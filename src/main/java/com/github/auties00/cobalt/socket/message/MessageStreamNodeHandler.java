@@ -3,7 +3,6 @@ package com.github.auties00.cobalt.socket.message;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.exception.LidMigrationException;
 import com.github.auties00.cobalt.exception.MediaDownloadException;
-import com.github.auties00.cobalt.message.MessageReceiverService;
 import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.model.action.ContactActionBuilder;
 import com.github.auties00.cobalt.model.chat.Chat;
@@ -44,7 +43,6 @@ public final class MessageStreamNodeHandler extends SocketStream.Handler {
     private static final int HISTORY_SYNC_MAX_TIMEOUT = 25;
     private static final Set<HistorySync.Type> REQUIRED_HISTORY_SYNC_TYPES = Set.of(HistorySync.Type.INITIAL_BOOTSTRAP, HistorySync.Type.PUSH_NAME, HistorySync.Type.NON_BLOCKING_DATA);
 
-    private final MessageReceiverService messageReceiverService;
     private final LidMigrationService lidMigrationService;
     private final Set<Jid> historyCache;
     private final HistorySyncProgressTracker recentHistorySyncTracker;
@@ -52,9 +50,8 @@ public final class MessageStreamNodeHandler extends SocketStream.Handler {
     private final Set<HistorySync.Type> historySyncTypes;
     private CompletableFuture<Void> historySyncTask;
 
-    public MessageStreamNodeHandler(WhatsAppClient whatsapp, MessageReceiverService messageReceiverService, LidMigrationService lidMigrationService) {
+    public MessageStreamNodeHandler(WhatsAppClient whatsapp, LidMigrationService lidMigrationService) {
         super(whatsapp, "message");
-        this.messageReceiverService = messageReceiverService;
         this.lidMigrationService = lidMigrationService;
         this.historyCache = new HashSet<>();
         this.historySyncTypes = new HashSet<>();
@@ -64,17 +61,9 @@ public final class MessageStreamNodeHandler extends SocketStream.Handler {
 
     @Override
     public void handle(Node node) {
-        var messageInfos = messageReceiverService.readMessages(node);
-        for(var messageInfo : messageInfos) {
-            if(messageInfo instanceof ChatMessageInfo chatMessageInfo && chatMessageInfo.message().content() instanceof ProtocolMessage protocolMessage) {
-                handleProtocolMessage(chatMessageInfo, protocolMessage);
-            }
-            saveMessage(messageInfo);
-            notifyListeners(messageInfo);
-        }
+        // TODO: Deserialize messages
     }
 
-    // FIXME
     private void saveMessage(MessageInfo messageInfo) {
         if(messageInfo instanceof ChatMessageInfo chatMessageInfo && chatMessageInfo.parentJid().equals(Jid.statusBroadcastAccount())) {
             whatsapp.store().addStatus(chatMessageInfo);

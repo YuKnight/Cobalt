@@ -2,8 +2,6 @@ package com.github.auties00.cobalt.client;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.device.DeviceService;
-import com.github.auties00.cobalt.message.MessageReceiverService;
-import com.github.auties00.cobalt.message.MessageSenderService;
 import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.model.action.*;
 import com.github.auties00.cobalt.model.auth.*;
@@ -109,8 +107,6 @@ public final class WhatsAppClient {
     private final WebAppStateService webAppStateService;
     private final DeviceService deviceService;
     private final LidMigrationService lidMigrationService;
-    private final MessageSenderService messageSenderService;
-    private final MessageReceiverService messageReceiverService;
 
     private SocketSession socketSession;
     private final SocketStream socketStream;
@@ -128,10 +124,8 @@ public final class WhatsAppClient {
         this.webAppStateService = new WebAppStateService(this);
         this.deviceService = new DeviceService(this, sessionCipher, groupCipher);
         this.lidMigrationService = new LidMigrationService(this);
-        this.messageSenderService = new MessageSenderService(this, deviceService, sessionCipher, groupCipher);
-        this.messageReceiverService = new MessageReceiverService(this, deviceService, sessionCipher, groupCipher);
         this.pendingSocketRequests = new ConcurrentHashMap<>();
-        this.socketStream = new SocketStream(this, deviceService, messageReceiverService, lidMigrationService, webVerificationHandler);
+        this.socketStream = new SocketStream(this, deviceService, lidMigrationService, webVerificationHandler);
         this.messagePreviewHandler = messagePreviewHandler;
     }
 
@@ -1692,7 +1686,7 @@ public final class WhatsAppClient {
         if (compose) {
             changePresence(recipient, COMPOSING);
         }
-        messageSenderService.sendMessage(info, Map.of());
+        // TODO: Send message
         if (compose) {
             var pausedNode = new NodeBuilder()
                     .description("paused")
@@ -1715,7 +1709,7 @@ public final class WhatsAppClient {
      * @return a CompletableFuture
      */
     public NewsletterMessageInfo sendMessage(NewsletterMessageInfo info) {
-        messageSenderService.sendMessage(info, Map.of());
+        // TODO: Send message
         return info;
     }
 
@@ -1727,7 +1721,7 @@ public final class WhatsAppClient {
      * @param deviceJid the device to resend the message to
      */
     public void resendMessage(ChatMessageInfo messsage, Jid deviceJid) {
-        messageSenderService.resendToDevice(messsage, deviceJid);
+        // TODO: Resend message
     }
 
     //</editor-fold>
@@ -1960,7 +1954,7 @@ public final class WhatsAppClient {
                         .status(MessageStatus.PENDING)
                         .build();
                 info.setNewsletter(oldNewsletterInfo.newsletter());
-                messageSenderService.sendMessage(info, Map.of("edit", getEditBit(info)));
+                // TODO: Edit message Map.of("edit", getEditBit(info))
                 return oldMessage;
             }
             case ChatMessageInfo oldChatInfo -> {
@@ -1980,7 +1974,7 @@ public final class WhatsAppClient {
                         .timestampSeconds(Clock.nowSeconds())
                         .broadcast(oldChatInfo.chatJid().hasServer(JidServer.broadcast()))
                         .build();
-                messageSenderService.sendMessage(info, Map.of("edit", getEditBit(info)));
+                // TODO: Edit message Map.of("edit", getEditBit(info))
                 return oldMessage;
             }
             default -> throw new IllegalStateException("Unsupported edit: " + oldMessage);
@@ -2003,7 +1997,7 @@ public final class WhatsAppClient {
                 .status(MessageStatus.PENDING)
                 .build();
         revokeInfo.setNewsletter(info.newsletter());
-        messageSenderService.sendMessage(info, Map.of("edit", getDeleteBit(localJid, info)));
+        // TODO: Delete message Map.of("edit", getDeleteBit(info))
     }
 
     /**
@@ -2035,7 +2029,7 @@ public final class WhatsAppClient {
                     .message(MessageContainer.of(message))
                     .timestampSeconds(Clock.nowSeconds())
                     .build();
-            messageSenderService.sendMessage(info, Map.of("edit", getDeleteBit(localJid, info)));
+            // TODO: Delete message Map.of("edit", getDeleteBit(info))
         } else {
             switch (store.clientType()) {
                 case WEB -> {

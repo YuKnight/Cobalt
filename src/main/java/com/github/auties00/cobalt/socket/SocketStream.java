@@ -24,7 +24,7 @@ import java.util.*;
 public final class SocketStream {
     private final Map<String, SequencedCollection<Handler>> handlers;
 
-    public SocketStream(WhatsAppClient whatsapp, DeviceService deviceService, MessageReceiverService messageReceiverService, LidMigrationService lidMigrationService, WhatsAppClientVerificationHandler.Web webVerificationHandler) {
+    public SocketStream(WhatsAppClient whatsapp, DeviceService deviceService, LidMigrationService lidMigrationService, WhatsAppClientVerificationHandler.Web webVerificationHandler) {
         var pairingCode = switch (webVerificationHandler) {
             case WhatsAppClientVerificationHandler.Web.PairingCode _ -> new SocketPhonePairing();
             case WhatsAppClientVerificationHandler.Web.QrCode _ -> null;
@@ -39,7 +39,7 @@ public final class SocketStream {
         addHandler(result, new FailureStreamNodeHandler(whatsapp));
         addHandler(result, new IbStreamNodeHandler(whatsapp));
         addHandler(result, new IqStreamNodeHandler(whatsapp, webVerificationHandler, pairingCode));
-        addHandler(result, new MessageStreamNodeHandler(whatsapp, messageReceiverService, lidMigrationService));
+        addHandler(result, new MessageStreamNodeHandler(whatsapp, lidMigrationService));
         addHandler(result, new MessageAckStreamNodeHandler(whatsapp));
         addHandler(result, new MessageReceiptStreamNodeHandler(whatsapp, deviceService));
         addHandler(result, new NotificationStreamNodeHandler(whatsapp, pairingCode, lidMigrationService));
