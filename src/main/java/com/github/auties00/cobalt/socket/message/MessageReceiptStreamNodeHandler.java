@@ -1,7 +1,6 @@
 package com.github.auties00.cobalt.socket.message;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
-import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.model.info.ChatMessageInfo;
 import com.github.auties00.cobalt.model.info.MessageInfo;
 import com.github.auties00.cobalt.model.info.NewsletterMessageInfo;
@@ -12,20 +11,15 @@ import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.socket.SocketStream;
 import com.github.auties00.cobalt.util.Clock;
 
-import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
-import static com.github.auties00.cobalt.client.WhatsAppClientErrorHandler.Location.MESSAGE;
-
 public final class MessageReceiptStreamNodeHandler extends SocketStream.Handler {
-    private final DeviceService deviceService;
     private final Set<String> retries;
 
-    public MessageReceiptStreamNodeHandler(WhatsAppClient whatsapp, DeviceService deviceService) {
+    public MessageReceiptStreamNodeHandler(WhatsAppClient whatsapp) {
         super(whatsapp, "receipt");
-        this.deviceService = deviceService;
         this.retries = ConcurrentHashMap.newKeySet();
     }
 
@@ -131,20 +125,9 @@ public final class MessageReceiptStreamNodeHandler extends SocketStream.Handler 
 
         switch (message) {
             // Chat messages support messages retries
-            case ChatMessageInfo chatMessage -> Thread.startVirtualThread(() -> {
-                try {
-                    // Query fresh session for the retry device
-                    var deviceJids = deviceService.queryDevices(List.of(retryDeviceJid.toUserJid()));
-                    if (deviceJids.isEmpty()) {
-                        return;
-                    }
-
-                    // Resend the message to the specific device
-                    whatsapp.resendMessage(chatMessage, retryDeviceJid);
-                } catch (Throwable throwable) {
-                    whatsapp.handleFailure(MESSAGE, throwable);
-                }
-            });
+            case ChatMessageInfo chatMessage -> {
+                // TODO: Message retry
+            }
 
             // Newsletter messages don't support retry (they're plaintext)
             case NewsletterMessageInfo _ -> {}

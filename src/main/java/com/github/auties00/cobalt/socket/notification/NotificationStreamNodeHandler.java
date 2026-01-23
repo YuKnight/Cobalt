@@ -1,7 +1,6 @@
 package com.github.auties00.cobalt.socket.notification;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
-import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.model.chat.Chat;
 import com.github.auties00.cobalt.model.chat.ChatEphemeralTimer;
 import com.github.auties00.cobalt.model.info.ChatMessageInfoBuilder;
@@ -47,11 +46,9 @@ public final class NotificationStreamNodeHandler extends SocketStream.Handler {
     private static final int DEFAULT_NEWSLETTER_MESSAGES = 100;
 
     private final SocketPhonePairing pairingCode;
-    private final LidMigrationService lidMigrationService;
-    public NotificationStreamNodeHandler(WhatsAppClient whatsapp, SocketPhonePairing pairingCode, LidMigrationService lidMigrationService) {
+    public NotificationStreamNodeHandler(WhatsAppClient whatsapp, SocketPhonePairing pairingCode) {
         super(whatsapp, "notification");
         this.pairingCode = pairingCode;
-        this.lidMigrationService = lidMigrationService;
     }
 
     @Override
@@ -413,7 +410,7 @@ public final class NotificationStreamNodeHandler extends SocketStream.Handler {
         }
 
         var lidChange = notification.get();
-        lidMigrationService.handleNotification(lidChange);
+        // TODO: Handle LID notification
     }
 
     public void updateUserPicture() {

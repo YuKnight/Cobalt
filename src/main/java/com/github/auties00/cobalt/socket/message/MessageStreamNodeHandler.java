@@ -3,7 +3,6 @@ package com.github.auties00.cobalt.socket.message;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.exception.LidMigrationException;
 import com.github.auties00.cobalt.exception.MediaDownloadException;
-import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.model.action.ContactActionBuilder;
 import com.github.auties00.cobalt.model.chat.Chat;
 import com.github.auties00.cobalt.model.chat.ChatEphemeralTimer;
@@ -43,16 +42,14 @@ public final class MessageStreamNodeHandler extends SocketStream.Handler {
     private static final int HISTORY_SYNC_MAX_TIMEOUT = 25;
     private static final Set<HistorySync.Type> REQUIRED_HISTORY_SYNC_TYPES = Set.of(HistorySync.Type.INITIAL_BOOTSTRAP, HistorySync.Type.PUSH_NAME, HistorySync.Type.NON_BLOCKING_DATA);
 
-    private final LidMigrationService lidMigrationService;
     private final Set<Jid> historyCache;
     private final HistorySyncProgressTracker recentHistorySyncTracker;
     private final HistorySyncProgressTracker fullHistorySyncTracker;
     private final Set<HistorySync.Type> historySyncTypes;
     private CompletableFuture<Void> historySyncTask;
 
-    public MessageStreamNodeHandler(WhatsAppClient whatsapp, LidMigrationService lidMigrationService) {
+    public MessageStreamNodeHandler(WhatsAppClient whatsapp) {
         super(whatsapp, "message");
-        this.lidMigrationService = lidMigrationService;
         this.historyCache = new HashSet<>();
         this.historySyncTypes = new HashSet<>();
         this.recentHistorySyncTracker = new HistorySyncProgressTracker();
@@ -239,7 +236,7 @@ public final class MessageStreamNodeHandler extends SocketStream.Handler {
 
         try(var stream = new GZIPInputStream(new ByteArrayInputStream(lidMigrationMappingPayload.get()))) {
             var lidMigrationMapping = LIDMigrationMappingSyncPayloadSpec.decode(ProtobufInputStream.fromStream(stream));
-            lidMigrationService.handleProtocolMessage(lidMigrationMapping);
+            // TODO: Handle LID migration mapping
         } catch (Throwable throwable) {
             whatsapp.handleFailure(LID_MIGRATION, new LidMigrationException.FailedToParseMappings("cannot parse protobuf message", throwable));
         }
@@ -457,7 +454,6 @@ public final class MessageStreamNodeHandler extends SocketStream.Handler {
         for (var listener : whatsapp.store().listeners()) {
             Thread.startVirtualThread(() -> listener.onChats(whatsapp, chats));
         }
-        lidMigrationService.triggerMigration();
     }
 
     private void handleChatsSync(HistorySync history, boolean recent) {
@@ -524,7 +520,6 @@ public final class MessageStreamNodeHandler extends SocketStream.Handler {
 
     private void handleConversations(HistorySync history) {
         for (var chat : history.conversations()) {
-            messageReceiverService.validateMessages(chat);
             whatsapp.store().addChat(chat);
         }
     }
@@ -543,7 +538,7 @@ public final class MessageStreamNodeHandler extends SocketStream.Handler {
     }
 
     private void handleLidMappings(HistorySync history) {
-        lidMigrationService.handleHistorySync(history);
+        // TODO: Handle LID mappings
     }
 
     @Override

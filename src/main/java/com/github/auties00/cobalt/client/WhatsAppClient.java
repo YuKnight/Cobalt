@@ -1,8 +1,6 @@
 package com.github.auties00.cobalt.client;
 
 import com.alibaba.fastjson2.JSON;
-import com.github.auties00.cobalt.device.DeviceService;
-import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.model.action.*;
 import com.github.auties00.cobalt.model.auth.*;
 import com.github.auties00.cobalt.model.business.*;
@@ -105,8 +103,6 @@ public final class WhatsAppClient {
     private final WhatsAppClientMessagePreviewHandler messagePreviewHandler;
 
     private final WebAppStateService webAppStateService;
-    private final DeviceService deviceService;
-    private final LidMigrationService lidMigrationService;
 
     private SocketSession socketSession;
     private final SocketStream socketStream;
@@ -122,10 +118,8 @@ public final class WhatsAppClient {
         var sessionCipher = new SignalSessionCipher(store);
         var groupCipher = new SignalGroupCipher(store);
         this.webAppStateService = new WebAppStateService(this);
-        this.deviceService = new DeviceService(this, sessionCipher, groupCipher);
-        this.lidMigrationService = new LidMigrationService(this);
         this.pendingSocketRequests = new ConcurrentHashMap<>();
-        this.socketStream = new SocketStream(this, deviceService, lidMigrationService, webVerificationHandler);
+        this.socketStream = new SocketStream(this, webVerificationHandler);
         this.messagePreviewHandler = messagePreviewHandler;
     }
 
@@ -336,7 +330,6 @@ public final class WhatsAppClient {
             store.serialize();
         }
 
-        lidMigrationService.reset();
         socketStream.reset();
         webAppStateService.reset();
 
@@ -3973,7 +3966,7 @@ public final class WhatsAppClient {
             throw new IllegalArgumentException("Calling is only available for the mobile api");
         }
         addContacts(contact);
-        deviceService.queryDevices(List.of(contact.toJid()));
+        // TODO: Query devices
         return sendCallMessage(contact, video);
     }
 
