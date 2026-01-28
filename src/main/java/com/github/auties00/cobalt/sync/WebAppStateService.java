@@ -29,16 +29,6 @@ import static com.github.auties00.cobalt.client.WhatsAppClientErrorHandler.Locat
  *
  * <p>This class manages bidirectional synchronization of application state
  * across multiple devices using end-to-end encryption and LT-Hash verification.
- *
- * <p>Key responsibilities:
- * <ul>
- *   <li>Pushing local mutations to the server</li>
- *   <li>Pulling remote mutations from the server</li>
- *   <li>Encrypting and decrypting mutations</li>
- *   <li>Verifying integrity with LT-Hash</li>
- *   <li>Applying mutations via action handlers</li>
- *   <li>Managing collection states</li>
- * </ul>
  */
 public final class WebAppStateService {
     private final WhatsAppClient whatsapp;
@@ -72,13 +62,13 @@ public final class WebAppStateService {
      * @param patches the patches to push
      */
     public void pushPatches(PatchType patchType, SequencedCollection<PendingMutation> patches) {
-        // 1. Mark collection as dirty
+        // Mark collection as dirty
         store.markWebAppStateDirty(patchType);
 
-        // 2. Store patches as pending mutations
+        // Store patches as pending mutations
         whatsapp.store().addPendingMutations(patchType, patches);
 
-        // 3. Trigger sync
+        // Trigger sync
         syncCollection(patchType);
     }
 
@@ -121,13 +111,13 @@ public final class WebAppStateService {
     private void syncCollection(PatchType patchType) {
         var remoteMutations = new ArrayList<DecryptedMutation.Trusted>();
         while(store.findWebAppState(patchType).state() != CollectionState.UP_TO_DATE) {
-            // 1. Get the sync response
+            // Get the sync response
             var syncResponse = sendSyncRequest(patchType);
             if(syncResponse.isEmpty()) {
                 break;
             }
 
-            // 2. Process the result
+            // Process the result
             var results = handleSyncResponse(syncResponse.get());
             remoteMutations.addAll(results);
         }
@@ -138,20 +128,20 @@ public final class WebAppStateService {
 
     private Optional<MutationSyncResponse> sendSyncRequest(PatchType patchType) {
         try {
-            // 1. Get pending mutations
+            // Get pending mutations
             var pending = whatsapp.store()
                     .findPendingMutations(patchType);
 
-            // 2. Build request
+            // Build request
             var request = requestBuilder.buildSyncRequest(patchType, pending);
 
-            // 3. Mark as in-flight
+            // Mark as in-flight
             store.markWebAppStateInFlight(patchType);
 
-            // 4. Send a request and get a response (synchronous)
+            // Send a request and get a response (synchronous)
             var response = whatsapp.sendNode(request);
 
-            // 5. Handle response
+            // Handle response
             var result = responseParser.parseSyncResponse(response);
             return Optional.of(result);
         }catch(Throwable throwable) {
@@ -162,7 +152,7 @@ public final class WebAppStateService {
 
     private SequencedCollection<DecryptedMutation.Trusted> handleSyncResponse(MutationSyncResponse syncResponse) {
         try {
-            // 1. Get all mutations from patches or snapshot
+            // Get all mutations from patches or snapshot
             var mutations = getOrDownloadMutations(syncResponse);
             if (mutations.isEmpty()) {
                 // No updates - mark as up-to-date
@@ -170,19 +160,19 @@ public final class WebAppStateService {
                 return List.of();
             }
 
-            // 2. Decrypt mutations
+            // Decrypt mutations
             var untrusted = decryptMutations(mutations);
 
-            // 3. Compute new LT-Hash
+            // Compute new LT-Hash
             var newHash = computeNewLTHash(syncResponse.collectionName(), untrusted);
 
-            // 4. Verify integrity (if snapshot/patch MAC provided)
+            // Verify integrity (if snapshot/patch MAC provided)
             integrityVerifier.verifyIntegrity(syncResponse, newHash);
 
-            // 5. Update collection version and hash
+            // Update collection version and hash
             updateCollectionState(syncResponse.collectionName(), syncResponse.version(), newHash);
 
-            // 6. Check if more data available
+            // Check if more data available
             if (syncResponse.hasMore()) {
                 store.markWebAppStatePending(syncResponse.collectionName());
             } else {

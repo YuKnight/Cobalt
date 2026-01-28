@@ -28,7 +28,7 @@ public record EncryptedMutation(
             MutationKeys keys,
             byte[] keyId
     ) throws GeneralSecurityException {
-        // 1. Create ActionDataSync
+        // Create ActionDataSync
         var padding = SecureBytes.random(1, MAX_PADDING_LENGTH + 1);
         var mutation = patch.mutation();
         var actionVersion = mutation.value()
@@ -41,10 +41,10 @@ public record EncryptedMutation(
                 .version(actionVersion)
                 .build();
 
-        // 2. Encode to protobuf
+        // Encode to protobuf
         var plaintext = ActionDataSyncSpec.encode(actionData);
 
-        // 3. Encrypt with AES-256-CBC
+        // Encrypt with AES-256-CBC
         var cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
         var ciphertextLength = cipher.getOutputSize(plaintext.length);
         var encryptedValue = new byte[IV_LENGTH + ciphertextLength +  MAC_LENGTH];
@@ -55,7 +55,7 @@ public record EncryptedMutation(
             throw new InternalError("Ciphertext length mismatch");
         }
 
-        // 4. Compute value MAC
+        // Compute value MAC
         var mac = Mac.getInstance("HmacSHA256");
         var operation = mutation.operation().content();
         mac.init(keys.valueMacKey());
@@ -65,12 +65,12 @@ public record EncryptedMutation(
         mac.update(encryptedValue, IV_LENGTH, ciphertextLength);
         mac.doFinal(encryptedValue, IV_LENGTH + ciphertextLength);
 
-        // 5. Compute index MAC
+        // Compute index MAC
         var indexBytes = mutation.index().getBytes(StandardCharsets.UTF_8);
         mac.init(keys.indexKey());
         var indexMac = mac.doFinal(indexBytes);
 
-        // 8. Create EncryptedMutation
+        // Create EncryptedMutation
         return new EncryptedMutation(indexMac, encryptedValue, keyId, mutation.operation());
     }
 }
