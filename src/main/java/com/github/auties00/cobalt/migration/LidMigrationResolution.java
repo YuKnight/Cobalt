@@ -18,14 +18,6 @@ public sealed interface LidMigrationResolution
         permits LidMigrationResolution.Migrate,
                 LidMigrationResolution.Keep,
                 LidMigrationResolution.Delete{
-
-    /**
-     * Returns the migration status for this resolution.
-     *
-     * @return the thread migration status
-     */
-    LidThreadMigrationStatus status();
-
     /**
      * Returns the original JID of the thread.
      *
@@ -40,11 +32,6 @@ public sealed interface LidMigrationResolution
      * @param targetLid   the target LID to migrate to
      */
     record Migrate(Jid originalJid, Jid targetLid) implements LidMigrationResolution {
-        @Override
-        public LidThreadMigrationStatus status() {
-            return LidThreadMigrationStatus.MIGRATE;
-        }
-
         /**
          * Returns the target LID for migration.
          *
@@ -62,10 +49,7 @@ public sealed interface LidMigrationResolution
      * @param reason      the reason for keeping the thread unchanged
      */
     record Keep(Jid originalJid, KeepReason reason) implements LidMigrationResolution {
-        @Override
-        public LidThreadMigrationStatus status() {
-            return LidThreadMigrationStatus.KEEP;
-        }
+
     }
 
     /**
@@ -75,10 +59,7 @@ public sealed interface LidMigrationResolution
      * @param reason      the reason for deletion
      */
     record Delete(Jid originalJid, DeleteReason reason) implements LidMigrationResolution {
-        @Override
-        public LidThreadMigrationStatus status() {
-            return LidThreadMigrationStatus.DELETE;
-        }
+
     }
 
     /**

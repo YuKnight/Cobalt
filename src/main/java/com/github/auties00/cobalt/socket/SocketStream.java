@@ -63,7 +63,7 @@ public final class SocketStream {
                 addHandler(result, new WebQueryNewslettersStreamNodeHandler(whatsapp));
             }
             case MOBILE -> {
-                addHandler(result, new MobileFinishLoginStreamNodeHandler(whatsapp));
+                addHandler(result, new MobileFinishLoginStreamNodeHandler(whatsapp, lidMigrationService));
             }
         }
 
