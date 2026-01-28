@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.socket.notification;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.model.chat.Chat;
 import com.github.auties00.cobalt.model.chat.ChatEphemeralTimer;
 import com.github.auties00.cobalt.model.info.ChatMessageInfoBuilder;
@@ -46,9 +47,12 @@ public final class NotificationStreamNodeHandler extends SocketStream.Handler {
     private static final int DEFAULT_NEWSLETTER_MESSAGES = 100;
 
     private final SocketPhonePairing pairingCode;
-    public NotificationStreamNodeHandler(WhatsAppClient whatsapp, SocketPhonePairing pairingCode) {
+    private final LidMigrationService lidMigrationService;
+
+    public NotificationStreamNodeHandler(WhatsAppClient whatsapp, SocketPhonePairing pairingCode, LidMigrationService lidMigrationService) {
         super(whatsapp, "notification");
         this.pairingCode = pairingCode;
+        this.lidMigrationService = lidMigrationService;
     }
 
     @Override
@@ -398,19 +402,36 @@ public final class NotificationStreamNodeHandler extends SocketStream.Handler {
     }
 
     private void handleLidChangeNotification(Node update) {
-        var payloadString = update.toContentBytes()
+        var payloadBytes = update.toContentBytes()
                 .orElse(null);
-        if (payloadString == null) {
+        if (payloadBytes == null) {
             return;
         }
 
-        var notification = LidChangeNotificationResponse.ofJson(payloadString);
+        var notification = LidChangeNotificationResponse.ofJson(payloadBytes);
         if (notification.isEmpty()) {
             return;
         }
 
         var lidChange = notification.get();
-        // TODO: Handle LID notification
+
+        // Handle self LID change
+        if (lidChange.isSelf()) {
+            whatsapp.store().setLid(lidChange.newLid());
+            return;
+        }
+
+        // Handle contact LID change
+        var contactJid = lidChange.jid();
+        if (contactJid == null) {
+            return;
+        }
+
+        lidMigrationService.onLidChanged(
+                contactJid,
+                lidChange.newLid(),
+                lidChange.oldLid().orElse(null)
+        );
     }
 
     public void updateUserPicture() {

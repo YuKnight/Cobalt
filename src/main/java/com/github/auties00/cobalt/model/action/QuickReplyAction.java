@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.model.action;
 
-import com.github.auties00.cobalt.model.preferences.QuickReply;
-import com.github.auties00.cobalt.model.preferences.QuickReplyBuilder;
+import com.github.auties00.cobalt.model.preference.QuickReply;
+import com.github.auties00.cobalt.model.preference.QuickReplyBuilder;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;

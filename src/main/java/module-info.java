@@ -26,6 +26,7 @@ module com.github.auties00.cobalt {
     // Mobile api
     requires net.dongliu.apkparser;
     requires com.google.i18n.phonenumbers.libphonenumber;
+    requires com.github.auties00.cobalt;
 
     // Client
     exports com.github.auties00.cobalt.client;
@@ -86,7 +87,7 @@ module com.github.auties00.cobalt {
     exports com.github.auties00.cobalt.model.poll;
 
     // Proto models - preferences
-    exports com.github.auties00.cobalt.model.preferences;
+    exports com.github.auties00.cobalt.model.preference;
 
     // Proto models - privacy
     exports com.github.auties00.cobalt.model.privacy;

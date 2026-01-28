@@ -2,8 +2,8 @@ package com.github.auties00.cobalt.model.action;
 
 import com.github.auties00.cobalt.model.media.MediaPath;
 import com.github.auties00.cobalt.model.media.MediaProvider;
-import com.github.auties00.cobalt.model.preferences.Sticker;
-import com.github.auties00.cobalt.model.preferences.StickerBuilder;
+import com.github.auties00.cobalt.model.preference.Sticker;
+import com.github.auties00.cobalt.model.preference.StickerBuilder;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;

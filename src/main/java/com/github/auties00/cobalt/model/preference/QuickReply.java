@@ -1,4 +1,4 @@
-package com.github.auties00.cobalt.model.preferences;
+package com.github.auties00.cobalt.model.preference;
 
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;

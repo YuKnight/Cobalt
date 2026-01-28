@@ -37,6 +37,7 @@ import com.github.auties00.cobalt.node.mex.json.response.*;
 import com.github.auties00.cobalt.socket.SocketRequest;
 import com.github.auties00.cobalt.socket.SocketSession;
 import com.github.auties00.cobalt.socket.SocketStream;
+import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.store.WhatsAppStore;
 import com.github.auties00.cobalt.sync.WebAppStateService;
 import com.github.auties00.cobalt.util.Clock;
@@ -103,6 +104,7 @@ public final class WhatsAppClient {
     private final WhatsAppClientMessagePreviewHandler messagePreviewHandler;
 
     private final WebAppStateService webAppStateService;
+    private final LidMigrationService lidMigrationService;
 
     private SocketSession socketSession;
     private final SocketStream socketStream;
@@ -118,8 +120,9 @@ public final class WhatsAppClient {
         var sessionCipher = new SignalSessionCipher(store);
         var groupCipher = new SignalGroupCipher(store);
         this.webAppStateService = new WebAppStateService(this);
+        this.lidMigrationService = new LidMigrationService(this);
         this.pendingSocketRequests = new ConcurrentHashMap<>();
-        this.socketStream = new SocketStream(this, webVerificationHandler);
+        this.socketStream = new SocketStream(this, webVerificationHandler, lidMigrationService);
         this.messagePreviewHandler = messagePreviewHandler;
     }
 
@@ -332,6 +335,7 @@ public final class WhatsAppClient {
 
         socketStream.reset();
         webAppStateService.reset();
+        lidMigrationService.reset();
 
         if (reason != WhatsAppClientDisconnectReason.RECONNECTING && shutdownHook != null && canRemoveShutdownHook) {
             Runtime.getRuntime().removeShutdownHook(shutdownHook);

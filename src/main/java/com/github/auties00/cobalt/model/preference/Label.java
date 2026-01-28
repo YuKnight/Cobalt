@@ -1,4 +1,4 @@
-package com.github.auties00.cobalt.model.preferences;
+package com.github.auties00.cobalt.model.preference;
 
 import com.github.auties00.cobalt.model.jid.Jid;
 import it.auties.protobuf.annotation.ProtobufMessage;
