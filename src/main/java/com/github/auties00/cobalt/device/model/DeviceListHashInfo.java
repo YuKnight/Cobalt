@@ -1,4 +1,4 @@
-package com.github.auties00.cobalt.device.info;
+package com.github.auties00.cobalt.device.model;
 
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
@@ -20,7 +20,7 @@ public record DeviceListHashInfo(String hash, long timestamp, Long expectedTs) {
      * @return hash info
      * @throws NoSuchAlgorithmException if SHA-256 is not available
      */
-    public static DeviceListHashInfo from(DeviceList deviceList) throws NoSuchAlgorithmException {
+    public static DeviceListHashInfo of(DeviceList deviceList) throws NoSuchAlgorithmException {
         var hash = calculateDeviceHash(deviceList);
         return new DeviceListHashInfo(
                 hash,

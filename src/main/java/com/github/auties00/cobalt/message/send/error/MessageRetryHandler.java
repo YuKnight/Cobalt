@@ -1,8 +1,8 @@
 package com.github.auties00.cobalt.message.send.error;
 
 import com.github.auties00.cobalt.device.DeviceService;
-import com.github.auties00.cobalt.device.phash.DevicePhashCalculator;
-import com.github.auties00.cobalt.device.phash.DevicePhashVersion;
+import com.github.auties00.cobalt.device.fanout.DevicePhashCalculator;
+import com.github.auties00.cobalt.device.fanout.DevicePhashVersion;
 import com.github.auties00.cobalt.message.send.keys.MessagePreKeyBundleService;
 import com.github.auties00.cobalt.message.send.MessageSendResult;
 import com.github.auties00.cobalt.model.jid.Jid;

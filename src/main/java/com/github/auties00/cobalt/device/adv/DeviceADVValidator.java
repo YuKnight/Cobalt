@@ -1,5 +1,6 @@
-package com.github.auties00.cobalt.device;
+package com.github.auties00.cobalt.device.adv;
 
+import com.github.auties00.cobalt.device.util.DeviceConstants;
 import com.github.auties00.cobalt.exception.ADVValidationException;
 import com.github.auties00.cobalt.model.auth.SignedDeviceIdentity;
 import com.github.auties00.cobalt.model.auth.SignedDeviceIdentityBuilder;
@@ -12,10 +13,15 @@ import com.github.auties00.cobalt.util.SecureBytes;
 import com.github.auties00.curve25519.Curve25519;
 import com.github.auties00.libsignal.key.SignalIdentityKeyPair;
 
+import com.github.auties00.cobalt.model.auth.KeyIndexListSpec;
+import com.github.auties00.cobalt.model.auth.SignedKeyIndexListSpec;
+import it.auties.protobuf.exception.ProtobufDeserializationException;
+
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.security.GeneralSecurityException;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -51,6 +57,12 @@ public final class DeviceADVValidator {
      * Used for both verifying remote device signatures and creating local device signatures.
      */
     private static final byte[] HOSTED_DEVICE_SIGNATURE_HEADER = {6, 6};
+
+    /**
+     * Header bytes prepended to messages before key index list account signature verification.
+     * Used for verifying signed key index lists in USync responses and device notifications.
+     */
+    private static final byte[] KEY_INDEX_LIST_SIGNATURE_HEADER = {6, 2};
 
     private DeviceADVValidator() {
         throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
@@ -190,6 +202,97 @@ public final class DeviceADVValidator {
     }
 
     /**
+     * Result of validating a signed key index list.
+     *
+     * @param rawId        the raw identity ID
+     * @param timestamp    the timestamp from the key index list
+     * @param validIndexes the list of valid key indexes
+     * @param currentIndex the current key index
+     * @param accountType  the account type (E2EE or HOSTED)
+     */
+    public record ValidatedKeyIndexList(
+            long rawId,
+            long timestamp,
+            List<Integer> validIndexes,
+            int currentIndex,
+            com.github.auties00.cobalt.model.auth.ADVEncryptionType accountType
+    ) {}
+
+    /**
+     * Validates and decodes a signed key index list from raw bytes.
+     * <p>
+     * This method verifies the account signature on the key index list using the
+     * embedded account signature key. The signature is verified using Curve25519
+     * with the {@link #KEY_INDEX_LIST_SIGNATURE_HEADER} prefix.
+     *
+     * @param signedKeyIndexBytes the raw signed key index list bytes
+     * @param storedAccountSignatureKey optional stored account signature key (used if not embedded in the protobuf)
+     * @return the validated key index list data, or empty if validation fails
+     */
+    public static Optional<ValidatedKeyIndexList> validateAndDecodeSignedKeyIndexList(
+            byte[] signedKeyIndexBytes,
+            byte[] storedAccountSignatureKey
+    ) {
+        Objects.requireNonNull(signedKeyIndexBytes, "signedKeyIndexBytes cannot be null");
+
+        try {
+            // Decode the outer signed key index list protobuf
+            var signedKeyIndexList = SignedKeyIndexListSpec.decode(signedKeyIndexBytes);
+            if (signedKeyIndexList == null || signedKeyIndexList.details() == null) {
+                return Optional.empty();
+            }
+
+            // Get the account signature key (embedded or stored)
+            var accountSignatureKey = signedKeyIndexList.accountSignatureKey();
+            if (accountSignatureKey == null || accountSignatureKey.length == 0) {
+                accountSignatureKey = storedAccountSignatureKey;
+            }
+            if (accountSignatureKey == null || accountSignatureKey.length == 0) {
+                return Optional.empty();
+            }
+
+            // Verify the account signature
+            var accountSignature = signedKeyIndexList.accountSignature();
+            if (accountSignature == null || accountSignature.length == 0) {
+                return Optional.empty();
+            }
+
+            var message = SecureBytes.concat(KEY_INDEX_LIST_SIGNATURE_HEADER, signedKeyIndexList.details());
+            if (!Curve25519.verifySignature(accountSignatureKey, message, accountSignature)) {
+                return Optional.empty();
+            }
+
+            // Decode the inner key index list protobuf
+            var keyIndexList = KeyIndexListSpec.decode(signedKeyIndexList.details());
+
+            // Validate required fields
+            if (keyIndexList.rawId() == 0 && keyIndexList.timestamp() == 0) {
+                return Optional.empty();
+            }
+
+            return Optional.of(new ValidatedKeyIndexList(
+                    keyIndexList.rawId(),
+                    keyIndexList.timestamp(),
+                    keyIndexList.validIndexes() != null ? keyIndexList.validIndexes() : List.of(),
+                    keyIndexList.currentIndex(),
+                    keyIndexList.accountType()
+            ));
+        } catch (ProtobufDeserializationException e) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Validates and decodes a signed key index list using only the embedded account signature key.
+     *
+     * @param signedKeyIndexBytes the raw signed key index list bytes
+     * @return the validated key index list data, or empty if validation fails
+     */
+    public static Optional<ValidatedKeyIndexList> validateAndDecodeSignedKeyIndexList(byte[] signedKeyIndexBytes) {
+        return validateAndDecodeSignedKeyIndexList(signedKeyIndexBytes, null);
+    }
+
+    /**
      * Checks if a device requires ADV validation.
      * Companion devices (device ID != 0) require ADV validation.
      *
@@ -198,6 +301,6 @@ public final class DeviceADVValidator {
      */
     private static boolean requiresValidation(Jid jid) {
         Objects.requireNonNull(jid, "jid cannot be null");
-        return jid.hasDevice();
+        return jid.device() != DeviceConstants.PRIMARY_DEVICE_ID;
     }
 }

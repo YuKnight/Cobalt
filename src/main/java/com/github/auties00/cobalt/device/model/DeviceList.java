@@ -1,5 +1,6 @@
-package com.github.auties00.cobalt.device.info;
+package com.github.auties00.cobalt.device.model;
 
+import com.github.auties00.cobalt.device.util.DeviceConstants;
 import com.github.auties00.cobalt.model.jid.Jid;
 
 import java.time.Duration;
@@ -157,7 +158,7 @@ public record DeviceList(
         var now = Instant.now();
         return new DeviceList(
                 userJid,
-                List.of(DeviceInfo.e2ee(DeviceConstants.PRIMARY_DEVICE_ID, 0)),
+                List.of(DeviceInfo.ofE2EE(DeviceConstants.PRIMARY_DEVICE_ID, 0)),
                 now,
                 now.plus(DEFAULT_TTL),
                 null,

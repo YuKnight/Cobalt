@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.device.stanza;
 
-import com.github.auties00.cobalt.device.info.DeviceList;
+import com.github.auties00.cobalt.device.model.DeviceList;
 import com.github.auties00.cobalt.model.jid.Jid;
 
 /**

@@ -1,4 +1,4 @@
-package com.github.auties00.cobalt.device.phash;
+package com.github.auties00.cobalt.device.fanout;
 
 import com.github.auties00.cobalt.model.jid.Jid;
 
@@ -67,6 +67,10 @@ public final class DevicePhashCalculator {
 
     /**
      * Converts a device JID to legacy format for phash calculation.
+     * <p>
+     * Per WhatsApp Web:
+     * - V1: uses {@code toString({legacy: true})} → "user@server"
+     * - V2: uses {@code toString({legacy: true, formatFull: true})} → "user:device@server"
      *
      * @param jid     the JID to convert
      * @param version the phash version (determines format)
@@ -75,13 +79,17 @@ public final class DevicePhashCalculator {
     private static String toLegacyJidString(Jid jid, DevicePhashVersion version) {
         var user = jid.user();
         var server = jid.server().address();
+        var device = jid.device();
 
         return switch (version) {
-            // V1: Simple format without device ID
+            // V1: Simple legacy format without device ID
             case V1 -> user + "@" + server;
 
-            // V2: Full format without device ID (formatFull in WhatsApp Web)
-            case V2 -> user + "@" + server;
+            // V2: Full legacy format with device ID (formatFull in WhatsApp Web)
+            // Format: user:device@server (device is omitted if 0)
+            case V2 -> device == 0
+                    ? user + "@" + server
+                    : user + ":" + device + "@" + server;
         };
     }
 }

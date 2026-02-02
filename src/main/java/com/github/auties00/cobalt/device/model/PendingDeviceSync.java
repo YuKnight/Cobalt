@@ -1,4 +1,4 @@
-package com.github.auties00.cobalt.device;
+package com.github.auties00.cobalt.device.model;
 
 import com.github.auties00.cobalt.model.jid.Jid;
 
@@ -46,7 +46,7 @@ public record PendingDeviceSync(
      *
      * @return pending sync with retry count incremented
      */
-    public PendingDeviceSync withRetry() {
+    public PendingDeviceSync nextRetry() {
         return new PendingDeviceSync(userJids, context, timestamp, retryCount + 1);
     }
 

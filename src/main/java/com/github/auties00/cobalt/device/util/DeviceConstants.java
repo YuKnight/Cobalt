@@ -1,4 +1,4 @@
-package com.github.auties00.cobalt.device.info;
+package com.github.auties00.cobalt.device.util;
 
 public final class DeviceConstants {
     private DeviceConstants() {

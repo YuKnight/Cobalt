@@ -1,7 +1,8 @@
-package com.github.auties00.cobalt.device;
+package com.github.auties00.cobalt.device.adv;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
-import com.github.auties00.cobalt.device.info.DeviceExpectedTsUtils;
+import com.github.auties00.cobalt.device.DeviceService;
+import com.github.auties00.cobalt.device.util.DeviceExpectedTsUtils;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.util.SchedulerUtils;
@@ -66,7 +67,7 @@ public final class DeviceADVCheckScheduler implements Closeable {
      */
     private void performCheck() {
         try {
-            var lastCheck = deviceService.getLastAdvCheckTime();
+            var lastCheck = deviceService.lastAdvCheckTime();
             if (lastCheck == null) {
                 // First check - just record the time
                 deviceService.updateAdvCheckTime();

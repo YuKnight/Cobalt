@@ -1,9 +1,9 @@
-package com.github.auties00.cobalt.device.info;
+package com.github.auties00.cobalt.device.model;
 
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidServer;
 
-import static com.github.auties00.cobalt.device.info.DeviceConstants.*;
+import static com.github.auties00.cobalt.device.util.DeviceConstants.*;
 
 /**
  * Represents information about a single device in a user's device list.
@@ -16,14 +16,14 @@ public record DeviceInfo(int id, int keyIndex, Type type) {
     /**
      * Creates a DeviceInfo with E2EE account type.
      */
-    public static DeviceInfo e2ee(int id, int keyIndex) {
+    public static DeviceInfo ofE2EE(int id, int keyIndex) {
         return new DeviceInfo(id, keyIndex, Type.E2EE);
     }
 
     /**
      * Creates a DeviceInfo for a hosted device.
      */
-    public static DeviceInfo hosted(int keyIndex) {
+    public static DeviceInfo ofHosted(int keyIndex) {
         return new DeviceInfo(HOSTED_DEVICE_ID, keyIndex, Type.HOSTED);
     }
 

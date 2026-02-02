@@ -1,13 +1,11 @@
 package com.github.auties00.cobalt.device.stanza;
 
-import com.github.auties00.cobalt.device.info.DeviceConstants;
-import com.github.auties00.cobalt.device.info.DeviceInfo;
-import com.github.auties00.cobalt.device.info.DeviceList;
-import com.github.auties00.cobalt.model.auth.KeyIndexList;
-import com.github.auties00.cobalt.model.auth.KeyIndexListSpec;
-import com.github.auties00.cobalt.model.auth.SignedKeyIndexListSpec;
+import com.github.auties00.cobalt.device.adv.DeviceADVValidator;
+import com.github.auties00.cobalt.device.adv.DeviceADVValidator.ValidatedKeyIndexList;
+import com.github.auties00.cobalt.device.model.DeviceInfo;
+import com.github.auties00.cobalt.device.model.DeviceList;
+import com.github.auties00.cobalt.device.util.DeviceConstants;
 import com.github.auties00.cobalt.node.Node;
-import it.auties.protobuf.exception.ProtobufDeserializationException;
 
 import java.util.List;
 import java.util.Map;
@@ -118,33 +116,22 @@ public final class DeviceUSyncResponseParser {
 
     /**
      * Validates and extracts key index list data from the signed protobuf.
-     * Returns null if validation fails.
+     * Performs cryptographic signature verification using Curve25519.
+     * Returns null if validation or signature verification fails.
      */
-    private static KeyIndexList validateKeyIndexList(Node keyIndexListNode) {
-        try {
-            var signedKeyIndexBytes = keyIndexListNode.toContentBytes();
-            if (signedKeyIndexBytes.isEmpty()) {
-                return null;
-            }
-
-            var signedKeyIndexList = SignedKeyIndexListSpec.decode(signedKeyIndexBytes.get());
-            if (signedKeyIndexList.details() == null) {
-                return null;
-            }
-
-            var keyIndexList = KeyIndexListSpec.decode(signedKeyIndexList.details());
-
-            // Validate required fields
-            if (keyIndexList.rawId() == 0 && keyIndexList.timestamp() == 0) {
-                LOGGER.log(System.Logger.Level.WARNING, "Key index list missing rawId and timestamp");
-                return null;
-            }
-
-            return keyIndexList;
-        } catch (ProtobufDeserializationException e) {
-            LOGGER.log(System.Logger.Level.WARNING, "Failed to decode key index list protobuf", e);
+    private static ValidatedKeyIndexList validateKeyIndexList(Node keyIndexListNode) {
+        var signedKeyIndexBytes = keyIndexListNode.toContentBytes();
+        if (signedKeyIndexBytes.isEmpty()) {
             return null;
         }
+
+        var validated = DeviceADVValidator.validateAndDecodeSignedKeyIndexList(signedKeyIndexBytes.get());
+        if (validated.isEmpty()) {
+            LOGGER.log(System.Logger.Level.WARNING, "Key index list signature verification failed");
+            return null;
+        }
+
+        return validated.get();
     }
 
     private static Map<Integer, Integer> buildKeyIndexMap(Node userNode) {
@@ -169,7 +156,7 @@ public final class DeviceUSyncResponseParser {
         return Stream.of(result);
     }
 
-    private static Stream<DeviceInfo> parseDeviceEntry(Node deviceNode, Map<Integer, Integer> keyIndexMap, KeyIndexList validatedKeyIndexInfo) {
+    private static Stream<DeviceInfo> parseDeviceEntry(Node deviceNode, Map<Integer, Integer> keyIndexMap, ValidatedKeyIndexList validatedKeyIndexInfo) {
         var id = deviceNode.getAttributeAsInt("id");
         if(id.isEmpty()) {
             return Stream.empty();
@@ -189,9 +176,9 @@ public final class DeviceUSyncResponseParser {
         }
 
         if (deviceId == DeviceConstants.HOSTED_DEVICE_ID) {
-            return Stream.of(DeviceInfo.hosted(keyIndex));
+            return Stream.of(DeviceInfo.ofHosted(keyIndex));
         } else {
-            return Stream.of(DeviceInfo.e2ee(deviceId, keyIndex));
+            return Stream.of(DeviceInfo.ofE2EE(deviceId, keyIndex));
         }
     }
 
@@ -199,7 +186,7 @@ public final class DeviceUSyncResponseParser {
 
     }
 
-    private static Optional<DeviceInfo.Type> parseAdvAccountType(KeyIndexList keyIndexList) {
+    private static Optional<DeviceInfo.Type> parseAdvAccountType(ValidatedKeyIndexList keyIndexList) {
         if (keyIndexList == null || keyIndexList.accountType() == null) {
             return Optional.empty();
         }

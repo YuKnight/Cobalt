@@ -1,12 +1,11 @@
 package com.github.auties00.cobalt.device.notification;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
-import com.github.auties00.cobalt.device.info.DeviceConstants;
-import com.github.auties00.cobalt.device.info.DeviceInfo;
-import com.github.auties00.cobalt.device.info.DeviceList;
-import com.github.auties00.cobalt.model.auth.KeyIndexList;
-import com.github.auties00.cobalt.model.auth.KeyIndexListSpec;
-import com.github.auties00.cobalt.model.auth.SignedKeyIndexListSpec;
+import com.github.auties00.cobalt.device.adv.DeviceADVValidator;
+import com.github.auties00.cobalt.device.adv.DeviceADVValidator.ValidatedKeyIndexList;
+import com.github.auties00.cobalt.device.model.DeviceInfo;
+import com.github.auties00.cobalt.device.model.DeviceList;
+import com.github.auties00.cobalt.device.util.DeviceConstants;
 import com.github.auties00.cobalt.model.info.ChatMessageInfoBuilder;
 import com.github.auties00.cobalt.model.info.MessageInfoStubType;
 import com.github.auties00.cobalt.model.jid.Jid;
@@ -14,7 +13,6 @@ import com.github.auties00.cobalt.model.message.model.ChatMessageKey;
 import com.github.auties00.cobalt.model.message.model.ChatMessageKeyBuilder;
 import com.github.auties00.cobalt.model.message.model.MessageStatus;
 import com.github.auties00.cobalt.node.Node;
-import it.auties.protobuf.exception.ProtobufDeserializationException;
 
 import java.time.Instant;
 import java.util.List;
@@ -134,9 +132,9 @@ public final class DeviceNotificationHandler {
                     }
 
                     if (deviceId == DeviceConstants.HOSTED_DEVICE_ID) {
-                        return java.util.stream.Stream.of(DeviceInfo.hosted(keyIndex));
+                        return java.util.stream.Stream.of(DeviceInfo.ofHosted(keyIndex));
                     } else {
-                        return java.util.stream.Stream.of(DeviceInfo.e2ee(deviceId, keyIndex));
+                        return java.util.stream.Stream.of(DeviceInfo.ofE2EE(deviceId, keyIndex));
                     }
                 })
                 .toList();
@@ -146,7 +144,7 @@ public final class DeviceNotificationHandler {
         var rawId = validatedKeyIndexInfo != null
                 ? String.valueOf(validatedKeyIndexInfo.rawId())
                 : String.valueOf(timestamp);
-        var advAccountType = parseAdvAccountType(keyIndexListNode).orElse(null);
+        var advAccountType = parseAdvAccountType(validatedKeyIndexInfo).orElse(null);
         var currentIndex = validatedKeyIndexInfo != null ? validatedKeyIndexInfo.currentIndex() : 0;
         var validIndexes = validatedKeyIndexInfo != null && validatedKeyIndexInfo.validIndexes() != null
                 ? validatedKeyIndexInfo.validIndexes()
@@ -166,7 +164,19 @@ public final class DeviceNotificationHandler {
 
         // Check for identity changes and account type transitions
         var cachedList = client.store().findDeviceList(userJid);
-        if (cachedList.isPresent()) {
+        if (cachedList.isPresent() && !cachedList.get().deleted()) {
+            // Feature 4: Detect rawId change (full identity reset)
+            var oldRawId = cachedList.get().rawId();
+            if (oldRawId != null && !oldRawId.equals(rawId)) {
+                LOGGER.log(System.Logger.Level.INFO, "Device list rawId changed via notification for {0}: {1} -> {2}, triggering full reset",
+                        userJid, oldRawId, rawId);
+                // Clear all Signal sessions for this user's devices
+                for (var device : cachedList.get().devices()) {
+                    var deviceJid = device.toDeviceJid(userJid.user(), userJid.server());
+                    client.store().cleanupSignalSessionsForDevice(deviceJid);
+                }
+            }
+
             // Feature 9: Detect account type transitions
             if (newDeviceList.hasAccountTypeChanged(cachedList.get())) {
                 var oldType = cachedList.get().advAccountType();
@@ -319,31 +329,22 @@ public final class DeviceNotificationHandler {
 
     /**
      * Validates and extracts key index list data from the signed protobuf.
-     * Returns null if validation fails.
+     * Performs cryptographic signature verification using Curve25519.
+     * Returns null if validation or signature verification fails.
      */
-    private static KeyIndexList validateKeyIndexList(Node keyIndexListNode) {
-        try {
-            var signedKeyIndexBytes = keyIndexListNode.toContentBytes();
-            if (signedKeyIndexBytes.isEmpty()) {
-                return null;
-            }
-
-            var signedKeyIndexList = SignedKeyIndexListSpec.decode(signedKeyIndexBytes.get());
-            if (signedKeyIndexList.details() == null) {
-                return null;
-            }
-
-            var keyIndexList = KeyIndexListSpec.decode(signedKeyIndexList.details());
-            if (keyIndexList.rawId() == 0 && keyIndexList.timestamp() == 0) {
-                LOGGER.log(System.Logger.Level.WARNING, "Key index list missing rawId and timestamp in notification");
-                return null;
-            }
-
-            return keyIndexList;
-        } catch (ProtobufDeserializationException e) {
-            LOGGER.log(System.Logger.Level.WARNING, "Failed to decode key index list protobuf in notification", e);
+    private static ValidatedKeyIndexList validateKeyIndexList(Node keyIndexListNode) {
+        var signedKeyIndexBytes = keyIndexListNode.toContentBytes();
+        if (signedKeyIndexBytes.isEmpty()) {
             return null;
         }
+
+        var validated = DeviceADVValidator.validateAndDecodeSignedKeyIndexList(signedKeyIndexBytes.get());
+        if (validated.isEmpty()) {
+            LOGGER.log(System.Logger.Level.WARNING, "Key index list signature verification failed in notification");
+            return null;
+        }
+
+        return validated.get();
     }
 
     /**
@@ -406,32 +407,17 @@ public final class DeviceNotificationHandler {
     }
 
     /**
-     * Parses the ADV account type from the key-index-list protobuf content.
+     * Parses the ADV account type from validated key index list.
      */
-    private static Optional<DeviceInfo.Type> parseAdvAccountType(Node keyIndexList) {
-        try {
-            var signedKeyIndexBytes = keyIndexList.toContentBytes();
-            if (signedKeyIndexBytes.isEmpty()) {
-                return Optional.empty();
-            }
-
-            var signedKeyIndexList = SignedKeyIndexListSpec.decode(signedKeyIndexBytes.get());
-            if (signedKeyIndexList.details() == null) {
-                return Optional.empty();
-            }
-
-            var keyIndexListProto = KeyIndexListSpec.decode(signedKeyIndexList.details());
-            if (keyIndexListProto.accountType() == null) {
-                return Optional.empty();
-            }
-
-            var result = switch (keyIndexListProto.accountType()) {
-                case E2EE -> DeviceInfo.Type.E2EE;
-                case HOSTED -> DeviceInfo.Type.HOSTED;
-            };
-            return Optional.of(result);
-        } catch (ProtobufDeserializationException e) {
+    private static Optional<DeviceInfo.Type> parseAdvAccountType(ValidatedKeyIndexList keyIndexList) {
+        if (keyIndexList == null || keyIndexList.accountType() == null) {
             return Optional.empty();
         }
+
+        var result = switch (keyIndexList.accountType()) {
+            case E2EE -> DeviceInfo.Type.E2EE;
+            case HOSTED -> DeviceInfo.Type.HOSTED;
+        };
+        return Optional.of(result);
     }
 }

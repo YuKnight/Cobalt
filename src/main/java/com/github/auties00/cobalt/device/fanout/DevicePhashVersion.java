@@ -1,4 +1,4 @@
-package com.github.auties00.cobalt.device.phash;
+package com.github.auties00.cobalt.device.fanout;
 
 /**
  * Participant hash version.

@@ -3,12 +3,15 @@ package com.github.auties00.cobalt.device;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.device.fanout.DeviceFanoutCalculator;
 import com.github.auties00.cobalt.device.fanout.DeviceGroupFanoutResult;
-import com.github.auties00.cobalt.device.info.DeviceExpectedTsUtils;
-import com.github.auties00.cobalt.device.info.DeviceInfo;
-import com.github.auties00.cobalt.device.info.DeviceList;
-import com.github.auties00.cobalt.device.info.DeviceListHashInfo;
-import com.github.auties00.cobalt.device.phash.DevicePhashCalculator;
-import com.github.auties00.cobalt.device.phash.DevicePhashVersion;
+import com.github.auties00.cobalt.device.adv.DeviceADVCheckScheduler;
+import com.github.auties00.cobalt.device.fanout.DevicePhashCalculator;
+import com.github.auties00.cobalt.device.fanout.DevicePhashVersion;
+import com.github.auties00.cobalt.device.model.DeviceInfo;
+import com.github.auties00.cobalt.device.model.DeviceList;
+import com.github.auties00.cobalt.device.model.DeviceListHashInfo;
+import com.github.auties00.cobalt.device.model.PendingDeviceSync;
+import com.github.auties00.cobalt.device.util.DeviceConstants;
+import com.github.auties00.cobalt.device.util.DeviceExpectedTsUtils;
 import com.github.auties00.cobalt.device.stanza.DeviceListResult;
 import com.github.auties00.cobalt.device.stanza.DeviceUSyncQueryBuilder;
 import com.github.auties00.cobalt.device.stanza.DeviceUSyncResponseParser;
@@ -206,7 +209,7 @@ public final class DeviceService {
                 var cached = store.findDeviceList(jid);
                 if (cached.isPresent() && !cached.get().isExpired()) {
                     try {
-                        hashInfos.put(jid, DeviceListHashInfo.from(cached.get()));
+                        hashInfos.put(jid, DeviceListHashInfo.of(cached.get()));
                     } catch (NoSuchAlgorithmException e) {
                         // Skip hash for this JID
                     }
@@ -239,11 +242,27 @@ public final class DeviceService {
                         var newList = full.deviceList();
                         var cachedList = store.findDeviceList(newList.userJid());
 
+                        // Feature 4: Detect rawId change (full identity reset)
+                        // If rawId differs, clear all Signal sessions and rebuild from scratch
+                        var needsListReset = false;
+                        if (cachedList.isPresent() && !cachedList.get().deleted()) {
+                            var oldRawId = cachedList.get().rawId();
+                            var newRawId = newList.rawId();
+                            if (oldRawId != null && newRawId != null && !oldRawId.equals(newRawId)) {
+                                needsListReset = true;
+                                LOGGER.log(System.Logger.Level.INFO, "Device list rawId changed for {0}: {1} -> {2}, triggering full reset",
+                                        newList.userJid(), oldRawId, newRawId);
+                                // Clear all Signal sessions for this user's devices
+                                cleanupAllSessionsForUser(newList.userJid(), cachedList.get());
+                            }
+                        }
+
                         // Feature 9: Detect account type transitions
                         if (cachedList.isPresent() && newList.hasAccountTypeChanged(cachedList.get())) {
                             var oldType = cachedList.get().advAccountType();
                             var newType = newList.advAccountType();
                             handleAccountTypeTransition(newList.userJid(), oldType, newType, cachedList.get());
+                            needsListReset = true; // Account type change also requires list reset
                         }
 
                         // Track expectedTs changes and update tracking fields
@@ -322,7 +341,8 @@ public final class DeviceService {
                     }
 
                     case DeviceListResult.Omitted omitted -> {
-                        // Omitted result - server confirmed dhash matches, use cached list with updated timestamp
+                        // Omitted result - server confirmed dhash matches
+                        // Per WhatsApp Web: strip to primary-only device list
                         var cachedList = store.findDeviceList(omitted.userJid());
                         if (cachedList.isEmpty()) {
                             // No cached list to update, skip
@@ -362,16 +382,25 @@ public final class DeviceService {
                             }
                         }
 
-                        // Create updated device list with new timestamp and tracked expectedTs
+                        // Feature 5: Per WhatsApp Web, omitted result strips to primary-only
+                        var primaryOnlyDevices = List.of(DeviceInfo.ofE2EE(DeviceConstants.PRIMARY_DEVICE_ID, 0));
+
+                        // Feature 5: If advAccountType was HOSTED, reset to E2EE
+                        var newAdvAccountType = oldList.advAccountType();
+                        if (newAdvAccountType == DeviceInfo.Type.HOSTED) {
+                            newAdvAccountType = DeviceInfo.Type.E2EE;
+                        }
+
+                        // Create updated device list with primary-only devices
                         var updatedList = new DeviceList(
                                 oldList.userJid(),
-                                oldList.devices(),
+                                primaryOnlyDevices,
                                 newTimestamp,
                                 newExpiresAt,
                                 oldList.rawId(),
                                 oldList.deleted(),
                                 oldList.deletedChangedToHost(),
-                                oldList.advAccountType(),
+                                newAdvAccountType,
                                 finalExpectedTs,
                                 newExpectedTsLastDeviceJobTs,
                                 newExpectedTsUpdateTs,
@@ -511,7 +540,7 @@ public final class DeviceService {
      *
      * @return the last check time in epoch millis, or null if never checked
      */
-    public Long getLastAdvCheckTime() {
+    public Long lastAdvCheckTime() {
         return store.lastAdvCheckTime();
     }
 
@@ -563,7 +592,7 @@ public final class DeviceService {
                 store.removePendingDeviceSync(sync);
             } catch (Exception e) {
                 // Increment retry count and re-queue
-                var retried = sync.withRetry();
+                var retried = sync.nextRetry();
                 store.removePendingDeviceSync(sync);
                 if (retried.shouldRetry()) {
                     store.addPendingDeviceSync(retried);
@@ -613,7 +642,7 @@ public final class DeviceService {
                     .orElse(false);
             var includeMetaBot = webAiGroupOpenSupport && aiGroupParticipationEnabled;
             var phash = DevicePhashCalculator.calculate(filteredDevices, DevicePhashVersion.V2, includeMetaBot);
-            return new DeviceGroupFanoutResult(filteredDevices, phash, deviceLists);
+            return new DeviceGroupFanoutResult(filteredDevices, phash);
         } catch (NoSuchAlgorithmException exception) {
             throw new InternalError("Missing SHA-256 implementation", exception);
         }

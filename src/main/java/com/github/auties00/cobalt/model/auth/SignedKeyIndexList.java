@@ -6,5 +6,6 @@ import it.auties.protobuf.model.ProtobufType;
 
 @ProtobufMessage(name = "ADVSignedKeyIndexList")
 public record SignedKeyIndexList(@ProtobufProperty(index = 1, type = ProtobufType.BYTES) byte[] details,
-                                 @ProtobufProperty(index = 2, type = ProtobufType.BYTES) byte[] accountSignature) {
+                                 @ProtobufProperty(index = 2, type = ProtobufType.BYTES) byte[] accountSignature,
+                                 @ProtobufProperty(index = 3, type = ProtobufType.BYTES) byte[] accountSignatureKey) {
 }

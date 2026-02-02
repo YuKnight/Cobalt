@@ -107,9 +107,5 @@ module com.github.auties00.cobalt {
     exports com.github.auties00.cobalt.media;
 
     // Device
-    exports com.github.auties00.cobalt.device;
-    exports com.github.auties00.cobalt.device.fanout;
-    exports com.github.auties00.cobalt.device.info;
-    exports com.github.auties00.cobalt.device.phash;
-    exports com.github.auties00.cobalt.device.stanza;
+    exports com.github.auties00.cobalt.device.model;
 }

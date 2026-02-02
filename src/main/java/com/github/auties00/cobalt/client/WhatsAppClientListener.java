@@ -15,7 +15,7 @@ import com.github.auties00.cobalt.model.privacy.PrivacySettingEntry;
 import com.github.auties00.cobalt.model.setting.Setting;
 import com.github.auties00.cobalt.node.Node;
 
-import com.github.auties00.cobalt.device.info.DeviceInfo;
+import com.github.auties00.cobalt.device.model.DeviceInfo;
 
 import java.util.Collection;
 import java.util.List;
