@@ -15,7 +15,7 @@ void main() {
             .addContactsListener((_, contacts) -> System.out.printf("Contacts: %s%n", contacts.size()))
             .addChatsListener((api, chats) -> {
                 System.out.printf("Chats: %s%n", chats.size());
-                api.sendMessage(api.store().lid().get().withDevice(0), "Hello World");
+                api.sendMessage(api.store().jid().get().withoutData(), "Hello World");
             })
             .addNewslettersListener((_, newsletters) -> System.out.printf("Newsletters: %s%n", newsletters.size()))
             .addNodeReceivedListener((_, incoming) -> System.out.printf("Received node %s%n", incoming))

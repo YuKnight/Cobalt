@@ -46,10 +46,14 @@ public final class GlobalSettings {
     @ProtobufProperty(index = 11, type = ProtobufType.MESSAGE)
     final AvatarUserSettings avatarUserSettings;
 
+    @ProtobufProperty(index = 20, type = ProtobufType.INT64)
+    final long chatDbLidMigrationTimestamp;
+
     GlobalSettings(ChatWallpaper lightThemeWallpaper, MediaVisibility mediaVisibility, ChatWallpaper darkThemeWallpaper,
                    AutoDownloadSettings autoDownloadWiFi, AutoDownloadSettings autoDownloadCellular, AutoDownloadSettings autoDownloadRoaming,
                    boolean showIndividualNotificationsPreview, boolean showGroupNotificationsPreview,
-                   int disappearingModeDuration, long disappearingModeTimestampSeconds, AvatarUserSettings avatarUserSettings) {
+                   int disappearingModeDuration, long disappearingModeTimestampSeconds, AvatarUserSettings avatarUserSettings,
+                   long chatDbLidMigrationTimestamp) {
         this.lightThemeWallpaper = lightThemeWallpaper;
         this.mediaVisibility = mediaVisibility;
         this.darkThemeWallpaper = darkThemeWallpaper;
@@ -61,6 +65,7 @@ public final class GlobalSettings {
         this.disappearingModeDuration = disappearingModeDuration;
         this.disappearingModeTimestampSeconds = disappearingModeTimestampSeconds;
         this.avatarUserSettings = avatarUserSettings;
+        this.chatDbLidMigrationTimestamp = chatDbLidMigrationTimestamp;
     }
 
     public Optional<ChatWallpaper> lightThemeWallpaper() {
@@ -108,6 +113,15 @@ public final class GlobalSettings {
     }
 
     /**
+     * Returns the timestamp when the chat database LID migration should occur.
+     *
+     * @return the migration timestamp in seconds since epoch, or 0 if not set
+     */
+    public long chatDbLidMigrationTimestamp() {
+        return chatDbLidMigrationTimestamp;
+    }
+
+    /**
      * Returns when the disappearing mode was toggled
      *
      * @return an optional
@@ -129,7 +143,8 @@ public final class GlobalSettings {
                 && showGroupNotificationsPreview == that.showGroupNotificationsPreview
                 && disappearingModeDuration == that.disappearingModeDuration
                 && disappearingModeTimestampSeconds == that.disappearingModeTimestampSeconds
-                && Objects.equals(avatarUserSettings, that.avatarUserSettings);
+                && Objects.equals(avatarUserSettings, that.avatarUserSettings)
+                && chatDbLidMigrationTimestamp == that.chatDbLidMigrationTimestamp;
     }
 
     @Override
@@ -137,7 +152,8 @@ public final class GlobalSettings {
         return Objects.hash(lightThemeWallpaper, mediaVisibility, darkThemeWallpaper,
                 autoDownloadWiFi, autoDownloadCellular, autoDownloadRoaming,
                 showIndividualNotificationsPreview, showGroupNotificationsPreview,
-                disappearingModeDuration, disappearingModeTimestampSeconds, avatarUserSettings);
+                disappearingModeDuration, disappearingModeTimestampSeconds, avatarUserSettings,
+                chatDbLidMigrationTimestamp);
     }
 
     @Override
@@ -153,6 +169,7 @@ public final class GlobalSettings {
                 "showGroupNotificationsPreview=" + showGroupNotificationsPreview + ", " +
                 "disappearingModeDuration=" + disappearingModeDuration + ", " +
                 "disappearingModeTimestampSeconds=" + disappearingModeTimestampSeconds + ", " +
-                "avatarUserSettings=" + avatarUserSettings + ']';
+                "avatarUserSettings=" + avatarUserSettings + ", " +
+                "chatDbLidMigrationTimestamp=" + chatDbLidMigrationTimestamp + ']';
     }
 }

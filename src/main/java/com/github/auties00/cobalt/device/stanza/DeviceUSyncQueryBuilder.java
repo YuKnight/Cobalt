@@ -1,5 +1,6 @@
-package com.github.auties00.cobalt.device.usync;
+package com.github.auties00.cobalt.device.stanza;
 
+import com.github.auties00.cobalt.device.info.DeviceListHashInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidServer;
 import com.github.auties00.cobalt.node.Node;
@@ -39,18 +40,30 @@ public final class DeviceUSyncQueryBuilder {
      * @return list of IQ nodes, one per batch
      */
     public static List<NodeBuilder> build(Collection<Jid> userJids, String context) {
+        return build(userJids, context, null);
+    }
+
+    /**
+     * Builds batched USync queries with device hash information for delta updates.
+     *
+     * @param userJids  the user JIDs to query
+     * @param context   the context for device filtering
+     * @param hashInfos optional hash information for enabling delta updates
+     * @return list of IQ nodes, one per batch
+     */
+    public static List<NodeBuilder> build(Collection<Jid> userJids, String context, Map<Jid, DeviceListHashInfo> hashInfos) {
         Objects.requireNonNull(userJids, "userJids cannot be null");
         Objects.requireNonNull(context, "context cannot be null");
 
         var userJidsCount = userJids.size();
         if(userJidsCount <= MAX_USERS_PER_QUERY) {
-            return List.of(buildEntry(userJids, context));
+            return List.of(buildEntry(userJids, context, hashInfos));
         } else if(userJids instanceof List<Jid> list){
             var batches = new ArrayList<NodeBuilder>(userJidsCount / MAX_USERS_PER_QUERY);
             for (var i = 0; i < list.size(); i += MAX_USERS_PER_QUERY) {
                 var end = Math.min(i + MAX_USERS_PER_QUERY, list.size());
                 var batch = list.subList(i, end);
-                batches.add(buildEntry(batch, context));
+                batches.add(buildEntry(batch, context, hashInfos));
             }
             return batches;
         } else {
@@ -60,23 +73,23 @@ public final class DeviceUSyncQueryBuilder {
             while (iterator.hasNext()) {
                 batch.add(iterator.next());
                 if (batch.size() == MAX_USERS_PER_QUERY) {
-                    batches.add(buildEntry(batch, context));
+                    batches.add(buildEntry(batch, context, hashInfos));
                     batch.clear();
                 }
             }
             if (!batch.isEmpty()) {
-                batches.add(buildEntry(batch, context));
+                batches.add(buildEntry(batch, context, hashInfos));
             }
             return batches;
         }
     }
 
-    private static NodeBuilder buildEntry(Collection<Jid> userJids, String context) {
+    private static NodeBuilder buildEntry(Collection<Jid> userJids, String context, Map<Jid, DeviceListHashInfo> hashInfos) {
         var sessionId = UUID.randomUUID().toString();
 
         // Build user list nodes
         var userNodes = userJids.stream()
-                .map(DeviceUSyncQueryBuilder::buildUserNode)
+                .map(jid -> buildUserNode(jid, hashInfos))
                 .toList();
 
         // Build list node
@@ -116,11 +129,25 @@ public final class DeviceUSyncQueryBuilder {
                 .content(usyncNode);
     }
 
-    private static Node buildUserNode(Jid jid) {
+    private static Node buildUserNode(Jid jid, Map<Jid, DeviceListHashInfo> hashInfos) {
         var userJid = jid.toUserJid();
-        return new NodeBuilder()
+        var builder = new NodeBuilder()
                 .description("user")
-                .attribute("jid", userJid)
-                .build();
+                .attribute("jid", userJid);
+
+        // Add hash info if available for delta updates
+        if (hashInfos != null) {
+            var hashInfo = hashInfos.get(userJid);
+            if (hashInfo != null) {
+                builder.attribute("dhash", hashInfo.hash());
+                builder.attribute("ts", hashInfo.timestamp());
+                if (hashInfo.expectedTs() != null) {
+                    builder.attribute("expected_ts", hashInfo.expectedTs());
+                }
+            }
+        }
+
+        return builder.build();
     }
 }
+

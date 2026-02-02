@@ -953,7 +953,7 @@ public abstract sealed class SocketSession {
         // Otherwise performs a single read
         private final boolean fullRead;
 
-        // The lock to wait/notify the operation's result
+        // The lock to wait/notifyStr the operation's result
         private final Object lock;
 
         // The length of the data read

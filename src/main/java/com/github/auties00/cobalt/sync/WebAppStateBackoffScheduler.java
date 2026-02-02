@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync;
 
 import com.github.auties00.cobalt.model.sync.PatchType;
-import com.github.auties00.cobalt.util.DelayedSchedulerUtils;
+import com.github.auties00.cobalt.util.SchedulerUtils;
 
 import java.io.Closeable;
 import java.time.Duration;
@@ -33,7 +33,7 @@ public final class WebAppStateBackoffScheduler implements Closeable {
         var delayMs = calculateBackoff(attemptNumber);
 
         // Schedule the retry
-        var future = DelayedSchedulerUtils.scheduleDelayed(Duration.ofMillis(delayMs), () -> {
+        var future = SchedulerUtils.scheduleDelayed(Duration.ofMillis(delayMs), () -> {
             pendingRetries.remove(collectionName);
             retryAction.run();
         });

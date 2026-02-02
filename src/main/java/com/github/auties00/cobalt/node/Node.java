@@ -8,6 +8,7 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.util.*;
 import java.util.stream.DoubleStream;
+import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
@@ -124,6 +125,44 @@ public sealed interface Node {
         return result.isEmpty() ? defaultValue : result.get().toLong().orElse(defaultValue);
     }
 
+    default Long getAttributeAsLong(String key, Long defaultValue) {
+        var result = getAttribute(key);
+        if (result.isEmpty()) {
+            return defaultValue;
+        }
+
+        var converted = result.get().toLong();
+        if(converted.isEmpty()) {
+            return defaultValue;
+        }
+
+        return converted.getAsLong();
+    }
+
+    default OptionalInt getAttributeAsInt(String key) {
+        var result = getAttribute(key);
+        return result.isEmpty() ? OptionalInt.empty() : result.get().toInt();
+    }
+
+    default int getAttributeAsInt(String key, int defaultValue) {
+        var result = getAttribute(key);
+        return result.isEmpty() ? defaultValue : result.get().toInt().orElse(defaultValue);
+    }
+
+    default Integer getAttributeAsInt(String key, Integer defaultValue) {
+        var result = getAttribute(key);
+        if (result.isEmpty()) {
+            return defaultValue;
+        }
+
+        var converted = result.get().toInt();
+        if(converted.isEmpty()) {
+            return defaultValue;
+        }
+
+        return converted.getAsInt();
+    }
+
     default OptionalDouble getAttributeAsDouble(String key) {
         var result = getAttribute(key);
         return result.isEmpty() ? OptionalDouble.empty() : result.get().toDouble();
@@ -132,6 +171,20 @@ public sealed interface Node {
     default double getAttributeAsDouble(String key, double defaultValue) {
         var result = getAttribute(key);
         return result.isEmpty() ? defaultValue : result.get().toDouble().orElse(defaultValue);
+    }
+
+    default Double getAttributeAsDouble(String key, Double defaultValue) {
+        var result = getAttribute(key);
+        if (result.isEmpty()) {
+            return defaultValue;
+        }
+
+        var converted = result.get().toDouble();
+        if(converted.isEmpty()) {
+            return defaultValue;
+        }
+
+        return converted.getAsDouble();
     }
 
     /**
@@ -175,6 +228,14 @@ public sealed interface Node {
         return attributeValue != null
                 ? attributeValue.toLong().stream()
                 : LongStream.empty();
+    }
+
+    default IntStream streamAttributeAsInt(String key) {
+        Objects.requireNonNull(key, "key cannot be null");
+        var attributeValue = attributes().get(key);
+        return attributeValue != null
+                ? attributeValue.toInt().stream()
+                : IntStream.empty();
     }
 
     default DoubleStream streamAttributeAsDouble(String key) {
@@ -231,6 +292,13 @@ public sealed interface Node {
                 .orElseThrow(() -> new IllegalArgumentException("Cannot convert required attribute " + key + " to long. Attribute value: " + requiredAttribute));
     }
 
+    default long getRequiredAttributeAsInt(String key) {
+        var requiredAttribute = getRequiredAttribute(key);
+        return requiredAttribute
+                .toInt()
+                .orElseThrow(() -> new IllegalArgumentException("Cannot convert required attribute " + key + " to int. Attribute value: " + requiredAttribute));
+    }
+
     default double getRequiredAttributeAsDouble(String key) {
         var requiredAttribute = getRequiredAttribute(key);
         return requiredAttribute
@@ -279,6 +347,18 @@ public sealed interface Node {
         var attributeValue = attribute.toLong();
         return attributeValue.isPresent()
                && attributeValue.getAsLong() == value;
+    }
+
+    default boolean hasAttribute(String key, int value) {
+        Objects.requireNonNull(key, "key cannot be null");
+        var attribute = attributes().get(key);
+        if(attribute == null) {
+            return false;
+        }
+
+        var attributeValue = attribute.toInt();
+        return attributeValue.isPresent()
+               && attributeValue.getAsInt() == value;
     }
 
     default boolean hasAttribute(String key, double value) {

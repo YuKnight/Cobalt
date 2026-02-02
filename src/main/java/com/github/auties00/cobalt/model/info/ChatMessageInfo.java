@@ -33,7 +33,7 @@ public final class ChatMessageInfo implements MessageInfo { // TODO: Check me
     MessageContainer message;
 
     @ProtobufProperty(index = 3, type = ProtobufType.UINT64)
-    final long timestampSeconds;
+    long timestampSeconds;
 
     @ProtobufProperty(index = 4, type = ProtobufType.ENUM)
     MessageStatus status;
@@ -252,6 +252,10 @@ public final class ChatMessageInfo implements MessageInfo { // TODO: Check me
      */
     public Optional<ZonedDateTime> timestamp() {
         return Clock.parseSeconds(timestampSeconds);
+    }
+
+    public void setTimestampSeconds(long timestampSeconds) {
+        this.timestampSeconds = timestampSeconds;
     }
 
     /**

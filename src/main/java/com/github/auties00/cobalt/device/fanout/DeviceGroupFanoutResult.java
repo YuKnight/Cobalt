@@ -4,16 +4,17 @@ import com.github.auties00.cobalt.device.info.DeviceList;
 import com.github.auties00.cobalt.model.jid.Jid;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * Result of group fanout calculation.
  *
- * @param devices     the list of device JIDs to send to
+ * @param devices     the set of device JIDs to send to
  * @param phash       the calculated participant hash
  * @param deviceLists the device lists used for calculation
  */
 public record DeviceGroupFanoutResult(
-        List<Jid> devices,
+        Set<Jid> devices,
         String phash,
         List<DeviceList> deviceLists
 ) {

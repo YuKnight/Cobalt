@@ -6,6 +6,8 @@ import com.github.auties00.cobalt.client.WhatsAppClientListener;
 import com.github.auties00.cobalt.client.WhatsAppClientType;
 import com.github.auties00.cobalt.client.WhatsAppWebClientHistory;
 import com.github.auties00.cobalt.client.info.WhatsAppClientInfo;
+import com.github.auties00.cobalt.device.PendingDeviceSync;
+import com.github.auties00.cobalt.device.info.DeviceList;
 import com.github.auties00.cobalt.media.MediaConnection;
 import com.github.auties00.cobalt.model.auth.SignedDeviceIdentity;
 import com.github.auties00.cobalt.model.auth.UserAgent.ReleaseChannel;
@@ -88,9 +90,21 @@ import java.util.concurrent.ConcurrentMap;
 @SuppressWarnings({"unused", "UnusedReturnValue"})
 @ProtobufMessage
 public final class WhatsAppStore implements SignalProtocolStore {
-    private static final WhatsappStoreSerializer DEFAULT_DESERIALIZER = WhatsappStoreSerializer.discarding();
+    /**
+     * Default serializer..
+     */
+    private static final WhatsappStoreSerializer DEFAULT_SERIALIZER = WhatsappStoreSerializer.toProtobuf();
+
+    /**
+     * Default user name.
+     */
     private static final String DEFAULT_NAME = "User";
 
+    /**
+     * Maximum size for device lists cache (matches WhatsApp Web's 5000 limit).
+     */
+    private static final int MAX_DEVICE_LISTS = 5000;
+    
     // =====================================================
     // SECTION: Core Identity & Configuration
     // =====================================================
@@ -598,7 +612,7 @@ public final class WhatsAppStore implements SignalProtocolStore {
      * is synchronized from mobile device. Used to verify device authenticity.
      */
     @ProtobufProperty(index = 46, type = ProtobufType.MESSAGE)
-    SignedDeviceIdentity companionIdentity;
+    SignedDeviceIdentity signedDeviceIdentity;
 
     // =====================================================
     // SECTION: Signal Protocol - Pre-Keys & Key Management
@@ -793,6 +807,12 @@ public final class WhatsAppStore implements SignalProtocolStore {
     @ProtobufProperty(index = 65, type = ProtobufType.MESSAGE)
     Version companionVersion;
 
+    /**
+     * ADV (Authenticated Device Verification) metadata.
+     */
+    @ProtobufProperty(index = 66, type = ProtobufType.INT64)
+    Long lastAdvCheckTime;
+
     // =====================================================
     // SECTION: Runtime State (Non-Serialized)
     // =====================================================
@@ -884,9 +904,31 @@ public final class WhatsAppStore implements SignalProtocolStore {
     private final ConcurrentMap<Jid, GroupOrCommunityMetadata> groupOrCommunityMetadata;
 
     /**
-     * Cache for WhatsApp devices
+     * Cache for WhatsApp device lists with metadata (LRU, max 5000 entries).
+     * Stores full DeviceList objects including timestamps, ADV info, and expiration.
      */
-    private final ConcurrentMap<Jid, SequencedCollection<Jid>> deviceLists;
+    private final ConcurrentMap<Jid, DeviceList> deviceLists;
+
+    /**
+     * LRU access order tracking for device lists cache eviction.
+     */
+    private final LinkedList<Jid> deviceListsAccessOrder;
+
+    /**
+     * Cache for offline device timestamps (tracks when devices went offline).
+     */
+    private final ConcurrentHashMap<Jid, Long> offlineDeviceTimestamps;
+
+    /**
+     * Set of devices with unconfirmed identity changes.
+     * These devices should be excluded from message fanout until confirmed.
+     */
+    private final Set<Jid> unconfirmedIdentityChanges;
+
+    /**
+     * Queue for pending device sync requests that failed and need retry.
+     */
+    private final java.util.concurrent.ConcurrentLinkedQueue<PendingDeviceSync> pendingDeviceSyncs;
 
     // =====================================================
     // SECTION: Constructor & Factory Methods
@@ -940,7 +982,7 @@ public final class WhatsAppStore implements SignalProtocolStore {
             SignalIdentityKeyPair noiseKeyPair,
             SignalIdentityKeyPair identityKeyPair,
             SignalIdentityKeyPair companionKeyPair,
-            SignedDeviceIdentity companionIdentity,
+            SignedDeviceIdentity signedDeviceIdentity,
             SignalSignedKeyPair signedKeyPair,
             LinkedHashMap<Integer, SignalPreKeyPair> preKeys,
             UUID fdid,
@@ -959,7 +1001,8 @@ public final class WhatsAppStore implements SignalProtocolStore {
             ConcurrentMap<String, QuickReply> quickReplies,
             ConcurrentMap<Integer, Label> labels,
             Version clientVersion,
-            Version companionVersion
+            Version companionVersion,
+            Long lastAdvCheckTime
     ) {
         this.uuid = Objects.requireNonNull(uuid, "uuid cannot be null");
         this.phoneNumber = phoneNumber; 
@@ -1024,7 +1067,7 @@ public final class WhatsAppStore implements SignalProtocolStore {
         this.advertisingId = Objects.requireNonNullElseGet(advertisingId, UUID::randomUUID);
         this.identityId = Objects.requireNonNullElseGet(identityId, () -> SecureBytes.random(16));
         this.backupToken = Objects.requireNonNullElseGet(backupToken, () -> SecureBytes.random(20));
-        this.companionIdentity = companionIdentity;
+        this.signedDeviceIdentity = signedDeviceIdentity;
         this.senderKeys = Objects.requireNonNull(senderKeys, "senderKeys cannot be null");
         this.appStateKeys = Objects.requireNonNull(appStateKeys, "appStateKeys cannot be null");
         this.sessions = Objects.requireNonNull(sessions, "sessions cannot be null");
@@ -1040,6 +1083,11 @@ public final class WhatsAppStore implements SignalProtocolStore {
         this.serializable = true;
         this.groupOrCommunityMetadata = new ConcurrentHashMap<>();
         this.deviceLists = new ConcurrentHashMap<>();
+        this.deviceListsAccessOrder = new LinkedList<>();
+        this.offlineDeviceTimestamps = new ConcurrentHashMap<>();
+        this.unconfirmedIdentityChanges = ConcurrentHashMap.newKeySet();
+        this.pendingDeviceSyncs = new java.util.concurrent.ConcurrentLinkedQueue<>();
+        this.lastAdvCheckTime = lastAdvCheckTime;
     }
 
     // =====================================================
@@ -1075,7 +1123,7 @@ public final class WhatsAppStore implements SignalProtocolStore {
      * @return the current serializer, may be null if not configured
      */
     public WhatsappStoreSerializer serializer() {
-        return Objects.requireNonNullElse(serializer, DEFAULT_DESERIALIZER);
+        return Objects.requireNonNullElse(serializer, DEFAULT_SERIALIZER);
     }
 
     /**
@@ -2319,18 +2367,18 @@ public final class WhatsAppStore implements SignalProtocolStore {
      *
      * @return Optional containing the companion identity, empty if not set
      */
-    public Optional<SignedDeviceIdentity> companionIdentity() {
-        return Optional.ofNullable(companionIdentity);
+    public Optional<SignedDeviceIdentity> signedDeviceIdentity() {
+        return Optional.ofNullable(signedDeviceIdentity);
     }
 
     /**
      * Sets the companion identity.
      *
-     * @param companionIdentity the companion identity, may be null
+     * @param signedDeviceIdentity the companion identity, may be null
      * @return this store instance for method chaining
      */
-    public WhatsAppStore setCompanionIdentity(SignedDeviceIdentity companionIdentity) {
-        this.companionIdentity = companionIdentity;
+    public WhatsAppStore setSignedDeviceIdentity(SignedDeviceIdentity signedDeviceIdentity) {
+        this.signedDeviceIdentity = signedDeviceIdentity;
         return this;
     }
 
@@ -2563,6 +2611,40 @@ public final class WhatsAppStore implements SignalProtocolStore {
     @Override
     public void addSenderKey(SignalSenderKeyName name, SignalSenderKeyRecord newRecord) {
         senderKeys.put(name, newRecord);
+    }
+
+    /**
+     * Removes a Signal protocol session by address.
+     *
+     * @param address the address of the session to remove
+     * @return true if a session was removed
+     */
+    public boolean removeSession(SignalProtocolAddress address) {
+        return sessions.remove(address) != null;
+    }
+
+    /**
+     * Removes all sender key records where the given device JID is the sender.
+     *
+     * @param deviceJid the device JID whose sender keys should be removed
+     */
+    public void removeSenderKeysForDevice(Jid deviceJid) {
+        var signalAddress = deviceJid.toSignalAddress();
+        senderKeys.keySet().removeIf(name ->
+                name.sender().equals(signalAddress)
+        );
+    }
+
+    /**
+     * Cleans up all Signal sessions and sender keys for a device.
+     * Should be called when a device identity change is detected or a device is removed.
+     *
+     * @param deviceJid the device JID to clean up
+     */
+    public void cleanupSignalSessionsForDevice(Jid deviceJid) {
+        var signalAddress = deviceJid.toSignalAddress();
+        removeSession(signalAddress);
+        removeSenderKeysForDevice(deviceJid);
     }
 
     /**
@@ -2949,7 +3031,7 @@ public final class WhatsAppStore implements SignalProtocolStore {
                && Objects.equals(noiseKeyPair, that.noiseKeyPair)
                && Objects.equals(identityKeyPair, that.identityKeyPair)
                && Objects.equals(companionKeyPair, that.companionKeyPair)
-               && Objects.equals(companionIdentity, that.companionIdentity)
+               && Objects.equals(signedDeviceIdentity, that.signedDeviceIdentity)
                && Objects.equals(signedKeyPair, that.signedKeyPair)
                && Objects.equals(preKeys, that.preKeys)
                && Objects.equals(fdid, that.fdid)
@@ -2976,7 +3058,7 @@ public final class WhatsAppStore implements SignalProtocolStore {
                 unarchiveChats, twentyFourHourFormat, newChatsEphemeralTimer, webHistoryPolicy,
                 automaticPresenceUpdates, automaticMessageReceipts, checkPatchMacs, syncedChats, 
                 syncedContacts, syncedNewsletters, syncedStatus, syncedWebAppState, syncedBusinessCertificate,
-                registrationId, noiseKeyPair, identityKeyPair, companionKeyPair, companionIdentity,
+                registrationId, noiseKeyPair, identityKeyPair, companionKeyPair, signedDeviceIdentity,
                 signedKeyPair, preKeys, fdid, Arrays.hashCode(deviceId), advertisingId, Arrays.hashCode(identityId), 
                 Arrays.hashCode(backupToken), senderKeys, appStateKeys, sessions, hashStates, registered, listeners, mediaConnection);
     }
@@ -3131,61 +3213,97 @@ public final class WhatsAppStore implements SignalProtocolStore {
     }
 
     /**
-     * Gets the device list for a user.
+     * Gets the device list for a user with full metadata.
      *
      * @param userJid the user JID
-     * @return the device list, or empty if not cached
+     * @return the device list with metadata, or empty if not cached or expired
      */
-    public SequencedCollection<Jid> findDeviceList(Jid userJid) {
+    public Optional<DeviceList> findDeviceList(Jid userJid) {
         Objects.requireNonNull(userJid, "userJid cannot be null");
-        var deviceList = deviceLists.get(userJid);
-        return deviceList == null ? List.of() : Collections.unmodifiableSequencedCollection(deviceList);
-    }
 
-    /**
-     * Stores a device list for a user.
-     *
-     * @param userJid the user JID
-     * @param deviceList the device list
-     */
-    public void addDeviceList(Jid userJid, SequencedCollection<Jid> deviceList) {
-        Objects.requireNonNull(userJid, "userJid cannot be null");
-        Objects.requireNonNull(deviceList, "deviceList cannot be null");
-        deviceLists.put(userJid, deviceList);
-    }
+        synchronized (deviceListsAccessOrder) {
+            var deviceList = deviceLists.get(userJid);
+            if (deviceList == null || deviceList.isExpired()) {
+                if (deviceList != null) {
+                    deviceLists.remove(userJid);
+                    deviceListsAccessOrder.remove(userJid);
+                }
 
-    /**
-     * Adds a device to a user's device list.
-     *
-     * @param userJid the user JID
-     * @param deviceJid the device JID to add
-     */
-    public void addDevice(Jid userJid, Jid deviceJid) {
-        Objects.requireNonNull(userJid, "userJid cannot be null");
-        Objects.requireNonNull(deviceJid, "deviceJid cannot be null");
+                Jid alternateJid;
+                if (userJid.hasUserServer()) {
+                    alternateJid = findLidByPhone(userJid).orElse(null);
+                } else if (userJid.hasLidServer()) {
+                    alternateJid = findPhoneByLid(userJid).orElse(null);
+                } else {
+                    alternateJid = null;
+                }
 
-        deviceLists.compute(userJid, (key, existing) -> {
-            if (existing == null) {
-                existing = new ArrayList<>();
+                if (alternateJid != null) {
+                    var alternateList = deviceLists.get(alternateJid);
+                    if (alternateList != null && !alternateList.isExpired()) {
+                        deviceListsAccessOrder.remove(alternateJid);
+                        deviceListsAccessOrder.addLast(alternateJid);
+                        return Optional.of(alternateList);
+                    }
+                }
+
+                return Optional.empty();
             }
-            existing.add(deviceJid);
-            return existing;
-        });
+
+            // Update LRU access order
+            deviceListsAccessOrder.remove(userJid);
+            deviceListsAccessOrder.addLast(userJid);
+
+            return Optional.of(deviceList);
+        }
     }
 
     /**
-     * Removes a device from a user's device list.
+     * Gets simple JID list for backward compatibility.
      *
      * @param userJid the user JID
-     * @param deviceJid the device JID to remove
+     * @return list of device JIDs
      */
-    public void removeDevice(Jid userJid, Jid deviceJid) {
-        Objects.requireNonNull(userJid, "userJid cannot be null");
-        Objects.requireNonNull(deviceJid, "deviceJid cannot be null");
-        deviceLists.computeIfPresent(userJid, (key, existing) -> {
-            existing.remove(deviceJid);
-            return existing;
-        });
+    public List<Jid> findDeviceJids(Jid userJid) {
+        return findDeviceList(userJid)
+                .map(DeviceList::deviceJids)
+                .orElse(List.of());
+    }
+
+    /**
+     * Returns all cached device lists.
+     * Used for periodic ADV checks and expiration validation.
+     *
+     * @return collection of all cached device lists
+     */
+    public Collection<DeviceList> deviceLists() {
+        synchronized (deviceListsAccessOrder) {
+            return List.copyOf(deviceLists.values());
+        }
+    }
+
+    /**
+     * Stores a device list for a user with LRU eviction.
+     *
+     * @param deviceList the device list to store
+     */
+    public void addDeviceList(DeviceList deviceList) {
+        Objects.requireNonNull(deviceList, "deviceList cannot be null");
+
+        synchronized (deviceListsAccessOrder) {
+            var userJid = deviceList.userJid();
+
+            // Evict oldest entry if cache is full
+            if (deviceLists.size() >= MAX_DEVICE_LISTS && !deviceLists.containsKey(userJid)) {
+                var oldest = deviceListsAccessOrder.removeFirst();
+                deviceLists.remove(oldest);
+            }
+
+            // Update or add entry
+            deviceLists.put(userJid, deviceList);
+            deviceListsAccessOrder.remove(userJid);
+            deviceListsAccessOrder.addLast(userJid);
+        }
     }
 
     /**
@@ -3193,9 +3311,180 @@ public final class WhatsAppStore implements SignalProtocolStore {
      *
      * @param userJid the user JID
      */
-    public void removeDevices(Jid userJid) {
+    public void removeDeviceList(Jid userJid) {
         Objects.requireNonNull(userJid, "userJid cannot be null");
-        deviceLists.remove(userJid);
+        synchronized (deviceListsAccessOrder) {
+            deviceLists.remove(userJid);
+            deviceListsAccessOrder.remove(userJid);
+        }
+    }
+
+    /**
+     * Clears all device lists from cache.
+     */
+    public void clearDeviceLists() {
+        synchronized (deviceListsAccessOrder) {
+            deviceLists.clear();
+            deviceListsAccessOrder.clear();
+        }
+    }
+
+    /**
+     * Removes expired device lists from cache.
+     *
+     * @return number of entries removed
+     */
+    public int removeExpiredDeviceLists() {
+        synchronized (deviceListsAccessOrder) {
+            var toRemove = new ArrayList<Jid>();
+            for (var entry : deviceLists.entrySet()) {
+                if (entry.getValue().isExpired()) {
+                    toRemove.add(entry.getKey());
+                }
+            }
+            for (var jid : toRemove) {
+                deviceLists.remove(jid);
+                deviceListsAccessOrder.remove(jid);
+            }
+            return toRemove.size();
+        }
+    }
+
+    /**
+     * Gets the last ADV check time.
+     *
+     * @return the last check time in epoch millis, or null if never checked
+     */
+    public Long lastAdvCheckTime() {
+        return lastAdvCheckTime;
+    }
+
+    /**
+     * Updates the last ADV check time to now.
+     */
+    public void updateAdvCheckTime() {
+        this.lastAdvCheckTime = System.currentTimeMillis();
+    }
+
+    /**
+     * Marks a device as offline for temporary caching.
+     *
+     * @param deviceJid the device JID
+     */
+    public void markDeviceOffline(Jid deviceJid) {
+        offlineDeviceTimestamps.put(deviceJid, System.currentTimeMillis());
+    }
+
+    /**
+     * Checks if a device is currently marked as offline.
+     *
+     * @param deviceJid the device JID
+     * @return true if offline and not expired (< 24 hours)
+     */
+    public boolean isDeviceOffline(Jid deviceJid) {
+        var timestamp = offlineDeviceTimestamps.get(deviceJid);
+        if (timestamp == null) {
+            return false;
+        }
+        var elapsed = System.currentTimeMillis() - timestamp;
+        return elapsed < 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+    }
+
+    /**
+     * Marks a device as online (removes from offline cache).
+     *
+     * @param deviceJid the device JID
+     */
+    public void markDeviceOnline(Jid deviceJid) {
+        offlineDeviceTimestamps.remove(deviceJid);
+    }
+
+    /**
+     * Cleans up expired offline device entries (older than 24 hours).
+     */
+    public void cleanupExpiredOfflineDevices() {
+        var now = System.currentTimeMillis();
+        var expirationTime = 24 * 60 * 60 * 1000; // 24 hours
+
+        offlineDeviceTimestamps.entrySet().removeIf(entry ->
+            now - entry.getValue() >= expirationTime
+        );
+    }
+
+    /**
+     * Adds a pending device sync request for retry.
+     *
+     * @param sync the pending sync
+     */
+    public void addPendingDeviceSync(PendingDeviceSync sync) {
+        pendingDeviceSyncs.offer(sync);
+    }
+
+    /**
+     * Gets all pending device sync requests.
+     *
+     * @return list of pending syncs
+     */
+    public List<PendingDeviceSync> pendingDevicesSyncs() {
+        return List.copyOf(pendingDeviceSyncs);
+    }
+
+    /**
+     * Removes a pending device sync request.
+     *
+     * @param sync the sync to remove
+     */
+    public void removePendingDeviceSync(PendingDeviceSync sync) {
+        pendingDeviceSyncs.remove(sync);
+    }
+
+    /**
+     * Clears all pending device sync requests.
+     */
+    public void clearPendingDeviceSyncs() {
+        pendingDeviceSyncs.clear();
+    }
+
+    /**
+     * Cleans up expired pending device syncs (older than 24 hours).
+     */
+    public void cleanupExpiredPendingDeviceSyncs() {
+        pendingDeviceSyncs.removeIf(PendingDeviceSync::isExpired);
+    }
+
+    /**
+     * Marks a device as having an unconfirmed identity change.
+     * The device should be excluded from fanout until confirmed.
+     *
+     * @param deviceJid the device JID
+     */
+    public void markIdentityChange(Jid deviceJid) {
+        unconfirmedIdentityChanges.add(deviceJid);
+    }
+
+    /**
+     * Confirms an identity change for a device, removing it from the exclusion list.
+     *
+     * @param deviceJid the device JID
+     */
+    public void confirmIdentityChange(Jid deviceJid) {
+        unconfirmedIdentityChanges.remove(deviceJid);
+    }
+
+    /**
+     * Gets all devices with unconfirmed identity changes.
+     *
+     * @return immutable set of device JIDs with unconfirmed identity changes
+     */
+    public Set<Jid> unconfirmedIdentityChanges() {
+        return Collections.unmodifiableSet(unconfirmedIdentityChanges);
+    }
+
+    /**
+     * Clears all unconfirmed identity changes.
+     */
+    public void clearUnconfirmedIdentityChanges() {
+        unconfirmedIdentityChanges.clear();
     }
 
     public boolean hasJid(JidProvider entry) {

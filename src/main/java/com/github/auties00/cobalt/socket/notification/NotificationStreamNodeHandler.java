@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.socket.notification;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.device.notification.DeviceNotificationHandler;
 import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.model.chat.Chat;
 import com.github.auties00.cobalt.model.chat.ChatEphemeralTimer;
@@ -69,6 +70,7 @@ public final class NotificationStreamNodeHandler extends SocketStream.Handler {
                 case "link_code_companion_reg" -> handleCompanionRegistration(node);
                 case "newsletter" -> handleNewsletter(node);
                 case "mex" -> handleMexNamespace(node);
+                case "device" -> handleDeviceNotification(node);
             }
         } finally {
             whatsapp.sendAck(node);
@@ -427,7 +429,7 @@ public final class NotificationStreamNodeHandler extends SocketStream.Handler {
             return;
         }
 
-        lidMigrationService.onLidChanged(
+        lidMigrationService.changeLid(
                 contactJid,
                 lidChange.newLid(),
                 lidChange.oldLid().orElse(null)
@@ -560,6 +562,25 @@ public final class NotificationStreamNodeHandler extends SocketStream.Handler {
         whatsapp.pullWebAppState(patches);
     }
 
+
+    private void handleDeviceNotification(Node node) {
+        var action = node.getAttributeAsString("action")
+                .orElse(null);
+        if (action == null) {
+            return;
+        }
+
+        var jid = node.getAttributeAsJid("jid")
+                .orElse(null);
+        if (jid == null) {
+            return;
+        }
+
+        var userJid = jid.toUserJid();
+
+        // Handle device add/remove actions using dedicated handler
+        DeviceNotificationHandler.handleDeviceNotification(whatsapp, node, action, userJid);
+    }
 
     private void handleCompanionRegistration(Node node) {
         try {

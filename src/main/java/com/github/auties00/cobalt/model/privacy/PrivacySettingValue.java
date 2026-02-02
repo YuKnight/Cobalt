@@ -26,9 +26,9 @@ public enum PrivacySettingValue {
      */
     CONTACTS_EXCEPT(2, "contact_blacklist"),
     /**
-     * Nobody
+     * No one
      */
-    NOBODY(3, "none"),
+    NO_ONE(3, "none"),
     /**
      * Match last seen
      */

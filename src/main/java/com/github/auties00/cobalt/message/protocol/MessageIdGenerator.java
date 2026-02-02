@@ -1,4 +1,4 @@
-package com.github.auties00.cobalt.message.id;
+package com.github.auties00.cobalt.message.protocol;
 
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.util.SecureBytes;

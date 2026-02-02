@@ -23,7 +23,7 @@ public final class NewsletterMessageInfo implements MessageInfo {
     final String id;
 
     @ProtobufProperty(index = 2, type = ProtobufType.INT32)
-    final int serverId;
+    int serverId;
 
     @ProtobufProperty(index = 3, type = ProtobufType.UINT64)
     final Long timestampSeconds;
@@ -146,6 +146,10 @@ public final class NewsletterMessageInfo implements MessageInfo {
 
     public int serverId() {
         return serverId;
+    }
+
+    public void setServerId(int serverId) {
+        this.serverId = serverId;
     }
 
     @Override

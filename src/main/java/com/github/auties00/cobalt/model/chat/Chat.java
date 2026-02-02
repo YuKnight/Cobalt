@@ -111,10 +111,13 @@ public final class Chat implements MessageInfoParent {
     @ProtobufProperty(index = 42, type = ProtobufType.STRING)
     Jid lid;
 
+    @ProtobufProperty(index = 49, type = ProtobufType.STRING)
+    Jid accountLid;
+
     @ProtobufProperty(index = 999, type = ProtobufType.MAP, mapKeyType = ProtobufType.STRING, mapValueType = ProtobufType.ENUM)
     final ConcurrentHashMap<Jid, ContactStatus> presences;
 
-    Chat(Jid jid, Messages messages, Jid newJid, Jid oldJid, int unreadMessagesCount, boolean endOfHistoryTransfer, ChatEphemeralTimer ephemeralMessageDuration, long ephemeralMessagesToggleTimeSeconds, EndOfHistoryTransferType endOfHistoryTransferType, long timestampSeconds, String name, boolean notSpam, boolean archived, ChatDisappear disappearInitiator, boolean markedAsUnread, int pinnedTimestampSeconds, ChatMute mute, ChatWallpaper wallpaper, MediaVisibility mediaVisibility, boolean suspended, boolean terminated, boolean support, String displayName, Jid phoneJid, boolean shareOwnPhoneNumber, boolean phoneDuplicateLidThread, Jid lid, ConcurrentHashMap<Jid, ContactStatus> presences) {
+    Chat(Jid jid, Messages messages, Jid newJid, Jid oldJid, int unreadMessagesCount, boolean endOfHistoryTransfer, ChatEphemeralTimer ephemeralMessageDuration, long ephemeralMessagesToggleTimeSeconds, EndOfHistoryTransferType endOfHistoryTransferType, long timestampSeconds, String name, boolean notSpam, boolean archived, ChatDisappear disappearInitiator, boolean markedAsUnread, int pinnedTimestampSeconds, ChatMute mute, ChatWallpaper wallpaper, MediaVisibility mediaVisibility, boolean suspended, boolean terminated, boolean support, String displayName, Jid phoneJid, boolean shareOwnPhoneNumber, boolean phoneDuplicateLidThread, Jid lid, Jid accountLid, ConcurrentHashMap<Jid, ContactStatus> presences) {
         this.jid = jid;
         this.messages = messages;
         this.newJid = newJid;
@@ -142,6 +145,7 @@ public final class Chat implements MessageInfoParent {
         this.shareOwnPhoneNumber = shareOwnPhoneNumber;
         this.phoneDuplicateLidThread = phoneDuplicateLidThread;
         this.lid = lid;
+        this.accountLid = accountLid;
         this.presences = presences;
     }
 
@@ -240,6 +244,10 @@ public final class Chat implements MessageInfoParent {
 
     public Optional<Jid> lidJid() {
         return Optional.ofNullable(lid);
+    }
+
+    public Optional<Jid> accountLid() {
+        return Optional.ofNullable(accountLid);
     }
 
     public Optional<ContactStatus> getPresence(JidProvider jid) {
@@ -348,6 +356,10 @@ public final class Chat implements MessageInfoParent {
 
     public void setLid(Jid lid) {
         this.lid = lid;
+    }
+
+    public void setAccountLid(Jid accountLid) {
+        this.accountLid = accountLid;
     }
 
     /**
@@ -594,12 +606,13 @@ public final class Chat implements MessageInfoParent {
                Objects.equals(displayName, chat.displayName) &&
                Objects.equals(phoneJid, chat.phoneJid) &&
                Objects.equals(lid, chat.lid) &&
+               Objects.equals(accountLid, chat.accountLid) &&
                Objects.equals(presences, chat.presences);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(jid, messages, newJid, oldJid, unreadMessagesCount, endOfHistoryTransfer, ephemeralMessageDuration, ephemeralMessagesToggleTimeSeconds, endOfHistoryTransferType, timestampSeconds, name, notSpam, archived, disappearInitiator, markedAsUnread, pinnedTimestampSeconds, mute, wallpaper, mediaVisibility, suspended, terminated, support, displayName, phoneJid, shareOwnPhoneNumber, phoneDuplicateLidThread, lid, presences);
+        return Objects.hash(jid, messages, newJid, oldJid, unreadMessagesCount, endOfHistoryTransfer, ephemeralMessageDuration, ephemeralMessagesToggleTimeSeconds, endOfHistoryTransferType, timestampSeconds, name, notSpam, archived, disappearInitiator, markedAsUnread, pinnedTimestampSeconds, mute, wallpaper, mediaVisibility, suspended, terminated, support, displayName, phoneJid, shareOwnPhoneNumber, phoneDuplicateLidThread, lid, accountLid, presences);
     }
 
     @Override

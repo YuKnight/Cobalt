@@ -18,7 +18,7 @@ import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.socket.SocketPhonePairing;
 import com.github.auties00.cobalt.socket.SocketStream;
-import com.github.auties00.cobalt.device.adv.DeviceADVValidator;
+import com.github.auties00.cobalt.device.DeviceADVValidator;
 import com.github.auties00.cobalt.util.Clock;
 import com.github.auties00.libsignal.key.SignalIdentityKeyPair;
 
@@ -202,7 +202,7 @@ public final class IqStreamNodeHandler extends SocketStream.Handler {
             return;
         }
         whatsapp.store()
-                .setCompanionIdentity(signedDeviceIdentity.get());
+                .setSignedDeviceIdentity(signedDeviceIdentity.get());
 
         var platform = getWebPlatform(node);
         var device = whatsapp.store()

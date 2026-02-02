@@ -4,10 +4,7 @@ import com.github.auties00.cobalt.exception.MalformedJidException;
 import com.github.auties00.cobalt.model.jid.Jid;
 import it.auties.protobuf.model.ProtobufString;
 
-import java.util.Objects;
-import java.util.Optional;
-import java.util.OptionalDouble;
-import java.util.OptionalLong;
+import java.util.*;
 
 /**
  * A sealed interface representing attribute values within WhatsApp protocol nodes.
@@ -53,6 +50,8 @@ public sealed interface NodeAttribute {
     Optional<Jid> toJid();
 
     OptionalLong toLong();
+
+    OptionalInt toInt();
 
     OptionalDouble toDouble();
 
@@ -109,6 +108,16 @@ public sealed interface NodeAttribute {
                 return OptionalLong.of(result);
             }catch (NumberFormatException exception) {
                 return OptionalLong.empty();
+            }
+        }
+
+        @Override
+        public OptionalInt toInt() {
+            try {
+                var result = Integer.parseInt(value);
+                return OptionalInt.of(result);
+            }catch (NumberFormatException exception) {
+                return OptionalInt.empty();
             }
         }
 
@@ -174,6 +183,11 @@ public sealed interface NodeAttribute {
         @Override
         public OptionalLong toLong() {
             return OptionalLong.empty();
+        }
+
+        @Override
+        public OptionalInt toInt() {
+            return OptionalInt.empty();
         }
 
         @Override
@@ -243,6 +257,16 @@ public sealed interface NodeAttribute {
                 return OptionalLong.of(result);
             }catch (NumberFormatException exception) {
                 return OptionalLong.empty();
+            }
+        }
+
+        @Override
+        public OptionalInt toInt() {
+            try {
+                var result = Integer.parseInt(toString());
+                return OptionalInt.of(result);
+            }catch (NumberFormatException exception) {
+                return OptionalInt.empty();
             }
         }
 

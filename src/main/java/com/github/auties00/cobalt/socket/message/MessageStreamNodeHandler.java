@@ -2,8 +2,13 @@ package com.github.auties00.cobalt.socket.message;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.exception.LidMigrationException;
-import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.exception.MediaDownloadException;
+import com.github.auties00.cobalt.exception.MessageDecryptionException;
+import com.github.auties00.cobalt.message.receipt.MessageReceiptService;
+import com.github.auties00.cobalt.message.receive.MessageReceiveResult;
+import com.github.auties00.cobalt.message.receive.MessageReceivingService;
+import com.github.auties00.cobalt.message.receive.stanza.MessageReceiveStanzaParser;
+import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.model.action.ContactActionBuilder;
 import com.github.auties00.cobalt.model.chat.Chat;
 import com.github.auties00.cobalt.model.chat.ChatEphemeralTimer;
@@ -14,6 +19,7 @@ import com.github.auties00.cobalt.model.info.MessageIndexInfoBuilder;
 import com.github.auties00.cobalt.model.info.MessageInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.model.Message;
+import com.github.auties00.cobalt.model.message.model.MessageContainerSpec;
 import com.github.auties00.cobalt.model.message.server.ProtocolMessage;
 import com.github.auties00.cobalt.model.setting.EphemeralSettingsBuilder;
 import com.github.auties00.cobalt.model.sync.*;
@@ -40,28 +46,173 @@ import static com.github.auties00.cobalt.client.WhatsAppClientErrorHandler.Locat
 import static com.github.auties00.cobalt.client.WhatsAppClientErrorHandler.Location.LID_MIGRATION;
 
 public final class MessageStreamNodeHandler extends SocketStream.Handler {
+    private static final System.Logger LOGGER = System.getLogger("MessageStreamNodeHandler");
     private static final int HISTORY_SYNC_MAX_TIMEOUT = 25;
     private static final Set<HistorySync.Type> REQUIRED_HISTORY_SYNC_TYPES = Set.of(HistorySync.Type.INITIAL_BOOTSTRAP, HistorySync.Type.PUSH_NAME, HistorySync.Type.NON_BLOCKING_DATA);
 
     private final LidMigrationService lidMigrationService;
+    private final MessageReceivingService messageReceivingService;
+    private final MessageReceiptService messageReceiptService;
     private final Set<Jid> historyCache;
     private final HistorySyncProgressTracker recentHistorySyncTracker;
     private final HistorySyncProgressTracker fullHistorySyncTracker;
     private final Set<HistorySync.Type> historySyncTypes;
     private CompletableFuture<Void> historySyncTask;
 
-    public MessageStreamNodeHandler(WhatsAppClient whatsapp, LidMigrationService lidMigrationService) {
+    public MessageStreamNodeHandler(
+            WhatsAppClient whatsapp,
+            LidMigrationService lidMigrationService,
+            MessageReceivingService messageReceivingService,
+            MessageReceiptService messageReceiptService
+    ) {
         super(whatsapp, "message");
         this.lidMigrationService = lidMigrationService;
         this.historyCache = new HashSet<>();
         this.historySyncTypes = new HashSet<>();
         this.recentHistorySyncTracker = new HistorySyncProgressTracker();
         this.fullHistorySyncTracker = new HistorySyncProgressTracker();
+        this.messageReceivingService = messageReceivingService;
+        this.messageReceiptService = messageReceiptService;
     }
 
     @Override
     public void handle(Node node) {
-        // TODO: Deserialize messages
+        // Check if this is a newsletter message (unencrypted)
+        var fromJid = node.getRequiredAttributeAsJid("from");
+        if (fromJid.hasNewsletterServer()) {
+            handleNewsletterMessage(node);
+            return;
+        }
+
+        // Parse the message stanza
+        var parsedStanza = MessageReceiveStanzaParser.parse(node);
+
+        // Process the message
+        var result = messageReceivingService.process(parsedStanza);
+
+        // Handle the result
+        switch (result) {
+            case MessageReceiveResult.Success success -> {
+                var info = success.info();
+
+                // Handle protocol messages (history sync, key share, etc.)
+                var content = info.message().content();
+                if (content instanceof ProtocolMessage pm) {
+                    handleProtocolMessage(info, pm);
+                }
+
+                // Save the message
+                saveMessage(info);
+
+                // Notify listeners
+                notifyListeners(info);
+
+                // Send delivery receipt
+                messageReceiptService.sendDeliveryReceipt(info);
+            }
+
+            case MessageReceiveResult.DecryptionFailure failure -> {
+                // Edge case 59: DUPLICATE_MESSAGE should not send retry receipt
+                // Some errors (like old counter) are not fatal and shouldn't request retry
+                if (failure.reason().shouldSendRetryReceipt()) {
+                    var retryCount = parsedStanza.retryCount().orElse(0) + 1;
+                    LOGGER.log(System.Logger.Level.WARNING,
+                            "Decryption failed for message {0} ({1}), sending retry receipt (count={2})",
+                            failure.messageId(), failure.reason(), retryCount);
+                    messageReceiptService.sendRetryReceipt(
+                            failure.messageId(),
+                            parsedStanza.chatJid(),
+                            parsedStanza.senderJid(),
+                            failure.reason(),
+                            retryCount
+                    );
+                } else {
+                    // For DUPLICATE_MESSAGE: log and ignore (per design doc edge case 58/59)
+                    LOGGER.log(System.Logger.Level.DEBUG,
+                            "Decryption issue for message {0} ({1}), not sending retry",
+                            failure.messageId(), failure.reason());
+                }
+            }
+
+            case MessageReceiveResult.ParseError error -> {
+                LOGGER.log(System.Logger.Level.WARNING,
+                        "Parse error for message {0}: {1}",
+                        error.messageId(), error.description());
+                messageReceiptService.sendNackReceipt(
+                        error.messageId(),
+                        parsedStanza.chatJid(),
+                        parsedStanza.participant(),
+                        error.errorCode()
+                );
+            }
+
+            case MessageReceiveResult.AdvValidationFailure advFailure -> {
+                LOGGER.log(System.Logger.Level.WARNING,
+                        "ADV validation failed for message {0}: {1}",
+                        advFailure.messageId(), advFailure.reason());
+                // Send retry with ADV failure reason
+                messageReceiptService.sendRetryReceipt(
+                        advFailure.messageId(),
+                        parsedStanza.chatJid(),
+                        parsedStanza.senderJid(),
+                        MessageDecryptionException.Reason.ADV_FAILURE,
+                        1
+                );
+            }
+
+            case MessageReceiveResult.Duplicate duplicate -> {
+                // Edge case 58: Only log if notification shouldn't be suppressed
+                if (!duplicate.suppressNotification()) {
+                    LOGGER.log(System.Logger.Level.DEBUG,
+                            "Ignoring duplicate message: {0}", duplicate.messageId());
+                }
+                // No receipt sent for duplicates
+            }
+
+            case MessageReceiveResult.NotForThisDevice notForThis -> {
+                LOGGER.log(System.Logger.Level.DEBUG,
+                        "Message not for this device: {0}", notForThis.messageId());
+            }
+
+            case MessageReceiveResult.InvalidStanza invalid -> {
+                LOGGER.log(System.Logger.Level.WARNING,
+                        "Invalid stanza for message {0}: {1}",
+                        invalid.messageId(), invalid.description());
+                if (invalid.messageId() != null) {
+                    messageReceiptService.sendNackReceipt(
+                            invalid.messageId(),
+                            parsedStanza.chatJid(),
+                            parsedStanza.participant(),
+                            "400"
+                    );
+                }
+            }
+        }
+    }
+
+    /**
+     * Handles unencrypted newsletter messages.
+     */
+    private void handleNewsletterMessage(Node node) {
+        var bodyNode = node.getChild("body");
+        if (bodyNode.isEmpty()) {
+            LOGGER.log(System.Logger.Level.DEBUG, "Newsletter message missing body node");
+            return;
+        }
+
+        var plaintext = bodyNode.get().toContentBytes().orElse(null);
+        if (plaintext == null || plaintext.length == 0) {
+            LOGGER.log(System.Logger.Level.DEBUG, "Newsletter message has empty body");
+            return;
+        }
+
+        try {
+            var messageContainer = MessageContainerSpec.decode(ProtobufInputStream.fromBytes(plaintext));
+            // TODO: Build NewsletterMessageInfo and save
+            LOGGER.log(System.Logger.Level.DEBUG, "Received newsletter message");
+        } catch (Exception e) {
+            LOGGER.log(System.Logger.Level.WARNING, "Failed to parse newsletter message: {0}", e.getMessage());
+        }
     }
 
     private void saveMessage(MessageInfo messageInfo) {
@@ -239,7 +390,7 @@ public final class MessageStreamNodeHandler extends SocketStream.Handler {
 
         try(var stream = new GZIPInputStream(new ByteArrayInputStream(lidMigrationMappingPayload.get()))) {
             var lidMigrationMapping = LIDMigrationMappingSyncPayloadSpec.decode(ProtobufInputStream.fromStream(stream));
-            lidMigrationService.onMappingsReceived(lidMigrationMapping);
+            lidMigrationService.processProtocolMessage(lidMigrationMapping);
         } catch (Throwable throwable) {
             whatsapp.handleFailure(LID_MIGRATION, new LidMigrationException.FailedToParseMappings("cannot parse protobuf message", throwable));
         }
@@ -375,6 +526,10 @@ public final class MessageStreamNodeHandler extends SocketStream.Handler {
     }
 
     private void handleHistorySync(HistorySync history) {
+        // Process LID mappings from all history sync types that may contain them
+        // This must happen before conversation processing to ensure mappings are available
+        lidMigrationService.processHistorySync(history);
+
         switch (history.syncType()) {
             case INITIAL_STATUS_V3 -> handleInitialStatus(history);
             case PUSH_NAME -> handlePushNames(history);
@@ -529,7 +684,7 @@ public final class MessageStreamNodeHandler extends SocketStream.Handler {
 
     private void handleNonBlockingData(HistorySync history) {
         handlePastParticipants(history);
-        handleLidMappings(history);
+        // LID mappings are processed at the top of handleHistorySync() via lidMigrationService.onHistorySyncReceived()
     }
 
     private void handlePastParticipants(HistorySync history) {
@@ -538,10 +693,6 @@ public final class MessageStreamNodeHandler extends SocketStream.Handler {
                 Thread.startVirtualThread(() -> listener.onWebHistorySyncPastParticipants(whatsapp, pastParticipants.groupJid(), pastParticipants.pastParticipants()));
             }
         }
-    }
-
-    private void handleLidMappings(HistorySync history) {
-        // TODO: Handle LID mappings
     }
 
     @Override

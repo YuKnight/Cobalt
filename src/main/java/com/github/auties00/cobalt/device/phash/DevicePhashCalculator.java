@@ -5,6 +5,7 @@ import com.github.auties00.cobalt.model.jid.Jid;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collection;
 import java.util.Comparator;
@@ -16,7 +17,6 @@ import java.util.Comparator;
  * list of participants/devices that should receive a group message.
  */
 public final class DevicePhashCalculator {
-    private static final String PHASH_PREFIX = "2:";
     private static final int HASH_BYTES_TO_USE = 6;
 
     private DevicePhashCalculator() {
@@ -24,20 +24,36 @@ public final class DevicePhashCalculator {
     }
 
     /**
-     * Calculates the phash v2 for a collection of device JIDs.
+     * Calculates the phash for a collection of device JIDs.
+     * The Meta AI bot can be injected for open groups (only applicable for V2).
      *
-     * @param deviceJids the device JIDs to include in the hash
-     * @return the phash string (e.g., "2:q83vEjRW")
-     * @throws NoSuchAlgorithmException if SHA-256 is not available
+     * @param deviceJids     the device JIDs to include in the hash
+     * @param version        the phash version to use
+     * @param includeMetaBot whether to include the Meta AI bot (only for V2, ignored for V1)
+     * @return the phash string (e.g., "1:q83vEjRW" or "2:q83vEjRW")
+     * @throws NoSuchAlgorithmException if the hash algorithm is not available
      */
-    public static String calculateV2(Collection<Jid> deviceJids) throws NoSuchAlgorithmException {
-        var legacyJids = deviceJids.stream()
-                .map(DevicePhashCalculator::toLegacyJidString)
+    // TODO: Cache hash for better performance
+    //       The cache should not be shared between sessions
+    public static String calculate(
+            Collection<Jid> deviceJids,
+            DevicePhashVersion version,
+            boolean includeMetaBot
+    ) throws NoSuchAlgorithmException {
+        var jidsToHash = new ArrayList<>(deviceJids);
+
+        // Add Meta AI bot for open groups if version supports it
+        if (includeMetaBot && version.supportsMetaBot()) {
+            jidsToHash.add(Jid.metaAiBot());
+        }
+
+        var legacyJids = jidsToHash.stream()
+                .map(jid -> toLegacyJidString(jid, version))
                 .sorted(Comparator.naturalOrder())
                 .toList();
 
-        var digest = MessageDigest.getInstance("SHA-256");
-        for(var legacyJid : legacyJids) {
+        var digest = MessageDigest.getInstance(version.algorithm());
+        for (var legacyJid : legacyJids) {
             digest.update(legacyJid.getBytes(StandardCharsets.UTF_8));
         }
         var hash = digest.digest();
@@ -46,19 +62,26 @@ public final class DevicePhashCalculator {
         System.arraycopy(hash, 0, truncated, 0, HASH_BYTES_TO_USE);
 
         var base64 = Base64.getEncoder().encodeToString(truncated);
-        return PHASH_PREFIX + base64;
+        return version.prefix() + base64;
     }
 
-    // Converts a device JID to legacy format for phash calculation.
-    private static String toLegacyJidString(Jid jid) {
+    /**
+     * Converts a device JID to legacy format for phash calculation.
+     *
+     * @param jid     the JID to convert
+     * @param version the phash version (determines format)
+     * @return the legacy JID string
+     */
+    private static String toLegacyJidString(Jid jid, DevicePhashVersion version) {
         var user = jid.user();
         var server = jid.server().address();
-        var device = jid.device();
 
-        if (device == 0) {
-            return user + "@" + server;
-        } else {
-            return user + "." + device + "@" + server;
-        }
+        return switch (version) {
+            // V1: Simple format without device ID
+            case V1 -> user + "@" + server;
+
+            // V2: Full format without device ID (formatFull in WhatsApp Web)
+            case V2 -> user + "@" + server;
+        };
     }
 }

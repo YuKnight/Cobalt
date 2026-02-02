@@ -18,7 +18,7 @@ import java.util.OptionalLong;
 
 
 /**
- * A model class that represents a message to notify the invoice about a successful payment.
+ * A model class that represents a message to notifyStr the invoice about a successful payment.
  */
 @ProtobufMessage
 public final class PaymentInvoiceMessage implements MediaMessage, PaymentMessage {

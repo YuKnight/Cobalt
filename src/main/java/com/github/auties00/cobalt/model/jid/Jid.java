@@ -39,6 +39,13 @@ public record Jid(String user, JidServer server, int device, int agent) implemen
 
     private static final Jid LOCATION_BROADCAST = new Jid("location", JidServer.broadcast());
 
+    /**
+     * Meta AI bot JID used for open group phash calculation.
+     * This bot is added to the participant list when calculating phash for groups
+     * that have the open group bot feature enabled.
+     */
+    private static final Jid META_AI_BOT = new Jid("867051314767696", JidServer.bot());
+
     public Jid {
         Objects.requireNonNull(server, "server cannot be null");
         checkUnsignedByte(device);
@@ -115,6 +122,16 @@ public record Jid(String user, JidServer server, int device, int agent) implemen
 
     public static Jid locationBroadcast() {
         return Jid.LOCATION_BROADCAST;
+    }
+
+    /**
+     * Returns the Meta AI bot JID.
+     * This bot is used in open group phash calculations.
+     *
+     * @return the Meta AI bot JID
+     */
+    public static Jid metaAiBot() {
+        return Jid.META_AI_BOT;
     }
 
     public static Jid of(JidServer server) {

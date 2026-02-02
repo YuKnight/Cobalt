@@ -375,7 +375,7 @@ public final class ProtocolMessage implements ServerMessage {
          */
         BOT_FEEDBACK_MESSAGE(19),
         /**
-         * Media notify message
+         * Media notifyStr message
          */
         MEDIA_NOTIFY_MESSAGE(20),
         /**

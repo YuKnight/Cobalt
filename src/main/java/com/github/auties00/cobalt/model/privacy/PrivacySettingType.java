@@ -15,7 +15,7 @@ public enum PrivacySettingType {
     /**
      * Refers to whether your last access on Whatsapp should be visible
      */
-    LAST_SEEN(0, "last", Set.of(PrivacySettingValue.EVERYONE, PrivacySettingValue.CONTACTS, PrivacySettingValue.CONTACTS_EXCEPT, PrivacySettingValue.NOBODY)),
+    LAST_SEEN(0, "last", Set.of(PrivacySettingValue.EVERYONE, PrivacySettingValue.CONTACTS, PrivacySettingValue.CONTACTS_EXCEPT, PrivacySettingValue.NO_ONE)),
     /**
      * Refers to whether other people should be able to see when you are online
      */
@@ -23,11 +23,11 @@ public enum PrivacySettingType {
     /**
      * Refers to who should be able to see your profile pic
      */
-    PROFILE_PIC(2, "profile", Set.of(PrivacySettingValue.EVERYONE, PrivacySettingValue.CONTACTS, PrivacySettingValue.CONTACTS_EXCEPT, PrivacySettingValue.NOBODY)),
+    PROFILE_PIC(2, "profile", Set.of(PrivacySettingValue.EVERYONE, PrivacySettingValue.CONTACTS, PrivacySettingValue.CONTACTS_EXCEPT, PrivacySettingValue.NO_ONE)),
     /**
      * Refers to who should be able to see your status
      */
-    STATUS(3, "status", Set.of(PrivacySettingValue.EVERYONE, PrivacySettingValue.CONTACTS, PrivacySettingValue.CONTACTS_EXCEPT, PrivacySettingValue.NOBODY)),
+    STATUS(3, "status", Set.of(PrivacySettingValue.EVERYONE, PrivacySettingValue.CONTACTS, PrivacySettingValue.CONTACTS_EXCEPT, PrivacySettingValue.NO_ONE)),
     /**
      * Refers to who should be able to add you to groups
      */
@@ -35,7 +35,7 @@ public enum PrivacySettingType {
     /**
      * Refers to whether read receipts should be sent and received for messages
      */
-    READ_RECEIPTS(5, "readreceipts", Set.of(PrivacySettingValue.EVERYONE, PrivacySettingValue.NOBODY)),
+    READ_RECEIPTS(5, "readreceipts", Set.of(PrivacySettingValue.EVERYONE, PrivacySettingValue.NO_ONE)),
     /**
      * Refers to who can add you to a call
      */

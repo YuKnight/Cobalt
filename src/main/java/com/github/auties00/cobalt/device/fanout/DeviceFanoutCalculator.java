@@ -1,13 +1,10 @@
 package com.github.auties00.cobalt.device.fanout;
 
-import com.github.auties00.cobalt.device.info.DeviceInfo;
 import com.github.auties00.cobalt.device.info.DeviceList;
 import com.github.auties00.cobalt.model.jid.Jid;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Calculates which devices should receive a message (fanout list).
@@ -18,81 +15,43 @@ public final class DeviceFanoutCalculator {
     }
 
     /**
-     * Calculates the fanout list for a device list.
+     * Calculates the fanout list for any number of device lists.
      *
-     * @param deviceList the user's device list
-     * @param options    fanout calculation options
-     * @return list of device JIDs to send to
+     * @param senderJid the jid of the sender
+     * @param deviceLists the users' device list
+     * @return set of device JIDs to send to
      */
-    public static List<Jid> calculate(DeviceList deviceList, DeviceFanoutOptions options) {
-        var userJid = deviceList.userJid();
-        var filtered = new ArrayList<DeviceInfo>();
+    public static Set<Jid> calculate(Jid senderJid, List<DeviceList> deviceLists) {
+        var results = new HashSet<Jid>();
+        for(var deviceList : deviceLists) {
+            var userJid = deviceList.userJid();
+            for (var device : deviceList.devices()) {
+                if (device.isHosted()) {
+                    continue;
+                }
 
-        for (var device : deviceList.devices()) {
-            if (device.isHosted() && !options.includeHosted()) {
-                continue;
+                var deviceJid = device.toDeviceJid(userJid.user(), userJid.server());
+                if (Objects.equals(deviceJid, senderJid)) {
+                    continue;
+                }
+
+                results.add(deviceJid);
             }
-
-            var deviceJid = device.toDeviceJid(userJid.user(), userJid.server());
-            if (isOwnDevice(deviceJid, options.myDeviceJid())) {
-                continue;
-            }
-
-            filtered.add(device);
         }
-
-        if (options.mergeAlternate()) {
-            filtered = mergeAlternateDevices(filtered);
-        }
-
-        // Step 4: If no devices remain, fall back to primary device
-        if (filtered.isEmpty()) {
-            deviceList.getPrimaryDevice()
-                    .filter(primary -> !isOwnDevice(
-                            primary.toDeviceJid(userJid.user(), userJid.server()),
-                            options.myDeviceJid())
-                    )
-                    .ifPresent(filtered::add);
-        }
-
-        // Convert to JIDs
-        return filtered.stream()
-                .map(d -> d.toDeviceJid(userJid.user(), userJid.server()))
-                .toList();
+        return Collections.unmodifiableSet(results);
     }
 
     /**
-     * Calculates fanout for multiple device lists (e.g., group message).
+     * Filters out devices with unconfirmed identity changes.
+     * These devices should be excluded from fanout until the user confirms the identity change.
      *
-     * @param deviceLists list of device lists for all participants
-     * @param options     fanout calculation options
-     * @return combined list of device JIDs to send to
+     * @param devices         the list of devices to filter
+     * @param changedIdentities the set of devices with unconfirmed identity changes
+     * @return filtered list excluding devices with identity changes
      */
-    public static List<Jid> calculateMultiple(List<DeviceList> deviceLists, DeviceFanoutOptions options) {
-        var result = new ArrayList<Jid>();
-        for (var deviceList : deviceLists) {
-            result.addAll(calculate(deviceList, options));
-        }
-        return result;
-    }
-
-    private static boolean isOwnDevice(Jid targetDevice, Jid myDevice) {
-        if (myDevice == null) {
-            return false;
-        }
-        return Objects.equals(targetDevice.user(), myDevice.user())
-                && Objects.equals(targetDevice.server(), myDevice.server())
-                && targetDevice.device() == myDevice.device();
-    }
-
-    private static ArrayList<DeviceInfo> mergeAlternateDevices(ArrayList<DeviceInfo> devices) {
-        var seen = new HashSet<Integer>();
-        var result = new ArrayList<DeviceInfo>();
-        for (var device : devices) {
-            if (seen.add(device.id())) {
-                result.add(device);
-            }
-        }
-        return result;
+    public static Set<Jid> filterIdentityChanges(Set<Jid> devices, Set<Jid> changedIdentities) {
+        return changedIdentities.isEmpty() ? devices : devices.stream()
+                .filter(jid -> !changedIdentities.contains(jid))
+                .collect(Collectors.toUnmodifiableSet());
     }
 }

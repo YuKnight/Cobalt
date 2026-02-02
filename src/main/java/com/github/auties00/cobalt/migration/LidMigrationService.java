@@ -4,8 +4,10 @@ import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.exception.LidMigrationException;
 import com.github.auties00.cobalt.model.chat.Chat;
 import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.model.sync.HistorySync;
 import com.github.auties00.cobalt.model.sync.LIDMigrationMapping;
 import com.github.auties00.cobalt.model.sync.LIDMigrationMappingSyncPayload;
+import com.github.auties00.cobalt.model.sync.PhoneNumberToLidMapping;
 import com.github.auties00.cobalt.store.WhatsAppStore;
 
 import java.util.*;
@@ -81,9 +83,19 @@ public final class LidMigrationService {
      * Called when the AB prop indicates LID migration is enabled.
      * Transitions from WAITING_PROP to WAITING_MAPPINGS state.
      */
-    public void onMigrationEnabled() {
+    public void enableMigration() {
         if (state.compareAndSet(LidMigrationState.WAITING_PROP, LidMigrationState.WAITING_MAPPINGS)) {
             LOGGER.log(System.Logger.Level.INFO, "LID migration enabled, waiting for mappings from primary");
+        }
+    }
+
+    /**
+     * Called when the AB prop indicates LID migration is disabled.
+     * Transitions from WAITING_PROP to DISABLED
+     */
+    public void disableMigration() {
+        if (state.compareAndSet(LidMigrationState.WAITING_PROP, LidMigrationState.DISABLED)) {
+            LOGGER.log(System.Logger.Level.INFO, "LID migration disabled");
         }
     }
 
@@ -100,7 +112,7 @@ public final class LidMigrationService {
      *
      * @param payload the decoded mapping payload from primary device
      */
-    public void onMappingsReceived(LIDMigrationMappingSyncPayload payload) {
+    public void processProtocolMessage(LIDMigrationMappingSyncPayload payload) {
         if (payload == null) {
             handleError(new LidMigrationException.FailedToParseMappings("null payload"));
             return;
@@ -145,6 +157,162 @@ public final class LidMigrationService {
         } catch (Throwable throwable) {
             handleError(new LidMigrationException.FailedToParseMappings("error processing mappings", throwable));
         }
+    }
+
+    /**
+     * Processes LID mappings from a HistorySync message.
+     * <p>
+     * This method extracts LID mappings from two sources:
+     * <ol>
+     *     <li>The top-level {@code phoneNumberToLidMappings} field</li>
+     *     <li>Individual conversation entries containing {@code pnJid} or {@code lidJid} fields</li>
+     * </ol>
+     * <p>
+     * Additionally, if GlobalSettings contains a {@code chatDbLidMigrationTimestamp},
+     * that timestamp is recorded for use during migration timing decisions.
+     *
+     * @param historySync the decoded HistorySync protobuf
+     */
+    public void processHistorySync(HistorySync historySync) {
+        if (historySync == null) {
+            return;
+        }
+
+        var mappingsProcessed = 0;
+
+        // 1. Process top-level phoneNumberToLidMappings
+        var topLevelMappings = historySync.phoneNumberToLidMappings();
+        if (topLevelMappings != null && !topLevelMappings.isEmpty()) {
+            for (var mapping : topLevelMappings) {
+                if (processPhoneNumberToLidMapping(mapping)) {
+                    mappingsProcessed++;
+                }
+            }
+        }
+
+        // 2. Process conversation-level LID fields
+        var conversations = historySync.conversations();
+        if (conversations != null) {
+            for (var conversation : conversations) {
+                if (processConversationLidData(conversation)) {
+                    mappingsProcessed++;
+                }
+            }
+        }
+
+        // 3. Extract chatDbMigrationTimestamp from GlobalSettings if present
+        var globalSettings = historySync.globalSettings();
+        if (globalSettings != null && globalSettings.chatDbLidMigrationTimestamp() > 0) {
+            var newTimestamp = globalSettings.chatDbLidMigrationTimestamp();
+            if (newTimestamp > this.chatDbMigrationTimestamp) {
+                this.chatDbMigrationTimestamp = newTimestamp;
+                LOGGER.log(System.Logger.Level.DEBUG,
+                        "Updated chatDbMigrationTimestamp from GlobalSettings: {0}", newTimestamp);
+            }
+        }
+
+        if (mappingsProcessed > 0) {
+            // Update the mappings timestamp since we received new mappings
+            this.primaryMappingsTimestamp = System.currentTimeMillis();
+            LOGGER.log(System.Logger.Level.INFO,
+                    "Processed {0} LID mappings from history sync (type={1})",
+                    mappingsProcessed, historySync.syncType());
+        }
+    }
+
+    /**
+     * Processes a single PhoneNumberToLidMapping from the top-level history sync field.
+     *
+     * @param mapping the mapping to process
+     * @return true if a valid mapping was processed
+     */
+    private boolean processPhoneNumberToLidMapping(PhoneNumberToLidMapping mapping) {
+        if (mapping == null) {
+            return false;
+        }
+
+        var pnJid = mapping.pnJid().orElse(null);
+        var lidJid = mapping.lidJid().orElse(null);
+
+        if (pnJid == null || lidJid == null) {
+            return false;
+        }
+
+        // Store in primary cache
+        var user = pnJid.user();
+        if (user != null) {
+            primaryPnToLidCache.put(user, lidJid);
+        }
+
+        // Register bidirectional mapping in store
+        store.registerLidMapping(pnJid, lidJid);
+
+        // Update contact if exists
+        store.findContactByJid(pnJid).ifPresent(contact -> contact.setLid(lidJid));
+
+        return true;
+    }
+
+    /**
+     * Extracts LID mapping from a conversation entry.
+     * <p>
+     * For LID chats (jid has lid server): extracts phone number from pnJid field
+     * For PN chats (jid has user server): extracts LID from lidJid field
+     *
+     * @param conversation the conversation to process
+     * @return true if a valid mapping was extracted
+     */
+    private boolean processConversationLidData(Chat conversation) {
+        if (conversation == null) {
+            return false;
+        }
+
+        var chatJid = conversation.jid();
+
+        // Only process 1:1 chats (user or lid server)
+        if (!chatJid.hasUserServer() && !chatJid.hasLidServer()) {
+            return false;
+        }
+
+        final Jid phoneJid;
+        final Jid lidJid;
+
+        if (chatJid.hasLidServer()) {
+            // LID chat: extract phone number from pnJid field
+            phoneJid = conversation.phoneJid().orElse(null);
+            lidJid = chatJid;
+        } else if (chatJid.hasUserServer()) {
+            // PN chat: extract LID from lidJid field (the 'lid' field in Chat)
+            phoneJid = chatJid;
+            lidJid = conversation.lidJid().orElse(null);
+        } else {
+            phoneJid = null;
+            lidJid = null;
+        }
+
+        if (phoneJid == null || lidJid == null) {
+            return false;
+        }
+
+        // Store in primary cache
+        var user = phoneJid.user();
+        if (user != null) {
+            primaryPnToLidCache.put(user, lidJid);
+        }
+
+        // Register bidirectional mapping in store
+        store.registerLidMapping(phoneJid, lidJid);
+
+        // Update contact if exists
+        store.findContactByJid(phoneJid).ifPresent(contact -> contact.setLid(lidJid));
+
+        // Update the chat itself to ensure it has the mapping
+        conversation.setLid(lidJid);
+        if (!phoneJid.equals(chatJid)) {
+            conversation.setPhoneJid(phoneJid);
+        }
+
+        return true;
     }
 
     /**
@@ -236,7 +404,7 @@ public final class LidMigrationService {
      * @param chat the chat to resolve
      * @return the resolution for this thread
      */
-    public LidMigrationResolution resolveThread(Chat chat) {
+    private LidMigrationResolution resolveThread(Chat chat) {
         var jid = chat.jid();
 
         // Rule 1: Already LID → KEEP
@@ -469,7 +637,7 @@ public final class LidMigrationService {
      * @param newLid   the new LID
      * @param oldLid   the old LID (may be null)
      */
-    public void onLidChanged(Jid phoneJid, Jid newLid, Jid oldLid) {
+    public void changeLid(Jid phoneJid, Jid newLid, Jid oldLid) {
         if (phoneJid == null || newLid == null) {
             return;
         }
@@ -609,26 +777,5 @@ public final class LidMigrationService {
 
         // Check if we have a LID for this recipient
         return lookupLid(recipientJid).isPresent();
-    }
-
-    /**
-     * Gets the effective JID to use for messaging a recipient.
-     * <p>
-     * If LID addressing should be used and a LID is available, returns the LID.
-     * Otherwise returns the original JID.
-     *
-     * @param recipientJid the recipient's original JID
-     * @return the effective JID to use for messaging
-     */
-    public Jid getEffectiveJid(Jid recipientJid) {
-        if (recipientJid == null) {
-            return null;
-        }
-
-        if (!shouldUseLidAddressing(recipientJid)) {
-            return recipientJid;
-        }
-
-        return lookupLid(recipientJid).orElse(recipientJid);
     }
 }

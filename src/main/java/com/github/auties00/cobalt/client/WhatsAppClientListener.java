@@ -15,6 +15,8 @@ import com.github.auties00.cobalt.model.privacy.PrivacySettingEntry;
 import com.github.auties00.cobalt.model.setting.Setting;
 import com.github.auties00.cobalt.node.Node;
 
+import com.github.auties00.cobalt.device.info.DeviceInfo;
+
 import java.util.Collection;
 import java.util.List;
 
@@ -322,5 +324,48 @@ public interface WhatsAppClientListener {
      * @param call     the non-null phone call information
      */
     default void onCall(WhatsAppClient whatsapp, Call call) {
+    }
+
+    /**
+     * Called when a device's identity key has changed.
+     * This indicates the device was reset, reinstalled, or potentially compromised.
+     * Applications should display a security warning to users.
+     *
+     * @param whatsapp       an instance of the calling API
+     * @param userJid        the user whose device changed
+     * @param changedDevices the devices with new identity keys
+     */
+    default void onDeviceIdentityChanged(WhatsAppClient whatsapp, Jid userJid, List<Jid> changedDevices) {
+    }
+
+    /**
+     * Called when ADV (Authenticated Device Verification) device info is refreshed.
+     * This happens automatically every 24 hours to prevent ADV data from expiring.
+     *
+     * @param whatsapp an instance of the calling API
+     */
+    default void onDeviceAdvRefreshed(WhatsAppClient whatsapp) {
+    }
+
+    /**
+     * Called when a device list changes (device added or removed).
+     *
+     * @param whatsapp an instance of the calling API
+     * @param userJid  the user whose device list changed
+     * @param action   the action ("add" or "remove")
+     */
+    default void onDeviceListChanged(WhatsAppClient whatsapp, Jid userJid, String action) {
+    }
+
+    /**
+     * Called when a contact's account type changes between E2EE and HOSTED.
+     * This indicates a transition in the contact's encryption configuration.
+     *
+     * @param whatsapp an instance of the calling API
+     * @param userJid  the user whose account type changed
+     * @param oldType  the previous account type
+     * @param newType  the new account type
+     */
+    default void onAccountTypeChanged(WhatsAppClient whatsapp, Jid userJid, DeviceInfo.Type oldType, DeviceInfo.Type newType) {
     }
 }
