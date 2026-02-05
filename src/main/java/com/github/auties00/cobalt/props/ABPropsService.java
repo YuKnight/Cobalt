@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.props;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
-import com.github.auties00.cobalt.exception.ABPropTypeMismatchException;
+import com.github.auties00.cobalt.exception.WhatsAppABPropTypeMismatchException;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 
@@ -362,7 +362,7 @@ public final class ABPropsService {
      * @param expectedType the expected type (Boolean, Integer, Long, Double, or String)
      * @param <T>          the type parameter
      * @return an Optional containing the typed value if the prop exists, or empty if not found or timeout occurred
-     * @throws ABPropTypeMismatchException if the prop exists but cannot be converted to the expected type
+     * @throws WhatsAppABPropTypeMismatchException if the prop exists but cannot be converted to the expected type
      */
     @SuppressWarnings("unchecked")
     public <T> Optional<T> get(int configCode, Class<T> expectedType) {
@@ -384,19 +384,19 @@ public final class ABPropsService {
         } else if (expectedType == Integer.class || expectedType == int.class) {
             var value = prop.asInt();
             if (value.isEmpty()) {
-                throw new ABPropTypeMismatchException(configCode, expectedType, prop.value());
+                throw new WhatsAppABPropTypeMismatchException(configCode, expectedType, prop.value());
             }
             return (Optional<T>) Optional.of(value.getAsInt());
         } else if (expectedType == Long.class || expectedType == long.class) {
             var value = prop.asLong();
             if (value.isEmpty()) {
-                throw new ABPropTypeMismatchException(configCode, expectedType, prop.value());
+                throw new WhatsAppABPropTypeMismatchException(configCode, expectedType, prop.value());
             }
             return (Optional<T>) Optional.of(value.getAsLong());
         } else if (expectedType == Double.class || expectedType == double.class) {
             var value = prop.asDouble();
             if (value.isEmpty()) {
-                throw new ABPropTypeMismatchException(configCode, expectedType, prop.value());
+                throw new WhatsAppABPropTypeMismatchException(configCode, expectedType, prop.value());
             }
             return (Optional<T>) Optional.of(value.getAsDouble());
         } else if (expectedType == String.class) {

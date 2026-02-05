@@ -1,7 +1,6 @@
 package com.github.auties00.cobalt.media;
 
-import com.github.auties00.cobalt.exception.MediaDownloadException;
-import com.github.auties00.cobalt.exception.MediaException;
+import com.github.auties00.cobalt.exception.WhatsAppMediaException;
 import com.github.auties00.cobalt.model.media.MediaProvider;
 
 import javax.crypto.Cipher;
@@ -47,7 +46,7 @@ final class MediaDownloadInputStream extends MediaInputStream {
 
     private State state;
 
-    MediaDownloadInputStream(HttpClient client, InputStream rawInputStream, long payloadLength, MediaProvider provider) throws MediaException {
+    MediaDownloadInputStream(HttpClient client, InputStream rawInputStream, long payloadLength, MediaProvider provider) throws WhatsAppMediaException {
         super(rawInputStream);
         Objects.requireNonNull(client, "client cannot be null");
         Objects.requireNonNull(rawInputStream, "rawInputStream must not be null");
@@ -66,15 +65,15 @@ final class MediaDownloadInputStream extends MediaInputStream {
         var hasMediaKey = provider.mediaKey().isPresent();
 
         if (hasKeyName != hasMediaKey) {
-            throw new MediaDownloadException("Media key and key name must both be present or both be absent");
+            throw new WhatsAppMediaException.Download("Media key and key name must both be present or both be absent");
         } else if (hasKeyName) {
             this.expectedCiphertextSha256 = provider.mediaEncryptedSha256().orElse(null);
             this.ciphertextDigest = expectedCiphertextSha256 != null ? newHash() : null;
 
             var mediaKey = provider.mediaKey()
-                    .orElseThrow(() -> new MediaDownloadException("Media key must be present"));
+                    .orElseThrow(() -> new WhatsAppMediaException.Download("Media key must be present"));
             var keyName = provider.mediaPath().keyName()
-                    .orElseThrow(() -> new MediaDownloadException("Key name must be present"));
+                    .orElseThrow(() -> new WhatsAppMediaException.Download("Key name must be present"));
 
             var expanded = deriveMediaKeyData(mediaKey, keyName);
             var iv = new IvParameterSpec(expanded, 0, IV_LENGTH);
@@ -100,7 +99,7 @@ final class MediaDownloadInputStream extends MediaInputStream {
     }
 
     @Override
-    public int read() throws MediaDownloadException {
+    public int read() throws WhatsAppMediaException.Download {
         if (isDone()) {
             return -1;
         } else if (isInflatable()) {
@@ -111,7 +110,7 @@ final class MediaDownloadInputStream extends MediaInputStream {
     }
 
     @Override
-    public int read(byte[] b, int off, int len) throws MediaDownloadException {
+    public int read(byte[] b, int off, int len) throws WhatsAppMediaException.Download {
         if (isDone()) {
             return -1;
         } else if (isInflatable()) {
@@ -128,7 +127,7 @@ final class MediaDownloadInputStream extends MediaInputStream {
     }
 
 
-    private boolean isDone() throws MediaDownloadException {
+    private boolean isDone() throws WhatsAppMediaException.Download {
         try {
             var inflatable = isInflatable();
             while ((inflatable ? inflatedOffset >= inflatedLimit : bufferOffset >= bufferLimit) && state != State.DONE) {
@@ -142,7 +141,7 @@ final class MediaDownloadInputStream extends MediaInputStream {
                                 var toRead = (int) Math.min(buffer.length, remainingText);
                                 var read = rawInputStream.read(buffer, 0, toRead);
                                 if (read == -1) {
-                                    throw new MediaDownloadException("Unexpected end of stream: expected " + remainingText + " more bytes");
+                                    throw new WhatsAppMediaException.Download("Unexpected end of stream: expected " + remainingText + " more bytes");
                                 }
                                 remainingText -= read;
 
@@ -200,7 +199,7 @@ final class MediaDownloadInputStream extends MediaInputStream {
                             if(toRead > 0) {
                                 var read = rawInputStream.read(macBuffer, macBufferOffset, toRead);
                                 if (read == -1) {
-                                    throw new MediaDownloadException("Unexpected end of stream: expected " + toRead + " more bytes");
+                                    throw new WhatsAppMediaException.Download("Unexpected end of stream: expected " + toRead + " more bytes");
                                 }
                                 macBufferOffset += read;
                             }
@@ -221,20 +220,20 @@ final class MediaDownloadInputStream extends MediaInputStream {
                                 if (ciphertextDigest != null) {
                                     var actualCiphertextSha256 = ciphertextDigest.digest();
                                     if (!Arrays.equals(expectedCiphertextSha256, actualCiphertextSha256)) {
-                                        throw new MediaDownloadException("Ciphertext SHA256 hash doesn't match the expected value");
+                                        throw new WhatsAppMediaException.Download("Ciphertext SHA256 hash doesn't match the expected value");
                                     }
                                 }
 
                                 var actualCiphertextMac = mac.doFinal();
                                 if (!Arrays.equals(macBuffer, 0, MAC_LENGTH, actualCiphertextMac, 0, MAC_LENGTH)) {
-                                    throw new MediaDownloadException("Mac doesn't match the expected value");
+                                    throw new WhatsAppMediaException.Download("Mac doesn't match the expected value");
                                 }
                             }
 
                             if (plaintextDigest != null) {
                                 var actualPlaintextSha256 = plaintextDigest.digest();
                                 if (!Arrays.equals(expectedPlaintextSha256, actualPlaintextSha256)) {
-                                    throw new MediaDownloadException("Plaintext SHA256 hash doesn't match the expected value");
+                                    throw new WhatsAppMediaException.Download("Plaintext SHA256 hash doesn't match the expected value");
                                 }
                             }
 
@@ -246,11 +245,11 @@ final class MediaDownloadInputStream extends MediaInputStream {
 
             return state == State.DONE;
         } catch (IOException exception) {
-            throw new MediaDownloadException("Cannot read data", exception);
+            throw new WhatsAppMediaException.Download("Cannot read data", exception);
         } catch (GeneralSecurityException exception) {
-            throw new MediaDownloadException("Cannot decrypt data", exception);
+            throw new WhatsAppMediaException.Download("Cannot decrypt data", exception);
         } catch (DataFormatException exception) {
-            throw new MediaDownloadException("Cannot inflate data", exception);
+            throw new WhatsAppMediaException.Download("Cannot inflate data", exception);
         }
     }
 

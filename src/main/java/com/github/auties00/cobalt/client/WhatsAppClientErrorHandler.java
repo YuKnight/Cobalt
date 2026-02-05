@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.client;
 
-import com.github.auties00.cobalt.exception.*;
+import com.github.auties00.cobalt.exception.WhatsAppException;
+import com.github.auties00.cobalt.exception.WhatsAppReconnectionException;
 import com.github.auties00.cobalt.model.jid.Jid;
 
 import java.io.IOException;
@@ -12,7 +13,6 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.function.BiConsumer;
 
-import static com.github.auties00.cobalt.client.WhatsAppClientErrorHandler.Location.*;
 import static java.lang.System.Logger.Level.ERROR;
 import static java.lang.System.Logger.Level.WARNING;
 
@@ -37,15 +37,14 @@ public interface WhatsAppClientErrorHandler {
      * Processes an error that occurred within the WhatsApp API.
      * <p>
      * When an error occurs in any component of the API, this method is called with details
-     * about where the error happened and the associated exception. The implementation should
+     * about the exception that was thrown. The implementation should
      * evaluate the error context and determine the appropriate response action.
      *
      * @param whatsapp  the WhatsApp API instance where the error occurred
-     * @param location  the specific component or operation where the error was detected
-     * @param throwable the exception containing error details, if available
+     * @param exception the exception that occurred
      * @return a {@link Result} value indicating how the API should respond to the error
      */
-    Result handleError(WhatsAppClient whatsapp, Location location, Throwable throwable);
+    Result handleError(WhatsAppClient whatsapp, WhatsAppException exception);
 
     /**
      * Creates an error handler that logs errors to the terminal's standard error.
@@ -94,91 +93,25 @@ public interface WhatsAppClientErrorHandler {
         }));
     }
 
-    private static WhatsAppClientErrorHandler defaultErrorHandler(BiConsumer<WhatsAppClient, Throwable> printer) {
-        return (whatsapp, location, throwable) -> {
+    private static WhatsAppClientErrorHandler defaultErrorHandler(BiConsumer<WhatsAppClient, WhatsAppException> printer) {
+        return (whatsapp, exception) -> {
             var logger = System.getLogger("ErrorHandler");
             var jid = whatsapp.store()
                     .jid()
                     .map(Jid::user)
                     .orElse("UNKNOWN");
-            if(location == RECONNECT) {
+            if(exception instanceof WhatsAppReconnectionException) {
                 logger.log(WARNING, "[{0}] Cannot reconnect: retrying on next timeout", jid);
                 return Result.DISCARD;
             }
 
-            var critical = isCriticalError(location, throwable);
-            logger.log(ERROR, "[{0}] Socket failure at {1}: {2} failure", jid, location, critical ? "Critical" : "Ignored");
+            var fatal = exception.isFatal();
+            logger.log(ERROR, "[{0}] Socket failure at {1}: {2} failure", jid, exception.getClass().getSimpleName(), fatal ? "Fatal" : "Ignored");
             if (printer != null) {
-                printer.accept(whatsapp, throwable);
+                printer.accept(whatsapp, exception);
             }
-            return critical ? Result.DISCONNECT : Result.DISCARD;
+            return fatal ? Result.DISCONNECT : Result.DISCARD;
         };
-    }
-
-    private static boolean isCriticalError(Location location, Throwable throwable) {
-        return location == AUTH // Can't log in
-               || (location == WEB_APP_STATE && throwable instanceof WebAppStateFatalSyncException) // Web app state sync failed
-               || location == CRYPTOGRAPHY // Can't encrypt/decrypt a node
-               || (location == STREAM && (throwable instanceof SessionConflictException || throwable instanceof SessionBadMacException || throwable instanceof MalformedNodeException)) // Something went wrong in the stream
-               || (location == LID_MIGRATION && throwable instanceof LidMigrationException); // LID migration failed critically
-    }
-
-    /**
-     * Defines the possible locations within the WhatsApp API where errors can occur.
-     * <p>
-     * Each value represents a specific component or operation that may encounter errors,
-     * helping to categorize and handle errors appropriately based on their source.
-     */
-    enum Location {
-        /**
-         * Indicates an error with an unspecified or unknown source
-         */
-        UNKNOWN,
-
-        /**
-         * Indicates an error that occurred during the authentication process
-         */
-        AUTH,
-
-        /**
-         * Indicates an error in cryptographic operations, such as encryption or decryption
-         */
-        CRYPTOGRAPHY,
-
-        /**
-         * Indicates an error that occurred while establishing or renewing media connections
-         */
-        MEDIA_CONNECTION,
-
-        /**
-         * Indicates an error in the underlying communication stream
-         */
-        STREAM,
-
-        /**
-         * Indicates an error that occurred while retrieving web app state data
-         */
-        WEB_APP_STATE,
-
-        /**
-         * Indicates an error in message serialization or deserialization
-         */
-        MESSAGE,
-
-        /**
-         * Indicates an error that occurred during message history synchronization
-         */
-        HISTORY_SYNC,
-
-        /**
-         * Indicates an error that occurred during connection re-establishment
-         */
-        RECONNECT,
-
-        /**
-         * Indicates an error that occurred when migrating to the new lid addressing mode
-         */
-        LID_MIGRATION
     }
 
     /**

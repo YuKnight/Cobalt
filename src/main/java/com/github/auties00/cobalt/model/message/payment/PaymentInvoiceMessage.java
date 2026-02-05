@@ -2,9 +2,9 @@ package com.github.auties00.cobalt.model.message.payment;
 
 import com.github.auties00.cobalt.model.info.ContextInfo;
 import com.github.auties00.cobalt.model.media.MediaPath;
-import com.github.auties00.cobalt.model.message.model.MediaMessage;
-import com.github.auties00.cobalt.model.message.model.Message;
-import com.github.auties00.cobalt.model.message.model.PaymentMessage;
+import com.github.auties00.cobalt.model.message.common.MediaMessage;
+import com.github.auties00.cobalt.model.message.common.Message;
+import com.github.auties00.cobalt.model.message.common.PaymentMessage;
 import com.github.auties00.cobalt.util.Clock;
 import it.auties.protobuf.annotation.ProtobufEnum;
 import it.auties.protobuf.annotation.ProtobufEnumIndex;

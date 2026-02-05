@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.node;
 
-import com.github.auties00.cobalt.exception.MalformedNodeException;
+import com.github.auties00.cobalt.exception.WhatsAppStreamException;
 import com.github.auties00.cobalt.model.jid.Jid;
 
 import java.nio.ByteBuffer;
@@ -311,14 +311,14 @@ public final class NodeEncoder {
      * @param output the output byte array
      * @param offset the offset in the output array where encoding should start
      * @param length the length of the output array, in bytes, to encode to.
-     * @throws MalformedNodeException if the node is shorter/longer than the specified length
+     * @throws WhatsAppStreamException.MalformedNode if the node is shorter/longer than the specified length
      * @return the new offset after writing
      */
     public static int encode(Node node, byte[] output, int offset, int length) {
         output[offset] = 0;
         var result = writeNode(node, output, offset + 1);
         if(result - offset != length) {
-            throw new MalformedNodeException();
+            throw new WhatsAppStreamException.MalformedNode();
         }
         return result;
     }

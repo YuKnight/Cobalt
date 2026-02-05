@@ -2,8 +2,8 @@ package com.github.auties00.cobalt.model.message.button;
 
 import com.github.auties00.cobalt.model.button.base.Button;
 import com.github.auties00.cobalt.model.info.ContextInfo;
-import com.github.auties00.cobalt.model.message.model.ButtonMessage;
-import com.github.auties00.cobalt.model.message.model.ContextualMessage;
+import com.github.auties00.cobalt.model.message.common.ButtonMessage;
+import com.github.auties00.cobalt.model.message.common.ContextualMessage;
 import com.github.auties00.cobalt.model.message.standard.DocumentMessage;
 import com.github.auties00.cobalt.model.message.standard.ImageMessage;
 import com.github.auties00.cobalt.model.message.standard.LocationMessage;

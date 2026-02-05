@@ -6,7 +6,7 @@ import com.github.auties00.cobalt.model.info.MessageInfo;
 import com.github.auties00.cobalt.model.info.NewsletterMessageInfo;
 import com.github.auties00.cobalt.model.info.QuotedMessageInfo;
 import com.github.auties00.cobalt.model.jid.JidServer;
-import com.github.auties00.cobalt.model.message.model.MessageStatus;
+import com.github.auties00.cobalt.model.message.common.MessageStatus;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.socket.SocketStream;
 import com.github.auties00.cobalt.util.Clock;

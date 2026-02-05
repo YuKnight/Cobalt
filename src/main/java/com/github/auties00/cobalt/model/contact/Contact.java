@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.model.contact;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.model.auth.ADVEncryptionType;
 import com.github.auties00.cobalt.model.chat.Chat;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidProvider;
@@ -83,7 +84,23 @@ public final class Contact implements JidProvider {
     @ProtobufProperty(index = 9, type = ProtobufType.STRING)
     Jid lid;
 
-    Contact(Jid jid, String chosenName, String fullName, String shortName, ContactStatus lastKnownPresence, long lastSeenSeconds, boolean blocked, boolean statusMuted, Jid lid) {
+    /**
+     * The username associated with this contact.
+     * Usernames are optional identifiers that users can set for their accounts.
+     * Per WhatsApp Web WAWebUsyncUsername: fetched via USync username protocol.
+     */
+    @ProtobufProperty(index = 10, type = ProtobufType.STRING)
+    String username;
+
+    /**
+     * The ADV encryption type for this contact.
+     * Tracks whether the contact uses E2EE (end-to-end encryption) or HOSTED (business API) encryption.
+     * Per WhatsApp Web WAWebApiContact.updateContactAdvHostedType: updated during device list sync.
+     */
+    @ProtobufProperty(index = 11, type = ProtobufType.ENUM)
+    ADVEncryptionType encryptionType;
+
+    Contact(Jid jid, String chosenName, String fullName, String shortName, ContactStatus lastKnownPresence, long lastSeenSeconds, boolean blocked, boolean statusMuted, Jid lid, String username, ADVEncryptionType encryptionType) {
         this.jid = Objects.requireNonNull(jid, "value cannot be null");
         this.chosenName = chosenName;
         this.fullName = fullName;
@@ -93,6 +110,8 @@ public final class Contact implements JidProvider {
         this.blocked = blocked;
         this.statusMuted = statusMuted;
         this.lid = lid;
+        this.username = username;
+        this.encryptionType = encryptionType;
     }
 
     public Jid jid() {
@@ -200,6 +219,54 @@ public final class Contact implements JidProvider {
      */
     public boolean hasLid() {
         return lid != null;
+    }
+
+    /**
+     * Returns the username associated with this contact.
+     * Per WhatsApp Web WAWebUsyncUsername: usernames are optional identifiers.
+     *
+     * @return an optional username
+     */
+    public Optional<String> username() {
+        return Optional.ofNullable(username);
+    }
+
+    /**
+     * Sets the username for this contact.
+     *
+     * @param username the username to set (may be null to clear)
+     */
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    /**
+     * Returns whether this contact has a username set.
+     *
+     * @return true if a username is set
+     */
+    public boolean hasUsername() {
+        return username != null;
+    }
+
+    /**
+     * Returns the ADV encryption type for this contact.
+     * Per WhatsApp Web: E2EE for regular users, HOSTED for business API users.
+     *
+     * @return an optional encryption type
+     */
+    public Optional<ADVEncryptionType> encryptionType() {
+        return Optional.ofNullable(encryptionType);
+    }
+
+    /**
+     * Sets the ADV encryption type for this contact.
+     * Per WhatsApp Web WAWebApiContact.updateContactAdvHostedType: called during device list sync.
+     *
+     * @param encryptionType the encryption type to set (may be null)
+     */
+    public void setEncryptionType(ADVEncryptionType encryptionType) {
+        this.encryptionType = encryptionType;
     }
 
     @Override

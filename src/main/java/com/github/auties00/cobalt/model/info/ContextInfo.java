@@ -4,8 +4,8 @@ import com.github.auties00.cobalt.model.button.base.ButtonActionLink;
 import com.github.auties00.cobalt.model.chat.ChatDisappear;
 import com.github.auties00.cobalt.model.contact.Contact;
 import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.model.ChatMessageKey;
-import com.github.auties00.cobalt.model.message.model.MessageContainer;
+import com.github.auties00.cobalt.model.message.common.ChatMessageKey;
+import com.github.auties00.cobalt.model.message.common.MessageContainer;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
@@ -172,6 +172,12 @@ public final class ContextInfo implements Info { // TODO: Check me
     final int trustBannerAction;
 
     /**
+     * Information about a forwarded AI bot message.
+     */
+    @ProtobufProperty(index = 56, type = ProtobufType.MESSAGE)
+    final ForwardedAIBotMessageInfo forwardedAiBotMessageInfo;
+
+    /**
      * The contact that sent the message that this ContextualMessage quotes
      */
     private Contact quotedMessageSender;
@@ -181,7 +187,7 @@ public final class ContextInfo implements Info { // TODO: Check me
      */
     private MessageInfoParent quotedMessageParent;
 
-    ContextInfo(String quotedMessageId, Jid quotedMessageSenderJid, MessageContainer quotedMessage, Jid quotedMessageParentJid, List<Jid> mentions, String conversionSource, byte[] conversionData, int conversionDelaySeconds, int forwardingScore, boolean forwarded, AdReplyInfo quotedAd, ChatMessageKey placeholderKey, int ephemeralExpiration, long ephemeralSettingTimestamp, byte[] ephemeralSharedSecret, ExternalAdReplyInfo externalAdReply, String entryPointConversionSource, String entryPointConversionApp, int entryPointConversionDelaySeconds, ChatDisappear disappearingMode, ButtonActionLink actionLink, String groupSubject, Jid parentGroup, String trustBannerType, int trustBannerAction) {
+    ContextInfo(String quotedMessageId, Jid quotedMessageSenderJid, MessageContainer quotedMessage, Jid quotedMessageParentJid, List<Jid> mentions, String conversionSource, byte[] conversionData, int conversionDelaySeconds, int forwardingScore, boolean forwarded, AdReplyInfo quotedAd, ChatMessageKey placeholderKey, int ephemeralExpiration, long ephemeralSettingTimestamp, byte[] ephemeralSharedSecret, ExternalAdReplyInfo externalAdReply, String entryPointConversionSource, String entryPointConversionApp, int entryPointConversionDelaySeconds, ChatDisappear disappearingMode, ButtonActionLink actionLink, String groupSubject, Jid parentGroup, String trustBannerType, int trustBannerAction, ForwardedAIBotMessageInfo forwardedAiBotMessageInfo) {
         this.quotedMessageId = quotedMessageId;
         this.quotedMessageSenderJid = quotedMessageSenderJid;
         this.quotedMessage = quotedMessage;
@@ -207,6 +213,7 @@ public final class ContextInfo implements Info { // TODO: Check me
         this.parentGroup = parentGroup;
         this.trustBannerType = trustBannerType;
         this.trustBannerAction = trustBannerAction;
+        this.forwardedAiBotMessageInfo = forwardedAiBotMessageInfo;
     }
 
     public static ContextInfo of(MessageInfo quotedMessage) {
@@ -422,5 +429,9 @@ public final class ContextInfo implements Info { // TODO: Check me
 
     public int trustBannerAction() {
         return trustBannerAction;
+    }
+
+    public Optional<ForwardedAIBotMessageInfo> forwardedAiBotMessageInfo() {
+        return Optional.ofNullable(forwardedAiBotMessageInfo);
     }
 }

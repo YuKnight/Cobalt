@@ -3,10 +3,9 @@ package com.github.auties00.cobalt.socket.iq;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.client.WhatsAppClientDisconnectReason;
 import com.github.auties00.cobalt.client.WhatsAppClientVerificationHandler;
-import com.github.auties00.cobalt.exception.ADVValidationException;
-import com.github.auties00.cobalt.exception.SessionClosedException;
+import com.github.auties00.cobalt.device.DeviceService;
+import com.github.auties00.cobalt.exception.WhatsAppSessionException;
 import com.github.auties00.cobalt.model.auth.DeviceIdentitySpec;
-import com.github.auties00.cobalt.model.auth.SignedDeviceIdentity;
 import com.github.auties00.cobalt.model.auth.SignedDeviceIdentityBuilder;
 import com.github.auties00.cobalt.model.auth.SignedDeviceIdentitySpec;
 import com.github.auties00.cobalt.model.auth.UserAgent.PlatformType;
@@ -18,19 +17,15 @@ import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.socket.SocketPhonePairing;
 import com.github.auties00.cobalt.socket.SocketStream;
-import com.github.auties00.cobalt.device.adv.DeviceADVValidator;
 import com.github.auties00.cobalt.util.Clock;
 import com.github.auties00.libsignal.key.SignalIdentityKeyPair;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.NoSuchElementException;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
-
-import static com.github.auties00.cobalt.client.WhatsAppClientErrorHandler.Location.AUTH;
 
 public final class IqStreamNodeHandler extends SocketStream.Handler {
     private static final int PING_INTERVAL = 30;
@@ -38,11 +33,14 @@ public final class IqStreamNodeHandler extends SocketStream.Handler {
     private final WhatsAppClientVerificationHandler.Web webVerificationHandler;
     private final SocketPhonePairing pairingCode;
     private final Executor pingExecutor;
-    public IqStreamNodeHandler(WhatsAppClient whatsapp, WhatsAppClientVerificationHandler.Web webVerificationHandler, SocketPhonePairing pairingCode) {
+    private final DeviceService deviceService;
+
+    public IqStreamNodeHandler(WhatsAppClient whatsapp, WhatsAppClientVerificationHandler.Web webVerificationHandler, SocketPhonePairing pairingCode, DeviceService deviceService) {
         super(whatsapp, "iq");
         this.webVerificationHandler = webVerificationHandler;
         this.pairingCode = pairingCode;
         this.pingExecutor = CompletableFuture.delayedExecutor(PING_INTERVAL, TimeUnit.SECONDS);
+        this.deviceService = deviceService;
     }
 
     @Override
@@ -100,6 +98,8 @@ public final class IqStreamNodeHandler extends SocketStream.Handler {
                 .orElseThrow(() -> new NoSuchElementException("Missing ref"));
         var companionKeyPair = SignalIdentityKeyPair.random();
         whatsapp.store().setCompanionKeyPair(companionKeyPair);
+        // WAWebAdvSignatureApi.generateADVSecretKey: generate random 32-byte secret for HMAC verification
+        whatsapp.store().generateAdvSecretKey();
         var qr = String.join(
                 ",",
                 ref,
@@ -146,7 +146,7 @@ public final class IqStreamNodeHandler extends SocketStream.Handler {
                     .attribute("type", "get")
                     .content(pingBody);
             return whatsapp.sendNode(pingRequest);
-        }catch (SessionClosedException throwable) {
+        }catch (WhatsAppSessionException.Closed throwable) {
             return null;
         }
     }
@@ -157,6 +157,9 @@ public final class IqStreamNodeHandler extends SocketStream.Handler {
                 .orElseThrow(() -> new InternalError("Phone number was not set"));
         var companionKeyPair = SignalIdentityKeyPair.random();
         whatsapp.store().setCompanionKeyPair(companionKeyPair);
+        // WAWebAdvSignatureApi.generateADVSecretKey: generate random 32-byte secret for HMAC verification
+        // Note: For phone number pairing, this will be replaced by HKDF-derived secret in handlePrimaryHello
+        whatsapp.store().generateAdvSecretKey();
         var linkCodePairingWrappedCompanionEphemeralPub = new NodeBuilder()
                 .description("link_code_pairing_wrapped_companion_ephemeral_pub")
                 .content(pairingCode.encrypt(companionKeyPair.publicKey()))
@@ -197,7 +200,7 @@ public final class IqStreamNodeHandler extends SocketStream.Handler {
     private void handlePairSuccess(Node node, Node container) {
         saveCompanion(container);
 
-        var signedDeviceIdentity = parseSignedDeviceIdentity(container);
+        var signedDeviceIdentity = deviceService.extractAndValidateLocalSignedDeviceIdentity(container);
         if(signedDeviceIdentity.isEmpty()) {
             return;
         }
@@ -228,23 +231,6 @@ public final class IqStreamNodeHandler extends SocketStream.Handler {
                 .content(deviceIdentityNode)
                 .build();
         sendConfirmNode(node, devicePairRequest);
-    }
-
-    private Optional<SignedDeviceIdentity> parseSignedDeviceIdentity(Node container) {
-        try {
-            var jid = whatsapp.store()
-                    .jid()
-                    .orElseThrow(() -> new IllegalStateException("Jid was not set"));
-            var companionKeyPair = whatsapp.store()
-                    .companionKeyPair()
-                    .orElseThrow(() -> new IllegalStateException("Missing companion key pair"));
-            var identityKeyPair = whatsapp.store().identityKeyPair();
-            var signedDeviceIdentity = DeviceADVValidator.extractAndValidateLocalSignedDeviceIdentity(jid, companionKeyPair, identityKeyPair, container);
-            return Optional.of(signedDeviceIdentity);
-        } catch (ADVValidationException exception) {
-            whatsapp.handleFailure(AUTH, exception);
-            return Optional.empty();
-        }
     }
 
     private PlatformType getWebPlatform(Node node) {

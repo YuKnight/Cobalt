@@ -2,9 +2,7 @@ package com.github.auties00.cobalt.media;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
-import com.github.auties00.cobalt.exception.MediaDownloadException;
-import com.github.auties00.cobalt.exception.MediaException;
-import com.github.auties00.cobalt.exception.MediaUploadException;
+import com.github.auties00.cobalt.exception.WhatsAppMediaException;
 import com.github.auties00.cobalt.model.media.MediaProvider;
 import com.github.auties00.cobalt.util.Clock;
 
@@ -38,7 +36,7 @@ public final class MediaConnection {
         this.hosts = hosts;
     }
 
-    public boolean upload(MediaProvider provider, InputStream inputStream) throws MediaException {
+    public boolean upload(MediaProvider provider, InputStream inputStream) throws WhatsAppMediaException {
         Objects.requireNonNull(provider, "provider cannot be null");
         Objects.requireNonNull(inputStream, "inputStream cannot be null");
 
@@ -90,9 +88,9 @@ public final class MediaConnection {
                 }
             }
 
-            throw new MediaUploadException("Cannot upload media: no hosts available");
+            throw new WhatsAppMediaException.Upload("Cannot upload media: no hosts available");
         }catch (IOException exception) {
-            throw new MediaUploadException("Cannot upload media", exception);
+            throw new WhatsAppMediaException.Upload("Cannot upload media", exception);
         }
     }
 
@@ -112,7 +110,7 @@ public final class MediaConnection {
                     .build();
             var response = client.send(request, HttpResponse.BodyHandlers.ofByteArray());
             if (response.statusCode() != 200) {
-                throw new MediaUploadException("Cannot upload media: status code " + response.statusCode());
+                throw new WhatsAppMediaException.Upload("Cannot upload media: status code " + response.statusCode());
             }
 
             var jsonObject = JSON.parseObject(response.body());
@@ -122,7 +120,7 @@ public final class MediaConnection {
         }
     }
 
-    public InputStream download(MediaProvider provider) throws MediaException {
+    public InputStream download(MediaProvider provider) throws WhatsAppMediaException {
         Objects.requireNonNull(provider, "provider cannot be null");
 
         var defaultUploadUrl = provider.mediaUrl();
@@ -134,7 +132,7 @@ public final class MediaConnection {
         }
 
         var defaultDirectPath = provider.mediaDirectPath()
-                .orElseThrow(() -> new MediaDownloadException("Missing direct path from media"));
+                .orElseThrow(() -> new WhatsAppMediaException.Download("Missing direct path from media"));
         for(var host : hosts) {
             if(!host.canDownload(provider)) {
                 continue;
@@ -147,10 +145,10 @@ public final class MediaConnection {
             }
         }
 
-        throw new MediaDownloadException("Cannot download media: no hosts available");
+        throw new WhatsAppMediaException.Download("Cannot download media: no hosts available");
     }
 
-    public Optional<InputStream> tryDownload(MediaProvider provider, String uploadUrl) throws MediaException {
+    public Optional<InputStream> tryDownload(MediaProvider provider, String uploadUrl) throws WhatsAppMediaException {
         var client = HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.ALWAYS)
                 .build();
@@ -160,12 +158,12 @@ public final class MediaConnection {
         try {
             var response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
             if (response.statusCode() != 200) {
-                throw new MediaDownloadException("Cannot download media: status code " + response.statusCode());
+                throw new WhatsAppMediaException.Download("Cannot download media: status code " + response.statusCode());
             }
 
             var payloadLength = response.headers()
                     .firstValueAsLong("Content-Length")
-                    .orElseThrow(() -> new MediaDownloadException("Unknown content length"));
+                    .orElseThrow(() -> new WhatsAppMediaException.Download("Unknown content length"));
 
             var rawInputStream = response.body();
             return Optional.of(new MediaDownloadInputStream(client, rawInputStream, payloadLength, provider));

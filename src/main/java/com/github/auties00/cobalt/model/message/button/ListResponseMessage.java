@@ -2,8 +2,8 @@ package com.github.auties00.cobalt.model.message.button;
 
 import com.github.auties00.cobalt.model.button.base.SingleSelectReplyButton;
 import com.github.auties00.cobalt.model.info.ContextInfo;
-import com.github.auties00.cobalt.model.message.model.ButtonReplyMessage;
-import com.github.auties00.cobalt.model.message.model.Message;
+import com.github.auties00.cobalt.model.message.common.ButtonReplyMessage;
+import com.github.auties00.cobalt.model.message.common.Message;
 import it.auties.protobuf.annotation.ProtobufEnum;
 import it.auties.protobuf.annotation.ProtobufEnumIndex;
 import it.auties.protobuf.annotation.ProtobufMessage;

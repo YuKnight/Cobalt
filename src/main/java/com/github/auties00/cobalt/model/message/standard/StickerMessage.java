@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.model.message.standard;
 
 import com.github.auties00.cobalt.model.info.ContextInfo;
-import com.github.auties00.cobalt.model.message.model.MediaMessage;
+import com.github.auties00.cobalt.model.message.common.MediaMessage;
 import com.github.auties00.cobalt.util.Clock;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;

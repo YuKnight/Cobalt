@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.sync.crypto;
 
-import com.github.auties00.cobalt.exception.WebAppStateFatalSyncException;
+import com.github.auties00.cobalt.exception.WhatsAppWebAppStateSyncException;
 import com.github.auties00.cobalt.sync.exchange.MutationSyncResponse;
 import com.github.auties00.cobalt.model.sync.PatchSync;
 import com.github.auties00.cobalt.model.sync.PatchType;
@@ -56,7 +56,7 @@ public final class MutationIntegrityVerifier {
         try (var keys = MutationKeys.ofSyncKey(keyData.keyData())) {
             var expectedMac = computeMac(response.collectionName(), response.version(), expectedHash, keys.snapshotMacKey());
             if (!MessageDigest.isEqual(snapshot.mac(), expectedMac)) {
-                throw new WebAppStateFatalSyncException("Snapshot MAC mismatch");
+                throw new WhatsAppWebAppStateSyncException.SnapshotMacMismatch(response.collectionName(), response.version());
             }
         }
     }
@@ -84,7 +84,7 @@ public final class MutationIntegrityVerifier {
         try (var keys = MutationKeys.ofSyncKey(keyData.keyData())) {
             var expectedMac = computeMac(type, patch.encodedVersion(), expectedHash, keys.patchMacKey());
             if (!MessageDigest.isEqual(patch.patchMac(), expectedMac)) {
-                throw new WebAppStateFatalSyncException("Patch MAC mismatch");
+                throw new WhatsAppWebAppStateSyncException.PatchMacMismatch(type, patch.encodedVersion());
             }
         }
     }
@@ -108,8 +108,8 @@ public final class MutationIntegrityVerifier {
             mac.update(expectedHash);
 
             return mac.doFinal();
-        }catch (GeneralSecurityException exception) {
-            throw new WebAppStateFatalSyncException("Failed to compute MAC", exception);
+        } catch (GeneralSecurityException exception) {
+            throw new WhatsAppWebAppStateSyncException.MacComputationFailed(exception);
         }
     }
 }

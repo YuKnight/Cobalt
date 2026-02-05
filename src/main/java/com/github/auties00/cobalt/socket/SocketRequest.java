@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.socket;
 
-import com.github.auties00.cobalt.exception.NodeTimeoutException;
+import com.github.auties00.cobalt.exception.WhatsAppStreamException;
 import com.github.auties00.cobalt.node.Node;
 
 import java.time.Duration;
@@ -38,11 +38,11 @@ public final class SocketRequest {
                     try {
                         wait(TIMEOUT.toMillis());
                         if (response == null) {
-                            throw new NodeTimeoutException(body);
+                            throw new WhatsAppStreamException.NodeTimeout(body);
                         }
                     } catch (InterruptedException exception) {
                         Thread.currentThread().interrupt();
-                        throw new NodeTimeoutException(body);
+                        throw new WhatsAppStreamException.NodeTimeout(body);
                     }
                 }
             }

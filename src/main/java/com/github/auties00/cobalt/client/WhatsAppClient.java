@@ -2,12 +2,9 @@ package com.github.auties00.cobalt.client;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.device.DeviceService;
-import com.github.auties00.cobalt.message.receipt.MessageReceiptService;
+import com.github.auties00.cobalt.exception.*;
+import com.github.auties00.cobalt.message.receipt.MessageReceiptHandler;
 import com.github.auties00.cobalt.message.receive.MessageReceivingService;
-import com.github.auties00.cobalt.message.send.MessageSendInput;
-import com.github.auties00.cobalt.message.send.MessageSendInput.Chat.Edit.Type;
-import com.github.auties00.cobalt.message.send.MessageSendResult;
-import com.github.auties00.cobalt.message.send.MessageSendingService;
 import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.model.action.*;
 import com.github.auties00.cobalt.model.auth.*;
@@ -23,7 +20,7 @@ import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidProvider;
 import com.github.auties00.cobalt.model.jid.JidServer;
 import com.github.auties00.cobalt.model.media.MediaProvider;
-import com.github.auties00.cobalt.model.message.model.*;
+import com.github.auties00.cobalt.model.message.common.*;
 import com.github.auties00.cobalt.model.message.server.ProtocolMessage;
 import com.github.auties00.cobalt.model.message.server.ProtocolMessageBuilder;
 import com.github.auties00.cobalt.model.message.standard.NewsletterAdminInviteMessageBuilder;
@@ -49,7 +46,6 @@ import com.github.auties00.cobalt.socket.SocketStream;
 import com.github.auties00.cobalt.store.WhatsAppStore;
 import com.github.auties00.cobalt.sync.WebAppStateService;
 import com.github.auties00.cobalt.util.Clock;
-import com.github.auties00.cobalt.util.MetaBots;
 import com.github.auties00.cobalt.util.SecureBytes;
 import com.github.auties00.curve25519.Curve25519;
 import com.github.auties00.libsignal.SignalSessionCipher;
@@ -86,7 +82,6 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static com.github.auties00.cobalt.client.WhatsAppClientErrorHandler.Location.*;
 import static com.github.auties00.cobalt.model.contact.ContactStatus.*;
 
 /**
@@ -116,11 +111,8 @@ public final class WhatsAppClient {
     private final DeviceService deviceService;
     private final ABPropsService abPropsService;
 
-    private final SignalSessionCipher sessionCipher;
-    private final SignalGroupCipher groupCipher;
-    private final MessageSendingService messageSendingService;
     private final MessageReceivingService messageReceivingService;
-    private final MessageReceiptService messageReceiptService;
+    private final MessageReceiptHandler messageReceiptHandler;
 
     private SocketSession socketSession;
     private final SocketStream socketStream;
@@ -133,17 +125,16 @@ public final class WhatsAppClient {
         if ((store.clientType() == WhatsAppClientType.WEB) == (webVerificationHandler == null)) {
             throw new IllegalArgumentException("webVerificationHandler cannot be null when client type is WEB");
         }
-        this.sessionCipher = new SignalSessionCipher(store);
-        this.groupCipher = new SignalGroupCipher(store);
-        this.webAppStateService = new WebAppStateService(this);
-        this.lidMigrationService = new LidMigrationService(this);
+        SignalSessionCipher sessionCipher = new SignalSessionCipher(store);
+        SignalGroupCipher groupCipher = new SignalGroupCipher(store);
         this.abPropsService = new ABPropsService(this);
-        this.deviceService = new DeviceService(this, abPropsService);
-        this.messageSendingService = new MessageSendingService(this, store, lidMigrationService, deviceService, sessionCipher, groupCipher);
+        this.webAppStateService = new WebAppStateService(this, abPropsService);
+        this.lidMigrationService = new LidMigrationService(this);
+        this.deviceService = new DeviceService(this, abPropsService, sessionCipher);
         this.messageReceivingService = new MessageReceivingService(store, sessionCipher, groupCipher);
-        this.messageReceiptService = new MessageReceiptService(this);
+        this.messageReceiptHandler = new MessageReceiptHandler(this);
         this.pendingSocketRequests = new ConcurrentHashMap<>();
-        this.socketStream = new SocketStream(this, webVerificationHandler, lidMigrationService, messageReceivingService, messageReceiptService, abPropsService);
+        this.socketStream = new SocketStream(this, webVerificationHandler, lidMigrationService, messageReceivingService, messageReceiptHandler, abPropsService, deviceService);
         this.messagePreviewHandler = messagePreviewHandler;
     }
 
@@ -200,9 +191,10 @@ public final class WhatsAppClient {
             socketSession.connect(this::onMessage);
         } catch (Throwable throwable) {
             if (reason == WhatsAppClientDisconnectReason.RECONNECTING) {
-                handleFailure(RECONNECT, throwable);
+                // TODO: Add attempts count
+                handleFailure(new WhatsAppReconnectionException(throwable.getMessage(), 0, throwable));
             } else {
-                handleFailure(AUTH, throwable);
+                handleFailure(new WhatsAppConnectionException(throwable.getMessage(), throwable));
             }
             return;
         }
@@ -358,6 +350,9 @@ public final class WhatsAppClient {
         webAppStateService.reset();
         lidMigrationService.reset();
 
+        // Stop ADV check scheduler (will be restarted on successful reconnection)
+        deviceService.stopAdvCheckScheduler();
+
         if (reason != WhatsAppClientDisconnectReason.RECONNECTING && shutdownHook != null && canRemoveShutdownHook) {
             Runtime.getRuntime().removeShutdownHook(shutdownHook);
             shutdownHook = null;
@@ -382,8 +377,10 @@ public final class WhatsAppClient {
                 resolvePendingRequest(node);
                 socketStream.digest(node);
             }
+        } catch (WhatsAppStreamException exception) {
+            handleFailure(exception);
         } catch (Throwable throwable) {
-            handleFailure(STREAM, throwable);
+            handleFailure(new WhatsAppStreamException(throwable));
         }
     }
 
@@ -502,8 +499,8 @@ public final class WhatsAppClient {
 
     //<editor-fold desc="Error handling">
 
-    public void handleFailure(WhatsAppClientErrorHandler.Location location, Throwable throwable) {
-        var result = errorHandler.handleError(this, location, throwable);
+    public void handleFailure(WhatsAppException exception) {
+        var result = errorHandler.handleError(this, exception);
         switch (result) {
             case LOG_OUT -> disconnect(WhatsAppClientDisconnectReason.LOGGED_OUT);
             case DISCONNECT -> disconnect(WhatsAppClientDisconnectReason.DISCONNECTED);
@@ -1689,26 +1686,25 @@ public final class WhatsAppClient {
     }
 
     /**
-     * Sends a message to a chat
+     * Sends a message to a chat.
      *
      * @param info    the message to send
      * @param compose whether a compose status should be sent before sending the message
-     * @return a CompletableFuture
+     * @return the sent message info
+     * @throws WhatsAppMessageException.Send if sending fails
      */
     public ChatMessageInfo sendChatMessage(ChatMessageInfo info, boolean compose) {
         var recipient = info.chatJid();
         if (recipient.hasServer(JidServer.newsletter())) {
             throw new IllegalArgumentException("Use sendNewsletterMessage to send a message in a newsletter");
         }
-        var timestamp = Clock.nowSeconds();
+
         if (compose) {
             changePresence(recipient, COMPOSING);
         }
 
-        var result = messageSendingService.send(new MessageSendInput.Chat.Default(info));
-        if (!result.isSuccess()) {
-            handleSendFailure(info, result);
-        }
+        // TODO: Send chat message
+        ChatMessageInfo sentInfo = null;
 
         if (compose) {
             var pausedNode = new NodeBuilder()
@@ -1722,48 +1718,20 @@ public final class WhatsAppClient {
             sendNodeWithNoResponse(node);
             updatePresence(recipient, AVAILABLE);
         }
-        return info;
+
+        return sentInfo;
     }
 
     /**
-     * Sends a message to a newsletter
+     * Sends a message to a newsletter.
      *
      * @param info the message to send
-     * @return a CompletableFuture
+     * @return the sent message info
+     * @throws WhatsAppMessageException.Send if sending fails
      */
     public NewsletterMessageInfo sendMessage(NewsletterMessageInfo info) {
-        var result = messageSendingService.send(new MessageSendInput.Newsletter(info));
-        if (!result.isSuccess()) {
-            handleNewsletterSendFailure(info, result);
-        }
-        return info;
-    }
-
-    private void handleSendFailure(ChatMessageInfo info, MessageSendResult result) {
-        switch (result) {
-            case MessageSendResult.PhashMismatch mismatch ->
-                throw new com.github.auties00.cobalt.exception.MessageException(
-                    "Phash mismatch: expected " + mismatch.expectedPhash() + ", got " + mismatch.actualPhash());
-            case MessageSendResult.MissingPreKeys missing ->
-                throw new com.github.auties00.cobalt.exception.MessageException(
-                    "Missing prekeys for devices: " + missing.devices());
-            case MessageSendResult.IdentityChanged changed ->
-                throw new com.github.auties00.cobalt.exception.MessageException(
-                    "Identity changed for devices: " + changed.devices());
-            case MessageSendResult.NetworkError error ->
-                throw new com.github.auties00.cobalt.exception.MessageException(
-                    "Network error", error.cause());
-            case MessageSendResult.ProtocolError error ->
-                throw new com.github.auties00.cobalt.exception.MessageException(
-                    "Protocol error " + error.code() + ": " + error.description());
-            default -> {}
-        }
-    }
-
-    private void handleNewsletterSendFailure(NewsletterMessageInfo info, MessageSendResult result) {
-        if (result instanceof MessageSendResult.ProtocolError(var code, var description)) {
-            throw new com.github.auties00.cobalt.exception.MessageException("Newsletter send failed: " + code + ": " + description);
-        }
+        // TODO: Send newsletter message
+        return null;
     }
 
     //</editor-fold>
@@ -2059,8 +2027,7 @@ public final class WhatsAppClient {
                     .build();
             var sender = info.chatJid().hasServer(JidServer.groupOrCommunity()) ? localJid : null;
             var editId = ChatMessageKey.randomId(store.clientType());
-            var input = new MessageSendInput.Chat.Edit(info, Type.REVOKE, editId);
-            messageSendingService.send(input);
+            // TODO: Delete message
         } else {
             switch (store.clientType()) {
                 case WEB -> {
@@ -4004,7 +3971,8 @@ public final class WhatsAppClient {
             throw new IllegalArgumentException("Calling is only available for the mobile api");
         }
         addContacts(contact);
-        deviceService.getDeviceLists(List.of(contact.toJid()));
+        Collection<Jid> userJids = List.of(contact.toJid());
+        deviceService.getDeviceLists(userJids, "message", null, false);
         return sendCallMessage(contact, video);
     }
 

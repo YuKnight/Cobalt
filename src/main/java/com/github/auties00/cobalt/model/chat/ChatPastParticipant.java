@@ -8,6 +8,8 @@ import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.util.Objects;
 import java.util.Optional;
@@ -17,6 +19,13 @@ import java.util.Optional;
  */
 @ProtobufMessage(name = "PastParticipant")
 public final class ChatPastParticipant {
+    /**
+     * Duration after which past participant records expire.
+     *
+     * @apiNote WAWebDbPastParticipant: PAST_PARTICIPANT_EXPIRATION_DAYS
+     */
+    private static final Duration EXPIRATION = Duration.ofDays(180);
+
     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
     final Jid jid;
 
@@ -51,6 +60,20 @@ public final class ChatPastParticipant {
 
     public long timestampSeconds() {
         return timestampSeconds;
+    }
+
+    /**
+     * Returns whether this past participant record has expired.
+     * <p>
+     * Per WhatsApp Web: past participant records are pruned after 180 days.
+     *
+     * @return true if the record is expired and should be pruned
+     *
+     * @apiNote WAWebDbPastParticipant: checks if record exceeds PAST_PARTICIPANT_EXPIRATION_DAYS
+     */
+    public boolean isExpired() {
+        var age = Duration.between(Instant.ofEpochSecond(timestampSeconds), Instant.now());
+        return age.compareTo(EXPIRATION) > 0;
     }
 
     @Override

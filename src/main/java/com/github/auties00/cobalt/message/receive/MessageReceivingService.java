@@ -1,23 +1,21 @@
 package com.github.auties00.cobalt.message.receive;
 
-import com.github.auties00.cobalt.exception.ADVValidationException;
-import com.github.auties00.cobalt.exception.MessageDecryptionException;
-import com.github.auties00.cobalt.exception.MessageParseException;
-import com.github.auties00.cobalt.message.receive.decryption.MessageDecryptionService;
-import com.github.auties00.cobalt.message.receive.stanza.MessageReceiveStanzaParser.EncNode;
-import com.github.auties00.cobalt.message.receive.stanza.MessageReceiveStanzaParser.ParsedMessageStanza;
-import com.github.auties00.cobalt.model.chat.Chat;
-import com.github.auties00.cobalt.model.chat.ChatBuilder;
+import com.github.auties00.cobalt.exception.WhatsAppAdvValidationException;
+import com.github.auties00.cobalt.exception.WhatsAppMessageException;
+import com.github.auties00.cobalt.message.encryption.MessageDecryption;
+import com.github.auties00.cobalt.message.receive.MessageReceiveStanzaParser.EncNode;
+import com.github.auties00.cobalt.message.receive.MessageReceiveStanzaParser.ParsedMessageStanza;
 import com.github.auties00.cobalt.model.info.ChatMessageInfo;
 import com.github.auties00.cobalt.model.info.ChatMessageInfoBuilder;
 import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.model.ChatMessageKey;
-import com.github.auties00.cobalt.model.message.model.MessageContainer;
-import com.github.auties00.cobalt.model.message.model.MessageStatus;
+import com.github.auties00.cobalt.model.message.common.ChatMessageKey;
+import com.github.auties00.cobalt.model.message.common.MessageContainer;
+import com.github.auties00.cobalt.model.message.common.MessageStatus;
 import com.github.auties00.cobalt.store.WhatsAppStore;
 import com.github.auties00.libsignal.SignalSessionCipher;
 import com.github.auties00.libsignal.groups.SignalGroupCipher;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -25,15 +23,17 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Main service for processing received messages.
  * Coordinates decryption, validation, parsing, and storage of incoming messages.
- * This is the counterpart to {@link com.github.auties00.cobalt.message.send.MessageSendingService}.
+ * <p>
+ * The {@link #process(ParsedMessageStanza)} method returns a {@link ChatMessageInfo} on success,
+ * returns {@code null} for messages that should be silently skipped (duplicates, not for this device),
+ * or throws a {@link WhatsAppMessageException.Receive} subclass for errors that require receipts.
  */
 public final class MessageReceivingService {
     private static final System.Logger LOGGER = System.getLogger("MessageReceivingService");
 
     private final WhatsAppStore store;
-    private final MessageDecryptionService decryptionService;
+    private final MessageDecryption decryptionService;
 
-    // Track recently processed message IDs to detect duplicates
     private final Set<String> recentMessageIds = ConcurrentHashMap.newKeySet();
     private static final int MAX_RECENT_IDS = 10000;
 
@@ -43,16 +43,18 @@ public final class MessageReceivingService {
             SignalGroupCipher groupCipher
     ) {
         this.store = Objects.requireNonNull(store, "store cannot be null");
-        this.decryptionService = new MessageDecryptionService(store, sessionCipher, groupCipher);
+        this.decryptionService = new MessageDecryption(store, sessionCipher, groupCipher);
     }
 
     /**
      * Processes a received message stanza.
      *
      * @param stanza the parsed message stanza
-     * @return the result of processing
+     * @return the processed message info, or {@code null} if the message should be skipped
+     *         (duplicate or not for this device)
+     * @throws WhatsAppMessageException.Receive if decryption or validation fails
      */
-    public MessageReceiveResult process(ParsedMessageStanza stanza) {
+    public ChatMessageInfo process(ParsedMessageStanza stanza) {
         Objects.requireNonNull(stanza, "stanza cannot be null");
 
         var messageId = stanza.id();
@@ -62,76 +64,52 @@ public final class MessageReceivingService {
         LOGGER.log(System.Logger.Level.DEBUG, "Processing message {0} from {1} in chat {2}",
                 messageId, senderJid, chatJid);
 
-        try {
-            // 1. Check for duplicates
-            // Edge case 58: suppress notification if hideFail flag set or reaction/poll vote
-            if (isDuplicate(messageId)) {
-                var suppressNotification = stanza.shouldSuppressDuplicateNotification();
-                if (suppressNotification) {
-                    LOGGER.log(System.Logger.Level.TRACE, "Suppressed duplicate message: {0}", messageId);
-                } else {
-                    LOGGER.log(System.Logger.Level.DEBUG, "Duplicate message detected: {0}", messageId);
-                }
-                return new MessageReceiveResult.Duplicate(messageId, suppressNotification);
+        if (isDuplicate(messageId)) {
+            var suppressNotification = stanza.shouldSuppressDuplicateNotification();
+            if (suppressNotification) {
+                LOGGER.log(System.Logger.Level.TRACE, "Suppressed duplicate message: {0}", messageId);
+            } else {
+                LOGGER.log(System.Logger.Level.DEBUG, "Duplicate message detected: {0}", messageId);
             }
-
-            // 2. Check if message is for this device
-            if (!isForThisDevice(stanza)) {
-                return new MessageReceiveResult.NotForThisDevice(messageId, "Not addressed to this device");
-            }
-
-            // 3. Validate ADV for companion devices
-            if (stanza.deviceIdentity().isPresent()) {
-                try {
-                    // TODO: Validate ADV
-                } catch (ADVValidationException e) {
-                    LOGGER.log(System.Logger.Level.WARNING, "ADV validation failed for {0}: {1}",
-                            senderJid, e.getMessage());
-                    return new MessageReceiveResult.AdvValidationFailure(messageId, e.getMessage());
-                }
-            }
-
-            // 4. Decrypt the message
-            MessageContainer messageContainer;
-            try {
-                messageContainer = decryptMessage(stanza);
-            } catch (MessageDecryptionException e) {
-                LOGGER.log(System.Logger.Level.WARNING, "Decryption failed for message {0}: {1}",
-                        messageId, e.getMessage());
-                return new MessageReceiveResult.DecryptionFailure(e.reason(), messageId, e);
-            }
-
-            // 5. Process sender key distribution if present
-            processSenderKeyDistributionIfPresent(messageContainer, chatJid, senderJid);
-
-            // 6. Unwrap wrapper messages (deviceSent, ephemeral, viewOnce)
-            var unwrappedContainer = messageContainer.unbox();
-            if (unwrappedContainer == null) {
-                unwrappedContainer = messageContainer;
-            }
-
-            // 7. Build ChatMessageInfo
-            var messageInfo = buildMessageInfo(stanza, unwrappedContainer);
-
-            // 8. Mark as processed
-            markAsProcessed(messageId);
-
-            LOGGER.log(System.Logger.Level.DEBUG, "Successfully processed message {0}", messageId);
-            return new MessageReceiveResult.Success(messageInfo);
-
-        } catch (MessageParseException e) {
-            LOGGER.log(System.Logger.Level.WARNING, "Parse error for message {0}: {1}",
-                    messageId, e.getMessage());
-            return new MessageReceiveResult.ParseError(e.errorCode(), messageId, e.getMessage());
-        } catch (Exception e) {
-            LOGGER.log(System.Logger.Level.ERROR, "Unexpected error processing message {0}: {1}",
-                    messageId, e.getMessage(), e);
-            return new MessageReceiveResult.ParseError("500", messageId, e.getMessage());
+            return null;
         }
+
+        if (!isForThisDevice(stanza)) {
+            LOGGER.log(System.Logger.Level.DEBUG, "Message not for this device: {0}", messageId);
+            return null;
+        }
+
+        if (stanza.deviceIdentity().isPresent()) {
+            try {
+                // TODO: Validate ADV
+            } catch (WhatsAppAdvValidationException e) {
+                LOGGER.log(System.Logger.Level.WARNING, "ADV validation failed for {0}: {1}",
+                        senderJid, e.getMessage());
+                throw new WhatsAppMessageException.Receive.AdvFailure(e.getMessage(), e);
+            }
+        }
+
+        MessageContainer messageContainer = decryptMessage(stanza);
+
+        processSenderKeyDistributionIfPresent(messageContainer, chatJid, senderJid);
+
+        var unwrappedContainer = messageContainer.unbox();
+        if (unwrappedContainer == null) {
+            unwrappedContainer = messageContainer;
+        }
+
+        var messageInfo = buildMessageInfo(stanza, unwrappedContainer);
+
+        markAsProcessed(messageId);
+
+        LOGGER.log(System.Logger.Level.DEBUG, "Successfully processed message {0}", messageId);
+        return messageInfo;
     }
 
     /**
      * Decrypts the message from the stanza.
+     *
+     * @throws WhatsAppMessageException.Receive if decryption fails
      */
     private MessageContainer decryptMessage(ParsedMessageStanza stanza) {
         var chatJid = stanza.chatJid();
@@ -139,10 +117,9 @@ public final class MessageReceivingService {
         var encNodes = stanza.encNodes();
 
         if (encNodes.isEmpty()) {
-            throw new MessageParseException(stanza.id(), "No enc nodes in message stanza");
+            throw new WhatsAppMessageException.Receive.InvalidProtobuf("No enc nodes in message stanza");
         }
 
-        // For groups, try skmsg first (most common)
         if (stanza.isGroupMessage()) {
             return decryptGroupMessage(encNodes, chatJid, senderJid);
         } else {
@@ -152,15 +129,10 @@ public final class MessageReceivingService {
 
     /**
      * Decrypts a group message, trying skmsg first then falling back to pkmsg/msg.
-     * <p>
-     * Edge case handling:
-     * - If SKMSG fails with NO_SENDER_KEY, try pkmsg/msg (sender key distribution message)
-     * - Propagate the most relevant exception if all attempts fail
      */
-    private MessageContainer decryptGroupMessage(java.util.List<EncNode> encNodes, Jid groupJid, Jid senderJid) {
-        MessageDecryptionException lastException = null;
+    private MessageContainer decryptGroupMessage(List<EncNode> encNodes, Jid groupJid, Jid senderJid) {
+        WhatsAppMessageException.Receive lastException = null;
 
-        // Try skmsg first (sender key encryption, most common for groups)
         var skmsgNode = encNodes.stream()
                 .filter(EncNode::isSenderKeyMessage)
                 .findFirst();
@@ -172,18 +144,16 @@ public final class MessageReceivingService {
                         groupJid,
                         senderJid
                 );
-            } catch (MessageDecryptionException e) {
+            } catch (WhatsAppMessageException.Receive e) {
                 lastException = e;
                 LOGGER.log(System.Logger.Level.DEBUG, "SKMSG decryption failed ({0}), trying fallback: {1}",
-                        e.reason(), e.getMessage());
-                // Fall through to try pkmsg/msg
+                        e.retryReason(), e.getMessage());
             }
         }
 
-        // Fallback: try pkmsg/msg (used for sender key distribution)
         for (var encNode : encNodes) {
             if (encNode.isSenderKeyMessage()) {
-                continue; // Already tried
+                continue;
             }
             try {
                 return decryptionService.decryptAndDecodeFromDevice(
@@ -191,63 +161,57 @@ public final class MessageReceivingService {
                         senderJid,
                         encNode.type()
                 );
-            } catch (MessageDecryptionException e) {
-                // Keep the more specific exception (e.g., SESSION_NOT_FOUND over DECRYPT_FAILED)
-                if (lastException == null || isMoreSpecificReason(e.reason(), lastException.reason())) {
+            } catch (WhatsAppMessageException.Receive e) {
+                if (lastException == null || isMoreSpecificException(e, lastException)) {
                     lastException = e;
                 }
                 LOGGER.log(System.Logger.Level.DEBUG, "Fallback decryption failed with {0}: {1}",
                         encNode.type(), e.getMessage());
-                // Continue to next enc node
             }
         }
 
-        // All attempts failed - throw the most relevant exception
         if (lastException != null) {
             throw lastException;
         }
-        throw new MessageDecryptionException(
-                MessageDecryptionException.Reason.DECRYPT_FAILED,
-                "All decryption attempts failed for group message"
-        );
+        throw new WhatsAppMessageException.Receive.Unknown("All decryption attempts failed for group message");
     }
 
     /**
-     * Determines if reason1 is more specific than reason2 for error reporting.
-     * More specific reasons give better retry receipt feedback to the sender.
+     * Determines if exception1 is more specific than exception2 for error reporting.
      */
-    private boolean isMoreSpecificReason(MessageDecryptionException.Reason reason1, MessageDecryptionException.Reason reason2) {
-        // Priority order: specific reasons > generic DECRYPT_FAILED
-        var specificity = java.util.Map.of(
-                MessageDecryptionException.Reason.SESSION_NOT_FOUND, 10,
-                MessageDecryptionException.Reason.NO_SENDER_KEY, 10,
-                MessageDecryptionException.Reason.UNTRUSTED_IDENTITY, 9,
-                MessageDecryptionException.Reason.INVALID_SENDER_KEY, 8,
-                MessageDecryptionException.Reason.INVALID_MESSAGE, 7,
-                MessageDecryptionException.Reason.ADV_FAILURE, 6,
-                MessageDecryptionException.Reason.INVALID_DSM, 5,
-                MessageDecryptionException.Reason.DUPLICATE_MESSAGE, 4,
-                MessageDecryptionException.Reason.DECRYPT_FAILED, 1
-        );
-        return specificity.getOrDefault(reason1, 0) > specificity.getOrDefault(reason2, 0);
+    private boolean isMoreSpecificException(WhatsAppMessageException.Receive e1, WhatsAppMessageException.Receive e2) {
+        return getExceptionSpecificity(e1) > getExceptionSpecificity(e2);
+    }
+
+    /**
+     * Returns a specificity score for the exception type.
+     */
+    private int getExceptionSpecificity(WhatsAppMessageException.Receive e) {
+        return switch (e) {
+            case WhatsAppMessageException.Receive.NoSession _ -> 10;
+            case WhatsAppMessageException.Receive.NoSenderKey _ -> 10;
+            case WhatsAppMessageException.Receive.InvalidSignature _ -> 9;
+            case WhatsAppMessageException.Receive.InvalidSenderKey _ -> 8;
+            case WhatsAppMessageException.Receive.InvalidMessage _ -> 7;
+            case WhatsAppMessageException.Receive.AdvFailure _ -> 6;
+            case WhatsAppMessageException.Receive.InvalidDeviceSentMessage _ -> 5;
+            case WhatsAppMessageException.Receive.DuplicateMessage _ -> 4;
+            case WhatsAppMessageException.Receive.InvalidKey _ -> 3;
+            case WhatsAppMessageException.Receive.BadMac _ -> 3;
+            case WhatsAppMessageException.Receive.Unknown _ -> 1;
+            default -> 2;
+        };
     }
 
     /**
      * Decrypts a private (1:1) message.
-     * <p>
-     * Edge case handling:
-     * - Try pkmsg first if present (establishes new session)
-     * - Fall back to msg if pkmsg fails or isn't present
-     * - Propagate the most relevant exception if all attempts fail
      */
-    private MessageContainer decryptPrivateMessage(java.util.List<EncNode> encNodes, Jid senderJid) {
-        MessageDecryptionException lastException = null;
+    private MessageContainer decryptPrivateMessage(List<EncNode> encNodes, Jid senderJid) {
+        WhatsAppMessageException.Receive lastException = null;
 
-        // Prefer pkmsg (establishes session) over msg
         var sortedNodes = encNodes.stream()
-                .filter(enc -> !enc.isSenderKeyMessage()) // skmsg not used for 1:1
+                .filter(enc -> !enc.isSenderKeyMessage())
                 .sorted((a, b) -> {
-                    // PKMSG first (can establish session), then MSG
                     if (a.isPreKeyMessage() && !b.isPreKeyMessage()) return -1;
                     if (!a.isPreKeyMessage() && b.isPreKeyMessage()) return 1;
                     return 0;
@@ -261,24 +225,19 @@ public final class MessageReceivingService {
                         senderJid,
                         encNode.type()
                 );
-            } catch (MessageDecryptionException e) {
-                if (lastException == null || isMoreSpecificReason(e.reason(), lastException.reason())) {
+            } catch (WhatsAppMessageException.Receive e) {
+                if (lastException == null || isMoreSpecificException(e, lastException)) {
                     lastException = e;
                 }
                 LOGGER.log(System.Logger.Level.DEBUG, "Decryption failed with {0} ({1}): {2}",
-                        encNode.type(), e.reason(), e.getMessage());
-                // Continue to next enc node
+                        encNode.type(), e.retryReason(), e.getMessage());
             }
         }
 
-        // All attempts failed - throw the most relevant exception
         if (lastException != null) {
             throw lastException;
         }
-        throw new MessageDecryptionException(
-                MessageDecryptionException.Reason.DECRYPT_FAILED,
-                "All decryption attempts failed for private message"
-        );
+        throw new WhatsAppMessageException.Receive.Unknown("All decryption attempts failed for private message");
     }
 
     /**
@@ -331,7 +290,7 @@ public final class MessageReceivingService {
     }
 
     /**
-     * Checks if a message is from the current user (this device or another device of the same user).
+     * Checks if a message is from the current user.
      */
     private boolean isFromMe(Jid senderJid) {
         return store.jid()
@@ -343,24 +302,21 @@ public final class MessageReceivingService {
      * Checks if this message is intended for this device.
      */
     private boolean isForThisDevice(ParsedMessageStanza stanza) {
-        // Newsletter messages are for everyone
         if (stanza.isNewsletterMessage()) {
             return true;
         }
 
-        // Check the "to" attribute matches our JID
         if (stanza.to().isEmpty()) {
-            return true; // No explicit recipient, assume it's for us
+            return true;
         }
 
         return store.jid()
                 .map(myJid -> {
                     var toJid = stanza.to().get();
-                    // Check if the user part matches (ignoring device)
                     return myJid.toUserJid().equals(toJid.toUserJid()) ||
                             myJid.equals(toJid);
                 })
-                .orElse(true); // If we don't know our JID, accept the message
+                .orElse(true);
     }
 
     /**
@@ -376,9 +332,7 @@ public final class MessageReceivingService {
     private void markAsProcessed(String messageId) {
         recentMessageIds.add(messageId);
 
-        // Cleanup old entries if needed
         if (recentMessageIds.size() > MAX_RECENT_IDS) {
-            // Remove approximately half of the entries
             var iterator = recentMessageIds.iterator();
             int toRemove = MAX_RECENT_IDS / 2;
             while (iterator.hasNext() && toRemove > 0) {
@@ -387,19 +341,5 @@ public final class MessageReceivingService {
                 toRemove--;
             }
         }
-    }
-
-    /**
-     * Gets or creates a chat for the given JID.
-     */
-    public Chat getOrCreateChat(Jid chatJid) {
-        return store.findChatByJid(chatJid)
-                .orElseGet(() -> {
-                    var chat = new ChatBuilder()
-                            .jid(chatJid)
-                            .build();
-                    store.addChat(chat);
-                    return chat;
-                });
     }
 }

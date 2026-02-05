@@ -2,8 +2,8 @@ package com.github.auties00.cobalt.model.message.standard;
 
 import com.github.auties00.cobalt.model.info.ContextInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.model.ContextualMessage;
-import com.github.auties00.cobalt.model.message.model.Message;
+import com.github.auties00.cobalt.model.message.common.ContextualMessage;
+import com.github.auties00.cobalt.model.message.common.Message;
 import com.github.auties00.cobalt.util.Clock;
 import it.auties.protobuf.annotation.ProtobufEnum;
 import it.auties.protobuf.annotation.ProtobufEnumIndex;

@@ -4,7 +4,7 @@ import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.info.ChatMessageInfo;
 import com.github.auties00.cobalt.model.info.ContextInfo;
 import com.github.auties00.cobalt.model.jid.JidProvider;
-import com.github.auties00.cobalt.model.message.model.ContextualMessage;
+import com.github.auties00.cobalt.model.message.common.ContextualMessage;
 import com.github.auties00.cobalt.model.poll.PollOption;
 import com.github.auties00.cobalt.model.poll.SelectedPollOption;
 import com.github.auties00.cobalt.model.poll.SelectedPollOptionBuilder;

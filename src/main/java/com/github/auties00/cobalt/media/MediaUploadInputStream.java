@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.media;
 
-import com.github.auties00.cobalt.exception.MediaException;
+import com.github.auties00.cobalt.exception.WhatsAppMediaException;
 import com.github.auties00.cobalt.model.media.MediaProvider;
 import com.github.auties00.cobalt.util.SecureBytes;
 
@@ -30,7 +30,7 @@ public abstract sealed class MediaUploadInputStream extends MediaInputStream {
 
     public abstract Optional<byte[]> fileKey();
 
-    static MediaUploadInputStream of(MediaProvider provider, InputStream inputStream) throws MediaException {
+    static MediaUploadInputStream of(MediaProvider provider, InputStream inputStream) throws WhatsAppMediaException {
         var keyName = provider.mediaPath()
                 .keyName();
         if(keyName.isPresent()) {
@@ -59,7 +59,7 @@ public abstract sealed class MediaUploadInputStream extends MediaInputStream {
         private int outputPosition;
         private int outputLimit;
     
-        public Ciphertext(InputStream rawInputStream, String keyName) throws MediaException {
+        public Ciphertext(InputStream rawInputStream, String keyName) throws WhatsAppMediaException {
             super(rawInputStream);
 
             this.plaintextDigest = newHash();

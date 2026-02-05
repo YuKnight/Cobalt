@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.node;
 
-import com.github.auties00.cobalt.exception.MalformedJidException;
+import com.github.auties00.cobalt.exception.WhatsAppMalformedJidException;
 import com.github.auties00.cobalt.model.jid.Jid;
 import it.auties.protobuf.model.ProtobufString;
 
@@ -792,7 +792,7 @@ public sealed interface Node {
             try {
                 var result = Jid.of(content);
                 return Optional.of(result);
-            }catch (MalformedJidException exception) {
+            }catch (WhatsAppMalformedJidException exception) {
                 return Optional.empty();
             }
         }
@@ -995,7 +995,7 @@ public sealed interface Node {
             try {
                 var result = Jid.of(ProtobufString.lazy(content));
                 return Optional.of(result);
-            } catch (MalformedJidException exception) {
+            } catch (WhatsAppMalformedJidException exception) {
                 return Optional.empty();
             }
         }

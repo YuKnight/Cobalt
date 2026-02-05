@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.client;
 
 import com.github.auties00.cobalt.model.action.Action;
+import com.github.auties00.cobalt.model.auth.ADVEncryptionType;
 import com.github.auties00.cobalt.model.call.Call;
 import com.github.auties00.cobalt.model.chat.Chat;
 import com.github.auties00.cobalt.model.chat.ChatPastParticipant;
@@ -14,8 +15,6 @@ import com.github.auties00.cobalt.model.newsletter.Newsletter;
 import com.github.auties00.cobalt.model.privacy.PrivacySettingEntry;
 import com.github.auties00.cobalt.model.setting.Setting;
 import com.github.auties00.cobalt.node.Node;
-
-import com.github.auties00.cobalt.device.model.DeviceInfo;
 
 import java.util.Collection;
 import java.util.List;
@@ -339,25 +338,6 @@ public interface WhatsAppClientListener {
     }
 
     /**
-     * Called when ADV (Authenticated Device Verification) device info is refreshed.
-     * This happens automatically every 24 hours to prevent ADV data from expiring.
-     *
-     * @param whatsapp an instance of the calling API
-     */
-    default void onDeviceAdvRefreshed(WhatsAppClient whatsapp) {
-    }
-
-    /**
-     * Called when a device list changes (device added or removed).
-     *
-     * @param whatsapp an instance of the calling API
-     * @param userJid  the user whose device list changed
-     * @param action   the action ("add" or "remove")
-     */
-    default void onDeviceListChanged(WhatsAppClient whatsapp, Jid userJid, String action) {
-    }
-
-    /**
      * Called when a contact's account type changes between E2EE and HOSTED.
      * This indicates a transition in the contact's encryption configuration.
      *
@@ -366,6 +346,6 @@ public interface WhatsAppClientListener {
      * @param oldType  the previous account type
      * @param newType  the new account type
      */
-    default void onAccountTypeChanged(WhatsAppClient whatsapp, Jid userJid, DeviceInfo.Type oldType, DeviceInfo.Type newType) {
+    default void onAccountTypeChanged(WhatsAppClient whatsapp, Jid userJid, ADVEncryptionType oldType, ADVEncryptionType newType) {
     }
 }

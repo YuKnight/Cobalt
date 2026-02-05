@@ -6,7 +6,7 @@ import com.github.auties00.cobalt.model.chat.ChatSpec;
 import com.github.auties00.cobalt.model.info.ContextInfo;
 import com.github.auties00.cobalt.model.info.MessageInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.model.ContextualMessage;
+import com.github.auties00.cobalt.model.message.common.ContextualMessage;
 import com.github.auties00.cobalt.model.newsletter.Newsletter;
 import com.github.auties00.cobalt.model.newsletter.NewsletterSpec;
 import it.auties.protobuf.stream.ProtobufInputStream;

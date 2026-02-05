@@ -2,15 +2,12 @@ package com.github.auties00.cobalt.socket.error;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.client.WhatsAppClientDisconnectReason;
-import com.github.auties00.cobalt.exception.MalformedNodeException;
-import com.github.auties00.cobalt.exception.SessionBadMacException;
-import com.github.auties00.cobalt.exception.SessionConflictException;
+import com.github.auties00.cobalt.exception.WhatsAppSessionException;
+import com.github.auties00.cobalt.exception.WhatsAppStreamException;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.socket.SocketStream;
 
 import java.util.concurrent.atomic.AtomicBoolean;
-
-import static com.github.auties00.cobalt.client.WhatsAppClientErrorHandler.Location.STREAM;
 
 public final class ErrorStreamNodeHandler extends SocketStream.Handler {
     private final AtomicBoolean retriedConnection;
@@ -23,11 +20,11 @@ public final class ErrorStreamNodeHandler extends SocketStream.Handler {
     @Override
     public void handle(Node node) {
         if (node.hasChild("xml-not-well-formed")) {
-            whatsapp.handleFailure(STREAM, new MalformedNodeException());
+            whatsapp.handleFailure(new WhatsAppStreamException.MalformedNode());
         } else if (node.hasChild("conflict")) {
-            whatsapp.handleFailure(STREAM, new SessionConflictException());
+            whatsapp.handleFailure(new WhatsAppSessionException.Conflict());
         } else if (node.hasChild("bad-mac")) {
-            whatsapp.handleFailure(STREAM, new SessionBadMacException());
+            whatsapp.handleFailure(new WhatsAppSessionException.BadMac());
         } else {
             var statusCode = node.getAttributeAsLong("code");
             if(statusCode.isEmpty()) {
@@ -68,7 +65,7 @@ public final class ErrorStreamNodeHandler extends SocketStream.Handler {
         if (reason.equals("device_removed")) {
             handleLogout();
         } else {
-            whatsapp.handleFailure(STREAM, new SessionConflictException());
+            whatsapp.handleFailure(new WhatsAppSessionException.Conflict());
         }
     }
 

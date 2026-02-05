@@ -1,10 +1,9 @@
 package com.github.auties00.cobalt.sync;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
-import com.github.auties00.cobalt.exception.WebAppStateFatalSyncException;
-import com.github.auties00.cobalt.exception.WebAppStateMissingKeyException;
-import com.github.auties00.cobalt.exception.WebAppStateRetryableSyncException;
+import com.github.auties00.cobalt.exception.WhatsAppWebAppStateSyncException;
 import com.github.auties00.cobalt.model.sync.*;
+import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.store.WhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 import com.github.auties00.cobalt.sync.crypto.MutationIntegrityVerifier;
@@ -13,6 +12,8 @@ import com.github.auties00.cobalt.sync.crypto.MutationLTHash;
 import com.github.auties00.cobalt.sync.exchange.MutationRequestBuilder;
 import com.github.auties00.cobalt.sync.exchange.MutationResponseParser;
 import com.github.auties00.cobalt.sync.exchange.MutationSyncResponse;
+import com.github.auties00.cobalt.sync.key.MissingSyncKeyRequestService;
+import com.github.auties00.cobalt.sync.key.MissingSyncKeyTimeoutScheduler;
 import com.github.auties00.cobalt.util.SecureBytes;
 import it.auties.protobuf.stream.ProtobufInputStream;
 
@@ -22,7 +23,6 @@ import java.util.concurrent.Executors;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import static com.github.auties00.cobalt.client.WhatsAppClientErrorHandler.Location.WEB_APP_STATE;
 
 /**
  * Main coordinator for WhatsApp Web App State synchronization.
@@ -38,13 +38,16 @@ public final class WebAppStateService {
     private final MutationIntegrityVerifier integrityVerifier;
     private final WebAppStateHandlerRegistry handlerRegistry;
     private final WebAppStateBackoffScheduler retryScheduler;
+    private final MissingSyncKeyTimeoutScheduler missingSyncKeyTimeoutScheduler;
+    private final MissingSyncKeyRequestService missingSyncKeyRequestService;
 
     /**
      * Creates a new WebAppStateManager instance.
      *
      * @param whatsapp the Whatsapp instance to use for store access and node sending
+     * @param abPropsService the AB props service for configuration values
      */
-    public WebAppStateService(WhatsAppClient whatsapp) {
+    public WebAppStateService(WhatsAppClient whatsapp, ABPropsService abPropsService) {
         this.whatsapp = whatsapp;
         this.store = whatsapp.store();
         this.requestBuilder = new MutationRequestBuilder(whatsapp);
@@ -52,6 +55,8 @@ public final class WebAppStateService {
         this.handlerRegistry = new WebAppStateHandlerRegistry();
         this.integrityVerifier = new MutationIntegrityVerifier(store);
         this.retryScheduler = new WebAppStateBackoffScheduler();
+        this.missingSyncKeyTimeoutScheduler = new MissingSyncKeyTimeoutScheduler(whatsapp, abPropsService);
+        this.missingSyncKeyRequestService = new MissingSyncKeyRequestService(whatsapp);
     }
 
     /**
@@ -221,7 +226,7 @@ public final class WebAppStateService {
                     .waitForMediaConnection()
                     .download(externalRef);
         }catch (Throwable throwable) {
-            throw new WebAppStateRetryableSyncException("Failed to download external mutations", throwable);
+            throw new WhatsAppWebAppStateSyncException.ExternalDownloadFailed(throwable);
         }
     }
 
@@ -229,7 +234,7 @@ public final class WebAppStateService {
         try(var protobufStream = ProtobufInputStream.fromStream(downloadedData)) {
             return MutationsSyncSpec.decode(protobufStream);
         }catch (Throwable throwable) {
-            throw new WebAppStateRetryableSyncException("Failed to decode external mutations", throwable);
+            throw new WhatsAppWebAppStateSyncException.ExternalDecodeFailed(throwable);
         }
     }
 
@@ -251,7 +256,7 @@ public final class WebAppStateService {
             // Get encryption key
             var syncKey = whatsapp.store()
                     .findWebAppStateKeyById(keyId.id())
-                    .orElseThrow(() -> new WebAppStateMissingKeyException(keyId.id()));
+                    .orElseThrow(() -> new WhatsAppWebAppStateSyncException.MissingKey(keyId.id()));
             var keyData = syncKey.keyData();
             if (keyData == null || keyData.keyData() == null) {
                 continue;
@@ -267,7 +272,7 @@ public final class WebAppStateService {
                 );
                 decrypted.add(decryptedMutation);
             }catch (Exception e) {
-                throw new WebAppStateRetryableSyncException("Failed to decrypt mutation", e);
+                throw new WhatsAppWebAppStateSyncException.DecryptionFailed(e);
             }
         }
 
@@ -311,8 +316,10 @@ public final class WebAppStateService {
             for (var mutation : mutations) {
                 try {
                     handler.get().applyMutation(whatsapp, mutation);
-                }catch (Throwable throwable) {
-                    whatsapp.handleFailure(WEB_APP_STATE, throwable);
+                } catch (WhatsAppWebAppStateSyncException exception) {
+                    whatsapp.handleFailure(exception);
+                } catch (Throwable throwable) {
+                    whatsapp.handleFailure(new WhatsAppWebAppStateSyncException.UnexpectedError(throwable));
                 }
             }
         }
@@ -383,37 +390,46 @@ public final class WebAppStateService {
         }
 
         var metadata = store.findWebAppState(collectionName);
-        switch (error) {
-            case WebAppStateMissingKeyException missingKeyEx -> {
-                store.markWebAppStateBlocked(collectionName);
-                var keyId = missingKeyEx.keyId();
-                // TODO: Request missing key with peer message
-            }
-            case WebAppStateRetryableSyncException _ -> {
-                var result = retryScheduler.scheduleRetry(
-                        collectionName,
-                        metadata.retryCount(),
-                        () -> syncCollection(collectionName)
-                );
-                if(result) {
-                    store.markWebAppStateErrorRetry(collectionName);
-                }else {
-                    store.markWebAppStateErrorFatal(collectionName);
-                }
-            }
-            case WebAppStateFatalSyncException fatalException -> {
+        if (error instanceof WhatsAppWebAppStateSyncException.MissingKey missingKeyEx) {
+            store.markWebAppStateBlocked(collectionName);
+            var keyId = missingKeyEx.keyId();
+
+            // Per WhatsApp Web WAWebSyncdHandleMissingKeys._handleMissingKeys:
+            // Request missing key from companion devices and schedule timeout
+            missingSyncKeyRequestService.requestMissingKey(keyId);
+            missingSyncKeyTimeoutScheduler.scheduleTimeoutCheck();
+        } else if (error instanceof WhatsAppWebAppStateSyncException syncEx && syncEx.isFatal()) {
+            store.markWebAppStateErrorFatal(collectionName);
+            throw syncEx;
+        } else {
+            var result = retryScheduler.scheduleRetry(
+                    collectionName,
+                    metadata.retryCount(),
+                    () -> syncCollection(collectionName)
+            );
+            if (result) {
+                store.markWebAppStateErrorRetry(collectionName);
+            } else {
                 store.markWebAppStateErrorFatal(collectionName);
-                throw fatalException;
-            }
-            default -> {
-                store.markWebAppStateErrorFatal(collectionName);
-                throw new WebAppStateFatalSyncException(error);
             }
         }
     }
 
+    /**
+     * Called when a sync key is received (e.g., from AppStateSyncKeyShare response).
+     * Removes the key from missing keys tracking and reschedules timeout if needed.
+     *
+     * @param keyId the ID of the received key
+     */
+    public void onSyncKeyReceived(byte[] keyId) {
+        store.removeMissingSyncKey(keyId);
+        // Reschedule timeout for any remaining missing keys
+        missingSyncKeyTimeoutScheduler.scheduleTimeoutCheck();
+    }
+
     public void reset() {
         retryScheduler.close();
+        missingSyncKeyTimeoutScheduler.shutdown();
     }
 }
 

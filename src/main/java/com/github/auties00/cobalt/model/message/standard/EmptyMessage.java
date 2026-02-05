@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.model.message.standard;
 
-import com.github.auties00.cobalt.model.message.model.Message;
+import com.github.auties00.cobalt.model.message.common.Message;
 
 /**
  * A model class that represents an empty message. Used to prevent NPEs from empty messages sent by

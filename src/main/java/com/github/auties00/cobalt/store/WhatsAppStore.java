@@ -3,11 +3,13 @@ package com.github.auties00.cobalt.store;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.client.WhatsAppClientListener;
+import com.github.auties00.cobalt.client.WhatsAppClientOfflineResumeState;
 import com.github.auties00.cobalt.client.WhatsAppClientType;
 import com.github.auties00.cobalt.client.WhatsAppWebClientHistory;
 import com.github.auties00.cobalt.client.info.WhatsAppClientInfo;
-import com.github.auties00.cobalt.device.model.PendingDeviceSync;
-import com.github.auties00.cobalt.device.model.DeviceList;
+import com.github.auties00.cobalt.model.device.DeviceList;
+import com.github.auties00.cobalt.model.device.MissingDeviceSyncKey;
+import com.github.auties00.cobalt.model.device.PendingDeviceSync;
 import com.github.auties00.cobalt.media.MediaConnection;
 import com.github.auties00.cobalt.model.auth.SignedDeviceIdentity;
 import com.github.auties00.cobalt.model.auth.UserAgent.ReleaseChannel;
@@ -27,7 +29,7 @@ import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidCompanion;
 import com.github.auties00.cobalt.model.jid.JidProvider;
 import com.github.auties00.cobalt.model.jid.JidServer;
-import com.github.auties00.cobalt.model.message.model.ChatMessageKey;
+import com.github.auties00.cobalt.model.message.common.ChatMessageKey;
 import com.github.auties00.cobalt.model.newsletter.Newsletter;
 import com.github.auties00.cobalt.model.newsletter.NewsletterBuilder;
 import com.github.auties00.cobalt.model.preference.Label;
@@ -39,6 +41,7 @@ import com.github.auties00.cobalt.model.privacy.PrivacySettingValue;
 import com.github.auties00.cobalt.model.sync.*;
 import com.github.auties00.cobalt.sync.crypto.MutationLTHash;
 import com.github.auties00.cobalt.util.Clock;
+import com.github.auties00.cobalt.util.InstantProtobufMixin;
 import com.github.auties00.cobalt.util.SecureBytes;
 import com.github.auties00.libsignal.SignalProtocolAddress;
 import com.github.auties00.libsignal.SignalProtocolStore;
@@ -51,9 +54,12 @@ import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
 
 import java.net.URI;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentHashMap.KeySetView;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
 
 /**
@@ -810,8 +816,63 @@ public final class WhatsAppStore implements SignalProtocolStore {
     /**
      * ADV (Authenticated Device Verification) metadata.
      */
-    @ProtobufProperty(index = 66, type = ProtobufType.INT64)
-    Long lastAdvCheckTime;
+    @ProtobufProperty(index = 66, type = ProtobufType.UINT64, mixins = InstantProtobufMixin.class)
+    Instant lastAdvCheckTime;
+
+    /**
+     * Map of stored identity keys for remote users.
+     * <p>
+     * Per WhatsApp Web: identity keys are stored during ADV validation (when processing
+     * device sync results with accountSignatureKey) and used as fallback when validating
+     * signed key index lists where the embedded accountSignatureKey is missing.
+     * <p>
+     * Key: SignalProtocolAddress for the user (device 0)
+     * Value: SignalIdentityKey (the account signature key / identity public key)
+     */
+    @ProtobufProperty(index = 67, type = ProtobufType.MAP, mapKeyType = ProtobufType.STRING, mapValueType = ProtobufType.BYTES)
+    final ConcurrentMap<SignalProtocolAddress, SignalIdentityPublicKey> remoteIdentities;
+
+    /**
+     * Tracks missing Syncd keys and which companion devices have been queried.
+     * <p>
+     * Per WhatsApp Web WAWebSyncdStoreMissingKeys: when a sync key is missing,
+     * the client asks companion devices. If all respond without the key, it's fatal.
+     *
+     * @see MissingDeviceSyncKey
+     */
+    @ProtobufProperty(index = 68, type = ProtobufType.MAP, mapKeyType = ProtobufType.STRING, mapValueType = ProtobufType.MESSAGE)
+    final ConcurrentMap<String, MissingDeviceSyncKey> missingSyncKeys;
+
+    /**
+     * ADV (Account Device Verification) secret key for HMAC verification during pairing.
+     * <p>
+     * Random 32-byte key generated during pairing initialization. Sent to the primary device
+     * in the PairingRequest protobuf and used by the primary to create an HMAC over the
+     * device identity details. The companion then verifies this HMAC using the same key.
+     * <p>
+     * This is separate from the companion key pair - it's a symmetric key used only for
+     * HMAC verification, not for encryption or signing.
+     *
+     * @apiNote WAWebAdvSignatureApi.generateADVSecretKey: generates random 32-byte key.
+     * WAWebHandlePairSuccess: uses this key for HMAC verification with hmacSha256.
+     */
+    @ProtobufProperty(index = 69, type = ProtobufType.BYTES)
+    byte[] advSecretKey;
+
+    /**
+     * Tracks device identity ranges for resend filtering.
+     * <p>
+     * Per WhatsApp Web WAWebSendMsgCommonApi.updateIdentityRange: when encrypting for devices,
+     * records the message timestamp so that during resend we can filter out devices whose
+     * identity changed after the original encryption.
+     * <p>
+     * Key: Signal protocol address string (e.g., "1234567890:0")
+     * Value: Timestamp (seconds since epoch) when the device was last encrypted to
+     *
+     * @apiNote WAWebSendMsgCommonApi.filterDeviceWithChangedIdentity
+     */
+    @ProtobufProperty(index = 70, type = ProtobufType.MAP, mapKeyType = ProtobufType.STRING, mapValueType = ProtobufType.UINT64)
+    final ConcurrentMap<String, Long> deviceIdentityRanges;
 
     // =====================================================
     // SECTION: Runtime State (Non-Serialized)
@@ -884,6 +945,30 @@ public final class WhatsAppStore implements SignalProtocolStore {
     private final Object mediaConnectionLock = new Object();
 
     /**
+     * Current state of offline message resume processing.
+     * <p>
+     * Per WhatsApp Web WAWebOfflineResumeConst.ResumeStatus: when a client connects/reconnects,
+     * it goes through an offline resume phase where queued messages from the server are processed.
+     * This state tracks the progress of that phase.
+     * <p>
+     * Not serialized - reset to INIT on each connection.
+     *
+     * @see WhatsAppClientOfflineResumeState
+     */
+    private volatile WhatsAppClientOfflineResumeState offlineResumeState = WhatsAppClientOfflineResumeState.INIT;
+
+    /**
+     * Tracks users whose devices have changed and need sender key rotation.
+     * <p>
+     * Per WhatsApp Web WAWebAdvUpdateParticipantApi: when devices are added or removed
+     * for a user, their sender key distribution state needs to be updated for all groups
+     * they participate in. This set tracks which users need this update.
+     * <p>
+     * Not serialized - session-level tracking only.
+     */
+    private final KeySetView<Jid, Boolean> usersNeedingSenderKeyRotation = ConcurrentHashMap.newKeySet();
+
+    /**
      * Pending mutations awaiting synchronization to the server.
      */
     private final ConcurrentMap<PatchType, SequencedCollection<PendingMutation>> webAppStatePendingMutations;
@@ -892,6 +977,22 @@ public final class WhatsAppStore implements SignalProtocolStore {
      * The web app state
      */
     private final ConcurrentMap<PatchType, CollectionMetadata> webAppStateCollections;
+
+    /**
+     * Tracks pending receipt records for sent messages.
+     * <p>
+     * Per WhatsApp Web WAWebApiMessageInfoStore.createOrMergeReceiptRecords: when sending a message,
+     * records the recipient device JIDs that the message was sent to. This enables tracking
+     * delivery status at the device level when receipts are received.
+     * <p>
+     * Key: Message ID (stanza ID)
+     * Value: Set of recipient device JIDs the message was sent to
+     * <p>
+     * Not serialized - session-level tracking only.
+     *
+     * @apiNote WAWebApiMessageInfoStore.createOrMergeReceiptRecords
+     */
+    private final ConcurrentMap<String, Set<Jid>> pendingMessageRecipients;
 
     /**
      * Lock to update the client version
@@ -926,9 +1027,46 @@ public final class WhatsAppStore implements SignalProtocolStore {
     private final Set<Jid> unconfirmedIdentityChanges;
 
     /**
+     * Set of user JIDs verified as hosted (business coex) via ADV.
+     * Per WhatsApp Web WAWebBizCoexHostedAddVerification: this cache is used to verify
+     * that hosted device messages are from users we've previously verified as hosted.
+     * This prevents a malicious server from claiming a user is hosted when they're not.
+     */
+    private final Set<Jid> coexHostedVerificationCache;
+
+    /**
      * Queue for pending device sync requests that failed and need retry.
      */
-    private final java.util.concurrent.ConcurrentLinkedQueue<PendingDeviceSync> pendingDeviceSyncs;
+    private final ConcurrentLinkedQueue<PendingDeviceSync> pendingDeviceSyncs;
+
+    /**
+     * Tracks sender key distribution status per group.
+     * <p>
+     * Per WhatsApp Web WAWebApiParticipantStore: for each group, maintains a map of
+     * participant JIDs to their sender key status (whether they've received the sender key).
+     * <p>
+     * Key: Group JID (as string)
+     * Value: Set of participant device JIDs that have received the sender key
+     * <p>
+     * Not serialized - session-level tracking only. Rebuilt on message send if missing.
+     *
+     * @apiNote WAWebApiParticipantStore.getGroupSenderKeyListFromParticipantRecord:
+     * uses senderKey map to determine skDistribList (need key) vs skList (have key).
+     */
+    private final ConcurrentMap<String, Set<String>> groupSenderKeyDistribution;
+
+    /**
+     * Tracks message IDs that have been overwritten by a revoke.
+     * <p>
+     * Per WhatsApp Web WAWebResendUserMsg/WAWebResendGroupMsg: when a message is revoked,
+     * its isOverwrittenByRevoke flag is set to true. If a phash mismatch occurs and
+     * we attempt to resend, we should skip if the message has been revoked.
+     * <p>
+     * Not serialized - session-level tracking only.
+     *
+     * @apiNote WAWebResendUserMsg, WAWebResendGroupMsg: checks a.data.isOverwrittenByRevoke
+     */
+    private final KeySetView<String, Boolean> revokedMessageIds = ConcurrentHashMap.newKeySet();
 
     // =====================================================
     // SECTION: Constructor & Factory Methods
@@ -1002,7 +1140,11 @@ public final class WhatsAppStore implements SignalProtocolStore {
             ConcurrentMap<Integer, Label> labels,
             Version clientVersion,
             Version companionVersion,
-            Long lastAdvCheckTime
+            Instant lastAdvCheckTime,
+            ConcurrentMap<SignalProtocolAddress, SignalIdentityPublicKey> remoteIdentities,
+            ConcurrentMap<String, MissingDeviceSyncKey> missingSyncKeys,
+            byte[] advSecretKey,
+            ConcurrentMap<String, Long> deviceIdentityRanges
     ) {
         this.uuid = Objects.requireNonNull(uuid, "uuid cannot be null");
         this.phoneNumber = phoneNumber; 
@@ -1080,14 +1222,21 @@ public final class WhatsAppStore implements SignalProtocolStore {
         this.companionVersion = companionVersion;
         this.webAppStatePendingMutations = new ConcurrentHashMap<>();
         this.webAppStateCollections = new ConcurrentHashMap<>();
+        this.pendingMessageRecipients = new ConcurrentHashMap<>();
         this.serializable = true;
         this.groupOrCommunityMetadata = new ConcurrentHashMap<>();
         this.deviceLists = new ConcurrentHashMap<>();
         this.deviceListsAccessOrder = new LinkedList<>();
         this.offlineDeviceTimestamps = new ConcurrentHashMap<>();
         this.unconfirmedIdentityChanges = ConcurrentHashMap.newKeySet();
-        this.pendingDeviceSyncs = new java.util.concurrent.ConcurrentLinkedQueue<>();
+        this.coexHostedVerificationCache = ConcurrentHashMap.newKeySet();
+        this.pendingDeviceSyncs = new ConcurrentLinkedQueue<>();
+        this.groupSenderKeyDistribution = new ConcurrentHashMap<>();
         this.lastAdvCheckTime = lastAdvCheckTime;
+        this.remoteIdentities = Objects.requireNonNullElseGet(remoteIdentities, ConcurrentHashMap::new);
+        this.missingSyncKeys = Objects.requireNonNullElseGet(missingSyncKeys, ConcurrentHashMap::new);
+        this.advSecretKey = advSecretKey;
+        this.deviceIdentityRanges = Objects.requireNonNullElseGet(deviceIdentityRanges, ConcurrentHashMap::new);
     }
 
     // =====================================================
@@ -2363,6 +2512,42 @@ public final class WhatsAppStore implements SignalProtocolStore {
     }
 
     /**
+     * Returns the current offline resume state.
+     *
+     * @return the current offline resume state, never null
+     */
+    public WhatsAppClientOfflineResumeState offlineResumeState() {
+        return offlineResumeState;
+    }
+
+    /**
+     * Sets the offline resume state.
+     *
+     * @param state the new state, must not be null
+     * @return this store instance for method chaining
+     */
+    public WhatsAppStore setOfflineResumeState(WhatsAppClientOfflineResumeState state) {
+        this.offlineResumeState = Objects.requireNonNull(state, "state cannot be null");
+        return this;
+    }
+
+    /**
+     * Checks if the offline resume from restart is complete.
+     * <p>
+     * Per WhatsApp Web WAWebBlockingOfflineResumeManager.isResumeFromRestartComplete():
+     * Returns true when the state is neither INIT nor RESUME_ON_RESTART.
+     * <p>
+     * This is used to determine whether operations like immediate device syncs
+     * should be triggered (true) or deferred to a pending queue (false).
+     *
+     * @return true if offline resume from restart is complete, false otherwise
+     */
+    public boolean isResumeFromRestartComplete() {
+        return offlineResumeState != WhatsAppClientOfflineResumeState.INIT
+                && offlineResumeState != WhatsAppClientOfflineResumeState.RESUME_ON_RESTART;
+    }
+
+    /**
      * Returns the companion identity.
      *
      * @return Optional containing the companion identity, empty if not set
@@ -2482,6 +2667,61 @@ public final class WhatsAppStore implements SignalProtocolStore {
      */
     public void setCompanionKeyPair(SignalIdentityKeyPair companionKeyPair) {
         this.companionKeyPair = companionKeyPair;
+    }
+
+    /**
+     * Returns the ADV secret key used for HMAC verification during pairing.
+     * <p>
+     * This is a random 32-byte key generated during pairing initialization
+     * and used for HMAC verification of the device identity from the primary device.
+     *
+     * @return Optional containing the ADV secret key, empty if not set
+     *
+     * @apiNote WAWebAdvSignatureApi.getADVSecretKey: retrieves the stored secret key.
+     */
+    public Optional<byte[]> advSecretKey() {
+        return Optional.ofNullable(advSecretKey);
+    }
+
+    /**
+     * Sets the ADV secret key for HMAC verification during pairing.
+     * <p>
+     * This should be called when initializing the pairing process. The key is
+     * then sent to the primary device and used for HMAC verification.
+     *
+     * @param advSecretKey the ADV secret key (should be 32 bytes), or null to clear
+     *
+     * @apiNote WAWebAdvSignatureApi.setADVSecretKey: stores the secret key.
+     */
+    public void setAdvSecretKey(byte[] advSecretKey) {
+        this.advSecretKey = advSecretKey;
+    }
+
+    /**
+     * Generates and sets a new random ADV secret key.
+     * <p>
+     * This should be called during pairing initialization to create a fresh
+     * secret key for HMAC verification.
+     *
+     * @return the newly generated 32-byte ADV secret key
+     *
+     * @apiNote WAWebAdvSignatureApi.generateADVSecretKey: generates random 32-byte key.
+     */
+    public byte[] generateAdvSecretKey() {
+        this.advSecretKey = SecureBytes.random(32);
+        return this.advSecretKey;
+    }
+
+    /**
+     * Clears the ADV secret key.
+     * <p>
+     * This should be called after pairing completes successfully or fails,
+     * as the key is only needed during the pairing handshake.
+     *
+     * @apiNote WAWebAdvSignatureApi.clearADVSecretKey: clears the stored key.
+     */
+    public void clearAdvSecretKey() {
+        this.advSecretKey = null;
     }
 
     /**
@@ -2635,6 +2875,17 @@ public final class WhatsAppStore implements SignalProtocolStore {
         );
     }
 
+
+    /**
+     * Removes the sender keys for a sender key name
+     *
+     * @param senderKeyName the sender key name
+     */
+    public void removeSenderKeysForDevice(SignalSenderKeyName senderKeyName) {
+        Objects.requireNonNull(senderKeyName, "senderKeyName cannot be null");
+        senderKeys.remove(senderKeyName);
+    }
+
     /**
      * Cleans up all Signal sessions and sender keys for a device.
      * Should be called when a device identity change is detected or a device is removed.
@@ -2645,6 +2896,196 @@ public final class WhatsAppStore implements SignalProtocolStore {
         var signalAddress = deviceJid.toSignalAddress();
         removeSession(signalAddress);
         removeSenderKeysForDevice(deviceJid);
+    }
+
+    /**
+     * Marks a user as needing sender key rotation for all groups they participate in.
+     * <p>
+     * Per WhatsApp Web WAWebAdvUpdateParticipantApi: when devices are added or removed
+     * for a user, sender key distribution state needs to be updated. This ensures
+     * removed devices can't decrypt future messages and new devices receive sender keys.
+     *
+     * @param userJid the user JID whose device list changed
+     */
+    public void markUserNeedsSenderKeyRotation(Jid userJid) {
+        usersNeedingSenderKeyRotation.add(userJid.toUserJid());
+    }
+
+    /**
+     * Checks if a user needs sender key rotation and clears the flag.
+     * <p>
+     * Called by MessageSenderKeyDistributionService when determining if sender keys
+     * need to be redistributed for a group containing this user.
+     *
+     * @param userJid the user JID to check
+     * @return true if the user needed sender key rotation (flag is cleared), false otherwise
+     */
+    public boolean checkAndClearSenderKeyRotationNeeded(Jid userJid) {
+        return usersNeedingSenderKeyRotation.remove(userJid.toUserJid());
+    }
+
+    /**
+     * Checks if any of the provided users need sender key rotation.
+     *
+     * @param userJids the user JIDs to check
+     * @return true if any user needs sender key rotation
+     */
+    public boolean anyUserNeedsSenderKeyRotation(Collection<Jid> userJids) {
+        return userJids.stream()
+                .map(Jid::toUserJid)
+                .anyMatch(usersNeedingSenderKeyRotation::contains);
+    }
+
+    // =====================================================
+    // SECTION: Sender Key Distribution Tracking
+    // =====================================================
+
+    /**
+     * Marks a participant as having received the sender key for a group.
+     * <p>
+     * Per WhatsApp Web WAWebApiParticipantStore.markHasSenderKey: after successfully
+     * sending a sender key distribution message to a device, mark that device as
+     * having the sender key. Subsequent messages to that group won't include the
+     * sender key distribution for this device.
+     *
+     * @param groupJid       the group JID
+     * @param participantJid the participant device JID that received the sender key
+     *
+     * @apiNote WAWebApiParticipantStore.markHasSenderKey
+     */
+    public void markSenderKeyDistributed(Jid groupJid, Jid participantJid) {
+        Objects.requireNonNull(groupJid, "groupJid cannot be null");
+        Objects.requireNonNull(participantJid, "participantJid cannot be null");
+
+        var groupKey = groupJid.toString();
+        groupSenderKeyDistribution
+                .computeIfAbsent(groupKey, k -> ConcurrentHashMap.newKeySet())
+                .add(participantJid.toString());
+    }
+
+    /**
+     * Checks if a participant has received the sender key for a group.
+     * <p>
+     * Per WhatsApp Web WAWebApiParticipantStore.getGroupSenderKeyListFromParticipantRecord:
+     * determines whether a device should be in skDistribList (needs key) or skList (has key).
+     *
+     * @param groupJid       the group JID
+     * @param participantJid the participant device JID to check
+     * @return true if the participant has received the sender key for this group
+     *
+     * @apiNote WAWebApiParticipantStore.getGroupSenderKeyListFromParticipantRecord
+     */
+    public boolean hasSenderKeyDistributed(Jid groupJid, Jid participantJid) {
+        Objects.requireNonNull(groupJid, "groupJid cannot be null");
+        Objects.requireNonNull(participantJid, "participantJid cannot be null");
+
+        var groupKey = groupJid.toString();
+        var participants = groupSenderKeyDistribution.get(groupKey);
+        if (participants == null) {
+            return false;
+        }
+        return participants.contains(participantJid.toString());
+    }
+
+    /**
+     * Clears the sender key distribution status for all participants in a group.
+     * <p>
+     * Per WhatsApp Web WAWebApiParticipantStore: when the sender key is rotated
+     * (e.g., after a participant is removed), all distribution status is cleared
+     * so the new key will be sent to all participants.
+     *
+     * @param groupJid the group JID
+     *
+     * @apiNote WAWebApiParticipantStore: clears hasSenderKey when key is rotated
+     */
+    public void clearSenderKeyDistribution(Jid groupJid) {
+        Objects.requireNonNull(groupJid, "groupJid cannot be null");
+        groupSenderKeyDistribution.remove(groupJid.toString());
+    }
+
+    /**
+     * Clears the sender key distribution status for a specific participant across all groups.
+     * <p>
+     * Called when a participant's device list changes and they need to receive
+     * new sender keys.
+     *
+     * @param participantJid the participant JID whose status should be cleared
+     */
+    public void clearSenderKeyDistributionForParticipant(Jid participantJid) {
+        Objects.requireNonNull(participantJid, "participantJid cannot be null");
+        var participantKey = participantJid.toString();
+
+        for (var participants : groupSenderKeyDistribution.values()) {
+            participants.remove(participantKey);
+        }
+    }
+
+    /**
+     * Marks the sender key as forgotten for a specific participant in a group.
+     * <p>
+     * Per WhatsApp Web WAWebApiParticipantStore.markForgetSenderKey: this is different
+     * from clearing/rotating - it marks that the participant should no longer receive
+     * messages via sender key encryption until they rejoin or are explicitly re-added.
+     * Used when participants leave a group.
+     *
+     * @param groupJid       the group JID
+     * @param participantJid the participant JID whose sender key status should be forgotten
+     *
+     * @apiNote WAWebApiParticipantStore.markForgetSenderKey
+     */
+    public void forgetSenderKeyDistributed(Jid groupJid, Jid participantJid) {
+        Objects.requireNonNull(groupJid, "groupJid cannot be null");
+        Objects.requireNonNull(participantJid, "participantJid cannot be null");
+
+        var groupKey = groupJid.toString();
+        var participants = groupSenderKeyDistribution.get(groupKey);
+        if (participants != null) {
+            participants.remove(participantJid.toString());
+        }
+    }
+
+    /**
+     * Marks a message as having been overwritten by a revoke.
+     * <p>
+     * Per WhatsApp Web: when a message is revoked, we track this so that any
+     * pending resend operations are skipped.
+     *
+     * @param messageId the message ID to mark as revoked
+     *
+     * @apiNote WAWebResendUserMsg, WAWebResendGroupMsg: isOverwrittenByRevoke check
+     */
+    public void markMessageAsRevoked(String messageId) {
+        Objects.requireNonNull(messageId, "messageId cannot be null");
+        revokedMessageIds.add(messageId);
+    }
+
+    /**
+     * Checks if a message has been overwritten by a revoke.
+     * <p>
+     * Per WhatsApp Web WAWebResendUserMsg/WAWebResendGroupMsg: if a message has been
+     * revoked, resend operations should be skipped.
+     *
+     * @param messageId the message ID to check
+     * @return true if the message was overwritten by a revoke
+     *
+     * @apiNote WAWebResendUserMsg, WAWebResendGroupMsg: a.data.isOverwrittenByRevoke
+     */
+    public boolean isMessageOverwrittenByRevoke(String messageId) {
+        Objects.requireNonNull(messageId, "messageId cannot be null");
+        return revokedMessageIds.contains(messageId);
+    }
+
+    /**
+     * Clears the revoke tracking for a message.
+     * <p>
+     * Called when a message ID is no longer needed for tracking
+     * (e.g., after expiry or cleanup).
+     *
+     * @param messageId the message ID to clear
+     */
+    public void clearRevokeStatus(String messageId) {
+        Objects.requireNonNull(messageId, "messageId cannot be null");
+        revokedMessageIds.remove(messageId);
     }
 
     /**
@@ -2706,6 +3147,191 @@ public final class WhatsAppStore implements SignalProtocolStore {
      */
     public void addWebAppHashState(AppStateSyncHash state) {
         hashStates.put(state.type(), state);
+    }
+
+    /**
+     * Returns all missing sync keys being tracked.
+     *
+     * @return unmodifiable collection of missing sync keys
+     */
+    public Collection<MissingDeviceSyncKey> missingSyncKeys() {
+        return Collections.unmodifiableCollection(missingSyncKeys.values());
+    }
+
+    /**
+     * Finds a missing sync key by its ID.
+     *
+     * @param keyId the ID of the key
+     * @return an Optional containing the missing key entry if found
+     */
+    public Optional<MissingDeviceSyncKey> findMissingSyncKey(byte[] keyId) {
+        return Optional.ofNullable(missingSyncKeys.get(HexFormat.of().formatHex(keyId)));
+    }
+
+    /**
+     * Adds or updates a missing sync key entry.
+     *
+     * @param missingKey the missing key entry to add
+     */
+    public void addMissingSyncKey(MissingDeviceSyncKey missingKey) {
+        missingSyncKeys.put(HexFormat.of().formatHex(missingKey.keyId()), missingKey);
+    }
+
+    /**
+     * Removes a missing sync key entry (e.g., when the key is found).
+     *
+     * @param keyId the ID of the key to remove
+     */
+    public void removeMissingSyncKey(byte[] keyId) {
+        missingSyncKeys.remove(HexFormat.of().formatHex(keyId));
+    }
+
+    /**
+     * Checks for expired missing sync keys.
+     * <p>
+     * Per WhatsApp Web WAWebSyncdStoreMissingKeys: a key is expired if
+     * (now - key.timestamp) > timeout
+     *
+     * @param timeout the duration after which a key is considered expired
+     * @return the list of expired missing sync keys
+     */
+    public SequencedCollection<MissingDeviceSyncKey> findExpiredMissingSyncKeys(Duration timeout) {
+        var now = Instant.now();
+        return missingSyncKeys.values()
+                .stream()
+                .filter(key -> Duration.between(key.timestamp(), now).compareTo(timeout) > 0)
+                .toList();
+    }
+
+    /**
+     * Gets the earliest timestamp of all missing sync keys.
+     * Used to calculate when the timeout should fire.
+     *
+     * @return the earliest timestamp, or empty if no missing keys
+     */
+    public Optional<Instant> getEarliestMissingSyncKeyTimestamp() {
+        return missingSyncKeys.values().stream()
+                .map(MissingDeviceSyncKey::timestamp)
+                .min(Instant::compareTo);
+    }
+
+    /**
+     * Calculates the timeout delay for missing sync key check.
+     * <p>
+     * Per WhatsApp Web: timeout = timeoutDuration - (now - earliestKey.timestamp)
+     *
+     * @param timeout the timeout duration
+     * @return the remaining delay until timeout, or empty if no missing keys
+     */
+    public Optional<Duration> calculateMissingSyncKeyTimeoutDelay(Duration timeout) {
+        return getEarliestMissingSyncKeyTimestamp()
+                .map(earliest -> {
+                    var elapsed = Duration.between(earliest, Instant.now());
+                    var remaining = timeout.minus(elapsed);
+                    return remaining.isNegative() ? Duration.ZERO : remaining;
+                });
+    }
+
+    // =====================================================
+    // SECTION: Device Identity Range Operations
+    // =====================================================
+
+    /**
+     * Updates the identity range timestamp for a device.
+     * <p>
+     * Per WhatsApp Web WAWebSendMsgCommonApi.updateIdentityRange: records the timestamp
+     * when a device was last encrypted to. Only updates if the new timestamp is earlier
+     * than the existing one (or no existing entry).
+     *
+     * @param signalAddress    the Signal protocol address string
+     * @param messageTimestamp the timestamp of the message being sent
+     *
+     * @apiNote WAWebSendMsgCommonApi.updateIdentityRange
+     */
+    public void updateDeviceIdentityRange(String signalAddress, long messageTimestamp) {
+        deviceIdentityRanges.compute(signalAddress, (k, existing) ->
+                (existing == null || existing > messageTimestamp) ? messageTimestamp : existing);
+    }
+
+    /**
+     * Gets the identity range timestamp for a device.
+     *
+     * @param signalAddress the Signal protocol address string
+     * @return the timestamp, or null if no range recorded
+     *
+     * @apiNote WAWebSendMsgCommonApi.filterDeviceWithChangedIdentity
+     */
+    public Long getDeviceIdentityRange(String signalAddress) {
+        return deviceIdentityRanges.get(signalAddress);
+    }
+
+    /**
+     * Checks if a device should be included in a resend based on identity range.
+     * <p>
+     * Per WhatsApp Web WAWebSendMsgCommonApi.filterDeviceWithChangedIdentity:
+     * excludes devices whose identity changed after the original encryption.
+     *
+     * @param signalAddress     the Signal protocol address string
+     * @param originalTimestamp the timestamp of the original message send
+     * @return true if the device should be included (identity unchanged)
+     *
+     * @apiNote WAWebSendMsgCommonApi.filterDeviceWithChangedIdentity
+     */
+    public boolean shouldIncludeDeviceInResend(String signalAddress, long originalTimestamp) {
+        var rangeTimestamp = deviceIdentityRanges.get(signalAddress);
+        // Include device if no range recorded OR range is <= original message
+        return rangeTimestamp == null || rangeTimestamp <= originalTimestamp;
+    }
+
+    // =====================================================
+    // SECTION: Receipt Records Operations
+    // =====================================================
+
+    /**
+     * Creates or merges receipt records for a sent message.
+     * <p>
+     * Per WhatsApp Web WAWebApiMessageInfoStore.createOrMergeReceiptRecords: when sending
+     * a message, records the recipient device JIDs so that delivery/read receipts can be
+     * tracked at the device level.
+     *
+     * @param messageId    the message ID (stanza ID)
+     * @param recipientJids the recipient device JIDs the message was sent to
+     *
+     * @apiNote WAWebApiMessageInfoStore.createOrMergeReceiptRecords
+     */
+    public void createOrMergeReceiptRecords(String messageId, Collection<Jid> recipientJids) {
+        if (messageId == null || recipientJids == null || recipientJids.isEmpty()) {
+            return;
+        }
+        pendingMessageRecipients.compute(messageId, (k, existing) -> {
+            var set = existing != null ? existing : ConcurrentHashMap.<Jid>newKeySet();
+            set.addAll(recipientJids);
+            return set;
+        });
+    }
+
+    /**
+     * Gets the recipient JIDs for a sent message.
+     *
+     * @param messageId the message ID (stanza ID)
+     * @return the set of recipient device JIDs, or empty set if not found
+     *
+     * @apiNote WAWebApiMessageInfoStore
+     */
+    public Set<Jid> getMessageRecipients(String messageId) {
+        var recipients = pendingMessageRecipients.get(messageId);
+        return recipients != null ? Collections.unmodifiableSet(recipients) : Set.of();
+    }
+
+    /**
+     * Removes receipt records for a message (e.g., after all receipts received).
+     *
+     * @param messageId the message ID to remove records for
+     *
+     * @apiNote WAWebApiMessageInfoStore
+     */
+    public void removeReceiptRecords(String messageId) {
+        pendingMessageRecipients.remove(messageId);
     }
 
     /**
@@ -2795,6 +3421,43 @@ public final class WhatsAppStore implements SignalProtocolStore {
     @Override
     public void addTrustedIdentity(SignalProtocolAddress signalProtocolAddress, SignalIdentityPublicKey signalIdentityPublicKey) {
 
+    }
+
+    /**
+     * Saves an identity key for a remote user.
+     * <p>
+     * Per WhatsApp Web: identity keys are stored during ADV validation and used as
+     * fallback when validating signed key index lists with missing embedded keys.
+     *
+     * @param address     the signal address for the user (should use device 0)
+     * @param identityKey the identity key to save
+     */
+    public void saveIdentity(SignalProtocolAddress address, SignalIdentityPublicKey identityKey) {
+        Objects.requireNonNull(address, "address cannot be null");
+        Objects.requireNonNull(identityKey, "identityKey cannot be null");
+        remoteIdentities.put(address, identityKey);
+    }
+
+    /**
+     * Finds a stored identity key for a user.
+     * <p>
+     * If the address matches the local user, returns the local identity key.
+     * Otherwise, looks up the remote identity from the stored map.
+     *
+     * @param address the signal address for the user
+     * @return Optional containing the identity key if found
+     */
+    public Optional<SignalIdentityKey> findIdentity(SignalProtocolAddress address) {
+        if (address == null) {
+            return Optional.empty();
+        } else {
+            var localJid = jid;
+            if (localJid != null && address.name().equals(localJid.user())) {
+                return Optional.of(identityKeyPair.publicKey());
+            } else {
+                return Optional.ofNullable(remoteIdentities.get(address));
+            }
+        }
     }
 
     /**
@@ -3214,21 +3877,21 @@ public final class WhatsAppStore implements SignalProtocolStore {
 
     /**
      * Gets the device list for a user with full metadata.
+     * <p>
+     * Per WhatsApp Web: cached device lists are always returned regardless of age.
+     * The staleness check (using timestamp + num_days_key_index_list_expiration)
+     * is only used by the ADV scheduler to determine when to proactively refresh.
      *
      * @param userJid the user JID
-     * @return the device list with metadata, or empty if not cached or expired
+     * @return the device list with metadata, or empty if not cached
      */
     public Optional<DeviceList> findDeviceList(Jid userJid) {
         Objects.requireNonNull(userJid, "userJid cannot be null");
 
         synchronized (deviceListsAccessOrder) {
             var deviceList = deviceLists.get(userJid);
-            if (deviceList == null || deviceList.isExpired()) {
-                if (deviceList != null) {
-                    deviceLists.remove(userJid);
-                    deviceListsAccessOrder.remove(userJid);
-                }
-
+            if (deviceList == null) {
+                // Check alternate JID (PN ↔ LID mapping)
                 Jid alternateJid;
                 if (userJid.hasUserServer()) {
                     alternateJid = findLidByPhone(userJid).orElse(null);
@@ -3240,7 +3903,7 @@ public final class WhatsAppStore implements SignalProtocolStore {
 
                 if (alternateJid != null) {
                     var alternateList = deviceLists.get(alternateJid);
-                    if (alternateList != null && !alternateList.isExpired()) {
+                    if (alternateList != null) {
                         deviceListsAccessOrder.remove(alternateJid);
                         deviceListsAccessOrder.addLast(alternateJid);
                         return Optional.of(alternateList);
@@ -3330,40 +3993,19 @@ public final class WhatsAppStore implements SignalProtocolStore {
     }
 
     /**
-     * Removes expired device lists from cache.
-     *
-     * @return number of entries removed
-     */
-    public int removeExpiredDeviceLists() {
-        synchronized (deviceListsAccessOrder) {
-            var toRemove = new ArrayList<Jid>();
-            for (var entry : deviceLists.entrySet()) {
-                if (entry.getValue().isExpired()) {
-                    toRemove.add(entry.getKey());
-                }
-            }
-            for (var jid : toRemove) {
-                deviceLists.remove(jid);
-                deviceListsAccessOrder.remove(jid);
-            }
-            return toRemove.size();
-        }
-    }
-
-    /**
      * Gets the last ADV check time.
      *
-     * @return the last check time in epoch millis, or null if never checked
+     * @return the last check time, or empty if never checked
      */
-    public Long lastAdvCheckTime() {
-        return lastAdvCheckTime;
+    public Optional<Instant> lastAdvCheckTime() {
+        return Optional.ofNullable(lastAdvCheckTime);
     }
 
     /**
      * Updates the last ADV check time to now.
      */
     public void updateAdvCheckTime() {
-        this.lastAdvCheckTime = System.currentTimeMillis();
+        this.lastAdvCheckTime = Instant.now();
     }
 
     /**
@@ -3487,6 +4129,60 @@ public final class WhatsAppStore implements SignalProtocolStore {
         unconfirmedIdentityChanges.clear();
     }
 
+    // =====================================================
+    // SECTION: Coex Hosted Verification Cache
+    // =====================================================
+
+    /**
+     * Adds a user JID to the coex hosted verification cache.
+     * Per WhatsApp Web: this is called when we verify a user as hosted via ADV
+     * (during device list sync or message processing).
+     *
+     * @param userJid the user JID to add (will be normalized to user JID)
+     */
+    public void addToCoexHostedVerificationCache(Jid userJid) {
+        if (userJid != null) {
+            coexHostedVerificationCache.add(userJid.toUserJid());
+        }
+    }
+
+    /**
+     * Checks if a user JID is in the coex hosted verification cache.
+     *
+     * @param userJid the user JID to check
+     * @return true if the user has been verified as hosted
+     */
+    public boolean isInCoexHostedVerificationCache(Jid userJid) {
+        if (userJid == null) {
+            return false;
+        }
+        return coexHostedVerificationCache.contains(userJid.toUserJid());
+    }
+
+    /**
+     * Asserts that a user JID is in the coex hosted verification cache.
+     * Per WhatsApp Web: this throws an exception if the user hasn't been verified as hosted,
+     * which prevents accepting messages from potentially spoofed hosted devices.
+     *
+     * @param userJid the user JID to verify
+     * @throws IllegalStateException if the user is not in the cache
+     */
+    public void assertCoexHostedVerification(Jid userJid) {
+        if (!isInCoexHostedVerificationCache(userJid)) {
+            throw new IllegalStateException(
+                    "User " + userJid + " not found in coex verification cache"
+            );
+        }
+    }
+
+    /**
+     * Clears the coex hosted verification cache.
+     * Should be called on logout/disconnect.
+     */
+    public void clearCoexHostedVerificationCache() {
+        coexHostedVerificationCache.clear();
+    }
+
     public boolean hasJid(JidProvider entry) {
         if(entry == null) {
             return false;
@@ -3508,5 +4204,54 @@ public final class WhatsAppStore implements SignalProtocolStore {
             return (localJid != null && remoteJid.hasUser(localJid.user()))
                     || (localLid != null && remoteJid.hasUser(localLid.user()));
         }
+    }
+
+    /**
+     * Converts a LID to its phone number equivalent.
+     * Per WhatsApp Web WAWebLidMigrationUtils
+     *
+     * @param lidJid the LID JID
+     * @return an Optional containing the phone number JID, or empty if not found
+     */
+    public Optional<Jid> getPhoneNumberByLid(Jid lidJid) {
+        if (lidJid == null || !lidJid.hasLidServer()) {
+            return Optional.empty();
+        }
+        // Try to find phone number from contact with matching LID
+        return contacts.values().stream()
+                .filter(contact -> contact.lid().map(lid -> lid.equals(lidJid)).orElse(false))
+                .findFirst()
+                .map(Contact::jid);
+    }
+
+    /**
+     * Converts a phone number JID to its LID equivalent.
+     * Per WhatsApp Web WAWebLidMigrationUtils.toUserLid
+     *
+     * @param phoneNumberJid the phone number JID
+     * @return an Optional containing the LID JID, or empty if not found
+     */
+    public Optional<Jid> getLidByPhoneNumber(Jid phoneNumberJid) {
+        if (phoneNumberJid == null) {
+            return Optional.empty();
+        }
+        // Check if already a LID
+        if (phoneNumberJid.hasLidServer()) {
+            return Optional.of(phoneNumberJid);
+        }
+        // Try to find LID from contact
+        var contact = findContactByJid(phoneNumberJid).orElse(null);
+        if (contact != null) {
+            var contactLid = contact.lid();
+            if (contactLid.isPresent()) {
+                return contactLid;
+            }
+        }
+        // Try to find LID from chat
+        var chat = findChatByJid(phoneNumberJid).orElse(null);
+        if (chat != null) {
+            return chat.accountLid();
+        }
+        return Optional.empty();
     }
 }

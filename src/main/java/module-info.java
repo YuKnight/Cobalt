@@ -72,7 +72,7 @@ module com.github.auties00.cobalt {
     // Proto models - message
     exports com.github.auties00.cobalt.model.message.button;
     exports com.github.auties00.cobalt.model.message.server;
-    exports com.github.auties00.cobalt.model.message.model;
+    exports com.github.auties00.cobalt.model.message.common;
     exports com.github.auties00.cobalt.model.message.payment;
     exports com.github.auties00.cobalt.model.message.standard;
 
@@ -100,12 +100,13 @@ module com.github.auties00.cobalt {
     // Proto models - sync
     exports com.github.auties00.cobalt.model.sync;
 
+    // Proto models - device
+    exports com.github.auties00.cobalt.model.device;
+
     // Store
     exports com.github.auties00.cobalt.store;
 
     // Media
     exports com.github.auties00.cobalt.media;
-
-    // Device
-    exports com.github.auties00.cobalt.device.model;
+    exports com.github.auties00.cobalt.model.bot;
 }

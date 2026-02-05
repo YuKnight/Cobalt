@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.socket.state;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.props.ABProp;
@@ -10,11 +11,13 @@ import com.github.auties00.cobalt.socket.SocketStream;
 public final class WebOnInitialInfoStreamNodeHandler extends SocketStream.Handler {
     private final LidMigrationService lidMigrationService;
     private final ABPropsService abPropsService;
+    private final DeviceService deviceService;
 
-    public WebOnInitialInfoStreamNodeHandler(WhatsAppClient whatsapp, LidMigrationService lidMigrationService, ABPropsService abPropsService) {
+    public WebOnInitialInfoStreamNodeHandler(WhatsAppClient whatsapp, LidMigrationService lidMigrationService, ABPropsService abPropsService, DeviceService deviceService) {
         super(whatsapp, "success");
         this.lidMigrationService = lidMigrationService;
         this.abPropsService = abPropsService;
+        this.deviceService = deviceService;
     }
 
     @Override
@@ -40,6 +43,9 @@ public final class WebOnInitialInfoStreamNodeHandler extends SocketStream.Handle
         } else {
             lidMigrationService.disableMigration();
         }
+
+        // Start the ADV check scheduler for periodic device list expiration checks
+        deviceService.startAdvCheckScheduler();
 
         for(var listener : whatsapp.store().listeners()) {
             Thread.startVirtualThread(() -> listener.onLoggedIn(whatsapp));

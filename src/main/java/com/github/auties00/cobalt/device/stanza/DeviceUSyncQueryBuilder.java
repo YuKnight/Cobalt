@@ -1,71 +1,52 @@
 package com.github.auties00.cobalt.device.stanza;
 
-import com.github.auties00.cobalt.device.model.DeviceListHashInfo;
+import com.github.auties00.cobalt.model.device.DeviceListHashInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidServer;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
+import com.github.auties00.cobalt.util.WhatsAppIdGenerator;
 
 import java.util.*;
 
 /**
  * Builds USync IQ stanzas for device list queries.
+ *
+ * @apiNote WAWebUsync.USyncQuery: constructs and executes USync requests with configurable
+ * protocols and user lists. WAWebUsyncDevice.USyncDeviceProtocol: defines the device protocol.
  */
 public final class DeviceUSyncQueryBuilder {
+
+    /**
+     * Maximum users per USync query batch.
+     *
+     * @apiNote WAWebUsync: batches large user lists to avoid oversized requests.
+     */
     private static final int MAX_USERS_PER_QUERY = 500;
-    private static final String USYNC_XMLNS = "usync";
-    private static final String DEVICES_VERSION = "2";
 
     private DeviceUSyncQueryBuilder() {
         throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
     }
 
     /**
-     * Builds batched USync queries for large user lists.
-     * <p>
-     * Each batch contains at most 500 users.
+     * Builds batched USync queries with optional username protocol.
      *
-     * @param userJids the user JIDs to query
-     * @return list of IQ nodes, one per batch
-     */
-    public static List<NodeBuilder> build(Collection<Jid> userJids) {
-        return build(userJids, "message");
-    }
-
-    /**
-     * Builds batched USync queries with custom context.
+     * @param userJids                the user JIDs to query
+     * @param context                 the context for device filtering
+     * @param hashInfos               hash information for delta updates, or {@code null}
+     * @param includeUsernameProtocol whether to include the username protocol
+     * @return list of IQ node builders, one per batch
      *
-     * @param userJids the user JIDs to query
-     * @param context  the context for device filtering
-     * @return list of IQ nodes, one per batch
+     * @apiNote WAWebUsync.USyncQuery: supports adding multiple protocols (devices, username,
+     * contact, picture, etc.) in a single request.
      */
-    public static List<NodeBuilder> build(Collection<Jid> userJids, String context) {
-        return build(userJids, context, null);
-    }
-
-    /**
-     * Builds batched USync queries with device hash information for delta updates.
-     *
-     * @param userJids  the user JIDs to query
-     * @param context   the context for device filtering
-     * @param hashInfos optional hash information for enabling delta updates
-     * @return list of IQ nodes, one per batch
-     */
-    public static List<NodeBuilder> build(Collection<Jid> userJids, String context, Map<Jid, DeviceListHashInfo> hashInfos) {
+    public static List<NodeBuilder> build(Set<Jid> userJids, String context, Map<Jid, DeviceListHashInfo> hashInfos, boolean includeUsernameProtocol) {
         Objects.requireNonNull(userJids, "userJids cannot be null");
         Objects.requireNonNull(context, "context cannot be null");
 
         var userJidsCount = userJids.size();
-        if(userJidsCount <= MAX_USERS_PER_QUERY) {
-            return List.of(buildEntry(userJids, context, hashInfos));
-        } else if(userJids instanceof List<Jid> list){
-            var batches = new ArrayList<NodeBuilder>(userJidsCount / MAX_USERS_PER_QUERY);
-            for (var i = 0; i < list.size(); i += MAX_USERS_PER_QUERY) {
-                var end = Math.min(i + MAX_USERS_PER_QUERY, list.size());
-                var batch = list.subList(i, end);
-                batches.add(buildEntry(batch, context, hashInfos));
-            }
-            return batches;
+        if (userJidsCount <= MAX_USERS_PER_QUERY) {
+            return List.of(buildEntry(userJids, context, hashInfos, includeUsernameProtocol));
         } else {
             var iterator = userJids.iterator();
             var batch = new ArrayList<Jid>(MAX_USERS_PER_QUERY);
@@ -73,43 +54,57 @@ public final class DeviceUSyncQueryBuilder {
             while (iterator.hasNext()) {
                 batch.add(iterator.next());
                 if (batch.size() == MAX_USERS_PER_QUERY) {
-                    batches.add(buildEntry(batch, context, hashInfos));
+                    batches.add(buildEntry(batch, context, hashInfos, includeUsernameProtocol));
                     batch.clear();
                 }
             }
             if (!batch.isEmpty()) {
-                batches.add(buildEntry(batch, context, hashInfos));
+                batches.add(buildEntry(batch, context, hashInfos, includeUsernameProtocol));
             }
             return batches;
         }
     }
 
-    private static NodeBuilder buildEntry(Collection<Jid> userJids, String context, Map<Jid, DeviceListHashInfo> hashInfos) {
-        var sessionId = UUID.randomUUID().toString();
+    private static NodeBuilder buildEntry(Collection<Jid> userJids, String context, Map<Jid, DeviceListHashInfo> hashInfos, boolean includeUsernameProtocol) {
+        // WAWap.generateId(): generates session ID in WhatsApp format
+        var sessionId = WhatsAppIdGenerator.newId();
 
-        // Build user list nodes
+        // WAWebAdvSyncDeviceListApi: filters out PSA (Public Service Announcements) account
+        // e.id.user!=="0" && a.withUser(...)
         var userNodes = userJids.stream()
+                .filter(jid -> !jid.toUserJid().equals(Jid.announcementsAccount()))
                 .map(jid -> buildUserNode(jid, hashInfos))
                 .toList();
 
-        // Build list node
         var listNode = new NodeBuilder()
                 .description("list")
                 .content(userNodes)
                 .build();
 
-        // Build query node
+        // WAWebUsyncDevice.USyncDeviceProtocol: defines devices protocol with version
         var devicesNode = new NodeBuilder()
                 .description("devices")
-                .attribute("version", DEVICES_VERSION)
+                .attribute("version", "2")
                 .build();
 
-        var queryNode = new NodeBuilder()
-                .description("query")
-                .content(devicesNode)
-                .build();
+        // WAWebUsyncUsername.USyncUsernameProtocol: simple empty element for username protocol
+        Node queryNode;
+        if (includeUsernameProtocol) {
+            var usernameNode = new NodeBuilder()
+                    .description("username")
+                    .build();
+            queryNode = new NodeBuilder()
+                    .description("query")
+                    .content(devicesNode, usernameNode)
+                    .build();
+        } else {
+            queryNode = new NodeBuilder()
+                    .description("query")
+                    .content(devicesNode)
+                    .build();
+        }
 
-        // Build usync node
+        // WAWebUsync.USyncQuery: builds the usync node with session ID, mode, and context
         var usyncNode = new NodeBuilder()
                 .description("usync")
                 .attribute("sid", sessionId)
@@ -120,10 +115,9 @@ public final class DeviceUSyncQueryBuilder {
                 .content(queryNode, listNode)
                 .build();
 
-        // Build IQ node
         return new NodeBuilder()
                 .description("iq")
-                .attribute("xmlns", USYNC_XMLNS)
+                .attribute("xmlns", "usync")
                 .attribute("to", JidServer.user())
                 .attribute("type", "get")
                 .content(usyncNode);
@@ -135,19 +129,18 @@ public final class DeviceUSyncQueryBuilder {
                 .description("user")
                 .attribute("jid", userJid);
 
-        // Add hash info if available for delta updates
+        // WAWebAdvSyncDeviceListApi: adds device_hash, ts, and expected_ts attributes
+        // for delta updates when hash info is available
         if (hashInfos != null) {
             var hashInfo = hashInfos.get(userJid);
             if (hashInfo != null) {
-                builder.attribute("dhash", hashInfo.hash());
-                builder.attribute("ts", hashInfo.timestamp());
-                if (hashInfo.expectedTs() != null) {
-                    builder.attribute("expected_ts", hashInfo.expectedTs());
-                }
+                builder.attribute("device_hash", hashInfo.hash());
+                builder.attribute("ts", hashInfo.timestamp().getEpochSecond());
+                hashInfo.expectedTimestamp()
+                        .ifPresent(instant -> builder.attribute("expected_ts", instant.getEpochSecond()));
             }
         }
 
         return builder.build();
     }
 }
-

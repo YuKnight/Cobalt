@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.model.jid;
 
-import com.github.auties00.cobalt.exception.MalformedJidException;
+import com.github.auties00.cobalt.exception.WhatsAppMalformedJidException;
 import com.github.auties00.libsignal.SignalProtocolAddress;
 import it.auties.protobuf.annotation.ProtobufDeserializer;
 import it.auties.protobuf.annotation.ProtobufSerializer;
@@ -36,15 +36,9 @@ public record Jid(String user, JidServer server, int device, int agent) implemen
     private static final Jid OFFICIAL_SURVEYS_ACCOUNT = new Jid("16505361212", JidServer.user());
     private static final Jid OFFICIAL_BUSINESS_ACCOUNT = new Jid("16505361212", JidServer.legacyUser());
     private static final Jid ANNOUNCEMENTS_ACCOUNT = new Jid("0", JidServer.user());
+    private static final Jid META_AI_BOT_ACCOUNT = new Jid("867051314767696", JidServer.bot());
 
     private static final Jid LOCATION_BROADCAST = new Jid("location", JidServer.broadcast());
-
-    /**
-     * Meta AI bot JID used for open group phash calculation.
-     * This bot is added to the participant list when calculating phash for groups
-     * that have the open group bot feature enabled.
-     */
-    private static final Jid META_AI_BOT = new Jid("867051314767696", JidServer.bot());
 
     public Jid {
         Objects.requireNonNull(server, "server cannot be null");
@@ -120,18 +114,12 @@ public record Jid(String user, JidServer server, int device, int agent) implemen
         return Jid.ANNOUNCEMENTS_ACCOUNT;
     }
 
-    public static Jid locationBroadcast() {
-        return Jid.LOCATION_BROADCAST;
+    public static Jid metaAiBotAccount() {
+        return Jid.META_AI_BOT_ACCOUNT;
     }
 
-    /**
-     * Returns the Meta AI bot JID.
-     * This bot is used in open group phash calculations.
-     *
-     * @return the Meta AI bot JID
-     */
-    public static Jid metaAiBot() {
-        return Jid.META_AI_BOT;
+    public static Jid locationBroadcast() {
+        return Jid.LOCATION_BROADCAST;
     }
 
     public static Jid of(JidServer server) {
@@ -163,7 +151,7 @@ public record Jid(String user, JidServer server, int device, int agent) implemen
 
     public static Jid of(long jid) {
         if (jid < 0) {
-            throw new MalformedJidException("value cannot be negative");
+            throw new WhatsAppMalformedJidException("value cannot be negative");
         }
         return new Jid(String.valueOf(jid), JidServer.user());
     }
@@ -238,27 +226,27 @@ public record Jid(String user, JidServer server, int device, int agent) implemen
                 case DEVICE -> {
                     if (token == AGENT_CHAR) {
                         if (agent != 0) {
-                            throw new MalformedJidException("Encountered unexpected token '" + token + "' while parsing value '" + jid + "'");
+                            throw new WhatsAppMalformedJidException("Encountered unexpected token '" + token + "' while parsing value '" + jid + "'");
                         }
                         state = ParserState.AGENT;
                     } else if (Character.isDigit(token)) {
                         device = device * 10 + (token - '0');
                     } else {
                         var value = new String(source, offset, length, StandardCharsets.US_ASCII);
-                        throw new MalformedJidException("Encountered unexpected token '" + token + "' while parsing value '" + value + "'");
+                        throw new WhatsAppMalformedJidException("Encountered unexpected token '" + token + "' while parsing value '" + value + "'");
                     }
                 }
                 case AGENT -> {
                     if (token == DEVICE_CHAR) {
                         if (device != 0) {
-                            throw new MalformedJidException("Encountered unexpected token '" + token + "' while parsing value '" + jid + "'");
+                            throw new WhatsAppMalformedJidException("Encountered unexpected token '" + token + "' while parsing value '" + jid + "'");
                         }
                         state = ParserState.DEVICE;
                     } else if (Character.isDigit(token)) {
                         agent = agent * 10 + (token - '0');
                     } else {
                         var value = new String(source, offset, length, StandardCharsets.US_ASCII);
-                        throw new MalformedJidException("Encountered unexpected token '" + token + "' while parsing value '" + value + "'");
+                        throw new WhatsAppMalformedJidException("Encountered unexpected token '" + token + "' while parsing value '" + value + "'");
                     }
                 }
             }
@@ -269,7 +257,7 @@ public record Jid(String user, JidServer server, int device, int agent) implemen
 
     private static void checkUnsignedByte(int i) {
         if (i < 0 || i > 255) {
-            throw new MalformedJidException(i + " is not an unsigned byte");
+            throw new WhatsAppMalformedJidException(i + " is not an unsigned byte");
         }
     }
 
@@ -280,7 +268,7 @@ public record Jid(String user, JidServer server, int device, int agent) implemen
         }
         var offset = jid.charAt(0) == PHONE_CHAR ? 1 : 0;
         if (offset >= length) {
-            throw new MalformedJidException("Malformed value '" + jid + "'");
+            throw new WhatsAppMalformedJidException("Malformed value '" + jid + "'");
         }
 
         enum ParserState { USER, DEVICE, AGENT }
@@ -311,25 +299,25 @@ public record Jid(String user, JidServer server, int device, int agent) implemen
                 case DEVICE -> {
                     if (token == AGENT_CHAR) {
                         if (agent != 0) {
-                            throw new MalformedJidException("Encountered unexpected token '" + token + "' while parsing value '" + jid + "'");
+                            throw new WhatsAppMalformedJidException("Encountered unexpected token '" + token + "' while parsing value '" + jid + "'");
                         }
                         state = ParserState.AGENT;
                     } else if (Character.isDigit(token)) {
                         device = device * 10 + (token - '0');
                     } else {
-                        throw new MalformedJidException("Encountered unexpected token '" + token + "' while parsing value '" + jid + "'");
+                        throw new WhatsAppMalformedJidException("Encountered unexpected token '" + token + "' while parsing value '" + jid + "'");
                     }
                 }
                 case AGENT -> {
                     if (token == DEVICE_CHAR) {
                         if (device != 0) {
-                            throw new MalformedJidException("Encountered unexpected token '" + token + "' while parsing value '" + jid + "'");
+                            throw new WhatsAppMalformedJidException("Encountered unexpected token '" + token + "' while parsing value '" + jid + "'");
                         }
                         state = ParserState.DEVICE;
                     } else if (Character.isDigit(token)) {
                         agent = agent * 10 + (token - '0');
                     } else {
-                        throw new MalformedJidException("Encountered unexpected token '" + token + "' while parsing value '" + jid + "'");
+                        throw new WhatsAppMalformedJidException("Encountered unexpected token '" + token + "' while parsing value '" + jid + "'");
                     }
                 }
             }

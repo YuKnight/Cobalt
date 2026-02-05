@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.socket.notification;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
-import com.github.auties00.cobalt.device.notification.DeviceNotificationHandler;
+import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.model.chat.Chat;
 import com.github.auties00.cobalt.model.chat.ChatEphemeralTimer;
@@ -10,9 +10,9 @@ import com.github.auties00.cobalt.model.info.MessageInfoStubType;
 import com.github.auties00.cobalt.model.info.NewsletterMessageInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidServer;
-import com.github.auties00.cobalt.model.message.model.ChatMessageKey;
-import com.github.auties00.cobalt.model.message.model.ChatMessageKeyBuilder;
-import com.github.auties00.cobalt.model.message.model.MessageStatus;
+import com.github.auties00.cobalt.model.message.common.ChatMessageKey;
+import com.github.auties00.cobalt.model.message.common.ChatMessageKeyBuilder;
+import com.github.auties00.cobalt.model.message.common.MessageStatus;
 import com.github.auties00.cobalt.model.newsletter.NewsletterMetadataBuilder;
 import com.github.auties00.cobalt.model.newsletter.NewsletterReaction;
 import com.github.auties00.cobalt.model.newsletter.NewsletterVerification;
@@ -24,12 +24,11 @@ import com.github.auties00.cobalt.model.sync.PatchType;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.node.mex.json.response.*;
+import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.socket.SocketPhonePairing;
 import com.github.auties00.cobalt.socket.SocketStream;
 import com.github.auties00.cobalt.util.SecureBytes;
 import com.github.auties00.curve25519.Curve25519;
-import com.github.auties00.libsignal.key.SignalIdentityKeyPair;
-import com.github.auties00.libsignal.key.SignalIdentityPublicKey;
 
 import javax.crypto.Cipher;
 import javax.crypto.KDF;
@@ -49,11 +48,15 @@ public final class NotificationStreamNodeHandler extends SocketStream.Handler {
 
     private final SocketPhonePairing pairingCode;
     private final LidMigrationService lidMigrationService;
+    private final DeviceService deviceService;
+    private final ABPropsService abPropsService;
 
-    public NotificationStreamNodeHandler(WhatsAppClient whatsapp, SocketPhonePairing pairingCode, LidMigrationService lidMigrationService) {
+    public NotificationStreamNodeHandler(WhatsAppClient whatsapp, SocketPhonePairing pairingCode, LidMigrationService lidMigrationService, DeviceService deviceService, ABPropsService abPropsService) {
         super(whatsapp, "notification");
         this.pairingCode = pairingCode;
         this.lidMigrationService = lidMigrationService;
+        this.deviceService = deviceService;
+        this.abPropsService = abPropsService;
     }
 
     @Override
@@ -578,8 +581,8 @@ public final class NotificationStreamNodeHandler extends SocketStream.Handler {
 
         var userJid = jid.toUserJid();
 
-        // Handle device add/remove actions using dedicated handler
-        DeviceNotificationHandler.handleDeviceNotification(whatsapp, node, action, userJid);
+        // Handle device add/remove actions
+        deviceService.handleDeviceNotification(node, action, userJid);
     }
 
     private void handleCompanionRegistration(Node node) {
@@ -626,14 +629,15 @@ public final class NotificationStreamNodeHandler extends SocketStream.Handler {
             var encryptedPayload = SecureBytes.concat(linkCodeSalt, SecureBytes.random(12), encrypted);
             var identitySharedKey = Curve25519.sharedKey(whatsapp.store().identityKeyPair().privateKey().toEncodedPoint(), primaryIdentityPublicKey);
             var identityPayload = SecureBytes.concat(companionSharedKey, identitySharedKey, random);
-            var companionKeyHkdf = KDF.getInstance("HKDF-SHA256");
-            var companionKeyHkdfParams = HKDFParameterSpec.ofExtract()
+            // WAWebAltDeviceLinkingAlgorithm.createAdvSecret: derive advSecret using HKDF
+            // This is used for HMAC verification during pairing, NOT for creating a new key pair
+            var advSecretHkdf = KDF.getInstance("HKDF-SHA256");
+            var advSecretHkdfParams = HKDFParameterSpec.ofExtract()
                     .addIKM(new SecretKeySpec(identityPayload, "AES"))
                     .thenExpand("adv_secret".getBytes(StandardCharsets.UTF_8), 32);
-            var companionKey = companionKeyHkdf.deriveData(companionKeyHkdfParams);
-            var companionPublicKey = SignalIdentityPublicKey.ofDirect(companionKey);
-            var companionKeyPair = new SignalIdentityKeyPair(companionPublicKey, companionPrivateKey);
-            whatsapp.store().setCompanionKeyPair(companionKeyPair);
+            var advSecretKey = advSecretHkdf.deriveData(advSecretHkdfParams);
+            // Store the derived advSecretKey for HMAC verification in pair-success
+            whatsapp.store().setAdvSecretKey(advSecretKey);
             var linkCodePairingWrappedKeyBundle = new NodeBuilder()
                     .description("link_code_pairing_wrapped_key_bundle")
                     .content(encryptedPayload)

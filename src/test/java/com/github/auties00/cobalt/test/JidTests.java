@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.test;
 
 import it.auties.protobuf.model.ProtobufString;
-import com.github.auties00.cobalt.exception.MalformedJidException;
+import com.github.auties00.cobalt.exception.WhatsAppMalformedJidException;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidServer;
 import org.junit.jupiter.api.Test;
@@ -39,23 +39,23 @@ public class JidTests {
 
     @Test
     public void testMalformed() {
-        assertThrows(MalformedJidException.class, () -> Jid.of(-1));
-        assertThrows(MalformedJidException.class, () -> Jid.of("", JidServer.user(), -1, 0));
-        assertThrows(MalformedJidException.class, () -> Jid.of("", JidServer.user(), 256, 0));
-        assertThrows(MalformedJidException.class, () -> Jid.of("", JidServer.user(), 0, -1));
-        assertThrows(MalformedJidException.class, () -> Jid.of("", JidServer.user(), 0, 256));
-        assertThrows(MalformedJidException.class, () -> Jid.of("user:1:1", JidServer.user()));
-        assertThrows(MalformedJidException.class, () -> Jid.of(ProtobufString.lazy("user:1:1".getBytes())));
-        assertThrows(MalformedJidException.class, () -> Jid.of("user_1_1", JidServer.user()));
-        assertThrows(MalformedJidException.class, () -> Jid.of(ProtobufString.lazy("user_1_1".getBytes())));
-        assertThrows(MalformedJidException.class, () -> Jid.of("user::1", JidServer.user()));
-        assertThrows(MalformedJidException.class, () -> Jid.of(ProtobufString.lazy("user::1".getBytes())));
-        assertThrows(MalformedJidException.class, () -> Jid.of("user__1", JidServer.user()));
-        assertThrows(MalformedJidException.class, () -> Jid.of(ProtobufString.lazy("user__1".getBytes())));
-        assertThrows(MalformedJidException.class, () -> Jid.of("user:1_1:1", JidServer.user()));
-        assertThrows(MalformedJidException.class, () -> Jid.of(ProtobufString.lazy("user:1_1:1".getBytes())));
-        assertThrows(MalformedJidException.class, () -> Jid.of("user_1:1_1", JidServer.user()));
-        assertThrows(MalformedJidException.class, () -> Jid.of(ProtobufString.lazy("user_1:1_1".getBytes())));
+        assertThrows(WhatsAppMalformedJidException.class, () -> Jid.of(-1));
+        assertThrows(WhatsAppMalformedJidException.class, () -> Jid.of("", JidServer.user(), -1, 0));
+        assertThrows(WhatsAppMalformedJidException.class, () -> Jid.of("", JidServer.user(), 256, 0));
+        assertThrows(WhatsAppMalformedJidException.class, () -> Jid.of("", JidServer.user(), 0, -1));
+        assertThrows(WhatsAppMalformedJidException.class, () -> Jid.of("", JidServer.user(), 0, 256));
+        assertThrows(WhatsAppMalformedJidException.class, () -> Jid.of("user:1:1", JidServer.user()));
+        assertThrows(WhatsAppMalformedJidException.class, () -> Jid.of(ProtobufString.lazy("user:1:1".getBytes())));
+        assertThrows(WhatsAppMalformedJidException.class, () -> Jid.of("user_1_1", JidServer.user()));
+        assertThrows(WhatsAppMalformedJidException.class, () -> Jid.of(ProtobufString.lazy("user_1_1".getBytes())));
+        assertThrows(WhatsAppMalformedJidException.class, () -> Jid.of("user::1", JidServer.user()));
+        assertThrows(WhatsAppMalformedJidException.class, () -> Jid.of(ProtobufString.lazy("user::1".getBytes())));
+        assertThrows(WhatsAppMalformedJidException.class, () -> Jid.of("user__1", JidServer.user()));
+        assertThrows(WhatsAppMalformedJidException.class, () -> Jid.of(ProtobufString.lazy("user__1".getBytes())));
+        assertThrows(WhatsAppMalformedJidException.class, () -> Jid.of("user:1_1:1", JidServer.user()));
+        assertThrows(WhatsAppMalformedJidException.class, () -> Jid.of(ProtobufString.lazy("user:1_1:1".getBytes())));
+        assertThrows(WhatsAppMalformedJidException.class, () -> Jid.of("user_1:1_1", JidServer.user()));
+        assertThrows(WhatsAppMalformedJidException.class, () -> Jid.of(ProtobufString.lazy("user_1:1_1".getBytes())));
     }
 
     @Test

@@ -1,8 +1,8 @@
 package com.github.auties00.cobalt.model.message.server;
 
 import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.model.MessageContainer;
-import com.github.auties00.cobalt.model.message.model.ServerMessage;
+import com.github.auties00.cobalt.model.message.common.MessageContainer;
+import com.github.auties00.cobalt.model.message.common.ServerMessage;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;

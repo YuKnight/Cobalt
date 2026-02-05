@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.migration;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
-import com.github.auties00.cobalt.exception.LidMigrationException;
+import com.github.auties00.cobalt.exception.WhatsAppLidMigrationException;
 import com.github.auties00.cobalt.model.chat.Chat;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.HistorySync;
@@ -14,8 +14,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
-
-import static com.github.auties00.cobalt.client.WhatsAppClientErrorHandler.Location.LID_MIGRATION;
 
 /**
  * Service responsible for orchestrating LID (Long ID) migration.
@@ -114,7 +112,7 @@ public final class LidMigrationService {
      */
     public void processProtocolMessage(LIDMigrationMappingSyncPayload payload) {
         if (payload == null) {
-            handleError(new LidMigrationException.FailedToParseMappings("null payload"));
+            handleError(new WhatsAppLidMigrationException.FailedToParseMappings("null payload"));
             return;
         }
 
@@ -155,7 +153,7 @@ public final class LidMigrationService {
             }
 
         } catch (Throwable throwable) {
-            handleError(new LidMigrationException.FailedToParseMappings("error processing mappings", throwable));
+            handleError(new WhatsAppLidMigrationException.FailedToParseMappings("error processing mappings", throwable));
         }
     }
 
@@ -362,7 +360,7 @@ public final class LidMigrationService {
         // Verify primary mappings haven't expired before starting migration
         if (!primaryPnToLidCache.isEmpty() && !arePrimaryMappingsValid()) {
             LOGGER.log(System.Logger.Level.ERROR, "Primary mappings have expired (older than 24 hours)");
-            handleError(new LidMigrationException.PrimaryMappingsObsolete());
+            handleError(new WhatsAppLidMigrationException.PrimaryMappingsObsolete());
             return;
         }
 
@@ -391,10 +389,10 @@ public final class LidMigrationService {
             state.set(LidMigrationState.COMPLETE);
             LOGGER.log(System.Logger.Level.INFO, "LID migration completed");
 
-        } catch (LidMigrationException e) {
+        } catch (WhatsAppLidMigrationException e) {
             handleError(e);
         } catch (Throwable throwable) {
-            handleError(new LidMigrationException.FailedToParseMappings("migration execution failed", throwable));
+            handleError(new WhatsAppLidMigrationException.FailedToParseMappings("migration execution failed", throwable));
         }
     }
 
@@ -463,7 +461,7 @@ public final class LidMigrationService {
             var chatTimestamp = chat.timestampSeconds();
             if (chatTimestamp >= chatDbMigrationTimestamp && chatDbMigrationTimestamp > 0) {
                 // Local data is fresher than primary sync → primary mappings are obsolete
-                throw new LidMigrationException.PrimaryMappingsObsolete();
+                throw new WhatsAppLidMigrationException.PrimaryMappingsObsolete();
             }
 
             // Primary is fresher → trust primary
@@ -516,7 +514,7 @@ public final class LidMigrationService {
      * Checks for split thread issues that would cause conflicts after migration.
      *
      * @param resolutions the list of resolutions to check
-     * @throws LidMigrationException.SplitThreadMismatch if a critical split thread issue is detected
+     * @throws WhatsAppLidMigrationException.SplitThreadMismatch if a critical split thread issue is detected
      */
     private void checkForSplitThreads(List<LidMigrationResolution> resolutions) {
         // Collect all existing LID threads that are being kept as ALREADY_LID
@@ -551,7 +549,7 @@ public final class LidMigrationService {
                 LOGGER.log(System.Logger.Level.WARNING,
                         "Split thread detected: {0} threads would migrate to {1}: [{2}]",
                         migrations.size(), targetLid, duplicates);
-                throw new LidMigrationException.SplitThreadMismatch();
+                throw new WhatsAppLidMigrationException.SplitThreadMismatch();
             }
 
             // Check 2: A PN thread would migrate to a LID that already exists as a separate thread
@@ -560,7 +558,7 @@ public final class LidMigrationService {
                 LOGGER.log(System.Logger.Level.WARNING,
                         "Split thread detected: PN thread {0} would collide with existing LID thread {1}",
                         pnThread, targetLid);
-                throw new LidMigrationException.SplitThreadMismatch();
+                throw new WhatsAppLidMigrationException.SplitThreadMismatch();
             }
         }
     }
@@ -690,10 +688,10 @@ public final class LidMigrationService {
     /**
      * Handles a migration error.
      */
-    private void handleError(LidMigrationException error) {
+    private void handleError(WhatsAppLidMigrationException error) {
         state.set(LidMigrationState.FAILED);
         LOGGER.log(System.Logger.Level.ERROR, "LID migration failed: {0}", error.getMessage());
-        whatsapp.handleFailure(LID_MIGRATION, error);
+        whatsapp.handleFailure(error);
     }
 
     /**

@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.socket.state;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.exception.WhatsAppMediaException;
 import com.github.auties00.cobalt.media.MediaConnection;
 import com.github.auties00.cobalt.media.MediaHost;
 import com.github.auties00.cobalt.model.jid.JidServer;
@@ -13,8 +14,6 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-
-import static com.github.auties00.cobalt.client.WhatsAppClientErrorHandler.Location.MEDIA_CONNECTION;
 
 public final class WebScheduleMediaConnectionUpdateStreamNodeHandler extends SocketStream.Handler {
     private static final int DEFAULT_MEDIA_CONNECTION_TTL = 300;
@@ -55,7 +54,7 @@ public final class WebScheduleMediaConnectionUpdateStreamNodeHandler extends Soc
                     .setMediaConnection(mediaConnection);
         } catch (Exception throwable) {
             whatsapp.store().setMediaConnection(null);
-            whatsapp.handleFailure(MEDIA_CONNECTION, throwable);
+            whatsapp.handleFailure(new WhatsAppMediaException.Connection(throwable));
         }finally {
             var mediaConnectionTtl = mediaConnection != null ? mediaConnection.ttl() : DEFAULT_MEDIA_CONNECTION_TTL;
             var executor = CompletableFuture.delayedExecutor(mediaConnectionTtl, TimeUnit.SECONDS);

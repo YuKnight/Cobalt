@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.node;
 
-import com.github.auties00.cobalt.exception.MalformedJidException;
+import com.github.auties00.cobalt.exception.WhatsAppMalformedJidException;
 import com.github.auties00.cobalt.model.jid.Jid;
 import it.auties.protobuf.model.ProtobufString;
 
@@ -89,14 +89,14 @@ public sealed interface NodeAttribute {
          * Converts the text value to a {@link Jid}
          *
          * @return a non-null {@link Jid}
-         * @throws MalformedJidException if the text value is not a jid
+         * @throws WhatsAppMalformedJidException if the text value is not a jid
          */
         @Override
         public Optional<Jid> toJid() {
             try {
                 var result = Jid.of(value);
                 return Optional.of(result);
-            }catch (MalformedJidException exception) {
+            }catch (WhatsAppMalformedJidException exception) {
                 return Optional.empty();
             }
         }
@@ -245,7 +245,7 @@ public sealed interface NodeAttribute {
             try {
                 var result = Jid.of(ProtobufString.lazy(value));
                 return Optional.of(result);
-            }catch (MalformedJidException exception) {
+            }catch (WhatsAppMalformedJidException exception) {
                 return Optional.empty();
             }
         }

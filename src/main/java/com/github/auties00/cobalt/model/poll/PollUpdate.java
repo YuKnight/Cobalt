@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.model.poll;
 
-import com.github.auties00.cobalt.model.message.model.ChatMessageKey;
+import com.github.auties00.cobalt.model.message.common.ChatMessageKey;
 import com.github.auties00.cobalt.util.Clock;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;

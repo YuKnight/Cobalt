@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.socket;
 
-import com.github.auties00.cobalt.exception.SessionClosedException;
+import com.github.auties00.cobalt.exception.WhatsAppSessionException;
 import com.github.auties00.cobalt.model.auth.*;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeEncoder;
@@ -153,7 +153,7 @@ public abstract sealed class SocketSession {
     public synchronized void sendNode(Node node) {
         var ctx = CentralSelector.INSTANCE.getContext(channel);
         if(ctx == null || !ctx.connected || !ctx.secured) {
-            throw new SessionClosedException();
+            throw new WhatsAppSessionException.Closed();
         }
 
         try {

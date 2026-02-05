@@ -3,7 +3,7 @@ package com.github.auties00.cobalt.client.registration;
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClientVerificationHandler;
 import com.github.auties00.cobalt.client.info.WhatsAppMobileClientInfo;
-import com.github.auties00.cobalt.exception.MobileRegistrationException;
+import com.github.auties00.cobalt.exception.WhatsAppRegistrationException;
 import com.github.auties00.cobalt.model.business.BusinessVerifiedNameCertificateBuilder;
 import com.github.auties00.cobalt.model.business.BusinessVerifiedNameCertificateSpec;
 import com.github.auties00.cobalt.model.business.BusinessVerifiedNameDetailsBuilder;
@@ -70,7 +70,7 @@ public abstract sealed class WhatsAppMobileClientRegistration implements AutoClo
             requestVerificationCodeIfNecessary();
             sendVerificationCode();
         } catch (IOException | InterruptedException exception) {
-            throw new MobileRegistrationException(exception);
+            throw new WhatsAppRegistrationException(exception);
         }
     }
 
@@ -95,7 +95,7 @@ public abstract sealed class WhatsAppMobileClientRegistration implements AutoClo
         }
 
         // Error
-        throw new MobileRegistrationException("Cannot get account data", new String(result));
+        throw new WhatsAppRegistrationException("Cannot get account data", new String(result));
     }
 
 
@@ -123,20 +123,20 @@ public abstract sealed class WhatsAppMobileClientRegistration implements AutoClo
 
             var reason = response.getString("reason");
             if(isTooRecent(reason)) {
-                throw new MobileRegistrationException("Please wait before trying to register this phone value again. Don't spam!", new String(result));
+                throw new WhatsAppRegistrationException("Please wait before trying to register this phone value again. Don't spam!", new String(result));
             }
 
             if(isRegistrationBlocked(reason)) {
                 var resultJson = new String(result);
                 if(method.equals("wa_old")) {
-                    throw new MobileRegistrationException("The registration attempt was blocked by Whatsapp: you might want to change platform(iOS/Android) or try using a residential proxy (don't spam)", resultJson);
+                    throw new WhatsAppRegistrationException("The registration attempt was blocked by Whatsapp: you might want to change platform(iOS/Android) or try using a residential proxy (don't spam)", resultJson);
                 }else {
-                    throw new MobileRegistrationException("The registration attempt was blocked by Whatsapp: please try using a Whatsapp OTP as a verification method", resultJson);
+                    throw new WhatsAppRegistrationException("The registration attempt was blocked by Whatsapp: please try using a Whatsapp OTP as a verification method", resultJson);
                 }
             }
 
             if (Objects.equals(reason, lastError)) {
-                throw new MobileRegistrationException("An error occurred while registering: " + reason, new String(result));
+                throw new WhatsAppRegistrationException("An error occurred while registering: " + reason, new String(result));
             }
 
             lastError = reason;
@@ -165,14 +165,14 @@ public abstract sealed class WhatsAppMobileClientRegistration implements AutoClo
             saveRegistrationStatus(true);
             return;
         }
-        throw new MobileRegistrationException("Cannot confirm registration", new String(result));
+        throw new WhatsAppRegistrationException("Cannot confirm registration", new String(result));
     }
 
     private void saveRegistrationStatus(boolean registered) {
         store.setRegistered(registered);
         if (registered) {
             var phoneNumber = store.phoneNumber()
-                    .orElseThrow(() -> new MobileRegistrationException("Phone number wasn't set"));
+                    .orElseThrow(() -> new WhatsAppRegistrationException("Phone number wasn't set"));
             var jid = Jid.of(phoneNumber);
             store.setJid(jid);
         }
@@ -276,12 +276,12 @@ public abstract sealed class WhatsAppMobileClientRegistration implements AutoClo
 
     protected static PhoneNumber getPhoneNumber(WhatsAppStore store) {
         var phoneNumber = store.phoneNumber()
-                .orElseThrow(() -> new MobileRegistrationException("Phone number wasn't set"));
+                .orElseThrow(() -> new WhatsAppRegistrationException("Phone number wasn't set"));
         try {
             return PhoneNumberUtil.getInstance()
                     .parse("+" + phoneNumber, null);
         }catch (NumberParseException exception) {
-            throw new MobileRegistrationException("Malformed phone number: " + phoneNumber);
+            throw new WhatsAppRegistrationException("Malformed phone number: " + phoneNumber);
         }
     }
 

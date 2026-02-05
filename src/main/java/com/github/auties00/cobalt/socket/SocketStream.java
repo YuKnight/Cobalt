@@ -2,10 +2,12 @@ package com.github.auties00.cobalt.socket;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.client.WhatsAppClientVerificationHandler;
-import com.github.auties00.cobalt.message.receipt.MessageReceiptService;
+import com.github.auties00.cobalt.device.DeviceService;
+import com.github.auties00.cobalt.message.receipt.MessageReceiptHandler;
 import com.github.auties00.cobalt.message.receive.MessageReceivingService;
 import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.node.Node;
+import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.socket.call.CallAckStreamNodeHandler;
 import com.github.auties00.cobalt.socket.call.CallStreamNodeHandler;
 import com.github.auties00.cobalt.socket.error.ErrorStreamNodeHandler;
@@ -24,7 +26,7 @@ import java.util.*;
 public final class SocketStream {
     private final Map<String, SequencedCollection<Handler>> handlers;
 
-    public SocketStream(WhatsAppClient whatsapp, WhatsAppClientVerificationHandler.Web webVerificationHandler, LidMigrationService lidMigrationService, MessageReceivingService messageReceivingService, MessageReceiptService messageReceiptService, com.github.auties00.cobalt.props.ABPropsService abPropsService) {
+    public SocketStream(WhatsAppClient whatsapp, WhatsAppClientVerificationHandler.Web webVerificationHandler, LidMigrationService lidMigrationService, MessageReceivingService messageReceivingService, MessageReceiptHandler messageReceiptHandler, ABPropsService abPropsService, DeviceService deviceService) {
         var pairingCode = switch (webVerificationHandler) {
             case WhatsAppClientVerificationHandler.Web.PairingCode _ -> new SocketPhonePairing();
             case WhatsAppClientVerificationHandler.Web.QrCode _ -> null;
@@ -37,12 +39,12 @@ public final class SocketStream {
         addHandler(result, new CallAckStreamNodeHandler(whatsapp));
         addHandler(result, new ErrorStreamNodeHandler(whatsapp));
         addHandler(result, new FailureStreamNodeHandler(whatsapp));
-        addHandler(result, new IbStreamNodeHandler(whatsapp));
-        addHandler(result, new IqStreamNodeHandler(whatsapp, webVerificationHandler, pairingCode));
-        addHandler(result, new MessageStreamNodeHandler(whatsapp, lidMigrationService, messageReceivingService, messageReceiptService));
+        addHandler(result, new IbStreamNodeHandler(whatsapp, deviceService));
+        addHandler(result, new IqStreamNodeHandler(whatsapp, webVerificationHandler, pairingCode, deviceService));
+        addHandler(result, new MessageStreamNodeHandler(whatsapp, lidMigrationService, messageReceivingService, messageReceiptHandler));
         addHandler(result, new MessageAckStreamNodeHandler(whatsapp));
         addHandler(result, new MessageReceiptStreamNodeHandler(whatsapp));
-        addHandler(result, new NotificationStreamNodeHandler(whatsapp, pairingCode, lidMigrationService));
+        addHandler(result, new NotificationStreamNodeHandler(whatsapp, pairingCode, lidMigrationService, deviceService, abPropsService));
         addHandler(result, new PresenceStreamNodeHandler(whatsapp));
         addHandler(result, new EndStreamNodeHandler(whatsapp));
         addHandler(result, new UpdateIdentityStreamNodeHandler(whatsapp));
@@ -61,7 +63,7 @@ public final class SocketStream {
                 addHandler(result, new WebQueryPrivacySettingsStreamNodeHandler(whatsapp));
                 addHandler(result, new WebQueryDisappearingModeStreamNodeHandler(whatsapp));
                 addHandler(result, new WebQueryBlockListStreamNodeHandler(whatsapp));
-                addHandler(result, new WebOnInitialInfoStreamNodeHandler(whatsapp, lidMigrationService, abPropsService));
+                addHandler(result, new WebOnInitialInfoStreamNodeHandler(whatsapp, lidMigrationService, abPropsService, deviceService));
                 addHandler(result, new WebQueryNewslettersStreamNodeHandler(whatsapp));
                 addHandler(result, new WebPropsStreamNodeHandler(whatsapp, abPropsService));
             }

@@ -4,12 +4,12 @@ import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
 
-import java.util.List;
+import java.util.SequencedSet;
 
 @ProtobufMessage(name = "ADVKeyIndexList")
 public record KeyIndexList(@ProtobufProperty(index = 1, type = ProtobufType.UINT32) int rawId,
                            @ProtobufProperty(index = 2, type = ProtobufType.UINT64) long timestamp,
                            @ProtobufProperty(index = 3, type = ProtobufType.UINT32) int currentIndex,
-                           @ProtobufProperty(index = 4, type = ProtobufType.UINT32) List<Integer> validIndexes,
+                           @ProtobufProperty(index = 4, type = ProtobufType.UINT32) SequencedSet<Integer> validIndexes,
                            @ProtobufProperty(index = 5, type = ProtobufType.ENUM) ADVEncryptionType accountType) {
 }

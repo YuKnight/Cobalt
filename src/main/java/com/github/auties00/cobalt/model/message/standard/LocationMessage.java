@@ -4,8 +4,8 @@ import com.github.auties00.cobalt.model.button.template.highlyStructured.HighlyS
 import com.github.auties00.cobalt.model.button.template.hydrated.HydratedFourRowTemplateTitle;
 import com.github.auties00.cobalt.model.info.ContextInfo;
 import com.github.auties00.cobalt.model.message.button.ButtonsMessageHeader;
-import com.github.auties00.cobalt.model.message.model.ContextualMessage;
-import com.github.auties00.cobalt.model.message.model.Message;
+import com.github.auties00.cobalt.model.message.common.ContextualMessage;
+import com.github.auties00.cobalt.model.message.common.Message;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;

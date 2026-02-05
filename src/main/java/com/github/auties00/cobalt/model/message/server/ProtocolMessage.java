@@ -1,10 +1,10 @@
 package com.github.auties00.cobalt.model.message.server;
 
 import com.github.auties00.cobalt.model.chat.ChatDisappear;
-import com.github.auties00.cobalt.model.message.model.ChatMessageKey;
-import com.github.auties00.cobalt.model.message.model.Message;
-import com.github.auties00.cobalt.model.message.model.MessageContainer;
-import com.github.auties00.cobalt.model.message.model.ServerMessage;
+import com.github.auties00.cobalt.model.message.common.ChatMessageKey;
+import com.github.auties00.cobalt.model.message.common.Message;
+import com.github.auties00.cobalt.model.message.common.MessageContainer;
+import com.github.auties00.cobalt.model.message.common.ServerMessage;
 import com.github.auties00.cobalt.model.sync.*;
 import com.github.auties00.cobalt.util.Clock;
 import it.auties.protobuf.annotation.ProtobufEnum;

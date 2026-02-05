@@ -1,18 +1,24 @@
 package com.github.auties00.cobalt.device.fanout;
 
 /**
- * Participant hash version.
+ * Participant hash (phash) version for group message verification.
+ *
+ * @apiNote WAWebPhashUtils: defines phashV1 (SHA-1) and phashV2 (SHA-256) algorithms
+ * for calculating participant hashes used in group message stanzas.
  */
 public enum DevicePhashVersion {
+
     /**
      * Version 1: SHA-1 based phash with "1:" prefix.
-     * Does not support Meta AI bot injection.
+     *
+     * @apiNote WAWebPhashUtils.phashV1: legacy format, does not support Meta AI bot injection.
      */
     V1("SHA-1", "1:", false),
 
     /**
-     * Version 2: SHA-256 based phash with "2:" prefix (current).
-     * Supports Meta AI bot injection for open groups.
+     * Version 2: SHA-256 based phash with "2:" prefix.
+     *
+     * @apiNote WAWebPhashUtils.phashV2: current format, supports Meta AI bot injection for open groups.
      */
     V2("SHA-256", "2:", true);
 
@@ -47,7 +53,7 @@ public enum DevicePhashVersion {
     /**
      * Returns whether this version supports Meta AI bot injection.
      *
-     * @return true if Meta AI bot can be injected, false otherwise
+     * @return {@code true} if Meta AI bot can be injected
      */
     public boolean supportsMetaBot() {
         return supportsMetaBot;

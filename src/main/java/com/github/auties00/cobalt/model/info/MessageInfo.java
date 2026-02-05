@@ -2,9 +2,9 @@ package com.github.auties00.cobalt.model.info;
 
 import com.github.auties00.cobalt.model.contact.Contact;
 import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.model.ContextualMessage;
-import com.github.auties00.cobalt.model.message.model.MessageContainer;
-import com.github.auties00.cobalt.model.message.model.MessageStatus;
+import com.github.auties00.cobalt.model.message.common.ContextualMessage;
+import com.github.auties00.cobalt.model.message.common.MessageContainer;
+import com.github.auties00.cobalt.model.message.common.MessageStatus;
 
 import java.util.Optional;
 import java.util.OptionalLong;

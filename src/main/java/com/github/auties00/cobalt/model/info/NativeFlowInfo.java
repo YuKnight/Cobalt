@@ -12,6 +12,34 @@ import java.util.Objects;
  */
 @ProtobufMessage(name = "Message.ButtonsMessage.Button.NativeFlowInfo")
 public final class NativeFlowInfo implements Info, ButtonBody {
+    /**
+     * Native flow name for order details.
+     *
+     * @apiNote WAWebNativeFlowUtils: ORDER_DETAILS native flow type
+     */
+    public static final String ORDER_DETAILS = "order_details";
+
+    /**
+     * Native flow name for order status.
+     *
+     * @apiNote WAWebNativeFlowUtils: ORDER_STATUS native flow type
+     */
+    public static final String ORDER_STATUS = "order_status";
+
+    /**
+     * Native flow name for payment status.
+     *
+     * @apiNote WAWebNativeFlowUtils: PAYMENT_STATUS native flow type
+     */
+    public static final String PAYMENT_STATUS = "payment_status";
+
+    /**
+     * Native flow name for payment method.
+     *
+     * @apiNote WAWebNativeFlowUtils: PAYMENT_METHOD native flow type
+     */
+    public static final String PAYMENT_METHOD = "payment_method";
+
     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
     final String name;
 
@@ -29,6 +57,28 @@ public final class NativeFlowInfo implements Info, ButtonBody {
 
     public String parameters() {
         return parameters;
+    }
+
+    /**
+     * Checks if this is an order-related native flow.
+     *
+     * @return true if this is an order details or order status flow
+     *
+     * @apiNote WAWebNativeFlowUtils: detects order native flow types
+     */
+    public boolean isOrderFlow() {
+        return ORDER_DETAILS.equals(name) || ORDER_STATUS.equals(name);
+    }
+
+    /**
+     * Checks if this is a payment-related native flow.
+     *
+     * @return true if this is a payment status or payment method flow
+     *
+     * @apiNote WAWebNativeFlowUtils: detects payment native flow types
+     */
+    public boolean isPaymentFlow() {
+        return PAYMENT_STATUS.equals(name) || PAYMENT_METHOD.equals(name);
     }
 
     @Override
