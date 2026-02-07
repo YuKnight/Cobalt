@@ -1,168 +1,156 @@
 package com.github.auties00.cobalt.message.send.senderkey;
 
-import com.github.auties00.cobalt.device.util.DeviceConstants;
-import com.github.auties00.cobalt.message.encryption.MessageEncryption;
+import com.github.auties00.cobalt.device.DeviceService;
+import com.github.auties00.cobalt.device.icdc.IcdcResult;
+import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
+import com.github.auties00.cobalt.message.send.crypto.MessageEncryptedPayload;
+import com.github.auties00.cobalt.message.send.icdc.IcdcEnricher;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.common.MessageContainer;
-import com.github.auties00.cobalt.model.message.common.MessageContainerBuilder;
+import com.github.auties00.cobalt.model.message.common.MessageContainerSpec;
+import com.github.auties00.cobalt.model.message.server.DeviceSentMessageBuilder;
 import com.github.auties00.cobalt.model.message.server.SenderKeyDistributionMessageBuilder;
 import com.github.auties00.cobalt.store.WhatsAppStore;
 
 import java.util.*;
 
 /**
- * Distributes sender keys to group participants.
+ * Distributes the sender's group encryption key to participants that do
+ * not yet possess it.
  *
- * @apiNote WAWebGetGroupKeyDistributionMsg, WAWebApiParticipantStore
+ * <p>Before a group message encrypted with a sender key (SKMSG) can be
+ * decrypted by a participant, that participant must have received the
+ * sender's {@code SenderKeyDistributionMessage}.  This class creates
+ * the per-device encrypted distribution messages, populating ICDC
+ * metadata per recipient and wrapping companion device payloads in
+ * {@code DeviceSentMessage}.
+ *
+ * <p>The distribution message is a protobuf containing:
+ * <ul>
+ *   <li>{@code groupId} — the group JID as a legacy string</li>
+ *   <li>{@code axolotlSenderKeyDistributionMessage} — the serialised
+ *       Signal sender-key distribution bytes</li>
+ * </ul>
+ *
+ * @apiNote WAWebGetGroupKeyDistributionMsg.getKeyDistributionMsg: creates
+ * the distribution protobuf, populates ICDC metadata per recipient, and
+ * encrypts it for each device in the sender-key distribution list.
+ * WAWebSendGroupSkmsgJob: uses the distribution messages to build the
+ * {@code <participants>} node in the group SKMSG stanza.
  */
 public final class SenderKeyDistribution {
     private static final System.Logger LOGGER = System.getLogger("SenderKeyDistribution");
 
-    private final WhatsAppStore store;
     private final MessageEncryption encryption;
+    private final DeviceService deviceService;
+    private final WhatsAppStore store;
 
-    public SenderKeyDistribution(WhatsAppStore store, MessageEncryption encryption) {
-        this.store = Objects.requireNonNull(store, "store cannot be null");
-        this.encryption = Objects.requireNonNull(encryption, "encryption cannot be null");
+    public SenderKeyDistribution(
+            MessageEncryption encryption,
+            DeviceService deviceService,
+            WhatsAppStore store
+    ) {
+        this.encryption = Objects.requireNonNull(encryption, "encryption");
+        this.deviceService = Objects.requireNonNull(deviceService, "deviceService");
+        this.store = Objects.requireNonNull(store, "store");
     }
 
     /**
-     * Creates a sender key distribution message container for a group.
+     * Encrypts the sender-key distribution message for each device in the
+     * distribution list, populating ICDC metadata per device.
+     *
+     * <p>Each device receives the distribution protobuf encrypted
+     * individually via the Signal session cipher (pkmsg or msg).
+     * Companion devices (same account as the sender) receive a
+     * {@code DeviceSentMessage} wrapper with the group JID as
+     * destination.  All devices receive ICDC metadata appropriate
+     * to their role (sender-only for self, sender+recipient for others).
+     * Devices that fail encryption are omitted with a warning log.
+     *
+     * @param groupJid       the group JID
+     * @param senderKeyBytes the serialised {@code SenderKeyDistributionMessage}
+     *                       from the Signal group cipher
+     * @param devices        the device JIDs that need the sender key
+     * @return the per-device encrypted payloads
+     * @throws NullPointerException if any argument is {@code null}
+     *
+     * @apiNote WAWebGetGroupKeyDistributionMsg.getKeyDistributionMsg:
+     * builds {@code {senderKeyDistributionMessage: {groupId, axolotlSenderKeyDistributionMessage}}},
+     * populates ICDC metadata per recipient via
+     * {@code WAWebIdentityIcdcApi.getICDCMetaFromDeviceRecord},
+     * wraps in {@code DeviceSentMessage} for self devices, then encrypts
+     * via {@code WAWebEncryptMsgProtobuf.encryptMsgProtobuf} for each device.
      */
-    public MessageContainer createDistributionMessage(Jid groupJid, Jid senderJid) {
-        Objects.requireNonNull(groupJid, "groupJid cannot be null");
-        Objects.requireNonNull(senderJid, "senderJid cannot be null");
+    public List<MessageEncryptedPayload> encrypt(
+            Jid groupJid,
+            byte[] senderKeyBytes,
+            Collection<Jid> devices
+    ) {
+        Objects.requireNonNull(groupJid, "groupJid");
+        Objects.requireNonNull(senderKeyBytes, "senderKeyBytes");
+        Objects.requireNonNull(devices, "devices");
 
-        var senderKeyBytes = encryption.getSenderKeyBytes(groupJid, senderJid);
+        // WAWebSendMsgCreateFanoutStanza: ensureE2ESessions before encrypting SK distribution
+        deviceService.ensureSessions(devices);
 
-        var distributionMessage = new SenderKeyDistributionMessageBuilder()
+        var selfJid = store.jid().orElse(null);
+
+        // WAWebGetGroupKeyDistributionMsg: precalculate ICDC for sender
+        var senderIcdc = selfJid != null ? deviceService.computeIcdc(selfJid).orElse(null) : null;
+
+        // WAWebGetGroupKeyDistributionMsg: build the distribution protobuf
+        var skDistMessage = new SenderKeyDistributionMessageBuilder()
                 .groupJid(groupJid)
                 .data(senderKeyBytes)
                 .build();
+        var container = MessageContainer.of(skDistMessage);
 
-        return new MessageContainerBuilder()
-                .senderKeyDistributionMessage(distributionMessage)
-                .build();
-    }
+        // WAWebGetGroupKeyDistributionMsg: encrypt for each device individually
+        // with per-device ICDC metadata and DSM wrapping for self devices
+        var results = new ArrayList<MessageEncryptedPayload>(devices.size());
+        for (var device : devices) {
+            try {
+                var isSelf = selfJid != null && device.toUserJid().equals(selfJid.toUserJid());
 
-    /**
-     * Categorizes participants into those who need the sender key and those who already have it.
-     */
-    public Lists categorizeParticipants(Jid groupJid, Jid senderJid, Collection<Jid> participants) {
-        Objects.requireNonNull(groupJid, "groupJid cannot be null");
-        Objects.requireNonNull(senderJid, "senderJid cannot be null");
-        Objects.requireNonNull(participants, "participants cannot be null");
+                // WAWebGetGroupKeyDistributionMsg: for recipient devices,
+                // resolve their ICDC metadata
+                IcdcResult recipientIcdc = null;
+                if (!isSelf) {
+                    recipientIcdc = deviceService.computeIcdc(device.toUserJid())
+                            .orElse(null);
+                }
 
-        var needsKey = new ArrayList<Jid>();
-        var hasKey = new ArrayList<Jid>();
+                // WAWebE2EProtoGenerator.populateMessageContextInfo:
+                // self devices get sender ICDC only, recipients get both
+                var enriched = IcdcEnricher.enrich(
+                        container, senderIcdc, isSelf ? null : recipientIcdc);
 
-        boolean rotateKey = store.anyUserNeedsSenderKeyRotation(participants);
+                byte[] plaintext;
+                if (isSelf) {
+                    // WAWebDeviceSentMessageProtoUtils.wrapDeviceSentMessage
+                    var dsm = new DeviceSentMessageBuilder()
+                            .destinationJid(groupJid)
+                            .message(enriched)
+                            .build();
+                    plaintext = MessageContainerSpec.encode(MessageContainer.of(dsm));
+                } else {
+                    plaintext = MessageContainerSpec.encode(enriched);
+                }
 
-        for (var participant : participants) {
-            if (hasSenderKeyForParticipant(groupJid, senderJid, participant)) {
-                hasKey.add(participant);
-            } else {
-                needsKey.add(participant);
+                var payload = encryption.encryptForDevice(device, plaintext);
+                results.add(payload);
+            } catch (Exception e) {
+                // WAWebGetGroupKeyDistributionMsg: logs encryption failure per device,
+                // continues for companion devices but rejects for primary devices
+                LOGGER.log(System.Logger.Level.WARNING,
+                        "getKeyDistributionMsg: encryption fail for {0}: {1}",
+                        device, e.getMessage());
             }
         }
 
-        if (rotateKey) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Sender key rotation needed for {0}, all {1} participants need key",
-                    groupJid, participants.size());
+        // WAWebSendMsgCommonApi.updateIdentityRange
+        store.updateIdentityRange(devices);
 
-            for (var participant : participants) {
-                store.checkAndClearSenderKeyRotationNeeded(participant);
-            }
-
-            var allParticipants = new ArrayList<Jid>(needsKey.size() + hasKey.size());
-            allParticipants.addAll(needsKey);
-            allParticipants.addAll(hasKey);
-
-            return new Lists(
-                    Collections.unmodifiableList(allParticipants),
-                    Collections.emptyList(),
-                    true
-            );
-        }
-
-        LOGGER.log(System.Logger.Level.DEBUG,
-                "Categorized participants for {0}: {1} need key, {2} have key",
-                groupJid, needsKey.size(), hasKey.size());
-
-        return new Lists(
-                Collections.unmodifiableList(needsKey),
-                Collections.unmodifiableList(hasKey),
-                false
-        );
-    }
-
-    private boolean hasSenderKeyForParticipant(Jid groupJid, Jid senderJid, Jid participantJid) {
-        return store.hasSenderKeyDistributed(groupJid, participantJid);
-    }
-
-    /**
-     * Marks participants as having received the sender key.
-     */
-    public void markParticipantsHaveSenderKey(Jid groupJid, Collection<Jid> participants) {
-        Objects.requireNonNull(groupJid, "groupJid cannot be null");
-        Objects.requireNonNull(participants, "participants cannot be null");
-
-        var count = 0;
-        for (var participant : participants) {
-            if (participant.device() == DeviceConstants.HOSTED_DEVICE_ID) {
-                continue;
-            }
-            store.markSenderKeyDistributed(groupJid, participant);
-            count++;
-        }
-
-        LOGGER.log(System.Logger.Level.DEBUG,
-                "Marked {0} participants as having sender key for {1}", count, groupJid);
-    }
-
-    /**
-     * Clears the sender key distribution status for all participants in a group.
-     */
-    public void clearDistributionStatus(Jid groupJid) {
-        Objects.requireNonNull(groupJid, "groupJid cannot be null");
-        store.clearSenderKeyDistribution(groupJid);
-        LOGGER.log(System.Logger.Level.DEBUG, "Cleared sender key distribution status for {0}", groupJid);
-    }
-
-    /**
-     * Marks the sender key as forgotten for specific participants.
-     */
-    public void forgetSenderKey(Jid groupJid, Collection<Jid> participants) {
-        Objects.requireNonNull(groupJid, "groupJid cannot be null");
-        Objects.requireNonNull(participants, "participants cannot be null");
-
-        for (var participant : participants) {
-            store.forgetSenderKeyDistributed(groupJid, participant);
-        }
-
-        LOGGER.log(System.Logger.Level.DEBUG,
-                "Marked sender key as forgotten for {0} participants in {1}",
-                participants.size(), groupJid);
-    }
-
-    /**
-     * Categorized sender key lists.
-     */
-    public record Lists(List<Jid> needsDistribution, List<Jid> alreadyHasKey, boolean rotateKey) {
-        public List<Jid> allParticipants() {
-            var all = new ArrayList<Jid>(needsDistribution.size() + alreadyHasKey.size());
-            all.addAll(needsDistribution);
-            all.addAll(alreadyHasKey);
-            return Collections.unmodifiableList(all);
-        }
-
-        public boolean hasParticipantsNeedingDistribution() {
-            return !needsDistribution.isEmpty();
-        }
-
-        public int totalCount() {
-            return needsDistribution.size() + alreadyHasKey.size();
-        }
+        return Collections.unmodifiableList(results);
     }
 }

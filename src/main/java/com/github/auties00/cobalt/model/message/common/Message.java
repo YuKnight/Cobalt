@@ -220,7 +220,15 @@ public sealed interface Message permits ButtonMessage, ContextualMessage, Paymen
         /**
          * Secret encrypted message
          */
-        SECRET_ENCRYPTED
+        SECRET_ENCRYPTED,
+        /**
+         * Calendar event message
+         */
+        EVENT,
+        /**
+         * Poll result snapshot message
+         */
+        POLL_RESULT_SNAPSHOT
     }
 
     /**

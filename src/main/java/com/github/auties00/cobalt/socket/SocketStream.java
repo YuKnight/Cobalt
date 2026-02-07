@@ -3,7 +3,7 @@ package com.github.auties00.cobalt.socket;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.client.WhatsAppClientVerificationHandler;
 import com.github.auties00.cobalt.device.DeviceService;
-import com.github.auties00.cobalt.message.receipt.MessageReceiptHandler;
+import com.github.auties00.cobalt.message.receive.receipt.MessageReceiptHandler;
 import com.github.auties00.cobalt.message.receive.MessageReceivingService;
 import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.node.Node;

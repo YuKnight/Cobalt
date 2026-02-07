@@ -1,7 +1,6 @@
 package com.github.auties00.cobalt.device.adv;
 
-import com.github.auties00.cobalt.device.result.ValidatedKeyIndexListResult;
-import com.github.auties00.cobalt.device.util.DeviceConstants;
+import com.github.auties00.cobalt.device.DeviceConstants;
 import com.github.auties00.cobalt.exception.WhatsAppAdvValidationException;
 import com.github.auties00.cobalt.model.auth.*;
 import com.github.auties00.cobalt.model.jid.Jid;

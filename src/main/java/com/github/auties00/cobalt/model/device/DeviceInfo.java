@@ -9,7 +9,7 @@ import it.auties.protobuf.model.ProtobufType;
 
 import java.util.Objects;
 
-import static com.github.auties00.cobalt.device.util.DeviceConstants.*;
+import static com.github.auties00.cobalt.device.DeviceConstants.*;
 
 /**
  * Represents information about a single device in a user's device list.

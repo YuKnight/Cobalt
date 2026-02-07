@@ -26,6 +26,10 @@ public enum PrivacySettingValue {
      */
     CONTACTS_EXCEPT(2, "contact_blacklist"),
     /**
+     * Only specific selected contacts (allowlist)
+     */
+    CONTACTS_ONLY(5, "contact_whitelist"),
+    /**
      * No one
      */
     NO_ONE(3, "none"),

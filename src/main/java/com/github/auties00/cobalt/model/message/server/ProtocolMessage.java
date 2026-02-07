@@ -24,7 +24,7 @@ import java.util.Optional;
 @ProtobufMessage(name = "Message.ProtocolMessage")
 public final class ProtocolMessage implements ServerMessage {
     @ProtobufProperty(index = 1, type = ProtobufType.MESSAGE)
-    final ChatMessageKey key;
+    ChatMessageKey key;
 
     @ProtobufProperty(index = 2, type = ProtobufType.ENUM)
     final Type protocolType;
@@ -129,6 +129,10 @@ public final class ProtocolMessage implements ServerMessage {
 
     public Optional<ChatMessageKey> key() {
         return Optional.ofNullable(key);
+    }
+
+    public void setKey(ChatMessageKey key) {
+        this.key = key;
     }
 
     public Type protocolType() {

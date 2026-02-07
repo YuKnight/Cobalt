@@ -27,7 +27,7 @@ public enum PrivacySettingType {
     /**
      * Refers to who should be able to see your status
      */
-    STATUS(3, "status", Set.of(PrivacySettingValue.EVERYONE, PrivacySettingValue.CONTACTS, PrivacySettingValue.CONTACTS_EXCEPT, PrivacySettingValue.NO_ONE)),
+    STATUS(3, "status", Set.of(PrivacySettingValue.CONTACTS, PrivacySettingValue.CONTACTS_EXCEPT, PrivacySettingValue.CONTACTS_ONLY, PrivacySettingValue.NO_ONE)),
     /**
      * Refers to who should be able to add you to groups
      */

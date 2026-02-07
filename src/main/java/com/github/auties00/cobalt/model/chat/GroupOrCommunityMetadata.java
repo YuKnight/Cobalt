@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.model.chat;
 
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.util.Clock;
+import it.auties.protobuf.annotation.ProtobufBuilder;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
@@ -12,7 +13,7 @@ import java.util.*;
 /**
  * This model class represents the metadata of a group or community
  */
-@ProtobufMessage
+@ProtobufMessage(generateBuilder = false)
 public final class GroupOrCommunityMetadata {
     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
     final Jid jid;
@@ -37,7 +38,7 @@ public final class GroupOrCommunityMetadata {
 
     @ProtobufProperty(index = 8, type = ProtobufType.STRING)
     final String descriptionId;
-
+    
     @ProtobufProperty(index = 9, type = ProtobufType.MAP, mapKeyType = ProtobufType.UINT32, mapValueType = ProtobufType.ENUM)
     final Map<Integer, ChatSettingPolicy> settings;
 
@@ -57,12 +58,15 @@ public final class GroupOrCommunityMetadata {
     final SequencedSet<CommunityLinkedGroup> communityGroups;
 
     @ProtobufProperty(index = 16, type = ProtobufType.BOOL)
-    final boolean isLidAddressingMode;
+    boolean isLidAddressingMode;
 
     @ProtobufProperty(index = 17, type = ProtobufType.BOOL)
     final boolean isIncognito;
 
-    GroupOrCommunityMetadata(Jid jid, String subject, Jid subjectAuthorJid, long subjectTimestampSeconds, long foundationTimestampSeconds, Jid founderJid, String description, String descriptionId, Map<Integer, ChatSettingPolicy> settings, SequencedSet<ChatParticipant> participants, long ephemeralExpirationSeconds, Jid parentCommunityJid, boolean isCommunity, SequencedSet<CommunityLinkedGroup> communityGroups, boolean isLidAddressingMode, boolean isIncognito) {
+    @ProtobufProperty(index = 18, type = ProtobufType.BOOL)
+    final boolean defaultSubgroup;
+
+    GroupOrCommunityMetadata(Jid jid, String subject, Jid subjectAuthorJid, long subjectTimestampSeconds, long foundationTimestampSeconds, Jid founderJid, String description, String descriptionId, Map<Integer, ChatSettingPolicy> settings, SequencedSet<ChatParticipant> participants, long ephemeralExpirationSeconds, Jid parentCommunityJid, boolean isCommunity, SequencedSet<CommunityLinkedGroup> communityGroups, boolean isLidAddressingMode, boolean isIncognito, boolean defaultSubgroup) {
         this.jid = Objects.requireNonNull(jid, "value cannot be null");
         this.subject = Objects.requireNonNull(subject, "subject cannot be null");
         this.subjectAuthorJid = subjectAuthorJid;
@@ -79,8 +83,19 @@ public final class GroupOrCommunityMetadata {
         this.communityGroups = Objects.requireNonNullElseGet(communityGroups, LinkedHashSet::new);
         this.isLidAddressingMode = isLidAddressingMode;
         this.isIncognito = isIncognito;
+        this.defaultSubgroup = defaultSubgroup;
     }
 
+    // TODO: Enums as indexes even though protobuf spec says no?
+    @ProtobufBuilder(className = "GroupOrCommunityMetadataBuilder")
+    static GroupOrCommunityMetadata ofConverted(Jid jid, String subject, Jid subjectAuthorJid, long subjectTimestampSeconds, long foundationTimestampSeconds, Jid founderJid, String description, String descriptionId, Map<ChatSetting, ChatSettingPolicy> settings, SequencedSet<ChatParticipant> participants, long ephemeralExpirationSeconds, Jid parentCommunityJid, boolean isCommunity, SequencedSet<CommunityLinkedGroup> communityGroups, boolean isLidAddressingMode, boolean isIncognito, boolean defaultSubgroup) {
+        var convertedSettings = new HashMap<Integer, ChatSettingPolicy>();
+        if(settings != null) {
+            settings.forEach((key, value) -> convertedSettings.put(key.index(), value));
+        }
+        return new GroupOrCommunityMetadata(jid, subject, subjectAuthorJid, subjectTimestampSeconds, foundationTimestampSeconds, founderJid, description, descriptionId, convertedSettings, participants, ephemeralExpirationSeconds, parentCommunityJid, isCommunity, communityGroups, isLidAddressingMode, isIncognito, defaultSubgroup);
+    }
+    
     public Jid jid() {
         return jid;
     }
@@ -109,7 +124,7 @@ public final class GroupOrCommunityMetadata {
         return Clock.parseSeconds(foundationTimestampSeconds);
     }
 
-    public Optional<Jid> founder() {
+    public Optional<Jid> founderJid() {
         return Optional.ofNullable(founderJid);
     }
 
@@ -119,6 +134,56 @@ public final class GroupOrCommunityMetadata {
 
     public Optional<String> descriptionId() {
         return Optional.ofNullable(descriptionId);
+    }
+
+    public Map<ChatSetting, ChatSettingPolicy> settings() {
+        return new AbstractMap<>() {
+            @Override
+            public ChatSettingPolicy get(Object key) {
+                return key instanceof ChatSetting s ? settings.get(s.index()) : null;
+            }
+
+            @Override
+            public boolean containsKey(Object key) {
+                return key instanceof ChatSetting s && settings.containsKey(s.index());
+            }
+
+            @Override
+            public int size() {
+                return settings.size();
+            }
+
+            @Override
+            public Set<Entry<ChatSetting, ChatSettingPolicy>> entrySet() {
+                return new AbstractSet<>() {
+                    @Override
+                    public Iterator<Entry<ChatSetting, ChatSettingPolicy>> iterator() {
+                        return new Iterator<>() {
+                            private final Iterator<Map.Entry<Integer, ChatSettingPolicy>> iterator =  settings.entrySet().iterator();
+
+                            @Override
+                            public boolean hasNext() {
+                                return iterator.hasNext();
+                            }
+
+                            @Override
+                            public Entry<ChatSetting, ChatSettingPolicy> next() {
+                                var entry = iterator.next();
+                                var setting = ChatSetting.of(entry.getKey())
+                                        .orElseThrow(() -> new IllegalArgumentException("Cannot parse " + entry.getKey() + " as a ChatSetting"));
+                                var policy = entry.getValue();
+                                return Map.entry(setting, policy);
+                            }
+                        };
+                    }
+
+                    @Override
+                    public int size() {
+                        return settings.size();
+                    }
+                };
+            }
+        };
     }
 
     public Optional<ChatSettingPolicy> getPolicy(ChatSetting setting) {
@@ -139,6 +204,14 @@ public final class GroupOrCommunityMetadata {
 
     public boolean removeParticipant(Jid jid) {
         return participants.removeIf(participant -> participant.jid().equals(jid));
+    }
+
+    public void clearParticipants() {
+        participants.clear();
+    }
+
+    public void addAllParticipants(Collection<ChatParticipant> newParticipants) {
+        participants.addAll(newParticipants);
     }
 
     public long ephemeralExpirationSeconds() {
@@ -177,8 +250,16 @@ public final class GroupOrCommunityMetadata {
         return isLidAddressingMode;
     }
 
+    public void setLidAddressingMode(boolean lidAddressingMode) {
+        this.isLidAddressingMode = lidAddressingMode;
+    }
+
     public boolean isIncognito() {
         return isIncognito;
+    }
+
+    public boolean isDefaultSubgroup() {
+        return defaultSubgroup;
     }
 
     @Override

@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.message.receive;
 
 import com.github.auties00.cobalt.exception.WhatsAppAdvValidationException;
 import com.github.auties00.cobalt.exception.WhatsAppMessageException;
-import com.github.auties00.cobalt.message.encryption.MessageDecryption;
+import com.github.auties00.cobalt.message.receive.crypto.MessageDecryption;
 import com.github.auties00.cobalt.message.receive.MessageReceiveStanzaParser.EncNode;
 import com.github.auties00.cobalt.message.receive.MessageReceiveStanzaParser.ParsedMessageStanza;
 import com.github.auties00.cobalt.model.info.ChatMessageInfo;

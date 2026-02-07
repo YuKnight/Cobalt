@@ -15,6 +15,7 @@ import com.github.auties00.cobalt.model.auth.SignedDeviceIdentity;
 import com.github.auties00.cobalt.model.auth.UserAgent.ReleaseChannel;
 import com.github.auties00.cobalt.model.auth.Version;
 import com.github.auties00.cobalt.model.business.BusinessCategory;
+import com.github.auties00.cobalt.model.business.VerifiedBusinessName;
 import com.github.auties00.cobalt.model.call.Call;
 import com.github.auties00.cobalt.model.chat.Chat;
 import com.github.auties00.cobalt.model.chat.ChatBuilder;
@@ -61,6 +62,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentHashMap.KeySetView;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * WhatsappStore manages all session-scoped data and state for WhatsApp client connections.
@@ -833,6 +837,23 @@ public final class WhatsAppStore implements SignalProtocolStore {
     final ConcurrentMap<SignalProtocolAddress, SignalIdentityPublicKey> remoteIdentities;
 
     /**
+     * Transient per-identity encryption range for retry detection.
+     * Not serialized — only relevant for in-flight retries.
+     *
+     * <p>Key: SignalProtocolAddress (device).
+     * Value: the earliest send sequence at which this identity was used.
+     *
+     * @apiNote WAWebSignalProtocolStoreUnifiedApi.updateIdentityRangeAfterEncryption:
+     * stores the message rowId on each identity record.
+     */
+    final ConcurrentMap<SignalProtocolAddress, Long> identityEncryptionRange = new ConcurrentHashMap<>();
+
+    /**
+     * Monotonic counter for identity range tracking, incremented per send.
+     */
+    final AtomicLong encryptionSequence = new AtomicLong();
+
+    /**
      * Tracks missing Syncd keys and which companion devices have been queried.
      * <p>
      * Per WhatsApp Web WAWebSyncdStoreMissingKeys: when a sync key is missing,
@@ -873,6 +894,21 @@ public final class WhatsAppStore implements SignalProtocolStore {
      */
     @ProtobufProperty(index = 70, type = ProtobufType.MAP, mapKeyType = ProtobufType.STRING, mapValueType = ProtobufType.UINT64)
     final ConcurrentMap<String, Long> deviceIdentityRanges;
+
+    /**
+     * Verified business name records, keyed by user JID string.
+     * <p>
+     * Populated from verified name syncs and biz profile queries.
+     * Queried at send time to resolve the {@code <biz>} stanza child node
+     * with host_storage, actual_actors, and privacy_mode_ts attributes.
+     *
+     * @apiNote WAWebSchemaVerifiedBusinessName: the IndexedDB table that
+     * stores these records in WhatsApp Web.
+     * WAWebApiVerifiedBusinessName.getPrivacyMode: queries the record
+     * at send time.
+     */
+    @ProtobufProperty(index = 71, type = ProtobufType.MAP, mapKeyType = ProtobufType.STRING, mapValueType = ProtobufType.MESSAGE)
+    final ConcurrentMap<String, VerifiedBusinessName> verifiedBusinessNames;
 
     // =====================================================
     // SECTION: Runtime State (Non-Serialized)
@@ -956,6 +992,15 @@ public final class WhatsAppStore implements SignalProtocolStore {
      * @see WhatsAppClientOfflineResumeState
      */
     private volatile WhatsAppClientOfflineResumeState offlineResumeState = WhatsAppClientOfflineResumeState.INIT;
+
+    /**
+     * Latch for blocking senders until offline delivery completes.
+     * Reset on each connection; counted down when state transitions to COMPLETE.
+     *
+     * @apiNote WAWebEventsWaitForOfflineDeliveryEnd: waits for
+     * the {@code offline_delivery_end} event with a 5-minute timeout.
+     */
+    private volatile CountDownLatch offlineDeliveryLatch = new CountDownLatch(1);
 
     /**
      * Tracks users whose devices have changed and need sender key rotation.
@@ -1144,7 +1189,8 @@ public final class WhatsAppStore implements SignalProtocolStore {
             ConcurrentMap<SignalProtocolAddress, SignalIdentityPublicKey> remoteIdentities,
             ConcurrentMap<String, MissingDeviceSyncKey> missingSyncKeys,
             byte[] advSecretKey,
-            ConcurrentMap<String, Long> deviceIdentityRanges
+            ConcurrentMap<String, Long> deviceIdentityRanges,
+            ConcurrentMap<String, VerifiedBusinessName> verifiedBusinessNames
     ) {
         this.uuid = Objects.requireNonNull(uuid, "uuid cannot be null");
         this.phoneNumber = phoneNumber; 
@@ -1237,6 +1283,7 @@ public final class WhatsAppStore implements SignalProtocolStore {
         this.missingSyncKeys = Objects.requireNonNullElseGet(missingSyncKeys, ConcurrentHashMap::new);
         this.advSecretKey = advSecretKey;
         this.deviceIdentityRanges = Objects.requireNonNullElseGet(deviceIdentityRanges, ConcurrentHashMap::new);
+        this.verifiedBusinessNames = Objects.requireNonNullElseGet(verifiedBusinessNames, ConcurrentHashMap::new);
     }
 
     // =====================================================
@@ -2528,6 +2575,12 @@ public final class WhatsAppStore implements SignalProtocolStore {
      */
     public WhatsAppStore setOfflineResumeState(WhatsAppClientOfflineResumeState state) {
         this.offlineResumeState = Objects.requireNonNull(state, "state cannot be null");
+        if (state == WhatsAppClientOfflineResumeState.COMPLETE) {
+            offlineDeliveryLatch.countDown();
+        } else if (state == WhatsAppClientOfflineResumeState.INIT) {
+            // Reset latch on reconnect
+            offlineDeliveryLatch = new CountDownLatch(1);
+        }
         return this;
     }
 
@@ -2542,6 +2595,24 @@ public final class WhatsAppStore implements SignalProtocolStore {
      *
      * @return true if offline resume from restart is complete, false otherwise
      */
+    /**
+     * Blocks until offline delivery is complete, or the timeout expires.
+     *
+     * @apiNote WAWebEventsWaitForOfflineDeliveryEnd.waitForOfflineDeliveryEnd:
+     * waits for the {@code offline_delivery_end} event with a 5-minute
+     * timeout before allowing outgoing messages.
+     */
+    public void waitForOfflineDeliveryEnd() {
+        if (offlineResumeState == WhatsAppClientOfflineResumeState.COMPLETE) {
+            return;
+        }
+        try {
+            offlineDeliveryLatch.await(5, TimeUnit.MINUTES);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
     public boolean isResumeFromRestartComplete() {
         return offlineResumeState != WhatsAppClientOfflineResumeState.INIT
                 && offlineResumeState != WhatsAppClientOfflineResumeState.RESUME_ON_RESTART;
@@ -3021,6 +3092,62 @@ public final class WhatsAppStore implements SignalProtocolStore {
     }
 
     /**
+     * Allocates a new send sequence number and records it against
+     * each device's identity, so that later retries can detect
+     * identity key changes.
+     *
+     * @param devices the device JIDs that were encrypted to
+     * @return the allocated sequence number
+     *
+     * @apiNote WAWebSendMsgCommonApi.updateIdentityRange: stores the
+     * message rowId on each identity record used during encryption
+     * via {@code updateIdentityRangeAfterEncryption}.
+     */
+    public long updateIdentityRange(Collection<Jid> devices) {
+        var seq = encryptionSequence.incrementAndGet();
+        for (var device : devices) {
+            var address = device.toSignalAddress();
+            // WAWebSignalProtocolStoreUnifiedApi: only set if null or > seq
+            // (i.e. record the *earliest* sequence for this identity)
+            identityEncryptionRange.merge(address, seq, Math::min);
+        }
+        return seq;
+    }
+
+    /**
+     * Checks whether any device's identity key may have changed since
+     * the given send sequence.
+     *
+     * <p>A device is considered changed if its identity range entry is
+     * absent (identity was replaced, clearing the entry) or if the
+     * recorded sequence is greater than the given one (identity was
+     * used for a newer send after being replaced).
+     *
+     * @param sendSequence the sequence returned by {@link #updateIdentityRange}
+     * @param device       the device JID to check
+     * @return {@code true} if the identity may have changed
+     *
+     * @apiNote WAWebSendMsgCommonApi.filterDeviceWithChangedIdentity
+     */
+    public boolean hasIdentityChanged(long sendSequence, Jid device) {
+        var recorded = identityEncryptionRange.get(device.toSignalAddress());
+        return recorded == null || recorded > sendSequence;
+    }
+
+    /**
+     * Clears the identity range entry for a device, indicating that
+     * its identity key has changed and any cached encryption is stale.
+     *
+     * <p>Called when an identity key change is detected (e.g. during
+     * prekey processing or ADV validation).
+     *
+     * @param device the device JID whose range should be cleared
+     */
+    public void clearIdentityRange(Jid device) {
+        identityEncryptionRange.remove(device.toSignalAddress());
+    }
+
+    /**
      * Marks the sender key as forgotten for a specific participant in a group.
      * <p>
      * Per WhatsApp Web WAWebApiParticipantStore.markForgetSenderKey: this is different
@@ -3335,6 +3462,24 @@ public final class WhatsAppStore implements SignalProtocolStore {
     }
 
     /**
+     * Returns the recipient device JIDs recorded for a sent message.
+     *
+     * @param messageId the message ID (stanza ID)
+     * @return an unmodifiable copy of the recipient set, or an empty set
+     *         if no records exist for this message
+     *
+     * @apiNote WAWebEncryptAndSendStatusMsg.calculateRevokeSenderList:
+     * retrieves original recipients to narrow the revoke audience.
+     */
+    public Set<Jid> findReceiptRecords(String messageId) {
+        if (messageId == null) {
+            return Set.of();
+        }
+        var recipients = pendingMessageRecipients.get(messageId);
+        return recipients != null ? Set.copyOf(recipients) : Set.of();
+    }
+
+    /**
      * Adds a pending mutation to the queue for the specified collection.
      *
      * @param collectionName the collection name
@@ -3447,12 +3592,12 @@ public final class WhatsAppStore implements SignalProtocolStore {
      * @param address the signal address for the user
      * @return Optional containing the identity key if found
      */
-    public Optional<SignalIdentityKey> findIdentity(SignalProtocolAddress address) {
+    public Optional<SignalIdentityPublicKey> findIdentity(SignalProtocolAddress address) {
         if (address == null) {
             return Optional.empty();
         } else {
             var localJid = jid;
-            if (localJid != null && address.name().equals(localJid.user())) {
+            if (localJid != null && address.equals(localJid.toSignalAddress())) {
                 return Optional.of(identityKeyPair.publicKey());
             } else {
                 return Optional.ofNullable(remoteIdentities.get(address));
@@ -3873,6 +4018,43 @@ public final class WhatsAppStore implements SignalProtocolStore {
     public void removeGroupOrCommunityMetadata(Jid groupJid) {
         Objects.requireNonNull(groupJid, "groupJid cannot be null");
         groupOrCommunityMetadata.remove(groupJid);
+    }
+
+    /**
+     * Finds the verified business name record for the given JID.
+     *
+     * @param jid the user JID
+     * @return the record, or empty if not found
+     *
+     * @apiNote WAWebApiVerifiedBusinessName.getVerifiedBusinessNameRecord:
+     * looks up the record by user JID string.
+     */
+    public Optional<VerifiedBusinessName> findVerifiedBusinessName(Jid jid) {
+        Objects.requireNonNull(jid, "jid cannot be null");
+        return Optional.ofNullable(verifiedBusinessNames.get(jid.toUserJid().toString()));
+    }
+
+    /**
+     * Adds or replaces a verified business name record.
+     *
+     * @param record the record to store
+     *
+     * @apiNote WAWebApiVerifiedBusinessName.createOrUpdateVerifiedBusinessName:
+     * stores the record keyed by user JID string.
+     */
+    public void addVerifiedBusinessName(VerifiedBusinessName record) {
+        Objects.requireNonNull(record, "record cannot be null");
+        verifiedBusinessNames.put(record.jid().toUserJid().toString(), record);
+    }
+
+    /**
+     * Removes the verified business name record for the given JID.
+     *
+     * @param jid the user JID
+     */
+    public void removeVerifiedBusinessName(Jid jid) {
+        Objects.requireNonNull(jid, "jid cannot be null");
+        verifiedBusinessNames.remove(jid.toUserJid().toString());
     }
 
     /**

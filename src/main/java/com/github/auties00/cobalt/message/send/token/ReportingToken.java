@@ -1,216 +1,164 @@
 package com.github.auties00.cobalt.message.send.token;
 
-import com.github.auties00.cobalt.message.send.util.CryptoUtils;
 import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.common.Message;
-import com.github.auties00.cobalt.model.message.common.MessageContainer;
-import com.github.auties00.cobalt.model.message.common.MessageContainerSpec;
-import com.github.auties00.cobalt.model.message.standard.*;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
+import javax.crypto.KDF;
+import javax.crypto.Mac;
+import javax.crypto.spec.HKDFParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
-import java.util.Set;
+import java.security.GeneralSecurityException;
+import java.util.Arrays;
+import java.util.Objects;
+import java.util.Optional;
 
 /**
- * Generates reporting tokens for message accountability.
- * <p>
- * Reporting tokens are used for content moderation and abuse reporting.
- * They allow WhatsApp to verify message content without having access
- * to the plaintext, using a franking mechanism.
+ * Generates reporting tokens (franking tags) for outgoing messages.
  *
- * @apiNote WAWebReportingTokenUtils.genReportingToken
+ * <p>A reporting token cryptographically binds a message's content to
+ * its sender and recipient, enabling the server to verify abuse reports
+ * without accessing plaintext.  The token is a 16-byte HMAC-SHA-256
+ * truncation computed over the <em>reporting token content</em>
+ * (a deterministic extract of the serialised protobuf), keyed by a
+ * 32-byte key derived from the message secret via HKDF-SHA-256.
+ *
+ * @apiNote WAWebReportingTokenUtils: provides {@code genReportingToken},
+ * {@code genReportingTokenKeyFromMessageSecret}, and
+ * {@code genReportingTokenBody}.
  */
 public final class ReportingToken {
-    private static final System.Logger LOGGER = System.getLogger("ReportingToken");
-
-    private static final int REPORTING_TOKEN_LENGTH = 16;
-    private static final int REPORTING_TOKEN_KEY_SIZE = 32;
-    private static final byte USE_CASE_SECRET_REPORT_TOKEN = 5;
-
-    private static final Set<Message.Type> SUPPORTED_TYPES = Set.of(
-            Message.Type.TEXT,
-            Message.Type.IMAGE,
-            Message.Type.VIDEO,
-            Message.Type.AUDIO,
-            Message.Type.DOCUMENT,
-            Message.Type.STICKER,
-            Message.Type.INTERACTIVE
-    );
+    /**
+     * Output length for the HKDF-derived reporting token key.
+     *
+     * @apiNote WAWebReportingTokenUtils: {@code REPORTING_TOKEN_KEY_SIZE = 32}
+     */
+    private static final int KEY_LENGTH = 32;
 
     /**
-     * Generates a reporting token for a message.
+     * Number of leading HMAC bytes kept as the reporting token.
      *
-     * @param messageId     the message ID
-     * @param message       the message container
-     * @param messageSecret the message secret bytes
-     * @param senderJid     the sender JID
-     * @param remoteJid     the remote JID
-     * @return the reporting token bytes, or null if not applicable
-     *
-     * @apiNote WAWebReportingTokenUtils.genReportingToken
+     * @apiNote WAWebReportingTokenUtils: {@code hmacSha256(key, content, 16)}
+     * — the third argument is the output length.
      */
-    public byte[] generate(
-            String messageId,
-            MessageContainer message,
+    private static final int TOKEN_LENGTH = 16;
+
+    /**
+     * The HKDF algorithm used for key derivation.
+     */
+    private static final String HKDF_ALGORITHM = "HKDF-SHA256";
+
+    /**
+     * The HMAC algorithm used for token computation.
+     */
+    private static final String HMAC_ALGORITHM = "HmacSHA256";
+
+    /**
+     * The use-case secret modification type string used in the HKDF
+     * info parameter.
+     *
+     * @apiNote WAWebReportingTokenUtils.genReportingTokenKeyFromMessageSecret:
+     * uses {@code WAUseCaseSecret.UseCaseSecretModificationType.REPORT_TOKEN}
+     * to build the info via {@code WABinary.Binary.build(stanzaId, senderJid,
+     * remoteJid, REPORT_TOKEN)}.
+     */
+    private static final String USE_CASE_TYPE = "REPORT_TOKEN";
+
+    private ReportingToken() {
+        throw new UnsupportedOperationException("Utility class");
+    }
+
+    /**
+     * Generates a reporting token for an outgoing message.
+     *
+     * @param messageSecret         the 32-byte message secret
+     * @param stanzaId              the message's stanza ID
+     * @param senderJid             the sender's user JID
+     * @param remoteJid             the remote JID (recipient for 1:1, or
+     *                              self JID for groups/broadcasts)
+     * @param reportingTokenContent the deterministic content extract from
+     *                              the serialised protobuf, or {@code null}
+     *                              if the message type is not compatible
+     * @param version               the reporting token version
+     * @return the reporting token, or empty if the content is {@code null}
+     *         or empty
+     * @throws NullPointerException     if a required argument is {@code null}
+     * @throws GeneralSecurityException if a cryptographic operation fails
+     *
+     * @apiNote WAWebReportingTokenUtils.genReportingToken: derives the key
+     * via genReportingTokenKeyFromMessageSecret, then
+     * {@code hmacSha256(key, content, 16)}.
+     */
+    public static Optional<ReportingTokenResult> generate(
             byte[] messageSecret,
+            String stanzaId,
+            Jid senderJid,
+            Jid remoteJid,
+            byte[] reportingTokenContent,
+            int version
+    ) throws GeneralSecurityException {
+        Objects.requireNonNull(messageSecret, "messageSecret");
+        Objects.requireNonNull(stanzaId, "stanzaId");
+        Objects.requireNonNull(senderJid, "senderJid");
+        Objects.requireNonNull(remoteJid, "remoteJid");
+
+        if (reportingTokenContent == null || reportingTokenContent.length == 0) {
+            return Optional.empty();
+        }
+
+        // WAWebReportingTokenUtils.genReportingTokenKeyFromMessageSecret
+        var key = deriveKey(messageSecret, stanzaId, senderJid, remoteJid);
+
+        // WAWebReportingTokenUtils: hmacSha256(key, content, 16)
+        var token = hmacTruncated(key, reportingTokenContent);
+
+        return Optional.of(new ReportingTokenResult(version, token));
+    }
+
+    /**
+     * Derives the 32-byte reporting token key from the message secret
+     * via HKDF-SHA-256.
+     *
+     * <p>The info parameter is the binary concatenation of
+     * {@code stanzaId ‖ senderJid ‖ remoteJid ‖ "REPORT_TOKEN"},
+     * all encoded as UTF-8.
+     *
+     * @param messageSecret the 32-byte message secret (used as the PRK)
+     * @param stanzaId      the message's stanza ID
+     * @param senderJid     the sender's user JID
+     * @param remoteJid     the remote JID
+     * @return a 32-byte key
+     * @throws GeneralSecurityException if HKDF is unavailable
+     *
+     * @apiNote WAWebReportingTokenUtils.genReportingTokenKeyFromMessageSecret:
+     * {@code WABinary.Binary.build(stanzaId, senderJid, remoteJid, REPORT_TOKEN)}
+     * produces the info, then {@code HKDF.extractAndExpand(messageSecret, info, 32)}.
+     */
+    static byte[] deriveKey(
+            byte[] messageSecret,
+            String stanzaId,
             Jid senderJid,
             Jid remoteJid
-    ) {
-        if (!isReportingTokenCompatible(message)) {
-            return null;
-        }
+    ) throws GeneralSecurityException {
+        // WAWebReportingTokenUtils: Binary.build(stanzaId, senderJid, remoteJid, REPORT_TOKEN)
+        var info = (stanzaId + senderJid + remoteJid + USE_CASE_TYPE)
+                .getBytes(StandardCharsets.UTF_8);
 
-        if (messageSecret == null || messageSecret.length == 0) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Cannot generate reporting token: missing message secret");
-            return null;
-        }
-
-        try {
-            var tokenKey = deriveReportingTokenKey(
-                    messageSecret,
-                    messageId,
-                    senderJid.toUserJid(),
-                    remoteJid
-            );
-
-            var reportingContent = getReportingTokenContent(message);
-            if (reportingContent == null || reportingContent.length == 0) {
-                return null;
-            }
-
-            return CryptoUtils.hmacSha256Truncated(tokenKey, reportingContent, REPORTING_TOKEN_LENGTH);
-        } catch (Exception e) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Failed to generate reporting token: {0}", e.getMessage());
-            return null;
-        }
+        var kdf = KDF.getInstance(HKDF_ALGORITHM);
+        var prk = new SecretKeySpec(messageSecret, HKDF_ALGORITHM);
+        var params = HKDFParameterSpec.expandOnly(prk, info, KEY_LENGTH);
+        return kdf.deriveData(params);
     }
 
-    private boolean isReportingTokenCompatible(MessageContainer message) {
-        var unwrapped = message.unbox();
-        var type = unwrapped.type();
-        return SUPPORTED_TYPES.contains(type);
-    }
-
-    private byte[] deriveReportingTokenKey(
-            byte[] messageSecret,
-            String messageId,
-            Jid senderJid,
-            Jid remoteJid
-    ) throws Exception {
-        var info = buildBinaryInfo(
-                messageId,
-                senderJid.toString(),
-                remoteJid.toString(),
-                USE_CASE_SECRET_REPORT_TOKEN
-        );
-
-        return CryptoUtils.hkdfExtractAndExpand(messageSecret, info, REPORTING_TOKEN_KEY_SIZE);
-    }
-
-    private byte[] buildBinaryInfo(String stanzaId, String senderJid, String remoteJid, byte useCaseType) {
-        try {
-            var baos = new ByteArrayOutputStream();
-            baos.write(stanzaId.getBytes(StandardCharsets.UTF_8));
-            baos.write(senderJid.getBytes(StandardCharsets.UTF_8));
-            baos.write(remoteJid.getBytes(StandardCharsets.UTF_8));
-            baos.write(useCaseType);
-            return baos.toByteArray();
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to build binary info", e);
-        }
-    }
-
-    private byte[] getReportingTokenContent(MessageContainer message) {
-        var unwrapped = message.unbox();
-        var content = unwrapped.content();
-
-        try {
-            return extractReportingContentV1(content);
-        } catch (Exception e) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Failed to extract reporting content, falling back to full message: {0}", e.getMessage());
-            return MessageContainerSpec.encode(message);
-        }
-    }
-
-    private byte[] extractReportingContentV1(Message content) throws IOException {
-        var baos = new ByteArrayOutputStream();
-
-        switch (content) {
-            case TextMessage text -> {
-                var body = text.text();
-                if (body != null) {
-                    baos.write(body.getBytes(StandardCharsets.UTF_8));
-                }
-            }
-            case ImageMessage image -> {
-                writeMediaReportingContent(baos, image.mediaEncryptedSha256().orElse(null), image.caption().orElse(null));
-            }
-            case VideoOrGifMessage video -> {
-                writeMediaReportingContent(baos, video.mediaEncryptedSha256().orElse(null), video.caption().orElse(null));
-            }
-            case AudioMessage audio -> {
-                var hash = audio.mediaEncryptedSha256().orElse(null);
-                if (hash != null) {
-                    baos.write(hash);
-                }
-            }
-            case DocumentMessage document -> {
-                writeMediaReportingContent(baos, document.mediaEncryptedSha256().orElse(null), document.caption().orElse(null));
-            }
-            case StickerMessage sticker -> {
-                var hash = sticker.mediaEncryptedSha256().orElse(null);
-                if (hash != null) {
-                    baos.write(hash);
-                }
-            }
-            case ContactMessage contact -> {
-                var vcard = contact.vcard().toVcard();
-                if (vcard != null) {
-                    baos.write(vcard.getBytes(StandardCharsets.UTF_8));
-                }
-            }
-            case ContactsMessage contacts -> {
-                for (var entry : contacts.contacts()) {
-                    var vcard = entry.vcard().toVcard();
-                    if (vcard != null) {
-                        baos.write(vcard.getBytes(StandardCharsets.UTF_8));
-                    }
-                }
-            }
-            case LocationMessage location -> {
-                baos.write(Double.toString(location.latitude()).getBytes(StandardCharsets.UTF_8));
-                baos.write(Double.toString(location.longitude()).getBytes(StandardCharsets.UTF_8));
-            }
-            case LiveLocationMessage liveLocation -> {
-                baos.write(Double.toString(liveLocation.latitude()).getBytes(StandardCharsets.UTF_8));
-                baos.write(Double.toString(liveLocation.longitude()).getBytes(StandardCharsets.UTF_8));
-            }
-            default -> {
-                return new byte[0];
-            }
-        }
-
-        return baos.toByteArray();
-    }
-
-    private void writeMediaReportingContent(ByteArrayOutputStream baos, byte[] encHash, String caption) throws IOException {
-        var totalLength = (encHash != null ? encHash.length : 0) +
-                          (caption != null && !caption.isEmpty() ? caption.getBytes(StandardCharsets.UTF_8).length : 0);
-
-        if (totalLength > 0) {
-            var randomBytes = new byte[totalLength];
-            try {
-                SecureRandom.getInstanceStrong().nextBytes(randomBytes);
-            } catch (NoSuchAlgorithmException e) {
-                new SecureRandom().nextBytes(randomBytes);
-            }
-            baos.write(randomBytes);
-        }
+    /**
+     * Computes HMAC-SHA-256 of {@code data} keyed by {@code key},
+     * truncated to the first {@value #TOKEN_LENGTH} bytes.
+     *
+     * @apiNote WAWebReportingTokenUtils: {@code hmacSha256(key, content, 16)}
+     */
+    private static byte[] hmacTruncated(byte[] key, byte[] data) throws GeneralSecurityException {
+        var mac = Mac.getInstance(HMAC_ALGORITHM);
+        mac.init(new SecretKeySpec(key, HMAC_ALGORITHM));
+        var full = mac.doFinal(data);
+        return Arrays.copyOf(full, TOKEN_LENGTH);
     }
 }

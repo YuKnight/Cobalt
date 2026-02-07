@@ -3,7 +3,7 @@ package com.github.auties00.cobalt.client;
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.exception.*;
-import com.github.auties00.cobalt.message.receipt.MessageReceiptHandler;
+import com.github.auties00.cobalt.message.receive.receipt.MessageReceiptHandler;
 import com.github.auties00.cobalt.message.receive.MessageReceivingService;
 import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.model.action.*;
@@ -2472,24 +2472,25 @@ public final class WhatsAppClient {
                 .orElse(0L);
         var communityNode = node.getChild("parent")
                 .orElse(null);
-        var policies = new HashMap<Integer, ChatSettingPolicy>();
+        var policies = new HashMap<ChatSetting, ChatSettingPolicy>();
         var lidAddressingMode = node.hasAttribute("addressing_mode", "lid");
         var linkedParent = node.getChild("linked_parent")
                 .flatMap(parent -> parent.getAttributeAsJid("jid"))
                 .orElse(null);
         var isIncognito = node.hasChild("incognito");
+        var defaultSubgroup = node.hasAttribute("default_sub_group", true);
         if (communityNode == null) {
-            policies.put(GroupSetting.EDIT_GROUP_INFO.index(), ChatSettingPolicy.of(node.hasChild("announce")));
-            policies.put(GroupSetting.SEND_MESSAGES.index(), ChatSettingPolicy.of(node.hasChild("restrict")));
+            policies.put(GroupSetting.EDIT_GROUP_INFO, ChatSettingPolicy.of(node.hasChild("announce")));
+            policies.put(GroupSetting.SEND_MESSAGES, ChatSettingPolicy.of(node.hasChild("restrict")));
             var addParticipantsMode = node.getChild("member_add_mode")
                     .flatMap(Node::toContentString)
                     .orElse(null);
-            policies.put(GroupSetting.ADD_PARTICIPANTS.index(), ChatSettingPolicy.of(Objects.equals(addParticipantsMode, "admin_add")));
+            policies.put(GroupSetting.ADD_PARTICIPANTS, ChatSettingPolicy.of(Objects.equals(addParticipantsMode, "admin_add")));
             var groupJoin = node.getChild("membership_approval_mode")
                     .flatMap(entry -> entry.getChild("group_join"))
                     .map(entry -> entry.hasAttribute("state", "on"))
                     .orElse(false);
-            policies.put(GroupSetting.APPROVE_PARTICIPANTS.index(), ChatSettingPolicy.of(groupJoin));
+            policies.put(GroupSetting.APPROVE_PARTICIPANTS, ChatSettingPolicy.of(groupJoin));
             var participants = node.streamChildren("participant")
                     .filter(entry -> !entry.hasAttribute("error"))
                     .map(entry -> {
@@ -2516,13 +2517,14 @@ public final class WhatsAppClient {
                     .isCommunity(false)
                     .isIncognito(isIncognito)
                     .parentCommunityJid(linkedParent)
+                    .defaultSubgroup(defaultSubgroup)
                     .build();
         } else {
-            policies.put(CommunitySetting.MODIFY_GROUPS.index(), ChatSettingPolicy.of(communityNode.hasChild("allow_non_admin_sub_group_creation")));
+            policies.put(CommunitySetting.MODIFY_GROUPS, ChatSettingPolicy.of(communityNode.hasChild("allow_non_admin_sub_group_creation")));
             var addParticipantsMode = node.getChild("member_add_mode")
                     .flatMap(Node::toContentString)
                     .orElse(null);
-            policies.put(CommunitySetting.ADD_PARTICIPANTS.index(), ChatSettingPolicy.of(Objects.equals(addParticipantsMode, "admin_add")));
+            policies.put(CommunitySetting.ADD_PARTICIPANTS, ChatSettingPolicy.of(Objects.equals(addParticipantsMode, "admin_add")));
             var linkedGroupsQueryBody = new NodeBuilder()
                     .description("linked_groups_participants")
                     .build();
@@ -4586,7 +4588,7 @@ public final class WhatsAppClient {
         ackBuilder.attribute("to", ackTo);
 
         node.getAttributeAsJid("participant")
-                .map(jid -> jid.hasServer(JidServer.bot()) && isMessage ? MetaBots.translate(jid) : jid)
+                .map(jid -> jid)
                 .ifPresent(receiptParticipant -> ackBuilder.attribute("recipient", receiptParticipant));
 
         if (!isMessage) {
@@ -4661,36 +4663,6 @@ public final class WhatsAppClient {
         for (var preKey : preKeys) {
             store.addPreKey(preKey);
         }
-    }
-
-    public void sendReceipt(String id, Jid parentJid, Jid senderJid, boolean peer) {
-        var me = store.jid()
-                .orElseThrow(() -> new IllegalStateException("No jid"));
-        var fromMe = Objects.equals(me, senderJid);
-
-        var receiptBuilder = new NodeBuilder()
-                .description("receipt")
-                .attribute("id", id);
-
-        if(peer) {
-            receiptBuilder.attribute("type", "peer_msg");
-        } else if (fromMe) {
-            receiptBuilder.attribute("type", "sender");
-        } else if (!store.automaticMessageReceipts()) {
-            receiptBuilder.attribute("type", "inactive");
-        }
-
-        if (parentJid.hasServer(JidServer.groupOrCommunity())) {
-            receiptBuilder.attribute("to", parentJid);
-            receiptBuilder.attribute("participant", senderJid);
-        } else if (fromMe) {
-            receiptBuilder.attribute("to", parentJid);
-            receiptBuilder.attribute("recipient", senderJid);
-        } else {
-            receiptBuilder.attribute("to", senderJid);
-        }
-
-        sendNodeWithNoResponse(receiptBuilder.build());
     }
 
     public void sendReceipt(String id, Jid from, String type) {

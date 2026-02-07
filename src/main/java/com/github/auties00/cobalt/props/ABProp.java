@@ -76,6 +76,15 @@ public record ABProp(int code, String value, Long exposureKey) {
     public static final int OVERRIDE_ADV_ACCOUNT_SIGNATURE_KEY_ENABLED_AB_PROP_CODE = 0; // TODO: Find actual code
 
     /**
+     * Controls whether username display is enabled for contacts.
+     * Per WhatsApp Web WAWebUsernameGatingUtils.usernameDisplayedEnabled():
+     * checks this AB prop value.
+     *
+     * @apiNote WAWebABPropsConfigs: username_contact_display:[4746,"bool",!1,!0]
+     */
+    public static final int USERNAME_CONTACT_DISPLAY_AB_PROP_CODE = 4746;
+
+    /**
      * Controls whether username protocol is enabled in USync queries.
      * When enabled, USync queries include the username protocol to fetch
      * username information for contacts.
@@ -109,7 +118,7 @@ public record ABProp(int code, String value, Long exposureKey) {
      * Controls whether CTWA context logging is enabled.
      * Per WhatsApp Web WAWebCtwaAttributionUtils
      */
-    public static final int CTWA_CONTEXT_LOGGING_ENABLED_AB_PROP_CODE = 0; // TODO: Find actual code
+    public static final int CTWA_CONTEXT_LOGGING_ENABLED_AB_PROP_CODE = 11655;
 
     /**
      * Controls whether business hosted devices feature is enabled.
@@ -143,12 +152,40 @@ public record ABProp(int code, String value, Long exposureKey) {
     public static final int SAGA_V1_CAROUSEL_ENABLED_AB_PROP_CODE = 0; // TODO: Find actual code
 
     /**
+     * Controls whether trust contact tokens are sent on all 1:1 messages.
+     * Per WhatsApp Web WAWebSendMsgCreateFanoutStanza: checks this AB prop
+     * to determine whether to include the {@code <tctoken>} node.
+     *
+     * @apiNote WAWebABPropsConfigs: privacy_token_sending_on_all_1_on_1_messages:[10518,"bool",!1,!1]
+     */
+    public static final int PRIVACY_TOKEN_SENDING_ON_ALL_1_ON_1_MESSAGES_AB_PROP_CODE = 10518;
+
+    /**
+     * Controls the ICDC identity key hash truncation length in bytes.
+     * The actual hash length is {@code max(this value, 8)}.
+     * Default: 10.
+     *
+     * @apiNote WAWebABPropsConfigs: md_icdc_hash_length:[310,"int",10,10]
+     */
+    public static final int MD_ICDC_HASH_LENGTH_AB_PROP_CODE = 310;
+
+    /**
      * Maximum group size for generating content bindings (RCAT).
      * Per WhatsApp Web WAWebMsgRcatUtils.genContentBindingForMsg:
      * Content bindings are only generated for groups smaller than this threshold.
      * Default: 100.
      */
     public static final int MAXIMUM_GROUP_SIZE_FOR_RCAT_AB_PROP_CODE = 2915;
+
+    /**
+     * Controls the sender reporting token version.
+     * Reporting tokens are enabled when this value is {@code > 0}.
+     * Per WhatsApp Web WAWebMessagingGatingUtils.isReportingTokenSendingEnabled():
+     * checks {@code getSenderReportingTokenVersion() > 0}.
+     *
+     * @apiNote WAWebABPropsConfigs: rt_sender_reporting_token_version:[8860,"int",2,2]
+     */
+    public static final int RT_SENDER_REPORTING_TOKEN_VERSION_AB_PROP_CODE = 8860;
 
     public ABProp {
         Objects.requireNonNull(value, "value cannot be null");

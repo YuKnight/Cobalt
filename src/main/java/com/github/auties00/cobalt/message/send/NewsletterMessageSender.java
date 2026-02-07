@@ -1,0 +1,358 @@
+package com.github.auties00.cobalt.message.send;
+
+import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.exception.WhatsAppMessageException;
+import com.github.auties00.cobalt.message.send.ack.AckParser;
+import com.github.auties00.cobalt.message.send.ack.AckResult;
+import com.github.auties00.cobalt.model.info.NewsletterMessageInfo;
+import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.model.message.common.MediaMessage;
+import com.github.auties00.cobalt.model.message.common.Message;
+import com.github.auties00.cobalt.model.message.common.MessageContainer;
+import com.github.auties00.cobalt.model.message.common.MessageContainerSpec;
+import com.github.auties00.cobalt.model.message.server.ProtocolMessage;
+import com.github.auties00.cobalt.model.message.standard.*;
+import com.github.auties00.cobalt.node.Node;
+import com.github.auties00.cobalt.node.NodeBuilder;
+
+/**
+ * Sends messages to newsletters ({@code newsletter@newsletter}).
+ *
+ * <p>Newsletter messages are <b>not</b> end-to-end encrypted.  They are
+ * sent as plaintext via the SMAX protocol, which uses a different stanza
+ * structure from the Signal-encrypted path: the serialised protobuf is
+ * wrapped in a {@code <plaintext>} child node, and the {@code type}
+ * attribute reflects the content type rather than the generic stanza
+ * type.
+ *
+ * <h3>Supported content types</h3>
+ * <ul>
+ *   <li><b>Text</b>: {@code <message type="text"><plaintext>...</plaintext></message>}</li>
+ *   <li><b>Media</b>: {@code <message type="image|video|..."><plaintext>...</plaintext>
+ *       <media_id>handle</media_id></message>}</li>
+ *   <li><b>Poll creation</b>: {@code <message type="poll"><meta polltype="creation"/>
+ *       <plaintext>...</plaintext></message>}</li>
+ *   <li><b>Poll result</b>: {@code <message type="poll"><meta polltype="result_snapshot"/>
+ *       <plaintext>...</plaintext></message>}</li>
+ *   <li><b>Revoke</b>: {@code <message edit="7"><admin_revoke/></message>}</li>
+ *   <li><b>Edit (text)</b>: {@code <message type="text"><admin_edit/>
+ *       <plaintext>...</plaintext></message>}</li>
+ *   <li><b>Edit (media)</b>: {@code <message type="..."><admin_edit/>
+ *       <plaintext>...</plaintext></message>}</li>
+ *   <li><b>Reaction</b>: {@code <message><reaction code="..."/></message>} (targets
+ *       an existing server message)</li>
+ *   <li><b>Poll vote</b>: {@code <message><poll_vote><vote>hash</vote>...</poll_vote>
+ *       </message>} (targets an existing server message)</li>
+ * </ul>
+ *
+ * @apiNote WAWebNewsletterSendMessageQueryJob.querySendNewsletterMessage:
+ * dispatches to content-type-specific SMAX mixins per message type.
+ * WASmaxMessagePublishNewsletterRPC.sendNewsletterRPC: sends via
+ * {@code WAComms.sendSmaxStanza} (same wire transport as regular stanzas).
+ * WASmaxOutMessagePublishNewsletterClientIdContent: routes to
+ * newsletterText, newsletterMediaPublish, newsletterEdit,
+ * newsletterRevoke, newsletterPollCreation, etc.
+ */
+final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo> {
+    private static final System.Logger LOGGER = System.getLogger("NewsletterMessageSender");
+
+    /**
+     * The edit attribute value for newsletter message edits.
+     *
+     * @apiNote WAWebAck.EDIT_ATTR.NEWSLETTER_MSG_EDIT = 3,
+     * distinct from MESSAGE_EDIT (1) and PIN_IN_CHAT (2).
+     */
+    private static final String NEWSLETTER_MSG_EDIT = "3";
+
+    NewsletterMessageSender(WhatsAppClient client) {
+        super(client);
+    }
+
+    @Override
+    AckResult send(Jid newsletterJid, NewsletterMessageInfo messageInfo) {
+        var container = messageInfo.message();
+        var message = container.content();
+
+        var stanza = switch (message) {
+            // WASmaxOutMessagePublishNewsletterRevokeMixin
+            case ProtocolMessage p when p.protocolType() == ProtocolMessage.Type.REVOKE ->
+                    buildRevoke(messageInfo, newsletterJid);
+
+            // WASmaxOutMessagePublishNewsletterEditMixin (text edit)
+            case ProtocolMessage p when p.protocolType() == ProtocolMessage.Type.MESSAGE_EDIT ->
+                    buildEdit(messageInfo, newsletterJid);
+
+            // WASmaxOutMessagePublishContentTypePollCreationMixin
+            case PollCreationMessage _ ->
+                    buildPoll(messageInfo, newsletterJid, "creation");
+
+            // WASmaxOutMessagePublishContentTypePollResultSnapshotMixin
+            case PollResultSnapshotMessage _ ->
+                    buildPoll(messageInfo, newsletterJid, "result_snapshot");
+
+            // WASmaxOutMessagePublishContentTypeReactionMixin
+            case ReactionMessage r ->
+                    buildReaction(messageInfo, newsletterJid, r);
+
+            // WASmaxOutMessagePublishContentTypePollVoteMixin
+            case PollUpdateMessage p ->
+                    buildPollVote(messageInfo, newsletterJid, p);
+
+            // WASmaxOutMessagePublishNewsletterTextMixin
+            case TextMessage t when t.matchedText().isEmpty() ->
+                    buildText(messageInfo, newsletterJid);
+
+            // WASmaxOutMessagePublishNewsletterMediaPublishMixin:
+            // URL messages and all other media types
+            case MediaMessage _ -> buildMedia(messageInfo, newsletterJid, resolveSmaxMediaType(message));
+
+            default -> throw new WhatsAppMessageException.Send.Unknown("Invalid message type");
+        };
+
+        var ackNode = client.sendNode(stanza);
+        return AckParser.parse(ackNode);
+    }
+
+    /**
+     * Builds the SMAX stanza for plain text messages.
+     *
+     * @apiNote WASmaxOutMessagePublishNewsletterTextMixin:
+     * {@code <message type="text"><plaintext>payload</plaintext></message>}
+     */
+    private NodeBuilder buildText(NewsletterMessageInfo info, Jid newsletterJid) {
+        var payload = MessageContainerSpec.encode(info.message());
+        var plaintextNode = new NodeBuilder()
+                .description("plaintext")
+                .content(payload)
+                .build();
+        return new NodeBuilder()
+                .description("message")
+                .attribute("id", info.id())
+                .attribute("to", newsletterJid)
+                .attribute("type", "text")
+                .content(plaintextNode);
+    }
+
+    /**
+     * Builds the SMAX stanza for media and URL messages.
+     *
+     * <p>Includes the {@code <media_id>} child when a media handle is
+     * available (set by the upload step before sending).
+     *
+     * @apiNote WASmaxOutMessagePublishNewsletterMediaPublishMixin:
+     * {@code <message type="..."><plaintext>payload</plaintext>
+     * <media_id>handle</media_id></message>}
+     */
+    private NodeBuilder buildMedia(
+            NewsletterMessageInfo info, Jid newsletterJid, String mediaType
+    ) {
+        var payload = MessageContainerSpec.encode(info.message());
+        // WASmaxOutMessagePublishNewsletterMediaPublishMixin: includes
+        // mediatype attribute on the <plaintext> node
+        var plaintextNode = new NodeBuilder()
+                .description("plaintext")
+                .attribute("mediatype", mediaType)
+                .content(payload)
+                .build();
+        Node mediaIdNode = info.mediaHandle()
+                .map(handle -> new NodeBuilder()
+                        .description("media_id")
+                        .content(handle)
+                        .build())
+                .orElse(null);
+        return new NodeBuilder()
+                .description("message")
+                .attribute("id", info.id())
+                .attribute("to", newsletterJid)
+                .attribute("type", mediaType)
+                .content(plaintextNode, mediaIdNode);
+    }
+
+    /**
+     * Builds the SMAX stanza for poll creation and poll result snapshot.
+     *
+     * @apiNote WASmaxOutMessagePublishContentTypePollCreationMixin,
+     * WASmaxOutMessagePublishContentTypePollResultSnapshotMixin:
+     * {@code <message type="poll"><meta polltype="..."/>
+     * <plaintext>payload</plaintext></message>}
+     */
+    private NodeBuilder buildPoll(
+            NewsletterMessageInfo info, Jid newsletterJid, String polltype
+    ) {
+        var payload = MessageContainerSpec.encode(info.message());
+        var metaNode = new NodeBuilder()
+                .description("meta")
+                .attribute("polltype", polltype)
+                .build();
+        var plaintextNode = new NodeBuilder()
+                .description("plaintext")
+                .content(payload)
+                .build();
+        return new NodeBuilder()
+                .description("message")
+                .attribute("id", info.id())
+                .attribute("to", newsletterJid)
+                .attribute("type", "poll")
+                .content(metaNode, plaintextNode);
+    }
+
+    /**
+     * Builds the SMAX stanza for revoke (admin delete).
+     *
+     * @apiNote WASmaxOutMessagePublishNewsletterRevokeMixin:
+     * {@code <message edit="7"><admin_revoke/></message>}
+     */
+    private NodeBuilder buildRevoke(NewsletterMessageInfo info, Jid newsletterJid) {
+        var adminRevokeNode = new NodeBuilder()
+                .description("admin_revoke")
+                .build();
+        return new NodeBuilder()
+                .description("message")
+                .attribute("id", info.id())
+                .attribute("to", newsletterJid)
+                .attribute("edit", resolveEditAttribute(info.message()))
+                .content(adminRevokeNode);
+    }
+
+    /**
+     * Builds the SMAX stanza for edit (text or media).
+     *
+     * <p>The edit stanza includes {@code <admin_edit/>} alongside the
+     * new payload.  The stanza type is determined by the edited content.
+     *
+     * @apiNote WASmaxOutMessagePublishNewsletterEditMixin:
+     * {@code <message edit="1"><admin_edit/>
+     * <plaintext>payload</plaintext></message>}
+     */
+    private NodeBuilder buildEdit(NewsletterMessageInfo info, Jid newsletterJid) {
+        var protocolMessage = (ProtocolMessage) info.message().content();
+        var editedMessage = protocolMessage.editedMessage();
+        var editedContent = editedMessage.map(MessageContainer::content).orElse(null);
+
+        var payload = MessageContainerSpec.encode(info.message());
+        var adminEditNode = new NodeBuilder()
+                .description("admin_edit")
+                .build();
+        var plaintextNode = new NodeBuilder()
+                .description("plaintext")
+                .content(payload)
+                .build();
+
+        // WASmaxOutMessagePublishNewsletterEditMixin: type is resolved
+        // from the edited content (text for text edits, media type for
+        // media edits)
+        var type = editedContent != null ? resolveSmaxMediaType(editedContent) : "text";
+
+        // WAWebAck.EDIT_ATTR.NEWSLETTER_MSG_EDIT = 3
+        // Newsletter edits use "3", distinct from regular MESSAGE_EDIT ("1")
+        var builder = new NodeBuilder()
+                .description("message")
+                .attribute("id", info.id())
+                .attribute("to", newsletterJid)
+                .attribute("type", type)
+                .attribute("edit", NEWSLETTER_MSG_EDIT)
+                .content(adminEditNode, plaintextNode);
+
+        // WASmaxOutMessagePublishNewsletterEditMixin: media edits include
+        // the media handle when available
+        info.mediaHandle().ifPresent(handle -> {
+            var mediaIdNode = new NodeBuilder()
+                    .description("media_id")
+                    .content(handle)
+                    .build();
+            builder.content(mediaIdNode);
+        });
+
+        return builder;
+    }
+
+    /**
+     * Builds the SMAX stanza for reactions on existing messages.
+     *
+     * <p>Reactions target an existing server message by its server ID.
+     * An empty or null reaction code signals a reaction revoke.
+     *
+     * @apiNote WASmaxOutMessagePublishContentTypeReactionMixin:
+     * {@code <message server_id="..."><reaction code="emoji"/></message>}
+     * or {@code <message server_id="..."><reaction_revoke/></message>}
+     */
+    private NodeBuilder buildReaction(
+            NewsletterMessageInfo info, Jid newsletterJid, ReactionMessage reaction
+    ) {
+        var code = reaction.content();
+        var isRevoke = code == null || code.isEmpty();
+
+        Node reactionNode;
+        if (isRevoke) {
+            reactionNode = new NodeBuilder()
+                    .description("reaction_revoke")
+                    .build();
+        } else {
+            reactionNode = new NodeBuilder()
+                    .description("reaction")
+                    .attribute("code", code)
+                    .build();
+        }
+
+        return new NodeBuilder()
+                .description("message")
+                .attribute("id", info.id())
+                .attribute("to", newsletterJid)
+                .attribute("server_id", info.serverId())
+                .content(reactionNode);
+    }
+
+    /**
+     * Builds the SMAX stanza for poll votes on existing messages.
+     *
+     * @apiNote WASmaxOutMessagePublishContentTypePollVoteMixin:
+     * {@code <message server_id="..."><poll_vote>
+     * <vote>hash</vote>...</poll_vote></message>}
+     */
+    private NodeBuilder buildPollVote(
+            NewsletterMessageInfo info, Jid newsletterJid, PollUpdateMessage pollUpdate
+    ) {
+        // WASmaxOutMessagePublishNewsletterPollVoteMixin: each vote
+        // element contains the option name as its value
+        var voteChildren = pollUpdate.votes().stream()
+                .map(vote -> new NodeBuilder()
+                        .description("vote")
+                        .content(vote.name())
+                        .build())
+                .toList();
+        var pollVoteNode = new NodeBuilder()
+                .description("poll_vote")
+                .content(voteChildren)
+                .build();
+        return new NodeBuilder()
+                .description("message")
+                .attribute("id", info.id())
+                .attribute("to", newsletterJid)
+                .attribute("server_id", String.valueOf(info.serverId()))
+                .content(pollVoteNode);
+    }
+
+    /**
+     * Resolves the SMAX content type attribute from the message.
+     *
+     * <p>Unlike {@link #resolveStanzaType} which returns generic stanza
+     * types (text/media/reaction/poll/event), this returns the specific
+     * media type string used in the SMAX {@code type} attribute.
+     *
+     * @apiNote WAWebNewsletterSendMessageQueryJob: uses the media type
+     * string directly as the SMAX {@code type} attribute.
+     */
+    private static String resolveSmaxMediaType(Message message) {
+        return switch (message) {
+            case ImageMessage _ -> "image";
+            case VideoOrGifMessage v -> v.gifPlayback() ? "gif" : "video";
+            case AudioMessage a -> a.voiceMessage() ? "ptt" : "audio";
+            case DocumentMessage _ -> "document";
+            case StickerMessage _ -> "sticker";
+            case ContactMessage _ -> "vcard";
+            case TextMessage t when t.matchedText().isPresent() -> "url";
+            case TextMessage _ -> "text";
+            default -> "text";
+        };
+    }
+}

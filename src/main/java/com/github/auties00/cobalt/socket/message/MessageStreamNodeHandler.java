@@ -4,7 +4,7 @@ import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.exception.WhatsAppMediaException;
 import com.github.auties00.cobalt.exception.WhatsAppMessageException;
 import com.github.auties00.cobalt.exception.WhatsAppLidMigrationException;
-import com.github.auties00.cobalt.message.receipt.MessageReceiptHandler;
+import com.github.auties00.cobalt.message.receive.receipt.MessageReceiptHandler;
 import com.github.auties00.cobalt.message.receive.MessageReceivingService;
 import com.github.auties00.cobalt.message.receive.MessageReceiveStanzaParser;
 import com.github.auties00.cobalt.migration.LidMigrationService;

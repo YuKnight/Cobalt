@@ -5,6 +5,7 @@ import com.github.auties00.cobalt.model.chat.ChatDisappear;
 import com.github.auties00.cobalt.model.contact.Contact;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.common.ChatMessageKey;
+import com.github.auties00.cobalt.model.message.common.ContextualMessage;
 import com.github.auties00.cobalt.model.message.common.MessageContainer;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
@@ -15,7 +16,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * A model class that holds the information related to a {@link it.auties.whatsapp.model.message.model.ContextualMessage}.
+ * A model class that holds the information related to a {@link ContextualMessage}.
  */
 @ProtobufMessage(name = "ContextInfo")
 public final class ContextInfo implements Info { // TODO: Check me
@@ -23,25 +24,25 @@ public final class ContextInfo implements Info { // TODO: Check me
      * The value of the message that this ContextualMessage quotes
      */
     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
-    final String quotedMessageId;
+    String quotedMessageId;
 
     /**
      * The value of the contact that sent the message that this ContextualMessage quotes
      */
     @ProtobufProperty(index = 2, type = ProtobufType.STRING)
-    final Jid quotedMessageSenderJid;
+    Jid quotedMessageSenderJid;
 
     /**
      * The message container that this ContextualMessage quotes
      */
     @ProtobufProperty(index = 3, type = ProtobufType.MESSAGE)
-    final MessageContainer quotedMessage;
+    MessageContainer quotedMessage;
 
     /**
      * The value of the contact that sent the message that this ContextualMessage quotes
      */
     @ProtobufProperty(index = 4, type = ProtobufType.STRING)
-    final Jid quotedMessageParentJid;
+    Jid quotedMessageParentJid;
 
     /**
      * A list of the contacts' jids mentioned in this ContextualMessage
@@ -323,6 +324,24 @@ public final class ContextInfo implements Info { // TODO: Check me
      */
     public Optional<MessageContainer> quotedMessage() {
         return Optional.ofNullable(quotedMessage);
+    }
+
+    public void setQuotedMessageSenderJid(Jid quotedMessageSenderJid) {
+        this.quotedMessageSenderJid = quotedMessageSenderJid;
+    }
+
+    /**
+     * Clears all quoted message fields (id, sender, message, parent).
+     *
+     * @apiNote WAWebE2EProtoGenerator.updateBotInvokeMsgProtoCopyForCapi:
+     * deletes quotedMessage, stanzaId, remoteJid, participant when
+     * the quoted participant is not a bot.
+     */
+    public void clearQuotedMessage() {
+        this.quotedMessageId = null;
+        this.quotedMessageSenderJid = null;
+        this.quotedMessage = null;
+        this.quotedMessageParentJid = null;
     }
 
     /**

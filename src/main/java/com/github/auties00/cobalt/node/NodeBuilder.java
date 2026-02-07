@@ -5,7 +5,6 @@ package com.github.auties00.cobalt.node;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidProvider;
 
-import java.io.InputStream;
 import java.util.*;
 
 /**
@@ -283,22 +282,6 @@ public final class NodeBuilder {
         this.textContent = null;
         this.jidContent = null;
         this.bytesContent = value;
-        this.childrenContent = null;
-        return this;
-    }
-
-    /**
-     * Sets the content of the node to binary data as an InputStream.
-     * This method clears any other content previously set (text, JID, bytes, or content).
-     *
-     * @param value the InputStream content value
-     * @param length the length of the InputStream
-     * @return this builder for method chaining
-     */
-    public NodeBuilder content(InputStream value, int length) {
-        this.textContent = null;
-        this.jidContent = null;
-        this.bytesContent = null;
         this.childrenContent = null;
         return this;
     }

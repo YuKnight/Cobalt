@@ -4,15 +4,15 @@ import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.device.adv.DeviceADVChecker;
 import com.github.auties00.cobalt.device.adv.DeviceADVValidator;
 import com.github.auties00.cobalt.device.fanout.DeviceFanoutCalculator;
+import com.github.auties00.cobalt.device.icdc.IcdcComputer;
+import com.github.auties00.cobalt.device.icdc.IcdcResult;
 import com.github.auties00.cobalt.device.fanout.DevicePhashCalculator;
 import com.github.auties00.cobalt.device.fanout.DevicePhashVersion;
-import com.github.auties00.cobalt.device.result.DeviceGroupFanoutResult;
-import com.github.auties00.cobalt.device.result.DeviceListResult;
-import com.github.auties00.cobalt.device.result.ValidatedKeyIndexListResult;
+import com.github.auties00.cobalt.device.fanout.DeviceGroupFanoutResult;
+import com.github.auties00.cobalt.device.adv.ValidatedKeyIndexListResult;
 import com.github.auties00.cobalt.device.stanza.DeviceUSyncQueryBuilder;
 import com.github.auties00.cobalt.device.stanza.DeviceUSyncResponseParser;
-import com.github.auties00.cobalt.device.util.DeviceConstants;
-import com.github.auties00.cobalt.device.util.DeviceExpectedTsUtils;
+import com.github.auties00.cobalt.device.timestamp.DeviceExpectedTsUtils;
 import com.github.auties00.cobalt.exception.WhatsAppAdvValidationException;
 import com.github.auties00.cobalt.exception.WhatsAppDeviceSyncException;
 import com.github.auties00.cobalt.exception.WhatsAppWebAppStateSyncException;
@@ -173,6 +173,14 @@ public final class DeviceService {
     private final DeviceFanoutCalculator fanoutCalculator;
 
     /**
+     * Service for computing ICDC (Identity Change Detection Consistency) metadata.
+     *
+     * @apiNote WAWebIdentityIcdcApi: computes identity key hashes and device
+     * timestamps for inclusion in every outgoing message's messageContextInfo.
+     */
+    private final IcdcComputer icdcComputer;
+
+    /**
      * Service for calculating participant hashes (phash) for group message verification.
      *
      * @apiNote WAWebPhashUtils: computes SHA-1 (V1) or SHA-256 (V2) hash of sorted
@@ -217,6 +225,7 @@ public final class DeviceService {
         this.abPropsService = abPropsService;
         this.advValidator = new DeviceADVValidator(store, abPropsService);
         this.fanoutCalculator = new DeviceFanoutCalculator(abPropsService);
+        this.icdcComputer = new IcdcComputer(store, abPropsService);
         this.phashCalculator = new DevicePhashCalculator(abPropsService);
         this.usyncResponseParser = new DeviceUSyncResponseParser(advValidator);
         this.pendingFetches = new ConcurrentHashMap<>();
@@ -1410,7 +1419,43 @@ public final class DeviceService {
      * @apiNote WAWebDBDeviceListFanout.getFanOutList: generates device lists for message fanout.
      * WAWebPhashUtils.phashV2: calculates the participant hash for group messages.
      */
-    public DeviceGroupFanoutResult getGroupFanout(Jid groupJid, Jid myDeviceJid) {
+    /**
+     * Computes the fanout device list for a 1:1 user chat.
+     *
+     * <p>This resolves device lists for both the recipient and the sender,
+     * computes the fanout (filtering self and applying hosted device logic),
+     * and filters out devices with unconfirmed identity changes.
+     *
+     * <p>If {@code expectedPhash} is non-null, the device list sync uses
+     * it for a phash pre-check optimisation, skipping the server round-trip
+     * when the local device list already matches.
+     *
+     * @param chatJid       the recipient user JID
+     * @param expectedPhash the server-provided phash to match against,
+     *                      or {@code null} for an unconditional sync
+     * @return the fanout device JIDs
+     *
+     * @apiNote WAWebSendUserMsgJob.encryptAndSendUserMsg: calls
+     * getFanOutList({wids: [to, meDevice],
+     * chatWidSetToIncludeHostedInFanoutOneToOneChatOnly: to}).
+     * WAWebDBDeviceListFanout.getFanOutList: filters self, includes hosted
+     * for 1:1 user chats when bizHostedDevicesEnabled.
+     */
+    public Collection<Jid> getUserFanout(Jid chatJid, String expectedPhash) {
+        var myDeviceJid = resolveMyDeviceJid(chatJid);
+        var deviceLists = getDeviceLists(
+                List.of(chatJid, myDeviceJid), "message", expectedPhash, false);
+
+        // WAWebDBDeviceListFanout.getFanOutList: include hosted devices for 1:1 user chats
+        var fanoutDevices = fanoutCalculator.calculate(myDeviceJid, deviceLists, chatJid);
+
+        // Filter out devices with unconfirmed identity changes
+        var changedIdentities = store.unconfirmedIdentityChanges();
+        return fanoutCalculator.filterIdentityChanges(fanoutDevices, changedIdentities);
+    }
+
+    public DeviceGroupFanoutResult getGroupFanout(Jid groupJid) {
+        var myDeviceJid = resolveMyDeviceJid(groupJid);
         try {
             // WAWebDBDeviceListFanout.getFanOutList: get devices for all participants
             var metadata = client.queryGroupOrCommunityMetadata(groupJid);
@@ -1434,6 +1479,62 @@ public final class DeviceService {
         } catch (NoSuchAlgorithmException exception) {
             throw new InternalError("Missing SHA-256 implementation", exception);
         }
+    }
+
+    /**
+     * Computes ICDC metadata for the given user.
+     *
+     * @param userJid the user JID (will be normalised to a user-level JID)
+     * @return the ICDC result, or {@code Optional.empty()} if no device list is cached
+     *         or the list is marked as deleted
+     *
+     * @apiNote WAWebIdentityIcdcApi.getICDCMeta: retrieves the device record
+     * and delegates to {@code getICDCMetaFromDeviceRecord}.
+     */
+    public Optional<IcdcResult> computeIcdc(Jid userJid) {
+        return icdcComputer.compute(userJid);
+    }
+
+    /**
+     * Ensures Signal sessions exist for all specified devices, fetching
+     * prekey bundles from the server for any devices without sessions.
+     *
+     * <p>This must be called before encrypting messages for a device
+     * list.  Devices that already have established sessions are skipped.
+     *
+     * @param deviceJids the device JIDs to ensure sessions for
+     *
+     * @apiNote WAWebSendMsgCreateFanoutStanza.createFanoutMsgStanza:
+     * calls {@code ensureE2ESessions(devices)} before encrypting.
+     * WAWebE2ESessionService: deduplicates concurrent session
+     * establishment requests.
+     */
+    public void ensureSessions(Collection<Jid> deviceJids) {
+        preKeyHandler.ensureSessions(deviceJids);
+    }
+
+    /**
+     * Resolves the sender's device JID based on the chat's addressing.
+     *
+     * <p>For LID-addressed chats, uses the sender's LID if available;
+     * otherwise falls back to the PN device JID.
+     *
+     * @param chatJid the chat JID that determines addressing
+     * @return the sender's device JID
+     * @throws IllegalStateException if not logged in
+     *
+     * @apiNote WAWebSendUserMsgJob: uses getMeDeviceLid for LID chats,
+     * getMeDevicePn otherwise.
+     * WAWebSendGroupSkmsgJob: uses getMeDeviceLid for LID groups,
+     * getMeDevicePn otherwise.
+     */
+    private Jid resolveMyDeviceJid(Jid chatJid) {
+        var selfJid = store.jid().orElseThrow(() ->
+                new IllegalStateException("Not logged in"));
+        if (chatJid.hasLidServer()) {
+            return store.lid().orElse(selfJid);
+        }
+        return selfJid;
     }
 
     /**

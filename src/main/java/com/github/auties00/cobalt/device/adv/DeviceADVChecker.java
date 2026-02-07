@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.device.adv;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceService;
-import com.github.auties00.cobalt.device.util.DeviceExpectedTsUtils;
+import com.github.auties00.cobalt.device.timestamp.DeviceExpectedTsUtils;
 import com.github.auties00.cobalt.exception.WhatsAppAdvCheckException;
 import com.github.auties00.cobalt.exception.WhatsAppOwnDeviceListExpiredException;
 import com.github.auties00.cobalt.model.auth.ADVEncryptionType;

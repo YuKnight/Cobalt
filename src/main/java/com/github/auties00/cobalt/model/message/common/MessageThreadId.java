@@ -19,7 +19,7 @@ import java.util.Optional;
  * @apiNote WAWebProtobufsE2E.pb.ThreadID
  */
 @ProtobufMessage(name = "ThreadID")
-public final class MessageThreadId implements Info {
+public final class MessageThreadId {
     @ProtobufProperty(index = 1, type = ProtobufType.ENUM)
     final ThreadType threadType;
 

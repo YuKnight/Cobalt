@@ -1,8 +1,8 @@
 package com.github.auties00.cobalt.device.stanza;
 
 import com.github.auties00.cobalt.device.adv.DeviceADVValidator;
-import com.github.auties00.cobalt.device.result.DeviceListResult;
-import com.github.auties00.cobalt.device.util.DeviceConstants;
+import com.github.auties00.cobalt.device.DeviceListResult;
+import com.github.auties00.cobalt.device.DeviceConstants;
 import com.github.auties00.cobalt.model.device.DeviceInfo;
 import com.github.auties00.cobalt.model.device.DeviceListBuilder;
 import com.github.auties00.cobalt.model.jid.Jid;

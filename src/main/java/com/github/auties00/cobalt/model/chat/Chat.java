@@ -1,6 +1,8 @@
 package com.github.auties00.cobalt.model.chat;
 
 import com.github.auties00.cobalt.model.contact.ContactStatus;
+
+import java.time.Instant;
 import com.github.auties00.cobalt.model.info.ChatMessageInfo;
 import com.github.auties00.cobalt.model.info.MessageInfoParent;
 import com.github.auties00.cobalt.model.jid.Jid;
@@ -75,6 +77,26 @@ public final class Chat implements MessageInfoParent {
     @ProtobufProperty(index = 19, type = ProtobufType.BOOL)
     boolean markedAsUnread;
 
+    /**
+     * The trust contact (TC) token for this chat, used in the
+     * {@code <tctoken>} stanza child when sending 1:1 messages.
+     *
+     * @apiNote WAWebSendMsgCreateFanoutStanza: includes {@code <tctoken>}
+     * when the AB prop privacy_token_sending_on_all_1_on_1_messages is enabled
+     * and this token is present and not expired.
+     */
+    @ProtobufProperty(index = 21, type = ProtobufType.BYTES)
+    byte[] tcToken;
+
+    /**
+     * The timestamp (epoch seconds) when the TC token was last updated.
+     *
+     * @apiNote WAWebTrustedContactsUtils.isTokenExpired: checks this
+     * timestamp against the current time.
+     */
+    @ProtobufProperty(index = 22, type = ProtobufType.UINT64)
+    Long tcTokenTimestamp;
+
     @ProtobufProperty(index = 24, type = ProtobufType.UINT32)
     int pinnedTimestampSeconds;
 
@@ -111,13 +133,37 @@ public final class Chat implements MessageInfoParent {
     @ProtobufProperty(index = 42, type = ProtobufType.STRING)
     Jid lid;
 
+    /**
+     * The LID origin type for this chat, indicating how the LID chat
+     * was created.
+     *
+     * <p>Values are {@code "ctwa"} (PNH_CTWA) or {@code "general"}.
+     * Used to determine the {@code origin} attribute in the
+     * {@code <meta>} stanza child node.
+     *
+     * @apiNote WAWebUsernameTypes.LidOriginType: PNH_CTWA="ctwa",
+     * GENERAL="general".
+     * WAWebSendMsgMetaNode.getOriginAttribute: includes origin when
+     * to.isLid() and lidOriginType is PNH_CTWA.
+     */
+    @ProtobufProperty(index = 44, type = ProtobufType.STRING)
+    String lidOriginType;
+
     @ProtobufProperty(index = 49, type = ProtobufType.STRING)
     Jid accountLid;
 
     @ProtobufProperty(index = 999, type = ProtobufType.MAP, mapKeyType = ProtobufType.STRING, mapValueType = ProtobufType.ENUM)
     final ConcurrentHashMap<Jid, ContactStatus> presences;
 
-    Chat(Jid jid, Messages messages, Jid newJid, Jid oldJid, int unreadMessagesCount, boolean endOfHistoryTransfer, ChatEphemeralTimer ephemeralMessageDuration, long ephemeralMessagesToggleTimeSeconds, EndOfHistoryTransferType endOfHistoryTransferType, long timestampSeconds, String name, boolean notSpam, boolean archived, ChatDisappear disappearInitiator, boolean markedAsUnread, int pinnedTimestampSeconds, ChatMute mute, ChatWallpaper wallpaper, MediaVisibility mediaVisibility, boolean suspended, boolean terminated, boolean support, String displayName, Jid phoneJid, boolean shareOwnPhoneNumber, boolean phoneDuplicateLidThread, Jid lid, Jid accountLid, ConcurrentHashMap<Jid, ContactStatus> presences) {
+    /**
+     * The CTWA (Click-to-WhatsApp) entry point for this chat, if the
+     * chat was opened via a CTWA ad link.  Not persisted.
+     *
+     * @apiNote WAWebExternalEntryPointPrefs: stores entry points per chat.
+     */
+    CtwaEntryPoint ctwaEntryPoint;
+
+    Chat(Jid jid, Messages messages, Jid newJid, Jid oldJid, int unreadMessagesCount, boolean endOfHistoryTransfer, ChatEphemeralTimer ephemeralMessageDuration, long ephemeralMessagesToggleTimeSeconds, EndOfHistoryTransferType endOfHistoryTransferType, long timestampSeconds, String name, boolean notSpam, boolean archived, ChatDisappear disappearInitiator, boolean markedAsUnread, byte[] tcToken, Long tcTokenTimestamp, int pinnedTimestampSeconds, ChatMute mute, ChatWallpaper wallpaper, MediaVisibility mediaVisibility, boolean suspended, boolean terminated, boolean support, String displayName, Jid phoneJid, boolean shareOwnPhoneNumber, boolean phoneDuplicateLidThread, Jid lid, String lidOriginType, Jid accountLid, ConcurrentHashMap<Jid, ContactStatus> presences) {
         this.jid = jid;
         this.messages = messages;
         this.newJid = newJid;
@@ -133,6 +179,8 @@ public final class Chat implements MessageInfoParent {
         this.archived = archived;
         this.disappearInitiator = disappearInitiator;
         this.markedAsUnread = markedAsUnread;
+        this.tcToken = tcToken;
+        this.tcTokenTimestamp = tcTokenTimestamp;
         this.pinnedTimestampSeconds = pinnedTimestampSeconds;
         this.mute = Objects.requireNonNullElse(mute, ChatMute.notMuted());
         this.wallpaper = wallpaper;
@@ -145,6 +193,7 @@ public final class Chat implements MessageInfoParent {
         this.shareOwnPhoneNumber = shareOwnPhoneNumber;
         this.phoneDuplicateLidThread = phoneDuplicateLidThread;
         this.lid = lid;
+        this.lidOriginType = lidOriginType;
         this.accountLid = accountLid;
         this.presences = presences;
     }
@@ -206,6 +255,43 @@ public final class Chat implements MessageInfoParent {
         return markedAsUnread;
     }
 
+    /**
+     * Returns the trust contact (TC) token for this chat.
+     *
+     * @return the TC token bytes, or empty if not set
+     */
+    public Optional<byte[]> tcToken() {
+        return Optional.ofNullable(tcToken);
+    }
+
+    /**
+     * Sets the trust contact (TC) token for this chat.
+     *
+     * @param tcToken the TC token bytes
+     */
+    public void setTcToken(byte[] tcToken) {
+        this.tcToken = tcToken;
+    }
+
+    /**
+     * Returns the timestamp when the TC token was last updated.
+     *
+     * @return the timestamp, or empty if not set
+     */
+    public Optional<Instant> tcTokenTimestamp() {
+        return Optional.ofNullable(tcTokenTimestamp)
+                .map(Instant::ofEpochSecond);
+    }
+
+    /**
+     * Sets the timestamp when the TC token was last updated.
+     *
+     * @param tcTokenTimestamp the timestamp in epoch seconds, or {@code null}
+     */
+    public void setTcTokenTimestamp(Long tcTokenTimestamp) {
+        this.tcTokenTimestamp = tcTokenTimestamp;
+    }
+
     public int pinnedTimestampSeconds() {
         return pinnedTimestampSeconds;
     }
@@ -244,6 +330,24 @@ public final class Chat implements MessageInfoParent {
 
     public Optional<Jid> lidJid() {
         return Optional.ofNullable(lid);
+    }
+
+    /**
+     * Returns the LID origin type for this chat.
+     *
+     * @return the origin type ({@code "ctwa"} or {@code "general"}),
+     *         or empty if not set
+     */
+    public Optional<String> lidOriginType() {
+        return Optional.ofNullable(lidOriginType);
+    }
+
+    public Optional<CtwaEntryPoint> ctwaEntryPoint() {
+        return Optional.ofNullable(ctwaEntryPoint);
+    }
+
+    public void setCtwaEntryPoint(CtwaEntryPoint ctwaEntryPoint) {
+        this.ctwaEntryPoint = ctwaEntryPoint;
     }
 
     public Optional<Jid> accountLid() {

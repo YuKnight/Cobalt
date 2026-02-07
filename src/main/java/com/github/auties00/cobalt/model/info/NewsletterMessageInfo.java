@@ -48,6 +48,15 @@ public final class NewsletterMessageInfo implements MessageInfo {
 
     Newsletter newsletter;
 
+    /**
+     * The server-assigned media handle for uploaded newsletter media.
+     * Set by the media upload step before sending; not persisted.
+     *
+     * @apiNote WAWebNewsletterSendMessageQueryJob: {@code e.mediaHandle}
+     * passed as {@code messageMediaId} in the SMAX stanza.
+     */
+    String mediaHandle;
+
     NewsletterMessageInfo(String id, int serverId, Long timestampSeconds, Long views, Map<String, NewsletterReaction> reactions, MessageContainer message, MessageStatus status, boolean starred, MessageReceipt receipt) {
         this.id = Objects.requireNonNull(id, "id cannot be null");
         this.serverId = serverId;
@@ -138,6 +147,14 @@ public final class NewsletterMessageInfo implements MessageInfo {
 
     public Newsletter newsletter() {
         return Objects.requireNonNull(newsletter, "newsletter cannot be null when accessed");
+    }
+
+    public Optional<String> mediaHandle() {
+        return Optional.ofNullable(mediaHandle);
+    }
+
+    public void setMediaHandle(String mediaHandle) {
+        this.mediaHandle = mediaHandle;
     }
 
     public String id() {

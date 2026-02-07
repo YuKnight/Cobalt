@@ -1,9 +1,9 @@
 package com.github.auties00.cobalt.message.receive;
 
-import com.github.auties00.cobalt.message.addressing.LidMessageAddressingMode;
-import com.github.auties00.cobalt.message.addressing.MessageAddressingMode;
-import com.github.auties00.cobalt.message.addressing.PhoneNumberMessageAddressingMode;
-import com.github.auties00.cobalt.message.encryption.MessageSignalEncryptionType;
+import com.github.auties00.cobalt.message.receive.addressing.LidMessageAddressingMode;
+import com.github.auties00.cobalt.message.receive.addressing.MessageAddressingMode;
+import com.github.auties00.cobalt.message.receive.addressing.PhoneNumberMessageAddressingMode;
+import com.github.auties00.cobalt.message.send.crypto.MessageSignalEncryptionType;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
 

@@ -1,0 +1,144 @@
+package com.github.auties00.cobalt.message.send.stanza;
+
+import com.github.auties00.cobalt.message.send.token.ReportingToken;
+import com.github.auties00.cobalt.model.info.ChatMessageInfo;
+import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.model.message.common.Message;
+import com.github.auties00.cobalt.model.message.common.MessageContainerSpec;
+import com.github.auties00.cobalt.model.message.standard.EncEventResponseMessage;
+import com.github.auties00.cobalt.model.message.standard.EncryptedReactionMessage;
+import com.github.auties00.cobalt.model.message.standard.PollUpdateMessage;
+import com.github.auties00.cobalt.model.message.standard.ReactionMessage;
+import com.github.auties00.cobalt.node.Node;
+import com.github.auties00.cobalt.node.NodeBuilder;
+import com.github.auties00.cobalt.props.ABProp;
+import com.github.auties00.cobalt.props.ABPropsService;
+
+import java.security.GeneralSecurityException;
+import java.util.Objects;
+
+/**
+ * Builds the {@code <reporting>} stanza child node containing the
+ * reporting token (franking tag) for message integrity verification.
+ *
+ * <p>Reporting tokens are only generated when:
+ * <ul>
+ *   <li>The {@code rt_sender_reporting_token_version} AB prop is &gt; 0</li>
+ *   <li>The message type is compatible (not reaction, poll vote, or
+ *       event response)</li>
+ *   <li>The message has a messageSecret</li>
+ * </ul>
+ *
+ * @apiNote WAWebReportingTokenUtils.genReportingTokenBody: derives
+ * the key from messageSecret, computes HMAC over the reporting token
+ * content, wraps in
+ * {@code <reporting><reporting_token v="...">token</reporting_token></reporting>}.
+ * WAWebMessagingGatingUtils.isReportingTokenSendingEnabled: checks
+ * rt_sender_reporting_token_version &gt; 0.
+ * WAWebMessagePluginGenerateReportingTokenContent.isMsgTypeReportingTokenCompatible:
+ * excludes reactions, encrypted reactions, event responses, and poll votes.
+ */
+public final class ReportingStanza {
+    private static final System.Logger LOGGER = System.getLogger("ReportingStanza");
+
+    /**
+     * Default reporting token version when the AB prop is not set.
+     *
+     * @apiNote WAWebABPropsConfigs: rt_sender_reporting_token_version
+     * default value is 2.
+     */
+    public static final int DEFAULT_VERSION = 2;
+
+    private final ABPropsService abPropsService;
+
+    public ReportingStanza(ABPropsService abPropsService) {
+        this.abPropsService = Objects.requireNonNull(abPropsService, "abPropsService");
+    }
+
+    /**
+     * Builds the {@code <reporting>} node for the given message.
+     *
+     * <p>Returns {@code null} if reporting tokens are disabled, the
+     * message type is incompatible, or the message has no messageSecret.
+     *
+     * @param messageInfo the outgoing message
+     * @param selfJid     the sender's user JID
+     * @param remoteJid   the remote JID (recipient for 1:1, group JID
+     *                    for groups, status JID for broadcasts)
+     * @return the reporting node, or {@code null}
+     *
+     * @apiNote WAWebReportingTokenUtils.genReportingTokenBody
+     */
+    public Node build(ChatMessageInfo messageInfo, Jid selfJid, Jid remoteJid) {
+        // WAWebMessagingGatingUtils.isReportingTokenSendingEnabled:
+        // rt_sender_reporting_token_version > 0
+        var senderVersion = abPropsService.getInt(ABProp.RT_SENDER_REPORTING_TOKEN_VERSION_AB_PROP_CODE)
+                .orElse(DEFAULT_VERSION);
+        if (senderVersion <= 0) {
+            return null;
+        }
+
+        // WAWebMessagePluginGenerateReportingTokenContent.isMsgTypeReportingTokenCompatible:
+        // excludes REACTION, REACTION_ENC, EVENT_RESPONSE, POLL_UPDATE
+        var message = messageInfo.message().content();
+        if (!isMsgTypeCompatible(message)) {
+            return null;
+        }
+
+        var messageSecret = messageInfo.messageSecret().orElse(null);
+        if (messageSecret == null) {
+            return null;
+        }
+
+        // TODO: Implement proper reporting token content extraction.
+        //  WA Web uses WAWebReportingTokenContent.ReportingTokenContentCalculator
+        //  which builds a sparse copy of the Message protobuf containing only
+        //  the fields specified by WAWebReportingTokenConfig for the given version,
+        //  then serializes that sparse copy. The config is a base64-encoded protobuf
+        //  (REPORTING_TOKEN_CONFIG_BASE64) mapping field numbers to extraction rules.
+        //  Currently we use the full serialized protobuf, which causes server-side
+        //  HMAC verification to fail.
+        var serializedProto = MessageContainerSpec.encode(messageInfo.message());
+
+        try {
+            var reportingToken = ReportingToken.generate(
+                    messageSecret,
+                    messageInfo.key().id(),
+                    selfJid.toUserJid(),
+                    remoteJid.toUserJid(),
+                    serializedProto,
+                    senderVersion
+            );
+            if (reportingToken.isEmpty()) {
+                return null;
+            }
+
+            var reportingBody = new NodeBuilder()
+                    .description("reporting_token")
+                    .attribute("v", String.valueOf(reportingToken.get().version()))
+                    .content(reportingToken.get().token())
+                    .build();
+            return new NodeBuilder()
+                    .description("reporting")
+                    .content(reportingBody)
+                    .build();
+        } catch (GeneralSecurityException e) {
+            LOGGER.log(System.Logger.Level.WARNING,
+                    "Failed to generate reporting token: {0}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Checks whether the message type is compatible with reporting tokens.
+     *
+     * @apiNote WAWebMessagePluginGenerateReportingTokenContent.isMsgTypeReportingTokenCompatible:
+     * returns false for REACTION, REACTION_ENC, EVENT_RESPONSE, POLL_UPDATE.
+     */
+    private static boolean isMsgTypeCompatible(Message message) {
+        return switch (message) {
+            case ReactionMessage _, PollUpdateMessage _, EncryptedReactionMessage _, EncEventResponseMessage _ -> false;
+            case null, default -> true;
+        };
+    }
+}

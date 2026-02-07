@@ -15,7 +15,8 @@ import java.util.Optional;
 public sealed interface ContextualMessage extends Message
         permits ButtonsMessage, InteractiveMessage, InteractiveResponseMessage, ListMessage,
         TemplateMessage, ButtonReplyMessage, MediaMessage, PaymentOrderMessage, ContactMessage, ContactsMessage,
-        GroupInviteMessage, LiveLocationMessage, LocationMessage, PollCreationMessage, ProductMessage, RequestPhoneNumberMessage, TextMessage {
+        EventMessage, GroupInviteMessage, LiveLocationMessage, LocationMessage, PollCreationMessage, PollResultSnapshotMessage,
+        ProductMessage, RequestPhoneNumberMessage, TextMessage {
     Optional<ContextInfo> contextInfo();
     void setContextInfo(ContextInfo contextInfo);
 }

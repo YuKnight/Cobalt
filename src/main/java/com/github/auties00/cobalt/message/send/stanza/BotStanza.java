@@ -1,0 +1,175 @@
+package com.github.auties00.cobalt.message.send.stanza;
+
+import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
+import com.github.auties00.cobalt.message.send.crypto.MessageEncryptedPayload;
+import com.github.auties00.cobalt.message.send.bot.BotMessageSecret;
+import com.github.auties00.cobalt.message.send.bot.BotProtobufTransform;
+import com.github.auties00.cobalt.model.info.ChatMessageInfo;
+import com.github.auties00.cobalt.model.info.DeviceContextInfo;
+import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.model.message.common.MessageContainerSpec;
+import com.github.auties00.cobalt.model.message.server.ProtocolMessage;
+import com.github.auties00.cobalt.node.Node;
+import com.github.auties00.cobalt.node.NodeBuilder;
+
+import java.security.GeneralSecurityException;
+import java.util.Objects;
+
+/**
+ * Builds the {@code <bot>} stanza child node for bot messages.
+ *
+ * <p>Bot messages are encrypted separately to the bot's device and
+ * included in the stanza as a {@code <bot>} node alongside the
+ * regular {@code <enc>} or {@code <participants>} nodes.
+ *
+ * <p>The {@code <bot>} node structure is:
+ * <pre>{@code
+ * <bot type="feedback|prompt" persona_type="...">
+ *   <to jid="botDevice">
+ *     <enc v="2" type="pkmsg|msg">ciphertext</enc>
+ *   </to>
+ * </bot>
+ * }</pre>
+ *
+ * @apiNote WAWebSendMsgCreateFanoutStanza: builds the bot body node
+ * with type, persona_type, and the encrypted payload for the bot device.
+ * WAWebSendGroupSkmsgJob: builds the bot node for group SKMSG stanzas.
+ */
+public final class BotStanza {
+    private static final System.Logger LOGGER = System.getLogger("BotStanza");
+
+    private final MessageEncryption encryption;
+    private final BotProtobufTransform protobufTransform;
+
+    public BotStanza(MessageEncryption encryption, BotProtobufTransform protobufTransform) {
+        this.encryption = Objects.requireNonNull(encryption, "encryption");
+        this.protobufTransform = Objects.requireNonNull(protobufTransform, "protobufTransform");
+    }
+
+    /**
+     * Builds the {@code <bot>} node for the given message, or
+     * returns {@code null} if the message has no bot involvement.
+     *
+     * <p>Derives the bot JID, feedback flag, and message secret from
+     * the message info and chat JID.  Applies bot protobuf transforms
+     * and encrypts to the bot device.
+     *
+     * @param messageInfo the outgoing message
+     * @param chatJid     the target chat JID
+     * @return the bot node, or {@code null}
+     *
+     * @apiNote WAWebSendMsgCreateFanoutStanza: determines bot involvement
+     * from invokedBotWid, isBotFeedbackMessage, etc., then encrypts
+     * a transformed protobuf to the bot device.
+     */
+    public Node build(ChatMessageInfo messageInfo, Jid chatJid) {
+        var botJid = resolveBotJid(messageInfo, chatJid);
+        if (botJid == null) {
+            return null;
+        }
+
+        var isFeedback = isBotFeedback(messageInfo);
+        var container = messageInfo.message();
+
+        // Derive bot message secret from the message secret
+        var messageSecret = container.deviceInfo()
+                .flatMap(DeviceContextInfo::messageSecret)
+                .orElse(null);
+        byte[] botSecret = null;
+        if (messageSecret != null) {
+            try {
+                botSecret = BotMessageSecret.derive(messageSecret);
+            } catch (GeneralSecurityException e) {
+                LOGGER.log(System.Logger.Level.WARNING,
+                        "Failed to derive bot message secret: {0}", e.getMessage());
+            }
+        }
+
+        // Apply bot protobuf transforms
+        protobufTransform.transformForCapi(container, botSecret);
+        if (isFbidBot(botJid)) {
+            protobufTransform.transformForFbidBot(container);
+        }
+        protobufTransform.transformForBot(container);
+
+        // Encrypt to bot device
+        var plaintext = MessageContainerSpec.encode(container);
+        MessageEncryptedPayload payload;
+        try {
+            payload = encryption.encryptForDevice(botJid, plaintext);
+        } catch (Exception e) {
+            LOGGER.log(System.Logger.Level.WARNING,
+                    "Bot encryption failed for {0}: {1}", botJid, e.getMessage());
+            return null;
+        }
+
+        // Build stanza
+        var encNode = new NodeBuilder()
+                .description("enc")
+                .attribute("v", String.valueOf(MessageEncryption.CIPHERTEXT_VERSION))
+                .attribute("type", payload.type().protocolValue())
+                .content(payload.ciphertext())
+                .build();
+        var toNode = new NodeBuilder()
+                .description("to")
+                .attribute("jid", botJid)
+                .content(encNode)
+                .build();
+        return new NodeBuilder()
+                .description("bot")
+                .attribute("type", isFeedback ? "feedback" : null)
+                .content(toNode)
+                .build();
+    }
+
+    /**
+     * Resolves the bot JID from the message and chat context.
+     *
+     * @return the bot device JID, or {@code null} if no bot is involved
+     *
+     * @apiNote WAWebSendMsgCreateFanoutStanza: uses invokedBotWid
+     * for invoke messages, protocolMessageKey.participant for feedback.
+     */
+    private static Jid resolveBotJid(ChatMessageInfo messageInfo, Jid chatJid) {
+        // 1:1 bot chats: the chat JID is the bot
+        if (chatJid.hasBotServer()) {
+            return chatJid;
+        }
+
+        // Feedback: the bot is the target of the protocol message
+        if (isBotFeedback(messageInfo)
+                && messageInfo.message().content() instanceof ProtocolMessage pm) {
+            return pm.key()
+                    .flatMap(key -> key.senderJid())
+                    .filter(Jid::hasBotServer)
+                    .orElse(null);
+        }
+
+        return null;
+    }
+
+    /**
+     * Checks whether the message is a bot feedback protocol message.
+     *
+     * @apiNote WAWebMsgGetters.getIsBotFeedbackMessage:
+     * {@code type === PROTOCOL && subtype === "bot_feedback"}
+     */
+    private static boolean isBotFeedback(ChatMessageInfo messageInfo) {
+        return messageInfo.message().content() instanceof ProtocolMessage pm
+                && pm.protocolType() == ProtocolMessage.Type.BOT_FEEDBACK_MESSAGE;
+    }
+
+    /**
+     * Checks whether the JID is an FBID bot (numeric user on bot server).
+     *
+     * @apiNote WAWebWid.isFbidBot
+     */
+    private static boolean isFbidBot(Jid jid) {
+        if (!jid.hasBotServer()) {
+            return false;
+        }
+        var user = jid.user();
+        return user != null && !user.isEmpty()
+                && user.chars().allMatch(Character::isDigit);
+    }
+}

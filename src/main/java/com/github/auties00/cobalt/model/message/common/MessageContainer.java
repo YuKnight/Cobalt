@@ -182,8 +182,17 @@ public final class MessageContainer {
     @ProtobufProperty(index = 76, type = ProtobufType.MESSAGE)
     final EncEventResponseMessage encEventResponseMessage;
 
+    @ProtobufProperty(index = 75, type = ProtobufType.MESSAGE)
+    final EventMessage eventMessage;
+
     @ProtobufProperty(index = 82, type = ProtobufType.MESSAGE)
     final SecretEncryptedMessage secretEncryptedMessage;
+
+    @ProtobufProperty(index = 88, type = ProtobufType.MESSAGE)
+    final PollResultSnapshotMessage pollResultSnapshotMessage;
+
+    @ProtobufProperty(index = 115, type = ProtobufType.MESSAGE)
+    final PollResultSnapshotMessage pollResultSnapshotMessageV3;
 
     @ProtobufProperty(index = 67, type = ProtobufType.MESSAGE)
     final FutureMessageContainer botInvokeMessage;
@@ -191,7 +200,7 @@ public final class MessageContainer {
     @ProtobufProperty(index = 35, type = ProtobufType.MESSAGE)
     final DeviceContextInfo deviceInfo;
 
-    MessageContainer(String textWithNoContextMessage, SenderKeyDistributionMessage senderKeyDistributionMessage, ImageMessage imageMessage, ContactMessage contactMessage, LocationMessage locationMessage, TextMessage textMessage, DocumentMessage documentMessage, AudioMessage audioMessage, VideoOrGifMessage videoMessage, CallMessage callMessage, ProtocolMessage protocolMessage, ContactsMessage contactsArrayMessage, HighlyStructuredMessage highlyStructuredMessage, SendPaymentMessage sendPaymentMessage, LiveLocationMessage liveLocationMessage, RequestPaymentMessage requestPaymentMessage, DeclinePaymentRequestMessage declinePaymentRequestMessage, CancelPaymentRequestMessage cancelPaymentRequestMessage, TemplateMessage templateMessage, StickerMessage stickerMessage, GroupInviteMessage groupInviteMessage, TemplateReplyMessage templateReplyMessage, ProductMessage productMessage, DeviceSentMessage deviceSentMessage, DeviceSyncMessage deviceSyncMessage, ListMessage listMessage, FutureMessageContainer viewOnceMessage, PaymentOrderMessage orderMessage, ListResponseMessage listResponseMessage, FutureMessageContainer ephemeralMessage, PaymentInvoiceMessage invoiceMessage, ButtonsMessage buttonsMessage, ButtonsResponseMessage buttonsResponseMessage, PaymentInviteMessage paymentInviteMessage, InteractiveMessage interactiveMessage, ReactionMessage reactionMessage, StickerSyncRMRMessage stickerSyncMessage, InteractiveResponseMessage interactiveResponseMessage, PollCreationMessage pollCreationMessage, PollUpdateMessage pollUpdateMessage, KeepInChatMessage keepInChatMessage, FutureMessageContainer documentWithCaptionMessage, RequestPhoneNumberMessage requestPhoneNumberMessage, FutureMessageContainer viewOnceV2Message, EncryptedReactionMessage encryptedReactionMessage, FutureMessageContainer editedMessage, FutureMessageContainer viewOnceV2ExtensionMessage, NewsletterAdminInviteMessage newsletterAdminInviteMessage, PinInChatMessage pinInChatMessage, EncEventResponseMessage encEventResponseMessage, SecretEncryptedMessage secretEncryptedMessage, FutureMessageContainer botInvokeMessage, DeviceContextInfo deviceInfo) {
+    MessageContainer(String textWithNoContextMessage, SenderKeyDistributionMessage senderKeyDistributionMessage, ImageMessage imageMessage, ContactMessage contactMessage, LocationMessage locationMessage, TextMessage textMessage, DocumentMessage documentMessage, AudioMessage audioMessage, VideoOrGifMessage videoMessage, CallMessage callMessage, ProtocolMessage protocolMessage, ContactsMessage contactsArrayMessage, HighlyStructuredMessage highlyStructuredMessage, SendPaymentMessage sendPaymentMessage, LiveLocationMessage liveLocationMessage, RequestPaymentMessage requestPaymentMessage, DeclinePaymentRequestMessage declinePaymentRequestMessage, CancelPaymentRequestMessage cancelPaymentRequestMessage, TemplateMessage templateMessage, StickerMessage stickerMessage, GroupInviteMessage groupInviteMessage, TemplateReplyMessage templateReplyMessage, ProductMessage productMessage, DeviceSentMessage deviceSentMessage, DeviceSyncMessage deviceSyncMessage, ListMessage listMessage, FutureMessageContainer viewOnceMessage, PaymentOrderMessage orderMessage, ListResponseMessage listResponseMessage, FutureMessageContainer ephemeralMessage, PaymentInvoiceMessage invoiceMessage, ButtonsMessage buttonsMessage, ButtonsResponseMessage buttonsResponseMessage, PaymentInviteMessage paymentInviteMessage, InteractiveMessage interactiveMessage, ReactionMessage reactionMessage, StickerSyncRMRMessage stickerSyncMessage, InteractiveResponseMessage interactiveResponseMessage, PollCreationMessage pollCreationMessage, PollUpdateMessage pollUpdateMessage, KeepInChatMessage keepInChatMessage, FutureMessageContainer documentWithCaptionMessage, RequestPhoneNumberMessage requestPhoneNumberMessage, FutureMessageContainer viewOnceV2Message, EncryptedReactionMessage encryptedReactionMessage, FutureMessageContainer editedMessage, FutureMessageContainer viewOnceV2ExtensionMessage, NewsletterAdminInviteMessage newsletterAdminInviteMessage, PinInChatMessage pinInChatMessage, EncEventResponseMessage encEventResponseMessage, EventMessage eventMessage, SecretEncryptedMessage secretEncryptedMessage, PollResultSnapshotMessage pollResultSnapshotMessage, PollResultSnapshotMessage pollResultSnapshotMessageV3, FutureMessageContainer botInvokeMessage, DeviceContextInfo deviceInfo) {
         this.textWithNoContextMessage = textWithNoContextMessage;
         this.senderKeyDistributionMessage = senderKeyDistributionMessage;
         this.imageMessage = imageMessage;
@@ -242,7 +251,10 @@ public final class MessageContainer {
         this.newsletterAdminInviteMessage = newsletterAdminInviteMessage;
         this.pinInChatMessage = pinInChatMessage;
         this.encEventResponseMessage = encEventResponseMessage;
+        this.eventMessage = eventMessage;
         this.secretEncryptedMessage = secretEncryptedMessage;
+        this.pollResultSnapshotMessage = pollResultSnapshotMessage;
+        this.pollResultSnapshotMessageV3 = pollResultSnapshotMessageV3;
         this.botInvokeMessage = botInvokeMessage;
         this.deviceInfo = deviceInfo;
     }
@@ -300,7 +312,10 @@ public final class MessageContainer {
                 && Objects.equals(newsletterAdminInviteMessage, that.newsletterAdminInviteMessage)
                 && Objects.equals(pinInChatMessage, that.pinInChatMessage)
                 && Objects.equals(encEventResponseMessage, that.encEventResponseMessage)
+                && Objects.equals(eventMessage, that.eventMessage)
                 && Objects.equals(secretEncryptedMessage, that.secretEncryptedMessage)
+                && Objects.equals(pollResultSnapshotMessage, that.pollResultSnapshotMessage)
+                && Objects.equals(pollResultSnapshotMessageV3, that.pollResultSnapshotMessageV3)
                 && Objects.equals(botInvokeMessage, that.botInvokeMessage)
                 && Objects.equals(deviceInfo, that.deviceInfo);
     }
@@ -358,7 +373,10 @@ public final class MessageContainer {
                 newsletterAdminInviteMessage,
                 pinInChatMessage,
                 encEventResponseMessage,
+                eventMessage,
                 secretEncryptedMessage,
+                pollResultSnapshotMessage,
+                pollResultSnapshotMessageV3,
                 botInvokeMessage,
                 deviceInfo
         );
@@ -454,8 +472,12 @@ public final class MessageContainer {
                     builder.pinInChatMessage(pinInChatMessage);
             case EncEventResponseMessage encEventResponseMessage ->
                     builder.encEventResponseMessage(encEventResponseMessage);
+            case EventMessage eventMessage ->
+                    builder.eventMessage(eventMessage);
             case SecretEncryptedMessage secretEncryptedMessage ->
                     builder.secretEncryptedMessage(secretEncryptedMessage);
+            case PollResultSnapshotMessage pollResultSnapshotMessage ->
+                    builder.pollResultSnapshotMessage(pollResultSnapshotMessage);
             default -> {
             }
         }
@@ -703,8 +725,17 @@ public final class MessageContainer {
         if (encEventResponseMessage != null) {
             return encEventResponseMessage;
         }
+        if (eventMessage != null) {
+            return eventMessage;
+        }
         if (secretEncryptedMessage != null) {
             return secretEncryptedMessage;
+        }
+        if (pollResultSnapshotMessage != null) {
+            return pollResultSnapshotMessage;
+        }
+        if (pollResultSnapshotMessageV3 != null) {
+            return pollResultSnapshotMessageV3;
         }
         if (botInvokeMessage != null) {
             return botInvokeMessage.value().content();
