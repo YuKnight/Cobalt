@@ -248,7 +248,18 @@ public final class ABPropsService {
      * @return an Optional containing the boolean value if the prop exists, or empty if not found or timeout occurred
      */
     public Optional<Boolean> getBool(int configCode) {
-        if (!awaitSync()) {
+        return getBool(configCode, true);
+    }
+
+    /**
+     * Queries a boolean AB prop by its config code.
+     *
+     * @param configCode the numeric identifier of the prop
+     * @param waitForSync whether the method should wait for the A/B props data to arrive from the server
+     * @return an Optional containing the boolean value if the prop exists, or empty if not found or timeout occurred
+     */
+    public Optional<Boolean> getBool(int configCode, boolean waitForSync) {
+        if (waitForSync && !awaitSync()) {
             LOGGER.log(System.Logger.Level.DEBUG, "Timeout waiting for AB props sync before querying config {0}", configCode);
             return Optional.empty();
         }
@@ -267,7 +278,18 @@ public final class ABPropsService {
      * @return an Optional containing the integer value if the prop exists and is parseable, or empty otherwise
      */
     public Optional<Integer> getInt(int configCode) {
-        if (!awaitSync()) {
+        return getInt(configCode, true);
+    }
+
+    /**
+     * Queries an integer AB prop by its config code.
+     *
+     * @param configCode the numeric identifier of the prop
+     * @param waitForSync whether the method should wait for the A/B props data to arrive from the server
+     * @return an Optional containing the integer value if the prop exists and is parseable, or empty otherwise
+     */
+    public Optional<Integer> getInt(int configCode, boolean waitForSync) {
+        if (waitForSync && !awaitSync()) {
             LOGGER.log(System.Logger.Level.DEBUG, "Timeout waiting for AB props sync before querying config {0}", configCode);
             return Optional.empty();
         }
@@ -291,7 +313,18 @@ public final class ABPropsService {
      * @return an Optional containing the long value if the prop exists and is parseable, or empty otherwise
      */
     public Optional<Long> getLong(int configCode) {
-        if (!awaitSync()) {
+        return getLong(configCode, true);
+    }
+
+    /**
+     * Queries a long AB prop by its config code.
+     *
+     * @param configCode the numeric identifier of the prop
+     * @param waitForSync whether the method should wait for the A/B props data to arrive from the server
+     * @return an Optional containing the long value if the prop exists and is parseable, or empty otherwise
+     */
+    public Optional<Long> getLong(int configCode, boolean waitForSync) {
+        if (waitForSync && !awaitSync()) {
             LOGGER.log(System.Logger.Level.DEBUG, "Timeout waiting for AB props sync before querying config {0}", configCode);
             return Optional.empty();
         }
@@ -315,7 +348,18 @@ public final class ABPropsService {
      * @return an Optional containing the double value if the prop exists and is parseable, or empty otherwise
      */
     public Optional<Double> getDouble(int configCode) {
-        if (!awaitSync()) {
+        return getDouble(configCode, true);
+    }
+
+    /**
+     * Queries a double (floating-point) AB prop by its config code.
+     *
+     * @param configCode the numeric identifier of the prop
+     * @param waitForSync whether the method should wait for the A/B props data to arrive from the server
+     * @return an Optional containing the double value if the prop exists and is parseable, or empty otherwise
+     */
+    public Optional<Double> getDouble(int configCode, boolean waitForSync) {
+        if (waitForSync && !awaitSync()) {
             LOGGER.log(System.Logger.Level.DEBUG, "Timeout waiting for AB props sync before querying config {0}", configCode);
             return Optional.empty();
         }
@@ -339,7 +383,18 @@ public final class ABPropsService {
      * @return an Optional containing the string value if the prop exists, or empty if not found or timeout occurred
      */
     public Optional<String> getString(int configCode) {
-        if (!awaitSync()) {
+        return getString(configCode, true);
+    }
+
+    /**
+     * Queries a string AB prop by its config code.
+     *
+     * @param configCode the numeric identifier of the prop
+     * @param waitForSync whether the method should wait for the A/B props data to arrive from the server
+     * @return an Optional containing the string value if the prop exists, or empty if not found or timeout occurred
+     */
+    public Optional<String> getString(int configCode, boolean waitForSync) {
+        if (waitForSync && !awaitSync()) {
             LOGGER.log(System.Logger.Level.DEBUG, "Timeout waiting for AB props sync before querying config {0}", configCode);
             return Optional.empty();
         }
@@ -351,12 +406,12 @@ public final class ABPropsService {
     /**
      * Queries an AB prop with type validation.
      * <p>
-     * If the initial sync hasn't completed, this method will wait (up to the configured timeout)
-     * for the sync to complete before querying.
-     * <p>
      * This method retrieves a prop and validates that it can be converted to the requested type.
      * If the prop exists but cannot be converted to the expected type, an exception is thrown
      * to alert developers of configuration mismatches.
+     * <p>
+     * If the initial sync hasn't completed, this method will wait (up to the configured timeout)
+     * for the sync to complete before querying.
      *
      * @param configCode   the numeric identifier of the prop
      * @param expectedType the expected type (Boolean, Integer, Long, Double, or String)
@@ -364,8 +419,26 @@ public final class ABPropsService {
      * @return an Optional containing the typed value if the prop exists, or empty if not found or timeout occurred
      * @throws WhatsAppABPropTypeMismatchException if the prop exists but cannot be converted to the expected type
      */
-    @SuppressWarnings("unchecked")
     public <T> Optional<T> get(int configCode, Class<T> expectedType) {
+        return get(configCode, expectedType, true);
+    }
+
+    /**
+     * Queries an AB prop with type validation.
+     * <p>
+     * This method retrieves a prop and validates that it can be converted to the requested type.
+     * If the prop exists but cannot be converted to the expected type, an exception is thrown
+     * to alert developers of configuration mismatches.
+     *
+     * @param configCode   the numeric identifier of the prop
+     * @param expectedType the expected type (Boolean, Integer, Long, Double, or String)
+     * @param waitForSync whether the method should wait for the A/B props data to arrive from the server
+     * @param <T>          the type parameter
+     * @return an Optional containing the typed value if the prop exists, or empty if not found or timeout occurred
+     * @throws WhatsAppABPropTypeMismatchException if the prop exists but cannot be converted to the expected type
+     */
+    @SuppressWarnings("unchecked")
+    public <T> Optional<T> get(int configCode, Class<T> expectedType, boolean waitForSync) {
         Objects.requireNonNull(expectedType, "expectedType cannot be null");
 
         if (!awaitSync()) {

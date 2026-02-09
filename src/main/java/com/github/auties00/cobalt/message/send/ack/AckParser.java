@@ -22,7 +22,7 @@ import java.util.Objects;
  */
 public final class AckParser {
     private AckParser() {
-        throw new UnsupportedOperationException("Utility class");
+        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
     }
 
     /**

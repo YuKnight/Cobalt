@@ -2,381 +2,367 @@ package com.github.auties00.cobalt.message.receive.receipt;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.exception.WhatsAppMessageException;
+import com.github.auties00.cobalt.message.receive.stanza.MessageReceiveStanza;
+import com.github.auties00.cobalt.model.auth.SignedDeviceIdentitySpec;
 import com.github.auties00.cobalt.model.info.ChatMessageInfo;
+import com.github.auties00.cobalt.model.info.MessageInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.jid.JidServer;
-import com.github.auties00.cobalt.model.privacy.PrivacySettingType;
-import com.github.auties00.cobalt.model.privacy.PrivacySettingValue;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
+import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.util.SecureBytes;
+import com.github.auties00.libsignal.key.SignalIdentityPublicKey;
+import com.github.auties00.libsignal.key.SignalPreKeyPair;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Service for sending message receipts (delivery, read, played, retry, nack).
- * <p>
- * Receipt types:
+ * Sends receipt stanzas in response to incoming messages.
+ *
+ * <p>After an incoming message is decrypted and processed, the client must
+ * send a receipt to the server indicating the result.  The receipt type and
+ * content vary depending on the outcome:
  * <ul>
- *   <li><b>Delivery receipt</b>: Sent when message is received (double checkmark)</li>
- *   <li><b>Read receipt</b>: Sent when message is viewed (blue checkmark)</li>
- *   <li><b>Played receipt</b>: Sent for voice messages when played</li>
- *   <li><b>Retry receipt</b>: Sent when decryption fails, requests re-transmission</li>
- *   <li><b>Nack receipt</b>: Sent when parsing/protocol errors occur</li>
+ *   <li><b>Delivery receipt:</b> Message was successfully decrypted and
+ *       stored — acknowledges delivery to the sender.</li>
+ *   <li><b>Retry receipt:</b> Decryption failed with a retryable error —
+ *       requests the sender to re-encrypt and resend, optionally including
+ *       a new prekey bundle for session re-establishment.</li>
+ *   <li><b>Nack receipt:</b> Message was received but could not be parsed
+ *       or validated — rejects the message with an error code.</li>
  * </ul>
+ *
+ * @apiNote WAWebHandleMsgSendReceipt.sendReceipt: routes to delivery,
+ * retry, or nack based on the E2E processing result.
+ * WAWebSendDeliveryReceiptJob.sendDeliveryReceiptsAfterDecryption: builds
+ * the delivery receipt stanza.
+ * WAWebSendRetryReceiptJob.sendRetryReceipt: builds the retry receipt
+ * stanza with registration info and optional key bundle.
+ * WAWebHandleMsgSendAck.sendAck / sendNack: sends ack/nack stanzas.
  */
 public final class MessageReceiptHandler {
-    private static final System.Logger LOGGER = System.getLogger("ReceiptService");
+    private static final System.Logger LOGGER = System.getLogger("MessageReceiptHandler");
+
+    /**
+     * The minimum retry count at which the prekey bundle is included
+     * in the retry receipt for session re-establishment.
+     *
+     * @apiNote WAWebSendRetryReceiptJob: {@code d = 2}, the key section
+     * is built when {@code retryCount >= d}.
+     */
+    private static final int RETRY_KEY_BUNDLE_THRESHOLD = 2;
 
     private final WhatsAppClient client;
+    private final WhatsAppStore store;
 
     public MessageReceiptHandler(WhatsAppClient client) {
         this.client = Objects.requireNonNull(client, "client cannot be null");
+        this.store = client.store();
     }
 
     /**
-     * Sends a read receipt for a single message.
+     * Sends a delivery receipt for a successfully decrypted message.
      *
-     * @param message the message to mark as read
+     * <p>The receipt type is determined by the message context:
+     * <ul>
+     *   <li>Peer messages → {@link MessageReceiptType#PEER}</li>
+     *   <li>Messages from self (companion device) → {@link MessageReceiptType#SENDER}</li>
+     *   <li>All other messages → {@link MessageReceiptType#DELIVERY}</li>
+     * </ul>
+     *
+     * @param stanza the parsed incoming stanza
+     * @param info   the successfully processed message info
+     *
+     * @apiNote WAWebHandleMsgSendReceipt.sendReceipt: for SUCCESS result,
+     * dispatches to sendDeliveryReceiptsAfterDecryption which determines
+     * the receipt type based on isPeer, isSender, and isInactive.
+     * WAWebSendDeliveryReceiptJob: builds the receipt stanza with to,
+     * participant, recipient, and type attributes.
      */
-    public void sendReadReceipt(ChatMessageInfo message) {
-        Objects.requireNonNull(message, "message cannot be null");
-        sendReceipt(message, MessageReceiptType.READ);
+    public void sendDeliveryReceipt(MessageReceiveStanza stanza, MessageInfo info) {
+        var receiptType = resolveDeliveryReceiptType(stanza, info);
+        var receipt = new NodeBuilder()
+                .description("receipt")
+                .attribute("id", stanza.id())
+                .attribute("type", receiptType.protocolValue())
+                .attribute("to", stanza.chatJid())
+                .attribute("participant",
+                        resolveParticipantForReceipt(stanza).orElse(null));
+        client.sendNodeWithNoResponse(receipt.build());
     }
 
     /**
-     * Sends read receipts for multiple messages.
+     * Sends a retry receipt requesting the sender to re-encrypt and
+     * resend the message.
      *
-     * @param messages the messages to mark as read
-     */
-    public void sendReadReceipts(List<ChatMessageInfo> messages) {
-        Objects.requireNonNull(messages, "messages cannot be null");
-        if (messages.isEmpty()) {
-            return;
-        }
-
-        // Group messages by chat for batch receipts
-        var messagesByChat = new HashMap<Jid, List<ChatMessageInfo>>();
-        for (var msg : messages) {
-            messagesByChat.computeIfAbsent(msg.chatJid(), _ -> new ArrayList<>()).add(msg);
-        }
-
-        // Send batch receipts per chat
-        for (var entry : messagesByChat.entrySet()) {
-            var chatJid = entry.getKey();
-            var chatMessages = entry.getValue();
-
-            if (chatMessages.size() == 1) {
-                sendReceipt(chatMessages.getFirst(), MessageReceiptType.READ);
-            } else {
-                sendBatchReceipt(chatJid, chatMessages, MessageReceiptType.READ);
-            }
-        }
-    }
-
-    /**
-     * Sends a played receipt for a voice message.
+     * <p>The retry receipt contains the failure reason code and the
+     * current retry count.  For retries after the first attempt, the
+     * client also includes its registration ID and optionally a prekey
+     * bundle so the sender can re-establish the Signal session.
      *
-     * @param message the voice message that was played
-     */
-    public void sendPlayedReceipt(ChatMessageInfo message) {
-        Objects.requireNonNull(message, "message cannot be null");
-        sendReceipt(message, MessageReceiptType.PLAYED);
-    }
-
-    /**
-     * Sends a delivery receipt for a message.
-     * Usually called automatically when receiving a message.
+     * @param stanza      the parsed incoming stanza
+     * @param retryReason the reason for the decryption failure
+     * @param retryCount  the current retry attempt number (1-based)
      *
-     * @param message the message to acknowledge delivery
-     */
-    public void sendDeliveryReceipt(ChatMessageInfo message) {
-        Objects.requireNonNull(message, "message cannot be null");
-        sendReceipt(message, MessageReceiptType.DELIVERY);
-    }
-
-    /**
-     * Sends a retry receipt indicating decryption failure.
-     * This requests the sender to re-transmit the message.
-     * <p>
-     * Retry receipt structure:
-     * <pre>{@code
-     * <receipt id="{msg_id}" to="{chat_jid}" type="retry" t="{timestamp}">
-     *   <retry v="1" count="{retry_count}" reason="{reason}"/>
-     *   <participant jid="{sender_jid}"/>  <!-- for groups -->
-     * </receipt>
-     * }</pre>
-     *
-     * @param messageId  the message ID that failed to decrypt
-     * @param chatJid    the chat JID
-     * @param senderJid  the sender JID (participant for groups)
-     * @param reason     the retry reason
-     * @param retryCount the current retry count
+     * @apiNote WAWebSendRetryReceiptJob.sendRetryReceipt: builds the
+     * retry receipt with registration info and key section.
+     * The retry stanza structure:
+     * {@code <receipt id="..." to="..." type="retry" participant="...">
+     *   <retry v="1" count="..." id="..." t="..." error="..."/>
+     *   <registration>registrationId</registration>
+     *   [<keys>...</keys> if retryCount >= 2]
+     * </receipt>}
      */
     public void sendRetryReceipt(
-            String messageId,
-            Jid chatJid,
-            Jid senderJid,
-            WhatsAppMessageException.Receive.RetryReason reason,
+            MessageReceiveStanza stanza,
+            WhatsAppMessageException.Receive.RetryReason retryReason,
             int retryCount
     ) {
-        Objects.requireNonNull(messageId, "messageId cannot be null");
-        Objects.requireNonNull(chatJid, "chatJid cannot be null");
-        Objects.requireNonNull(reason, "reason cannot be null");
-
-        var timestamp = System.currentTimeMillis() / 1000;
+        // WAWebSendRetryReceiptJob: skip retry for bot senders
+        if (!stanza.chatJid().hasBotServer() && stanza.senderJid().hasBotServer()) {
+            return;
+        }
 
         var retryNode = new NodeBuilder()
                 .description("retry")
                 .attribute("v", "1")
                 .attribute("count", retryCount)
-                .attribute("reason", reason.protocolValue())
+                .attribute("id", stanza.id())
+                .attribute("t", String.valueOf(stanza.timestamp().getEpochSecond()))
+                .attribute("error", retryReason.protocolValue())
                 .build();
 
-        var children = new ArrayList<Node>();
-        children.add(retryNode);
+        var registrationNode = new NodeBuilder()
+                .description("registration")
+                .content(SecureBytes.intToBytes(store.registrationId(), 4))
+                .build();
 
-        // Add participant node for group messages
-        if (chatJid.hasServer(JidServer.groupOrCommunity()) && senderJid != null) {
-            var participantNode = new NodeBuilder()
-                    .description("participant")
-                    .attribute("jid", senderJid)
+        var keysNode = retryCount >= RETRY_KEY_BUNDLE_THRESHOLD
+                ? buildKeyBundleNode()
+                : null;
+
+        var receipt = new NodeBuilder()
+                .description("receipt")
+                .attribute("id", stanza.id())
+                .attribute("type", MessageReceiptType.RETRY.protocolValue())
+                .attribute("to", stanza.chatJid())
+                .attribute("participant",
+                        resolveParticipantForReceipt(stanza).orElse(null))
+                .content(retryNode, registrationNode, keysNode);
+        client.sendNodeWithNoResponse(receipt.build());
+    }
+
+    /**
+     * Sends a bot invoke response ack for messages received from bot
+     * senders.
+     *
+     * <p>Bot messages get a special ack instead of a normal delivery receipt.
+     *
+     * @param stanza the parsed incoming stanza
+     *
+     * @apiNote WAWebSendReceiptJobCommon.sendBotInvokeResponseAcks:
+     * sends a bot-specific receipt for bot message delivery.
+     */
+    public void sendBotInvokeResponseAck(MessageReceiveStanza stanza) {
+        var chatJid = stanza.chatJid();
+        Jid to;
+        Jid participant = null;
+
+        if (chatJid.hasGroupOrCommunityServer() || chatJid.hasBroadcastServer()) {
+            to = chatJid;
+            participant = stanza.participant().orElse(null);
+        } else {
+            to = stanza.senderJid();
+        }
+
+        var receipt = new NodeBuilder()
+                .description("receipt")
+                .attribute("id", stanza.id())
+                .attribute("type", "server-error")
+                .attribute("to", to)
+                .attribute("participant", participant);
+        client.sendNodeWithNoResponse(receipt.build());
+    }
+
+    /**
+     * Returns whether the message sender is a bot (requires a bot-specific
+     * receipt rather than a normal delivery receipt).
+     *
+     * @param stanza the parsed incoming stanza
+     * @return {@code true} if the sender is a bot
+     *
+     * @apiNote WAWebHandleMsgSendReceipt: checks
+     * {@code !chat.isBot() && author.isBot()} to route to bot acks.
+     */
+    public boolean isBotSender(MessageReceiveStanza stanza) {
+        return !stanza.chatJid().hasBotServer()
+                && stanza.senderJid().hasBotServer();
+    }
+
+    /**
+     * Sends a negative acknowledgment (NACK) for a message that failed
+     * validation or protobuf parsing.
+     *
+     * @param stanza    the parsed incoming stanza
+     * @param errorCode the error code to include in the NACK
+     *
+     * @apiNote WAWebHandleMsgSendAck.sendNack: sends an ack stanza with
+     * an error attribute and optional meta child with failure_reason.
+     */
+    public void sendNackReceipt(MessageReceiveStanza stanza, int errorCode) {
+        var ack = new NodeBuilder()
+                .description("ack")
+                .attribute("id", stanza.id())
+                .attribute("class", "message")
+                .attribute("to", stanza.chatJid())
+                .attribute("participant",
+                        resolveParticipantForReceipt(stanza).orElse(null))
+                .attribute("type", stanza.stanzaType())
+                .attribute("error", errorCode);
+        client.sendNodeWithNoResponse(ack.build());
+    }
+
+    /**
+     * Sends a plain ack for messages that don't need a full delivery
+     * receipt (e.g. unavailable/fanout placeholders, media notify).
+     *
+     * @param stanza the parsed incoming stanza
+     *
+     * @apiNote WAWebHandleMsgSendAck.sendAck: sends an ack with class,
+     * type, to, and optional participant.
+     */
+    public void sendAck(MessageReceiveStanza stanza) {
+        var ack = new NodeBuilder()
+                .description("ack")
+                .attribute("id", stanza.id())
+                .attribute("class", "message")
+                .attribute("to", stanza.chatJid())
+                .attribute("participant",
+                        resolveParticipantForReceipt(stanza).orElse(null))
+                .attribute("type", stanza.stanzaType());
+        client.sendNodeWithNoResponse(ack.build());
+    }
+
+    /**
+     * Builds a {@code <keys>} node containing the identity key, a one-time
+     * prekey, the signed prekey, and the device-identity for session
+     * re-establishment.
+     *
+     * @return the keys node, or {@code null} if the bundle cannot be built
+     *
+     * @apiNote WAWebSendRetryReceiptJob function h(): builds the key
+     * section with type, identity, prekey, signed prekey, and
+     * device-identity when retryCount &gt;= 2.
+     */
+    private Node buildKeyBundleNode() {
+        try {
+            var preKey = store.hasPreKeys()
+                    ? store.preKeys().getFirst()
+                    : SignalPreKeyPair.random(1);
+            if (!store.hasPreKeys()) {
+                store.addPreKey(preKey);
+            }
+
+            var typeNode = new NodeBuilder()
+                    .description("type")
+                    .content(new byte[]{SignalIdentityPublicKey.type()})
                     .build();
-            children.add(participantNode);
-        }
-
-        var stanza = new NodeBuilder()
-                .description("receipt")
-                .attribute("id", messageId)
-                .attribute("to", chatJid)
-                .attribute("type", MessageReceiptType.RETRY.value())
-                .attribute("t", timestamp)
-                .content(children)
-                .build();
-
-        client.sendNodeWithNoResponse(stanza);
-
-        LOGGER.log(System.Logger.Level.DEBUG, "Sent retry receipt for message {0} with reason {1}",
-                messageId, reason);
-    }
-
-    /**
-     * Sends a retry receipt for a ChatMessageInfo that failed to decrypt.
-     *
-     * @param message    the message info (may have empty message content)
-     * @param reason     the retry reason
-     * @param retryCount the current retry count
-     */
-    public void sendRetryReceipt(ChatMessageInfo message, WhatsAppMessageException.Receive.RetryReason reason, int retryCount) {
-        sendRetryReceipt(message.id(), message.chatJid(), message.senderJid(), reason, retryCount);
-    }
-
-    /**
-     * Sends a nack receipt indicating a parsing or protocol error.
-     * The sender should not retry sending this message.
-     * <p>
-     * Nack receipt structure:
-     * <pre>{@code
-     * <receipt id="{msg_id}" to="{chat_jid}" type="nack" t="{timestamp}">
-     *   <error code="{error_code}"/>
-     * </receipt>
-     * }</pre>
-     *
-     * @param messageId the message ID that failed to parse
-     * @param chatJid   the chat JID
-     * @param senderJid the sender JID (optional, for groups)
-     * @param errorCode the error code (e.g., "400", "500")
-     */
-    public void sendNackReceipt(String messageId, Jid chatJid, Optional<Jid> senderJid, String errorCode) {
-        Objects.requireNonNull(messageId, "messageId cannot be null");
-        Objects.requireNonNull(chatJid, "chatJid cannot be null");
-        Objects.requireNonNull(errorCode, "errorCode cannot be null");
-
-        var timestamp = System.currentTimeMillis() / 1000;
-
-        var errorNode = new NodeBuilder()
-                .description("error")
-                .attribute("code", errorCode)
-                .build();
-
-        var children = new ArrayList<Node>();
-        children.add(errorNode);
-
-        // Add participant node for group messages
-        if (chatJid.hasServer(JidServer.groupOrCommunity()) && senderJid.isPresent()) {
-            var participantNode = new NodeBuilder()
-                    .description("participant")
-                    .attribute("jid", senderJid.get())
+            var identityNode = new NodeBuilder()
+                    .description("identity")
+                    .content(store.identityKeyPair().publicKey().toEncodedPoint())
                     .build();
-            children.add(participantNode);
-        }
 
-        var stanza = new NodeBuilder()
-                .description("receipt")
-                .attribute("id", messageId)
-                .attribute("to", chatJid)
-                .attribute("type", MessageReceiptType.NACK.value())
-                .attribute("t", timestamp)
-                .content(children)
-                .build();
+            var preKeyIdNode = new NodeBuilder()
+                    .description("id")
+                    .content(SecureBytes.intToBytes(preKey.id(), 3))
+                    .build();
+            var preKeyValueNode = new NodeBuilder()
+                    .description("value")
+                    .content(preKey.publicKey().toEncodedPoint())
+                    .build();
+            var preKeyNode = new NodeBuilder()
+                    .description("key")
+                    .content(preKeyIdNode, preKeyValueNode)
+                    .build();
 
-        client.sendNodeWithNoResponse(stanza);
+            var signedKeyPair = store.signedKeyPair();
+            var skeyIdNode = new NodeBuilder()
+                    .description("id")
+                    .content(SecureBytes.intToBytes(signedKeyPair.id(), 3))
+                    .build();
+            var skeyValueNode = new NodeBuilder()
+                    .description("value")
+                    .content(signedKeyPair.publicKey().toEncodedPoint())
+                    .build();
+            var skeySigNode = new NodeBuilder()
+                    .description("signature")
+                    .content(signedKeyPair.signature())
+                    .build();
+            var skeyNode = new NodeBuilder()
+                    .description("skey")
+                    .content(skeyIdNode, skeyValueNode, skeySigNode)
+                    .build();
 
-        LOGGER.log(System.Logger.Level.DEBUG, "Sent nack receipt for message {0} with error code {1}",
-                messageId, errorCode);
-    }
-
-    /**
-     * Sends a nack receipt with default error code "400".
-     *
-     * @param messageId the message ID
-     * @param chatJid   the chat JID
-     * @param senderJid the sender JID (optional, for groups)
-     */
-    public void sendNackReceipt(String messageId, Jid chatJid, Optional<Jid> senderJid) {
-        sendNackReceipt(messageId, chatJid, senderJid, "400");
-    }
-
-    /**
-     * Sends a receipt for a message.
-     */
-    private void sendReceipt(ChatMessageInfo message, MessageReceiptType type) {
-        // Don't send receipts for our own messages
-        if (message.fromMe()) {
-            return;
-        }
-
-        // Check if receipts are enabled
-        if (!shouldSendReceipt(message, type)) {
-            LOGGER.log(System.Logger.Level.DEBUG, "Skipping {0} receipt per privacy settings", type);
-            return;
-        }
-
-        var chatJid = message.chatJid();
-        var senderJid = message.senderJid();
-        var messageId = message.id();
-
-        var stanza = buildReceiptStanza(chatJid, senderJid, List.of(messageId), type);
-        client.sendNodeWithNoResponse(stanza.build());
-
-        LOGGER.log(System.Logger.Level.DEBUG, "Sent {0} receipt for message {1}", type, messageId);
-    }
-
-    /**
-     * Sends batch receipts for multiple messages in the same chat.
-     */
-    private void sendBatchReceipt(Jid chatJid, List<ChatMessageInfo> messages, MessageReceiptType type) {
-        // Get the sender JID (for group messages)
-        var senderJid = messages.getFirst().senderJid();
-
-        // Collect all message IDs
-        var messageIds = messages.stream()
-                .filter(m -> !m.fromMe())
-                .filter(m -> shouldSendReceipt(m, type))
-                .map(ChatMessageInfo::id)
-                .toList();
-
-        if (messageIds.isEmpty()) {
-            return;
-        }
-
-        var stanza = buildReceiptStanza(chatJid, senderJid, messageIds, type);
-        client.sendNodeWithNoResponse(stanza.build());
-
-        LOGGER.log(System.Logger.Level.DEBUG, "Sent batch {0} receipt for {1} messages",
-                type, messageIds.size());
-    }
-
-    /**
-     * Builds a receipt stanza.
-     *
-     * <pre>{@code
-     * <receipt id="{first_msg_id}" to="{chat_jid}" type="{type}" t="{timestamp}">
-     *   <list>
-     *     <item id="{additional_msg_id}"/>
-     *     ...
-     *   </list>
-     *   <participant jid="{sender_jid}"/>  <!-- for groups -->
-     * </receipt>
-     * }</pre>
-     */
-    private NodeBuilder buildReceiptStanza(
-            Jid chatJid,
-            Jid senderJid,
-            List<String> messageIds,
-            MessageReceiptType type
-    ) {
-        var firstMessageId = messageIds.getFirst();
-        var timestamp = System.currentTimeMillis() / 1000;
-
-        var builder = new NodeBuilder()
-                .description("receipt")
-                .attribute("id", firstMessageId)
-                .attribute("to", chatJid)
-                .attribute("t", timestamp);
-
-        // Add type attribute (delivery receipts have no type attribute)
-        if (type != MessageReceiptType.DELIVERY) {
-            builder.attribute("type", type.value());
-        }
-
-        var children = new ArrayList<Node>();
-
-        // Add list node for additional message IDs
-        if (messageIds.size() > 1) {
-            var itemNodes = messageIds.subList(1, messageIds.size()).stream()
+            var deviceIdentityNode = store.signedDeviceIdentity()
                     .map(id -> new NodeBuilder()
-                            .description("item")
-                            .attribute("id", id)
+                            .description("device-identity")
+                            .content(SignedDeviceIdentitySpec.encode(id))
                             .build())
-                    .toList();
+                    .orElse(null);
 
-            var listNode = new NodeBuilder()
-                    .description("list")
-                    .content(itemNodes)
+            return new NodeBuilder()
+                    .description("keys")
+                    .content(typeNode, identityNode, preKeyNode, skeyNode, deviceIdentityNode)
                     .build();
-            children.add(listNode);
+        } catch (Exception e) {
+            LOGGER.log(System.Logger.Level.WARNING,
+                    "Failed to build key bundle for retry receipt: {0}", e.getMessage());
+            return null;
         }
-
-        // Add participant node for group messages
-        if (chatJid.hasServer(JidServer.groupOrCommunity()) && senderJid != null) {
-            var participantNode = new NodeBuilder()
-                    .description("participant")
-                    .attribute("jid", senderJid)
-                    .build();
-            children.add(participantNode);
-        }
-
-        if (!children.isEmpty()) {
-            builder.content(children);
-        }
-
-        return builder;
     }
 
     /**
-     * Determines if a receipt should be sent based on privacy settings.
+     * Determines the delivery receipt type based on the message context.
+     *
+     * @apiNote WAWebSendDeliveryReceiptJob: isPeer → PEER_MSG,
+     * isSender (from self) → SENDER, active → DELIVERY,
+     * inactive → INACTIVE.
      */
-    private boolean shouldSendReceipt(ChatMessageInfo message, MessageReceiptType type) {
-        // Delivery receipts are always sent
-        if (type == MessageReceiptType.DELIVERY) {
-            return true;
+    private MessageReceiptType resolveDeliveryReceiptType(
+            MessageReceiveStanza stanza,
+            MessageInfo info
+    ) {
+        if (stanza.isPeer()) {
+            return MessageReceiptType.PEER;
         }
 
-        // Group messages: check group settings
-        if (message.chatJid().hasGroupOrCommunityServer()) {
-            // Groups always show read receipts
-            return true;
+        var selfJid = store.jid().orElse(null);
+        if (selfJid != null && info instanceof ChatMessageInfo chatInfo) {
+            var senderUser = stanza.senderJid().toUserJid();
+            if (senderUser.equals(selfJid.toUserJid())) {
+                return MessageReceiptType.SENDER;
+            }
         }
 
-        // Private chats: respect privacy settings
-        // Default to true if no settings available
-        return client.store()
-                .privacySettings()
-                .stream()
-                .noneMatch(entry -> entry.type() == PrivacySettingType.READ_RECEIPTS && entry.value() != PrivacySettingValue.EVERYONE);
+        return MessageReceiptType.DELIVERY;
+    }
+
+    /**
+     * Resolves the participant attribute for receipt stanzas.
+     *
+     * <p>For group, broadcast, and status messages the participant is
+     * the sender's device JID.  For 1:1 chat messages there is no
+     * participant.
+     *
+     * @apiNote WAWebSendDeliveryReceiptJob: participant is set for
+     * group/broadcast messages, null for 1:1 chats.
+     */
+    private Optional<Jid> resolveParticipantForReceipt(MessageReceiveStanza stanza) {
+        var chatJid = stanza.chatJid();
+        if (chatJid.hasGroupOrCommunityServer() || chatJid.hasBroadcastServer()) {
+            return stanza.participant();
+        }
+        return Optional.empty();
     }
 }

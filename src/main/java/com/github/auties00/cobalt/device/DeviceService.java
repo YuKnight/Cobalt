@@ -294,7 +294,7 @@ public final class DeviceService {
      * @apiNote WAWebAdvSyncDeviceListApi.syncAndGetDeviceList: if local phash matches
      * expectedPhash (l===d), the function returns early without sending USync request.
      */
-    public Collection<DeviceList> getDeviceLists(Collection<Jid> userJids, String context, String expectedPhash, boolean shouldMergeAltDevices) {
+    public Set<DeviceList> getDeviceLists(Collection<Jid> userJids, String context, String expectedPhash, boolean shouldMergeAltDevices) {
         // WAWebAdvSyncDeviceListApi.syncDeviceList: if phash is provided (l!=null), check local match
         if (expectedPhash != null && !expectedPhash.isEmpty()) {
             // WAWebApiDeviceList.getDeviceIds: get cached device lists for all requested JIDs
@@ -327,7 +327,7 @@ public final class DeviceService {
         }
 
         // WAWebAdvSyncDeviceListApi.syncDeviceList: normal sync path
-        var result = new ArrayList<DeviceList>();
+        var result = new HashSet<DeviceList>();
         var missingJids = new ArrayList<Jid>();
 
         // WAWebApiDeviceList.getDeviceIds: check local cache first before querying server
@@ -380,7 +380,7 @@ public final class DeviceService {
      * @apiNote WAWebLidMigrationUtils: during migration, both PN and LID may have device records.
      * The PN identity is preferred as the canonical representation.
      */
-    private Collection<DeviceList> mergeAlternateDeviceLists(Collection<DeviceList> deviceLists) {
+    private Set<DeviceList> mergeAlternateDeviceLists(Collection<DeviceList> deviceLists) {
         var mergedMap = new LinkedHashMap<Jid, DeviceList>();
 
         for (var deviceList : deviceLists) {
@@ -400,7 +400,7 @@ public final class DeviceService {
             mergedMap.merge(canonicalJid, deviceList, DeviceList::merge);
         }
 
-        return Collections.unmodifiableCollection(mergedMap.values());
+        return Set.copyOf(mergedMap.values());
     }
 
     /**

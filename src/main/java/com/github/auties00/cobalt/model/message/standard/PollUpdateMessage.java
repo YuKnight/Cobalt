@@ -1,27 +1,35 @@
 package com.github.auties00.cobalt.model.message.standard;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.message.addon.MessageAddonEncryption;
+import com.github.auties00.cobalt.message.addon.MessageAddonType;
 import com.github.auties00.cobalt.model.info.ChatMessageInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.common.ChatMessageKey;
 import com.github.auties00.cobalt.model.message.common.EncryptedMessage;
 import com.github.auties00.cobalt.model.message.common.Message;
-import com.github.auties00.cobalt.model.poll.PollOption;
-import com.github.auties00.cobalt.model.poll.PollUpdateEncryptedMetadata;
-import com.github.auties00.cobalt.model.poll.PollUpdateMessageMetadata;
+import com.github.auties00.cobalt.model.poll.*;
 import com.github.auties00.cobalt.util.Clock;
 import it.auties.protobuf.annotation.ProtobufBuilder;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.ZonedDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
 /**
- * A model class that represents a message holding a vote for a poll inside
+ * A model class that represents a message holding a vote for a poll inside.
+ * <p>
+ * Use {@link PollUpdateMessageSimpleBuilder} to create outgoing poll votes.
+ * It encrypts the selected options automatically.
+ *
+ * @apiNote WAWebPollVoteEncryptMsgData.encryptPollVoteMsgData: encrypts
+ * vote options as PollVoteMessage protobuf, then wraps in PollEncValue.
  */
 @ProtobufMessage(name = "Message.PollUpdateMessage")
 public final class PollUpdateMessage implements Message, EncryptedMessage {
@@ -37,45 +45,94 @@ public final class PollUpdateMessage implements Message, EncryptedMessage {
     @ProtobufProperty(index = 4, type = ProtobufType.INT64)
     final long senderTimestampMilliseconds;
 
-    @ProtobufProperty(index = 999, type = ProtobufType.STRING)
-    Jid voter;
+    /**
+     * Plaintext vote option names, retained for newsletter poll votes
+     * where the SMAX stanza sends option names as {@code <vote>} children
+     * instead of encrypted hashes.
+     *
+     * <p>This field is local-only and not serialized on the wire.
+     *
+     * @apiNote WASmaxOutMessagePublishNewsletterPollVoteMixin: sends
+     * plaintext option names, not the encrypted PollEncValue.
+     */
+    List<String> voteOptionNames;
 
-    @ProtobufProperty(index = 1000, type = ProtobufType.MESSAGE)
-    PollCreationMessage pollCreationMessage;
-
-    @ProtobufProperty(index = 1001, type = ProtobufType.MESSAGE)
-    List<PollOption> votes;
-
-    PollUpdateMessage(ChatMessageKey pollCreationMessageKey, PollUpdateEncryptedMetadata encryptedMetadata, PollUpdateMessageMetadata metadata, long senderTimestampMilliseconds, Jid voter, PollCreationMessage pollCreationMessage, List<PollOption> votes) {
+    PollUpdateMessage(ChatMessageKey pollCreationMessageKey, PollUpdateEncryptedMetadata encryptedMetadata, PollUpdateMessageMetadata metadata, long senderTimestampMilliseconds) {
         this.pollCreationMessageKey = pollCreationMessageKey;
         this.encryptedMetadata = encryptedMetadata;
         this.metadata = metadata;
         this.senderTimestampMilliseconds = senderTimestampMilliseconds;
-        this.voter = voter;
-        this.pollCreationMessage = pollCreationMessage;
-        this.votes = votes;
     }
 
     /**
-     * Constructs a new builder to create a PollCreationMessage The newsletters can be later sent using
-     * {@link WhatsAppClient#sendChatMessage(ChatMessageInfo)}
+     * Constructs a new poll vote message with encrypted vote data.
      *
-     * @param poll  the non-null poll where the vote should be cast
-     * @param votes the votes to cast: this list will override previous votes, so it can be empty or null if you want to revoke all votes
-     * @return a non-null new message
+     * <p>The selected options are SHA-256 hashed, serialized as a
+     * {@code PollVoteMessage} protobuf, and AES-GCM encrypted using the
+     * parent poll's messageSecret.
+     *
+     * @param poll       the parent poll creation message (must contain messageSecret)
+     * @param votes      the options to vote for (empty list to revoke all votes)
+     * @param selfJid    the sender's user JID (used for HKDF info and AAD)
+     * @return the encrypted poll update message
+     * @throws IllegalArgumentException if poll is not a POLL_CREATION type or has no messageSecret
+     *
+     * @apiNote WAWebPollVoteEncryptMsgData: hashes option names with SHA-256,
+     * encodes as PollVoteMessage, encrypts via WAWebAddonEncryption.encryptAddOn.
      */
     @ProtobufBuilder(className = "PollUpdateMessageSimpleBuilder")
-    static PollUpdateMessage simpleBuilder(ChatMessageInfo poll, List<PollOption> votes) {
+    static PollUpdateMessage simpleBuilder(ChatMessageInfo poll, List<PollOption> votes, Jid selfJid) {
         if (poll.message().type() != Type.POLL_CREATION) {
             throw new IllegalArgumentException("Expected a poll, got %s".formatted(poll.message().type()));
         }
-        var result = new PollUpdateMessageBuilder()
-                .pollCreationMessageKey(poll.key())
-                .senderTimestampMilliseconds(Clock.nowMilliseconds())
+
+        var parentSecret = poll.messageSecret()
+                .orElseThrow(() -> new IllegalArgumentException("Parent poll has no messageSecret"));
+        var parentKey = poll.key();
+        var originalSender = parentKey.senderJid()
+                .orElse(parentKey.fromMe() ? selfJid : parentKey.chatJid())
+                .toUserJid();
+
+        // WAWebPollsProtobufConversion: SHA-256 hash each selected option name
+        var selectedHashes = votes.stream()
+                .map(option -> sha256(option.name().getBytes(StandardCharsets.UTF_8)))
+                .toList();
+
+        // WAWebPollVoteEncryptMsgData: encode as PollVoteMessage protobuf
+        var voteMessage = new PollUpdateEncryptedOptionsBuilder()
+                .selectedOptions(selectedHashes)
                 .build();
-        result.setPollCreationMessage((PollCreationMessage) poll.message().content());
-        result.setVotes(votes);
+        var plaintext = PollUpdateEncryptedOptionsSpec.encode(voteMessage);
+
+        // WAWebAddonEncryption.encryptAddOn: dual encrypt with parent's messageSecret
+        var encrypted = MessageAddonEncryption.encrypt(
+                plaintext, parentSecret, parentKey.id(),
+                originalSender, selfJid.toUserJid(),
+                MessageAddonType.POLL_VOTE);
+
+        var metadata = new PollUpdateEncryptedMetadataBuilder()
+                .payload(encrypted.ciphertext())
+                .iv(encrypted.iv())
+                .build();
+        var result = new PollUpdateMessageBuilder()
+                .pollCreationMessageKey(parentKey)
+                .senderTimestampMilliseconds(Clock.nowMilliseconds())
+                .encryptedMetadata(metadata)
+                .build();
+        result.voteOptionNames = votes.stream().map(PollOption::name).toList();
         return result;
+    }
+
+    private static byte[] sha256(byte[] input) {
+        try {
+            return MessageDigest.getInstance("SHA-256").digest(input);
+        } catch (NoSuchAlgorithmException e) {
+            throw new UnsupportedOperationException("SHA-256 not available", e);
+        }
+    }
+
+    public ChatMessageKey pollCreationMessageKey() {
+        return pollCreationMessageKey;
     }
 
     public Optional<PollUpdateEncryptedMetadata> encryptedMetadata() {
@@ -84,34 +141,6 @@ public final class PollUpdateMessage implements Message, EncryptedMessage {
 
     public void setEncryptedMetadata(PollUpdateEncryptedMetadata encryptedMetadata) {
         this.encryptedMetadata = encryptedMetadata;
-    }
-
-    public Optional<Jid> voter() {
-        return Optional.ofNullable(voter);
-    }
-
-    public void setVoter(Jid voter) {
-        this.voter = voter;
-    }
-
-    public ChatMessageKey pollCreationMessageKey() {
-        return pollCreationMessageKey;
-    }
-
-    public Optional<PollCreationMessage> pollCreationMessage() {
-        return Optional.ofNullable(pollCreationMessage);
-    }
-
-    public void setPollCreationMessage(PollCreationMessage pollCreationMessage) {
-        this.pollCreationMessage = pollCreationMessage;
-    }
-
-    public List<PollOption> votes() {
-        return Collections.unmodifiableList(votes);
-    }
-
-    public void setVotes(List<PollOption> votes) {
-        this.votes = votes;
     }
 
     public Optional<PollUpdateMessageMetadata> metadata() {
@@ -126,9 +155,17 @@ public final class PollUpdateMessage implements Message, EncryptedMessage {
         return Clock.parseSeconds(senderTimestampMilliseconds);
     }
 
-
-    public String secretName() {
-        return "Poll Vote";
+    /**
+     * Returns the plaintext vote option names, if available.
+     *
+     * <p>Only populated when created via {@link PollUpdateMessageSimpleBuilder}.
+     * Used by the newsletter send path which sends option names as
+     * plaintext {@code <vote>} nodes.
+     *
+     * @return unmodifiable list of option names, or empty list
+     */
+    public List<String> voteOptionNames() {
+        return voteOptionNames != null ? Collections.unmodifiableList(voteOptionNames) : List.of();
     }
 
     @Override

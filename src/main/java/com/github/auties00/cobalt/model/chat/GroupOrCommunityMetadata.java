@@ -66,6 +66,16 @@ public final class GroupOrCommunityMetadata {
     @ProtobufProperty(index = 18, type = ProtobufType.BOOL)
     final boolean defaultSubgroup;
 
+    /**
+     * Whether this group has the open Meta AI bot enabled.
+     *
+     * @apiNote WAWebDBGroupsGroupMetadata: {@code isOpenBotGroup} field.
+     * WAWebMexFetchGroupInfoIncludBotsJob: populated from group query
+     * response when bot participants are present.
+     * WAWebBotGroupGatingUtils.isOpenGroupBotSendEnabled: AB prop gate.
+     */
+    boolean isOpenBotGroup;
+
     GroupOrCommunityMetadata(Jid jid, String subject, Jid subjectAuthorJid, long subjectTimestampSeconds, long foundationTimestampSeconds, Jid founderJid, String description, String descriptionId, Map<Integer, ChatSettingPolicy> settings, SequencedSet<ChatParticipant> participants, long ephemeralExpirationSeconds, Jid parentCommunityJid, boolean isCommunity, SequencedSet<CommunityLinkedGroup> communityGroups, boolean isLidAddressingMode, boolean isIncognito, boolean defaultSubgroup) {
         this.jid = Objects.requireNonNull(jid, "value cannot be null");
         this.subject = Objects.requireNonNull(subject, "subject cannot be null");
@@ -260,6 +270,14 @@ public final class GroupOrCommunityMetadata {
 
     public boolean isDefaultSubgroup() {
         return defaultSubgroup;
+    }
+
+    public boolean isOpenBotGroup() {
+        return isOpenBotGroup;
+    }
+
+    public void setOpenBotGroup(boolean openBotGroup) {
+        this.isOpenBotGroup = openBotGroup;
     }
 
     @Override

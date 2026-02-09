@@ -91,8 +91,9 @@ public final class DeviceADVValidator {
      *
      * @apiNote WAWebBizCoexGatingUtils.bizHostedDevicesEnabled: returns getABPropConfigValue("adv_accept_hosted_devices")
      */
-    public boolean bizHostedDevicesEnabled() {
-        return abProps.getBool(ABProp.ADV_ACCEPT_HOSTED_DEVICES_AB_PROP_CODE)
+    public boolean isBizHostedDevicesEnabled() {
+        // Don't wait for sync
+        return abProps.getBool(ABProp.ADV_ACCEPT_HOSTED_DEVICES_AB_PROP_CODE, false)
                 .orElse(false);
     }
 
@@ -170,7 +171,7 @@ public final class DeviceADVValidator {
             // WAWebAdvSignatureApi (function A): select account signature header based on deviceType
             // from the INNER ADVDeviceIdentitySpec, gated by bizHostedDevicesEnabled
             var accountSignatureHeader = E2EE_ACCOUNT_SIGNATURE_HEADER;
-            if (bizHostedDevicesEnabled()) {
+            if (isBizHostedDevicesEnabled()) {
                 try {
                     var innerDeviceIdentity = DeviceIdentitySpec.decode(deviceIdentity.details());
                     if (innerDeviceIdentity.deviceType() == ADVEncryptionType.HOSTED) {
@@ -263,7 +264,7 @@ public final class DeviceADVValidator {
         // WAWebAdvSignatureApi (function A): select account signature header based on deviceType from protobuf
         // Only check deviceType if bizHostedDevicesEnabled
         var accountSignatureHeader = E2EE_ACCOUNT_SIGNATURE_HEADER;
-        if (bizHostedDevicesEnabled()) {
+        if (isBizHostedDevicesEnabled()) {
             try {
                 var decodedDeviceIdentity = DeviceIdentitySpec.decode(remoteIdentityDetails);
                 if (decodedDeviceIdentity.deviceType() == ADVEncryptionType.HOSTED) {
@@ -277,7 +278,7 @@ public final class DeviceADVValidator {
         // WAWebAdvSignatureApi (function B via q): select device signature header based on isHosted from WID
         // Also gated by bizHostedDevicesEnabled
         var deviceSignatureHeader = E2EE_DEVICE_SIGNATURE_HEADER;
-        if (bizHostedDevicesEnabled() && isHostedFromJid) {
+        if (isBizHostedDevicesEnabled() && isHostedFromJid) {
             deviceSignatureHeader = HOSTED_DEVICE_SIGNATURE_HEADER;
         }
 
@@ -293,7 +294,7 @@ public final class DeviceADVValidator {
 
         // WAWebAdvSignatureApi (function F): for bizHostedDevicesEnabled, also check if empty
         // (r && r.byteLength > 0 ? r : t) - fallback to stored if empty
-        if (bizHostedDevicesEnabled()) {
+        if (isBizHostedDevicesEnabled()) {
             if (remoteIdentityAccountSignatureKey != null && remoteIdentityAccountSignatureKey.length == 0) {
                 remoteIdentityAccountSignatureKey = storedUserIdentityKey.orElse(null);
             }
@@ -397,7 +398,7 @@ public final class DeviceADVValidator {
             return Optional.empty();
         }
         var address = new SignalProtocolAddress(deviceJid.user(), deviceJid.device());
-        return store.findIdentity(address)
+        return store.findIdentityByAddress(address)
                 .map(SignalIdentityKey::toEncodedPoint);
     }
 
@@ -415,7 +416,7 @@ public final class DeviceADVValidator {
             return Optional.empty();
         }
         var address = new SignalProtocolAddress(jid.user(), 0);
-        return store.findIdentity(address)
+        return store.findIdentityByAddress(address)
                 .map(SignalIdentityKey::toEncodedPoint);
     }
 

@@ -1,12 +1,13 @@
 package com.github.auties00.cobalt.message.send.stanza;
 
-import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
-import com.github.auties00.cobalt.message.send.crypto.MessageEncryptedPayload;
 import com.github.auties00.cobalt.message.send.bot.BotMessageSecret;
 import com.github.auties00.cobalt.message.send.bot.BotProtobufTransform;
+import com.github.auties00.cobalt.message.send.crypto.MessageEncryptedPayload;
+import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
 import com.github.auties00.cobalt.model.info.ChatMessageInfo;
 import com.github.auties00.cobalt.model.info.DeviceContextInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.model.message.common.ChatMessageKey;
 import com.github.auties00.cobalt.model.message.common.MessageContainerSpec;
 import com.github.auties00.cobalt.model.message.server.ProtocolMessage;
 import com.github.auties00.cobalt.node.Node;
@@ -123,6 +124,105 @@ public final class BotStanza {
     }
 
     /**
+     * Builds the metadata-only {@code <bot>} node that carries bot
+     * invocation type, business bot classification, and AI thread ID.
+     *
+     * <p>This node is separate from the encrypted bot body built by
+     * {@link #build(ChatMessageInfo, Jid)}.  It carries stanza-level
+     * metadata that the server uses for routing and analytics.
+     *
+     * @param botMsgBodyType the bot message body type: {@code "prompt"},
+     *                       {@code "command"}, {@code "request_welcome"},
+     *                       or {@code null} if not a bot message
+     * @param bizBotType the business bot type: {@code "1p_partial"},
+     *                   {@code "3p_full"}, or {@code null}
+     * @param clientThreadId the AI thread ID, or {@code null}
+     * @return the bot metadata node, or {@code null} if no metadata applies
+     *
+     * @apiNote WAWebSendMsgCreateFanoutStanza: builds {@code oe} node with
+     * type (prompt/command/request_welcome), local_automated_type
+     * (1p_partial/3p_full), client_thread_id from AI thread.
+     */
+    public static Node buildMetadata(
+            String botMsgBodyType,
+            String bizBotType,
+            String clientThreadId
+    ) {
+        if (botMsgBodyType == null && bizBotType == null && clientThreadId == null) {
+            return null;
+        }
+
+        return new NodeBuilder()
+                .description("bot")
+                .attribute("type", botMsgBodyType)
+                .attribute("local_automated_type", bizBotType)
+                .attribute("client_thread_id", clientThreadId)
+                .build();
+    }
+
+    /**
+     * Builds the encrypted bot node for group messages when the group
+     * has an open Meta AI bot.
+     *
+     * @param messageInfo    the outgoing message
+     * @param isOpenBotGroup whether the group has the open bot enabled
+     * @return the bot node, or {@code null} if not applicable
+     *
+     * @apiNote WAWebSendGroupSkmsgJob function L: resolves bot JID
+     * to META_BOT_FBID_WID when isOpenBotGroup, encrypts to bot device.
+     */
+    public Node buildForGroup(ChatMessageInfo messageInfo, boolean isOpenBotGroup) {
+        if (!isOpenBotGroup) {
+            return null;
+        }
+
+        var botJid = Jid.metaAiBotAccount();
+        var container = messageInfo.message();
+
+        var messageSecret = container.deviceInfo()
+                .flatMap(DeviceContextInfo::messageSecret)
+                .orElse(null);
+        byte[] botSecret = null;
+        if (messageSecret != null) {
+            try {
+                botSecret = BotMessageSecret.derive(messageSecret);
+            } catch (GeneralSecurityException e) {
+                LOGGER.log(System.Logger.Level.WARNING,
+                        "Failed to derive bot message secret for open group bot: {0}", e.getMessage());
+            }
+        }
+
+        protobufTransform.transformForCapi(container, botSecret);
+        protobufTransform.transformForBot(container);
+
+        var plaintext = MessageContainerSpec.encode(container);
+        MessageEncryptedPayload payload;
+        try {
+            payload = encryption.encryptForDevice(botJid, plaintext);
+        } catch (Exception e) {
+            LOGGER.log(System.Logger.Level.WARNING,
+                    "Open group bot encryption failed: {0}", e.getMessage());
+            return null;
+        }
+
+        var encNode = new NodeBuilder()
+                .description("enc")
+                .attribute("v", String.valueOf(MessageEncryption.CIPHERTEXT_VERSION))
+                .attribute("type", payload.type().protocolValue())
+                .content(payload.ciphertext())
+                .build();
+        var toNode = new NodeBuilder()
+                .description("to")
+                .attribute("jid", botJid)
+                .content(encNode)
+                .build();
+        return new NodeBuilder()
+                .description("bot")
+                .content(toNode)
+                .build();
+    }
+
+    /**
      * Resolves the bot JID from the message and chat context.
      *
      * @return the bot device JID, or {@code null} if no bot is involved
@@ -140,7 +240,7 @@ public final class BotStanza {
         if (isBotFeedback(messageInfo)
                 && messageInfo.message().content() instanceof ProtocolMessage pm) {
             return pm.key()
-                    .flatMap(key -> key.senderJid())
+                    .flatMap(ChatMessageKey::senderJid)
                     .filter(Jid::hasBotServer)
                     .orElse(null);
         }

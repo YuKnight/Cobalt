@@ -1,11 +1,7 @@
 
 package com.github.auties00.cobalt.store;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClientListener;
-import com.github.auties00.cobalt.client.WhatsAppClientOfflineResumeState;
-import com.github.auties00.cobalt.client.WhatsAppClientType;
-import com.github.auties00.cobalt.client.WhatsAppWebClientHistory;
+import com.github.auties00.cobalt.client.*;
 import com.github.auties00.cobalt.client.info.WhatsAppClientInfo;
 import com.github.auties00.cobalt.model.device.DeviceList;
 import com.github.auties00.cobalt.model.device.MissingDeviceSyncKey;
@@ -164,16 +160,6 @@ public final class WhatsAppStore implements SignalProtocolStore {
     // =====================================================
     // SECTION: Network & Connection Configuration
     // =====================================================
-
-    /**
-     * HTTP proxy URI for routing network traffic.
-     * <p>
-     * When configured, all network connections are routed through this proxy server.
-     * Format: {@code http://host:port} or {@code https://host:port}
-     * May include authentication: {@code http://username:password@host:port}
-     */
-    @ProtobufProperty(index = 5, type = ProtobufType.STRING)
-    URI proxy;
 
     /**
      * Device information identifying this client to WhatsApp servers.
@@ -838,7 +824,7 @@ public final class WhatsAppStore implements SignalProtocolStore {
 
     /**
      * Transient per-identity encryption range for retry detection.
-     * Not serialized — only relevant for in-flight retries.
+     * Not serialized - only relevant for in-flight retries.
      *
      * <p>Key: SignalProtocolAddress (device).
      * Value: the earliest send sequence at which this identity was used.
@@ -913,6 +899,15 @@ public final class WhatsAppStore implements SignalProtocolStore {
     // =====================================================
     // SECTION: Runtime State (Non-Serialized)
     // =====================================================
+
+    /**
+     * HTTP proxy URI for routing network traffic.
+     * <p>
+     * When configured, all network connections are routed through this proxy server.
+     * Format: {@code http://host:port} or {@code https://host:port}
+     * May include authentication: {@code http://username:password@host:port}
+     */
+    private WhatsAppClientProxy proxy;
 
     /**
      * Serializer responsible for persisting this store to storage.
@@ -1126,7 +1121,6 @@ public final class WhatsAppStore implements SignalProtocolStore {
             Long phoneNumber,
             WhatsAppClientType clientType,
             long initializationTimeStamp,
-            URI proxy,
             JidCompanion device,
             ReleaseChannel releaseChannel,
             boolean online,
@@ -1195,7 +1189,6 @@ public final class WhatsAppStore implements SignalProtocolStore {
         this.uuid = Objects.requireNonNull(uuid, "uuid cannot be null");
         this.phoneNumber = phoneNumber; 
         this.clientType = Objects.requireNonNull(clientType, "clientType cannot be null");
-        this.proxy = proxy; 
         this.online = online;
         this.locale = locale; 
         this.name = name; 
@@ -1855,7 +1848,7 @@ public final class WhatsAppStore implements SignalProtocolStore {
      *
      * @return Optional containing the proxy URI, empty if not configured
      */
-    public Optional<URI> proxy() {
+    public Optional<WhatsAppClientProxy> proxy() {
         return Optional.ofNullable(proxy);
     }
 
@@ -1865,7 +1858,7 @@ public final class WhatsAppStore implements SignalProtocolStore {
      * @param proxy the proxy URI, may be null to disable proxy
      * @return this store instance for method chaining
      */
-    public WhatsAppStore setProxy(URI proxy) {
+    public WhatsAppStore setProxy(WhatsAppClientProxy proxy) {
         this.proxy = proxy;
         return this;
     }
@@ -3592,7 +3585,7 @@ public final class WhatsAppStore implements SignalProtocolStore {
      * @param address the signal address for the user
      * @return Optional containing the identity key if found
      */
-    public Optional<SignalIdentityPublicKey> findIdentity(SignalProtocolAddress address) {
+    public Optional<SignalIdentityPublicKey> findIdentityByAddress(SignalProtocolAddress address) {
         if (address == null) {
             return Optional.empty();
         } else {
@@ -4109,10 +4102,10 @@ public final class WhatsAppStore implements SignalProtocolStore {
      * @param userJid the user JID
      * @return list of device JIDs
      */
-    public List<Jid> findDeviceJids(Jid userJid) {
+    public Set<Jid> findDeviceJids(Jid userJid) {
         return findDeviceList(userJid)
                 .map(DeviceList::deviceJids)
-                .orElse(List.of());
+                .orElse(Set.of());
     }
 
     /**

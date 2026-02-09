@@ -1,8 +1,12 @@
 package com.github.auties00.cobalt.model.message.standard;
 
+import com.github.auties00.cobalt.message.addon.MessageAddonEncryption;
+import com.github.auties00.cobalt.message.addon.MessageAddonType;
+import com.github.auties00.cobalt.model.info.ChatMessageInfo;
+import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.common.ChatMessageKey;
 import com.github.auties00.cobalt.model.message.common.EncryptedMessage;
-import com.github.auties00.cobalt.model.message.common.ServerMessage;
+import it.auties.protobuf.annotation.ProtobufBuilder;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
@@ -10,8 +14,19 @@ import it.auties.protobuf.model.ProtobufType;
 import java.util.Arrays;
 import java.util.Objects;
 
+/**
+ * An encrypted reaction message used in CAG (Community Announcement Group)
+ * contexts where reactions must be dual-encrypted.
+ * <p>
+ * Use {@link EncryptedReactionMessageSimpleBuilder} to create outgoing encrypted reactions.
+ * It encrypts the reactions automatically.
+ *
+ * @apiNote WAWebReactionEncryptMsgData.encryptReactionMsgData: encrypts
+ * reaction data as ReactionMessage protobuf, then wraps as
+ * EncReactionMessage with encPayload and encIv.
+ */
 @ProtobufMessage(name = "Message.EncReactionMessage")
-public final class EncryptedReactionMessage implements ServerMessage, EncryptedMessage {
+public final class EncryptedReactionMessage implements EncryptedMessage {
     @ProtobufProperty(index = 1, type = ProtobufType.MESSAGE)
     final ChatMessageKey targetMessageKey;
 
@@ -27,6 +42,49 @@ public final class EncryptedReactionMessage implements ServerMessage, EncryptedM
         this.encIv = Objects.requireNonNull(encIv, "encIv cannot be null");
     }
 
+    /**
+     * Constructs an encrypted reaction message from a plaintext
+     * {@link ReactionMessage}, encrypting it with the parent message's
+     * messageSecret.
+     *
+     * @param reaction      the plaintext reaction message
+     * @param parentMessage the parent message being reacted to (must contain messageSecret)
+     * @param selfJid       the sender's user JID
+     * @return the encrypted reaction message
+     * @throws IllegalArgumentException if the parent message has no messageSecret
+     *
+     * @apiNote WAWebReactionEncryptMsgData: encodes ReactionMessage protobuf,
+     * encrypts via WAWebAddonEncryption.encryptAddOn with ENC_REACTION use case.
+     */
+    @ProtobufBuilder(className = "EncryptedReactionMessageSimpleBuilder")
+    static EncryptedReactionMessage simpleBuilder(ReactionMessage reaction, ChatMessageInfo parentMessage, Jid selfJid) {
+        Objects.requireNonNull(reaction, "reaction cannot be null");
+        Objects.requireNonNull(parentMessage, "parentMessage cannot be null");
+        Objects.requireNonNull(selfJid, "selfJid cannot be null");
+
+        var parentSecret = parentMessage.messageSecret()
+                .orElseThrow(() -> new IllegalArgumentException("Parent message has no messageSecret"));
+        var parentKey = parentMessage.key();
+        var originalSender = parentKey.senderJid()
+                .orElse(parentKey.fromMe() ? selfJid : parentKey.chatJid())
+                .toUserJid();
+
+        // WAWebReactionEncryptMsgData: encode the plaintext reaction as protobuf
+        var plaintext = ReactionMessageSpec.encode(reaction);
+
+        // WAWebAddonEncryption.encryptAddOn: encrypt with ENC_REACTION use case
+        var encrypted = MessageAddonEncryption.encrypt(
+                plaintext, parentSecret, parentKey.id(),
+                originalSender, selfJid.toUserJid(),
+                MessageAddonType.ENC_REACTION);
+
+        return new EncryptedReactionMessageBuilder()
+                .targetMessageKey(reaction.key())
+                .encPayload(encrypted.ciphertext())
+                .encIv(encrypted.iv())
+                .build();
+    }
+
     public ChatMessageKey targetMessageKey() {
         return targetMessageKey;
     }
@@ -37,10 +95,6 @@ public final class EncryptedReactionMessage implements ServerMessage, EncryptedM
 
     public byte[] encIv() {
         return encIv;
-    }
-
-    public String secretName() {
-        return "Enc Reaction";
     }
 
     @Override

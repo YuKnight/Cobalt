@@ -111,7 +111,7 @@ public final class IcdcComputer {
             var includedKeyIndexes = new ArrayList<Integer>();
             for (var device : remoteDevices) {
                 var deviceJid = device.toDeviceJid(userJid.user(), userJid.server());
-                var identityKey = store.findIdentity(deviceJid.toSignalAddress()).orElse(null);
+                var identityKey = store.findIdentityByAddress(deviceJid.toSignalAddress()).orElse(null);
                 if (identityKey != null) {
                     identityKeys.add(identityKey.toEncodedPoint());
                     includedKeyIndexes.add(device.keyIndex());

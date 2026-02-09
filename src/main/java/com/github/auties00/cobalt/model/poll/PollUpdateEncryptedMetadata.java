@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.model.poll;
 
+import com.github.auties00.cobalt.model.message.standard.PollUpdateMessage;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
@@ -9,7 +10,7 @@ import java.util.Objects;
 
 /**
  * A model class that represents the cypher data to decode a
- * {@link it.auties.whatsapp.model.message.standard.PollUpdateMessage}
+ * {@link PollUpdateMessage}
  */
 @ProtobufMessage(name = "PollEncValue")
 public final class PollUpdateEncryptedMetadata {

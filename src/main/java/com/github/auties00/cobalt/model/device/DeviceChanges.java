@@ -5,8 +5,9 @@ import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
 
-import java.util.List;
+import java.util.Collections;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Report of changes between two device lists.
@@ -15,15 +16,15 @@ import java.util.Objects;
 @ProtobufMessage
 public final class DeviceChanges {
     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
-    final List<Jid> addedDevices;
+    final Set<Jid> addedDevices;
 
     @ProtobufProperty(index = 2, type = ProtobufType.STRING)
-    final List<Jid> removedDevices;
+    final Set<Jid> removedDevices;
 
     @ProtobufProperty(index = 3, type = ProtobufType.STRING)
-    final List<Jid> identityChangedDevices;
+    final Set<Jid> identityChangedDevices;
 
-    DeviceChanges(List<Jid> addedDevices, List<Jid> removedDevices, List<Jid> identityChangedDevices) {
+    DeviceChanges(Set<Jid> addedDevices, Set<Jid> removedDevices, Set<Jid> identityChangedDevices) {
         this.addedDevices = addedDevices;
         this.removedDevices = removedDevices;
         this.identityChangedDevices = identityChangedDevices;
@@ -37,16 +38,16 @@ public final class DeviceChanges {
         return !identityChangedDevices.isEmpty();
     }
 
-    public List<Jid> addedDevices() {
-        return addedDevices;
+    public Set<Jid> addedDevices() {
+        return Collections.unmodifiableSet(addedDevices);
     }
 
-    public List<Jid> removedDevices() {
-        return removedDevices;
+    public Set<Jid> removedDevices() {
+        return Collections.unmodifiableSet(removedDevices);
     }
 
-    public List<Jid> identityChangedDevices() {
-        return identityChangedDevices;
+    public Set<Jid> identityChangedDevices() {
+        return Collections.unmodifiableSet(identityChangedDevices);
     }
 
     @Override

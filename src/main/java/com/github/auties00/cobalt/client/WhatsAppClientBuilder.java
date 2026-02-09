@@ -9,7 +9,6 @@ import com.github.auties00.cobalt.store.WhatsAppStoreBuilder;
 import com.github.auties00.cobalt.store.WhatsappStoreSerializer;
 import com.github.auties00.libsignal.key.SignalIdentityKeyPair;
 
-import java.net.URI;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -440,7 +439,7 @@ public sealed class WhatsAppClientBuilder {
          * @param proxy the proxy to use, can be null to use no proxy
          * @return the same instance for chaining
          */
-        public Options proxy(URI proxy) {
+        public Options proxy(WhatsAppClientProxy proxy) {
             store.setProxy(proxy);
             return this;
         }
@@ -526,7 +525,7 @@ public sealed class WhatsAppClientBuilder {
              * @return the same instance for chaining
              */
             @Override
-            public Web proxy(URI proxy) {
+            public Web proxy(WhatsAppClientProxy proxy) {
                 return (Web) super.proxy(proxy);
             }
 
@@ -663,7 +662,7 @@ public sealed class WhatsAppClientBuilder {
              * @return the same instance for chaining
              */
             @Override
-            public Mobile proxy(URI proxy) {
+            public Mobile proxy(WhatsAppClientProxy proxy) {
                 store.setProxy(proxy);
                 return this;
             }

@@ -77,7 +77,7 @@ public final class MessageIdGenerator {
     );
 
     private MessageIdGenerator() {
-        throw new UnsupportedOperationException("Utility class");
+        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
     }
 
     /**

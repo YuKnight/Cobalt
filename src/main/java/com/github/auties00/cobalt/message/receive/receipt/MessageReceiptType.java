@@ -1,56 +1,71 @@
 package com.github.auties00.cobalt.message.receive.receipt;
 
 /**
- * Receipt types supported by WhatsApp.
+ * Types of receipt stanzas sent in response to incoming messages.
+ *
+ * <p>After decrypting and processing an incoming message, the client sends
+ * a receipt back to the server to indicate the outcome.  The receipt type
+ * determines how the server and sending client handle the acknowledgment.
+ *
+ * @apiNote WAWebSendReceiptJobCommon: RECEIPT_TYPE constants used when
+ * building receipt stanzas.
+ * WAWebHandleMsgSendReceipt.sendReceipt: selects the receipt type based
+ * on the E2E processing result and message metadata.
  */
 public enum MessageReceiptType {
     /**
-     * Delivery receipt - message was delivered to device.
-     * Shows as double gray checkmark.
+     * Standard delivery receipt — message was successfully decrypted and
+     * processed.  No {@code type} attribute is set on the receipt stanza.
+     *
+     * @apiNote WAWebSendDeliveryReceiptJob: omits the type attribute
+     * for normal delivery receipts.
      */
     DELIVERY(null),
 
     /**
-     * Read receipt - message was viewed.
-     * Shows as double blue checkmark.
+     * Sender receipt — the message was received by our own companion
+     * device, acknowledging that we (as sender) know it was delivered.
+     *
+     * @apiNote WAWebSendReceiptJobCommon.RECEIPT_TYPE.SENDER
      */
-    READ("read"),
+    SENDER("sender"),
 
     /**
-     * Played receipt - voice message was played.
-     * Shows as blue checkmarks with audio played indicator.
+     * Peer message receipt — the message was a peer protocol message
+     * (e.g. app state sync) from our own device.
+     *
+     * @apiNote WAWebSendReceiptJobCommon.RECEIPT_TYPE.PEER_MSG
      */
-    PLAYED("played"),
+    PEER("peer_msg"),
 
     /**
-     * Inactive receipt - used for presence updates.
+     * Inactive receipt — the message was processed but the recipient
+     * chat is considered inactive (e.g. muted or archived).
+     *
+     * @apiNote WAWebSendReceiptJobCommon.RECEIPT_TYPE.INACTIVE
      */
     INACTIVE("inactive"),
 
     /**
-     * Retry receipt - sent when message decryption fails.
-     * Requests the sender to re-transmit the message.
+     * Retry receipt — decryption failed and we are requesting the sender
+     * to re-send the message, optionally with a new prekey bundle.
+     *
+     * @apiNote WAWebSendRetryReceiptJob.sendRetryReceipt: builds a retry
+     * receipt with registration ID, retry count, and optional key bundle.
      */
-    RETRY("retry"),
+    RETRY("retry");
 
-    /**
-     * Nack receipt - sent when message parsing or protocol errors occur.
-     * Indicates the message cannot be processed.
-     */
-    NACK("nack");
+    private final String protocolValue;
 
-    private final String value;
-
-    MessageReceiptType(String value) {
-        this.value = value;
+    MessageReceiptType(String protocolValue) {
+        this.protocolValue = protocolValue;
     }
 
     /**
-     * Returns the protocol value for the receipt type.
-     *
-     * @return the receipt type value, or null for delivery receipts
+     * Returns the protocol-level value used in the {@code type} attribute
+     * of the receipt stanza, or {@code null} for the default delivery type.
      */
-    public String value() {
-        return value;
+    public String protocolValue() {
+        return protocolValue;
     }
 }

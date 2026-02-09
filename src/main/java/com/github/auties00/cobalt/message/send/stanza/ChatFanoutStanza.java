@@ -28,7 +28,7 @@ import java.util.Objects;
  */
 public final class ChatFanoutStanza {
     private ChatFanoutStanza() {
-        throw new UnsupportedOperationException("Utility class");
+        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
     }
 
     /**
@@ -93,6 +93,7 @@ public final class ChatFanoutStanza {
             Node botNode,
             Node reportingNode,
             Node senderContentBinding,
+            Node botMetadataNode,
             Node tctokenNode,
             Node ctwaNode,
             Node groupDirectSkmsgNode
@@ -136,13 +137,16 @@ public final class ChatFanoutStanza {
 
         // WAWebSendMsgCreateFanoutStanza: optional children
         // NodeBuilder.content(Node...) silently skips nulls
+        // WAWebSendMsgCreateFanoutStanza: child order matches
+        // A.body, A.botBody, F, B, V, Z, te, oe, ae, ie, se
         builder.content(
+                botNode,
                 groupDirectSkmsgNode,
                 needsIdentity ? identityNode : null,
                 bizNode,
                 metaNode,
                 senderContentBinding,
-                botNode,
+                botMetadataNode,
                 reportingNode,
                 tctokenNode,
                 ctwaNode

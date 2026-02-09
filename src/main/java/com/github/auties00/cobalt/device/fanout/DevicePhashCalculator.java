@@ -8,11 +8,7 @@ import com.github.auties00.cobalt.props.ABPropsService;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
-import java.util.Base64;
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.Objects;
+import java.util.*;
 
 /**
  * Service that calculates participant hash (phash) for group messages.
@@ -41,7 +37,7 @@ public final class DevicePhashCalculator {
     }
 
     /**
-     * Calculates the phash for a collection of device JIDs.
+     * Calculates the phash for a set of device JIDs.
      *
      * @param deviceJids          the device JIDs to include in the hash
      * @param version             the phash version to use
@@ -53,7 +49,7 @@ public final class DevicePhashCalculator {
      * truncates to 6 bytes, and prepends "2:" prefix.
      */
     public String calculate(
-            Collection<Jid> deviceJids,
+            Set<Jid> deviceJids,
             DevicePhashVersion version,
             boolean allowIncludeMetaBot
     ) throws NoSuchAlgorithmException {

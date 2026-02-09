@@ -20,7 +20,7 @@ import com.github.auties00.cobalt.model.sync.DeviceListMetadataBuilder;
  */
 public final class IcdcEnricher {
     private IcdcEnricher() {
-        throw new UnsupportedOperationException("Utility class");
+        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
     }
 
     /**

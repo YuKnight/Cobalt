@@ -23,7 +23,7 @@ public final class BotMessageSecret {
     private static final int SECRET_LENGTH = 32;
 
     private BotMessageSecret() {
-        throw new UnsupportedOperationException("Utility class");
+        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
     }
 
     /**

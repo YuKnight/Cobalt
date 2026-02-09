@@ -58,6 +58,6 @@ public final class NackReason {
     public static final int DB_OPERATION_FAILED = 552;
 
     private NackReason() {
-        throw new UnsupportedOperationException("Utility class");
+        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
     }
 }

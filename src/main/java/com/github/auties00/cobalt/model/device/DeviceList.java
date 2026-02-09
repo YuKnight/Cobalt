@@ -9,6 +9,7 @@ import it.auties.protobuf.model.ProtobufType;
 
 import java.time.Instant;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Represents a cached device list for a user.
@@ -157,10 +158,10 @@ public final class DeviceList {
     /**
      * Converts all devices to their full JIDs.
      */
-    public List<Jid> deviceJids() {
+    public Set<Jid> deviceJids() {
         return devices.stream()
                 .map(d -> d.toDeviceJid(userJid.user(), userJid.server()))
-                .toList();
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     /**
@@ -235,7 +236,7 @@ public final class DeviceList {
      */
     public DeviceChanges mismatch(DeviceList other) {
         if (other == null) {
-            return new DeviceChanges(deviceJids(), List.of(), List.of());
+            return new DeviceChanges(deviceJids(), Set.of(), Set.of());
         }
 
         var otherDevices = new HashMap<Integer, DeviceInfo>();
@@ -243,8 +244,8 @@ public final class DeviceList {
             otherDevices.put(device.id(), device);
         }
 
-        var added = new ArrayList<Jid>();
-        var identityChanged = new ArrayList<Jid>();
+        var added = new HashSet<Jid>();
+        var identityChanged = new HashSet<Jid>();
 
         for (var device : devices) {
             var otherDevice = otherDevices.remove(device.id());
@@ -259,7 +260,7 @@ public final class DeviceList {
 
         var removed = otherDevices.values().stream()
                 .map(d -> d.toDeviceJid(userJid.user(), userJid.server()))
-                .toList();
+                .collect(Collectors.toUnmodifiableSet());
 
         return new DeviceChanges(added, removed, identityChanged);
     }

@@ -3,15 +3,23 @@ package com.github.auties00.cobalt.message.send;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.exception.WhatsAppMessageException;
-import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
-import com.github.auties00.cobalt.message.send.crypto.MessageEncryptedPayload;
 import com.github.auties00.cobalt.message.send.ack.AckParser;
 import com.github.auties00.cobalt.message.send.ack.AckResult;
+import com.github.auties00.cobalt.message.send.crypto.MessageEncryptedPayload;
+import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
 import com.github.auties00.cobalt.message.send.stanza.*;
+import com.github.auties00.cobalt.model.business.BusinessProfile;
 import com.github.auties00.cobalt.model.chat.Chat;
 import com.github.auties00.cobalt.model.contact.Contact;
 import com.github.auties00.cobalt.model.info.ChatMessageInfo;
+import com.github.auties00.cobalt.model.info.DeviceContextInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.model.message.common.ChatMessageKey;
+import com.github.auties00.cobalt.model.message.common.Message;
+import com.github.auties00.cobalt.model.message.common.MessageThreadId;
+import com.github.auties00.cobalt.model.message.server.ProtocolMessage;
+import com.github.auties00.cobalt.model.message.standard.TextMessage;
+import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
@@ -144,12 +152,17 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
         var identityNode = ParticipantsStanza.requiresIdentityNode(payloads)
                 ? buildIdentityNode() : null;
 
-        var metaNode = metaStanza.build(chatJid, container, null);
+        var metaNode = metaStanza.buildChat(chatJid, container, null);
         var bizNode = bizStanza.build(chatJid);
         var botNode = botStanza.build(messageInfo, chatJid);
         var reportingNode = reportingStanza.build(messageInfo, requireSelfJid(), chatJid);
         var senderContentBinding = SenderContentBindingStanza.buildForUser(messageInfo, requireSelfJid());
         var ctwaNode = ctwaStanza.build(chatJid);
+
+        // WAWebSendMsgCreateFanoutStanza: metadata-only <bot> node with
+        // type (prompt/command/request_welcome), local_automated_type,
+        // client_thread_id - resolved from message context and AI thread
+        var botMetadataNode = resolveBotMetadataNode(chatJid, messageInfo);
 
         return ChatFanoutStanza.build(
                 messageInfo.key().id(),
@@ -174,6 +187,7 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
                 botNode,
                 reportingNode,
                 senderContentBinding,
+                botMetadataNode,
                 tcTokenStanza.build(chatJid),
                 ctwaNode,
                 null
@@ -244,6 +258,77 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
         return store.findContactByJid(chatJid)
                 .flatMap(Contact::username)
                 .orElse(null);
+    }
+
+    /**
+     * Resolves the metadata-only {@code <bot>} node for the stanza.
+     *
+     * <p>Determines the bot message body type (prompt/command/request_welcome)
+     * from the message content and chat context, and extracts the AI
+     * thread ID from the device context info.
+     *
+     * @apiNote WAWebSendMsgCreateFanoutStanza: resolves {@code ne}
+     * (type), {@code re} (local_automated_type), {@code x}
+     * (client_thread_id) and builds {@code oe} when any is present.
+     */
+    private Node resolveBotMetadataNode(Jid chatJid, ChatMessageInfo messageInfo) {
+        var container = messageInfo.message();
+        var content = container.content();
+
+        // WAWebSendMsgCreateFanoutStanza: resolve bot message body type
+        String botMsgBodyType = null;
+        if (content instanceof ProtocolMessage pm
+                && pm.protocolType() == ProtocolMessage.Type.REQUEST_WELCOME_MESSAGE) {
+            botMsgBodyType = "request_welcome";
+        } else if (chatJid.hasBotServer() || container.type() == Message.Type.BOT_INVOKE) {
+            botMsgBodyType = resolveBotMsgBodyType(chatJid, content);
+        }
+
+        // WAWebSendMsgCreateFanoutStanza: resolve AI thread ID
+        var clientThreadId = container.deviceInfo()
+                .map(DeviceContextInfo::threadId)
+                .stream()
+                .flatMap(Collection::stream)
+                .filter(MessageThreadId::isAiThread)
+                .findFirst()
+                .flatMap(MessageThreadId::threadKey)
+                .map(ChatMessageKey::id)
+                .filter(id -> !id.isEmpty())
+                .orElse(null);
+
+        // WAWebSendMsgCreateFanoutStanza: resolve bizBotType from the
+        // business profile's automated_type field
+        // WAWebCommonParsersParseBusinessProfile: automated_type is
+        // "1p_partial" (BIZ_1P) or "3p_full" (BIZ_3P)
+        var bizBotType = client.queryBusinessProfile(chatJid)
+                .flatMap(BusinessProfile::automatedType)
+                .orElse(null);
+
+        return BotStanza.buildMetadata(botMsgBodyType, bizBotType, clientThreadId);
+    }
+
+    /**
+     * Resolves the bot message body type by checking whether the message
+     * text matches a registered command on the bot's profile.
+     *
+     * @param botJid  the bot JID
+     * @param content the inner message content
+     * @return {@code "command"} if the text starts with a registered
+     *         bot command, otherwise {@code "prompt"}
+     *
+     * @apiNote WAWebBotCommandFormatMutator: matches text against the
+     * bot's registered command names.
+     * WAWebSendTextMsgChatAction: sets botMsgBodyType from caller options.
+     */
+    private String resolveBotMsgBodyType(Jid botJid, Message content) {
+        if (!(content instanceof TextMessage text) || text.text() == null) {
+            return "prompt";
+        } else {
+            var isCommand = client.queryBotProfile(botJid)
+                    .map(profile -> profile.isCommand(text.text()))
+                    .orElse(false);
+            return isCommand ? "command" : "prompt";
+        }
     }
 
     /**

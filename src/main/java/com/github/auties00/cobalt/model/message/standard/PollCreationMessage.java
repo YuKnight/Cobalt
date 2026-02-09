@@ -3,20 +3,16 @@ package com.github.auties00.cobalt.model.message.standard;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.info.ChatMessageInfo;
 import com.github.auties00.cobalt.model.info.ContextInfo;
-import com.github.auties00.cobalt.model.jid.JidProvider;
 import com.github.auties00.cobalt.model.message.common.ContextualMessage;
 import com.github.auties00.cobalt.model.poll.PollOption;
-import com.github.auties00.cobalt.model.poll.SelectedPollOption;
-import com.github.auties00.cobalt.model.poll.SelectedPollOptionBuilder;
 import com.github.auties00.cobalt.util.SecureBytes;
 import it.auties.protobuf.annotation.ProtobufBuilder;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
 
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.*;
+import java.util.List;
+import java.util.Optional;
 
 
 /**
@@ -39,20 +35,12 @@ public final class PollCreationMessage implements ContextualMessage {
     @ProtobufProperty(index = 5, type = ProtobufType.MESSAGE)
     ContextInfo contextInfo;
 
-    @ProtobufProperty(index = 999, type = ProtobufType.MAP, mapKeyType = ProtobufType.STRING, mapValueType = ProtobufType.MESSAGE)
-    final Map<String, PollOption> selectableOptionsMap;
-
-    @ProtobufProperty(index = 1000, type = ProtobufType.MESSAGE)
-    final List<SelectedPollOption> selectedOptions;
-
-    PollCreationMessage(byte[] encryptionKey, String title, List<PollOption> selectableOptions, int selectableOptionsCount, ContextInfo contextInfo, Map<String, PollOption> selectableOptionsMap, List<SelectedPollOption> selectedOptions) {
+    PollCreationMessage(byte[] encryptionKey, String title, List<PollOption> selectableOptions, int selectableOptionsCount, ContextInfo contextInfo) {
         this.encryptionKey = encryptionKey;
         this.title = title;
         this.selectableOptions = selectableOptions;
         this.selectableOptionsCount = selectableOptionsCount;
         this.contextInfo = contextInfo;
-        this.selectableOptionsMap = selectableOptionsMap;
-        this.selectedOptions = selectedOptions;
     }
 
     /**
@@ -69,55 +57,14 @@ public final class PollCreationMessage implements ContextualMessage {
             throw new IllegalArgumentException("Title cannot be empty");
         }
         if (selectableOptions.size() <= 1) {
-            throw new IllegalArgumentException("Options must have at least two patches");
+            throw new IllegalArgumentException("Options must have at least two entries");
         }
-        var result = new PollCreationMessageBuilder()
+        return new PollCreationMessageBuilder()
                 .encryptionKey(SecureBytes.random(32))
                 .title(title)
                 .selectableOptions(selectableOptions)
                 .selectableOptionsCount(selectableOptions.size())
                 .build();
-        for (var entry : result.selectableOptions()) {
-            try {
-                var digest = MessageDigest.getInstance("SHA-256");
-                var data = entry.name().getBytes();
-                var hash = HexFormat.of().formatHex(digest.digest(data));
-                result.addSelectableOption(hash, entry);
-            } catch (NoSuchAlgorithmException exception) {
-                throw new UnsupportedOperationException("Missing sha256 implementation");
-            }
-        }
-        return result;
-    }
-
-    /**
-     * Returns an unmodifiable list of the options that a contact voted in this poll
-     *
-     * @param voter the non-null contact that voted in this poll
-     * @return a non-null unmodifiable map
-     */
-    public Collection<SelectedPollOption> getSelectedOptions(JidProvider voter) {
-        return selectedOptions.stream()
-                .filter(entry -> Objects.equals(entry.jid(), voter.toJid()))
-                .toList();
-    }
-
-    public void addSelectedOptions(JidProvider voter, Collection<PollOption> voted) {
-        for (var entry : voted) {
-            var selectedPollOption = new SelectedPollOptionBuilder()
-                    .jid(voter.toJid())
-                    .name(entry.name())
-                    .build();
-            selectedOptions.add(selectedPollOption);
-        }
-    }
-
-    public void addSelectableOption(String hash, PollOption option) {
-        selectableOptionsMap.put(hash, option);
-    }
-
-    public Optional<PollOption> getSelectableOption(String hash) {
-        return Optional.ofNullable(selectableOptionsMap.get(hash));
     }
 
     @Override

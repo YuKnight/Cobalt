@@ -4,12 +4,11 @@ import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.exception.WhatsAppMessageException;
 import com.github.auties00.cobalt.message.send.ack.AckParser;
 import com.github.auties00.cobalt.message.send.ack.AckResult;
+import com.github.auties00.cobalt.message.send.stanza.MetaStanza;
+import com.github.auties00.cobalt.message.send.stanza.NewsletterStanza;
 import com.github.auties00.cobalt.model.info.NewsletterMessageInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.common.MediaMessage;
-import com.github.auties00.cobalt.model.message.common.Message;
-import com.github.auties00.cobalt.model.message.common.MessageContainer;
-import com.github.auties00.cobalt.model.message.common.MessageContainerSpec;
+import com.github.auties00.cobalt.model.message.common.*;
 import com.github.auties00.cobalt.model.message.server.ProtocolMessage;
 import com.github.auties00.cobalt.model.message.standard.*;
 import com.github.auties00.cobalt.node.Node;
@@ -71,46 +70,73 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
     @Override
     AckResult send(Jid newsletterJid, NewsletterMessageInfo messageInfo) {
         var container = messageInfo.message();
-        var message = container.content();
 
-        var stanza = switch (message) {
-            // WASmaxOutMessagePublishNewsletterRevokeMixin
-            case ProtocolMessage p when p.protocolType() == ProtocolMessage.Type.REVOKE ->
-                    buildRevoke(messageInfo, newsletterJid);
+        // WASmaxOutMessagePublishNewsletterClientIdContent: question and
+        // question reply wrappers take priority over inner content type
+        var containerType = container.type();
+        if (containerType == Message.Type.NEWSLETTER_QUESTION || containerType == Message.Type.NEWSLETTER_QUESTION_REPLY) {
+            var innerContent = container.content();
+            var innerType = resolveSmaxMediaType(innerContent);
+            var payload = MessageContainerSpec.encode(container.unbox());
+            var metaNode = containerType == Message.Type.NEWSLETTER_QUESTION
+                    ? MetaStanza.buildNewsletterQuestion()
+                    : MetaStanza.buildNewsletterQuestionReply();
+            var plaintextNode = NewsletterStanza.buildPlaintext(payload,
+                    "text".equals(innerType) ? null : innerType);
+            var mediaIdNode = NewsletterStanza.buildMediaId(messageInfo);
+            var stanza = new NodeBuilder()
+                    .description("message")
+                    .attribute("id", messageInfo.id())
+                    .attribute("to", newsletterJid)
+                    .attribute("type", innerType)
+                    .content(metaNode, plaintextNode, mediaIdNode);
+            var ackNode = client.sendNode(stanza);
+            return AckParser.parse(ackNode);
+        } else {
+            var message = container.content();
 
-            // WASmaxOutMessagePublishNewsletterEditMixin (text edit)
-            case ProtocolMessage p when p.protocolType() == ProtocolMessage.Type.MESSAGE_EDIT ->
-                    buildEdit(messageInfo, newsletterJid);
+            var stanza = switch (message) {
+                // WASmaxOutMessagePublishNewsletterRevokeMixin
+                case ProtocolMessage p when p.protocolType() == ProtocolMessage.Type.REVOKE ->
+                        buildRevoke(messageInfo, newsletterJid);
 
-            // WASmaxOutMessagePublishContentTypePollCreationMixin
-            case PollCreationMessage _ ->
-                    buildPoll(messageInfo, newsletterJid, "creation");
+                // WASmaxOutMessagePublishNewsletterEditMixin (text edit)
+                case ProtocolMessage p when p.protocolType() == ProtocolMessage.Type.MESSAGE_EDIT ->
+                        buildEdit(messageInfo, newsletterJid);
 
-            // WASmaxOutMessagePublishContentTypePollResultSnapshotMixin
-            case PollResultSnapshotMessage _ ->
-                    buildPoll(messageInfo, newsletterJid, "result_snapshot");
+                // WASmaxOutMessagePublishContentTypePollCreationMixin
+                case PollCreationMessage _ ->
+                        buildPoll(messageInfo, newsletterJid, "creation");
 
-            // WASmaxOutMessagePublishContentTypeReactionMixin
-            case ReactionMessage r ->
-                    buildReaction(messageInfo, newsletterJid, r);
+                // WASmaxOutMessagePublishContentTypePollResultSnapshotMixin
+                case PollResultSnapshotMessage _ ->
+                        buildPoll(messageInfo, newsletterJid, "result_snapshot");
 
-            // WASmaxOutMessagePublishContentTypePollVoteMixin
-            case PollUpdateMessage p ->
-                    buildPollVote(messageInfo, newsletterJid, p);
+                // WASmaxOutMessagePublishContentTypeReactionMixin
+                case ReactionMessage r ->
+                        buildReaction(messageInfo, newsletterJid, r);
 
-            // WASmaxOutMessagePublishNewsletterTextMixin
-            case TextMessage t when t.matchedText().isEmpty() ->
-                    buildText(messageInfo, newsletterJid);
+                // WASmaxOutMessagePublishContentTypePollVoteMixin
+                case PollUpdateMessage p ->
+                        buildPollVote(messageInfo, newsletterJid, p);
 
-            // WASmaxOutMessagePublishNewsletterMediaPublishMixin:
-            // URL messages and all other media types
-            case MediaMessage _ -> buildMedia(messageInfo, newsletterJid, resolveSmaxMediaType(message));
+                // WASmaxOutMessagePublishNewsletterQuestionResponsePublishMixin
+                case QuestionResponseMessage _ -> buildQuestionResponse(messageInfo, newsletterJid, container);
 
-            default -> throw new WhatsAppMessageException.Send.Unknown("Invalid message type");
-        };
+                // WASmaxOutMessagePublishNewsletterTextMixin
+                case TextMessage t when t.matchedText().isEmpty() ->
+                        buildText(messageInfo, newsletterJid);
 
-        var ackNode = client.sendNode(stanza);
-        return AckParser.parse(ackNode);
+                // WASmaxOutMessagePublishNewsletterMediaPublishMixin:
+                // URL messages and all other media types
+                case MediaMessage _ -> buildMedia(messageInfo, newsletterJid, resolveSmaxMediaType(message));
+
+                default -> throw new WhatsAppMessageException.Send.Unknown("Invalid message type");
+            };
+
+            var ackNode = client.sendNode(stanza);
+            return AckParser.parse(ackNode);
+        }
     }
 
     /**
@@ -121,16 +147,32 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
      */
     private NodeBuilder buildText(NewsletterMessageInfo info, Jid newsletterJid) {
         var payload = MessageContainerSpec.encode(info.message());
-        var plaintextNode = new NodeBuilder()
-                .description("plaintext")
-                .content(payload)
-                .build();
+        var plaintextNode = NewsletterStanza.buildPlaintext(payload);
         return new NodeBuilder()
                 .description("message")
                 .attribute("id", info.id())
                 .attribute("to", newsletterJid)
                 .attribute("type", "text")
                 .content(plaintextNode);
+    }
+
+    /**
+     * Builds the SMAX stanza for question response.
+     *
+     * @apiNote WASmaxOutMessagePublishNewsletterQuestionResponsePublishMixin:
+     * {@code <message server_id="..."><meta questiontype="response"/>
+     * <plaintext>payload</plaintext></message>}
+     */
+    private static NodeBuilder buildQuestionResponse(NewsletterMessageInfo messageInfo, Jid newsletterJid, MessageContainer container) {
+        var payload = MessageContainerSpec.encode(container);
+        var metaNode = MetaStanza.buildNewsletterQuestionResponse();
+        var plaintextNode = NewsletterStanza.buildPlaintext(payload);
+        return new NodeBuilder()
+                .description("message")
+                .attribute("id", messageInfo.id())
+                .attribute("to", newsletterJid)
+                .attribute("server_id", String.valueOf(messageInfo.serverId()))
+                .content(metaNode, plaintextNode);
     }
 
     /**
@@ -147,19 +189,8 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
             NewsletterMessageInfo info, Jid newsletterJid, String mediaType
     ) {
         var payload = MessageContainerSpec.encode(info.message());
-        // WASmaxOutMessagePublishNewsletterMediaPublishMixin: includes
-        // mediatype attribute on the <plaintext> node
-        var plaintextNode = new NodeBuilder()
-                .description("plaintext")
-                .attribute("mediatype", mediaType)
-                .content(payload)
-                .build();
-        Node mediaIdNode = info.mediaHandle()
-                .map(handle -> new NodeBuilder()
-                        .description("media_id")
-                        .content(handle)
-                        .build())
-                .orElse(null);
+        var plaintextNode = NewsletterStanza.buildPlaintext(payload, mediaType);
+        var mediaIdNode = NewsletterStanza.buildMediaId(info);
         return new NodeBuilder()
                 .description("message")
                 .attribute("id", info.id())
@@ -184,10 +215,7 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
                 .description("meta")
                 .attribute("polltype", polltype)
                 .build();
-        var plaintextNode = new NodeBuilder()
-                .description("plaintext")
-                .content(payload)
-                .build();
+        var plaintextNode = NewsletterStanza.buildPlaintext(payload);
         return new NodeBuilder()
                 .description("message")
                 .attribute("id", info.id())
@@ -233,10 +261,7 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
         var adminEditNode = new NodeBuilder()
                 .description("admin_edit")
                 .build();
-        var plaintextNode = new NodeBuilder()
-                .description("plaintext")
-                .content(payload)
-                .build();
+        var plaintextNode = NewsletterStanza.buildPlaintext(payload);
 
         // WASmaxOutMessagePublishNewsletterEditMixin: type is resolved
         // from the edited content (text for text edits, media type for
@@ -245,25 +270,13 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
 
         // WAWebAck.EDIT_ATTR.NEWSLETTER_MSG_EDIT = 3
         // Newsletter edits use "3", distinct from regular MESSAGE_EDIT ("1")
-        var builder = new NodeBuilder()
+        return new NodeBuilder()
                 .description("message")
                 .attribute("id", info.id())
                 .attribute("to", newsletterJid)
                 .attribute("type", type)
                 .attribute("edit", NEWSLETTER_MSG_EDIT)
-                .content(adminEditNode, plaintextNode);
-
-        // WASmaxOutMessagePublishNewsletterEditMixin: media edits include
-        // the media handle when available
-        info.mediaHandle().ifPresent(handle -> {
-            var mediaIdNode = new NodeBuilder()
-                    .description("media_id")
-                    .content(handle)
-                    .build();
-            builder.content(mediaIdNode);
-        });
-
-        return builder;
+                .content(adminEditNode, plaintextNode, NewsletterStanza.buildMediaId(info));
     }
 
     /**
@@ -314,10 +327,10 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
     ) {
         // WASmaxOutMessagePublishNewsletterPollVoteMixin: each vote
         // element contains the option name as its value
-        var voteChildren = pollUpdate.votes().stream()
-                .map(vote -> new NodeBuilder()
+        var voteChildren = pollUpdate.voteOptionNames().stream()
+                .map(name -> new NodeBuilder()
                         .description("vote")
-                        .content(vote.name())
+                        .content(name)
                         .build())
                 .toList();
         var pollVoteNode = new NodeBuilder()

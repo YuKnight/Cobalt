@@ -30,7 +30,7 @@ abstract class MediaInputStream extends InputStream {
         try {
             var hkdf = KDF.getInstance("HKDF-SHA256");
             var params = HKDFParameterSpec.ofExtract()
-                    .addIKM(new SecretKeySpec(mediaKey, "AES"))
+                    .addIKM(mediaKey)
                     .thenExpand(mediaKeyName.getBytes(), EXPANDED_SIZE);
             return hkdf.deriveData(params);
         }catch (GeneralSecurityException e) {

@@ -17,17 +17,5 @@ public record MessageEncryptedAddon(byte[] ciphertext, byte[] iv) {
         if (iv.length != AES_GCM_IV_SIZE) {
             throw new IllegalArgumentException("IV must be " + AES_GCM_IV_SIZE + " bytes");
         }
-        ciphertext = ciphertext.clone();
-        iv = iv.clone();
-    }
-
-    @Override
-    public byte[] ciphertext() {
-        return ciphertext.clone();
-    }
-
-    @Override
-    public byte[] iv() {
-        return iv.clone();
     }
 }

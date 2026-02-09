@@ -16,7 +16,8 @@ public sealed interface ContextualMessage extends Message
         permits ButtonsMessage, InteractiveMessage, InteractiveResponseMessage, ListMessage,
         TemplateMessage, ButtonReplyMessage, MediaMessage, PaymentOrderMessage, ContactMessage, ContactsMessage,
         EventMessage, GroupInviteMessage, LiveLocationMessage, LocationMessage, PollCreationMessage, PollResultSnapshotMessage,
-        ProductMessage, RequestPhoneNumberMessage, TextMessage {
+        ProductMessage, RequestPhoneNumberMessage, TextMessage,
+        AlbumMessage, NewsletterFollowerInviteMessage, StickerPackMessage {
     Optional<ContextInfo> contextInfo();
     void setContextInfo(ContextInfo contextInfo);
 }

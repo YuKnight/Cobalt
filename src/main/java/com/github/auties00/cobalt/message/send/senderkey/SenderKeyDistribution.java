@@ -25,13 +25,6 @@ import java.util.*;
  * metadata per recipient and wrapping companion device payloads in
  * {@code DeviceSentMessage}.
  *
- * <p>The distribution message is a protobuf containing:
- * <ul>
- *   <li>{@code groupId} — the group JID as a legacy string</li>
- *   <li>{@code axolotlSenderKeyDistributionMessage} — the serialised
- *       Signal sender-key distribution bytes</li>
- * </ul>
- *
  * @apiNote WAWebGetGroupKeyDistributionMsg.getKeyDistributionMsg: creates
  * the distribution protobuf, populates ICDC metadata per recipient, and
  * encrypts it for each device in the sender-key distribution list.

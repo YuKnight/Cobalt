@@ -1,8 +1,6 @@
 package com.github.auties00.cobalt.model.chat;
 
 import com.github.auties00.cobalt.model.contact.ContactStatus;
-
-import java.time.Instant;
 import com.github.auties00.cobalt.model.info.ChatMessageInfo;
 import com.github.auties00.cobalt.model.info.MessageInfoParent;
 import com.github.auties00.cobalt.model.jid.Jid;
@@ -77,23 +75,9 @@ public final class Chat implements MessageInfoParent {
     @ProtobufProperty(index = 19, type = ProtobufType.BOOL)
     boolean markedAsUnread;
 
-    /**
-     * The trust contact (TC) token for this chat, used in the
-     * {@code <tctoken>} stanza child when sending 1:1 messages.
-     *
-     * @apiNote WAWebSendMsgCreateFanoutStanza: includes {@code <tctoken>}
-     * when the AB prop privacy_token_sending_on_all_1_on_1_messages is enabled
-     * and this token is present and not expired.
-     */
     @ProtobufProperty(index = 21, type = ProtobufType.BYTES)
     byte[] tcToken;
 
-    /**
-     * The timestamp (epoch seconds) when the TC token was last updated.
-     *
-     * @apiNote WAWebTrustedContactsUtils.isTokenExpired: checks this
-     * timestamp against the current time.
-     */
     @ProtobufProperty(index = 22, type = ProtobufType.UINT64)
     Long tcTokenTimestamp;
 
@@ -133,19 +117,6 @@ public final class Chat implements MessageInfoParent {
     @ProtobufProperty(index = 42, type = ProtobufType.STRING)
     Jid lid;
 
-    /**
-     * The LID origin type for this chat, indicating how the LID chat
-     * was created.
-     *
-     * <p>Values are {@code "ctwa"} (PNH_CTWA) or {@code "general"}.
-     * Used to determine the {@code origin} attribute in the
-     * {@code <meta>} stanza child node.
-     *
-     * @apiNote WAWebUsernameTypes.LidOriginType: PNH_CTWA="ctwa",
-     * GENERAL="general".
-     * WAWebSendMsgMetaNode.getOriginAttribute: includes origin when
-     * to.isLid() and lidOriginType is PNH_CTWA.
-     */
     @ProtobufProperty(index = 44, type = ProtobufType.STRING)
     String lidOriginType;
 
@@ -155,12 +126,6 @@ public final class Chat implements MessageInfoParent {
     @ProtobufProperty(index = 999, type = ProtobufType.MAP, mapKeyType = ProtobufType.STRING, mapValueType = ProtobufType.ENUM)
     final ConcurrentHashMap<Jid, ContactStatus> presences;
 
-    /**
-     * The CTWA (Click-to-WhatsApp) entry point for this chat, if the
-     * chat was opened via a CTWA ad link.  Not persisted.
-     *
-     * @apiNote WAWebExternalEntryPointPrefs: stores entry points per chat.
-     */
     CtwaEntryPoint ctwaEntryPoint;
 
     Chat(Jid jid, Messages messages, Jid newJid, Jid oldJid, int unreadMessagesCount, boolean endOfHistoryTransfer, ChatEphemeralTimer ephemeralMessageDuration, long ephemeralMessagesToggleTimeSeconds, EndOfHistoryTransferType endOfHistoryTransferType, long timestampSeconds, String name, boolean notSpam, boolean archived, ChatDisappear disappearInitiator, boolean markedAsUnread, byte[] tcToken, Long tcTokenTimestamp, int pinnedTimestampSeconds, ChatMute mute, ChatWallpaper wallpaper, MediaVisibility mediaVisibility, boolean suspended, boolean terminated, boolean support, String displayName, Jid phoneJid, boolean shareOwnPhoneNumber, boolean phoneDuplicateLidThread, Jid lid, String lidOriginType, Jid accountLid, ConcurrentHashMap<Jid, ContactStatus> presences) {

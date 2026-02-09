@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.message.send.stanza;
 
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
-import com.github.auties00.cobalt.message.send.crypto.MessageSignalEncryptionType;
+import com.github.auties00.cobalt.message.MessageEncryptionType;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
@@ -26,7 +26,7 @@ import java.util.Objects;
  */
 public final class GroupSkmsgFanoutStanza {
     private GroupSkmsgFanoutStanza() {
-        throw new UnsupportedOperationException("Utility class");
+        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
     }
 
     /**
@@ -82,7 +82,7 @@ public final class GroupSkmsgFanoutStanza {
         var skmsgEncNode = new NodeBuilder()
                 .description("enc")
                 .attribute("v", String.valueOf(MessageEncryption.CIPHERTEXT_VERSION))
-                .attribute("type", MessageSignalEncryptionType.SKMSG.protocolValue())
+                .attribute("type", MessageEncryptionType.SKMSG.protocolValue())
                 .attribute("mediatype", mediaType)
                 .attribute("decrypt-fail", decryptFail)
                 .content(skmsgCiphertext)

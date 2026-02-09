@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.message.send.crypto;
 
+import com.github.auties00.cobalt.message.MessageEncryptionType;
 import com.github.auties00.cobalt.model.jid.Jid;
 
 /**
@@ -11,7 +12,7 @@ import com.github.auties00.cobalt.model.jid.Jid;
  * @apiNote WAWebBackendJobs.flow.CiphertextType
  */
 public record MessageEncryptedPayload(
-        MessageSignalEncryptionType type,
+        MessageEncryptionType type,
         byte[] ciphertext,
         Jid recipientJid
 ) {

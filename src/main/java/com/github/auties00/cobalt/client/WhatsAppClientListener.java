@@ -18,6 +18,7 @@ import com.github.auties00.cobalt.node.Node;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 
 /**
  * An event listener interface for WhatsApp communication events.
@@ -334,7 +335,7 @@ public interface WhatsAppClientListener {
      * @param userJid        the user whose device changed
      * @param changedDevices the devices with new identity keys
      */
-    default void onDeviceIdentityChanged(WhatsAppClient whatsapp, Jid userJid, List<Jid> changedDevices) {
+    default void onDeviceIdentityChanged(WhatsAppClient whatsapp, Jid userJid, Set<Jid> changedDevices) {
     }
 
     /**

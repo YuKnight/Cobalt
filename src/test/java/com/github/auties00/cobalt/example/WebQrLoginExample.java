@@ -6,7 +6,7 @@ import com.github.auties00.cobalt.model.info.ChatMessageInfo;
 void main() {
     WhatsAppClient.builder()
             .webClient()
-            .createConnection()
+            .loadLastOrCreateConnection()
             .historySetting(WhatsAppWebClientHistory.extended(true))
             .unregistered(WhatsAppClientVerificationHandler.Web.QrCode.toTerminal())
             .addLoggedInListener(api -> System.out.printf("Connected: %s%n", api.store().privacySettings()))

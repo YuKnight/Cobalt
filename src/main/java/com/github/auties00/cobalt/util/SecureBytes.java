@@ -30,9 +30,9 @@ public final class SecureBytes {
             throw new IllegalArgumentException("From cannot be greater than to: " + from + " > " + to);
         }
 
-        var bytes = new byte[to - from];
+        var size = RANDOM.nextInt(from, to);
+        var bytes = new byte[size];
         RANDOM.nextBytes(bytes);
-        System.arraycopy(bytes, 0, bytes, from, bytes.length);
         return bytes;
     }
 

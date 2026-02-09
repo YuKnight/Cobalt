@@ -3,18 +3,18 @@ package com.github.auties00.cobalt.message.send;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.exception.WhatsAppMessageException;
-import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
+import com.github.auties00.cobalt.message.dedup.MessageDedup;
 import com.github.auties00.cobalt.message.send.ack.AckResult;
 import com.github.auties00.cobalt.message.send.bot.BotProtobufTransform;
-import com.github.auties00.cobalt.message.send.queue.GroupSendQueue;
-import com.github.auties00.cobalt.message.send.queue.MessageDedup;
+import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
 import com.github.auties00.cobalt.message.send.senderkey.SenderKeyDistribution;
 import com.github.auties00.cobalt.message.send.stanza.*;
 import com.github.auties00.cobalt.model.info.ChatMessageInfo;
 import com.github.auties00.cobalt.model.info.MessageInfo;
 import com.github.auties00.cobalt.model.info.NewsletterMessageInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.common.ChatMessageKey;
+import com.github.auties00.cobalt.model.jid.JidServer;
+import com.github.auties00.cobalt.model.message.common.MessageContainer;
 import com.github.auties00.cobalt.props.ABPropsService;
 
 import java.util.Objects;
@@ -46,7 +46,7 @@ import java.util.Objects;
  * WAWebSendAppStateSyncMsgJob.encryptAndSendKeyMsg: peer message sending.
  */
 public final class MessageSendingService {
-    private final WhatsAppClient client;
+    private final MessagePreparer preparer;
     private final MessageDedup messageDedup;
     private final UserMessageSender userSender;
     private final GroupMessageSender groupSender;
@@ -73,11 +73,9 @@ public final class MessageSendingService {
         Objects.requireNonNull(deviceService, "deviceService");
         Objects.requireNonNull(abPropsService, "abPropsService");
 
-        this.client = client;
-        this.messageDedup = new MessageDedup();
-
         var store = client.store();
-        var groupSendQueue = new GroupSendQueue();
+        this.preparer = new MessagePreparer(store);
+        this.messageDedup = new MessageDedup();
         var skDistribution = new SenderKeyDistribution(encryption, deviceService, store);
         var botTransform = new BotProtobufTransform(store);
         var botStanza = new BotStanza(encryption, botTransform);
@@ -89,31 +87,63 @@ public final class MessageSendingService {
 
         this.userSender = new UserMessageSender(client, encryption, deviceService, abPropsService,
                 botStanza, bizStanza, metaStanza, reportingStanza, ctwaStanza, tcTokenStanza);
-        this.groupSender = new GroupMessageSender(client, encryption, deviceService, groupSendQueue,
-                abPropsService, skDistribution, botStanza, bizStanza, metaStanza, reportingStanza);
-        this.statusSender = new StatusMessageSender(client, encryption, deviceService,
-                skDistribution, metaStanza, reportingStanza);
+        this.groupSender = new GroupMessageSender(client, encryption, deviceService, abPropsService, skDistribution, botStanza, bizStanza, metaStanza, reportingStanza);
+        this.statusSender = new StatusMessageSender(client, encryption, deviceService, skDistribution, metaStanza, reportingStanza);
         this.newsletterSender = new NewsletterMessageSender(client);
         this.peerSender = new PeerMessageSender(client, encryption, deviceService);
     }
 
     /**
-     * Generates a new message ID for outgoing messages.
+     * Prepares and sends a message to the specified chat.
      *
-     * @return a new message ID string
+     * <p>This is the primary send API.  The raw {@link MessageContainer}
+     * is prepared into a fully-populated {@link ChatMessageInfo} or
+     * {@link NewsletterMessageInfo} before being dispatched to the
+     * appropriate sender.  Preparation includes:
+     * <ul>
+     *   <li>Generating a unique message ID</li>
+     *   <li>Generating the 32-byte messageSecret</li>
+     *   <li>Generating random padding bytes</li>
+     *   <li>Populating {@code DeviceContextInfo}</li>
+     *   <li>Validating addon encryption state</li>
+     *   <li>Auto-converting {@code ReactionMessage} to
+     *       {@code EncryptedReactionMessage} for CAG groups</li>
+     * </ul>
+     *
+     * @param chatJid   the recipient chat JID
+     * @param container the raw message content
+     * @return the server ack result
+     * @throws NullPointerException if any argument is {@code null}
+     *
+     * @apiNote WAWebOutgoingMessage.createOutgoingMessageProtobuf:
+     * prepares the protobuf before passing to encryptAndSendMsg.
      */
-    public String generateId() {
-        return ChatMessageKey.randomId(client.store().clientType());
+    public AckResult send(Jid chatJid, MessageContainer container) {
+        Objects.requireNonNull(chatJid, "chatJid");
+        Objects.requireNonNull(container, "container");
+
+        MessageInfo prepared;
+        if (chatJid.hasServer(JidServer.newsletter())) {
+            prepared = preparer.prepareNewsletter(chatJid, container);
+        } else {
+            prepared = preparer.prepareChat(chatJid, container);
+        }
+
+        return send(prepared);
     }
 
     /**
-     * Sends a message to the specified chat.
+     * Sends a pre-prepared message directly without any preparation.
+     *
+     * <p>Use this overload when the caller has already constructed a
+     * fully-populated {@link ChatMessageInfo} or
+     * {@link NewsletterMessageInfo} with all required fields
+     * (messageSecret, deviceInfo, encryption metadata, etc.).
      *
      * <p>The method dispatches to the appropriate send path based on the
      * message info type and the chat JID's server type.
      *
-     * @param chatJid     the chat to send to
-     * @param messageInfo the outgoing message
+     * @param messageInfo the fully-prepared outgoing message
      * @return the server ack result
      * @throws NullPointerException                          if any argument is {@code null}
      * @throws WhatsAppMessageException.Send.InvalidRecipient if the chat JID type is unsupported
@@ -121,9 +151,10 @@ public final class MessageSendingService {
      *
      * @apiNote WAWebSendMsgJob.encryptAndSendMsg: routes based on JID type.
      */
-    public AckResult send(Jid chatJid, MessageInfo messageInfo) {
-        Objects.requireNonNull(chatJid, "chatJid");
+    public AckResult send(MessageInfo messageInfo) {
         Objects.requireNonNull(messageInfo, "messageInfo");
+
+        var parentId = messageInfo.parentJid();
 
         // WAWebMessageDedupUtils: check if this message ID is already in flight
         var messageId = messageInfo.id();
@@ -135,21 +166,21 @@ public final class MessageSendingService {
         messageDedup.add(messageId);
         try {
             return switch (messageInfo) {
-                case ChatMessageInfo chatMessage when chatJid.hasUserServer() || chatJid.hasLidServer() ->
+                case ChatMessageInfo chatMessage when parentId.hasUserServer() || parentId.hasLidServer() ->
                     // WAWebSendMsgJob: to.isUser() → encryptAndSendUserMsg
-                    userSender.send(chatJid, chatMessage);
-                case ChatMessageInfo chatMessage when chatJid.hasGroupOrCommunityServer() ->
+                    userSender.send(parentId, chatMessage);
+                case ChatMessageInfo chatMessage when parentId.hasGroupOrCommunityServer() ->
                     // WAWebSendMsgJob: to.isGroup() → encryptAndSendGroupMsg
-                    groupSender.send(chatJid, chatMessage);
-                case ChatMessageInfo chatMessage when chatJid.isStatusBroadcastAccount() ->
+                    groupSender.send(parentId, chatMessage);
+                case ChatMessageInfo chatMessage when parentId.isStatusBroadcastAccount() ->
                     // WAWebEncryptAndSendStatusMsg: status@broadcast → encryptAndSendStatusMsg
-                    statusSender.send(chatJid, chatMessage);
-                case NewsletterMessageInfo newsletterMessage when chatJid.hasNewsletterServer() ->
+                    statusSender.send(parentId, chatMessage);
+                case NewsletterMessageInfo newsletterMessage when parentId.hasNewsletterServer() ->
                     // WAWebNewsletterSendMessageQueryJob: newsletter → querySendNewsletterMessage
-                    newsletterSender.send(chatJid, newsletterMessage);
+                    newsletterSender.send(parentId, newsletterMessage);
                 default -> throw new WhatsAppMessageException.Send.InvalidRecipient(
-                    chatJid, "Unsupported combination: " + messageInfo.getClass().getSimpleName()
-                            + " with JID type " + chatJid.server());
+                    parentId, "Unsupported combination: " + messageInfo.getClass().getSimpleName()
+                            + " with JID type " + parentId.server());
             };
         } finally {
             messageDedup.remove(messageId);

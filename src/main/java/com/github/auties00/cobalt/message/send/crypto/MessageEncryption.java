@@ -1,11 +1,10 @@
 package com.github.auties00.cobalt.message.send.crypto;
 
 import com.github.auties00.cobalt.exception.WhatsAppMessageException;
+import com.github.auties00.cobalt.message.MessageEncryptionType;
 import com.github.auties00.cobalt.message.receive.crypto.MessageDecryption;
-import com.github.auties00.cobalt.message.receive.addressing.PhoneNumberMessageAddressingMode;
+import com.github.auties00.cobalt.message.receive.crypto.SenderKeyNameFactory;
 import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.common.MessageContainer;
-import com.github.auties00.cobalt.model.message.common.MessageContainerSpec;
 import com.github.auties00.cobalt.store.WhatsAppStore;
 import com.github.auties00.cobalt.util.SecureBytes;
 import com.github.auties00.libsignal.SignalSessionCipher;
@@ -88,7 +87,7 @@ public final class MessageEncryption {
             var ciphertextMessage = sessionCipher.encrypt(address, paddedPlaintext);
 
             // WAWebEncryptMsgProtobuf: type is Pkmsg for PreKeySignalMessage, Msg for SignalMessage
-            var encryptionType = MessageSignalEncryptionType.fromSignalCiphertext(ciphertextMessage);
+            var encryptionType = MessageEncryptionType.fromSignalCiphertext(ciphertextMessage);
 
             LOGGER.log(System.Logger.Level.DEBUG,
                     "Encrypted message for {0}, type={1}",
@@ -125,22 +124,6 @@ public final class MessageEncryption {
     }
 
     /**
-     * Encrypts a message container for a specific device.
-     *
-     * @param recipientJid the recipient's device JID
-     * @param container    the message container to encrypt
-     * @return the encrypted payload with its type
-     * @throws WhatsAppMessageException.Send if encryption fails
-     *
-     * @apiNote WAWebOutgoingMessage.createOutgoingMessageProtobuf
-     */
-    public MessageEncryptedPayload encryptForDevice(Jid recipientJid, MessageContainer container) {
-        Objects.requireNonNull(container, "container cannot be null");
-        var plaintext = MessageContainerSpec.encode(container);
-        return encryptForDevice(recipientJid, plaintext);
-    }
-
-    /**
      * Encrypts a message for a group using Sender Key encryption.
      * <p>
      * Group messages are encrypted once with the sender's key. All group members
@@ -163,7 +146,7 @@ public final class MessageEncryption {
         var paddedPlaintext = addPadding(plaintext);
 
         // WAWebSendGroupSkmsgJob: sender JID is based on addressing mode (PN or LID)
-        var senderKeyName = PhoneNumberMessageAddressingMode.SenderKeyNameFactory.create(groupJid, senderJid);
+        var senderKeyName = SenderKeyNameFactory.create(groupJid, senderJid);
 
         try {
             // WAWebSignal.Cipher.encryptSenderKeyMsgSignalProto
@@ -174,7 +157,7 @@ public final class MessageEncryption {
                     groupJid, senderJid);
 
             return new MessageEncryptedPayload(
-                    MessageSignalEncryptionType.SKMSG,
+                    MessageEncryptionType.SKMSG,
                     ciphertextMessage.toSerialized(),
                     null
             );
@@ -235,7 +218,7 @@ public final class MessageEncryption {
         Objects.requireNonNull(groupJid, "groupJid cannot be null");
         Objects.requireNonNull(senderJid, "senderJid cannot be null");
 
-        var senderKeyName = PhoneNumberMessageAddressingMode.SenderKeyNameFactory.create(groupJid, senderJid);
+        var senderKeyName = SenderKeyNameFactory.create(groupJid, senderJid);
         return groupCipher.create(senderKeyName);
     }
 
@@ -268,7 +251,7 @@ public final class MessageEncryption {
         Objects.requireNonNull(senderJid, "senderJid cannot be null");
 
         // WAWebSignal.Session.deleteGroupSenderKeyInfo(groupJid, senderJid)
-        var senderKeyName = PhoneNumberMessageAddressingMode.SenderKeyNameFactory.create(groupJid, senderJid);
+        var senderKeyName = SenderKeyNameFactory.create(groupJid, senderJid);
         store.removeSenderKeysForDevice(senderKeyName);
 
         LOGGER.log(System.Logger.Level.DEBUG,
@@ -302,7 +285,7 @@ public final class MessageEncryption {
     public boolean hasSenderKey(Jid groupJid, Jid senderJid) {
         Objects.requireNonNull(groupJid, "groupJid cannot be null");
         Objects.requireNonNull(senderJid, "senderJid cannot be null");
-        var senderKeyName = PhoneNumberMessageAddressingMode.SenderKeyNameFactory.create(groupJid, senderJid);
+        var senderKeyName = SenderKeyNameFactory.create(groupJid, senderJid);
         return store.findSenderKeyByName(senderKeyName).isPresent();
     }
 

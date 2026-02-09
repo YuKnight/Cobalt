@@ -40,7 +40,10 @@ public final class BusinessProfile {
     @ProtobufProperty(index = 8, type = ProtobufType.MESSAGE)
     final List<BusinessCategory> categories;
 
-    BusinessProfile(Jid jid, String description, String address, String email, BusinessHours hours, boolean cartEnabled, List<URI> websites, List<BusinessCategory> categories) {
+    @ProtobufProperty(index = 9, type = ProtobufType.STRING)
+    final String automatedType;
+
+    BusinessProfile(Jid jid, String description, String address, String email, BusinessHours hours, boolean cartEnabled, List<URI> websites, List<BusinessCategory> categories, String automatedType) {
         this.jid = Objects.requireNonNull(jid, "value cannot be null");
         this.description = description;
         this.address = address;
@@ -49,6 +52,7 @@ public final class BusinessProfile {
         this.cartEnabled = cartEnabled;
         this.websites = Objects.requireNonNullElse(websites, List.of());
         this.categories = Objects.requireNonNullElse(categories, List.of());
+        this.automatedType = automatedType;
     }
 
     public static BusinessProfile of(Node node) {
@@ -78,7 +82,10 @@ public final class BusinessProfile {
                 .flatMap(attributes -> attributes.getAttributeAsString("timezone"))
                 .map(timezone -> getBusinessHours(node, timezone))
                 .orElse(null);
-        return new BusinessProfile(jid, description, address, email, hours, cartEnabled, websites, categories);
+        var automatedType = node.getChild("automated_type")
+                .flatMap(Node::toContentString)
+                .orElse(null);
+        return new BusinessProfile(jid, description, address, email, hours, cartEnabled, websites, categories, automatedType);
     }
 
     private static BusinessHours getBusinessHours(Node node, String timezone) {
@@ -119,6 +126,19 @@ public final class BusinessProfile {
 
     public List<BusinessCategory> categories() {
         return categories;
+    }
+
+    /**
+     * Returns the business bot automated type.
+     *
+     * @return {@code "1p_partial"} for first-party bots,
+     *         {@code "3p_full"} for third-party bots, or empty
+     *
+     * @apiNote WAWebBotTypes.BizBotAutomatedType: maps to
+     * {@code local_automated_type} on the {@code <bot>} stanza node.
+     */
+    public Optional<String> automatedType() {
+        return Optional.ofNullable(automatedType);
     }
 
     @Override

@@ -35,13 +35,13 @@ public final class DeviceFanoutCalculator {
      * @apiNote WAWebDBDeviceListFanout.getFanOutList: filters out sender's own device and
      * applies hosted device logic based on bizHostedDevicesEnabled and chat type.
      */
-    public Collection<Jid> calculate(
+    public Set<Jid> calculate(
             Jid senderJid,
-            Collection<DeviceList> deviceLists,
+            Set<DeviceList> deviceLists,
             Jid includeHostedForOneToOneChatJid
     ) {
         // WAWebDBDeviceListFanout.getFanOutList: uses Map with toString() key for deduplication
-        var results = new LinkedHashMap<String, Jid>();
+        var results = new HashSet<Jid>();
 
         // WAWebDBDeviceListFanout.getFanOutList: hosted devices are included for 1:1 user chats
         // when bizHostedDevicesEnabled is true AND the chat JID is a user type (not group)
@@ -63,7 +63,7 @@ public final class DeviceFanoutCalculator {
                 // WAWebDBDeviceListFanout: isMeAccount check - don't add self as fallback
                 if (!isSameAccount(userJid, senderJid)) {
                     var primaryJid = userJid.toUserJid();
-                    results.put(primaryJid.toString(), primaryJid);
+                    results.add(primaryJid);
                 }
                 continue;
             }
@@ -84,11 +84,11 @@ public final class DeviceFanoutCalculator {
                 }
 
                 // WAWebDBDeviceListFanout: uses toString() as Map key for deduplication
-                results.put(deviceJid.toString(), deviceJid);
+                results.add(deviceJid);
             }
         }
 
-        return Collections.unmodifiableCollection(results.values());
+        return Collections.unmodifiableSet(results);
     }
 
     /**
@@ -149,7 +149,7 @@ public final class DeviceFanoutCalculator {
      * @apiNote WAWebIdentityChangeApi: devices with pending identity change confirmation
      * are excluded from fanout until the user confirms the change.
      */
-    public Collection<Jid> filterIdentityChanges(Collection<Jid> devices, Set<Jid> changedIdentities) {
+    public Set<Jid> filterIdentityChanges(Set<Jid> devices, Set<Jid> changedIdentities) {
         if (changedIdentities.isEmpty()) {
             return devices;
         }

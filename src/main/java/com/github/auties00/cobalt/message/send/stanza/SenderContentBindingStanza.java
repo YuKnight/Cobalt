@@ -27,7 +27,7 @@ public final class SenderContentBindingStanza {
     private static final System.Logger LOGGER = System.getLogger("SenderContentBindingStanza");
 
     private SenderContentBindingStanza() {
-        throw new UnsupportedOperationException("Utility class");
+        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
     }
 
     /**

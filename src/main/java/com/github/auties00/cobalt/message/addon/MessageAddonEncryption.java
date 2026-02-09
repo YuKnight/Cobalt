@@ -10,6 +10,8 @@ import javax.crypto.spec.HKDFParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.NoSuchAlgorithmException;
 import java.util.Objects;
 
 /**
@@ -74,13 +76,7 @@ public final class MessageAddonEncryption {
 
         try {
             // Build use-case info
-            var info = buildUseCaseInfo(stanzaId, originalSender, addonSender, useCaseType);
-
-            // Derive use-case secret via HKDF
-            var kdf = KDF.getInstance(HKDF_ALGORITHM);
-            var secretKey = new SecretKeySpec(messageSecret, "AES");
-            var params = HKDFParameterSpec.expandOnly(secretKey, info, MessageAddonEncryption.HKDF_OUTPUT_SIZE);
-            var useCaseSecret = kdf.deriveData(params);
+            var useCaseSecret = deriveUseCaseSecret(messageSecret, stanzaId, originalSender, addonSender, useCaseType);
 
             // Generate random IV
             var iv = SecureBytes.random(AES_GCM_IV_SIZE);
@@ -140,13 +136,7 @@ public final class MessageAddonEncryption {
 
         try {
             // Build use-case info
-            var info = buildUseCaseInfo(stanzaId, originalSender, addonSender, useCaseType);
-
-            // Derive use-case secret via HKDF
-            var kdf = KDF.getInstance(HKDF_ALGORITHM);
-            var secretKey = new SecretKeySpec(messageSecret, "AES");
-            var params = HKDFParameterSpec.expandOnly(secretKey, info, MessageAddonEncryption.HKDF_OUTPUT_SIZE);
-            var useCaseSecret = kdf.deriveData(params);
+            var useCaseSecret = deriveUseCaseSecret(messageSecret, stanzaId, originalSender, addonSender, useCaseType);
 
             // Decrypt with AES-256-GCM
             var cipher = Cipher.getInstance(AES_GCM_ALGORITHM);
@@ -168,29 +158,33 @@ public final class MessageAddonEncryption {
         }
     }
 
+
     /**
-     * Builds the AAD (Additional Authenticated Data) for poll vote encryption.
-     * <p>
-     * Format: stanzaId + "\0" + addonSenderJid
-     * <p>
-     * This prevents vote substitution attacks where an attacker might try
-     * to copy an encrypted vote from one user to another.
+     * Derives the use case secret
      *
-     * @param stanzaId    the parent message's stanza ID
-     * @param addonSender the JID of the voter
-     * @return the AAD bytes
+     * @param messageSecret  the parent message's 32-byte secret
+     * @param stanzaId       the parent message's stanza ID
+     * @param originalSender the JID of the original message sender (poll creator)
+     * @param addonSender    the JID of the add-on sender (voter/reactor)
+     * @param useCaseType    the type of add-on
+     * @return the derived use case secret
      */
-    private static byte[] buildAad(String stanzaId, Jid addonSender) {
-        var stanzaIdBytes = stanzaId.getBytes(StandardCharsets.UTF_8);
-        var nullByte = new byte[]{0x00};
-        var senderBytes = addonSender.toString().getBytes(StandardCharsets.UTF_8);
+    private static byte[] deriveUseCaseSecret(
+            byte[] messageSecret,
+            String stanzaId,
+            Jid originalSender,
+            Jid addonSender,
+            MessageAddonType useCaseType
+    ) throws NoSuchAlgorithmException, InvalidAlgorithmParameterException {
+        // Build use-case info
+        var info = buildUseCaseInfo(stanzaId, originalSender, addonSender, useCaseType);
 
-        var aad = new byte[stanzaIdBytes.length + 1 + senderBytes.length];
-        System.arraycopy(stanzaIdBytes, 0, aad, 0, stanzaIdBytes.length);
-        System.arraycopy(nullByte, 0, aad, stanzaIdBytes.length, 1);
-        System.arraycopy(senderBytes, 0, aad, stanzaIdBytes.length + 1, senderBytes.length);
+        // Derive use-case secret via HKDF
+        var kdf = KDF.getInstance(HKDF_ALGORITHM);
+        var secretKey = new SecretKeySpec(messageSecret, "AES");
+        var params = HKDFParameterSpec.expandOnly(secretKey, info, MessageAddonEncryption.HKDF_OUTPUT_SIZE);
 
-        return aad;
+        return kdf.deriveData(params);
     }
 
     /**
@@ -222,7 +216,39 @@ public final class MessageAddonEncryption {
         offset += addonSenderBytes.length;
 
         System.arraycopy(useCaseBytes, 0, info, offset, useCaseBytes.length);
+        // No need to change offset
 
         return info;
+    }
+
+    /**
+     * Builds the AAD (Additional Authenticated Data) for poll vote encryption.
+     * <p>
+     * Format: stanzaId + "\0" + addonSenderJid
+     * <p>
+     * This prevents vote substitution attacks where an attacker might try
+     * to copy an encrypted vote from one user to another.
+     *
+     * @param stanzaId    the parent message's stanza ID
+     * @param addonSender the JID of the voter
+     * @return the AAD bytes
+     */
+    private static byte[] buildAad(String stanzaId, Jid addonSender) {
+        var stanzaIdBytes = stanzaId.getBytes(StandardCharsets.UTF_8);
+        var senderBytes = addonSender.toString().getBytes(StandardCharsets.UTF_8);
+
+        var aad = new byte[stanzaIdBytes.length + 1 + senderBytes.length];
+        var offset = 0;
+
+        System.arraycopy(stanzaIdBytes, 0, aad, offset, stanzaIdBytes.length);
+        offset += stanzaIdBytes.length;
+
+        aad[offset] = 0x00;
+        offset++;
+
+        System.arraycopy(senderBytes, 0, aad, offset, senderBytes.length);
+        // No need to change offset
+
+        return aad;
     }
 }

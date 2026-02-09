@@ -54,7 +54,7 @@ public final class MetaStanza {
      * WAWebEncryptAndSendStatusMsg: includes
      * {@code status_setting} in meta node for status stanzas.
      */
-    public Node build(Jid chatJid, MessageContainer container, String statusSetting) {
+    public Node buildChat(Jid chatJid, MessageContainer container, String statusSetting) {
         var message = container.content();
 
         // WAWebSendMsgMetaNode: determine polltype
@@ -86,7 +86,7 @@ public final class MetaStanza {
         }
 
         // WAWebSendMsgCreateFanoutStanza: resolve thread context from
-        // deviceInfo.threadId — AI threads set conversation_thread_id,
+        // deviceInfo.threadId - AI threads set conversation_thread_id,
         // non-AI threads set thread_msg_id and thread_msg_sender_jid
         String threadMsgId = null;
         Jid threadMsgSenderJid = null;
@@ -177,8 +177,56 @@ public final class MetaStanza {
             case EventMessage _ -> "creation";
             case SecretEncryptedMessage s
                     when s.secretEncType() == SecretEncryptedMessage.SecretEncType.EVENT_EDIT -> "edit";
-            case EncEventResponseMessage _ -> "response";
+            case EncryptedEventResponseMessage _ -> "response";
             default -> null;
         };
+    }
+
+    /**
+     * Builds a {@code <meta questiontype="question">} node for
+     * newsletter question messages.
+     *
+     * @return the meta node
+     *
+     * @apiNote WASmaxOutMessagePublishQuestionTypeQuestionMixin:
+     * {@code <meta questiontype="question">}
+     */
+    public static Node buildNewsletterQuestion() {
+        return new NodeBuilder()
+                .description("meta")
+                .attribute("questiontype", "question")
+                .build();
+    }
+
+    /**
+     * Builds a {@code <meta questiontype="reply">} node for
+     * newsletter question reply messages.
+     *
+     * @return the meta node
+     *
+     * @apiNote WASmaxOutMessagePublishQuestionTypeReplyMixin:
+     * {@code <meta questiontype="reply">}
+     */
+    public static Node buildNewsletterQuestionReply() {
+        return new NodeBuilder()
+                .description("meta")
+                .attribute("questiontype", "reply")
+                .build();
+    }
+
+    /**
+     * Builds a {@code <meta questiontype="response">} node for
+     * newsletter question response messages.
+     *
+     * @return the meta node
+     *
+     * @apiNote WASmaxOutMessagePublishQuestionTypeResponseMixin:
+     * {@code <meta questiontype="response">}
+     */
+    public static Node buildNewsletterQuestionResponse() {
+        return new NodeBuilder()
+                .description("meta")
+                .attribute("questiontype", "response")
+                .build();
     }
 }

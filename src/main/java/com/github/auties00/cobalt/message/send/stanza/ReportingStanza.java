@@ -5,7 +5,7 @@ import com.github.auties00.cobalt.model.info.ChatMessageInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.common.Message;
 import com.github.auties00.cobalt.model.message.common.MessageContainerSpec;
-import com.github.auties00.cobalt.model.message.standard.EncEventResponseMessage;
+import com.github.auties00.cobalt.model.message.standard.EncryptedEventResponseMessage;
 import com.github.auties00.cobalt.model.message.standard.EncryptedReactionMessage;
 import com.github.auties00.cobalt.model.message.standard.PollUpdateMessage;
 import com.github.auties00.cobalt.model.message.standard.ReactionMessage;
@@ -72,7 +72,7 @@ public final class ReportingStanza {
     public Node build(ChatMessageInfo messageInfo, Jid selfJid, Jid remoteJid) {
         // WAWebMessagingGatingUtils.isReportingTokenSendingEnabled:
         // rt_sender_reporting_token_version > 0
-        var senderVersion = abPropsService.getInt(ABProp.RT_SENDER_REPORTING_TOKEN_VERSION_AB_PROP_CODE)
+        int senderVersion = abPropsService.getInt(ABProp.RT_SENDER_REPORTING_TOKEN_VERSION_AB_PROP_CODE)
                 .orElse(DEFAULT_VERSION);
         if (senderVersion <= 0) {
             return null;
@@ -137,7 +137,7 @@ public final class ReportingStanza {
      */
     private static boolean isMsgTypeCompatible(Message message) {
         return switch (message) {
-            case ReactionMessage _, PollUpdateMessage _, EncryptedReactionMessage _, EncEventResponseMessage _ -> false;
+            case ReactionMessage _, PollUpdateMessage _, EncryptedReactionMessage _, EncryptedEventResponseMessage _ -> false;
             case null, default -> true;
         };
     }

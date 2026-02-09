@@ -5,11 +5,10 @@ import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.exception.WhatsAppMessageException;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryptedPayload;
-import com.github.auties00.cobalt.message.send.crypto.MessageSignalEncryptionType;
+import com.github.auties00.cobalt.message.MessageEncryptionType;
 import com.github.auties00.cobalt.message.send.ack.AckParser;
 import com.github.auties00.cobalt.message.send.ack.AckResult;
 import com.github.auties00.cobalt.message.send.ack.NackReason;
-import com.github.auties00.cobalt.message.send.queue.GroupSendQueue;
 import com.github.auties00.cobalt.message.send.senderkey.SenderKeyDistribution;
 import com.github.auties00.cobalt.message.send.stanza.*;
 import com.github.auties00.cobalt.message.send.token.ContentBindingToken;
@@ -26,17 +25,20 @@ import com.github.auties00.cobalt.props.ABPropsService;
 
 import java.security.GeneralSecurityException;
 import java.util.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
  * Sends messages to group chats ({@code group@g.us}).
  *
- * <p>Group messages are serialised per group via a {@link GroupSendQueue}
- * to maintain monotonic sender-key counters.  The primary path uses
- * sender-key (SKMSG) encryption: the message is encrypted once with
- * the group sender key, and a separate sender-key distribution message
- * is sent individually to new members who don't yet have the key.
+ * <p>The primary path uses sender-key (SKMSG) encryption: the message is
+ * encrypted once with the group sender key, and a separate sender-key
+ * distribution message is sent individually to new members who don't
+ * yet have the key.
  *
  * <p>When the server returns a phash mismatch, the delta devices receive
  * the message as a group-direct fanout (per-device encryption).
@@ -61,19 +63,18 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
 
     private final MessageEncryption encryption;
     private final DeviceService deviceService;
-    private final GroupSendQueue groupSendQueue;
     private final ABPropsService abPropsService;
     private final SenderKeyDistribution senderKeyDistribution;
     private final BotStanza botStanza;
     private final BizStanza bizStanza;
     private final MetaStanza metaStanza;
     private final ReportingStanza reportingStanza;
+    private final ConcurrentMap<String, ReentrantLock> locks;
 
     GroupMessageSender(
             WhatsAppClient client,
             MessageEncryption encryption,
             DeviceService deviceService,
-            GroupSendQueue groupSendQueue,
             ABPropsService abPropsService,
             SenderKeyDistribution senderKeyDistribution,
             BotStanza botStanza,
@@ -84,13 +85,41 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
         super(client);
         this.encryption = Objects.requireNonNull(encryption, "encryption");
         this.deviceService = Objects.requireNonNull(deviceService, "deviceService");
-        this.groupSendQueue = Objects.requireNonNull(groupSendQueue, "groupSendQueue");
         this.abPropsService = Objects.requireNonNull(abPropsService, "abPropsService");
         this.senderKeyDistribution = Objects.requireNonNull(senderKeyDistribution, "senderKeyDistribution");
         this.botStanza = Objects.requireNonNull(botStanza, "botStanza");
         this.bizStanza = Objects.requireNonNull(bizStanza, "bizStanza");
         this.metaStanza = Objects.requireNonNull(metaStanza, "metaStanza");
         this.reportingStanza = Objects.requireNonNull(reportingStanza, "reportingStanza");
+        this.locks = new ConcurrentHashMap<>();
+    }
+
+    /**
+     * Executes the given task while holding the lock for {@code key},
+     * ensuring mutual exclusion with other tasks enqueued under the same key.
+     *
+     * <p>Tasks enqueued under different keys may run concurrently.
+     *
+     * @param <T>  the result type
+     * @param key  the queue key (typically the group JID string)
+     * @param task the task to execute
+     * @return the result produced by {@code task}
+     * @throws NullPointerException if any argument is {@code null}
+     * @throws Exception if {@code task} throws
+     *
+     * @apiNote WAWebSendMsgQueueMap.sendMsgQueueMap.enqueue: serialises
+     * the send task per group JID string key.
+     */
+    private  <T> T enqueue(String key, Callable<T> task) throws Exception {
+        Objects.requireNonNull(key, "key");
+        Objects.requireNonNull(task, "task");
+        var lock = locks.computeIfAbsent(key, _ -> new ReentrantLock());
+        lock.lock();
+        try {
+            return task.call();
+        } finally {
+            lock.unlock();
+        }
     }
 
     @Override
@@ -99,7 +128,7 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
         try {
             // WAWebSendGroupMsgJob.encryptAndSendGroupMsg: enqueue per group to
             // serialise sender-key encryption (monotonic counter requirement)
-            return groupSendQueue.enqueue(groupJid.toString(), () -> {
+            return enqueue(groupJid.toString(), () -> {
                 var container = messageInfo.message();
 
                 // WAWebSendGroupSkmsgJob: resolve group metadata for addressing mode
@@ -185,12 +214,37 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
                     participantsNode = null;
                 }
 
+                // WAWebSendGroupSkmsgJob: build open group bot node when applicable
+                // WAWebBotGroupGatingUtils.isOpenGroupBotSendEnabled: AB prop gate
+                var isOpenBotGroup = groupMetadata != null && groupMetadata.isOpenBotGroup()
+                        && abPropsService.getBool(ABProp.OPEN_GROUP_BOT_SEND_ENABLED_AB_PROP_CODE)
+                                .orElse(false);
+                Node openBotNode = null;
+                if (isOpenBotGroup) {
+                    // WAWebSendGroupSkmsgJob function L: ensure sessions with
+                    // the bot device before encrypting
+                    deviceService.ensureSessions(List.of(Jid.metaAiBotAccount()));
+                    store.createOrMergeReceiptRecords(
+                            messageInfo.key().id(), List.of(Jid.metaAiBotAccount()));
+                    openBotNode = botStanza.buildForGroup(messageInfo, true);
+                }
+
                 // WAWebSendGroupSkmsgJob: identity node when any pkmsg
-                var identityNode = ParticipantsStanza.requiresIdentityNode(skDistPayloads)
-                        ? buildIdentityNode() : null;
+                // Also needed when open group bot encryption produced pkmsg
+                var needsIdentity = ParticipantsStanza.requiresIdentityNode(skDistPayloads);
+                if (!needsIdentity && openBotNode != null) {
+                    needsIdentity = openBotNode.streamChild("to")
+                            .flatMap(to -> to.streamChild("enc"))
+                            .anyMatch(enc -> "pkmsg".equals(enc.getAttributeAsString("type", null)));
+                }
+                var identityNode = needsIdentity ? buildIdentityNode() : null;
 
                 // WAWebSendGroupSkmsgJob: build and send the stanza
+                // Use the existing botStanza for 1:1 bot/feedback, or open group bot
                 var mediaType = resolveMediaType(container);
+                var botNode = openBotNode != null
+                        ? openBotNode
+                        : botStanza.build(messageInfo, groupJid);
                 var stanza = GroupSkmsgFanoutStanza.build(
                         messageInfo.key().id(),
                         groupJid,
@@ -203,9 +257,9 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
                         addressingMode,
                         participantsNode,
                         identityNode,
-                        metaStanza.build(groupJid, container, null),
+                        metaStanza.buildChat(groupJid, container, null),
                         bizStanza.buildGroup(container),
-                        botStanza.build(messageInfo, groupJid),
+                        botNode,
                         reportingStanza.build(messageInfo, requireSelfJid(), groupJid),
                         SenderContentBindingStanza.build(senderJid, contentBindings)
                 );
@@ -332,7 +386,8 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
     private static boolean isCagAddonMessage(MessageContainer container) {
         return switch (container.content()) {
             case EncryptedReactionMessage _ -> true;
-            case EncEventResponseMessage _ -> true;
+            case EncryptedCommentMessage _ -> true;
+            case EncryptedEventResponseMessage _ -> true;
             case PollUpdateMessage _ -> true;
             default -> false;
         };
@@ -393,7 +448,7 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
         var emptySkmsgNode = new NodeBuilder()
                 .description("enc")
                 .attribute("v", String.valueOf(MessageEncryption.CIPHERTEXT_VERSION))
-                .attribute("type", MessageSignalEncryptionType.SKMSG.protocolValue())
+                .attribute("type", MessageEncryptionType.SKMSG.protocolValue())
                 .attribute("mediatype", resolveMediaType(container))
                 .build();
 
@@ -415,7 +470,8 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
                 null,
                 null,
                 identityNode,
-                metaStanza.build(groupJid, container, null),
+                metaStanza.buildChat(groupJid, container, null),
+                null,
                 null,
                 null,
                 null,

@@ -187,6 +187,17 @@ public record ABProp(int code, String value, Long exposureKey) {
      */
     public static final int RT_SENDER_REPORTING_TOKEN_VERSION_AB_PROP_CODE = 8860;
 
+    /**
+     * Controls whether sending messages to the open Meta AI bot in
+     * groups is enabled.
+     *
+     * @apiNote WAWebBotGroupGatingUtils.isOpenGroupBotSendEnabled:
+     * checks {@code web_ai_group_open_support === true} AND
+     * {@code ai_group_participation_send_enabled === true}.
+     * WAWebABPropsConfigs: ai_group_participation_send_enabled:[22184,"bool",false,false]
+     */
+    public static final int OPEN_GROUP_BOT_SEND_ENABLED_AB_PROP_CODE = 22184;
+
     public ABProp {
         Objects.requireNonNull(value, "value cannot be null");
     }

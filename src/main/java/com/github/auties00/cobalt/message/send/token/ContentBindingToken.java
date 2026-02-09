@@ -68,7 +68,7 @@ public final class ContentBindingToken {
     private static final int YT_VIDEO_ID_LENGTH = 11;
 
     private ContentBindingToken() {
-        throw new UnsupportedOperationException("Utility class");
+        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
     }
 
     /**

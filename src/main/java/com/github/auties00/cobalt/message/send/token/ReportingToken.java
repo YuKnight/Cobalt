@@ -38,7 +38,7 @@ public final class ReportingToken {
      * Number of leading HMAC bytes kept as the reporting token.
      *
      * @apiNote WAWebReportingTokenUtils: {@code hmacSha256(key, content, 16)}
-     * — the third argument is the output length.
+     *          the third argument is the output length.
      */
     private static final int TOKEN_LENGTH = 16;
 
@@ -54,17 +54,14 @@ public final class ReportingToken {
 
     /**
      * The use-case secret modification type string used in the HKDF
-     * info parameter.
+     * info parameter for reporting token key derivation.
      *
-     * @apiNote WAWebReportingTokenUtils.genReportingTokenKeyFromMessageSecret:
-     * uses {@code WAUseCaseSecret.UseCaseSecretModificationType.REPORT_TOKEN}
-     * to build the info via {@code WABinary.Binary.build(stanzaId, senderJid,
-     * remoteJid, REPORT_TOKEN)}.
+     * @apiNote WAUseCaseSecret.UseCaseSecretModificationType.REPORT_TOKEN = "Report Token"
      */
-    private static final String USE_CASE_TYPE = "REPORT_TOKEN";
+    private static final String USE_CASE_TYPE = "Report Token";
 
     private ReportingToken() {
-        throw new UnsupportedOperationException("Utility class");
+        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
     }
 
     /**

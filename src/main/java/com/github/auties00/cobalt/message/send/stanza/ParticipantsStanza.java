@@ -14,18 +14,6 @@ import java.util.Map;
  * Builds {@code <participants>} stanza nodes that wrap per-device
  * encrypted payloads and optional content-binding tags.
  *
- * <p>Two variants are provided:
- * <ul>
- *   <li>{@link #buildSenderKeyDistribution buildSenderKeyDistribution} —
- *       for group SKMSG fanout, where each {@code <enc>} carries a
- *       sender-key distribution message with {@code decrypt-fail="hide"},
- *       and each {@code <to>} may include a {@code <content_binding>}
- *       child for RCAT verification.</li>
- *   <li>{@link #buildContentBindingOnly buildContentBindingOnly} — for
- *       group SKMSG fanout when no SK distribution is needed but RCAT
- *       content bindings exist for existing SK devices.</li>
- * </ul>
- *
  * @apiNote WAWebSendMsgCreateFanoutStanza: wraps per-device payloads
  * in {@code <to jid=...><enc ...>ciphertext</enc></to>} under
  * {@code <participants>}.
@@ -34,7 +22,7 @@ import java.util.Map;
  */
 public final class ParticipantsStanza {
     private ParticipantsStanza() {
-        throw new UnsupportedOperationException("Utility class");
+        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
     }
 
     /**

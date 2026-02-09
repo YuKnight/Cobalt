@@ -61,15 +61,6 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
     abstract AckResult send(Jid chatJid, T messageInfo);
 
     /**
-     * Persists the store's encryption state before sending the wire
-     * stanza, ensuring session keys and prekeys survive a crash.
-     *
-     * @apiNote WAWebEncryptAndSendStatusMsg, WAWebSendMsgJob,
-     * WAWebSendGroupSkmsgJob: all call
-     * {@code getSignalProtocolStore().flushBufferToDiskIfNotMemOnlyMode()}
-     * before the stanza is sent on the wire.
-     */
-    /**
      * Blocks until the offline message queue has been drained.
      *
      * @apiNote WAWebEventsWaitForOfflineDeliveryEnd: waits for the
@@ -79,6 +70,15 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
         store.waitForOfflineDeliveryEnd();
     }
 
+    /**
+     * Persists the store's encryption state before sending the wire
+     * stanza, ensuring session keys and prekeys survive a crash.
+     *
+     * @apiNote WAWebEncryptAndSendStatusMsg, WAWebSendMsgJob,
+     * WAWebSendGroupSkmsgJob: all call
+     * {@code getSignalProtocolStore().flushBufferToDiskIfNotMemOnlyMode()}
+     * before the stanza is sent on the wire.
+     */
     void flushStore() {
         store.serializer().serialize(store);
     }
@@ -196,7 +196,7 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
             // WAWebE2EProtoUtils: eventMessage, encEventResponseMessage,
             // secretEncryptedMessage(EVENT_EDIT) → "event"
             case EventMessage _ -> "event";
-            case EncEventResponseMessage _ -> "event";
+            case EncryptedEventResponseMessage _ -> "event";
             case SecretEncryptedMessage s
                     when s.secretEncType() == SecretEncryptedMessage.SecretEncType.EVENT_EDIT -> "event";
 
@@ -298,7 +298,7 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
             case PollUpdateMessage _ -> "hide";
             case KeepInChatMessage _ -> "hide";
             case PinInChatMessage _ -> "hide";
-            case EncEventResponseMessage _ -> "hide";
+            case EncryptedEventResponseMessage _ -> "hide";
             case SecretEncryptedMessage s
                     when s.secretEncType() == SecretEncryptedMessage.SecretEncType.EVENT_EDIT -> "hide";
             case ProtocolMessage p -> switch (p.protocolType()) {

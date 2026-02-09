@@ -5,7 +5,9 @@ import com.github.auties00.cobalt.model.message.standard.*;
 /**
  * A model interface that represents a message sent by a contact or by Whatsapp.
  */
-public sealed interface Message permits ButtonMessage, ContextualMessage, PaymentMessage, ServerMessage, CallMessage, EmptyMessage, KeepInChatMessage, NewsletterAdminInviteMessage, PollUpdateMessage, ReactionMessage {
+public sealed interface Message
+        permits ButtonMessage, ContextualMessage, EncryptedMessage, PaymentMessage, ServerMessage, CallMessage, CommentMessage, EmptyMessage, EventResponseMessage, KeepInChatMessage, NewsletterAdminInviteMessage, PollUpdateMessage, ReactionMessage,
+        BCallMessage, CallLogMessage, PlaceholderMessage, QuestionResponseMessage, ScheduledCallCreationMessage, ScheduledCallEditMessage, StatusNotificationMessage, StatusQuestionAnswerMessage, StatusQuotedMessage, StatusStickerInteractionMessage {
     /**
      * Return message type
      *
@@ -226,9 +228,149 @@ public sealed interface Message permits ButtonMessage, ContextualMessage, Paymen
          */
         EVENT,
         /**
+         * Event response
+         */
+        EVENT_RESPONSE,
+        /**
          * Poll result snapshot message
          */
-        POLL_RESULT_SNAPSHOT
+        POLL_RESULT_SNAPSHOT,
+        /**
+         * Comment message
+         */
+        COMMENT,
+        /**
+         * Encrypted comment message
+         */
+        ENCRYPTED_COMMENT,
+        /**
+         * Scheduled call creation
+         */
+        SCHEDULED_CALL_CREATION,
+        /**
+         * Scheduled call edit
+         */
+        SCHEDULED_CALL_EDIT,
+        /**
+         * Call log
+         */
+        CALL_LOG,
+        /**
+         * Message history bundle
+         */
+        MESSAGE_HISTORY_BUNDLE,
+        /**
+         * Business call
+         */
+        BCALL,
+        /**
+         * Placeholder
+         */
+        PLACEHOLDER,
+        /**
+         * Album
+         */
+        ALBUM,
+        /**
+         * Sticker pack
+         */
+        STICKER_PACK,
+        /**
+         * Status notification
+         */
+        STATUS_NOTIFICATION,
+        /**
+         * Message history notice
+         */
+        MESSAGE_HISTORY_NOTICE,
+        /**
+         * Status question answer
+         */
+        STATUS_QUESTION_ANSWER,
+        /**
+         * Question response
+         */
+        QUESTION_RESPONSE,
+        /**
+         * Status quoted
+         */
+        STATUS_QUOTED,
+        /**
+         * Status sticker interaction
+         */
+        STATUS_STICKER_INTERACTION,
+        /**
+         * Newsletter follower invite
+         */
+        NEWSLETTER_FOLLOWER_INVITE,
+        /**
+         * Newsletter question wrapper
+         */
+        NEWSLETTER_QUESTION,
+        /**
+         * Newsletter question reply wrapper
+         */
+        NEWSLETTER_QUESTION_REPLY,
+        /**
+         * Document with caption wrapper
+         */
+        DOCUMENT_WITH_CAPTION,
+        /**
+         * Bot invoke wrapper
+         */
+        BOT_INVOKE,
+        /**
+         * Group mentioned wrapper
+         */
+        GROUP_MENTIONED,
+        /**
+         * Lottie sticker wrapper
+         */
+        LOTTIE_STICKER,
+        /**
+         * Event cover image wrapper
+         */
+        EVENT_COVER_IMAGE,
+        /**
+         * Status mention wrapper
+         */
+        STATUS_MENTION,
+        /**
+         * Poll creation option image wrapper
+         */
+        POLL_CREATION_OPTION_IMAGE,
+        /**
+         * Associated child message wrapper
+         */
+        ASSOCIATED_CHILD,
+        /**
+         * Group status mention wrapper
+         */
+        GROUP_STATUS_MENTION,
+        /**
+         * Status add yours wrapper
+         */
+        STATUS_ADD_YOURS,
+        /**
+         * Group status wrapper
+         */
+        GROUP_STATUS,
+        /**
+         * Limit sharing wrapper
+         */
+        LIMIT_SHARING,
+        /**
+         * Bot task wrapper
+         */
+        BOT_TASK,
+        /**
+         * Bot forwarded wrapper
+         */
+        BOT_FORWARDED,
+        /**
+         * Newsletter admin profile wrapper
+         */
+        NEWSLETTER_ADMIN_PROFILE
     }
 
     /**
@@ -253,9 +395,9 @@ public sealed interface Message permits ButtonMessage, ContextualMessage, Paymen
          */
         SERVER,
         /**
-         * Device message
+         * Encrypted
          */
-        DEVICE,
+        ENCRYPTED,
         /**
          * Standard message
          */
