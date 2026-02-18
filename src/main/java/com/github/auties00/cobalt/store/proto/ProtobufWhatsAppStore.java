@@ -4,9 +4,8 @@ package com.github.auties00.cobalt.store.proto;
 import com.github.auties00.cobalt.client.*;
 import com.github.auties00.cobalt.client.info.WhatsAppClientInfo;
 import com.github.auties00.cobalt.media.MediaConnection;
-import com.github.auties00.cobalt.model.auth.SignedDeviceIdentity;
-import com.github.auties00.cobalt.model.auth.UserAgent.ReleaseChannel;
-import com.github.auties00.cobalt.model.auth.Version;
+import com.github.auties00.cobalt.model.device.pairing.ClientPayload.ClientReleaseChannel;
+import com.github.auties00.cobalt.model.device.pairing.ClientPayload.UserAgent.AppVersion;
 import com.github.auties00.cobalt.model.business.profile.BusinessCategory;
 import com.github.auties00.cobalt.model.business.VerifiedBusinessName;
 import com.github.auties00.cobalt.model.call.CallOffer;
@@ -18,15 +17,14 @@ import com.github.auties00.cobalt.model.contact.ContactBuilder;
 import com.github.auties00.cobalt.model.device.info.DeviceList;
 import com.github.auties00.cobalt.model.device.sync.MissingDeviceSyncKey;
 import com.github.auties00.cobalt.model.device.sync.PendingDeviceSync;
-import com.github.auties00.cobalt.model.info.ChatMessageInfo;
-import com.github.auties00.cobalt.model.info.MessageInfo;
+import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.mixin.InstantMillisMixin;
 import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidDevice;
 import com.github.auties00.cobalt.model.jid.JidProvider;
 import com.github.auties00.cobalt.model.jid.JidServer;
-import com.github.auties00.cobalt.model.message.ChatMessageKey;
+import com.github.auties00.cobalt.model.message.MessageKey;
 import com.github.auties00.cobalt.model.newsletter.Newsletter;
 import com.github.auties00.cobalt.model.newsletter.NewsletterBuilder;
 import com.github.auties00.cobalt.model.newsletter.NewsletterSpec;
@@ -90,7 +88,7 @@ public final class ProtobufWhatsAppStore implements WhatsAppStore {
     JidDevice device;
 
     @ProtobufProperty(index = 7, type = ProtobufType.ENUM)
-    ReleaseChannel releaseChannel;
+    ClientReleaseChannel releaseChannel;
 
     @ProtobufProperty(index = 9, type = ProtobufType.BOOL)
     boolean online;
@@ -350,7 +348,7 @@ public final class ProtobufWhatsAppStore implements WhatsAppStore {
             WhatsAppClientType clientType,
             long initializationTimeStamp,
             JidDevice device,
-            ReleaseChannel releaseChannel,
+            ClientReleaseChannel releaseChannel,
             boolean online,
             String locale,
             String name,
@@ -446,7 +444,7 @@ public final class ProtobufWhatsAppStore implements WhatsAppStore {
         this.webHistoryPolicy = webHistoryPolicy;
         this.automaticPresenceUpdates = automaticPresenceUpdates;
         this.automaticMessageReceipts = automaticMessageReceipts;
-        this.releaseChannel = Objects.requireNonNullElse(releaseChannel, ReleaseChannel.RELEASE);
+        this.releaseChannel = Objects.requireNonNullElse(releaseChannel, ClientReleaseChannel.RELEASE);
         this.device = Objects.requireNonNull(device, "device cannot be null");
         this.checkPatchMacs = checkPatchMacs;
         this.syncedChats = syncedChats;
@@ -1026,11 +1024,11 @@ public final class ProtobufWhatsAppStore implements WhatsAppStore {
         return this;
     }
 
-    public ReleaseChannel releaseChannel() {
+    public ClientReleaseChannel releaseChannel() {
         return releaseChannel;
     }
 
-    public WhatsAppStore setReleaseChannel(ReleaseChannel releaseChannel) {
+    public WhatsAppStore setReleaseChannel(ClientReleaseChannel releaseChannel) {
         this.releaseChannel = Objects.requireNonNull(releaseChannel, "releaseChannel cannot be null");
         return this;
     }
@@ -2045,7 +2043,7 @@ public final class ProtobufWhatsAppStore implements WhatsAppStore {
         privacySettings.put(entry.type(), entry);
     }
 
-    public Optional<ChatMessageInfo> findChatMessageByKey(ChatMessageKey key) {
+    public Optional<ChatMessageInfo> findChatMessageByKey(MessageKey key) {
         var chat = chats.get(key.chatJid());
         if(chat == null) {
             return Optional.empty();

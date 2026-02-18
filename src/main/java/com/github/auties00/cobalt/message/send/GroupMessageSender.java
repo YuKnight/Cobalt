@@ -14,7 +14,7 @@ import com.github.auties00.cobalt.message.send.stanza.*;
 import com.github.auties00.cobalt.message.send.token.ContentBindingToken;
 import com.github.auties00.cobalt.model.chat.group.GroupMetadata;
 import com.github.auties00.cobalt.model.chat.group.GroupParticipant;
-import com.github.auties00.cobalt.model.info.ChatMessageInfo;
+import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.MessageContainer;
 import com.github.auties00.cobalt.model.message.MessageContainerSpec;

@@ -1,13 +1,13 @@
 package com.github.auties00.cobalt.model.message.text;
 
-import com.github.auties00.cobalt.model.message.ContextInfo;
-import com.github.auties00.cobalt.model.message.ContextualMessage;
+import com.github.auties00.cobalt.model.message.context.ContextInfo;
+import com.github.auties00.cobalt.model.message.context.ContextualMessage;
 import com.github.auties00.cobalt.model.message.media.EmbeddedMusic;
 import com.github.auties00.cobalt.model.message.payment.PaymentExtendedMetadata;
 import com.github.auties00.cobalt.model.message.payment.PaymentLinkMetadata;
-import com.github.auties00.cobalt.model.message.util.LinkPreviewMetadata;
-import com.github.auties00.cobalt.model.message.util.MMSThumbnailMetadata;
-import com.github.auties00.cobalt.model.message.util.VideoEndCard;
+import com.github.auties00.cobalt.model.message.media.MessageLinkPreviewMetadata;
+import com.github.auties00.cobalt.model.message.media.MessageMMSThumbnailMetadata;
+import com.github.auties00.cobalt.model.message.media.MessageVideoEndCard;
 
 import java.time.Instant;
 import java.util.Collections;
@@ -95,16 +95,16 @@ public final class ExtendedTextMessage implements ContextualMessage {
     Integer videoWidth;
 
     @ProtobufProperty(index = 33, type = ProtobufType.MESSAGE)
-    MMSThumbnailMetadata faviconMMSMetadata;
+    MessageMMSThumbnailMetadata faviconMMSMetadata;
 
     @ProtobufProperty(index = 34, type = ProtobufType.MESSAGE)
-    LinkPreviewMetadata linkPreviewMetadata;
+    MessageLinkPreviewMetadata linkPreviewMetadata;
 
     @ProtobufProperty(index = 35, type = ProtobufType.MESSAGE)
     PaymentLinkMetadata paymentLinkMetadata;
 
     @ProtobufProperty(index = 36, type = ProtobufType.MESSAGE)
-    List<VideoEndCard> endCardTiles;
+    List<MessageVideoEndCard> endCardTiles;
 
     @ProtobufProperty(index = 37, type = ProtobufType.STRING)
     String videoContentUrl;
@@ -116,7 +116,7 @@ public final class ExtendedTextMessage implements ContextualMessage {
     PaymentExtendedMetadata paymentExtendedMetadata;
 
 
-    ExtendedTextMessage(String text, String matchedText, String description, String title, Integer textArgb, Integer backgroundArgb, FontType font, PreviewType previewType, byte[] jpegThumbnail, ContextInfo contextInfo, Boolean doNotPlayInline, String thumbnailDirectPath, byte[] thumbnailSha256, byte[] thumbnailEncSha256, byte[] mediaKey, Instant mediaKeyTimestamp, Integer thumbnailHeight, Integer thumbnailWidth, InviteLinkGroupType inviteLinkGroupType, String inviteLinkParentGroupSubjectV2, byte[] inviteLinkParentGroupThumbnailV2, InviteLinkGroupType inviteLinkGroupTypeV2, Boolean viewOnce, Integer videoHeight, Integer videoWidth, MMSThumbnailMetadata faviconMMSMetadata, LinkPreviewMetadata linkPreviewMetadata, PaymentLinkMetadata paymentLinkMetadata, List<VideoEndCard> endCardTiles, String videoContentUrl, EmbeddedMusic musicMetadata, PaymentExtendedMetadata paymentExtendedMetadata) {
+    ExtendedTextMessage(String text, String matchedText, String description, String title, Integer textArgb, Integer backgroundArgb, FontType font, PreviewType previewType, byte[] jpegThumbnail, ContextInfo contextInfo, Boolean doNotPlayInline, String thumbnailDirectPath, byte[] thumbnailSha256, byte[] thumbnailEncSha256, byte[] mediaKey, Instant mediaKeyTimestamp, Integer thumbnailHeight, Integer thumbnailWidth, InviteLinkGroupType inviteLinkGroupType, String inviteLinkParentGroupSubjectV2, byte[] inviteLinkParentGroupThumbnailV2, InviteLinkGroupType inviteLinkGroupTypeV2, Boolean viewOnce, Integer videoHeight, Integer videoWidth, MessageMMSThumbnailMetadata faviconMMSMetadata, MessageLinkPreviewMetadata linkPreviewMetadata, PaymentLinkMetadata paymentLinkMetadata, List<MessageVideoEndCard> endCardTiles, String videoContentUrl, EmbeddedMusic musicMetadata, PaymentExtendedMetadata paymentExtendedMetadata) {
         this.text = text;
         this.matchedText = matchedText;
         this.description = description;
@@ -251,11 +251,11 @@ public final class ExtendedTextMessage implements ContextualMessage {
         return videoWidth == null ? OptionalInt.empty() : OptionalInt.of(videoWidth);
     }
 
-    public Optional<MMSThumbnailMetadata> faviconMMSMetadata() {
+    public Optional<MessageMMSThumbnailMetadata> faviconMMSMetadata() {
         return Optional.ofNullable(faviconMMSMetadata);
     }
 
-    public Optional<LinkPreviewMetadata> linkPreviewMetadata() {
+    public Optional<MessageLinkPreviewMetadata> linkPreviewMetadata() {
         return Optional.ofNullable(linkPreviewMetadata);
     }
 
@@ -263,7 +263,7 @@ public final class ExtendedTextMessage implements ContextualMessage {
         return Optional.ofNullable(paymentLinkMetadata);
     }
 
-    public List<VideoEndCard> endCardTiles() {
+    public List<MessageVideoEndCard> endCardTiles() {
         return endCardTiles == null ? List.of() : Collections.unmodifiableList(endCardTiles);
     }
 
@@ -404,12 +404,12 @@ public final class ExtendedTextMessage implements ContextualMessage {
         return this;
     }
 
-    public ExtendedTextMessage setFaviconMMSMetadata(MMSThumbnailMetadata faviconMMSMetadata) {
+    public ExtendedTextMessage setFaviconMMSMetadata(MessageMMSThumbnailMetadata faviconMMSMetadata) {
         this.faviconMMSMetadata = faviconMMSMetadata;
         return this;
     }
 
-    public ExtendedTextMessage setLinkPreviewMetadata(LinkPreviewMetadata linkPreviewMetadata) {
+    public ExtendedTextMessage setLinkPreviewMetadata(MessageLinkPreviewMetadata linkPreviewMetadata) {
         this.linkPreviewMetadata = linkPreviewMetadata;
         return this;
     }
@@ -419,7 +419,7 @@ public final class ExtendedTextMessage implements ContextualMessage {
         return this;
     }
 
-    public ExtendedTextMessage setEndCardTiles(List<VideoEndCard> endCardTiles) {
+    public ExtendedTextMessage setEndCardTiles(List<MessageVideoEndCard> endCardTiles) {
         this.endCardTiles = endCardTiles;
         return this;
     }

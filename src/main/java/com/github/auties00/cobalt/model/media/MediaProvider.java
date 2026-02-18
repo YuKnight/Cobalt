@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.model.media;
 
-import com.github.auties00.cobalt.model.action.StickerAction;
-import com.github.auties00.cobalt.model.message.MediaMessage;
+import com.github.auties00.cobalt.model.sync.action.media.StickerAction;
+import com.github.auties00.cobalt.model.message.media.MediaMessage;
 import com.github.auties00.cobalt.model.preference.Sticker;
 import com.github.auties00.cobalt.model.sync.ExternalBlobReference;
 import com.github.auties00.cobalt.model.sync.HistorySyncNotification;

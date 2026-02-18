@@ -1,8 +1,6 @@
 package com.github.auties00.cobalt.model.message.media;
 
-import com.github.auties00.cobalt.model.message.ContextInfo;
-import com.github.auties00.cobalt.model.message.MediaMessage;
-import com.github.auties00.cobalt.model.message.util.MediaKeyDomain;
+import com.github.auties00.cobalt.model.message.context.ContextInfo;
 
 import java.time.Instant;
 import it.auties.protobuf.annotation.*;
@@ -74,10 +72,10 @@ public final class StickerMessage implements MediaMessage {
     String accessibilityLabel;
 
     @ProtobufProperty(index = 23, type = ProtobufType.ENUM)
-    MediaKeyDomain mediaKeyDomain;
+    MediaMessageKeyDomain mediaKeyDomain;
 
 
-    StickerMessage(String url, byte[] fileSha256, byte[] fileEncSha256, byte[] mediaKey, String mimetype, Integer height, Integer width, String directPath, Long fileLength, Instant mediaKeyTimestamp, Integer firstFrameLength, byte[] firstFrameSidecar, Boolean isAnimated, byte[] pngThumbnail, ContextInfo contextInfo, Instant stickerSentTs, Boolean isAvatar, Boolean isAiSticker, Boolean isLottie, String accessibilityLabel, MediaKeyDomain mediaKeyDomain) {
+    StickerMessage(String url, byte[] fileSha256, byte[] fileEncSha256, byte[] mediaKey, String mimetype, Integer height, Integer width, String directPath, Long fileLength, Instant mediaKeyTimestamp, Integer firstFrameLength, byte[] firstFrameSidecar, Boolean isAnimated, byte[] pngThumbnail, ContextInfo contextInfo, Instant stickerSentTs, Boolean isAvatar, Boolean isAiSticker, Boolean isLottie, String accessibilityLabel, MediaMessageKeyDomain mediaKeyDomain) {
         this.url = url;
         this.fileSha256 = fileSha256;
         this.fileEncSha256 = fileEncSha256;
@@ -181,7 +179,7 @@ public final class StickerMessage implements MediaMessage {
         return Optional.ofNullable(accessibilityLabel);
     }
 
-    public Optional<MediaKeyDomain> mediaKeyDomain() {
+    public Optional<MediaMessageKeyDomain> mediaKeyDomain() {
         return Optional.ofNullable(mediaKeyDomain);
     }
 
@@ -285,7 +283,7 @@ public final class StickerMessage implements MediaMessage {
         return this;
     }
 
-    public StickerMessage setMediaKeyDomain(MediaKeyDomain mediaKeyDomain) {
+    public StickerMessage setMediaKeyDomain(MediaMessageKeyDomain mediaKeyDomain) {
         this.mediaKeyDomain = mediaKeyDomain;
         return this;
     }

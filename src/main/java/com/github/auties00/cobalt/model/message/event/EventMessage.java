@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.model.message.event;
 
-import com.github.auties00.cobalt.model.message.ContextInfo;
-import com.github.auties00.cobalt.model.message.ContextualMessage;
+import com.github.auties00.cobalt.model.message.context.ContextInfo;
+import com.github.auties00.cobalt.model.message.context.ContextualMessage;
 import com.github.auties00.cobalt.model.message.location.LocationMessage;
 
 import java.time.Instant;

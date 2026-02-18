@@ -3,7 +3,7 @@ package com.github.auties00.cobalt.sync.exchange;
 import com.github.auties00.cobalt.model.sync.PatchSyncSpec;
 import com.github.auties00.cobalt.model.sync.SnapshotSyncSpec;
 import com.github.auties00.cobalt.model.sync.PatchSync;
-import com.github.auties00.cobalt.model.sync.PatchType;
+import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.SnapshotSync;
 import com.github.auties00.cobalt.node.Node;
 
@@ -24,7 +24,7 @@ public final class MutationResponseParser {
         // Extract collection metadata
         var collectionName = collectionNode.getAttributeAsString("name")
                 .orElseThrow(() -> new IllegalArgumentException("Collection missing 'name' attribute"));
-        var patchType = PatchType.of(collectionName)
+        var patchType = SyncPatchType.of(collectionName)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid collection name: " + collectionName));
 
         var version = collectionNode.getAttributeAsLong("version")

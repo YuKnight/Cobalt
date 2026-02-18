@@ -8,8 +8,8 @@ import com.github.auties00.cobalt.message.send.icdc.IcdcEnricher;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.MessageContainer;
 import com.github.auties00.cobalt.model.message.MessageContainerSpec;
-import com.github.auties00.cobalt.model.message.server.DeviceSentMessageBuilder;
-import com.github.auties00.cobalt.model.message.server.SenderKeyDistributionMessageBuilder;
+import com.github.auties00.cobalt.model.message.system.DeviceSentMessageBuilder;
+import com.github.auties00.cobalt.model.message.group.SenderKeyDistributionMessageBuilder;
 import com.github.auties00.cobalt.store.WhatsAppStore;
 
 import java.util.*;

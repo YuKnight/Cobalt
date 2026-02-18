@@ -4,11 +4,10 @@ package com.github.auties00.cobalt.store.db;
 import com.github.auties00.cobalt.client.*;
 import com.github.auties00.cobalt.client.info.WhatsAppClientInfo;
 import com.github.auties00.cobalt.media.MediaConnection;
-import com.github.auties00.cobalt.model.auth.SignedDeviceIdentity;
-import com.github.auties00.cobalt.model.auth.SignedDeviceIdentitySpec;
-import com.github.auties00.cobalt.model.auth.UserAgent.ReleaseChannel;
-import com.github.auties00.cobalt.model.auth.Version;
-import com.github.auties00.cobalt.model.auth.VersionSpec;
+import com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentitySpec;
+import com.github.auties00.cobalt.model.device.pairing.ClientPayload.ClientReleaseChannel;
+import com.github.auties00.cobalt.model.device.pairing.ClientPayload.UserAgent.AppVersion;
+import com.github.auties00.cobalt.model.device.pairing.ClientPayload.UserAgent.AppVersionSpec;
 import com.github.auties00.cobalt.model.call.CallOffer;
 import com.github.auties00.cobalt.model.chat.ChatEphemeralTimer;
 import com.github.auties00.cobalt.model.chat.ChatMetadata;
@@ -34,8 +33,8 @@ import com.github.auties00.cobalt.model.device.info.DeviceList;
 import com.github.auties00.cobalt.model.device.sync.MissingDeviceSyncKey;
 import com.github.auties00.cobalt.model.device.MissingDeviceSyncKeySpec;
 import com.github.auties00.cobalt.model.device.sync.PendingDeviceSync;
-import com.github.auties00.cobalt.model.info.*;
-import com.github.auties00.cobalt.model.message.ChatMessageKey;
+import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.model.message.MessageKey;
 import com.github.auties00.cobalt.model.newsletter.Newsletter;
 import com.github.auties00.cobalt.model.newsletter.NewsletterBuilder;
 import com.github.auties00.cobalt.model.newsletter.NewsletterSpec;
@@ -154,7 +153,7 @@ public final class DatabaseWhatsAppStore implements WhatsAppStore {
     private final byte[] backupToken;
     private Long phoneNumber;
     private JidDevice device;
-    private ReleaseChannel releaseChannel;
+    private ClientReleaseChannel releaseChannel;
     private boolean online;
     private String locale;
     private String name;
@@ -254,7 +253,7 @@ public final class DatabaseWhatsAppStore implements WhatsAppStore {
         this.identityId = Objects.requireNonNull(identityId);
         this.backupToken = Objects.requireNonNull(backupToken);
         this.device = Objects.requireNonNull(device);
-        this.releaseChannel = ReleaseChannel.RELEASE;
+        this.releaseChannel = ClientReleaseChannel.RELEASE;
         this.newChatsEphemeralTimer = ChatEphemeralTimer.OFF;
         try {
             this.connection = DriverManager.getConnection(jdbcUrl);
@@ -622,7 +621,7 @@ public final class DatabaseWhatsAppStore implements WhatsAppStore {
         var dev = getProto("device", JidDeviceSpec::decode);
         if (dev != null) this.device = dev;
         var rc = getString("releaseChannel", null);
-        if (rc != null) { try { this.releaseChannel = ReleaseChannel.valueOf(rc); } catch (IllegalArgumentException ignored) {} }
+        if (rc != null) { try { this.releaseChannel = ClientReleaseChannel.valueOf(rc); } catch (IllegalArgumentException ignored) {} }
         this.online = getBool("online", false);
         this.locale = getString("locale", null);
         this.name = getString("name", null);
@@ -784,8 +783,8 @@ public final class DatabaseWhatsAppStore implements WhatsAppStore {
     @Override public JidDevice device() { return device; }
     @Override public WhatsAppStore setDevice(JidDevice v) { this.device = Objects.requireNonNull(v); putProto("device", v, JidDeviceSpec::encode); return this; }
 
-    @Override public ReleaseChannel releaseChannel() { return releaseChannel; }
-    @Override public WhatsAppStore setReleaseChannel(ReleaseChannel v) { this.releaseChannel = Objects.requireNonNull(v); putString("releaseChannel", v.name()); return this; }
+    @Override public ClientReleaseChannel releaseChannel() { return releaseChannel; }
+    @Override public WhatsAppStore setReleaseChannel(ClientReleaseChannel v) { this.releaseChannel = Objects.requireNonNull(v); putString("releaseChannel", v.name()); return this; }
 
     @Override public boolean online() { return online; }
     @Override public WhatsAppStore setOnline(boolean v) { this.online = v; putBool("online", v); return this; }
@@ -1285,7 +1284,7 @@ public final class DatabaseWhatsAppStore implements WhatsAppStore {
     }
 
     @Override
-    public Optional<ChatMessageInfo> findChatMessageByKey(ChatMessageKey key) {
+    public Optional<ChatMessageInfo> findChatMessageByKey(MessageKey key) {
         return key == null ? Optional.empty()
                 : findChatByJid(key.chatJid()).flatMap(chat -> findMessageById(chat, key.id()));
     }

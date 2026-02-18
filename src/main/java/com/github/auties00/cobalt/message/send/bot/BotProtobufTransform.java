@@ -1,9 +1,9 @@
 package com.github.auties00.cobalt.message.send.bot;
 
-import com.github.auties00.cobalt.model.info.ContextInfo;
-import com.github.auties00.cobalt.model.message.ContextualMessage;
+import com.github.auties00.cobalt.model.message.context.ContextInfo;
+import com.github.auties00.cobalt.model.message.context.ContextualMessage;
 import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.server.ProtocolMessage;
+import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
 import com.github.auties00.cobalt.model.sync.BotFeedbackMessage;
 import com.github.auties00.cobalt.store.WhatsAppStore;
 

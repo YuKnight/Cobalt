@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.message.send.icdc;
 
 import com.github.auties00.cobalt.device.icdc.IcdcResult;
-import com.github.auties00.cobalt.model.info.DeviceContextInfoBuilder;
+import com.github.auties00.cobalt.model.device.DeviceListMetadataBuilder;
 import com.github.auties00.cobalt.model.message.MessageContainer;
 import com.github.auties00.cobalt.model.sync.DeviceListMetadataBuilder;
 

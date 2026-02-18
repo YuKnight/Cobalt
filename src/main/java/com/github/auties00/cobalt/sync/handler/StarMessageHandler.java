@@ -2,10 +2,9 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
-import com.github.auties00.cobalt.model.info.ChatMessageInfo;
-import com.github.auties00.cobalt.model.info.MessageInfo;
+import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
-import com.github.auties00.cobalt.model.info.QuotedMessageInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 

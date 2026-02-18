@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.sync.crypto;
 
 import com.github.auties00.cobalt.model.sync.ActionDataSyncBuilder;
 import com.github.auties00.cobalt.model.sync.ActionDataSyncSpec;
-import com.github.auties00.cobalt.model.sync.PendingMutation;
+import com.github.auties00.cobalt.model.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.model.sync.RecordSync.Operation;
 import com.github.auties00.cobalt.util.SecureBytes;
 
@@ -24,7 +24,7 @@ public record EncryptedMutation(
     private static final byte[] VERSION = {0x00, 0x00, 0x00, 0x02};
 
     public static EncryptedMutation of(
-            PendingMutation patch,
+            SyncPendingMutation patch,
             MutationKeys keys,
             byte[] keyId
     ) throws GeneralSecurityException {

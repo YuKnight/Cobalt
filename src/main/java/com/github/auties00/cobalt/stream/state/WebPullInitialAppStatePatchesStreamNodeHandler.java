@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.stream.state;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
-import com.github.auties00.cobalt.model.sync.PatchType;
+import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.stream.SocketStream;
 
@@ -15,7 +15,7 @@ public final class WebPullInitialAppStatePatchesStreamNodeHandler extends Socket
         if (!whatsapp.store().hasPreKeys() || whatsapp.store().syncedWebAppState()) {
             return;
         }
-        whatsapp.pullWebAppState(PatchType.values());
+        whatsapp.pullWebAppState(SyncPatchType.values());
         whatsapp.store()
                 .setSyncedWebAppState(true);
     }

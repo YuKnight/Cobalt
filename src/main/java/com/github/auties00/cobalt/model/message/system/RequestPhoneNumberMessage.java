@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.model.message.system;
 
-import com.github.auties00.cobalt.model.message.ContextInfo;
-import com.github.auties00.cobalt.model.message.ContextualMessage;
+import com.github.auties00.cobalt.model.message.context.ContextInfo;
+import com.github.auties00.cobalt.model.message.context.ContextualMessage;
 
 import it.auties.protobuf.annotation.*;
 import it.auties.protobuf.model.*;

@@ -1,6 +1,5 @@
 package com.github.auties00.cobalt.model.device.info;
 
-import com.github.auties00.cobalt.model.device.DeviceListBuilder;
 import com.github.auties00.cobalt.model.device.identity.ADVEncryptionType;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.mixin.InstantMillisMixin;

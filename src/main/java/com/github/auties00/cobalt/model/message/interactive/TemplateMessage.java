@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.model.message.interactive;
 
-import com.github.auties00.cobalt.model.message.ContextInfo;
-import com.github.auties00.cobalt.model.message.ContextualMessage;
+import com.github.auties00.cobalt.model.message.context.ContextInfo;
+import com.github.auties00.cobalt.model.message.context.ContextualMessage;
 import com.github.auties00.cobalt.model.message.location.LocationMessage;
 import com.github.auties00.cobalt.model.message.media.DocumentMessage;
 import com.github.auties00.cobalt.model.message.media.ImageMessage;

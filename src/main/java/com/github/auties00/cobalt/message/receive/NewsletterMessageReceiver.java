@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.message.receive;
 
 import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
-import com.github.auties00.cobalt.model.info.NewsletterMessageInfoBuilder;
+import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfoBuilder;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.MessageStatus;
 import com.github.auties00.cobalt.node.Node;

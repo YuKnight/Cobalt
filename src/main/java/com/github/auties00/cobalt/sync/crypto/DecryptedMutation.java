@@ -1,9 +1,9 @@
 package com.github.auties00.cobalt.sync.crypto;
 
 import com.github.auties00.cobalt.exception.WhatsAppWebAppStateSyncException;
-import com.github.auties00.cobalt.model.sync.ActionDataSyncSpec;
-import com.github.auties00.cobalt.model.sync.ActionValueSync;
-import com.github.auties00.cobalt.model.sync.RecordSync;
+import com.github.auties00.cobalt.model.sync.SyncActionData;
+import com.github.auties00.cobalt.model.sync.SyncActionValue;
+import com.github.auties00.cobalt.model.sync.data.SyncdMutation;
 import it.auties.protobuf.stream.ProtobufInputStream;
 
 import javax.crypto.Cipher;
@@ -18,15 +18,15 @@ import java.util.Arrays;
 
 public sealed interface DecryptedMutation {
     String index();
-    RecordSync.Operation operation();
+    SyncdMutation.SyncdOperation operation();
     long timestamp();
 
     record Untrusted(
             String index,
             byte[] indexMac,
             byte[] valueMac,
-            ActionValueSync value,
-            RecordSync.Operation operation,
+            SyncActionValue value,
+            SyncdMutation.SyncdOperation operation,
             long timestamp
     ) implements DecryptedMutation {
         private static final int IV_LENGTH = 16;
@@ -37,16 +37,16 @@ public sealed interface DecryptedMutation {
                 byte[] encryptedValue,
                 byte[] indexMac,
                 MutationKeys keys,
-                RecordSync.Operation operation
+                SyncdMutation.SyncdOperation operation
         ) throws GeneralSecurityException {
             if (encryptedValue.length < IV_LENGTH + MAC_LENGTH) {
                 throw new IllegalArgumentException("Encrypted value too short");
             }
 
-            // 1. Extract value MAC
+            // Extract value MAC
             var valueMac = Arrays.copyOfRange(encryptedValue, encryptedValue.length - 32, encryptedValue.length);
 
-            // 2. Verify value MAC
+            // Verify value MAC
             var mac = Mac.getInstance("HmacSHA256");
             mac.init(keys.valueMacKey());
             mac.update(operation.content());
@@ -58,22 +58,22 @@ public sealed interface DecryptedMutation {
                 throw new WhatsAppWebAppStateSyncException.ValueMacMismatch();
             }
 
-            // 3. Decrypt payload with AES-256-CBC and decode protobuf
+            // Decrypt payload with AES-256-CBC and decode protobuf
             var cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
             var ivSpec = new IvParameterSpec(encryptedValue, 0, IV_LENGTH);
             cipher.init(Cipher.DECRYPT_MODE, keys.valueEncryptionKey(), ivSpec);
             var ciphertextStream = new ByteArrayInputStream(encryptedValue, IV_LENGTH, encryptedValue.length - IV_LENGTH - MAC_LENGTH);
             var plaintextStream = new CipherInputStream(ciphertextStream, cipher);
-            var actionData = ActionDataSyncSpec.decode(ProtobufInputStream.fromStream(plaintextStream));
+            var actionData = SyncActionDataSpec.decode(ProtobufInputStream.fromStream(plaintextStream));
 
-            // 4. Verify index MAC
+            // Verify index MAC
             mac.init(keys.indexKey());
             var expectedIndexMac = mac.doFinal(actionData.index());
             if (!MessageDigest.isEqual(indexMac, expectedIndexMac)) {
                 throw new WhatsAppWebAppStateSyncException.IndexMacMismatch();
             }
 
-            // 5. Build mutation
+            // Build mutation
             return new Untrusted(
                     new String(actionData.index(), StandardCharsets.UTF_8),
                     indexMac,
@@ -87,8 +87,8 @@ public sealed interface DecryptedMutation {
 
     record Trusted(
             String index,
-            ActionValueSync value,
-            RecordSync.Operation operation,
+            SyncActionValue value,
+            SyncdMutation.SyncdOperation operation,
             long timestamp
     ) implements DecryptedMutation {
 

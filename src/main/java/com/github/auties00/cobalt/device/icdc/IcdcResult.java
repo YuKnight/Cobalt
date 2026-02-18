@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.device.icdc;
 
-import com.github.auties00.cobalt.model.auth.ADVEncryptionType;
+import com.github.auties00.cobalt.model.device.identity.ADVEncryptionType;
 
 import java.time.Instant;
 import java.util.Collections;

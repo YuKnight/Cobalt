@@ -17,14 +17,14 @@ import com.github.auties00.cobalt.exception.WhatsAppAdvValidationException;
 import com.github.auties00.cobalt.exception.WhatsAppDeviceSyncException;
 import com.github.auties00.cobalt.exception.WhatsAppWebAppStateSyncException;
 import com.github.auties00.cobalt.device.key.DevicePreKeyHandler;
-import com.github.auties00.cobalt.model.auth.ADVEncryptionType;
-import com.github.auties00.cobalt.model.auth.SignedDeviceIdentity;
+import com.github.auties00.cobalt.model.device.identity.ADVEncryptionType;
+import com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentity;
 import com.github.auties00.cobalt.model.chat.group.GroupParticipant;
-import com.github.auties00.cobalt.model.info.ChatMessageInfoBuilder;
-import com.github.auties00.cobalt.model.info.MessageInfoStubType;
+import com.github.auties00.cobalt.model.chat.ChatMessageInfoBuilder;
+import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.ChatMessageKey;
-import com.github.auties00.cobalt.model.message.ChatMessageKeyBuilder;
+import com.github.auties00.cobalt.model.message.MessageKey;
+import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
 import com.github.auties00.cobalt.model.message.MessageStatus;
 import com.github.auties00.cobalt.model.device.info.DeviceInfo;
 import com.github.auties00.cobalt.model.device.info.DeviceList;
@@ -978,8 +978,8 @@ public final class DeviceService {
                 ? MessageInfoStubType.E2E_ENCRYPTED_NOW
                 : MessageInfoStubType.CIPHERTEXT;
 
-        var key = new ChatMessageKeyBuilder()
-                .id(ChatMessageKey.randomId(store.clientType()))
+        var key = new MessageKeyBuilder()
+                .id(MessageKey.randomId(store.clientType()))
                 .chatJid(chat.jid())
                 .senderJid(userJid)
 

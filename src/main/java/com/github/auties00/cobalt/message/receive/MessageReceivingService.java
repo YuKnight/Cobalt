@@ -3,7 +3,7 @@ package com.github.auties00.cobalt.message.receive;
 import com.github.auties00.cobalt.exception.WhatsAppMessageException;
 import com.github.auties00.cobalt.message.dedup.MessageDedup;
 import com.github.auties00.cobalt.message.receive.crypto.MessageDecryption;
-import com.github.auties00.cobalt.model.info.MessageInfo;
+import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.store.WhatsAppStore;

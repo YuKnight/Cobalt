@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.message.receive;
 
 import com.github.auties00.cobalt.message.receive.stanza.MessageReceiveStanza;
-import com.github.auties00.cobalt.model.info.MessageInfo;
+import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.MessageContainer;
 import com.github.auties00.cobalt.model.message.MessageContainerSpec;

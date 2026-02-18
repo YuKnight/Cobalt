@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.model.chat;
 
 import com.github.auties00.cobalt.model.chat.group.GroupParticipant;
 import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.model.jid.JidProvider;
 import com.github.auties00.cobalt.model.media.MediaVisibility;
 import com.github.auties00.cobalt.model.message.PrivacySystemMessage;
 import com.github.auties00.cobalt.model.mixin.InstantMillisMixin;
@@ -17,7 +18,7 @@ import java.time.Instant;
 import java.util.*;
 
 @ProtobufMessage(name = "Conversation")
-public final class Chat {
+public final class Chat implements JidProvider {
     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
     Jid jid;
 
@@ -236,6 +237,11 @@ public final class Chat {
         this.limitSharingTrigger = limitSharingTrigger;
         this.limitSharingInitiatedByMe = limitSharingInitiatedByMe;
         this.maibaAiThreadEnabled = maibaAiThreadEnabled;
+    }
+
+    @Override
+    public Jid toJid() {
+        return jid;
     }
 
     public Jid jid() {

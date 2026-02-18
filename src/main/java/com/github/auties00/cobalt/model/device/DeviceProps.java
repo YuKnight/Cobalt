@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.model.device;
 
+import com.github.auties00.cobalt.model.device.pairing.ClientAppVersion;
 import it.auties.protobuf.annotation.*;
 import it.auties.protobuf.model.*;
 import java.util.Optional;
@@ -11,7 +12,7 @@ public final class DeviceProps {
     String os;
 
     @ProtobufProperty(index = 2, type = ProtobufType.MESSAGE)
-    AppVersion version;
+    ClientAppVersion version;
 
     @ProtobufProperty(index = 3, type = ProtobufType.ENUM)
     DevicePlatformType platformType;
@@ -23,7 +24,7 @@ public final class DeviceProps {
     HistorySyncConfig historySyncConfig;
 
 
-    DeviceProps(String os, AppVersion version, DevicePlatformType platformType, Boolean requireFullSync, HistorySyncConfig historySyncConfig) {
+    DeviceProps(String os, ClientAppVersion version, DevicePlatformType platformType, Boolean requireFullSync, HistorySyncConfig historySyncConfig) {
         this.os = os;
         this.version = version;
         this.platformType = platformType;
@@ -35,7 +36,7 @@ public final class DeviceProps {
         return Optional.ofNullable(os);
     }
 
-    public Optional<AppVersion> version() {
+    public Optional<ClientAppVersion> version() {
         return Optional.ofNullable(version);
     }
 
@@ -56,7 +57,7 @@ public final class DeviceProps {
         return this;
     }
 
-    public DeviceProps setVersion(AppVersion version) {
+    public DeviceProps setVersion(ClientAppVersion version) {
         this.version = version;
         return this;
     }
@@ -74,78 +75,6 @@ public final class DeviceProps {
     public DeviceProps setHistorySyncConfig(HistorySyncConfig historySyncConfig) {
         this.historySyncConfig = historySyncConfig;
         return this;
-    }
-
-    @ProtobufMessage(name = "DeviceProps.AppVersion")
-    public static final class AppVersion {
-        @ProtobufProperty(index = 1, type = ProtobufType.UINT32)
-        Integer primary;
-
-        @ProtobufProperty(index = 2, type = ProtobufType.UINT32)
-        Integer secondary;
-
-        @ProtobufProperty(index = 3, type = ProtobufType.UINT32)
-        Integer tertiary;
-
-        @ProtobufProperty(index = 4, type = ProtobufType.UINT32)
-        Integer quaternary;
-
-        @ProtobufProperty(index = 5, type = ProtobufType.UINT32)
-        Integer quinary;
-
-
-        AppVersion(Integer primary, Integer secondary, Integer tertiary, Integer quaternary, Integer quinary) {
-            this.primary = primary;
-            this.secondary = secondary;
-            this.tertiary = tertiary;
-            this.quaternary = quaternary;
-            this.quinary = quinary;
-        }
-
-        public OptionalInt primary() {
-            return primary == null ? OptionalInt.empty() : OptionalInt.of(primary);
-        }
-
-        public OptionalInt secondary() {
-            return secondary == null ? OptionalInt.empty() : OptionalInt.of(secondary);
-        }
-
-        public OptionalInt tertiary() {
-            return tertiary == null ? OptionalInt.empty() : OptionalInt.of(tertiary);
-        }
-
-        public OptionalInt quaternary() {
-            return quaternary == null ? OptionalInt.empty() : OptionalInt.of(quaternary);
-        }
-
-        public OptionalInt quinary() {
-            return quinary == null ? OptionalInt.empty() : OptionalInt.of(quinary);
-        }
-
-        public AppVersion setPrimary(Integer primary) {
-            this.primary = primary;
-            return this;
-        }
-
-        public AppVersion setSecondary(Integer secondary) {
-            this.secondary = secondary;
-            return this;
-        }
-
-        public AppVersion setTertiary(Integer tertiary) {
-            this.tertiary = tertiary;
-            return this;
-        }
-
-        public AppVersion setQuaternary(Integer quaternary) {
-            this.quaternary = quaternary;
-            return this;
-        }
-
-        public AppVersion setQuinary(Integer quinary) {
-            this.quinary = quinary;
-            return this;
-        }
     }
 
     @ProtobufMessage(name = "DeviceProps.HistorySyncConfig")

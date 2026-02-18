@@ -1,8 +1,6 @@
 package com.github.auties00.cobalt.model.message.media;
 
-import com.github.auties00.cobalt.model.message.ContextInfo;
-import com.github.auties00.cobalt.model.message.MediaMessage;
-import com.github.auties00.cobalt.model.message.util.MediaKeyDomain;
+import com.github.auties00.cobalt.model.message.context.ContextInfo;
 
 import java.time.Instant;
 import it.auties.protobuf.annotation.*;
@@ -77,10 +75,10 @@ public final class DocumentMessage implements InteractiveHeader, InteractiveMess
     String accessibilityLabel;
 
     @ProtobufProperty(index = 22, type = ProtobufType.ENUM)
-    MediaKeyDomain mediaKeyDomain;
+    MediaMessageKeyDomain mediaKeyDomain;
 
 
-    DocumentMessage(String url, String mimetype, String title, byte[] fileSha256, Long fileLength, Integer pageCount, byte[] mediaKey, String fileName, byte[] fileEncSha256, String directPath, Instant mediaKeyTimestamp, Boolean contactVcard, String thumbnailDirectPath, byte[] thumbnailSha256, byte[] thumbnailEncSha256, byte[] jpegThumbnail, ContextInfo contextInfo, Integer thumbnailHeight, Integer thumbnailWidth, String caption, String accessibilityLabel, MediaKeyDomain mediaKeyDomain) {
+    DocumentMessage(String url, String mimetype, String title, byte[] fileSha256, Long fileLength, Integer pageCount, byte[] mediaKey, String fileName, byte[] fileEncSha256, String directPath, Instant mediaKeyTimestamp, Boolean contactVcard, String thumbnailDirectPath, byte[] thumbnailSha256, byte[] thumbnailEncSha256, byte[] jpegThumbnail, ContextInfo contextInfo, Integer thumbnailHeight, Integer thumbnailWidth, String caption, String accessibilityLabel, MediaMessageKeyDomain mediaKeyDomain) {
         this.url = url;
         this.mimetype = mimetype;
         this.title = title;
@@ -189,7 +187,7 @@ public final class DocumentMessage implements InteractiveHeader, InteractiveMess
         return Optional.ofNullable(accessibilityLabel);
     }
 
-    public Optional<MediaKeyDomain> mediaKeyDomain() {
+    public Optional<MediaMessageKeyDomain> mediaKeyDomain() {
         return Optional.ofNullable(mediaKeyDomain);
     }
 
@@ -298,7 +296,7 @@ public final class DocumentMessage implements InteractiveHeader, InteractiveMess
         return this;
     }
 
-    public DocumentMessage setMediaKeyDomain(MediaKeyDomain mediaKeyDomain) {
+    public DocumentMessage setMediaKeyDomain(MediaMessageKeyDomain mediaKeyDomain) {
         this.mediaKeyDomain = mediaKeyDomain;
         return this;
     }

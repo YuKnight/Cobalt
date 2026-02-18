@@ -12,8 +12,8 @@ import com.github.auties00.cobalt.model.message.interactive.InteractiveMessageAd
 import com.github.auties00.cobalt.model.message.location.LiveLocationMessage;
 import com.github.auties00.cobalt.model.message.status.StatusMentionMessage;
 import com.github.auties00.cobalt.model.message.status.StatusPSA;
-import com.github.auties00.cobalt.model.message.util.Citation;
-import com.github.auties00.cobalt.model.message.util.ReportingTokenInfo;
+import com.github.auties00.cobalt.model.message.MessageCitation;
+import com.github.auties00.cobalt.model.message.MessageReportingTokenInfo;
 import com.github.auties00.cobalt.model.mixin.InstantMillisMixin;
 import com.github.auties00.cobalt.model.mixin.InstantSecondsMixin;
 import com.github.auties00.cobalt.model.payment.PaymentInfo;
@@ -27,15 +27,15 @@ import java.time.Instant;
 import java.util.*;
 
 @ProtobufMessage(name = "WebMessageInfo")
-public final class ChatMessageInfo {
+public final class ChatMessageInfo implements MessageInfo {
     @ProtobufProperty(index = 1, type = ProtobufType.MESSAGE)
     MessageKey key;
 
     @ProtobufProperty(index = 2, type = ProtobufType.MESSAGE)
-    MessageContainer messageContainer;
+    MessageContainer message;
 
     @ProtobufProperty(index = 3, type = ProtobufType.UINT64, mixins = InstantSecondsMixin.class)
-    Instant messageTimestamp;
+    Instant timestamp;
 
     @ProtobufProperty(index = 4, type = ProtobufType.ENUM)
     MessageStatus status;
@@ -44,7 +44,7 @@ public final class ChatMessageInfo {
     String participant;
 
     @ProtobufProperty(index = 6, type = ProtobufType.UINT64, mixins = InstantSecondsMixin.class)
-    Instant messageC2STimestamp;
+    Instant c2STimestamp;
 
     @ProtobufProperty(index = 16, type = ProtobufType.BOOL)
     Boolean ignore;
@@ -71,13 +71,13 @@ public final class ChatMessageInfo {
     Boolean urlNumber;
 
     @ProtobufProperty(index = 24, type = ProtobufType.ENUM)
-    StubType messageStubType;
+    StubType stubType;
 
     @ProtobufProperty(index = 25, type = ProtobufType.BOOL)
     Boolean clearMedia;
 
     @ProtobufProperty(index = 26, type = ProtobufType.STRING)
-    List<String> messageStubParameters;
+    List<String> stubParameters;
 
     @ProtobufProperty(index = 27, type = ProtobufType.UINT32)
     Integer duration;
@@ -119,7 +119,7 @@ public final class ChatMessageInfo {
     PhotoChange photoChange;
 
     @ProtobufProperty(index = 40, type = ProtobufType.MESSAGE)
-    List<MessageReceipt> messageReceipt;
+    List<MessageReceipt> receipts;
 
     @ProtobufProperty(index = 41, type = ProtobufType.MESSAGE)
     List<Reaction> reactions;
@@ -179,7 +179,7 @@ public final class ChatMessageInfo {
     List<EventResponse> eventResponses;
 
     @ProtobufProperty(index = 62, type = ProtobufType.MESSAGE)
-    ReportingTokenInfo reportingTokenInfo;
+    MessageReportingTokenInfo reportingTokenInfo;
 
     @ProtobufProperty(index = 63, type = ProtobufType.UINT64)
     Long newsletterServerId;
@@ -209,7 +209,7 @@ public final class ChatMessageInfo {
     List<String> statusMentionSources;
 
     @ProtobufProperty(index = 72, type = ProtobufType.MESSAGE)
-    List<Citation> supportAiCitations;
+    List<MessageCitation> supportAiCitations;
 
     @ProtobufProperty(index = 73, type = ProtobufType.STRING)
     String botTargetId;
@@ -230,13 +230,13 @@ public final class ChatMessageInfo {
     Integer nonJidMentions;
 
 
-    ChatMessageInfo(MessageKey key, MessageContainer messageContainer, Instant messageTimestamp, MessageStatus status, String participant, Instant messageC2STimestamp, Boolean ignore, Boolean starred, Boolean broadcast, String pushName, byte[] mediaCiphertextSha256, Boolean multicast, Boolean urlText, Boolean urlNumber, StubType messageStubType, Boolean clearMedia, List<String> messageStubParameters, Integer duration, List<String> labels, PaymentInfo paymentInfo, LiveLocationMessage finalLiveLocation, PaymentInfo quotedPaymentInfo, Instant ephemeralStartTimestamp, Integer ephemeralDuration, Boolean ephemeralOffToOn, Boolean ephemeralOutOfSync, BizPrivacyStatus bizPrivacyStatus, String verifiedBizName, MediaData mediaData, PhotoChange photoChange, List<MessageReceipt> messageReceipt, List<Reaction> reactions, MediaData quotedStickerData, byte[] futureproofData, StatusPSA statusPsa, List<PollVoteRecord> pollUpdates, PollAdditionalMetadata pollAdditionalMetadata, String agentId, Boolean statusAlreadyViewed, byte[] messageSecret, KeepInChat keepInChat, Jid originalSelfAuthorUserJidString, Instant revokeMessageTimestamp, PinInChat pinInChat, PremiumMessageInfo premiumMessageInfo, Boolean is1PBizBotMessage, Boolean isGroupHistoryMessage, Jid botMessageInvokerJid, ChatCommentMetadata commentMetadata, List<EventResponse> eventResponses, ReportingTokenInfo reportingTokenInfo, Long newsletterServerId, EventAdditionalMetadata eventAdditionalMetadata, Boolean isMentionedInStatus, List<String> statusMentions, MessageKey targetMessageId, List<MessageAddOn> messageAddOns, StatusMentionMessage statusMentionMessageInfo, Boolean isSupportAiMessage, List<String> statusMentionSources, List<Citation> supportAiCitations, String botTargetId, GroupHistoryIndividualMessageInfo groupHistoryIndividualMessageInfo, GroupHistoryBundleInfo groupHistoryBundleInfo, InteractiveMessageAdditionalMetadata interactiveMessageAdditionalMetadata, QuarantinedMessage quarantinedMessage, Integer nonJidMentions) {
+    ChatMessageInfo(MessageKey key, MessageContainer messageContainer, Instant messageTimestamp, MessageStatus status, String participant, Instant c2STimestamp, Boolean ignore, Boolean starred, Boolean broadcast, String pushName, byte[] mediaCiphertextSha256, Boolean multicast, Boolean urlText, Boolean urlNumber, StubType stubType, Boolean clearMedia, List<String> stubParameters, Integer duration, List<String> labels, PaymentInfo paymentInfo, LiveLocationMessage finalLiveLocation, PaymentInfo quotedPaymentInfo, Instant ephemeralStartTimestamp, Integer ephemeralDuration, Boolean ephemeralOffToOn, Boolean ephemeralOutOfSync, BizPrivacyStatus bizPrivacyStatus, String verifiedBizName, MediaData mediaData, PhotoChange photoChange, List<MessageReceipt> receipts, List<Reaction> reactions, MediaData quotedStickerData, byte[] futureproofData, StatusPSA statusPsa, List<PollVoteRecord> pollUpdates, PollAdditionalMetadata pollAdditionalMetadata, String agentId, Boolean statusAlreadyViewed, byte[] messageSecret, KeepInChat keepInChat, Jid originalSelfAuthorUserJidString, Instant revokeMessageTimestamp, PinInChat pinInChat, PremiumMessageInfo premiumMessageInfo, Boolean is1PBizBotMessage, Boolean isGroupHistoryMessage, Jid botMessageInvokerJid, ChatCommentMetadata commentMetadata, List<EventResponse> eventResponses, MessageReportingTokenInfo reportingTokenInfo, Long newsletterServerId, EventAdditionalMetadata eventAdditionalMetadata, Boolean isMentionedInStatus, List<String> statusMentions, MessageKey targetMessageId, List<MessageAddOn> messageAddOns, StatusMentionMessage statusMentionMessageInfo, Boolean isSupportAiMessage, List<String> statusMentionSources, List<MessageCitation> supportAiCitations, String botTargetId, GroupHistoryIndividualMessageInfo groupHistoryIndividualMessageInfo, GroupHistoryBundleInfo groupHistoryBundleInfo, InteractiveMessageAdditionalMetadata interactiveMessageAdditionalMetadata, QuarantinedMessage quarantinedMessage, Integer nonJidMentions) {
         this.key = Objects.requireNonNull(key);
-        this.messageContainer = messageContainer;
-        this.messageTimestamp = messageTimestamp;
+        this.message = messageContainer;
+        this.timestamp = messageTimestamp;
         this.status = status;
         this.participant = participant;
-        this.messageC2STimestamp = messageC2STimestamp;
+        this.c2STimestamp = c2STimestamp;
         this.ignore = ignore;
         this.starred = starred;
         this.broadcast = broadcast;
@@ -245,9 +245,9 @@ public final class ChatMessageInfo {
         this.multicast = multicast;
         this.urlText = urlText;
         this.urlNumber = urlNumber;
-        this.messageStubType = messageStubType;
+        this.stubType = stubType;
         this.clearMedia = clearMedia;
-        this.messageStubParameters = messageStubParameters;
+        this.stubParameters = stubParameters;
         this.duration = duration;
         this.labels = labels;
         this.paymentInfo = paymentInfo;
@@ -261,7 +261,7 @@ public final class ChatMessageInfo {
         this.verifiedBizName = verifiedBizName;
         this.mediaData = mediaData;
         this.photoChange = photoChange;
-        this.messageReceipt = messageReceipt;
+        this.receipts = receipts;
         this.reactions = reactions;
         this.quotedStickerData = quotedStickerData;
         this.futureproofData = futureproofData;
@@ -300,18 +300,22 @@ public final class ChatMessageInfo {
         this.nonJidMentions = nonJidMentions;
     }
 
+    @Override
     public MessageKey key() {
         return key;
     }
 
-    public Optional<MessageContainer> message() {
-        return Optional.ofNullable(messageContainer);
+    @Override
+    public MessageContainer message() {
+        return message != null ? message : MessageContainer.empty();
     }
 
-    public Optional<Instant> messageTimestamp() {
-        return Optional.ofNullable(messageTimestamp);
+    @Override
+    public Optional<Instant> timestamp() {
+        return Optional.ofNullable(timestamp);
     }
 
+    @Override
     public Optional<MessageStatus> status() {
         return Optional.ofNullable(status);
     }
@@ -321,13 +325,14 @@ public final class ChatMessageInfo {
     }
 
     public Optional<Instant> messageC2STimestamp() {
-        return Optional.ofNullable(messageC2STimestamp);
+        return Optional.ofNullable(c2STimestamp);
     }
 
     public boolean ignore() {
         return ignore != null && ignore;
     }
 
+    @Override
     public boolean starred() {
         return starred != null && starred;
     }
@@ -357,7 +362,7 @@ public final class ChatMessageInfo {
     }
 
     public Optional<StubType> messageStubType() {
-        return Optional.ofNullable(messageStubType);
+        return Optional.ofNullable(stubType);
     }
 
     public boolean clearMedia() {
@@ -365,7 +370,7 @@ public final class ChatMessageInfo {
     }
 
     public List<String> messageStubParameters() {
-        return messageStubParameters == null ? List.of() : Collections.unmodifiableList(messageStubParameters);
+        return stubParameters == null ? List.of() : Collections.unmodifiableList(stubParameters);
     }
 
     public OptionalInt duration() {
@@ -420,8 +425,9 @@ public final class ChatMessageInfo {
         return Optional.ofNullable(photoChange);
     }
 
-    public List<MessageReceipt> userReceipt() {
-        return messageReceipt == null ? List.of() : Collections.unmodifiableList(messageReceipt);
+    @Override
+    public List<MessageReceipt> receipts() {
+        return receipts == null ? List.of() : Collections.unmodifiableList(receipts);
     }
 
     public List<Reaction> reactions() {
@@ -500,7 +506,7 @@ public final class ChatMessageInfo {
         return eventResponses == null ? List.of() : Collections.unmodifiableList(eventResponses);
     }
 
-    public Optional<ReportingTokenInfo> reportingTokenInfo() {
+    public Optional<MessageReportingTokenInfo> reportingTokenInfo() {
         return Optional.ofNullable(reportingTokenInfo);
     }
 
@@ -540,7 +546,7 @@ public final class ChatMessageInfo {
         return statusMentionSources == null ? List.of() : Collections.unmodifiableList(statusMentionSources);
     }
 
-    public List<Citation> supportAiCitations() {
+    public List<MessageCitation> supportAiCitations() {
         return supportAiCitations == null ? List.of() : Collections.unmodifiableList(supportAiCitations);
     }
 
@@ -574,12 +580,12 @@ public final class ChatMessageInfo {
     }
 
     public ChatMessageInfo setMessage(MessageContainer messageContainer) {
-        this.messageContainer = messageContainer;
+        this.message = messageContainer;
         return this;
     }
 
-    public ChatMessageInfo setMessageTimestamp(Instant messageTimestamp) {
-        this.messageTimestamp = messageTimestamp;
+    public ChatMessageInfo setTimestamp(Instant timestamp) {
+        this.timestamp = timestamp;
         return this;
     }
 
@@ -593,8 +599,8 @@ public final class ChatMessageInfo {
         return this;
     }
 
-    public ChatMessageInfo setMessageC2STimestamp(Instant messageC2STimestamp) {
-        this.messageC2STimestamp = messageC2STimestamp;
+    public ChatMessageInfo setC2STimestamp(Instant c2STimestamp) {
+        this.c2STimestamp = c2STimestamp;
         return this;
     }
 
@@ -638,8 +644,8 @@ public final class ChatMessageInfo {
         return this;
     }
 
-    public ChatMessageInfo setMessageStubType(StubType messageStubType) {
-        this.messageStubType = messageStubType;
+    public ChatMessageInfo setStubType(StubType stubType) {
+        this.stubType = stubType;
         return this;
     }
 
@@ -648,8 +654,8 @@ public final class ChatMessageInfo {
         return this;
     }
 
-    public ChatMessageInfo setMessageStubParameters(List<String> messageStubParameters) {
-        this.messageStubParameters = messageStubParameters;
+    public ChatMessageInfo setStubParameters(List<String> stubParameters) {
+        this.stubParameters = stubParameters;
         return this;
     }
 
@@ -718,8 +724,8 @@ public final class ChatMessageInfo {
         return this;
     }
 
-    public ChatMessageInfo setUserReceipt(List<MessageReceipt> messageReceipt) {
-        this.messageReceipt = messageReceipt;
+    public ChatMessageInfo setReceipts(List<MessageReceipt> messageReceipt) {
+        this.receipts = messageReceipt;
         return this;
     }
 
@@ -818,7 +824,7 @@ public final class ChatMessageInfo {
         return this;
     }
 
-    public ChatMessageInfo setReportingTokenInfo(ReportingTokenInfo reportingTokenInfo) {
+    public ChatMessageInfo setReportingTokenInfo(MessageReportingTokenInfo reportingTokenInfo) {
         this.reportingTokenInfo = reportingTokenInfo;
         return this;
     }
@@ -868,7 +874,7 @@ public final class ChatMessageInfo {
         return this;
     }
 
-    public ChatMessageInfo setSupportAiCitations(List<Citation> supportAiCitations) {
+    public ChatMessageInfo setSupportAiCitations(List<MessageCitation> supportAiCitations) {
         this.supportAiCitations = supportAiCitations;
         return this;
     }

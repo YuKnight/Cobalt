@@ -1,5 +1,7 @@
-package com.github.auties00.cobalt.model.message;
+package com.github.auties00.cobalt.model.message.context;
 
+import com.github.auties00.cobalt.model.message.media.MediaMessage;
+import com.github.auties00.cobalt.model.message.Message;
 import com.github.auties00.cobalt.model.message.call.CallOfferMessage;
 import com.github.auties00.cobalt.model.message.commerce.*;
 import com.github.auties00.cobalt.model.message.contact.ContactMessage;
@@ -35,7 +37,7 @@ import java.util.Optional;
  * subtypes of this interface expose a {@code contextInfo} accessor and setter.
  */
 public sealed interface ContextualMessage extends Message permits
-    MediaMessage,
+        MediaMessage,
     AlbumMessage,
     ButtonsMessage,
     ButtonsResponseMessage,

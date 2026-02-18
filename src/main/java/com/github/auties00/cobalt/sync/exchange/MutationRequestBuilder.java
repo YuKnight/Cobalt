@@ -5,9 +5,9 @@ import com.github.auties00.cobalt.sync.crypto.EncryptedMutation;
 import com.github.auties00.cobalt.sync.crypto.MutationKeys;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
-import com.github.auties00.cobalt.model.sync.PendingMutation;
-import com.github.auties00.cobalt.model.sync.AppStateSyncHash;
-import com.github.auties00.cobalt.model.sync.PatchType;
+import com.github.auties00.cobalt.model.sync.SyncPendingMutation;
+import com.github.auties00.cobalt.model.sync.SyncHashValue;
+import com.github.auties00.cobalt.model.sync.SyncPatchType;
 
 import java.security.GeneralSecurityException;
 import java.util.ArrayList;
@@ -21,11 +21,11 @@ public final class MutationRequestBuilder {
         this.whatsapp = whatsapp;
     }
 
-    public NodeBuilder buildSyncRequest(PatchType patchType, SequencedCollection<PendingMutation> patches) {
+    public NodeBuilder buildSyncRequest(SyncPatchType patchType, SequencedCollection<SyncPendingMutation> patches) {
         // Get current hash state for this collection
         var hashState = whatsapp.store()
                 .findWebAppHashStateByName(patchType)
-                .orElseGet(() -> new AppStateSyncHash(patchType));
+                .orElseGet(() -> new SyncHashValue(patchType));
 
         // Encrypt mutations if we have any to push
         var mutationNodes = encryptMutations(patches);
@@ -73,7 +73,7 @@ public final class MutationRequestBuilder {
     }
 
 
-    private SequencedCollection<Node> encryptMutations(SequencedCollection<PendingMutation> patches) {
+    private SequencedCollection<Node> encryptMutations(SequencedCollection<SyncPendingMutation> patches) {
         if(patches.isEmpty()) {
             return List.of();
         }

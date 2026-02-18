@@ -2,7 +2,8 @@ package com.github.auties00.cobalt.device.adv;
 
 import com.github.auties00.cobalt.device.DeviceConstants;
 import com.github.auties00.cobalt.exception.WhatsAppAdvValidationException;
-import com.github.auties00.cobalt.model.auth.*;
+import com.github.auties00.cobalt.model.device.pairing.*;
+import com.github.auties00.cobalt.model.device.identity.*;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.props.ABProp;

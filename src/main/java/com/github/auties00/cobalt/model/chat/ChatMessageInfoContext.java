@@ -4,7 +4,7 @@ import com.github.auties00.cobalt.model.bot.BotMetadata;
 import com.github.auties00.cobalt.model.message.MessageAssociation;
 import com.github.auties00.cobalt.model.message.MessageThreadId;
 import com.github.auties00.cobalt.model.device.DeviceListMetadata;
-import com.github.auties00.cobalt.model.message.MessageLinkRender;
+import com.github.auties00.cobalt.model.message.media.MessageLinkRender;
 import com.github.auties00.cobalt.model.message.addon.MessageAddOnContextInfo;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;

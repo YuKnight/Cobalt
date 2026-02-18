@@ -1,4 +1,4 @@
-package com.github.auties00.cobalt.model.message;
+package com.github.auties00.cobalt.model.message.media;
 
 import it.auties.protobuf.annotation.ProtobufEnum;
 import it.auties.protobuf.annotation.ProtobufEnumIndex;

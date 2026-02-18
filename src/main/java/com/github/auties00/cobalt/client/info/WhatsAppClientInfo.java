@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.client.info;
 
-import com.github.auties00.cobalt.model.auth.UserAgent;
-import com.github.auties00.cobalt.model.auth.Version;
+import com.github.auties00.cobalt.model.device.pairing.ClientPayload.UserAgent;
+import com.github.auties00.cobalt.model.device.pairing.ClientPayload.UserAgent.AppVersion;
 
 public sealed interface WhatsAppClientInfo
         permits WhatsAppWebClientInfo, WhatsAppMobileClientInfo {

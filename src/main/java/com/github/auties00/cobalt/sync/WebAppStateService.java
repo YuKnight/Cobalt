@@ -66,7 +66,7 @@ public final class WebAppStateService {
      * @param patchType the collection type to sync
      * @param patches the patches to push
      */
-    public void pushPatches(PatchType patchType, SequencedCollection<PendingMutation> patches) {
+    public void pushPatches(SyncPatchType patchType, SequencedCollection<SyncPendingMutation> patches) {
         // Mark collection as dirty
         store.markWebAppStateDirty(patchType);
 
@@ -83,10 +83,10 @@ public final class WebAppStateService {
      *
      * @param patchTypes the collection types to sync
      */
-    public void pullPatches(PatchType... patchTypes) {
+    public void pullPatches(SyncPatchType... patchTypes) {
         var pullCriticalBlock = false;
         var pullCriticalUnblockLow = false;
-        var pullNonCritical = new HashSet<PatchType>();
+        var pullNonCritical = new HashSet<SyncPatchType>();
 
         for (var patchType : patchTypes) {
             switch (patchType) {
@@ -97,11 +97,11 @@ public final class WebAppStateService {
         }
 
         if (pullCriticalBlock) {
-            syncCollection(PatchType.CRITICAL_BLOCK);
+            syncCollection(SyncPatchType.CRITICAL_BLOCK);
         }
 
         if (pullCriticalUnblockLow) {
-            syncCollection(PatchType.CRITICAL_UNBLOCK_LOW);
+            syncCollection(SyncPatchType.CRITICAL_UNBLOCK_LOW);
         }
 
         if (!pullNonCritical.isEmpty()) {
@@ -113,9 +113,9 @@ public final class WebAppStateService {
         }
     }
 
-    private void syncCollection(PatchType patchType) {
+    private void syncCollection(SyncPatchType patchType) {
         var remoteMutations = new ArrayList<DecryptedMutation.Trusted>();
-        while(store.findWebAppState(patchType).state() != CollectionState.UP_TO_DATE) {
+        while(store.findWebAppState(patchType).state() != SyncCollectionState.UP_TO_DATE) {
             // Get the sync response
             var syncResponse = sendSyncRequest(patchType);
             if(syncResponse.isEmpty()) {
@@ -131,7 +131,7 @@ public final class WebAppStateService {
         }
     }
 
-    private Optional<MutationSyncResponse> sendSyncRequest(PatchType patchType) {
+    private Optional<MutationSyncResponse> sendSyncRequest(SyncPatchType patchType) {
         try {
             // Get pending mutations
             var pending = whatsapp.store()
@@ -279,7 +279,7 @@ public final class WebAppStateService {
         return Collections.unmodifiableSequencedCollection(decrypted);
     }
 
-    private void applyMutations(PatchType collectionName, SequencedCollection<DecryptedMutation.Trusted> remoteMutations) {
+    private void applyMutations(SyncPatchType collectionName, SequencedCollection<DecryptedMutation.Trusted> remoteMutations) {
         // Step 1: Resolve conflicts with pending local mutations
         var mutationsToApply = resolveConflicts(remoteMutations, collectionName);
 
@@ -325,12 +325,12 @@ public final class WebAppStateService {
         }
     }
 
-    private SequencedCollection<DecryptedMutation.Trusted> resolveConflicts(SequencedCollection<DecryptedMutation.Trusted> remoteMutations, PatchType collectionName) {
+    private SequencedCollection<DecryptedMutation.Trusted> resolveConflicts(SequencedCollection<DecryptedMutation.Trusted> remoteMutations, SyncPatchType collectionName) {
         // Create index for quick lookup of pending mutations
         var pendingByIndex = whatsapp.store()
                 .findPendingMutations(collectionName)
                 .stream()
-                .map(PendingMutation::mutation)
+                .map(SyncPendingMutation::mutation)
                 .collect(Collectors.toUnmodifiableMap(DecryptedMutation.Trusted::index, Function.identity()));
 
         var results = new ArrayList<DecryptedMutation.Trusted>(remoteMutations.size());
@@ -349,10 +349,10 @@ public final class WebAppStateService {
         return Collections.unmodifiableSequencedCollection(results);
     }
 
-    private byte[] computeNewLTHash(PatchType patchType, SequencedCollection<DecryptedMutation.Untrusted> mutations) {
+    private byte[] computeNewLTHash(SyncPatchType patchType, SequencedCollection<DecryptedMutation.Untrusted> mutations) {
         // Get current hash
         var currentHashState = whatsapp.store().findWebAppHashStateByName(patchType)
-                .orElseGet(() -> new AppStateSyncHash(patchType));
+                .orElseGet(() -> new SyncHashValue(patchType));
 
         var currentHash = currentHashState.hash() != null ? currentHashState.hash() : MutationLTHash.EMPTY_HASH;
 
@@ -375,8 +375,8 @@ public final class WebAppStateService {
         return MutationLTHash.subtractThenAdd(currentHash, toAdd, toRemove);
     }
 
-    private void updateCollectionState(PatchType collectionName, long version, byte[] ltHash) {
-        var hashState = new AppStateSyncHash(collectionName);
+    private void updateCollectionState(SyncPatchType collectionName, long version, byte[] ltHash) {
+        var hashState = new SyncHashValue(collectionName);
         hashState.setHash(ltHash);
         hashState.setVersion(version);
         whatsapp.store()
@@ -384,7 +384,7 @@ public final class WebAppStateService {
         store.updateWebAppStateVersion(collectionName, version, ltHash);
     }
 
-    private void handleSyncError(Throwable error, PatchType collectionName) {
+    private void handleSyncError(Throwable error, SyncPatchType collectionName) {
         if (collectionName == null) {
             return;
         }

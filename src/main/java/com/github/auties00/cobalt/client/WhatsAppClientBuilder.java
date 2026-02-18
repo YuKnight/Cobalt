@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.client;
 
 import com.github.auties00.cobalt.client.registration.WhatsAppMobileClientRegistration;
-import com.github.auties00.cobalt.model.auth.Version;
+import com.github.auties00.cobalt.model.device.pairing.ClientPayload.UserAgent.AppVersion;
 import com.github.auties00.cobalt.model.business.profile.BusinessCategory;
 import com.github.auties00.cobalt.model.jid.JidDevice;
 import com.github.auties00.cobalt.store.WhatsAppStore;

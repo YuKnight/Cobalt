@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.exception;
 
-import com.github.auties00.cobalt.model.sync.PatchType;
+import com.github.auties00.cobalt.model.sync.SyncPatchType;
 
 import java.util.HexFormat;
 import java.util.Objects;
@@ -145,7 +145,7 @@ public sealed abstract class WhatsAppWebAppStateSyncException extends WhatsAppEx
         /**
          * The sync collection (patch type) that failed validation.
          */
-        private final PatchType collectionName;
+        private final SyncPatchType collectionName;
 
         /**
          * The version number of the snapshot that failed MAC validation.
@@ -159,7 +159,7 @@ public sealed abstract class WhatsAppWebAppStateSyncException extends WhatsAppEx
          * @param version        the version number of the failing snapshot
          * @throws NullPointerException if collectionName is null
          */
-        public SnapshotMacMismatch(PatchType collectionName, long version) {
+        public SnapshotMacMismatch(SyncPatchType collectionName, long version) {
             super("Snapshot MAC mismatch for collection " + collectionName + " at version " + version);
             this.collectionName = Objects.requireNonNull(collectionName);
             this.version = version;
@@ -172,7 +172,7 @@ public sealed abstract class WhatsAppWebAppStateSyncException extends WhatsAppEx
          *
          * @return the patch type / collection name; never null
          */
-        public PatchType collectionName() {
+        public SyncPatchType collectionName() {
             return collectionName;
         }
 
@@ -227,7 +227,7 @@ public sealed abstract class WhatsAppWebAppStateSyncException extends WhatsAppEx
         /**
          * The sync collection (patch type) that failed validation.
          */
-        private final PatchType collectionName;
+        private final SyncPatchType collectionName;
 
         /**
          * The version number of the patch that failed MAC validation.
@@ -241,7 +241,7 @@ public sealed abstract class WhatsAppWebAppStateSyncException extends WhatsAppEx
          * @param version        the version number of the failing patch
          * @throws NullPointerException if collectionName is null
          */
-        public PatchMacMismatch(PatchType collectionName, long version) {
+        public PatchMacMismatch(SyncPatchType collectionName, long version) {
             super("Patch MAC mismatch for collection " + collectionName + " at version " + version);
             this.collectionName = Objects.requireNonNull(collectionName);
             this.version = version;
@@ -254,7 +254,7 @@ public sealed abstract class WhatsAppWebAppStateSyncException extends WhatsAppEx
          *
          * @return the patch type / collection name; never null
          */
-        public PatchType collectionName() {
+        public SyncPatchType collectionName() {
             return collectionName;
         }
 

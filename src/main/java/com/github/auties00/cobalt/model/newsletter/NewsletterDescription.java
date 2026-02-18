@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.model.newsletter;
 
-import com.alibaba.fastjson2.JSONObject;
+import com.github.auties00.cobalt.model.mixin.InstantSecondsMixin;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
@@ -9,73 +9,107 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
 
+/**
+ * The description of a newsletter, including its unique identifier,
+ * text content, and the timestamp of the last update.
+ */
 @ProtobufMessage
 public final class NewsletterDescription {
     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
-    final String id;
+    String id;
 
     @ProtobufProperty(index = 2, type = ProtobufType.STRING)
-    final String text;
+    String text;
 
-    @ProtobufProperty(index = 3, type = ProtobufType.UINT64)
-    final long updateTimeSeconds;
+    @ProtobufProperty(index = 3, type = ProtobufType.UINT64, mixins = InstantSecondsMixin.class)
+    Instant updateTimestamp;
 
-    NewsletterDescription(String id, String text, long updateTimeSeconds) {
+    /**
+     * Constructs a new {@code NewsletterDescription} with the specified
+     * identifier, text, and update timestamp.
+     *
+     * @param id              the description identifier, must not be {@code null}
+     * @param text            the description text, must not be {@code null}
+     * @param updateTimestamp the timestamp of the last description update, may be {@code null}
+     * @throws NullPointerException if {@code id} or {@code text} is {@code null}
+     */
+    NewsletterDescription(String id, String text, Instant updateTimestamp) {
         this.id = Objects.requireNonNull(id, "id cannot be null");
         this.text = Objects.requireNonNull(text, "text cannot be null");
-        this.updateTimeSeconds = updateTimeSeconds;
+        this.updateTimestamp = updateTimestamp;
     }
 
-    public static Optional<NewsletterDescription> ofJson(JSONObject jsonObject) {
-        if(jsonObject == null) {
-            return Optional.empty();
-        }
-
-        var id = jsonObject.getString("id");
-        if(id == null) {
-            return Optional.empty();
-        }
-
-        var text = Objects.requireNonNullElse(jsonObject.getString("text"), "");
-        var updateTimeSeconds = jsonObject.getLongValue("update_time", 0);
-        var result = new NewsletterDescription(id, text, updateTimeSeconds);
-        return Optional.of(result);
-    }
-
+    /**
+     * Returns the description identifier.
+     *
+     * @return the id, never {@code null}
+     */
     public String id() {
         return id;
     }
 
+    /**
+     * Returns the description text.
+     *
+     * @return the text, never {@code null}
+     */
     public String text() {
         return text;
     }
 
-    public long updateTimeSeconds() {
-        return updateTimeSeconds;
+    /**
+     * Returns the timestamp of the last description update, if available.
+     *
+     * @return an {@link Optional} containing the update timestamp,
+     *         or empty if not set
+     */
+    public Optional<Instant> updateTimestamp() {
+        return Optional.ofNullable(updateTimestamp);
     }
 
-    public Optional<Instant> updateTime() {
-        return updateTimeSeconds == 0 ? Optional.empty() : Optional.of(Instant.ofEpochSecond(updateTimeSeconds));
+    /**
+     * Sets the description identifier.
+     *
+     * @param id the description id
+     * @return this instance for chaining
+     */
+    public NewsletterDescription setId(String id) {
+        this.id = id;
+        return this;
+    }
+
+    /**
+     * Sets the description text.
+     *
+     * @param text the description text
+     * @return this instance for chaining
+     */
+    public NewsletterDescription setText(String text) {
+        this.text = text;
+        return this;
+    }
+
+    /**
+     * Sets the timestamp of the last description update.
+     *
+     * @param updateTimestamp the update timestamp
+     * @return this instance for chaining
+     */
+    public NewsletterDescription setUpdateTimestamp(Instant updateTimestamp) {
+        this.updateTimestamp = updateTimestamp;
+        return this;
     }
 
     @Override
     public boolean equals(Object o) {
-        return o instanceof NewsletterDescription that
-                && Objects.equals(id, that.id)
-                && Objects.equals(text, that.text)
-                && updateTimeSeconds == that.updateTimeSeconds;
+        return o == this || o instanceof NewsletterDescription that
+                            && Objects.equals(id, that.id)
+                            && Objects.equals(text, that.text)
+                            && Objects.equals(updateTimestamp, that.updateTimestamp);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, text, updateTimeSeconds);
-    }
-
-    @Override
-    public String toString() {
-        return "NewsletterDescription[" +
-                "id=" + id + ", " +
-                "text=" + text + ", " +
-                "updateTimeSeconds=" + updateTimeSeconds + ']';
+        return Objects.hash(id, text, updateTimestamp);
     }
 }

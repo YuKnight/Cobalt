@@ -1,8 +1,6 @@
 package com.github.auties00.cobalt.model.message.media;
 
-import com.github.auties00.cobalt.model.message.ContextInfo;
-import com.github.auties00.cobalt.model.message.MediaMessage;
-import com.github.auties00.cobalt.model.message.util.MediaKeyDomain;
+import com.github.auties00.cobalt.model.message.context.ContextInfo;
 
 import java.time.Instant;
 import it.auties.protobuf.annotation.*;
@@ -62,10 +60,10 @@ public final class AudioMessage implements InteractiveMessage.Media, MediaMessag
     String accessibilityLabel;
 
     @ProtobufProperty(index = 23, type = ProtobufType.ENUM)
-    MediaKeyDomain mediaKeyDomain;
+    MediaMessageKeyDomain mediaKeyDomain;
 
 
-    AudioMessage(String url, String mimetype, byte[] fileSha256, Long fileLength, Integer seconds, Boolean ptt, byte[] mediaKey, byte[] fileEncSha256, String directPath, Instant mediaKeyTimestamp, ContextInfo contextInfo, byte[] streamingSidecar, byte[] waveform, Integer backgroundArgb, Boolean viewOnce, String accessibilityLabel, MediaKeyDomain mediaKeyDomain) {
+    AudioMessage(String url, String mimetype, byte[] fileSha256, Long fileLength, Integer seconds, Boolean ptt, byte[] mediaKey, byte[] fileEncSha256, String directPath, Instant mediaKeyTimestamp, ContextInfo contextInfo, byte[] streamingSidecar, byte[] waveform, Integer backgroundArgb, Boolean viewOnce, String accessibilityLabel, MediaMessageKeyDomain mediaKeyDomain) {
         this.url = url;
         this.mimetype = mimetype;
         this.fileSha256 = fileSha256;
@@ -149,7 +147,7 @@ public final class AudioMessage implements InteractiveMessage.Media, MediaMessag
         return Optional.ofNullable(accessibilityLabel);
     }
 
-    public Optional<MediaKeyDomain> mediaKeyDomain() {
+    public Optional<MediaMessageKeyDomain> mediaKeyDomain() {
         return Optional.ofNullable(mediaKeyDomain);
     }
 
@@ -233,7 +231,7 @@ public final class AudioMessage implements InteractiveMessage.Media, MediaMessag
         return this;
     }
 
-    public AudioMessage setMediaKeyDomain(MediaKeyDomain mediaKeyDomain) {
+    public AudioMessage setMediaKeyDomain(MediaMessageKeyDomain mediaKeyDomain) {
         this.mediaKeyDomain = mediaKeyDomain;
         return this;
     }

@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.sync;
 
-import com.github.auties00.cobalt.model.sync.PatchType;
+import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.util.SchedulerUtils;
 
 import java.io.Closeable;
@@ -14,13 +14,13 @@ public final class WebAppStateBackoffScheduler implements Closeable {
     private static final int MULTIPLIER = 2;
     private static final long JITTER_MS = 1000;
 
-    private final ConcurrentHashMap<PatchType, CompletableFuture<?>> pendingRetries;
+    private final ConcurrentHashMap<SyncPatchType, CompletableFuture<?>> pendingRetries;
 
     public WebAppStateBackoffScheduler() {
         this.pendingRetries = new ConcurrentHashMap<>();
     }
 
-    public boolean scheduleRetry(PatchType collectionName, int attemptNumber, Runnable retryAction) {
+    public boolean scheduleRetry(SyncPatchType collectionName, int attemptNumber, Runnable retryAction) {
         // Check if we should retry
         if (attemptNumber >= MAX_RETRIES) {
             return false;
@@ -59,7 +59,7 @@ public final class WebAppStateBackoffScheduler implements Closeable {
         return delay;
     }
 
-    public boolean cancelRetry(PatchType collectionName) {
+    public boolean cancelRetry(SyncPatchType collectionName) {
         var future = pendingRetries.remove(collectionName);
         if (future != null) {
             future.cancel(false);

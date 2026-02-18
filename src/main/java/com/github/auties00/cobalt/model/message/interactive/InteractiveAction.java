@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.model.message.interactive;
 
-import com.github.auties00.cobalt.model.message.ContextInfo;
+import com.github.auties00.cobalt.model.message.context.ContextInfo;
 import com.github.auties00.cobalt.model.location.Location;
 
 public sealed interface InteractiveAction permits Location, ContextInfo.ForwardedNewsletterMessageInfo, EmbeddedAction, TapLinkAction {

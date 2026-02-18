@@ -1,11 +1,14 @@
-package com.github.auties00.cobalt.model.message.util;
+package com.github.auties00.cobalt.model.message.media;
 
 import com.github.auties00.cobalt.model.message.Message;
+import it.auties.protobuf.annotation.ProtobufMessage;
+import it.auties.protobuf.annotation.ProtobufProperty;
+import it.auties.protobuf.model.ProtobufType;
 
 import java.util.Objects;
 
 @ProtobufMessage(name = "Message.VideoEndCard")
-public final class VideoEndCard implements Message {
+public final class MessageVideoEndCard implements Message {
     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
     String username;
 
@@ -19,7 +22,7 @@ public final class VideoEndCard implements Message {
     String profilePictureUrl;
 
 
-    VideoEndCard(String username, String caption, String thumbnailImageUrl, String profilePictureUrl) {
+    MessageVideoEndCard(String username, String caption, String thumbnailImageUrl, String profilePictureUrl) {
         this.username = Objects.requireNonNull(username);
         this.caption = Objects.requireNonNull(caption);
         this.thumbnailImageUrl = Objects.requireNonNull(thumbnailImageUrl);
@@ -42,22 +45,22 @@ public final class VideoEndCard implements Message {
         return profilePictureUrl;
     }
 
-    public VideoEndCard setUsername(String username) {
+    public MessageVideoEndCard setUsername(String username) {
         this.username = username;
         return this;
     }
 
-    public VideoEndCard setCaption(String caption) {
+    public MessageVideoEndCard setCaption(String caption) {
         this.caption = caption;
         return this;
     }
 
-    public VideoEndCard setThumbnailImageUrl(String thumbnailImageUrl) {
+    public MessageVideoEndCard setThumbnailImageUrl(String thumbnailImageUrl) {
         this.thumbnailImageUrl = thumbnailImageUrl;
         return this;
     }
 
-    public VideoEndCard setProfilePictureUrl(String profilePictureUrl) {
+    public MessageVideoEndCard setProfilePictureUrl(String profilePictureUrl) {
         this.profilePictureUrl = profilePictureUrl;
         return this;
     }

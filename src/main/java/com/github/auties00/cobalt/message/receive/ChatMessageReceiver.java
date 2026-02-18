@@ -9,16 +9,16 @@ import com.github.auties00.cobalt.message.receive.stanza.MessageReceiveBotInfo;
 import com.github.auties00.cobalt.message.receive.stanza.MessageReceiveEncryptedPayload;
 import com.github.auties00.cobalt.message.receive.stanza.MessageReceiveStanza;
 import com.github.auties00.cobalt.message.receive.stanza.MessageReceiveStanzaParser;
-import com.github.auties00.cobalt.model.auth.SignedDeviceIdentitySpec;
+import com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentitySpec;
 import com.github.auties00.cobalt.model.button.template.highlyStructured.HighlyStructuredMessage;
-import com.github.auties00.cobalt.model.info.ChatMessageInfo;
-import com.github.auties00.cobalt.model.info.ChatMessageInfoBuilder;
-import com.github.auties00.cobalt.model.info.DeviceContextInfo;
+import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.model.chat.ChatMessageInfoBuilder;
+import com.github.auties00.cobalt.model.device.DeviceListMetadata;
 import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.ChatMessageKeyBuilder;
+import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
 import com.github.auties00.cobalt.model.message.MessageContainer;
 import com.github.auties00.cobalt.model.message.MessageStatus;
-import com.github.auties00.cobalt.model.message.server.DeviceSentMessage;
+import com.github.auties00.cobalt.model.message.system.DeviceSentMessage;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.store.WhatsAppStore;
 
@@ -636,7 +636,7 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
         var fromMe = isFromMe(stanza);
         var senderJid = stanza.senderJid().toUserJid();
 
-        var key = new ChatMessageKeyBuilder()
+        var key = new MessageKeyBuilder()
                 .id(stanza.id())
                 .chatJid(chatJid)
                 .fromMe(fromMe)

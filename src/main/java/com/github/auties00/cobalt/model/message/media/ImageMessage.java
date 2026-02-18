@@ -1,9 +1,10 @@
 package com.github.auties00.cobalt.model.message.media;
 
-import com.github.auties00.cobalt.model.message.ContextInfo;
-import com.github.auties00.cobalt.model.message.MediaMessage;
+import com.github.auties00.cobalt.model.message.context.ContextInfo;
 import com.github.auties00.cobalt.model.message.interactive.InteractiveAnnotation;
-import com.github.auties00.cobalt.model.message.util.MediaKeyDomain;
+import it.auties.protobuf.annotation.ProtobufMessage;
+import it.auties.protobuf.annotation.ProtobufProperty;
+import it.auties.protobuf.model.ProtobufType;
 
 import java.time.Instant;
 import java.util.*;
@@ -98,13 +99,13 @@ public final class ImageMessage implements InteractiveHeader, InteractiveMessage
     String accessibilityLabel;
 
     @ProtobufProperty(index = 33, type = ProtobufType.ENUM)
-    MediaKeyDomain mediaKeyDomain;
+    MediaMessageKeyDomain mediaKeyDomain;
 
     @ProtobufProperty(index = 34, type = ProtobufType.STRING)
     String qrUrl;
 
 
-    ImageMessage(String url, String mimetype, String caption, byte[] fileSha256, Long fileLength, Integer height, Integer width, byte[] mediaKey, byte[] fileEncSha256, List<InteractiveAnnotation> interactiveAnnotations, String directPath, Instant mediaKeyTimestamp, byte[] jpegThumbnail, ContextInfo contextInfo, byte[] firstScanSidecar, Integer firstScanLength, Integer experimentGroupId, byte[] scansSidecar, List<Integer> scanLengths, byte[] midQualityFileSha256, byte[] midQualityFileEncSha256, Boolean viewOnce, String thumbnailDirectPath, byte[] thumbnailSha256, byte[] thumbnailEncSha256, String staticUrl, List<InteractiveAnnotation> annotations, ImageSourceType imageSourceType, String accessibilityLabel, MediaKeyDomain mediaKeyDomain, String qrUrl) {
+    ImageMessage(String url, String mimetype, String caption, byte[] fileSha256, Long fileLength, Integer height, Integer width, byte[] mediaKey, byte[] fileEncSha256, List<InteractiveAnnotation> interactiveAnnotations, String directPath, Instant mediaKeyTimestamp, byte[] jpegThumbnail, ContextInfo contextInfo, byte[] firstScanSidecar, Integer firstScanLength, Integer experimentGroupId, byte[] scansSidecar, List<Integer> scanLengths, byte[] midQualityFileSha256, byte[] midQualityFileEncSha256, Boolean viewOnce, String thumbnailDirectPath, byte[] thumbnailSha256, byte[] thumbnailEncSha256, String staticUrl, List<InteractiveAnnotation> annotations, ImageSourceType imageSourceType, String accessibilityLabel, MediaMessageKeyDomain mediaKeyDomain, String qrUrl) {
         this.url = url;
         this.mimetype = mimetype;
         this.caption = caption;
@@ -254,7 +255,7 @@ public final class ImageMessage implements InteractiveHeader, InteractiveMessage
         return Optional.ofNullable(accessibilityLabel);
     }
 
-    public Optional<MediaKeyDomain> mediaKeyDomain() {
+    public Optional<MediaMessageKeyDomain> mediaKeyDomain() {
         return Optional.ofNullable(mediaKeyDomain);
     }
 
@@ -407,7 +408,7 @@ public final class ImageMessage implements InteractiveHeader, InteractiveMessage
         return this;
     }
 
-    public ImageMessage setMediaKeyDomain(MediaKeyDomain mediaKeyDomain) {
+    public ImageMessage setMediaKeyDomain(MediaMessageKeyDomain mediaKeyDomain) {
         this.mediaKeyDomain = mediaKeyDomain;
         return this;
     }

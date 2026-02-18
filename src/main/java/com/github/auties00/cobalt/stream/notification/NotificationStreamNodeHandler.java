@@ -5,13 +5,12 @@ import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.model.chat.Chat;
 import com.github.auties00.cobalt.model.chat.ChatEphemeralTimer;
-import com.github.auties00.cobalt.model.info.ChatMessageInfoBuilder;
-import com.github.auties00.cobalt.model.info.MessageInfoStubType;
+import com.github.auties00.cobalt.model.chat.ChatMessageInfoBuilder;
 import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidServer;
-import com.github.auties00.cobalt.model.message.ChatMessageKey;
-import com.github.auties00.cobalt.model.message.ChatMessageKeyBuilder;
+import com.github.auties00.cobalt.model.message.MessageKey;
+import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
 import com.github.auties00.cobalt.model.message.MessageStatus;
 import com.github.auties00.cobalt.model.newsletter.NewsletterMetadataBuilder;
 import com.github.auties00.cobalt.model.newsletter.NewsletterReaction;
@@ -20,7 +19,7 @@ import com.github.auties00.cobalt.model.privacy.PrivacySettingEntry;
 import com.github.auties00.cobalt.model.privacy.PrivacySettingEntryBuilder;
 import com.github.auties00.cobalt.model.privacy.PrivacySettingType;
 import com.github.auties00.cobalt.model.privacy.PrivacySettingValue;
-import com.github.auties00.cobalt.model.sync.PatchType;
+import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.node.mex.json.response.*;
@@ -361,8 +360,8 @@ public final class NotificationStreamNodeHandler extends SocketStream.Handler {
     }
 
     private void addMessageForGroupStubType(long timestamp, Chat chat, Jid sender, MessageInfoStubType stubType, Node metadata) {
-        var key = new ChatMessageKeyBuilder()
-                .id(ChatMessageKey.randomId(whatsapp.store().clientType()))
+        var key = new MessageKeyBuilder()
+                .id(MessageKey.randomId(whatsapp.store().clientType()))
                 .chatJid(chat.jid())
                 .senderJid(sender)
                 .build();
@@ -558,9 +557,9 @@ public final class NotificationStreamNodeHandler extends SocketStream.Handler {
     private void handleServerSyncNotification(Node node) {
         var patches = node.streamChildren("collection")
                 .map(entry -> entry.getRequiredAttributeAsString("name"))
-                .map(PatchType::of)
+                .map(SyncPatchType::of)
                 .flatMap(Optional::stream)
-                .toArray(PatchType[]::new);
+                .toArray(SyncPatchType[]::new);
         whatsapp.pullWebAppState(patches);
     }
 

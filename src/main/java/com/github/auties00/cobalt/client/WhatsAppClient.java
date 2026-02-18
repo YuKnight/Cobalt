@@ -5,7 +5,7 @@ import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.exception.*;
 import com.github.auties00.cobalt.message.MessageService;
 import com.github.auties00.cobalt.migration.LidMigrationService;
-import com.github.auties00.cobalt.model.action.*;
+import com.github.auties00.cobalt.model.message.context.ContextualMessage;
 import com.github.auties00.cobalt.model.business.BusinessVerifiedNameCertificate;
 import com.github.auties00.cobalt.model.call.CallOffer;
 import com.github.auties00.cobalt.model.call.CallBuilder;
@@ -17,17 +17,17 @@ import com.github.auties00.cobalt.model.chat.community.CommunityMetadata;
 import com.github.auties00.cobalt.model.chat.group.*;
 import com.github.auties00.cobalt.model.contact.Contact;
 import com.github.auties00.cobalt.model.contact.ContactStatus;
-import com.github.auties00.cobalt.model.info.*;
+import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.model.message.context.ContextInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidProvider;
 import com.github.auties00.cobalt.model.jid.JidServer;
 import com.github.auties00.cobalt.model.media.MediaProvider;
 import com.github.auties00.cobalt.model.message.*;
-import com.github.auties00.cobalt.model.message.server.ProtocolMessage;
-import com.github.auties00.cobalt.model.message.server.ProtocolMessageBuilder;
-import com.github.auties00.cobalt.model.message.standard.NewsletterAdminInviteMessageBuilder;
-import com.github.auties00.cobalt.model.message.standard.ReactionMessageBuilder;
-import com.github.auties00.cobalt.model.message.standard.TextMessage;
+import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
+import com.github.auties00.cobalt.model.message.system.ProtocolMessageBuilder;
+import com.github.auties00.cobalt.model.message.newsletter.NewsletterAdminInviteMessageBuilder;
+import com.github.auties00.cobalt.model.message.text.ReactionMessageBuilder;
 import com.github.auties00.cobalt.model.privacy.PrivacySettingEntry;
 import com.github.auties00.cobalt.model.privacy.PrivacySettingEntryBuilder;
 import com.github.auties00.cobalt.model.privacy.PrivacySettingType;
@@ -1594,8 +1594,8 @@ public final class WhatsAppClient {
     public MessageInfo sendReaction(MessageInfo message, String reaction) {
         var localJid = store.jid()
                 .orElseThrow(() -> new IllegalStateException("Local jid is not available"));
-        var key = new ChatMessageKeyBuilder()
-                .id(ChatMessageKey.randomId(store.clientType()))
+        var key = new MessageKeyBuilder()
+                .id(MessageKey.randomId(store.clientType()))
                 .chatJid(message.parentJid())
                 .senderJid(message.senderJid())
                 .fromMe(Objects.equals(message.senderJid().withoutData(), localJid.withoutData()))
@@ -2022,7 +2022,7 @@ public final class WhatsAppClient {
             case ChatMessageInfo oldChatInfo -> {
                 var localJid = store.jid()
                         .orElseThrow(() -> new IllegalStateException("Local jid is not available"));
-                var key = new ChatMessageKeyBuilder()
+                var key = new MessageKeyBuilder()
                         .id(oldChatInfo.id())
                         .chatJid(oldChatInfo.chatJid())
                         .fromMe(true)
@@ -2078,7 +2078,7 @@ public final class WhatsAppClient {
                     .key(info.key())
                     .build();
             var sender = info.chatJid().hasServer(JidServer.groupOrCommunity()) ? localJid : null;
-            var editId = ChatMessageKey.randomId(store.clientType());
+            var editId = MessageKey.randomId(store.clientType());
             // TODO: Delete message
         } else {
             switch (store.clientType()) {
@@ -4144,7 +4144,7 @@ public final class WhatsAppClient {
     private CallOffer sendCallMessage(JidProvider jid, boolean video) {
         var localJid = store.jid()
                 .orElseThrow(() -> new IllegalStateException("Local jid is not available"));
-        var callId = ChatMessageKey.randomId(store.clientType());
+        var callId = MessageKey.randomId(store.clientType());
         var description = video ? "video" : "audio";
         var audioStream = new NodeBuilder()
                 .description(description)

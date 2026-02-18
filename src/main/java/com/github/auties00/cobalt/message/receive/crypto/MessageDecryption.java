@@ -4,7 +4,7 @@ import com.github.auties00.cobalt.exception.WhatsAppMessageException;
 import com.github.auties00.cobalt.message.MessageEncryptionType;
 import com.github.auties00.cobalt.message.send.bot.BotMessageSecret;
 import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.server.MessageSecretMessageSpec;
+import com.github.auties00.cobalt.model.message.SecretMessageContainerSpec;
 import com.github.auties00.cobalt.store.WhatsAppStore;
 import com.github.auties00.libsignal.SignalSessionCipher;
 import com.github.auties00.libsignal.exception.*;

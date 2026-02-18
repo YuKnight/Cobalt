@@ -1,6 +1,9 @@
 package com.github.auties00.cobalt.model.message.system;
 
 import com.github.auties00.cobalt.model.message.Message;
+import it.auties.protobuf.annotation.ProtobufMessage;
+import it.auties.protobuf.annotation.ProtobufProperty;
+import it.auties.protobuf.model.ProtobufType;
 
 @ProtobufMessage(name = "Message.InitialSecurityNotificationSettingSync")
 public final class InitialSecurityNotificationSettingSync implements Message {

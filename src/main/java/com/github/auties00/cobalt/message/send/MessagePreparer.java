@@ -1,12 +1,12 @@
 package com.github.auties00.cobalt.message.send;
 
 import com.github.auties00.cobalt.model.chat.group.GroupMetadata;
-import com.github.auties00.cobalt.model.info.*;
+import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidServer;
 import com.github.auties00.cobalt.model.message.*;
-import com.github.auties00.cobalt.model.message.standard.EncryptedCommentMessageSimpleBuilder;
-import com.github.auties00.cobalt.model.message.standard.EncryptedReactionMessageSimpleBuilder;
+import com.github.auties00.cobalt.model.message.security.EncCommentMessageSimpleBuilder;
+import com.github.auties00.cobalt.model.message.security.EncReactionMessageSimpleBuilder;
 import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
 import com.github.auties00.cobalt.model.sync.DeviceListMetadataBuilder;
 import com.github.auties00.cobalt.store.WhatsAppStore;
@@ -91,7 +91,7 @@ final class MessagePreparer {
 
         var localJid = store.jid()
                 .orElseThrow(() -> new IllegalStateException("Not logged in"));
-        var messageId = ChatMessageKey.randomId(store.clientType());
+        var messageId = MessageKey.randomId(store.clientType());
         var timestamp = Instant.now().getEpochSecond();
 
         // WAWebOutgoingMessage: generate 32-byte message secret
@@ -114,7 +114,7 @@ final class MessagePreparer {
                 .build();
         preparedContainer = preparedContainer.withDeviceInfo(deviceInfo);
 
-        var key = new ChatMessageKeyBuilder()
+        var key = new MessageKeyBuilder()
                 .id(messageId)
                 .chatJid(chatJid)
                 .fromMe(true)
@@ -154,7 +154,7 @@ final class MessagePreparer {
                 .map(NewsletterMessageInfo::serverId)
                 .orElse(0);
         var info = new NewsletterMessageInfoBuilder()
-                .id(ChatMessageKey.randomId(store.clientType()))
+                .id(MessageKey.randomId(store.clientType()))
                 .serverId(oldServerId + 1)
                 .timestampSeconds(Instant.now().getEpochSecond())
                 .message(container)
@@ -292,7 +292,7 @@ final class MessagePreparer {
     /**
      * Resolves the parent message referenced by a message key.
      */
-    private ChatMessageInfo resolveParentMessage(Jid chatJid, ChatMessageKey key) {
+    private ChatMessageInfo resolveParentMessage(Jid chatJid, MessageKey key) {
         return (ChatMessageInfo) store.findMessageById(chatJid, key.id())
                 .filter(msg -> msg instanceof ChatMessageInfo)
                 .orElse(null);

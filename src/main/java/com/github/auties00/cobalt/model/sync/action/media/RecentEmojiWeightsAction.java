@@ -1,6 +1,9 @@
 package com.github.auties00.cobalt.model.sync.action.media;
 
 import com.github.auties00.cobalt.model.sync.SyncAction;
+import it.auties.protobuf.annotation.ProtobufMessage;
+import it.auties.protobuf.annotation.ProtobufProperty;
+import it.auties.protobuf.model.ProtobufType;
 
 import java.util.Collections;
 import java.util.List;

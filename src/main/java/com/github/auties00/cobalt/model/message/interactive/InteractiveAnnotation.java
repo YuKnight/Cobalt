@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.model.message.interactive;
 
-import com.github.auties00.cobalt.model.message.ContextInfo;
+import com.github.auties00.cobalt.model.message.context.ContextInfo;
 import com.github.auties00.cobalt.model.location.Location;
 import com.github.auties00.cobalt.model.location.Point;
 import com.github.auties00.cobalt.model.message.media.EmbeddedContent;

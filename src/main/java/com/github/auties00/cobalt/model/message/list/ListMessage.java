@@ -1,8 +1,8 @@
 package com.github.auties00.cobalt.model.message.list;
 
 import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.ContextInfo;
-import com.github.auties00.cobalt.model.message.ContextualMessage;
+import com.github.auties00.cobalt.model.message.context.ContextInfo;
+import com.github.auties00.cobalt.model.message.context.ContextualMessage;
 
 import java.util.Collections;
 import java.util.List;

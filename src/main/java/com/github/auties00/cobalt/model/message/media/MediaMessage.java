@@ -1,6 +1,6 @@
-package com.github.auties00.cobalt.model.message;
+package com.github.auties00.cobalt.model.message.media;
 
-import com.github.auties00.cobalt.model.message.media.*;
+import com.github.auties00.cobalt.model.message.context.ContextualMessage;
 
 import java.time.Instant;
 import java.util.Optional;

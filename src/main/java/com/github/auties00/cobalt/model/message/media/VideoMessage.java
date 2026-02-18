@@ -1,10 +1,11 @@
 package com.github.auties00.cobalt.model.message.media;
 
-import com.github.auties00.cobalt.model.message.ContextInfo;
+import com.github.auties00.cobalt.model.message.context.ContextInfo;
 import com.github.auties00.cobalt.model.media.ProcessedVideo;
-import com.github.auties00.cobalt.model.message.MediaMessage;
 import com.github.auties00.cobalt.model.message.interactive.InteractiveAnnotation;
-import com.github.auties00.cobalt.model.message.util.MediaKeyDomain;
+import it.auties.protobuf.annotation.ProtobufMessage;
+import it.auties.protobuf.annotation.ProtobufProperty;
+import it.auties.protobuf.model.ProtobufType;
 
 import java.time.Instant;
 import java.util.*;
@@ -102,10 +103,10 @@ public final class VideoMessage implements InteractiveHeader, InteractiveMessage
     VideoSourceType videoSourceType;
 
     @ProtobufProperty(index = 32, type = ProtobufType.ENUM)
-    MediaKeyDomain mediaKeyDomain;
+    MediaMessageKeyDomain mediaKeyDomain;
 
 
-    VideoMessage(String url, String mimetype, byte[] fileSha256, Long fileLength, Integer seconds, byte[] mediaKey, String caption, Boolean gifPlayback, Integer height, Integer width, byte[] fileEncSha256, List<InteractiveAnnotation> interactiveAnnotations, String directPath, Instant mediaKeyTimestamp, byte[] jpegThumbnail, ContextInfo contextInfo, byte[] streamingSidecar, Attribution gifAttribution, Boolean viewOnce, String thumbnailDirectPath, byte[] thumbnailSha256, byte[] thumbnailEncSha256, String staticUrl, List<InteractiveAnnotation> annotations, String accessibilityLabel, List<ProcessedVideo> processedVideos, Integer externalShareFullVideoDurationInSeconds, Long motionPhotoPresentationOffsetMs, String metadataUrl, VideoSourceType videoSourceType, MediaKeyDomain mediaKeyDomain) {
+    VideoMessage(String url, String mimetype, byte[] fileSha256, Long fileLength, Integer seconds, byte[] mediaKey, String caption, Boolean gifPlayback, Integer height, Integer width, byte[] fileEncSha256, List<InteractiveAnnotation> interactiveAnnotations, String directPath, Instant mediaKeyTimestamp, byte[] jpegThumbnail, ContextInfo contextInfo, byte[] streamingSidecar, Attribution gifAttribution, Boolean viewOnce, String thumbnailDirectPath, byte[] thumbnailSha256, byte[] thumbnailEncSha256, String staticUrl, List<InteractiveAnnotation> annotations, String accessibilityLabel, List<ProcessedVideo> processedVideos, Integer externalShareFullVideoDurationInSeconds, Long motionPhotoPresentationOffsetMs, String metadataUrl, VideoSourceType videoSourceType, MediaMessageKeyDomain mediaKeyDomain) {
         this.url = url;
         this.mimetype = mimetype;
         this.fileSha256 = fileSha256;
@@ -259,7 +260,7 @@ public final class VideoMessage implements InteractiveHeader, InteractiveMessage
         return Optional.ofNullable(videoSourceType);
     }
 
-    public Optional<MediaKeyDomain> mediaKeyDomain() {
+    public Optional<MediaMessageKeyDomain> mediaKeyDomain() {
         return Optional.ofNullable(mediaKeyDomain);
     }
 
@@ -413,7 +414,7 @@ public final class VideoMessage implements InteractiveHeader, InteractiveMessage
         return this;
     }
 
-    public VideoMessage setMediaKeyDomain(MediaKeyDomain mediaKeyDomain) {
+    public VideoMessage setMediaKeyDomain(MediaMessageKeyDomain mediaKeyDomain) {
         this.mediaKeyDomain = mediaKeyDomain;
         return this;
     }

@@ -2,16 +2,14 @@ package com.github.auties00.cobalt.model.message;
 
 import com.github.auties00.cobalt.model.bot.response.AIRichResponseMessage;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfoContext;
-import com.github.auties00.cobalt.model.message.call.BCallMessage;
-import com.github.auties00.cobalt.model.message.call.CallOfferMessage;
-import com.github.auties00.cobalt.model.message.call.ScheduledCallCreationMessage;
-import com.github.auties00.cobalt.model.message.call.ScheduledCallEditMessage;
+import com.github.auties00.cobalt.model.message.call.*;
 import com.github.auties00.cobalt.model.message.commerce.*;
 import com.github.auties00.cobalt.model.message.contact.ContactMessage;
 import com.github.auties00.cobalt.model.message.contact.ContactsArrayMessage;
 import com.github.auties00.cobalt.model.message.event.EncEventResponseMessage;
 import com.github.auties00.cobalt.model.message.event.EventMessage;
 import com.github.auties00.cobalt.model.message.group.GroupInviteMessage;
+import com.github.auties00.cobalt.model.message.group.SenderKeyDistributionMessage;
 import com.github.auties00.cobalt.model.message.interactive.InteractiveMessage;
 import com.github.auties00.cobalt.model.message.interactive.InteractiveResponseMessage;
 import com.github.auties00.cobalt.model.message.interactive.TemplateButtonReplyMessage;
@@ -42,10 +40,10 @@ import com.github.auties00.cobalt.model.message.text.CommentMessage;
 import com.github.auties00.cobalt.model.message.text.ExtendedTextMessage;
 import com.github.auties00.cobalt.model.message.text.HighlyStructuredMessage;
 import com.github.auties00.cobalt.model.message.text.ReactionMessage;
-import com.github.auties00.cobalt.model.message.group.SenderKeyDistributionMessage;
+import it.auties.protobuf.annotation.ProtobufMessage;
+import it.auties.protobuf.annotation.ProtobufProperty;
+import it.auties.protobuf.model.ProtobufType;
 
-import it.auties.protobuf.annotation.*;
-import it.auties.protobuf.model.*;
 import java.util.Optional;
 
 @ProtobufMessage(name = "Message")

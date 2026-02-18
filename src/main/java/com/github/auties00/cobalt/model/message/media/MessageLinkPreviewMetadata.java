@@ -1,7 +1,6 @@
-package com.github.auties00.cobalt.model.message.util;
+package com.github.auties00.cobalt.model.message.media;
 
 import com.github.auties00.cobalt.model.message.Message;
-import com.github.auties00.cobalt.model.message.media.EmbeddedMusic;
 import com.github.auties00.cobalt.model.message.payment.PaymentLinkMetadata;
 
 import it.auties.protobuf.annotation.*;
@@ -10,12 +9,12 @@ import java.util.Optional;
 import java.util.OptionalInt;
 
 @ProtobufMessage(name = "Message.LinkPreviewMetadata")
-public final class LinkPreviewMetadata implements Message {
+public final class MessageLinkPreviewMetadata implements Message {
     @ProtobufProperty(index = 1, type = ProtobufType.MESSAGE)
     PaymentLinkMetadata paymentLinkMetadata;
 
     @ProtobufProperty(index = 2, type = ProtobufType.MESSAGE)
-    URLMetadata urlMetadata;
+    MessageURLMetadata urlMetadata;
 
     @ProtobufProperty(index = 3, type = ProtobufType.UINT32)
     Integer fbExperimentId;
@@ -39,7 +38,7 @@ public final class LinkPreviewMetadata implements Message {
     String videoContentCaption;
 
 
-    LinkPreviewMetadata(PaymentLinkMetadata paymentLinkMetadata, URLMetadata urlMetadata, Integer fbExperimentId, Integer linkMediaDuration, SocialMediaPostType socialMediaPostType, Boolean linkInlineVideoMuted, String videoContentUrl, EmbeddedMusic musicMetadata, String videoContentCaption) {
+    MessageLinkPreviewMetadata(PaymentLinkMetadata paymentLinkMetadata, MessageURLMetadata urlMetadata, Integer fbExperimentId, Integer linkMediaDuration, SocialMediaPostType socialMediaPostType, Boolean linkInlineVideoMuted, String videoContentUrl, EmbeddedMusic musicMetadata, String videoContentCaption) {
         this.paymentLinkMetadata = paymentLinkMetadata;
         this.urlMetadata = urlMetadata;
         this.fbExperimentId = fbExperimentId;
@@ -55,7 +54,7 @@ public final class LinkPreviewMetadata implements Message {
         return Optional.ofNullable(paymentLinkMetadata);
     }
 
-    public Optional<URLMetadata> urlMetadata() {
+    public Optional<MessageURLMetadata> urlMetadata() {
         return Optional.ofNullable(urlMetadata);
     }
 
@@ -87,47 +86,47 @@ public final class LinkPreviewMetadata implements Message {
         return Optional.ofNullable(videoContentCaption);
     }
 
-    public LinkPreviewMetadata setPaymentLinkMetadata(PaymentLinkMetadata paymentLinkMetadata) {
+    public MessageLinkPreviewMetadata setPaymentLinkMetadata(PaymentLinkMetadata paymentLinkMetadata) {
         this.paymentLinkMetadata = paymentLinkMetadata;
         return this;
     }
 
-    public LinkPreviewMetadata setUrlMetadata(URLMetadata urlMetadata) {
+    public MessageLinkPreviewMetadata setUrlMetadata(MessageURLMetadata urlMetadata) {
         this.urlMetadata = urlMetadata;
         return this;
     }
 
-    public LinkPreviewMetadata setFbExperimentId(Integer fbExperimentId) {
+    public MessageLinkPreviewMetadata setFbExperimentId(Integer fbExperimentId) {
         this.fbExperimentId = fbExperimentId;
         return this;
     }
 
-    public LinkPreviewMetadata setLinkMediaDuration(Integer linkMediaDuration) {
+    public MessageLinkPreviewMetadata setLinkMediaDuration(Integer linkMediaDuration) {
         this.linkMediaDuration = linkMediaDuration;
         return this;
     }
 
-    public LinkPreviewMetadata setSocialMediaPostType(SocialMediaPostType socialMediaPostType) {
+    public MessageLinkPreviewMetadata setSocialMediaPostType(SocialMediaPostType socialMediaPostType) {
         this.socialMediaPostType = socialMediaPostType;
         return this;
     }
 
-    public LinkPreviewMetadata setLinkInlineVideoMuted(Boolean linkInlineVideoMuted) {
+    public MessageLinkPreviewMetadata setLinkInlineVideoMuted(Boolean linkInlineVideoMuted) {
         this.linkInlineVideoMuted = linkInlineVideoMuted;
         return this;
     }
 
-    public LinkPreviewMetadata setVideoContentUrl(String videoContentUrl) {
+    public MessageLinkPreviewMetadata setVideoContentUrl(String videoContentUrl) {
         this.videoContentUrl = videoContentUrl;
         return this;
     }
 
-    public LinkPreviewMetadata setMusicMetadata(EmbeddedMusic musicMetadata) {
+    public MessageLinkPreviewMetadata setMusicMetadata(EmbeddedMusic musicMetadata) {
         this.musicMetadata = musicMetadata;
         return this;
     }
 
-    public LinkPreviewMetadata setVideoContentCaption(String videoContentCaption) {
+    public MessageLinkPreviewMetadata setVideoContentCaption(String videoContentCaption) {
         this.videoContentCaption = videoContentCaption;
         return this;
     }

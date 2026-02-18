@@ -1,14 +1,12 @@
 package com.github.auties00.cobalt.client;
 
-import com.github.auties00.cobalt.model.action.Action;
-import com.github.auties00.cobalt.model.auth.ADVEncryptionType;
+import com.github.auties00.cobalt.model.sync.SyncAction;
+import com.github.auties00.cobalt.model.device.identity.ADVEncryptionType;
 import com.github.auties00.cobalt.model.call.CallOffer;
 import com.github.auties00.cobalt.model.chat.Chat;
 import com.github.auties00.cobalt.model.contact.Contact;
-import com.github.auties00.cobalt.model.info.ChatMessageInfo;
-import com.github.auties00.cobalt.model.info.MessageIndexInfo;
-import com.github.auties00.cobalt.model.info.MessageInfo;
-import com.github.auties00.cobalt.model.info.QuotedMessageInfo;
+import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.newsletter.Newsletter;
 import com.github.auties00.cobalt.model.privacy.PrivacySettingEntry;

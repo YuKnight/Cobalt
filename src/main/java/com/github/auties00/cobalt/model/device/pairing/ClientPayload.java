@@ -574,6 +574,43 @@ public final class ClientPayload {
         }
     }
 
+    @ProtobufEnum(name = "ClientPayload.UserAgent.ReleaseChannel")
+    public static enum ClientReleaseChannel {
+        RELEASE(0),
+        BETA(1),
+        ALPHA(2),
+        DEBUG(3);
+
+        ClientReleaseChannel(@ProtobufEnumIndex int index) {
+            this.index = index;
+        }
+
+        final int index;
+
+        public int index() {
+            return this.index;
+        }
+    }
+
+    @ProtobufEnum(name = "ClientPayload.UserAgent.DeviceType")
+    public static enum ClientType {
+        PHONE(0),
+        TABLET(1),
+        DESKTOP(2),
+        WEARABLE(3),
+        VR(4);
+
+        ClientType(@ProtobufEnumIndex int index) {
+            this.index = index;
+        }
+
+        final int index;
+
+        public int index() {
+            return this.index;
+        }
+    }
+
     @ProtobufMessage(name = "ClientPayload.DNSSource")
     public static final class DNSSource {
         @ProtobufProperty(index = 15, type = ProtobufType.ENUM)
@@ -789,10 +826,10 @@ public final class ClientPayload {
     @ProtobufMessage(name = "ClientPayload.UserAgent")
     public static final class UserAgent {
         @ProtobufProperty(index = 1, type = ProtobufType.ENUM)
-        UserAgent.Platform platform;
+        ClientPlatformType platform;
 
         @ProtobufProperty(index = 2, type = ProtobufType.MESSAGE)
-        UserAgent.AppVersion appVersion;
+        ClientAppVersion appVersion;
 
         @ProtobufProperty(index = 3, type = ProtobufType.STRING)
         String mcc;
@@ -816,7 +853,7 @@ public final class ClientPayload {
         String phoneId;
 
         @ProtobufProperty(index = 10, type = ProtobufType.ENUM)
-        UserAgent.ReleaseChannel releaseChannel;
+        ClientReleaseChannel releaseChannel;
 
         @ProtobufProperty(index = 11, type = ProtobufType.STRING)
         String localeLanguageIso6391;
@@ -831,13 +868,13 @@ public final class ClientPayload {
         String deviceExpId;
 
         @ProtobufProperty(index = 15, type = ProtobufType.ENUM)
-        UserAgent.DeviceType deviceType;
+        ClientType deviceType;
 
         @ProtobufProperty(index = 16, type = ProtobufType.STRING)
         String deviceModelType;
 
 
-        UserAgent(Platform platform, AppVersion appVersion, String mcc, String mnc, String osVersion, String manufacturer, String device, String osBuildNumber, String phoneId, ReleaseChannel releaseChannel, String localeLanguageIso6391, String localeCountryIso31661Alpha2, String deviceBoard, String deviceExpId, DeviceType deviceType, String deviceModelType) {
+        UserAgent(ClientPlatformType platform, ClientAppVersion appVersion, String mcc, String mnc, String osVersion, String manufacturer, String device, String osBuildNumber, String phoneId, ClientReleaseChannel releaseChannel, String localeLanguageIso6391, String localeCountryIso31661Alpha2, String deviceBoard, String deviceExpId, ClientType deviceType, String deviceModelType) {
             this.platform = platform;
             this.appVersion = appVersion;
             this.mcc = mcc;
@@ -856,11 +893,11 @@ public final class ClientPayload {
             this.deviceModelType = deviceModelType;
         }
 
-        public Optional<Platform> platform() {
+        public Optional<ClientPlatformType> platform() {
             return Optional.ofNullable(platform);
         }
 
-        public Optional<AppVersion> appVersion() {
+        public Optional<ClientAppVersion> appVersion() {
             return Optional.ofNullable(appVersion);
         }
 
@@ -892,7 +929,7 @@ public final class ClientPayload {
             return Optional.ofNullable(phoneId);
         }
 
-        public Optional<ReleaseChannel> releaseChannel() {
+        public Optional<ClientReleaseChannel> releaseChannel() {
             return Optional.ofNullable(releaseChannel);
         }
 
@@ -912,7 +949,7 @@ public final class ClientPayload {
             return Optional.ofNullable(deviceExpId);
         }
 
-        public Optional<DeviceType> deviceType() {
+        public Optional<ClientType> deviceType() {
             return Optional.ofNullable(deviceType);
         }
 
@@ -920,12 +957,12 @@ public final class ClientPayload {
             return Optional.ofNullable(deviceModelType);
         }
 
-        public UserAgent setPlatform(Platform platform) {
+        public UserAgent setPlatform(ClientPlatformType platform) {
             this.platform = platform;
             return this;
         }
 
-        public UserAgent setAppVersion(AppVersion appVersion) {
+        public UserAgent setAppVersion(ClientAppVersion appVersion) {
             this.appVersion = appVersion;
             return this;
         }
@@ -965,7 +1002,7 @@ public final class ClientPayload {
             return this;
         }
 
-        public UserAgent setReleaseChannel(ReleaseChannel releaseChannel) {
+        public UserAgent setReleaseChannel(ClientReleaseChannel releaseChannel) {
             this.releaseChannel = releaseChannel;
             return this;
         }
@@ -990,7 +1027,7 @@ public final class ClientPayload {
             return this;
         }
 
-        public UserAgent setDeviceType(DeviceType deviceType) {
+        public UserAgent setDeviceType(ClientType deviceType) {
             this.deviceType = deviceType;
             return this;
         }
@@ -998,167 +1035,6 @@ public final class ClientPayload {
         public UserAgent setDeviceModelType(String deviceModelType) {
             this.deviceModelType = deviceModelType;
             return this;
-        }
-
-        @ProtobufEnum(name = "ClientPayload.UserAgent.DeviceType")
-        public static enum DeviceType {
-            PHONE(0),
-            TABLET(1),
-            DESKTOP(2),
-            WEARABLE(3),
-            VR(4);
-
-            DeviceType(@ProtobufEnumIndex int index) {
-                this.index = index;
-            }
-
-            final int index;
-
-            public int index() {
-                return this.index;
-            }
-        }
-
-        @ProtobufEnum(name = "ClientPayload.UserAgent.Platform")
-        public static enum Platform {
-            ANDROID(0),
-            IOS(1),
-            WINDOWS_PHONE(2),
-            BLACKBERRY(3),
-            BLACKBERRYX(4),
-            S40(5),
-            S60(6),
-            PYTHON_CLIENT(7),
-            TIZEN(8),
-            ENTERPRISE(9),
-            SMB_ANDROID(10),
-            KAIOS(11),
-            SMB_IOS(12),
-            WINDOWS(13),
-            WEB(14),
-            PORTAL(15),
-            GREEN_ANDROID(16),
-            GREEN_IPHONE(17),
-            BLUE_ANDROID(18),
-            BLUE_IPHONE(19),
-            FBLITE_ANDROID(20),
-            MLITE_ANDROID(21),
-            IGLITE_ANDROID(22),
-            PAGE(23),
-            MACOS(24),
-            OCULUS_MSG(25),
-            OCULUS_CALL(26),
-            MILAN(27),
-            CAPI(28),
-            WEAROS(29),
-            ARDEVICE(30),
-            VRDEVICE(31),
-            BLUE_WEB(32),
-            IPAD(33),
-            TEST(34),
-            SMART_GLASSES(35),
-            BLUE_VR(36),
-            AR_WRIST(37);
-
-            Platform(@ProtobufEnumIndex int index) {
-                this.index = index;
-            }
-
-            final int index;
-
-            public int index() {
-                return this.index;
-            }
-        }
-
-        @ProtobufEnum(name = "ClientPayload.UserAgent.ReleaseChannel")
-        public static enum ReleaseChannel {
-            RELEASE(0),
-            BETA(1),
-            ALPHA(2),
-            DEBUG(3);
-
-            ReleaseChannel(@ProtobufEnumIndex int index) {
-                this.index = index;
-            }
-
-            final int index;
-
-            public int index() {
-                return this.index;
-            }
-        }
-
-        @ProtobufMessage(name = "ClientPayload.UserAgent.AppVersion")
-        public static final class AppVersion {
-            @ProtobufProperty(index = 1, type = ProtobufType.UINT32)
-            Integer primary;
-
-            @ProtobufProperty(index = 2, type = ProtobufType.UINT32)
-            Integer secondary;
-
-            @ProtobufProperty(index = 3, type = ProtobufType.UINT32)
-            Integer tertiary;
-
-            @ProtobufProperty(index = 4, type = ProtobufType.UINT32)
-            Integer quaternary;
-
-            @ProtobufProperty(index = 5, type = ProtobufType.UINT32)
-            Integer quinary;
-
-
-            AppVersion(Integer primary, Integer secondary, Integer tertiary, Integer quaternary, Integer quinary) {
-                this.primary = primary;
-                this.secondary = secondary;
-                this.tertiary = tertiary;
-                this.quaternary = quaternary;
-                this.quinary = quinary;
-            }
-
-            public OptionalInt primary() {
-                return primary == null ? OptionalInt.empty() : OptionalInt.of(primary);
-            }
-
-            public OptionalInt secondary() {
-                return secondary == null ? OptionalInt.empty() : OptionalInt.of(secondary);
-            }
-
-            public OptionalInt tertiary() {
-                return tertiary == null ? OptionalInt.empty() : OptionalInt.of(tertiary);
-            }
-
-            public OptionalInt quaternary() {
-                return quaternary == null ? OptionalInt.empty() : OptionalInt.of(quaternary);
-            }
-
-            public OptionalInt quinary() {
-                return quinary == null ? OptionalInt.empty() : OptionalInt.of(quinary);
-            }
-
-            public AppVersion setPrimary(Integer primary) {
-                this.primary = primary;
-                return this;
-            }
-
-            public AppVersion setSecondary(Integer secondary) {
-                this.secondary = secondary;
-                return this;
-            }
-
-            public AppVersion setTertiary(Integer tertiary) {
-                this.tertiary = tertiary;
-                return this;
-            }
-
-            public AppVersion setQuaternary(Integer quaternary) {
-                this.quaternary = quaternary;
-                return this;
-            }
-
-            public AppVersion setQuinary(Integer quinary) {
-                this.quinary = quinary;
-                return this;
-            }
         }
     }
 

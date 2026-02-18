@@ -1,7 +1,8 @@
 package com.github.auties00.cobalt.model.jid;
 
+import com.github.auties00.cobalt.model.chat.Chat;
 import com.github.auties00.cobalt.model.contact.Contact;
-import com.github.auties00.cobalt.model.info.MessageInfoParent;
+import com.github.auties00.cobalt.model.newsletter.Newsletter;
 
 /**
  * A sealed interface that provides a standard way to obtain a {@link Jid} from various
@@ -12,7 +13,7 @@ import com.github.auties00.cobalt.model.info.MessageInfoParent;
  * to the underlying {@code Jid} by requiring each implementor to expose a {@link #toJid()}
  * method, enabling uniform handling of JID-bearing objects across the API.
  */
-public sealed interface JidProvider permits Contact, MessageInfoParent, Jid, JidServer {
+public sealed interface JidProvider permits Contact, Jid, JidServer, Chat, Newsletter {
     /**
      * Returns the {@link Jid} represented by this object.
      *

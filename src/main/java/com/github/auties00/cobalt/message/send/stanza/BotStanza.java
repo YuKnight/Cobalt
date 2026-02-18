@@ -4,12 +4,12 @@ import com.github.auties00.cobalt.message.send.bot.BotMessageSecret;
 import com.github.auties00.cobalt.message.send.bot.BotProtobufTransform;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryptedPayload;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
-import com.github.auties00.cobalt.model.info.ChatMessageInfo;
-import com.github.auties00.cobalt.model.info.DeviceContextInfo;
+import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.model.device.DeviceListMetadata;
 import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.ChatMessageKey;
+import com.github.auties00.cobalt.model.message.MessageKey;
 import com.github.auties00.cobalt.model.message.MessageContainerSpec;
-import com.github.auties00.cobalt.model.message.server.ProtocolMessage;
+import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 
@@ -240,7 +240,7 @@ public final class BotStanza {
         if (isBotFeedback(messageInfo)
                 && messageInfo.message().content() instanceof ProtocolMessage pm) {
             return pm.key()
-                    .flatMap(ChatMessageKey::senderJid)
+                    .flatMap(MessageKey::senderJid)
                     .filter(Jid::hasBotServer)
                     .orElse(null);
         }

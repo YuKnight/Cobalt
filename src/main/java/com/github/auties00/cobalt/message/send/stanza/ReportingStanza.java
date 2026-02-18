@@ -1,14 +1,14 @@
 package com.github.auties00.cobalt.message.send.stanza;
 
 import com.github.auties00.cobalt.message.send.token.ReportingToken;
-import com.github.auties00.cobalt.model.info.ChatMessageInfo;
+import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.Message;
 import com.github.auties00.cobalt.model.message.MessageContainerSpec;
-import com.github.auties00.cobalt.model.message.standard.EncryptedEventResponseMessage;
-import com.github.auties00.cobalt.model.message.standard.EncryptedReactionMessage;
-import com.github.auties00.cobalt.model.message.standard.PollUpdateMessage;
-import com.github.auties00.cobalt.model.message.standard.ReactionMessage;
+import com.github.auties00.cobalt.model.message.event.EncEventResponseMessage;
+import com.github.auties00.cobalt.model.message.security.EncReactionMessage;
+import com.github.auties00.cobalt.model.message.poll.PollUpdateMessage;
+import com.github.auties00.cobalt.model.message.text.ReactionMessage;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.props.ABProp;

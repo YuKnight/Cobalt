@@ -1,4 +1,4 @@
-package com.github.auties00.cobalt.model.message;
+package com.github.auties00.cobalt.model.message.context;
 
 import com.github.auties00.cobalt.model.bot.session.BotMessageSharingInfo;
 import com.github.auties00.cobalt.model.bot.session.ForwardedAIBotMessageInfo;
@@ -6,6 +6,8 @@ import com.github.auties00.cobalt.model.chat.ChatDisappearingMode;
 import com.github.auties00.cobalt.model.chat.group.GroupParticipantLabel;
 import com.github.auties00.cobalt.model.chat.group.GroupMention;
 import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.model.message.MessageContainer;
+import com.github.auties00.cobalt.model.message.MessageKey;
 import com.github.auties00.cobalt.model.message.interactive.InteractiveAction;
 import com.github.auties00.cobalt.model.message.interactive.InteractiveActionLink;
 import com.github.auties00.cobalt.model.message.interactive.UrlTrackingMap;

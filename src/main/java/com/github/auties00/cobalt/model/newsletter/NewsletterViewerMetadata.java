@@ -1,6 +1,5 @@
 package com.github.auties00.cobalt.model.newsletter;
 
-import com.alibaba.fastjson2.JSONObject;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
@@ -8,6 +7,11 @@ import it.auties.protobuf.model.ProtobufType;
 import java.util.Objects;
 import java.util.Optional;
 
+/**
+ * The metadata describing the current viewer's relationship with a
+ * newsletter, including their mute preference, role, and WAMO
+ * subscription status.
+ */
 @ProtobufMessage
 public final class NewsletterViewerMetadata {
     @ProtobufProperty(index = 1, type = ProtobufType.BOOL)
@@ -16,59 +20,96 @@ public final class NewsletterViewerMetadata {
     @ProtobufProperty(index = 2, type = ProtobufType.ENUM)
     NewsletterViewerRole role;
 
-    public NewsletterViewerMetadata(boolean mute, NewsletterViewerRole role) {
+    @ProtobufProperty(index = 3, type = ProtobufType.ENUM)
+    NewsletterWamoSubStatus wamoSubStatus;
+
+    /**
+     * Constructs a new {@code NewsletterViewerMetadata} with the specified
+     * mute preference, role, and WAMO subscription status.
+     *
+     * @param mute          {@code true} if the viewer has muted the newsletter
+     * @param role          the viewer's role, defaults to {@link NewsletterViewerRole#UNKNOWN}
+     *                      if {@code null}
+     * @param wamoSubStatus the WAMO subscription status, may be {@code null}
+     */
+    NewsletterViewerMetadata(boolean mute, NewsletterViewerRole role, NewsletterWamoSubStatus wamoSubStatus) {
         this.mute = mute;
         this.role = Objects.requireNonNullElse(role, NewsletterViewerRole.UNKNOWN);
+        this.wamoSubStatus = wamoSubStatus;
     }
 
-    public static Optional<NewsletterViewerMetadata> ofJson(JSONObject object) {
-        var mute = switch (object.get("mute")) {
-            case Boolean bool -> bool;
-            case String string -> string.equals("ON");
-            case null, default -> false;
-        };
-        var role = switch (object.get("role")) {
-            case String string -> NewsletterViewerRole.of(string);
-            case Integer index -> NewsletterViewerRole.of(index);
-            default -> NewsletterViewerRole.UNKNOWN;
-        };
-        var result = new NewsletterViewerMetadata(mute, role);
-        return Optional.of(result);
-    }
-
+    /**
+     * Returns whether the viewer has muted the newsletter.
+     *
+     * @return {@code true} if the newsletter is muted
+     */
     public boolean mute() {
         return mute;
     }
 
+    /**
+     * Returns the viewer's role within the newsletter.
+     *
+     * @return the viewer role, never {@code null}
+     */
     public NewsletterViewerRole role() {
         return role;
     }
 
-    public void setMute(boolean mute) {
+    /**
+     * Returns the viewer's WAMO subscription status, if available.
+     *
+     * @return an {@link Optional} containing the WAMO sub status,
+     *         or empty if not set
+     */
+    public Optional<NewsletterWamoSubStatus> wamoSubStatus() {
+        return Optional.ofNullable(wamoSubStatus);
+    }
+
+    /**
+     * Sets whether the viewer has muted the newsletter.
+     *
+     * @param mute {@code true} to mute the newsletter
+     * @return this instance for chaining
+     */
+    public NewsletterViewerMetadata setMute(boolean mute) {
         this.mute = mute;
+        return this;
     }
 
-    public void setRole(NewsletterViewerRole role) {
-        this.role = role;
+    /**
+     * Sets the viewer's role within the newsletter.
+     *
+     * @param role the viewer role, defaults to {@link NewsletterViewerRole#UNKNOWN}
+     *             if {@code null}
+     * @return this instance for chaining
+     */
+    public NewsletterViewerMetadata setRole(NewsletterViewerRole role) {
+        this.role = Objects.requireNonNullElse(role, NewsletterViewerRole.UNKNOWN);
+        return this;
     }
 
-    @Override
-    public String toString() {
-        return "NewsletterViewerMetadata{" +
-                "mute=" + mute +
-                ", role=" + role +
-                '}';
+    /**
+     * Sets the viewer's WAMO subscription status.
+     *
+     * @param wamoSubStatus the WAMO sub status
+     * @return this instance for chaining
+     */
+    public NewsletterViewerMetadata setWamoSubStatus(NewsletterWamoSubStatus wamoSubStatus) {
+        this.wamoSubStatus = wamoSubStatus;
+        return this;
     }
 
     @Override
     public boolean equals(Object o) {
         return o instanceof NewsletterViewerMetadata that
                 && mute == that.mute
-                && role == that.role;
+                && role == that.role
+                && wamoSubStatus == that.wamoSubStatus;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(mute, role);
+        return Objects.hash(mute, role, wamoSubStatus);
     }
 }

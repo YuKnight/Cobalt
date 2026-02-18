@@ -1,6 +1,9 @@
 package com.github.auties00.cobalt.model.sync.setting.privacy;
 
 import com.github.auties00.cobalt.model.sync.SyncAction;
+import it.auties.protobuf.annotation.ProtobufMessage;
+import it.auties.protobuf.annotation.ProtobufProperty;
+import it.auties.protobuf.model.ProtobufType;
 
 @ProtobufMessage(name = "SyncActionValue.PrivacySettingChannelsPersonalisedRecommendationAction")
 public final class PrivacySettingChannelsPersonalisedRecommendationAction implements SyncAction {

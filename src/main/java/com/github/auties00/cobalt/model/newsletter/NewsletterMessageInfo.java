@@ -1,38 +1,41 @@
 package com.github.auties00.cobalt.model.newsletter;
 
-import com.alibaba.fastjson2.JSONObject;
-import com.github.auties00.cobalt.model.info.MessageInfo;
-import com.github.auties00.cobalt.model.info.MessageInfoParent;
-import com.github.auties00.cobalt.model.contact.Contact;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageReceipt;
-import com.github.auties00.cobalt.model.message.MessageStatus;
+import com.github.auties00.cobalt.model.message.*;
+import com.github.auties00.cobalt.model.mixin.InstantSecondsMixin;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
 
 import java.time.Instant;
-import java.time.ZonedDateTime;
 import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
-// TODO: Add receipts
+/**
+ * A message within a newsletter, containing the message content, metadata
+ * such as view counts, reactions, poll votes, forwards, and administrative
+ * information about the sender.
+ *
+ * <p>Newsletter messages are not end-to-end encrypted. The message content
+ * is received as plaintext protobuf bytes using the standard
+ * {@code Message} protobuf specification.
+ */
 @ProtobufMessage
 public final class NewsletterMessageInfo implements MessageInfo {
-    @ProtobufProperty(index = 1, type = ProtobufType.STRING)
-    final String id;
+    @ProtobufProperty(index = 1, type = ProtobufType.MESSAGE)
+    MessageKey key;
 
     @ProtobufProperty(index = 2, type = ProtobufType.INT32)
     int serverId;
 
-    @ProtobufProperty(index = 3, type = ProtobufType.UINT64)
-    final Long timestampSeconds;
+    @ProtobufProperty(index = 3, type = ProtobufType.UINT64, mixins = InstantSecondsMixin.class)
+    Instant timestamp;
 
     @ProtobufProperty(index = 4, type = ProtobufType.UINT64)
-    final Long views;
+    Long views;
 
     @ProtobufProperty(index = 5, type = ProtobufType.MAP, mapKeyType = ProtobufType.STRING, mapValueType = ProtobufType.MESSAGE)
-    final Map<String, NewsletterReaction> reactions;
+    Map<String, NewsletterReaction> reactions;
 
     @ProtobufProperty(index = 6, type = ProtobufType.MESSAGE)
     MessageContainer message;
@@ -44,179 +47,305 @@ public final class NewsletterMessageInfo implements MessageInfo {
     boolean starred;
 
     @ProtobufProperty(index = 9, type = ProtobufType.MESSAGE)
-    final MessageReceipt receipt;
+    List<MessageReceipt> receipts;
 
-    Newsletter newsletter;
+    @ProtobufProperty(index = 10, type = ProtobufType.UINT64)
+    Long forwardsCount;
 
-    /**
-     * The server-assigned media handle for uploaded newsletter media.
-     * Set by the media upload step before sending; not persisted.
-     *
-     * @apiNote WAWebNewsletterSendMessageQueryJob: {@code e.mediaHandle}
-     * passed as {@code messageMediaId} in the SMAX stanza.
-     */
+    @ProtobufProperty(index = 11, type = ProtobufType.UINT64)
+    Long questionResponsesCount;
+
+    @ProtobufProperty(index = 12, type = ProtobufType.UINT64, mixins = InstantSecondsMixin.class)
+    Instant lastUpdateFromServerTimestamp;
+
+    @ProtobufProperty(index = 13, type = ProtobufType.UINT64)
+    Long latestEditSenderTimestampMs;
+
+    @ProtobufProperty(index = 14, type = ProtobufType.UINT64, mixins = InstantSecondsMixin.class)
+    Instant originalTimestamp;
+
+    @ProtobufProperty(index = 15, type = ProtobufType.BOOL)
+    boolean wamoSub;
+
+    @ProtobufProperty(index = 16, type = ProtobufType.MESSAGE)
+    NewsletterAdminProfile adminProfile;
+
+    @ProtobufProperty(index = 17, type = ProtobufType.MESSAGE)
+    List<NewsletterPollVote> pollVotes;
+
     String mediaHandle;
 
-    NewsletterMessageInfo(String id, int serverId, Long timestampSeconds, Long views, Map<String, NewsletterReaction> reactions, MessageContainer message, MessageStatus status, boolean starred, MessageReceipt receipt) {
-        this.id = Objects.requireNonNull(id, "id cannot be null");
+    /**
+     * Constructs a new {@code NewsletterMessageInfo} with the specified fields.
+     *
+     * @param key                            the message key, must not be {@code null}
+     * @param serverId                       the server-assigned message identifier
+     * @param timestamp                      the message timestamp, may be {@code null}
+     * @param views                          the view count, may be {@code null}
+     * @param reactions                      the reaction map keyed by emoji content, may be {@code null}
+     * @param message                        the message content container, may be {@code null}
+     * @param status                         the message delivery status, may be {@code null}
+     * @param starred                        whether the message is starred
+     * @param receipts                       the message receipts, may be {@code null}
+     * @param forwardsCount                  the number of times the message was forwarded, may be {@code null}
+     * @param questionResponsesCount         the number of question responses, may be {@code null}
+     * @param lastUpdateFromServerTimestamp  the timestamp of the last server update, may be {@code null}
+     * @param latestEditSenderTimestampMs    the timestamp in milliseconds of the latest edit, may be {@code null}
+     * @param originalTimestamp              the original timestamp before edits, may be {@code null}
+     * @param wamoSub                        whether this is a WAMO subscription message
+     * @param adminProfile                   the admin profile who sent the message, may be {@code null}
+     * @param pollVotes                      the poll vote data, may be {@code null}
+     * @throws NullPointerException if {@code key} is {@code null}
+     */
+    NewsletterMessageInfo(MessageKey key, int serverId, Instant timestamp, Long views, Map<String, NewsletterReaction> reactions, MessageContainer message, MessageStatus status, boolean starred, List<MessageReceipt> receipts, Long forwardsCount, Long questionResponsesCount, Instant lastUpdateFromServerTimestamp, Long latestEditSenderTimestampMs, Instant originalTimestamp, boolean wamoSub, NewsletterAdminProfile adminProfile, List<NewsletterPollVote> pollVotes) {
+        this.key = Objects.requireNonNull(key, "key cannot be null");
         this.serverId = serverId;
-        this.timestampSeconds = timestampSeconds;
+        this.timestamp = timestamp;
         this.views = views;
         this.reactions = reactions;
         this.message = message;
         this.status = status;
         this.starred = starred;
-        this.receipt = receipt;
+        this.receipts = receipts;
+        this.forwardsCount = forwardsCount;
+        this.questionResponsesCount = questionResponsesCount;
+        this.lastUpdateFromServerTimestamp = lastUpdateFromServerTimestamp;
+        this.latestEditSenderTimestampMs = latestEditSenderTimestampMs;
+        this.originalTimestamp = originalTimestamp;
+        this.wamoSub = wamoSub;
+        this.adminProfile = adminProfile;
+        this.pollVotes = Objects.requireNonNullElseGet(pollVotes, ArrayList::new);
     }
 
-    public static Optional<NewsletterMessageInfo> ofJson(JSONObject jsonObject) {
-        if(jsonObject == null) {
-            return Optional.empty();
-        }
-
-        var id = jsonObject.getString("id");
-        if(id == null) {
-            return Optional.empty();
-        }
-
-        var serverId = jsonObject.getIntValue("serverId", -1);
-        var timestampSeconds = jsonObject.getLongValue("timestampSeconds", 0);
-        var views = jsonObject.getLongValue("views", 0);
-        var reactionsJsonObject = jsonObject.getJSONObject("reactions");
-        Map<String, NewsletterReaction> reactions = HashMap.newHashMap(reactionsJsonObject.size());
-        for(var reactionKey : reactionsJsonObject.sequencedKeySet()) {
-            var reactionJsonObject = reactionsJsonObject.getJSONObject(reactionKey);
-            NewsletterReaction.ofJson(reactionJsonObject)
-                    .ifPresent(reaction -> reactions.put(reactionKey, reaction));
-        }
-        var message = MessageContainer.ofJson(jsonObject.getJSONObject("message"))
-                .orElse(MessageContainer.empty());
-        var status = MessageStatus.of(jsonObject.getString("status"))
-                .orElse(MessageStatus.ERROR);
-        // TODO
-        var starred = false;
-        var receipt = new MessageReceipt();
-        return Optional.of(new NewsletterMessageInfo(id, serverId, timestampSeconds, views, reactions, message, status, starred, receipt));
-    }
-
-    public void setNewsletter(Newsletter newsletter) {
-        Objects.requireNonNull(newsletter, "Newsletter cannot be null");
-        this.newsletter = newsletter;
-    }
-
-    public Jid newsletterJid() {
-        Objects.requireNonNull(newsletter, "Newsletter cannot be null");
-        return newsletter.jid();
-    }
-
+    /**
+     * {@inheritDoc}
+     */
     @Override
-    public Jid parentJid() {
-        return newsletterJid();
+    public MessageKey key() {
+        return key;
     }
 
-    @Override
-    public Optional<MessageInfoParent> parent() {
-        return Optional.ofNullable(newsletter);
+    /**
+     * Sets the message key.
+     *
+     * @param key the message key, must not be {@code null}
+     * @return this instance for chaining
+     * @throws NullPointerException if {@code key} is {@code null}
+     */
+    public NewsletterMessageInfo setKey(MessageKey key) {
+        this.key = Objects.requireNonNull(key, "key cannot be null");
+        return this;
     }
 
-    @Override
-    public void setParent(MessageInfoParent parent) {
-        if(parent == null) {
-            this.newsletter = null;
-        }else if(!(parent instanceof Newsletter parentNewsletter)) {
-            throw new IllegalArgumentException("Parent is not a newsletter");
-        }else {
-            this.newsletter = parentNewsletter;
-        }
-    }
-
-    @Override
-    public Optional<Contact> sender() {
-        return Optional.empty();
-    }
-
-    @Override
-    public void setSender(Contact sender) {
-
-    }
-
-    @Override
-    public Jid senderJid() {
-        return newsletterJid();
-    }
-
-    public Newsletter newsletter() {
-        return Objects.requireNonNull(newsletter, "newsletter cannot be null when accessed");
-    }
-
-    public Optional<String> mediaHandle() {
-        return Optional.ofNullable(mediaHandle);
-    }
-
-    public void setMediaHandle(String mediaHandle) {
-        this.mediaHandle = mediaHandle;
-    }
-
-    public String id() {
-        return id;
-    }
-
+    /**
+     * Returns the server-assigned message identifier.
+     *
+     * @return the server id
+     */
     public int serverId() {
         return serverId;
     }
 
-    public void setServerId(int serverId) {
+    /**
+     * Sets the server-assigned message identifier.
+     *
+     * @param serverId the server id
+     * @return this instance for chaining
+     */
+    public NewsletterMessageInfo setServerId(int serverId) {
         this.serverId = serverId;
+        return this;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
-    public OptionalLong timestampSeconds() {
-        return timestampSeconds == null ? OptionalLong.empty() : OptionalLong.of(timestampSeconds);
+    public Optional<Instant> timestamp() {
+        return Optional.ofNullable(timestamp);
     }
 
+    /**
+     * Sets the message timestamp.
+     *
+     * @param timestamp the timestamp
+     * @return this instance for chaining
+     */
+    public NewsletterMessageInfo setTimestamp(Instant timestamp) {
+        this.timestamp = timestamp;
+        return this;
+    }
+
+    /**
+     * Returns the view count, if available.
+     *
+     * @return an {@link OptionalLong} containing the view count,
+     *         or empty if not set
+     */
     public OptionalLong views() {
         return views == null ? OptionalLong.empty() : OptionalLong.of(views);
     }
 
+    /**
+     * Sets the view count.
+     *
+     * @param views the view count
+     * @return this instance for chaining
+     */
+    public NewsletterMessageInfo setViews(Long views) {
+        this.views = views;
+        return this;
+    }
+
+    /**
+     * Sets the reactions from a collection, merging duplicates.
+     *
+     * @param reactions the collection of reactions, may be {@code null}
+     * @return this instance for chaining
+     */
+    public NewsletterMessageInfo setReactions(Collection<NewsletterReaction> reactions) {
+        if (reactions == null) {
+            this.reactions = new HashMap<>();
+        } else {
+            this.reactions = reactions.stream().collect(Collectors.toMap(reaction -> reaction.content, Function.identity(), (firstReaction, secondReaction) -> {
+                var firstReactionContent = firstReaction.content;
+                var firstReactionCount = firstReaction.count;
+                var firstReactionFromMe = firstReaction.fromMe;
+
+                var secondReactionContent = secondReaction.content;
+                var secondReactionCount = secondReaction.count;
+                var secondReactionFromMe = secondReaction.fromMe;
+
+                assert Objects.equals(firstReactionContent, secondReactionContent);
+                assert firstReactionFromMe == secondReactionFromMe;
+
+                if (firstReactionCount == secondReactionCount) {
+                    return new NewsletterReaction(firstReactionContent, firstReactionCount + 1, firstReactionFromMe);
+                } else {
+                    return new NewsletterReaction(firstReactionContent, Math.max(firstReactionCount, secondReactionCount), firstReactionFromMe);
+                }
+            }));
+        }
+        return this;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
     public MessageContainer message() {
-        return message;
+        return message != null ? message : MessageContainer.empty();
     }
 
-    @Override
-    public void setMessage(MessageContainer message) {
+    /**
+     * Sets the message content container.
+     *
+     * @param message the message container
+     * @return this instance for chaining
+     */
+    public NewsletterMessageInfo setMessage(MessageContainer message) {
         this.message = message;
+        return this;
     }
 
-    public Optional<ZonedDateTime> timestamp() {
-        return timestampSeconds == 0 ? Optional.empty() : Optional.of(Instant.ofEpochSecond(timestampSeconds));
-    }
-
+    /**
+     * {@inheritDoc}
+     */
     @Override
-    public MessageStatus status() {
-        return status;
+    public Optional<MessageStatus> status() {
+        return Optional.ofNullable(status);
     }
 
-    @Override
-    public void setStatus(MessageStatus status) {
+    /**
+     * Sets the message delivery status.
+     *
+     * @param status the delivery status
+     * @return this instance for chaining
+     */
+    public NewsletterMessageInfo setStatus(MessageStatus status) {
         this.status = status;
+        return this;
     }
 
+    /**
+     * Sets the message receipts.
+     *
+     * @param receipts the receipt
+     * @return this instance for chaining
+     */
+    public NewsletterMessageInfo setReceipts(List<MessageReceipt> receipts) {
+        this.receipts = receipts;
+        return this;
+    }
+
+    /**
+     * Returns the media handle, if available.
+     *
+     * @return the media handle, may be {@code null}
+     */
+    public String mediaHandle() {
+        return mediaHandle;
+    }
+
+    /**
+     * Sets the media handle.
+     *
+     * @param mediaHandle the media handle
+     * @return this instance for chaining
+     */
+    public NewsletterMessageInfo setMediaHandle(String mediaHandle) {
+        this.mediaHandle = mediaHandle;
+        return this;
+    }
+
+    /**
+     * Returns an unmodifiable view of the reactions.
+     *
+     * @return the reactions collection, never {@code null}
+     */
     public Collection<NewsletterReaction> reactions() {
         return Collections.unmodifiableCollection(reactions.values());
     }
 
+    /**
+     * Finds a reaction by its emoji content.
+     *
+     * @param value the emoji content to search for
+     * @return an {@link Optional} containing the matching reaction,
+     *         or empty if not found
+     */
     public Optional<NewsletterReaction> findReaction(String value) {
         return Optional.ofNullable(reactions.get(value));
     }
 
+    /**
+     * Adds or replaces a reaction.
+     *
+     * @param reaction the reaction to add
+     * @return an {@link Optional} containing the previously associated reaction,
+     *         or empty if there was none
+     */
     public Optional<NewsletterReaction> addReaction(NewsletterReaction reaction) {
         return Optional.ofNullable(reactions.put(reaction.content(), reaction));
     }
 
+    /**
+     * Removes a reaction by its emoji code.
+     *
+     * @param code the emoji code to remove
+     * @return an {@link Optional} containing the removed reaction,
+     *         or empty if not found
+     */
     public Optional<NewsletterReaction> removeReaction(String code) {
         return Optional.ofNullable(reactions.remove(code));
     }
 
+    /**
+     * Increments the count for a reaction, creating it if it does not exist.
+     *
+     * @param code   the emoji code
+     * @param fromMe whether the reaction is from the current user
+     */
     public void incrementReaction(String code, boolean fromMe) {
         findReaction(code).ifPresentOrElse(reaction -> {
             reaction.setCount(reaction.count() + 1);
@@ -227,6 +356,12 @@ public final class NewsletterMessageInfo implements MessageInfo {
         });
     }
 
+    /**
+     * Decrements the count for a reaction, removing it if the count
+     * reaches zero.
+     *
+     * @param code the emoji code
+     */
     public void decrementReaction(String code) {
         findReaction(code).ifPresent(reaction -> {
             if (reaction.count() <= 1) {
@@ -239,47 +374,223 @@ public final class NewsletterMessageInfo implements MessageInfo {
         });
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    @Override
     public boolean starred() {
         return starred;
     }
 
-    public void setStarred(boolean starred) {
+    /**
+     * Sets whether the message is starred.
+     *
+     * @param starred {@code true} to star the message
+     */
+    public NewsletterMessageInfo setStarred(boolean starred) {
         this.starred = starred;
+        return this;
     }
 
-    public MessageReceipt receipt() {
-        return receipt;
-    }
-
+    /**
+     * {@inheritDoc}
+     */
     @Override
-    public String toString() {
-        return "NewsletterMessageInfo{" +
-               "newsletter=" + newsletter +
-               ", id='" + id + '\'' +
-               ", serverId=" + serverId +
-               ", timestampSeconds=" + timestampSeconds +
-               ", views=" + views +
-               ", reactions=" + reactions +
-               ", message=" + message +
-               ", status=" + status +
-               '}';
+    public List<MessageReceipt> receipts() {
+        return receipts == null ? List.of() : Collections.unmodifiableList(receipts);
+    }
+
+    /**
+     * Returns the number of times the message was forwarded, if available.
+     *
+     * @return an {@link OptionalLong} containing the forwards count,
+     *         or empty if not set
+     */
+    public OptionalLong forwardsCount() {
+        return forwardsCount == null ? OptionalLong.empty() : OptionalLong.of(forwardsCount);
+    }
+
+    /**
+     * Sets the forwards count.
+     *
+     * @param forwardsCount the forwards count
+     * @return this instance for chaining
+     */
+    public NewsletterMessageInfo setForwardsCount(Long forwardsCount) {
+        this.forwardsCount = forwardsCount;
+        return this;
+    }
+
+    /**
+     * Returns the number of question responses, if available.
+     *
+     * @return an {@link OptionalLong} containing the question responses count,
+     *         or empty if not set
+     */
+    public OptionalLong questionResponsesCount() {
+        return questionResponsesCount == null ? OptionalLong.empty() : OptionalLong.of(questionResponsesCount);
+    }
+
+    /**
+     * Sets the question responses count.
+     *
+     * @param questionResponsesCount the question responses count
+     * @return this instance for chaining
+     */
+    public NewsletterMessageInfo setQuestionResponsesCount(Long questionResponsesCount) {
+        this.questionResponsesCount = questionResponsesCount;
+        return this;
+    }
+
+    /**
+     * Returns the timestamp of the last server update, if available.
+     *
+     * @return an {@link Optional} containing the last update timestamp,
+     *         or empty if not set
+     */
+    public Optional<Instant> lastUpdateFromServerTimestamp() {
+        return Optional.ofNullable(lastUpdateFromServerTimestamp);
+    }
+
+    /**
+     * Sets the timestamp of the last server update.
+     *
+     * @param lastUpdateFromServerTimestamp the last update timestamp
+     * @return this instance for chaining
+     */
+    public NewsletterMessageInfo setLastUpdateFromServerTimestamp(Instant lastUpdateFromServerTimestamp) {
+        this.lastUpdateFromServerTimestamp = lastUpdateFromServerTimestamp;
+        return this;
+    }
+
+    /**
+     * Returns the timestamp in milliseconds of the latest edit by the
+     * sender, if available.
+     *
+     * @return an {@link OptionalLong} containing the edit timestamp in
+     *         milliseconds, or empty if not set
+     */
+    public OptionalLong latestEditSenderTimestampMs() {
+        return latestEditSenderTimestampMs == null ? OptionalLong.empty() : OptionalLong.of(latestEditSenderTimestampMs);
+    }
+
+    /**
+     * Sets the latest edit sender timestamp in milliseconds.
+     *
+     * @param latestEditSenderTimestampMs the edit timestamp in milliseconds
+     * @return this instance for chaining
+     */
+    public NewsletterMessageInfo setLatestEditSenderTimestampMs(Long latestEditSenderTimestampMs) {
+        this.latestEditSenderTimestampMs = latestEditSenderTimestampMs;
+        return this;
+    }
+
+    /**
+     * Returns the original timestamp of the message before any edits,
+     * if available.
+     *
+     * @return an {@link Optional} containing the original timestamp,
+     *         or empty if not set or the message was not edited
+     */
+    public Optional<Instant> originalTimestamp() {
+        return Optional.ofNullable(originalTimestamp);
+    }
+
+    /**
+     * Sets the original timestamp before edits.
+     *
+     * @param originalTimestamp the original timestamp
+     * @return this instance for chaining
+     */
+    public NewsletterMessageInfo setOriginalTimestamp(Instant originalTimestamp) {
+        this.originalTimestamp = originalTimestamp;
+        return this;
+    }
+
+    /**
+     * Returns whether this is a WAMO subscription message.
+     *
+     * @return {@code true} if this is a WAMO sub message
+     */
+    public boolean wamoSub() {
+        return wamoSub;
+    }
+
+    /**
+     * Sets whether this is a WAMO subscription message.
+     *
+     * @param wamoSub {@code true} if this is a WAMO sub message
+     * @return this instance for chaining
+     */
+    public NewsletterMessageInfo setWamoSub(boolean wamoSub) {
+        this.wamoSub = wamoSub;
+        return this;
+    }
+
+    /**
+     * Returns the admin profile of the message sender, if available.
+     *
+     * @return an {@link Optional} containing the admin profile,
+     *         or empty if not set
+     */
+    public Optional<NewsletterAdminProfile> adminProfile() {
+        return Optional.ofNullable(adminProfile);
+    }
+
+    /**
+     * Sets the admin profile of the message sender.
+     *
+     * @param adminProfile the admin profile
+     * @return this instance for chaining
+     */
+    public NewsletterMessageInfo setAdminProfile(NewsletterAdminProfile adminProfile) {
+        this.adminProfile = adminProfile;
+        return this;
+    }
+
+    /**
+     * Returns the poll vote data for this message, if it is a poll.
+     *
+     * @return an unmodifiable list of poll votes, never {@code null}
+     */
+    public List<NewsletterPollVote> pollVotes() {
+        return Collections.unmodifiableList(pollVotes);
+    }
+
+    /**
+     * Sets the poll vote data.
+     *
+     * @param pollVotes the list of poll votes
+     * @return this instance for chaining
+     */
+    public NewsletterMessageInfo setPollVotes(List<NewsletterPollVote> pollVotes) {
+        this.pollVotes = Objects.requireNonNullElseGet(pollVotes, ArrayList::new);
+        return this;
     }
 
     @Override
     public boolean equals(Object o) {
-        return o instanceof NewsletterMessageInfo that &&
-               serverId == that.serverId &&
-               Objects.equals(id, that.id) &&
-               Objects.equals(timestampSeconds, that.timestampSeconds) &&
-               Objects.equals(views, that.views) &&
-               Objects.equals(reactions, that.reactions) &&
-               Objects.equals(message, that.message) &&
-               Objects.equals(newsletter, that.newsletter) &&
-               status == that.status;
+        return o instanceof NewsletterMessageInfo that
+               && serverId == that.serverId
+               && starred == that.starred
+               && wamoSub == that.wamoSub
+               && Objects.equals(key, that.key)
+               && Objects.equals(timestamp, that.timestamp)
+               && Objects.equals(views, that.views)
+               && Objects.equals(reactions, that.reactions)
+               && Objects.equals(message, that.message)
+               && status == that.status
+               && Objects.equals(forwardsCount, that.forwardsCount)
+               && Objects.equals(questionResponsesCount, that.questionResponsesCount)
+               && Objects.equals(lastUpdateFromServerTimestamp, that.lastUpdateFromServerTimestamp)
+               && Objects.equals(latestEditSenderTimestampMs, that.latestEditSenderTimestampMs)
+               && Objects.equals(originalTimestamp, that.originalTimestamp)
+               && Objects.equals(adminProfile, that.adminProfile)
+               && Objects.equals(pollVotes, that.pollVotes);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, serverId, timestampSeconds, views, reactions, message, newsletter, status);
+        return Objects.hash(key, serverId, timestamp, views, reactions, message, status, starred, forwardsCount, questionResponsesCount, lastUpdateFromServerTimestamp, latestEditSenderTimestampMs, originalTimestamp, wamoSub, adminProfile, pollVotes);
     }
 }

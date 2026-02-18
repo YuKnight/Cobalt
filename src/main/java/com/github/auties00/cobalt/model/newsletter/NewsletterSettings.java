@@ -1,55 +1,59 @@
 package com.github.auties00.cobalt.model.newsletter;
 
-import com.alibaba.fastjson2.JSONObject;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
 
 import java.util.Objects;
-import java.util.Optional;
 
+/**
+ * The settings of a newsletter, currently containing only the reaction
+ * codes configuration.
+ */
 @ProtobufMessage
 public final class NewsletterSettings {
     @ProtobufProperty(index = 1, type = ProtobufType.MESSAGE)
-    final NewsletterReactionSettings reactionCodes;
+    NewsletterReactionSettings reactionCodes;
 
+    /**
+     * Constructs a new {@code NewsletterSettings} with the specified reaction
+     * codes configuration.
+     *
+     * @param reactionCodes the reaction codes settings, must not be {@code null}
+     * @throws NullPointerException if {@code reactionCodes} is {@code null}
+     */
     NewsletterSettings(NewsletterReactionSettings reactionCodes) {
         this.reactionCodes = Objects.requireNonNull(reactionCodes, "reactionCodes cannot be null");
     }
 
-    public static Optional<NewsletterSettings> ofJson(JSONObject jsonObject) {
-        if(jsonObject == null) {
-            return Optional.empty();
-        }
-
-        var reactionCodes = NewsletterReactionSettings.ofJson(jsonObject.getJSONObject("reaction_codes"));
-        if(reactionCodes.isEmpty()) {
-            return Optional.empty();
-        }
-
-        var result = new NewsletterSettings(reactionCodes.get());
-        return Optional.of(result);
-    }
-
+    /**
+     * Returns the reaction codes settings.
+     *
+     * @return the reaction codes settings, never {@code null}
+     */
     public NewsletterReactionSettings reactionCodes() {
         return reactionCodes;
     }
 
+    /**
+     * Sets the reaction codes settings.
+     *
+     * @param reactionCodes the reaction codes settings
+     * @return this instance for chaining
+     */
+    public NewsletterSettings setReactionCodes(NewsletterReactionSettings reactionCodes) {
+        this.reactionCodes = reactionCodes;
+        return this;
+    }
+
     @Override
     public boolean equals(Object o) {
-        return o instanceof NewsletterSettings that
-                && Objects.equals(reactionCodes, that.reactionCodes);
+        return o == this || o instanceof NewsletterSettings that
+               && Objects.equals(reactionCodes, that.reactionCodes);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(reactionCodes);
-    }
-
-    @Override
-    public String toString() {
-        return "NewsletterSettings[" +
-                "reactionCodes=" + reactionCodes +
-                ']';
+        return Objects.hashCode(reactionCodes);
     }
 }

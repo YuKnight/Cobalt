@@ -32,7 +32,6 @@ public final class MessageReceipt {
     @ProtobufProperty(index = 6, type = ProtobufType.STRING)
     List<Jid> deliveredDeviceJid;
 
-
     MessageReceipt(Jid userJid, Instant receiptTimestamp, Instant readTimestamp, Instant playedTimestamp, List<Jid> pendingDeviceJid, List<Jid> deliveredDeviceJid) {
         this.userJid = Objects.requireNonNull(userJid);
         this.receiptTimestamp = receiptTimestamp;

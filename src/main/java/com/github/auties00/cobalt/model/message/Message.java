@@ -5,8 +5,13 @@ import com.github.auties00.cobalt.model.message.call.CallLogMessage;
 import com.github.auties00.cobalt.model.message.call.ScheduledCallCreationMessage;
 import com.github.auties00.cobalt.model.message.call.ScheduledCallEditMessage;
 import com.github.auties00.cobalt.model.message.commerce.InvoiceMessage;
+import com.github.auties00.cobalt.model.message.context.ContextualMessage;
 import com.github.auties00.cobalt.model.message.event.EncEventResponseMessage;
 import com.github.auties00.cobalt.model.message.event.EventResponseMessage;
+import com.github.auties00.cobalt.model.message.media.MessageVideoEndCard;
+import com.github.auties00.cobalt.model.message.media.MessageLinkPreviewMetadata;
+import com.github.auties00.cobalt.model.message.media.MessageMMSThumbnailMetadata;
+import com.github.auties00.cobalt.model.message.media.MessageURLMetadata;
 import com.github.auties00.cobalt.model.message.payment.*;
 import com.github.auties00.cobalt.model.message.poll.*;
 import com.github.auties00.cobalt.model.message.security.EncCommentMessage;
@@ -25,14 +30,10 @@ import com.github.auties00.cobalt.model.message.system.peer.PeerDataOperationReq
 import com.github.auties00.cobalt.model.message.text.CommentMessage;
 import com.github.auties00.cobalt.model.message.text.HighlyStructuredMessage;
 import com.github.auties00.cobalt.model.message.text.ReactionMessage;
-import com.github.auties00.cobalt.model.message.util.LinkPreviewMetadata;
-import com.github.auties00.cobalt.model.message.util.MMSThumbnailMetadata;
-import com.github.auties00.cobalt.model.message.util.URLMetadata;
-import com.github.auties00.cobalt.model.message.util.VideoEndCard;
 import com.github.auties00.cobalt.model.message.group.SenderKeyDistributionMessage;
 
 public sealed interface Message permits
-    ContextualMessage,
+        ContextualMessage,
     AppStateFatalExceptionNotification,
     AppStateSyncKey,
     AppStateSyncKeyData,
@@ -60,8 +61,8 @@ public sealed interface Message permits
     InitialSecurityNotificationSettingSync,
     InvoiceMessage,
     KeepInChatMessage,
-    LinkPreviewMetadata,
-    MMSThumbnailMetadata,
+        MessageLinkPreviewMetadata,
+        MessageMMSThumbnailMetadata,
     MessageHistoryMetadata,
     PaymentExtendedMetadata,
     PaymentInviteMessage,
@@ -89,6 +90,6 @@ public sealed interface Message permits
     StatusQuotedMessage,
     StatusStickerInteractionMessage,
     StickerSyncRMRMessage,
-    URLMetadata,
-    VideoEndCard {
+        MessageURLMetadata,
+        MessageVideoEndCard {
 }

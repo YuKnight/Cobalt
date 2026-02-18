@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.model.message.system.history;
 
 import com.github.auties00.cobalt.model.chat.context.ContextInfo;
-import com.github.auties00.cobalt.model.message.ContextualMessage;
+import com.github.auties00.cobalt.model.message.context.ContextualMessage;
 
 import java.time.Instant;
 import it.auties.protobuf.annotation.*;

@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.model.bot.response;
 
-import com.github.auties00.cobalt.model.message.ContextInfo;
+import com.github.auties00.cobalt.model.message.context.ContextInfo;
 
 import java.util.Collections;
 import java.util.List;

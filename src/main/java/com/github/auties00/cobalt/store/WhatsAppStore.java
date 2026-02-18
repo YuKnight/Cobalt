@@ -3,32 +3,36 @@ package com.github.auties00.cobalt.store;
 
 import com.github.auties00.cobalt.client.*;
 import com.github.auties00.cobalt.media.MediaConnection;
-import com.github.auties00.cobalt.model.auth.SignedDeviceIdentity;
-import com.github.auties00.cobalt.model.auth.UserAgent.ReleaseChannel;
-import com.github.auties00.cobalt.model.auth.Version;
+import com.github.auties00.cobalt.model.business.BusinessVerifiedNameCertificate;
 import com.github.auties00.cobalt.model.business.profile.BusinessCategory;
-import com.github.auties00.cobalt.model.business.VerifiedBusinessName;
 import com.github.auties00.cobalt.model.call.CallOffer;
 import com.github.auties00.cobalt.model.chat.Chat;
 import com.github.auties00.cobalt.model.chat.ChatEphemeralTimer;
+import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.chat.ChatMetadata;
 import com.github.auties00.cobalt.model.contact.Contact;
+import com.github.auties00.cobalt.model.device.pairing.ClientAppVersion;
+import com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentity;
 import com.github.auties00.cobalt.model.device.info.DeviceList;
+import com.github.auties00.cobalt.model.device.pairing.ClientPayload.ClientReleaseChannel;
 import com.github.auties00.cobalt.model.device.sync.MissingDeviceSyncKey;
 import com.github.auties00.cobalt.model.device.sync.PendingDeviceSync;
-import com.github.auties00.cobalt.model.info.ChatMessageInfo;
-import com.github.auties00.cobalt.model.info.MessageInfo;
-import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidDevice;
 import com.github.auties00.cobalt.model.jid.JidProvider;
-import com.github.auties00.cobalt.model.message.ChatMessageKey;
+import com.github.auties00.cobalt.model.message.MessageKey;
+import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKey;
 import com.github.auties00.cobalt.model.newsletter.Newsletter;
+import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
 import com.github.auties00.cobalt.model.preference.Label;
 import com.github.auties00.cobalt.model.preference.QuickReply;
 import com.github.auties00.cobalt.model.preference.Sticker;
 import com.github.auties00.cobalt.model.privacy.PrivacySettingEntry;
 import com.github.auties00.cobalt.model.privacy.PrivacySettingType;
+import com.github.auties00.cobalt.model.sync.SyncPendingMutation;
+import com.github.auties00.cobalt.model.sync.SyncCollectionMetadata;
+import com.github.auties00.cobalt.model.sync.SyncHashValue;
+import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.libsignal.SignalProtocolAddress;
 import com.github.auties00.libsignal.SignalProtocolStore;
 import com.github.auties00.libsignal.groups.SignalSenderKeyName;
@@ -210,7 +214,7 @@ public interface WhatsAppStore extends SignalProtocolStore {
      *
      * @return the release channel, never {@code null}
      */
-    ReleaseChannel releaseChannel();
+    ClientReleaseChannel releaseChannel();
 
     /**
      * Sets the release channel.
@@ -218,7 +222,7 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * @param releaseChannel the release channel, must not be {@code null}
      * @return this store instance for method chaining
      */
-    WhatsAppStore setReleaseChannel(ReleaseChannel releaseChannel);
+    WhatsAppStore setReleaseChannel(ClientReleaseChannel releaseChannel);
 
     /**
      * Returns whether this account appears online to other users.
@@ -686,7 +690,7 @@ public interface WhatsAppStore extends SignalProtocolStore {
      *
      * @return an {@code Optional} containing the identity, or empty if not set
      */
-    Optional<SignedDeviceIdentity> signedDeviceIdentity();
+    Optional<ADVSignedDeviceIdentity> signedDeviceIdentity();
 
     /**
      * Sets the signed device identity.
@@ -694,7 +698,7 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * @param identity the signed device identity, may be {@code null}
      * @return this store instance for method chaining
      */
-    WhatsAppStore setSignedDeviceIdentity(SignedDeviceIdentity identity);
+    WhatsAppStore setSignedDeviceIdentity(ADVSignedDeviceIdentity identity);
 
     /**
      * Returns the ADV secret key used for HMAC verification during pairing.
@@ -880,7 +884,7 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * @param id       the message id to search
      * @return an {@code Optional} containing the message if found
      */
-    Optional<? extends MessageInfo> findMessageById(JidProvider provider, String id);
+    Optional<? extends ChatMessageInfo> findMessageById(JidProvider provider, String id);
 
     /**
      * Queries the first message whose id matches the one provided in the
@@ -908,7 +912,7 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * @param key the message key to search
      * @return an {@code Optional} containing the message if found
      */
-    Optional<ChatMessageInfo> findChatMessageByKey(ChatMessageKey key);
+    Optional<ChatMessageInfo> findChatMessageByKey(MessageKey key);
 
     /**
      * Returns all status updates stored in this session.
@@ -1147,14 +1151,14 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * @param patchType the patch type to query
      * @return an {@code Optional} containing the hash state if found
      */
-    Optional<AppStateSyncHash> findWebAppHashStateByName(PatchType patchType);
+    Optional<SyncHashValue> findWebAppHashStateByName(SyncPatchType patchType);
 
     /**
      * Adds or updates a hash state for app state synchronization.
      *
      * @param state the hash state to add, must not be {@code null}
      */
-    void addWebAppHashState(AppStateSyncHash state);
+    void addWebAppHashState(SyncHashValue state);
 
     /**
      * Returns all missing sync keys being tracked.
@@ -1216,7 +1220,7 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * @param collectionName the collection name
      * @return the collection metadata
      */
-    CollectionMetadata findWebAppState(PatchType collectionName);
+    SyncCollectionMetadata findWebAppState(SyncPatchType collectionName);
 
     /**
      * Updates a collection's version and LT-Hash.
@@ -1225,56 +1229,56 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * @param newVersion     the new version
      * @param newLtHash      the new LT-Hash
      */
-    void updateWebAppStateVersion(PatchType collectionName, long newVersion, byte[] newLtHash);
+    void updateWebAppStateVersion(SyncPatchType collectionName, long newVersion, byte[] newLtHash);
 
     /**
      * Marks a web app state collection as dirty.
      *
      * @param collectionName the collection name
      */
-    void markWebAppStateDirty(PatchType collectionName);
+    void markWebAppStateDirty(SyncPatchType collectionName);
 
     /**
      * Marks a web app state collection as in-flight.
      *
      * @param collectionName the collection name
      */
-    void markWebAppStateInFlight(PatchType collectionName);
+    void markWebAppStateInFlight(SyncPatchType collectionName);
 
     /**
      * Marks a web app state collection as up-to-date.
      *
      * @param collectionName the collection name
      */
-    void markWebAppStateUpToDate(PatchType collectionName);
+    void markWebAppStateUpToDate(SyncPatchType collectionName);
 
     /**
      * Marks a web app state collection as pending.
      *
      * @param collectionName the collection name
      */
-    void markWebAppStatePending(PatchType collectionName);
+    void markWebAppStatePending(SyncPatchType collectionName);
 
     /**
      * Marks a web app state collection as blocked.
      *
      * @param collectionName the collection name
      */
-    void markWebAppStateBlocked(PatchType collectionName);
+    void markWebAppStateBlocked(SyncPatchType collectionName);
 
     /**
      * Marks a web app state collection in error retry state.
      *
      * @param collectionName the collection name
      */
-    void markWebAppStateErrorRetry(PatchType collectionName);
+    void markWebAppStateErrorRetry(SyncPatchType collectionName);
 
     /**
      * Marks a web app state collection in fatal error state.
      *
      * @param collectionName the collection name
      */
-    void markWebAppStateErrorFatal(PatchType collectionName);
+    void markWebAppStateErrorFatal(SyncPatchType collectionName);
 
     /**
      * Adds pending mutations to the queue for the specified collection.
@@ -1282,7 +1286,7 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * @param collectionName the collection name
      * @param patch          the patches to queue
      */
-    void addPendingMutations(PatchType collectionName, Collection<? extends PendingMutation> patch);
+    void addPendingMutations(SyncPatchType collectionName, Collection<? extends SyncPendingMutation> patch);
 
     /**
      * Gets all pending mutations for the specified collection.
@@ -1290,21 +1294,21 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * @param collectionName the collection name
      * @return an unmodifiable sequenced collection of pending mutations
      */
-    SequencedCollection<PendingMutation> findPendingMutations(PatchType collectionName);
+    SequencedCollection<SyncPendingMutation> findPendingMutations(SyncPatchType collectionName);
 
     /**
      * Removes pending mutations for a collection.
      *
      * @param collectionName the collection name
      */
-    void removePendingMutations(PatchType collectionName);
+    void removePendingMutations(SyncPatchType collectionName);
 
     /**
      * Clears all pending mutations for a collection.
      *
      * @param collectionName the collection name
      */
-    void clearPendingMutations(PatchType collectionName);
+    void clearPendingMutations(SyncPatchType collectionName);
 
     /**
      * Marks a participant as having received the sender key for a group.
@@ -1438,7 +1442,7 @@ public interface WhatsAppStore extends SignalProtocolStore {
      *
      * @return the client version, never {@code null}
      */
-    Version clientVersion();
+    ClientAppVersion clientVersion();
 
     /**
      * Sets the client version.
@@ -1446,7 +1450,7 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * @param version the client version, may be {@code null}
      * @return this store instance for method chaining
      */
-    WhatsAppStore setClientVersion(Version version);
+    WhatsAppStore setClientVersion(ClientAppVersion version);
 
     /**
      * Returns the companion version.
@@ -1454,7 +1458,7 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * @return an {@code Optional} containing the companion version, or empty
      *         if not set
      */
-    Optional<Version> companionVersion();
+    Optional<ClientAppVersion> companionVersion();
 
     /**
      * Sets the companion version.
@@ -1462,7 +1466,7 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * @param version the companion version, may be {@code null}
      * @return this store instance for method chaining
      */
-    WhatsAppStore setCompanionVersion(Version version);
+    WhatsAppStore setCompanionVersion(ClientAppVersion version);
 
     /**
      * Gets the device list for a user with full metadata.
@@ -1590,14 +1594,14 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * @param jid the user JID
      * @return an {@code Optional} containing the record if found
      */
-    Optional<VerifiedBusinessName> findVerifiedBusinessName(Jid jid);
+    Optional<BusinessVerifiedNameCertificate> findVerifiedBusinessName(Jid jid);
 
     /**
      * Adds or replaces a verified business name record.
      *
      * @param record the record to store
      */
-    void addVerifiedBusinessName(VerifiedBusinessName record);
+    void addVerifiedBusinessName(BusinessVerifiedNameCertificate record);
 
     /**
      * Removes the verified business name record for the given JID.
@@ -1613,7 +1617,7 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * @param groupJid the group or community JID
      * @return an {@code Optional} containing the metadata if found
      */
-    Optional<ChatMetadata> findChatMetadata(Jid groupJid);
+    Optional<ChatMetadata<?>> findChatMetadata(Jid groupJid);
 
     /**
      * Stores the metadata for a group or community, replacing any
@@ -1621,7 +1625,7 @@ public interface WhatsAppStore extends SignalProtocolStore {
      *
      * @param metadata the non-{@code null} metadata to store
      */
-    void addChatMetadata(ChatMetadata metadata);
+    void addChatMetadata(ChatMetadata<?> metadata);
 
     /**
      * Removes the stored metadata for the group or community identified

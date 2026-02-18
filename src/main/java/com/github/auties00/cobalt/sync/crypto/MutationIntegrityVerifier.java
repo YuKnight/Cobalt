@@ -3,7 +3,7 @@ package com.github.auties00.cobalt.sync.crypto;
 import com.github.auties00.cobalt.exception.WhatsAppWebAppStateSyncException;
 import com.github.auties00.cobalt.sync.exchange.MutationSyncResponse;
 import com.github.auties00.cobalt.model.sync.PatchSync;
-import com.github.auties00.cobalt.model.sync.PatchType;
+import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.store.WhatsAppStore;
 
 import javax.crypto.Mac;
@@ -61,7 +61,7 @@ public final class MutationIntegrityVerifier {
         }
     }
 
-    private void verifyPatchMac(PatchType type, PatchSync patch, byte[] expectedHash) {
+    private void verifyPatchMac(SyncPatchType type, PatchSync patch, byte[] expectedHash) {
         if (patch.patchMac() == null) {
             return;  // No MAC to verify
         }
@@ -89,7 +89,7 @@ public final class MutationIntegrityVerifier {
         }
     }
 
-    private byte[] computeMac(PatchType type, long version, byte[] expectedHash, SecretKeySpec secretKey) {
+    private byte[] computeMac(SyncPatchType type, long version, byte[] expectedHash, SecretKeySpec secretKey) {
         try {
             var mac = Mac.getInstance("HmacSHA256");
             mac.init(secretKey);

@@ -5,7 +5,7 @@ import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.device.timestamp.DeviceExpectedTsUtils;
 import com.github.auties00.cobalt.exception.WhatsAppAdvCheckException;
 import com.github.auties00.cobalt.exception.WhatsAppOwnDeviceListExpiredException;
-import com.github.auties00.cobalt.model.auth.ADVEncryptionType;
+import com.github.auties00.cobalt.model.device.identity.ADVEncryptionType;
 import com.github.auties00.cobalt.model.device.info.DeviceList;
 import com.github.auties00.cobalt.model.device.DeviceListBuilder;
 import com.github.auties00.cobalt.model.device.sync.PendingDeviceSync;

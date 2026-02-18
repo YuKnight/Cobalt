@@ -1,8 +1,10 @@
 package com.github.auties00.cobalt.model.jid;
 
 import com.github.auties00.cobalt.client.WhatsAppClientType;
-import com.github.auties00.cobalt.model.auth.UserAgent.PlatformType;
-import com.github.auties00.cobalt.model.auth.Version;
+import com.github.auties00.cobalt.model.device.pairing.ClientAppVersion;
+import com.github.auties00.cobalt.model.device.DevicePlatformType;
+import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
+import com.github.auties00.cobalt.wam.type.PlatformType;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
@@ -18,10 +20,10 @@ import java.util.concurrent.ThreadLocalRandom;
  * <p>Each connected device in a WhatsApp multi-device session carries metadata about its
  * hardware model, manufacturer, operating system version, and client type. This information
  * is used during device registration and pairing to identify the companion to the WhatsApp
- * servers. The {@link DeviceProps$PlatformType} protobuf enum defined by WhatsApp Web
+ * servers. The {@link DevicePlatformType} protobuf enum defined by WhatsApp Web
  * classifies platforms such as {@code CHROME}, {@code IOS_PHONE}, {@code ANDROID_PHONE},
  * and others. This class maps those platform types to the internal
- * {@link PlatformType} representation used across the codebase.
+ * {@link DevicePlatformType} representation used across the codebase.
  *
  * <p>Pre-configured device profiles for common platforms are available through the
  * {@link #web()}, {@link #ios(boolean)}, and {@link #android(boolean)} factory methods.
@@ -29,7 +31,7 @@ import java.util.concurrent.ThreadLocalRandom;
  * to reduce fingerprinting surface.
  *
  * @see Jid
- * @see PlatformType
+ * @see DevicePlatformType
  * @see WhatsAppClientType
  */
 @ProtobufMessage
@@ -46,7 +48,7 @@ public final class JidDevice {
                     "iPhone 7",
                     "Apple",
                     null,
-                    Version.of("14.8.1"),
+                    ClientAppVersion.of("14.8.1"),
                     "18H107",
                     "iPhone9,3",
                     WhatsAppClientType.MOBILE
@@ -55,7 +57,7 @@ public final class JidDevice {
                     "iPhone 7",
                     "Apple",
                     null,
-                    Version.of("15.8.2"),
+                    ClientAppVersion.of("15.8.2"),
                     "19H384",
                     "iPhone9,3",
                     WhatsAppClientType.MOBILE
@@ -64,7 +66,7 @@ public final class JidDevice {
                     "iPhone 7 Plus",
                     "Apple",
                     null,
-                    Version.of("14.8.1"),
+                    ClientAppVersion.of("14.8.1"),
                     "18H107",
                     "iPhone9,4",
                     WhatsAppClientType.MOBILE
@@ -73,7 +75,7 @@ public final class JidDevice {
                     "iPhone 7 Plus",
                     "Apple",
                     null,
-                    Version.of("15.8.2"),
+                    ClientAppVersion.of("15.8.2"),
                     "19H384",
                     "iPhone9,4",
                     WhatsAppClientType.MOBILE
@@ -82,7 +84,7 @@ public final class JidDevice {
                     "iPhone 8",
                     "Apple",
                     null,
-                    Version.of("13.7"),
+                    ClientAppVersion.of("13.7"),
                     "17H35",
                     "iPhone10,4",
                     WhatsAppClientType.MOBILE
@@ -91,7 +93,7 @@ public final class JidDevice {
                     "iPhone 8",
                     "Apple",
                     null,
-                    Version.of("14.8.1"),
+                    ClientAppVersion.of("14.8.1"),
                     "18H107",
                     "iPhone10,4",
                     WhatsAppClientType.MOBILE
@@ -100,7 +102,7 @@ public final class JidDevice {
                     "iPhone 8",
                     "Apple",
                     null,
-                    Version.of("15.8.2"),
+                    ClientAppVersion.of("15.8.2"),
                     "19H384",
                     "iPhone10,4",
                     WhatsAppClientType.MOBILE
@@ -109,7 +111,7 @@ public final class JidDevice {
                     "iPhone 8",
                     "Apple",
                     null,
-                    Version.of("16.7.7"),
+                    ClientAppVersion.of("16.7.7"),
                     "20H330",
                     "iPhone10,4",
                     WhatsAppClientType.MOBILE
@@ -118,7 +120,7 @@ public final class JidDevice {
                     "iPhone 8 Plus",
                     "Apple",
                     null,
-                    Version.of("14.8.1"),
+                    ClientAppVersion.of("14.8.1"),
                     "18H107",
                     "iPhone10,5",
                     WhatsAppClientType.MOBILE
@@ -127,7 +129,7 @@ public final class JidDevice {
                     "iPhone 8 Plus",
                     "Apple",
                     null,
-                    Version.of("15.8.2"),
+                    ClientAppVersion.of("15.8.2"),
                     "19H384",
                     "iPhone10,5",
                     WhatsAppClientType.MOBILE
@@ -136,7 +138,7 @@ public final class JidDevice {
                     "iPhone 8 Plus",
                     "Apple",
                     null,
-                    Version.of("16.7.7"),
+                    ClientAppVersion.of("16.7.7"),
                     "20H330",
                     "iPhone10,5",
                     WhatsAppClientType.MOBILE
@@ -145,7 +147,7 @@ public final class JidDevice {
                     "iPhone X",
                     "Apple",
                     null,
-                    Version.of("14.8.1"),
+                    ClientAppVersion.of("14.8.1"),
                     "18H107",
                     "iPhone10,6",
                     WhatsAppClientType.MOBILE
@@ -154,7 +156,7 @@ public final class JidDevice {
                     "iPhone X",
                     "Apple",
                     null,
-                    Version.of("15.8.2"),
+                    ClientAppVersion.of("15.8.2"),
                     "19H384",
                     "iPhone10,6",
                     WhatsAppClientType.MOBILE
@@ -163,7 +165,7 @@ public final class JidDevice {
                     "iPhone X",
                     "Apple",
                     null,
-                    Version.of("16.7.7"),
+                    ClientAppVersion.of("16.7.7"),
                     "20H330",
                     "iPhone10,6",
                     WhatsAppClientType.MOBILE
@@ -172,7 +174,7 @@ public final class JidDevice {
                     "iPhone XR",
                     "Apple",
                     null,
-                    Version.of("14.8.1"),
+                    ClientAppVersion.of("14.8.1"),
                     "18H107",
                     "iPhone11,8",
                     WhatsAppClientType.MOBILE
@@ -181,7 +183,7 @@ public final class JidDevice {
                     "iPhone XR",
                     "Apple",
                     null,
-                    Version.of("15.8.2"),
+                    ClientAppVersion.of("15.8.2"),
                     "19H384",
                     "iPhone11,8",
                     WhatsAppClientType.MOBILE
@@ -190,7 +192,7 @@ public final class JidDevice {
                     "iPhone XR",
                     "Apple",
                     null,
-                    Version.of("16.7.7"),
+                    ClientAppVersion.of("16.7.7"),
                     "20H330",
                     "iPhone11,8",
                     WhatsAppClientType.MOBILE
@@ -199,7 +201,7 @@ public final class JidDevice {
                     "iPhone XR",
                     "Apple",
                     null,
-                    Version.of("17.4.1"),
+                    ClientAppVersion.of("17.4.1"),
                     "21E236",
                     "iPhone11,8",
                     WhatsAppClientType.MOBILE
@@ -208,7 +210,7 @@ public final class JidDevice {
                     "iPhone XS",
                     "Apple",
                     null,
-                    Version.of("14.8.1"),
+                    ClientAppVersion.of("14.8.1"),
                     "18H107",
                     "iPhone11,2",
                     WhatsAppClientType.MOBILE
@@ -217,7 +219,7 @@ public final class JidDevice {
                     "iPhone XS",
                     "Apple",
                     null,
-                    Version.of("15.8.2"),
+                    ClientAppVersion.of("15.8.2"),
                     "19H384",
                     "iPhone11,2",
                     WhatsAppClientType.MOBILE
@@ -226,7 +228,7 @@ public final class JidDevice {
                     "iPhone XS",
                     "Apple",
                     null,
-                    Version.of("16.7.7"),
+                    ClientAppVersion.of("16.7.7"),
                     "20H330",
                     "iPhone11,2",
                     WhatsAppClientType.MOBILE
@@ -235,7 +237,7 @@ public final class JidDevice {
                     "iPhone XS",
                     "Apple",
                     null,
-                    Version.of("17.4.1"),
+                    ClientAppVersion.of("17.4.1"),
                     "21E236",
                     "iPhone11,2",
                     WhatsAppClientType.MOBILE
@@ -244,7 +246,7 @@ public final class JidDevice {
                     "iPhone XS Max",
                     "Apple",
                     null,
-                    Version.of("14.8.1"),
+                    ClientAppVersion.of("14.8.1"),
                     "18H107",
                     "iPhone11,6",
                     WhatsAppClientType.MOBILE
@@ -253,7 +255,7 @@ public final class JidDevice {
                     "iPhone XS Max",
                     "Apple",
                     null,
-                    Version.of("15.8.2"),
+                    ClientAppVersion.of("15.8.2"),
                     "19H384",
                     "iPhone11,6",
                     WhatsAppClientType.MOBILE
@@ -262,7 +264,7 @@ public final class JidDevice {
                     "iPhone XS Max",
                     "Apple",
                     null,
-                    Version.of("16.7.7"),
+                    ClientAppVersion.of("16.7.7"),
                     "20H330",
                     "iPhone11,6",
                     WhatsAppClientType.MOBILE
@@ -271,7 +273,7 @@ public final class JidDevice {
                     "iPhone XS Max",
                     "Apple",
                     null,
-                    Version.of("17.4.1"),
+                    ClientAppVersion.of("17.4.1"),
                     "21E236",
                     "iPhone11,6",
                     WhatsAppClientType.MOBILE
@@ -293,17 +295,17 @@ public final class JidDevice {
 
     /**
      * The platform type identifying the operating system and client variant, such as
-     * {@link PlatformType#IOS} or {@link PlatformType#ANDROID_BUSINESS}.
+     * {@link DevicePlatformType#IOS_PHONE} or {@link DevicePlatformType#ANDROID_PHONE}.
      */
     @ProtobufProperty(index = 3, type = ProtobufType.ENUM)
-    PlatformType platform;
+    ClientPlatformType platform;
 
     /**
      * The operating system version running on the device, such as {@code 16.7.7} for
      * iOS or {@code 14} for Android.
      */
     @ProtobufProperty(index = 4, type = ProtobufType.MESSAGE)
-    Version osVersion;
+    ClientAppVersion osDeviceAppVersion;
 
     /**
      * The OS build number string, such as {@code "20H330"} for iOS. May be {@code null}
@@ -333,7 +335,7 @@ public final class JidDevice {
      * @param model         the user-facing model name
      * @param manufacturer  the device manufacturer
      * @param platform      the platform type, or {@code null}
-     * @param osVersion     the operating system version
+     * @param osDeviceAppVersion     the operating system version
      * @param osBuildNumber the OS build number, or {@code null}
      * @param modelId       the internal hardware model identifier, or {@code null}
      * @param clientType    the WhatsApp client type
@@ -341,8 +343,8 @@ public final class JidDevice {
     JidDevice(
             String model,
             String manufacturer,
-            PlatformType platform,
-            Version osVersion,
+            ClientPlatformType platform,
+            ClientAppVersion osDeviceAppVersion,
             String osBuildNumber,
             String modelId,
             WhatsAppClientType clientType
@@ -351,7 +353,7 @@ public final class JidDevice {
         this.modelId = modelId;
         this.manufacturer = manufacturer;
         this.platform = platform;
-        this.osVersion = osVersion;
+        this.osDeviceAppVersion = osDeviceAppVersion;
         this.osBuildNumber = osBuildNumber;
         this.clientType = clientType;
     }
@@ -368,8 +370,8 @@ public final class JidDevice {
         return new JidDevice(
                 "Surface Pro 4",
                 "Microsoft",
-                PlatformType.MACOS,
-                Version.of("10.0"),
+                ClientPlatformType.MACOS,
+                ClientAppVersion.of("10.0"),
                 null,
                 null,
                 WhatsAppClientType.WEB
@@ -381,8 +383,8 @@ public final class JidDevice {
      *
      * <p>A device configuration is chosen at random from an internal list of realistic
      * iPhone models and iOS versions. The platform is set to
-     * {@link PlatformType#IOS_BUSINESS} if the {@code business} parameter is
-     * {@code true}, or {@link PlatformType#IOS} otherwise.
+     * {@link ClientPlatformType#IOS_BUSINESS} if the {@code business} parameter is
+     * {@code true}, or {@link ClientPlatformType#IOS} otherwise.
      *
      * @param business {@code true} to configure the device for WhatsApp Business,
      *                 {@code false} for the consumer variant
@@ -393,8 +395,8 @@ public final class JidDevice {
         return new JidDevice(
                 device.model,
                 device.manufacturer,
-                business ? PlatformType.IOS_BUSINESS : PlatformType.IOS,
-                device.osVersion,
+                business ? ClientPlatformType.IOS_BUSINESS : ClientPlatformType.IOS,
+                device.osDeviceAppVersion,
                 device.osBuildNumber,
                 device.modelId,
                 WhatsAppClientType.MOBILE
@@ -406,8 +408,8 @@ public final class JidDevice {
      *
      * <p>The device emulates a Google Pixel with a randomly selected model number
      * (Pixel 2 through Pixel 8) and Android version (11 through 15). The platform
-     * is set to {@link PlatformType#ANDROID_BUSINESS} if the {@code business}
-     * parameter is {@code true}, or {@link PlatformType#ANDROID} otherwise.
+     * is set to {@link ClientPlatformType#ANDROID_BUSINESS} if the {@code business}
+     * parameter is {@code true}, or {@link ClientPlatformType#ANDROID} otherwise.
      *
      * @param business {@code true} to configure the device for WhatsApp Business,
      *                 {@code false} for the consumer variant
@@ -418,8 +420,8 @@ public final class JidDevice {
         return new JidDevice(
                 model,
                 "Google",
-                business ? PlatformType.ANDROID_BUSINESS : PlatformType.ANDROID,
-                Version.of(String.valueOf(ThreadLocalRandom.current().nextInt(11, 16))),
+                business ? ClientPlatformType.ANDROID_BUSINESS : ClientPlatformType.ANDROID,
+                ClientAppVersion.of(String.valueOf(ThreadLocalRandom.current().nextInt(11, 16))),
                 null,
                 model,
                 WhatsAppClientType.MOBILE
@@ -433,7 +435,7 @@ public final class JidDevice {
      * @return the OS build number string, never {@code null}
      */
     public String osBuildNumber() {
-        return Objects.requireNonNullElse(osBuildNumber, osVersion.toString());
+        return Objects.requireNonNullElse(osBuildNumber, osDeviceAppVersion.toString());
     }
 
     /**
@@ -445,11 +447,11 @@ public final class JidDevice {
      * mobile platforms, a WhatsApp-specific User-Agent containing the client version,
      * platform name, OS version, and device name is returned.
      *
-     * @param clientVersion the WhatsApp client version to embed in the User-Agent
+     * @param clientDeviceAppVersion the WhatsApp client version to embed in the User-Agent
      * @return the formatted User-Agent string
      */
-    public String toUserAgent(Version clientVersion) {
-        if(platform == PlatformType.WINDOWS || platform == PlatformType.MACOS) {
+    public String toUserAgent(ClientAppVersion clientDeviceAppVersion) {
+        if(platform == ClientPlatformType.WINDOWS || platform == ClientPlatformType.MACOS) {
             return "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36";
         }else {
             var platformName = switch (platform) {
@@ -457,18 +459,19 @@ public final class JidDevice {
                 case ANDROID_BUSINESS -> "SMBA";
                 case IOS -> "iOS";
                 case IOS_BUSINESS -> "SMB iOS";
-                case MACOS, WINDOWS -> throw new InternalError();
+                default -> throw new IllegalStateException("Unexpected value: " + platform);
             };
-            var deviceName = switch (platform()) {
+            var deviceName = switch (platform) {
                 case ANDROID, ANDROID_BUSINESS -> manufacturer + "-" + model;
                 case IOS, IOS_BUSINESS -> model;
                 case MACOS, WINDOWS -> throw new InternalError();
+                default -> throw new IllegalStateException("Unexpected value: " + platform);
             };
-            var deviceVersion = osVersion.toString();
+            var deviceDeviceAppVersion = osDeviceAppVersion.toString();
             return "WhatsApp/%s %s/%s Device/%s".formatted(
-                    clientVersion,
+                    clientDeviceAppVersion,
                     platformName,
-                    deviceVersion,
+                    deviceDeviceAppVersion,
                     deviceName
             );
         }
@@ -483,11 +486,11 @@ public final class JidDevice {
      *         personal platform variant
      */
     public JidDevice toPersonal() {
-        if (!platform.isBusiness()) {
-            return this;
-        }
-
-        return withPlatform(platform.toPersonal());
+        return switch (platform) {
+            case ANDROID_BUSINESS -> withPlatform(ClientPlatformType.ANDROID);
+            case IOS_BUSINESS -> withPlatform(ClientPlatformType.IOS);
+            default -> this;
+        };
     }
 
     /**
@@ -499,11 +502,11 @@ public final class JidDevice {
      *         business platform variant
      */
     public JidDevice toBusiness() {
-        if (platform.isBusiness()) {
-            return this;
-        }
-
-        return withPlatform(platform.toBusiness());
+        return switch (platform) {
+            case ANDROID -> withPlatform(ClientPlatformType.ANDROID_BUSINESS);
+            case ClientPlatformType.IOS -> withPlatform(ClientPlatformType.IOS_BUSINESS);
+            default -> this;
+        };
     }
 
     /**
@@ -513,12 +516,12 @@ public final class JidDevice {
      * @param platform the new platform type, or {@code null} to keep the current one
      * @return a new device with the given platform
      */
-    public JidDevice withPlatform(PlatformType platform) {
+    public JidDevice withPlatform(ClientPlatformType platform) {
         return new JidDevice(
                 model,
                 manufacturer,
                 Objects.requireNonNullElse(platform, this.platform),
-                osVersion,
+                osDeviceAppVersion,
                 osBuildNumber,
                 modelId,
                 clientType
@@ -558,7 +561,7 @@ public final class JidDevice {
      *
      * @return the platform type identifying the operating system and client variant
      */
-    public PlatformType platform() {
+    public ClientPlatformType platform() {
         return platform;
     }
 
@@ -567,8 +570,8 @@ public final class JidDevice {
      *
      * @return the OS version
      */
-    public Version osVersion() {
-        return osVersion;
+    public ClientAppVersion osDeviceAppVersion() {
+        return osDeviceAppVersion;
     }
 
     /**
@@ -609,7 +612,7 @@ public final class JidDevice {
      * @param platform the new platform type
      * @return this instance
      */
-    public JidDevice setPlatform(PlatformType platform) {
+    public JidDevice setPlatform(ClientPlatformType platform) {
         this.platform = platform;
         return this;
     }
@@ -617,11 +620,11 @@ public final class JidDevice {
     /**
      * Sets the operating system version of this device.
      *
-     * @param osVersion the new OS version
+     * @param osDeviceAppVersion the new OS version
      * @return this instance
      */
-    public JidDevice setOsVersion(Version osVersion) {
-        this.osVersion = osVersion;
+    public JidDevice setOsDeviceAppVersion(ClientAppVersion osDeviceAppVersion) {
+        this.osDeviceAppVersion = osDeviceAppVersion;
         return this;
     }
 
@@ -674,7 +677,7 @@ public final class JidDevice {
                 && Objects.equals(model, that.model)
                 && Objects.equals(manufacturer, that.manufacturer)
                 && platform == that.platform
-                && Objects.equals(osVersion, that.osVersion)
+                && Objects.equals(osDeviceAppVersion, that.osDeviceAppVersion)
                 && Objects.equals(osBuildNumber, that.osBuildNumber)
                 && Objects.equals(modelId, that.modelId)
                 && clientType == that.clientType;
@@ -687,7 +690,7 @@ public final class JidDevice {
      */
     @Override
     public int hashCode() {
-        return Objects.hash(model, manufacturer, platform, osVersion, osBuildNumber, modelId, clientType);
+        return Objects.hash(model, manufacturer, platform, osDeviceAppVersion, osBuildNumber, modelId, clientType);
     }
 
     /**
@@ -701,7 +704,7 @@ public final class JidDevice {
                 "model='" + model + '\'' +
                 ", manufacturer='" + manufacturer + '\'' +
                 ", platform=" + platform +
-                ", osVersion=" + osVersion +
+                ", osDeviceAppVersion=" + osDeviceAppVersion +
                 ", osBuildNumber='" + osBuildNumber + '\'' +
                 ", modelId='" + modelId + '\'' +
                 ", clientType=" + clientType +

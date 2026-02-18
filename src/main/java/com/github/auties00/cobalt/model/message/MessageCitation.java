@@ -1,9 +1,13 @@
-package com.github.auties00.cobalt.model.message.util;
+package com.github.auties00.cobalt.model.message;
+
+import it.auties.protobuf.annotation.ProtobufMessage;
+import it.auties.protobuf.annotation.ProtobufProperty;
+import it.auties.protobuf.model.ProtobufType;
 
 import java.util.Objects;
 
 @ProtobufMessage(name = "Citation")
-public final class Citation {
+public final class MessageCitation {
     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
     String title;
 
@@ -17,7 +21,7 @@ public final class Citation {
     String imageUrl;
 
 
-    Citation(String title, String subtitle, String cmsId, String imageUrl) {
+    MessageCitation(String title, String subtitle, String cmsId, String imageUrl) {
         this.title = Objects.requireNonNull(title);
         this.subtitle = Objects.requireNonNull(subtitle);
         this.cmsId = Objects.requireNonNull(cmsId);
@@ -40,22 +44,22 @@ public final class Citation {
         return imageUrl;
     }
 
-    public Citation setTitle(String title) {
+    public MessageCitation setTitle(String title) {
         this.title = title;
         return this;
     }
 
-    public Citation setSubtitle(String subtitle) {
+    public MessageCitation setSubtitle(String subtitle) {
         this.subtitle = subtitle;
         return this;
     }
 
-    public Citation setCmsId(String cmsId) {
+    public MessageCitation setCmsId(String cmsId) {
         this.cmsId = cmsId;
         return this;
     }
 
-    public Citation setImageUrl(String imageUrl) {
+    public MessageCitation setImageUrl(String imageUrl) {
         this.imageUrl = imageUrl;
         return this;
     }

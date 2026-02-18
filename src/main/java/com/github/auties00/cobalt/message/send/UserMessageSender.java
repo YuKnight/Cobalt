@@ -12,14 +12,14 @@ import com.github.auties00.cobalt.model.business.profile.BusinessAutomatedType;
 import com.github.auties00.cobalt.model.business.profile.BusinessProfile;
 import com.github.auties00.cobalt.model.chat.Chat;
 import com.github.auties00.cobalt.model.contact.Contact;
-import com.github.auties00.cobalt.model.info.ChatMessageInfo;
-import com.github.auties00.cobalt.model.info.DeviceContextInfo;
+import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.model.device.DeviceListMetadata;
 import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.ChatMessageKey;
+import com.github.auties00.cobalt.model.message.MessageKey;
 import com.github.auties00.cobalt.model.message.Message;
 import com.github.auties00.cobalt.model.message.MessageThreadId;
-import com.github.auties00.cobalt.model.message.server.ProtocolMessage;
-import com.github.auties00.cobalt.model.message.standard.TextMessage;
+import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
+import com.github.auties00.cobalt.model.message.text.ExtendedTextMessage;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.props.ABProp;
@@ -292,7 +292,7 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
                 .filter(MessageThreadId::isAiThread)
                 .findFirst()
                 .flatMap(MessageThreadId::threadKey)
-                .map(ChatMessageKey::id)
+                .map(MessageKey::id)
                 .filter(id -> !id.isEmpty())
                 .orElse(null);
 
