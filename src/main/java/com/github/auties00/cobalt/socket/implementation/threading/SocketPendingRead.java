@@ -1,4 +1,4 @@
-package com.github.auties00.cobalt.socket.implementation.context;
+package com.github.auties00.cobalt.socket.implementation.threading;
 
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;

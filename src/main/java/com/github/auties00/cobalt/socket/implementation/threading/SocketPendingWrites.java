@@ -1,5 +1,5 @@
 
-package com.github.auties00.cobalt.socket.implementation.context;
+package com.github.auties00.cobalt.socket.implementation.threading;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;

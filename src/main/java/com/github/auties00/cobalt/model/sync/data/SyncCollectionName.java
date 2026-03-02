@@ -1,7 +1,10 @@
 package com.github.auties00.cobalt.model.sync.data;
 
+import it.auties.protobuf.annotation.ProtobufEnum;
+import it.auties.protobuf.annotation.ProtobufEnumIndex;
+
 @ProtobufEnum(name = "CollectionName")
-public enum CollectionName {
+public enum SyncCollectionName {
     COLLECTION_NAME_UNKNOWN(0),
     REGULAR(1),
     REGULAR_LOW(2),
@@ -9,7 +12,7 @@ public enum CollectionName {
     CRITICAL_BLOCK(4),
     CRITICAL_UNBLOCK_LOW(5);
 
-    CollectionName(@ProtobufEnumIndex int index) {
+    SyncCollectionName(@ProtobufEnumIndex int index) {
         this.index = index;
     }
 

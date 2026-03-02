@@ -5,7 +5,7 @@ import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidServer;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
-import com.github.auties00.cobalt.util.WhatsAppIdGenerator;
+import com.github.auties00.cobalt.util.RandomIdUtils;
 
 import java.util.*;
 
@@ -67,7 +67,7 @@ public final class DeviceUSyncQueryBuilder {
 
     private static NodeBuilder buildEntry(Collection<Jid> userJids, String context, Map<Jid, DeviceListHashInfo> hashInfos, boolean includeUsernameProtocol) {
         // WAWap.generateId(): generates session ID in WhatsApp format
-        var sessionId = WhatsAppIdGenerator.newId();
+        var sessionId = RandomIdUtils.newId();
 
         // WAWebAdvSyncDeviceListApi: filters out PSA (Public Service Announcements) account
         // e.id.user!=="0" && a.withUser(...)

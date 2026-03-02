@@ -18,7 +18,7 @@ import com.github.auties00.cobalt.model.message.text.ReactionMessage;
 import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
 import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfoBuilder;
 import com.github.auties00.cobalt.store.WhatsAppStore;
-import com.github.auties00.cobalt.util.SecureBytes;
+import com.github.auties00.cobalt.util.FastRandomUtils;
 
 import java.time.Instant;
 import java.util.Objects;
@@ -103,14 +103,14 @@ final class MessagePreparer {
         var timestamp = Instant.now().getEpochSecond();
 
         // WAWebOutgoingMessage: generate 32-byte message secret
-        var messageSecret = SecureBytes.random(MESSAGE_SECRET_SIZE);
+        var messageSecret = FastRandomUtils.randomByteArray(MESSAGE_SECRET_SIZE);
 
         // WAWebAddonEncryptAddonMsgData: validate or convert addon content
         var preparedContainer = prepareAddonContent(container, chatJid, localJid);
 
         // WAWebE2EProtoGenerator.populateMessageContextInfo: attach
         // messageSecret and paddingBytes to the container's deviceInfo
-        var paddingBytes = SecureBytes.random(MIN_PADDING_SIZE, MAX_PADDING_SIZE);
+        var paddingBytes = FastRandomUtils.randomByteArray(MIN_PADDING_SIZE, MAX_PADDING_SIZE);
         var deviceInfoMetadata = new DeviceListMetadataBuilder()
                 .senderTimestamp(timestamp)
                 .build();

@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.model.sync.data;
 
 @ProtobufEnum(name = "MutationProps")
-public enum MutationProps {
+public enum SyncMutationProps {
     STAR_ACTION(2),
     CONTACT_ACTION(3),
     MUTE_ACTION(4),
@@ -78,7 +78,7 @@ public enum MutationProps {
     BUSINESS_BROADCAST_ACTION(10002),
     AI_THREAD_DELETE_ACTION(10003);
 
-    MutationProps(@ProtobufEnumIndex int index) {
+    SyncMutationProps(@ProtobufEnumIndex int index) {
         this.index = index;
     }
 

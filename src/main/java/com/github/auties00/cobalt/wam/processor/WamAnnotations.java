@@ -1,5 +1,10 @@
 package com.github.auties00.cobalt.wam.processor;
 
+import com.github.auties00.cobalt.wam.annotation.WamEnum;
+import com.github.auties00.cobalt.wam.annotation.WamEnumConstant;
+import com.github.auties00.cobalt.wam.annotation.WamEvent;
+import com.github.auties00.cobalt.wam.annotation.WamProperty;
+
 import javax.lang.model.element.*;
 
 /**
@@ -11,10 +16,10 @@ import javax.lang.model.element.*;
  * are not yet compiled in the current round.
  */
 public final class WamAnnotations {
-    private static final String WAM_EVENT = "com.github.auties00.cobalt.wam.annotation.WamEvent";
-    private static final String WAM_PROPERTY = "com.github.auties00.cobalt.wam.annotation.WamProperty";
-    private static final String WAM_ENUM = "com.github.auties00.cobalt.wam.annotation.WamEnum";
-    private static final String WAM_ENUM_CONSTANT = "com.github.auties00.cobalt.wam.annotation.WamEnumConstant";
+    static final String WAM_EVENT = WamEvent.class.getName();
+    static final String WAM_PROPERTY = WamProperty.class.getName();
+    static final String WAM_ENUM = WamEnum.class.getName();
+    static final String WAM_ENUM_CONSTANT = WamEnumConstant.class.getName();
 
     private WamAnnotations() {
         throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");

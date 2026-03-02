@@ -26,7 +26,7 @@ import com.github.auties00.cobalt.node.mex.json.response.*;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.stream.SocketPhonePairing;
 import com.github.auties00.cobalt.stream.SocketStream;
-import com.github.auties00.cobalt.util.SecureBytes;
+import com.github.auties00.cobalt.util.FastRandomUtils;
 import com.github.auties00.curve25519.Curve25519;
 
 import javax.crypto.Cipher;
@@ -605,8 +605,8 @@ public final class NotificationStreamNodeHandler extends SocketStream.Handler {
                     .orElseThrow(() -> new InternalError("No companion key pair was set"))
                     .privateKey();
             var companionSharedKey = Curve25519.sharedKey(companionPrivateKey.toEncodedPoint(), codePairingPublicKey);
-            var random = SecureBytes.random(32);
-            var linkCodeSalt = SecureBytes.random(32);
+            var random = FastRandomUtils.randomByteArray(32);
+            var linkCodeSalt = FastRandomUtils.randomByteArray(32);
             var secretKeyHkdf = KDF.getInstance("HKDF-SHA256");
             var secretKeyHkdfParams = HKDFParameterSpec.ofExtract()
                     .addSalt(linkCodeSalt)
@@ -617,16 +617,16 @@ public final class NotificationStreamNodeHandler extends SocketStream.Handler {
             cipher.init(
                     Cipher.ENCRYPT_MODE,
                     secretKey,
-                    new GCMParameterSpec(128, SecureBytes.random(12))
+                    new GCMParameterSpec(128, FastRandomUtils.randomByteArray(12))
             );
             var identityPublicKey = whatsapp.store().identityKeyPair().publicKey().toEncodedPoint();
             cipher.update(identityPublicKey);
             cipher.update(primaryIdentityPublicKey);
             cipher.update(random);
             var encrypted = cipher.doFinal();
-            var encryptedPayload = SecureBytes.concat(linkCodeSalt, SecureBytes.random(12), encrypted);
+            var encryptedPayload = FastRandomUtils.concatByteArrays(linkCodeSalt, FastRandomUtils.randomByteArray(12), encrypted);
             var identitySharedKey = Curve25519.sharedKey(whatsapp.store().identityKeyPair().privateKey().toEncodedPoint(), primaryIdentityPublicKey);
-            var identityPayload = SecureBytes.concat(companionSharedKey, identitySharedKey, random);
+            var identityPayload = FastRandomUtils.concatByteArrays(companionSharedKey, identitySharedKey, random);
             // WAWebAltDeviceLinkingAlgorithm.createAdvSecret: derive advSecret using HKDF
             // This is used for HMAC verification during pairing, NOT for creating a new key pair
             var advSecretHkdf = KDF.getInstance("HKDF-SHA256");

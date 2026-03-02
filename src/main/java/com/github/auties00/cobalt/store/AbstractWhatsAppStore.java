@@ -1,44 +1,41 @@
-
-package com.github.auties00.cobalt.store.proto;
+package com.github.auties00.cobalt.store;
 
 import com.github.auties00.cobalt.client.*;
 import com.github.auties00.cobalt.client.info.WhatsAppClientInfo;
 import com.github.auties00.cobalt.media.MediaConnection;
 import com.github.auties00.cobalt.model.business.BusinessVerifiedNameCertificate;
-import com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentity;
-import com.github.auties00.cobalt.model.device.pairing.ClientAppVersion;
-import com.github.auties00.cobalt.model.device.pairing.ClientPayload.ClientReleaseChannel;
 import com.github.auties00.cobalt.model.business.profile.BusinessCategory;
 import com.github.auties00.cobalt.model.call.CallOffer;
-import com.github.auties00.cobalt.model.chat.*;
+import com.github.auties00.cobalt.model.chat.Chat;
 import com.github.auties00.cobalt.model.chat.ChatEphemeralTimer;
 import com.github.auties00.cobalt.model.chat.ChatMetadata;
 import com.github.auties00.cobalt.model.contact.Contact;
+import com.github.auties00.cobalt.model.contact.ContactBuilder;
+import com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentity;
 import com.github.auties00.cobalt.model.device.info.DeviceList;
+import com.github.auties00.cobalt.model.device.pairing.ClientAppVersion;
+import com.github.auties00.cobalt.model.device.pairing.ClientPayload.ClientReleaseChannel;
 import com.github.auties00.cobalt.model.device.sync.MissingDeviceSyncKey;
 import com.github.auties00.cobalt.model.device.sync.PendingDeviceSync;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKey;
-import com.github.auties00.cobalt.model.mixin.InstantMillisMixin;
-import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidDevice;
 import com.github.auties00.cobalt.model.jid.JidProvider;
 import com.github.auties00.cobalt.model.jid.JidServer;
-import com.github.auties00.cobalt.model.message.MessageKey;
+import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKey;
+import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyId;
+import com.github.auties00.cobalt.model.mixin.InstantMillisMixin;
+import com.github.auties00.cobalt.model.mixin.InstantSecondsMixin;
+import com.github.auties00.cobalt.model.mixin.PathMixin;
 import com.github.auties00.cobalt.model.newsletter.Newsletter;
 import com.github.auties00.cobalt.model.preference.Label;
 import com.github.auties00.cobalt.model.preference.QuickReply;
 import com.github.auties00.cobalt.model.preference.Sticker;
 import com.github.auties00.cobalt.model.privacy.PrivacySettingEntry;
 import com.github.auties00.cobalt.model.privacy.PrivacySettingType;
-import com.github.auties00.cobalt.model.sync.SyncCollectionMetadata;
-import com.github.auties00.cobalt.model.sync.SyncHashValue;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.SyncPendingMutation;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.model.sync.*;
 import com.github.auties00.cobalt.sync.crypto.MutationLTHash;
-import com.github.auties00.cobalt.util.SecureBytes;
+import com.github.auties00.cobalt.util.FastRandomUtils;
+import com.github.auties00.collections.ConcurrentLinkedHashMap;
 import com.github.auties00.libsignal.SignalProtocolAddress;
 import com.github.auties00.libsignal.groups.SignalSenderKeyName;
 import com.github.auties00.libsignal.groups.state.SignalSenderKeyRecord;
@@ -46,309 +43,274 @@ import com.github.auties00.libsignal.key.*;
 import com.github.auties00.libsignal.state.SignalSessionRecord;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
+import it.auties.protobuf.builtin.ProtobufLazyMixin;
 import it.auties.protobuf.model.ProtobufType;
-import it.auties.protobuf.stream.ProtobufInputStream;
-import it.auties.protobuf.stream.ProtobufOutputStream;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.net.URI;
-import java.nio.file.*;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.ConcurrentHashMap.KeySetView;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.ReentrantLock;
 
 import static java.util.Objects.requireNonNullElseGet;
-import static java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor;
 
 @SuppressWarnings({"unused", "UnusedReturnValue"})
 @ProtobufMessage
-public final class ProtobufWhatsAppStore implements WhatsAppStore {
-    private static final String CHAT_PREFIX = "chat_";
-    private static final String NEWSLETTER_PREFIX = "newsletter_";
-    private static final Path DEFAULT_DIRECTORY = Path.of(System.getProperty("user.home") + "/.cobalt/");
-    private static final String DEFAULT_NAME = "User";
-    private static final int MAX_DEVICE_LISTS = 5000;
+public abstract class AbstractWhatsAppStore implements WhatsAppStore {
+    protected static final String DEFAULT_NAME = "User";
+    protected static final int MAX_DEVICE_LISTS = 5000;
+    protected static final Duration DEVICE_TTL = Duration.ofDays(1);
 
     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
-    final UUID uuid;
+    protected final UUID uuid;
 
     @ProtobufProperty(index = 2, type = ProtobufType.UINT64)
-    Long phoneNumber;
+    protected Long phoneNumber;
 
     @ProtobufProperty(index = 3, type = ProtobufType.ENUM)
-    final WhatsAppClientType clientType;
+    protected final WhatsAppClientType clientType;
 
-    @ProtobufProperty(index = 4, type = ProtobufType.UINT64)
-    final long initializationTimeStamp;
+    @ProtobufProperty(index = 4, type = ProtobufType.UINT64, mixins = InstantSecondsMixin.class)
+    protected final Instant initializationTimeStamp;
 
     @ProtobufProperty(index = 6, type = ProtobufType.MESSAGE)
-    JidDevice device;
+    protected JidDevice device;
 
     @ProtobufProperty(index = 7, type = ProtobufType.ENUM)
-    ClientReleaseChannel releaseChannel;
+    protected ClientReleaseChannel releaseChannel;
 
     @ProtobufProperty(index = 9, type = ProtobufType.BOOL)
-    boolean online;
+    protected boolean online;
 
     @ProtobufProperty(index = 10, type = ProtobufType.STRING)
-    String locale;
+    protected String locale;
 
     @ProtobufProperty(index = 11, type = ProtobufType.STRING)
-    String name;
+    protected String name;
 
     @ProtobufProperty(index = 12, type = ProtobufType.STRING)
-    String verifiedName;
+    protected String verifiedName;
 
     @ProtobufProperty(index = 13, type = ProtobufType.STRING)
-    URI profilePicture;
+    protected URI profilePicture;
 
     @ProtobufProperty(index = 14, type = ProtobufType.STRING)
-    String about;
+    protected String about;
 
     @ProtobufProperty(index = 15, type = ProtobufType.STRING)
-    Jid jid;
+    protected Jid jid;
 
     @ProtobufProperty(index = 16, type = ProtobufType.STRING)
-    Jid lid;
+    protected Jid lid;
 
     @ProtobufProperty(index = 17, type = ProtobufType.STRING)
-    String businessAddress;
+    protected String businessAddress;
 
     @ProtobufProperty(index = 18, type = ProtobufType.DOUBLE)
-    Double businessLongitude;
+    protected Double businessLongitude;
 
     @ProtobufProperty(index = 19, type = ProtobufType.DOUBLE)
-    Double businessLatitude;
+    protected Double businessLatitude;
 
     @ProtobufProperty(index = 20, type = ProtobufType.STRING)
-    String businessDescription;
+    protected String businessDescription;
 
     @ProtobufProperty(index = 21, type = ProtobufType.STRING)
-    String businessWebsite;
+    protected String businessWebsite;
 
     @ProtobufProperty(index = 22, type = ProtobufType.STRING)
-    String businessEmail;
+    protected String businessEmail;
 
     @ProtobufProperty(index = 23, type = ProtobufType.MESSAGE)
-    BusinessCategory businessCategory;
+    protected BusinessCategory businessCategory;
 
     @ProtobufProperty(index = 24, type = ProtobufType.MAP, mapKeyType = ProtobufType.STRING, mapValueType = ProtobufType.MESSAGE)
-    final ConcurrentHashMap<Jid, Contact> contacts;
+    protected final ConcurrentHashMap<Jid, Contact> contacts;
 
     @ProtobufProperty(index = 25, type = ProtobufType.MAP, mapKeyType = ProtobufType.STRING, mapValueType = ProtobufType.MESSAGE)
-    final ConcurrentHashMap<String, CallOffer> calls;
+    protected final ConcurrentHashMap<String, CallOffer> calls;
 
     @ProtobufProperty(index = 26, type = ProtobufType.MAP, mapKeyType = ProtobufType.INT32, mapValueType = ProtobufType.MESSAGE)
-    final ConcurrentHashMap<PrivacySettingType, PrivacySettingEntry> privacySettings;
-
-    @ProtobufProperty(index = 27, type = ProtobufType.MAP, mapKeyType = ProtobufType.STRING, mapValueType = ProtobufType.STRING)
-    final ConcurrentHashMap<String, String> properties;
+    protected final ConcurrentHashMap<PrivacySettingType, PrivacySettingEntry> privacySettings;
 
     @ProtobufProperty(index = 28, type = ProtobufType.BOOL)
-    boolean unarchiveChats;
+    protected boolean unarchiveChats;
 
     @ProtobufProperty(index = 29, type = ProtobufType.BOOL)
-    boolean twentyFourHourFormat;
+    protected boolean twentyFourHourFormat;
 
     @ProtobufProperty(index = 30, type = ProtobufType.ENUM)
-    ChatEphemeralTimer newChatsEphemeralTimer;
+    protected ChatEphemeralTimer newChatsEphemeralTimer;
 
     @ProtobufProperty(index = 31, type = ProtobufType.MESSAGE)
-    WhatsAppWebClientHistory webHistoryPolicy;
+    protected WhatsAppWebClientHistory webHistoryPolicy;
 
     @ProtobufProperty(index = 32, type = ProtobufType.BOOL)
-    boolean automaticPresenceUpdates;
+    protected boolean automaticPresenceUpdates;
 
     @ProtobufProperty(index = 33, type = ProtobufType.BOOL)
-    boolean automaticMessageReceipts;
+    protected boolean automaticMessageReceipts;
 
     @ProtobufProperty(index = 34, type = ProtobufType.BOOL)
-    boolean checkPatchMacs;
+    protected boolean checkPatchMacs;
 
     @ProtobufProperty(index = 35, type = ProtobufType.BOOL)
-    boolean syncedChats;
+    protected boolean syncedChats;
 
     @ProtobufProperty(index = 36, type = ProtobufType.BOOL)
-    boolean syncedContacts;
+    protected boolean syncedContacts;
 
     @ProtobufProperty(index = 37, type = ProtobufType.BOOL)
-    boolean syncedNewsletters;
+    protected boolean syncedNewsletters;
 
     @ProtobufProperty(index = 38, type = ProtobufType.BOOL)
-    boolean syncedStatus;
+    protected boolean syncedStatus;
 
     @ProtobufProperty(index = 39, type = ProtobufType.BOOL)
-    boolean syncedWebAppState;
+    protected boolean syncedWebAppState;
 
     @ProtobufProperty(index = 40, type = ProtobufType.BOOL)
-    boolean syncedBusinessCertificate;
+    protected boolean syncedBusinessCertificate;
 
     @ProtobufProperty(index = 41, type = ProtobufType.INT32)
-    final Integer registrationId;
+    protected final Integer registrationId;
 
     @ProtobufProperty(index = 42, type = ProtobufType.MESSAGE)
-    final SignalIdentityKeyPair noiseKeyPair;
+    protected final SignalIdentityKeyPair noiseKeyPair;
 
     @ProtobufProperty(index = 44, type = ProtobufType.MESSAGE)
-    final SignalIdentityKeyPair identityKeyPair;
-
-    @ProtobufProperty(index = 45, type = ProtobufType.MESSAGE)
-    SignalIdentityKeyPair companionKeyPair;
+    protected final SignalIdentityKeyPair identityKeyPair;
 
     @ProtobufProperty(index = 46, type = ProtobufType.MESSAGE)
-    ADVSignedDeviceIdentity signedDeviceIdentity;
+    protected ADVSignedDeviceIdentity signedDeviceIdentity;
 
     @ProtobufProperty(index = 47, type = ProtobufType.MESSAGE)
-    final SignalSignedKeyPair signedKeyPair;
+    protected final SignalSignedKeyPair signedKeyPair;
 
     @ProtobufProperty(index = 48, type = ProtobufType.MAP, mapKeyType = ProtobufType.INT32, mapValueType = ProtobufType.MESSAGE)
-    final LinkedHashMap<Integer, SignalPreKeyPair> preKeys;
+    protected final LinkedHashMap<Integer, SignalPreKeyPair> preKeys;
 
     @ProtobufProperty(index = 49, type = ProtobufType.STRING)
-    final UUID fdid;
+    protected final UUID fdid;
 
     @ProtobufProperty(index = 50, type = ProtobufType.BYTES)
-    final byte[] deviceId;
+    protected final byte[] deviceId;
 
     @ProtobufProperty(index = 51, type = ProtobufType.STRING)
-    final UUID advertisingId;
+    protected final UUID advertisingId;
 
     @ProtobufProperty(index = 52, type = ProtobufType.BYTES)
-    final byte[] identityId;
+    protected final byte[] identityId;
 
     @ProtobufProperty(index = 53, type = ProtobufType.BYTES)
-    final byte[] backupToken;
+    protected final byte[] backupToken;
 
     @ProtobufProperty(index = 54, type = ProtobufType.MAP, mapKeyType = ProtobufType.STRING, mapValueType = ProtobufType.MESSAGE)
-    final ConcurrentMap<SignalSenderKeyName, SignalSenderKeyRecord> senderKeys;
+    protected final ConcurrentMap<SignalSenderKeyName, SignalSenderKeyRecord> senderKeys;
 
     @ProtobufProperty(index = 55, type = ProtobufType.MAP, mapKeyType = ProtobufType.STRING, mapValueType = ProtobufType.MESSAGE)
-    final LinkedHashMap<String, AppStateSyncKey> appStateKeys;
+    protected final LinkedHashMap<String, AppStateSyncKey> appStateKeys;
 
     @ProtobufProperty(index = 56, type = ProtobufType.MAP, mapKeyType = ProtobufType.STRING, mapValueType = ProtobufType.MESSAGE)
-    final ConcurrentMap<SignalProtocolAddress, SignalSessionRecord> sessions;
+    protected final ConcurrentMap<SignalProtocolAddress, SignalSessionRecord> sessions;
 
     @ProtobufProperty(index = 57, type = ProtobufType.MESSAGE, mapKeyType = ProtobufType.INT32, mapValueType = ProtobufType.MESSAGE)
-    final ConcurrentMap<SyncPatchType, SyncHashValue> hashStates;
+    protected final ConcurrentMap<SyncPatchType, SyncHashValue> hashStates;
 
     @ProtobufProperty(index = 58, type = ProtobufType.BOOL)
-    boolean registered;
+    protected boolean registered;
 
     @ProtobufProperty(index = 59, type = ProtobufType.BOOL)
-    boolean showSecurityNotifications;
+    protected boolean showSecurityNotifications;
 
     @ProtobufProperty(index = 60, type = ProtobufType.MAP, mapKeyType = ProtobufType.STRING, mapValueType = ProtobufType.MESSAGE)
-    final ConcurrentMap<String, Sticker> recentStickers;
+    protected final ConcurrentMap<String, Sticker> recentStickers;
 
     @ProtobufProperty(index = 61, type = ProtobufType.MAP, mapKeyType = ProtobufType.STRING, mapValueType = ProtobufType.MESSAGE)
-    final ConcurrentMap<String, Sticker> favouriteStickers;
+    protected final ConcurrentMap<String, Sticker> favouriteStickers;
 
     @ProtobufProperty(index = 62, type = ProtobufType.MAP, mapKeyType = ProtobufType.STRING, mapValueType = ProtobufType.MESSAGE)
-    final ConcurrentMap<String, QuickReply> quickReplies;
+    protected final ConcurrentMap<String, QuickReply> quickReplies;
 
     @ProtobufProperty(index = 63, type = ProtobufType.MAP, mapKeyType = ProtobufType.INT32, mapValueType = ProtobufType.MESSAGE)
-    final ConcurrentMap<Integer, Label> labels;
+    protected final ConcurrentMap<Integer, Label> labels;
 
     @ProtobufProperty(index = 64, type = ProtobufType.MESSAGE)
-    volatile ClientAppVersion clientVersion;
+    protected volatile ClientAppVersion clientVersion;
 
     @ProtobufProperty(index = 65, type = ProtobufType.MESSAGE)
-    ClientAppVersion companionVersion;
+    protected ClientAppVersion companionVersion;
 
     @ProtobufProperty(index = 66, type = ProtobufType.UINT64, mixins = InstantMillisMixin.class)
-    Instant lastAdvCheckTime;
+    protected Instant lastAdvCheckTime;
 
     @ProtobufProperty(index = 67, type = ProtobufType.MAP, mapKeyType = ProtobufType.STRING, mapValueType = ProtobufType.BYTES)
-    final ConcurrentMap<SignalProtocolAddress, SignalIdentityPublicKey> remoteIdentities;
-
-    final ConcurrentMap<SignalProtocolAddress, Long> identityEncryptionRange = new ConcurrentHashMap<>();
-
-    final AtomicLong encryptionSequence = new AtomicLong();
+    protected final ConcurrentMap<SignalProtocolAddress, SignalIdentityPublicKey> remoteIdentities;
 
     @ProtobufProperty(index = 68, type = ProtobufType.MAP, mapKeyType = ProtobufType.STRING, mapValueType = ProtobufType.MESSAGE)
-    final ConcurrentMap<String, MissingDeviceSyncKey> missingSyncKeys;
+    protected final ConcurrentMap<String, MissingDeviceSyncKey> missingSyncKeys;
 
     @ProtobufProperty(index = 69, type = ProtobufType.BYTES)
-    byte[] advSecretKey;
+    protected byte[] advSecretKey;
 
-    @ProtobufProperty(index = 70, type = ProtobufType.MAP, mapKeyType = ProtobufType.STRING, mapValueType = ProtobufType.UINT64)
-    final ConcurrentMap<String, Long> deviceIdentityRanges;
+    @ProtobufProperty(index = 70, type = ProtobufType.MAP, mapKeyType = ProtobufType.STRING, mapValueType = ProtobufType.MESSAGE)
+    protected final ConcurrentMap<Jid, BusinessVerifiedNameCertificate> verifiedBusinessNames;
 
-    @ProtobufProperty(index = 71, type = ProtobufType.MAP, mapKeyType = ProtobufType.STRING, mapValueType = ProtobufType.MESSAGE)
-    final ConcurrentMap<String, BusinessVerifiedNameCertificate> verifiedBusinessNames;
+    @ProtobufProperty(index = 71, type = ProtobufType.STRING, mixins = {PathMixin.class, ProtobufLazyMixin.class})
+    protected final Path directory;
 
-    private WhatsAppClientProxy proxy;
+    protected final ConcurrentMap<SignalProtocolAddress, Long> identityEncryptionRange;
 
-    private Path directory;
+    protected final AtomicLong encryptionSequence;
 
-    final ConcurrentHashMap<Jid, Chat> chats;
+    protected WhatsAppClientProxy proxy;
 
-    final ConcurrentHashMap<Jid, Newsletter> newsletters;
+    protected final KeySetView<WhatsAppClientListener, Boolean> listeners;
 
-    final ConcurrentHashMap<String, ChatMessageInfo> status;
+    protected final ConcurrentHashMap<Jid, Jid> lidToPhoneMappings;
 
-    private final ConcurrentMap<UUID, Integer> storesHashCodes;
+    protected final ConcurrentHashMap<Jid, Jid> phoneToLidMappings;
 
-    private final ConcurrentMap<StoreJidPair, Integer> jidsHashCodes;
+    protected volatile MediaConnection mediaConnection;
 
-    private final ReentrantKeyedLock storeLock;
+    protected final Object mediaConnectionLock;
 
-    private volatile Thread attributionThread;
+    protected volatile WhatsAppClientOfflineResumeState offlineResumeState;
 
-    private final KeySetView<WhatsAppClientListener, Boolean> listeners;
+    protected volatile CountDownLatch offlineDeliveryLatch;
 
-    private final ConcurrentHashMap<Jid, Jid> lidToPhoneMappings;
+    protected final KeySetView<Jid, Boolean> usersNeedingSenderKeyRotation;
 
-    private final ConcurrentHashMap<Jid, Jid> phoneToLidMappings;
+    protected final ConcurrentMap<SyncPatchType, SequencedCollection<SyncPendingMutation>> webAppStatePendingMutations;
 
-    private volatile MediaConnection mediaConnection;
+    protected final ConcurrentMap<SyncPatchType, SyncCollectionMetadata> webAppStateCollections;
 
-    private final Object mediaConnectionLock = new Object();
+    protected final ConcurrentMap<String, Set<Jid>> pendingMessageRecipients;
 
-    private volatile WhatsAppClientOfflineResumeState offlineResumeState = WhatsAppClientOfflineResumeState.INIT;
+    protected final Object clientVersionLock;
 
-    private volatile CountDownLatch offlineDeliveryLatch = new CountDownLatch(1);
+    protected final ConcurrentMap<Jid, ChatMetadata<?>> chatMetadata;
 
-    private final KeySetView<Jid, Boolean> usersNeedingSenderKeyRotation = ConcurrentHashMap.newKeySet();
+    protected final ConcurrentLinkedHashMap<Jid, DeviceList> deviceLists;
 
-    private final ConcurrentMap<SyncPatchType, SequencedCollection<SyncPendingMutation>> webAppStatePendingMutations;
+    protected final Set<Jid> unconfirmedIdentityChanges;
 
-    private final ConcurrentMap<SyncPatchType, SyncCollectionMetadata> webAppStateCollections;
+    protected final Set<Jid> coexHostedVerificationCache;
 
-    private final ConcurrentMap<String, Set<Jid>> pendingMessageRecipients;
+    protected final ConcurrentLinkedQueue<PendingDeviceSync> pendingDeviceSyncs;
 
-    private final Object clientVersionLock;
+    protected final ConcurrentMap<String, Set<String>> groupSenderKeyDistribution;
 
-    private final ConcurrentMap<Jid, ChatMetadata<?>> chatMetadata;
+    protected final System.Logger logger;
 
-    private final ConcurrentMap<Jid, DeviceList> deviceLists;
-
-    private final LinkedList<Jid> deviceListsAccessOrder;
-
-    private final ConcurrentHashMap<Jid, Long> offlineDeviceTimestamps;
-
-    private final Set<Jid> unconfirmedIdentityChanges;
-
-    private final Set<Jid> coexHostedVerificationCache;
-
-    private final ConcurrentLinkedQueue<PendingDeviceSync> pendingDeviceSyncs;
-
-    private final ConcurrentMap<String, Set<String>> groupSenderKeyDistribution;
-
-    private final KeySetView<String, Boolean> revokedMessageIds = ConcurrentHashMap.newKeySet();
-
-    private boolean serializable;
-
-    ProtobufWhatsAppStore(
+    protected AbstractWhatsAppStore(
             UUID uuid,
             Long phoneNumber,
             WhatsAppClientType clientType,
-            long initializationTimeStamp,
+            Instant initializationTimeStamp,
             JidDevice device,
             ClientReleaseChannel releaseChannel,
             boolean online,
@@ -369,7 +331,6 @@ public final class ProtobufWhatsAppStore implements WhatsAppStore {
             ConcurrentHashMap<Jid, Contact> contacts,
             ConcurrentHashMap<String, CallOffer> calls,
             ConcurrentHashMap<PrivacySettingType, PrivacySettingEntry> privacySettings,
-            ConcurrentHashMap<String, String> properties,
             boolean unarchiveChats,
             boolean twentyFourHourFormat,
             ChatEphemeralTimer newChatsEphemeralTimer,
@@ -386,7 +347,6 @@ public final class ProtobufWhatsAppStore implements WhatsAppStore {
             Integer registrationId,
             SignalIdentityKeyPair noiseKeyPair,
             SignalIdentityKeyPair identityKeyPair,
-            SignalIdentityKeyPair companionKeyPair,
             ADVSignedDeviceIdentity signedDeviceIdentity,
             SignalSignedKeyPair signedKeyPair,
             LinkedHashMap<Integer, SignalPreKeyPair> preKeys,
@@ -411,12 +371,9 @@ public final class ProtobufWhatsAppStore implements WhatsAppStore {
             ConcurrentMap<SignalProtocolAddress, SignalIdentityPublicKey> remoteIdentities,
             ConcurrentMap<String, MissingDeviceSyncKey> missingSyncKeys,
             byte[] advSecretKey,
-            ConcurrentMap<String, Long> deviceIdentityRanges,
-            ConcurrentMap<String, BusinessVerifiedNameCertificate> verifiedBusinessNames
+            ConcurrentMap<Jid, BusinessVerifiedNameCertificate> verifiedBusinessNames,
+            Path directory
     ) {
-        this.storesHashCodes = new ConcurrentHashMap<>();
-        this.jidsHashCodes = new ConcurrentHashMap<>();
-        this.storeLock = new ReentrantKeyedLock();
         this.uuid = Objects.requireNonNull(uuid, "uuid cannot be null");
         this.phoneNumber = phoneNumber;
         this.clientType = Objects.requireNonNull(clientType, "clientType cannot be null");
@@ -435,13 +392,12 @@ public final class ProtobufWhatsAppStore implements WhatsAppStore {
         this.about = about;
         this.jid = jid;
         this.lid = lid;
-        this.properties = Objects.requireNonNull(properties, "properties cannot be null");
         this.contacts = Objects.requireNonNull(contacts, "contacts cannot be null");
         this.privacySettings = Objects.requireNonNull(privacySettings, "privacySettings cannot be null");
         this.calls = Objects.requireNonNull(calls, "calls cannot be null");
         this.unarchiveChats = unarchiveChats;
         this.twentyFourHourFormat = twentyFourHourFormat;
-        this.initializationTimeStamp = initializationTimeStamp;
+        this.initializationTimeStamp = requireNonNullElseGet(initializationTimeStamp, Instant::now);
         this.newChatsEphemeralTimer = Objects.requireNonNullElse(newChatsEphemeralTimer, ChatEphemeralTimer.OFF);
         this.webHistoryPolicy = webHistoryPolicy;
         this.automaticPresenceUpdates = automaticPresenceUpdates;
@@ -458,9 +414,6 @@ public final class ProtobufWhatsAppStore implements WhatsAppStore {
         this.favouriteStickers = favouriteStickers;
         this.quickReplies = quickReplies;
         this.labels = labels;
-        this.chats = new ConcurrentHashMap<>();
-        this.newsletters = new ConcurrentHashMap<>();
-        this.status = new ConcurrentHashMap<>();
         this.listeners = ConcurrentHashMap.newKeySet();
         this.lidToPhoneMappings = new ConcurrentHashMap<>();
         this.phoneToLidMappings = new ConcurrentHashMap<>();
@@ -468,17 +421,16 @@ public final class ProtobufWhatsAppStore implements WhatsAppStore {
             contact.lid()
                     .ifPresent(entry -> registerLidMapping(contact.jid(), entry));
         }
-        this.registrationId = Objects.requireNonNullElseGet(registrationId, () -> SecureBytes.nextInt(16380) + 1);
-        this.noiseKeyPair = Objects.requireNonNullElseGet(noiseKeyPair, SignalIdentityKeyPair::random);
-        this.identityKeyPair = Objects.requireNonNullElseGet(identityKeyPair, SignalIdentityKeyPair::random);
-        this.companionKeyPair = companionKeyPair;
-        this.signedKeyPair = Objects.requireNonNullElseGet(signedKeyPair, () -> SignalSignedKeyPair.of(this.registrationId, this.identityKeyPair));
+        this.registrationId = requireNonNullElseGet(registrationId, () -> FastRandomUtils.randomInt(16380) + 1);
+        this.noiseKeyPair = requireNonNullElseGet(noiseKeyPair, SignalIdentityKeyPair::random);
+        this.identityKeyPair = requireNonNullElseGet(identityKeyPair, SignalIdentityKeyPair::random);
+        this.signedKeyPair = requireNonNullElseGet(signedKeyPair, () -> SignalSignedKeyPair.of(this.registrationId, this.identityKeyPair));
         this.preKeys = Objects.requireNonNull(preKeys, "preKeys cannot be null");
-        this.fdid = Objects.requireNonNullElseGet(fdid, UUID::randomUUID);
-        this.deviceId = Objects.requireNonNullElseGet(deviceId, () -> HexFormat.of().parseHex(UUID.randomUUID().toString().replace("-", "")));
-        this.advertisingId = Objects.requireNonNullElseGet(advertisingId, UUID::randomUUID);
-        this.identityId = Objects.requireNonNullElseGet(identityId, () -> SecureBytes.random(16));
-        this.backupToken = Objects.requireNonNullElseGet(backupToken, () -> SecureBytes.random(20));
+        this.fdid = requireNonNullElseGet(fdid, UUID::randomUUID);
+        this.deviceId = requireNonNullElseGet(deviceId, () -> HexFormat.of().parseHex(UUID.randomUUID().toString().replace("-", "")));
+        this.advertisingId = requireNonNullElseGet(advertisingId, UUID::randomUUID);
+        this.identityId = requireNonNullElseGet(identityId, () -> FastRandomUtils.randomByteArray(16));
+        this.backupToken = requireNonNullElseGet(backupToken, () -> FastRandomUtils.randomByteArray(20));
         this.signedDeviceIdentity = signedDeviceIdentity;
         this.senderKeys = Objects.requireNonNull(senderKeys, "senderKeys cannot be null");
         this.appStateKeys = Objects.requireNonNull(appStateKeys, "appStateKeys cannot be null");
@@ -494,225 +446,27 @@ public final class ProtobufWhatsAppStore implements WhatsAppStore {
         this.webAppStateCollections = new ConcurrentHashMap<>();
         this.pendingMessageRecipients = new ConcurrentHashMap<>();
         this.chatMetadata = new ConcurrentHashMap<>();
-        this.deviceLists = new ConcurrentHashMap<>();
-        this.deviceListsAccessOrder = new LinkedList<>();
-        this.offlineDeviceTimestamps = new ConcurrentHashMap<>();
+        this.deviceLists = new ConcurrentLinkedHashMap<>();
         this.unconfirmedIdentityChanges = ConcurrentHashMap.newKeySet();
         this.coexHostedVerificationCache = ConcurrentHashMap.newKeySet();
         this.pendingDeviceSyncs = new ConcurrentLinkedQueue<>();
         this.groupSenderKeyDistribution = new ConcurrentHashMap<>();
         this.lastAdvCheckTime = lastAdvCheckTime;
-        this.remoteIdentities = Objects.requireNonNullElseGet(remoteIdentities, ConcurrentHashMap::new);
-        this.missingSyncKeys = Objects.requireNonNullElseGet(missingSyncKeys, ConcurrentHashMap::new);
+        this.remoteIdentities = requireNonNullElseGet(remoteIdentities, ConcurrentHashMap::new);
+        this.missingSyncKeys = requireNonNullElseGet(missingSyncKeys, ConcurrentHashMap::new);
         this.advSecretKey = advSecretKey;
-        this.deviceIdentityRanges = Objects.requireNonNullElseGet(deviceIdentityRanges, ConcurrentHashMap::new);
-        this.verifiedBusinessNames = Objects.requireNonNullElseGet(verifiedBusinessNames, ConcurrentHashMap::new);
+        this.verifiedBusinessNames = requireNonNullElseGet(verifiedBusinessNames, ConcurrentHashMap::new);
+        this.directory = directory;
+        this.identityEncryptionRange = new ConcurrentHashMap<>();
+        this.encryptionSequence = new AtomicLong();
+        this.logger = System.getLogger(this.getClass().getName());
+        this.mediaConnectionLock = new Object();
+        this.offlineResumeState = WhatsAppClientOfflineResumeState.INIT;
+        this.offlineDeliveryLatch = new CountDownLatch(1);
+        this.usersNeedingSenderKeyRotation = ConcurrentHashMap.newKeySet();
     }
 
     @Override
-    public WhatsAppStore save() {
-        if (!serializable) {
-            return this;
-        }
-        try {
-            storeLock.lock(uuid);
-            var oldHashCode = storesHashCodes.getOrDefault(uuid, -1);
-            var newHashCode = hashCode();
-            if (oldHashCode == newHashCode) {
-                return this;
-            }
-            storesHashCodes.put(uuid, newHashCode);
-            try (var executor = newVirtualThreadPerTaskExecutor()) {
-                executor.submit(this::serializeStore);
-                chats().forEach(chat -> executor.submit(() -> serializeChat(chat)));
-                newsletters().forEach(newsletter -> executor.submit(() -> serializeNewsletter(newsletter)));
-            }
-        } finally {
-            storeLock.unlock(uuid);
-        }
-        return this;
-    }
-
-    @Override
-    public void delete() throws IOException {
-        if (!serializable) {
-            return;
-        }
-
-        var folderPath = getSessionDirectory(clientType, directory, uuid.toString());
-        ProtobufWhatsAppStorePathUtils.deleteRecursively(folderPath);
-    }
-
-    @Override
-    public void await() {
-        var thread = attributionThread;
-        if (thread == null) {
-            return;
-        }
-        try {
-            thread.join();
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("Cannot finish deserializing store", exception);
-        }
-    }
-
-    private void startBackgroundDeserialization() {
-        attributionThread = Thread.startVirtualThread(this::deserializeChatsAndNewsletters);
-    }
-
-    private void deserializeChatsAndNewsletters() {
-        var sessionDir = getSessionDirectory(clientType, directory, uuid.toString());
-        try (var walker = Files.walk(sessionDir); var executor = newVirtualThreadPerTaskExecutor()) {
-            walker.forEach(path -> executor.submit(() -> deserializeChatOrNewsletter(path)));
-        }
-    }
-
-    private void deserializeChatOrNewsletter(Path path) {
-        try {
-            var fileName = path.getFileName().toString();
-            if (fileName.startsWith(CHAT_PREFIX)) {
-                deserializeChat(path);
-            } else if (fileName.startsWith(NEWSLETTER_PREFIX)) {
-                deserializeNewsletter(path);
-            }
-        } catch (Throwable throwable) {
-            handleSerializeError(path, throwable);
-        }
-    }
-
-    private void deserializeChat(Path chatFile) throws IOException {
-        try (var stream = Files.newInputStream(chatFile)) {
-            var chat = ChatSpec.decode(ProtobufInputStream.fromStream(stream));
-            var storeJidPair = new StoreJidPair(uuid, chat.jid());
-            jidsHashCodes.put(storeJidPair, chat.hashCode());
-            for (var message : chat.messages()) {
-                message.setChat(chat);
-                findContactByJid(message.senderJid())
-                        .ifPresent(message::setSender);
-            }
-            addChat(chat);
-        }
-    }
-
-    private void deserializeNewsletter(Path newsletterFile) throws IOException {
-        try (var stream = Files.newInputStream(newsletterFile)) {
-            var newsletter = NewsletterSpec.decode(ProtobufInputStream.fromStream(stream));
-            var storeJidPair = new StoreJidPair(uuid, newsletter.jid());
-            jidsHashCodes.put(storeJidPair, newsletter.hashCode());
-            for (var message : newsletter.messages()) {
-                message.setNewsletter(newsletter);
-            }
-            addNewsletter(newsletter);
-        }
-    }
-
-    private void serializeStore() {
-        try {
-            var path = getSessionFile(clientType, directory, uuid.toString(), "store.proto");
-            Files.createDirectories(path.getParent());
-            var tempFile = Files.createTempFile(path.getFileName().toString(), ".tmp");
-            try (var stream = Files.newOutputStream(tempFile)) {
-                InMemoryWhatsAppStoreSpec.encode(this, ProtobufOutputStream.toStream(stream));
-            }
-            Files.move(tempFile, path, StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException exception) {
-            throw new UncheckedIOException(exception);
-        }
-    }
-
-    private void serializeChat(Chat chat) {
-        var outputFile = getMessagesContainerPathIfUpdated(chat.jid(), chat.hashCode(), CHAT_PREFIX);
-        if (outputFile == null) {
-            return;
-        }
-        try {
-            var tempFile = Files.createTempFile(outputFile.getFileName().toString(), ".tmp");
-            try (var stream = Files.newOutputStream(tempFile)) {
-                ChatSpec.encode(chat, ProtobufOutputStream.toStream(stream));
-            }
-            Files.move(tempFile, outputFile, StandardCopyOption.REPLACE_EXISTING);
-        } catch (Throwable throwable) {
-            handleSerializeError(outputFile, throwable);
-        }
-    }
-
-    private void serializeNewsletter(Newsletter newsletter) {
-        var outputFile = getMessagesContainerPathIfUpdated(newsletter.jid(), newsletter.hashCode(), NEWSLETTER_PREFIX);
-        if (outputFile == null) {
-            return;
-        }
-        try {
-            var tempFile = Files.createTempFile(outputFile.getFileName().toString(), ".tmp");
-            try (var stream = Files.newOutputStream(tempFile)) {
-                NewsletterSpec.encode(newsletter, ProtobufOutputStream.toStream(stream));
-            }
-            Files.move(tempFile, outputFile, StandardCopyOption.REPLACE_EXISTING);
-        } catch (Throwable throwable) {
-            handleSerializeError(outputFile, throwable);
-        }
-    }
-
-    private Path getMessagesContainerPathIfUpdated(Jid jid, int hashCode, String filePrefix) {
-        var identifier = new StoreJidPair(uuid, jid);
-        var oldHashCode = jidsHashCodes.getOrDefault(identifier, -1);
-        if (oldHashCode == hashCode) {
-            return null;
-        }
-        jidsHashCodes.put(identifier, hashCode);
-        var fileName = filePrefix + jid.user() + ".proto";
-        return getSessionFile(clientType, directory, uuid.toString(), fileName);
-    }
-
-    private void handleSerializeError(Path path, Throwable error) {
-        var logger = System.getLogger("FileSerializer - " + path);
-        logger.log(System.Logger.Level.ERROR, error);
-    }
-
-    private static Path getHome(WhatsAppClientType type, Path baseDirectory) {
-        return baseDirectory.resolve(type == WhatsAppClientType.MOBILE ? "mobile" : "web");
-    }
-
-    private static Path getSessionDirectory(WhatsAppClientType clientType, Path baseDirectory, String path) {
-        try {
-            var result = getHome(clientType, baseDirectory).resolve(path);
-            Files.createDirectories(result.getParent());
-            return result;
-        } catch (IOException exception) {
-            throw new UncheckedIOException(exception);
-        }
-    }
-
-    private static Path getSessionFile(WhatsAppClientType clientType, Path baseDirectory, String uuid, String fileName) {
-        try {
-            var result = getSessionDirectory(clientType, baseDirectory, uuid).resolve(fileName);
-            Files.createDirectories(result.getParent());
-            return result;
-        } catch (IOException exception) {
-            throw new UncheckedIOException("Cannot create directory", exception);
-        }
-    }
-
-    private record StoreJidPair(UUID storeId, Jid jid) {
-    }
-
-    private static final class ReentrantKeyedLock {
-        private final ConcurrentMap<UUID, ReentrantLock> locks = new ConcurrentHashMap<>();
-
-        void lock(UUID key) {
-            var lockWrapper = locks.compute(key, (ignored, value) -> requireNonNullElseGet(value, () -> new ReentrantLock(true)));
-            lockWrapper.lock();
-        }
-
-        void unlock(UUID key) {
-            var lockWrapper = locks.get(key);
-            if (lockWrapper == null || !lockWrapper.isHeldByCurrentThread()) {
-                throw new IllegalStateException("The lock for the key %s doesn't exist or is not held by the current thread".formatted(key));
-            }
-            lockWrapper.unlock();
-        }
-    }
-
     public Optional<Contact> findContactByJid(JidProvider jid) {
         return switch (jid) {
             case Contact contact -> Optional.of(contact);
@@ -743,10 +497,12 @@ public final class ProtobufWhatsAppStore implements WhatsAppStore {
         };
     }
 
+    @Override
     public Collection<Contact> contacts() {
         return Collections.unmodifiableCollection(contacts.values());
     }
 
+    @Override
     public Contact addNewContact(Jid jid) {
         Objects.requireNonNull(jid, "jid cannot be null");
         var newContact = new ContactBuilder()
@@ -756,12 +512,14 @@ public final class ProtobufWhatsAppStore implements WhatsAppStore {
         return addContact(newContact);
     }
 
+    @Override
     public Contact addContact(Contact contact) {
         Objects.requireNonNull(contact, "contact cannot be null");
         contacts.put(contact.jid(), contact);
         return contact;
     }
 
+    @Override
     public Optional<Contact> removeContact(JidProvider contactJid) {
         if(contactJid == null) {
             return Optional.empty();
@@ -790,6 +548,7 @@ public final class ProtobufWhatsAppStore implements WhatsAppStore {
         }
     }
 
+    @Override
     public void registerLidMapping(Jid phoneJid, Jid lidJid) {
         if (phoneJid == null || lidJid == null) {
             return;
@@ -800,10 +559,12 @@ public final class ProtobufWhatsAppStore implements WhatsAppStore {
         phoneToLidMappings.put(normalizedPhone, normalizedLid);
     }
 
+    @Override
     public Optional<Jid> findPhoneByLid(Jid lidJid) {
         return lidJid == null ? Optional.empty() : Optional.ofNullable(lidToPhoneMappings.get(lidJid.withoutData()));
     }
 
+    @Override
     public Optional<Jid> findLidByPhone(Jid phoneJid) {
         if (phoneJid == null) {
             return Optional.empty();
@@ -819,507 +580,421 @@ public final class ProtobufWhatsAppStore implements WhatsAppStore {
         }
     }
 
-    public Optional<Chat> findChatByJid(JidProvider jid) {
-        return switch (jid) {
-            case null -> Optional.empty();
-            case Chat chat -> Optional.of(chat);
-            case Contact _, Newsletter _, Jid _, JidServer _-> {
-                var targetJid = jid.toJid();
-                if(targetJid.hasUserServer()) {
-                    var jidChat = chats.get(targetJid);
-                    if(jidChat != null) {
-                        yield Optional.of(jidChat);
-                    } else {
-                        yield findLidByPhone(targetJid)
-                                .map(chats::get);
-                    }
-                } else if(targetJid.hasLidServer()) {
-                    var lidChat = chats.get(targetJid);
-                    if(lidChat != null) {
-                        yield Optional.of(lidChat);
-                    } else {
-                        yield findPhoneByLid(targetJid)
-                                .map(chats::get);
-                    }
-                } else {
-                    var chat = chats.get(targetJid);
-                    yield Optional.ofNullable(chat);
-                }
-            }
-        };
-    }
-
-    public Optional<? extends MessageInfo> findMessageById(JidProvider provider, String id) {
-        return provider == null || id == null ? Optional.empty() : switch (provider) {
-            case Chat chat -> findMessageById(chat, id);
-            case Newsletter newsletter -> findMessageById(newsletter, id);
-            case Contact contact -> findChatByJid(contact.jid())
-                    .flatMap(chat -> findMessageById(chat, id));
-            case Jid contactJid -> {
-                if (contactJid.server().type() == JidServer.Type.NEWSLETTER) {
-                    yield findNewsletterByJid(contactJid)
-                            .flatMap(newsletter -> findMessageById(newsletter, id));
-                } else if (Jid.statusBroadcastAccount().equals(contactJid)) {
-                    yield Optional.ofNullable(status.get(id));
-                } else {
-                    yield findChatByJid(contactJid)
-                            .flatMap(chat -> findMessageById(chat, id));
-                }
-            }
-            case JidServer jidServer -> findChatByJid(jidServer.toJid())
-                    .flatMap(chat -> findMessageById(chat, id));
-        };
-    }
-
-    public Optional<NewsletterMessageInfo> findMessageById(Newsletter newsletter, String id) {
-        return newsletter == null || id == null ? Optional.empty() : newsletter.messages()
-                .parallelStream()
-                .filter(entry -> Objects.equals(id, entry.id()) || Objects.equals(id, String.valueOf(entry.serverId())))
-                .findFirst();
-    }
-
-
-    public Optional<ChatMessageInfo> findMessageById(Chat chat, String id) {
-        return chat == null || id == null ? Optional.empty() : chat.messages()
-                .parallelStream()
-                .filter(message -> Objects.equals(message.key().id(), id))
-                .findAny();
-    }
-
-    public Collection<Chat> chats() {
-        return Collections.unmodifiableCollection(chats.values());
-    }
-
-    public Chat addChat(Chat chat) {
-        Objects.requireNonNull(chat, "chat cannot be null");
-        chats.put(chat.jid(), chat);
-        return chat;
-    }
-
-    public Chat addNewChat(Jid chatJid) {
-        Objects.requireNonNull(chatJid, "chatJid cannot be null");
-        var chat = new ChatBuilder()
-                .jid(chatJid)
-                .build();
-        addChat(chat);
-        return chat;
-    }
-
-    public Optional<Chat> removeChat(JidProvider chatJid) {
-        if(chatJid == null) {
-            return Optional.empty();
-        } else {
-            var targetJid = jid.toJid();
-            if(targetJid.hasUserServer()) {
-                var jidChat = chats.remove(targetJid);
-                if(jidChat != null) {
-                    return Optional.of(jidChat);
-                } else {
-                    return findLidByPhone(targetJid)
-                            .map(chats::remove);
-                }
-            } else if(targetJid.hasLidServer()) {
-                var lidChat = chats.remove(targetJid);
-                if(lidChat != null) {
-                    return Optional.of(lidChat);
-                } else {
-                    return findPhoneByLid(targetJid)
-                            .map(chats::remove);
-                }
-            } else {
-                var chat = chats.remove(targetJid);
-                return Optional.ofNullable(chat);
-            }
-        }
-    }
-
-    public ChatMessageInfo addStatus(ChatMessageInfo messageInfo) {
-        Objects.requireNonNull(messageInfo, "messageInfo cannot be null");
-        status.put(messageInfo.key().id(), messageInfo);
-        return messageInfo;
-    }
-
-    public Optional<ChatMessageInfo> removeStatus(String id) {
-        return Optional.ofNullable(status.remove(id));
-    }
-
+    @Override
     public Optional<CallOffer> findCallById(String callId) {
         return callId == null
                 ? Optional.empty()
                 : Optional.ofNullable(calls.get(callId));
     }
 
+    @Override
     public CallOffer addCall(CallOffer call) {
         Objects.requireNonNull(call, "call cannot be null");
-        calls.put(call.id(), call);
+        calls.put(call.callId(), call);
         return call;
     }
 
+    @Override
     public Optional<CallOffer> removeCall(String id) {
         return id == null
                 ? Optional.empty()
                 : Optional.ofNullable(calls.remove(id));
     }
 
-    public Optional<Newsletter> findNewsletterByJid(JidProvider jid) {
-        return jid == null
-                ? Optional.empty()
-                : Optional.ofNullable(newsletters.get(jid.toJid()));
-    }
-
-    public Collection<Newsletter> newsletters() {
-        return Collections.unmodifiableCollection(newsletters.values());
-    }
-
-    public Newsletter addNewsletter(Newsletter newsletter) {
-        newsletters.put(newsletter.jid(), newsletter);
-        return newsletter;
-    }
-
-    public Newsletter addNewNewsletter(Jid newsletterJid) {
-        Objects.requireNonNull(newsletterJid, "newsletterJid cannot be null");
-        var newsletter = new NewsletterBuilder()
-                .jid(newsletterJid)
-                .build();
-        addNewsletter(newsletter);
-        return newsletter;
-    }
-
-    public Optional<Newsletter> removeNewsletter(JidProvider newsletterJid) {
-        return newsletterJid == null
-                ? Optional.empty()
-                : Optional.ofNullable(newsletters.remove(newsletterJid.toJid()));
-    }
-
+    @Override
     public UUID uuid() {
         return uuid;
     }
 
+    @Override
     public OptionalLong phoneNumber() {
         return phoneNumber == null ? OptionalLong.empty() : OptionalLong.of(phoneNumber);
     }
 
+    @Override
     public WhatsAppStore setPhoneNumber(Long phoneNumber) {
         this.phoneNumber = phoneNumber;
         return this;
     }
 
+    @Override
     public WhatsAppClientType clientType() {
         return clientType;
     }
 
+    @Override
     public Optional<WhatsAppClientProxy> proxy() {
         return Optional.ofNullable(proxy);
     }
 
+    @Override
     public WhatsAppStore setProxy(WhatsAppClientProxy proxy) {
         this.proxy = proxy;
         return this;
     }
 
+    @Override
     public JidDevice device() {
         return device;
     }
 
+    @Override
     public WhatsAppStore setDevice(JidDevice device) {
         this.device = Objects.requireNonNull(device, "device cannot be null");
         return this;
     }
 
+    @Override
     public ClientReleaseChannel releaseChannel() {
         return releaseChannel;
     }
 
+    @Override
     public WhatsAppStore setReleaseChannel(ClientReleaseChannel releaseChannel) {
         this.releaseChannel = Objects.requireNonNull(releaseChannel, "releaseChannel cannot be null");
         return this;
     }
 
+    @Override
     public boolean online() {
         return online;
     }
 
+    @Override
     public WhatsAppStore setOnline(boolean online) {
         this.online = online;
         return this;
     }
 
+    @Override
     public Optional<String> locale() {
         return Optional.ofNullable(locale);
     }
 
+    @Override
     public WhatsAppStore setLocale(String locale) {
         this.locale = locale;
         return this;
     }
 
+    @Override
     public String name() {
         return Objects.requireNonNullElse(name, DEFAULT_NAME);
     }
 
+    @Override
     public WhatsAppStore setName(String name) {
         this.name = name;
         return this;
     }
 
+    @Override
     public Optional<String> verifiedName() {
         return Optional.ofNullable(verifiedName);
     }
 
+    @Override
     public WhatsAppStore setVerifiedName(String verifiedName) {
         this.verifiedName = verifiedName;
         return this;
     }
 
+    @Override
     public Optional<URI> profilePicture() {
         return Optional.ofNullable(profilePicture);
     }
 
+    @Override
     public WhatsAppStore setProfilePicture(URI profilePicture) {
         this.profilePicture = profilePicture;
         return this;
     }
 
+    @Override
     public Optional<String> about() {
         return Optional.ofNullable(about);
     }
 
+    @Override
     public WhatsAppStore setAbout(String about) {
         this.about = about;
         return this;
     }
 
+    @Override
     public Optional<Jid> jid() {
         return Optional.ofNullable(jid);
     }
 
+    @Override
     public WhatsAppStore setJid(Jid jid) {
         this.jid = jid;
         return this;
     }
 
+    @Override
     public Optional<Jid> lid() {
         return Optional.ofNullable(lid);
     }
 
+    @Override
     public WhatsAppStore setLid(Jid lid) {
         this.lid = lid;
         return this;
     }
 
+    @Override
     public Optional<String> businessAddress() {
         return Optional.ofNullable(businessAddress);
     }
 
+    @Override
     public WhatsAppStore setBusinessAddress(String businessAddress) {
         this.businessAddress = businessAddress;
         return this;
     }
 
+    @Override
     public OptionalDouble businessLongitude() {
         return businessLongitude == null ? OptionalDouble.empty() : OptionalDouble.of(businessLongitude);
     }
 
+    @Override
     public WhatsAppStore setBusinessLongitude(Double businessLongitude) {
         this.businessLongitude = businessLongitude;
         return this;
     }
 
+    @Override
     public OptionalDouble businessLatitude() {
         return businessLatitude == null ? OptionalDouble.empty() : OptionalDouble.of(businessLatitude);
     }
 
+    @Override
     public WhatsAppStore setBusinessLatitude(Double businessLatitude) {
         this.businessLatitude = businessLatitude;
         return this;
     }
 
+    @Override
     public Optional<String> businessDescription() {
         return Optional.ofNullable(businessDescription);
     }
 
+    @Override
     public WhatsAppStore setBusinessDescription(String businessDescription) {
         this.businessDescription = businessDescription;
         return this;
     }
 
+    @Override
     public Optional<String> businessWebsite() {
         return Optional.ofNullable(businessWebsite);
     }
 
+    @Override
     public WhatsAppStore setBusinessWebsite(String businessWebsite) {
         this.businessWebsite = businessWebsite;
         return this;
     }
 
+    @Override
     public Optional<String> businessEmail() {
         return Optional.ofNullable(businessEmail);
     }
 
+    @Override
     public WhatsAppStore setBusinessEmail(String businessEmail) {
         this.businessEmail = businessEmail;
         return this;
     }
 
+    @Override
     public Optional<BusinessCategory> businessCategory() {
         return Optional.ofNullable(businessCategory);
     }
 
+    @Override
     public WhatsAppStore setBusinessCategory(BusinessCategory businessCategory) {
         this.businessCategory = businessCategory;
         return this;
     }
-
-    public Map<String, String> properties() {
-        return Collections.unmodifiableMap(properties);
-    }
-
-    public Collection<ChatMessageInfo> status() {
-        return Collections.unmodifiableCollection(status.values());
-    }
-
+    
+    @Override
     public Collection<CallOffer> calls() {
         return Collections.unmodifiableCollection(calls.values());
     }
 
+    @Override
     public Collection<PrivacySettingEntry> privacySettings() {
         return Collections.unmodifiableCollection(privacySettings.values());
     }
 
+    @Override
     public boolean unarchiveChats() {
         return unarchiveChats;
     }
 
+    @Override
     public WhatsAppStore setUnarchiveChats(boolean unarchiveChats) {
         this.unarchiveChats = unarchiveChats;
         return this;
     }
 
+    @Override
     public boolean twentyFourHourFormat() {
         return twentyFourHourFormat;
     }
 
+    @Override
     public WhatsAppStore setTwentyFourHourFormat(boolean twentyFourHourFormat) {
         this.twentyFourHourFormat = twentyFourHourFormat;
         return this;
     }
 
-    public long initializationTimeStamp() {
+    @Override
+    public Instant initializationTimeStamp() {
         return initializationTimeStamp;
     }
 
+    @Override
     public ChatEphemeralTimer newChatsEphemeralTimer() {
         return newChatsEphemeralTimer;
     }
 
+    @Override
     public WhatsAppStore setNewChatsEphemeralTimer(ChatEphemeralTimer newChatsEphemeralTimer) {
         this.newChatsEphemeralTimer = Objects.requireNonNull(newChatsEphemeralTimer, "newChatsEphemeralTimer cannot be null");
         return this;
     }
 
+    @Override
     public Optional<WhatsAppWebClientHistory> webHistoryPolicy() {
         return Optional.ofNullable(webHistoryPolicy);
     }
 
+    @Override
     public WhatsAppStore setWebHistoryPolicy(WhatsAppWebClientHistory webHistoryPolicy) {
         this.webHistoryPolicy = webHistoryPolicy;
         return this;
     }
 
+    @Override
     public boolean automaticPresenceUpdates() {
         return automaticPresenceUpdates;
     }
 
+    @Override
     public WhatsAppStore setAutomaticPresenceUpdates(boolean automaticPresenceUpdates) {
         this.automaticPresenceUpdates = automaticPresenceUpdates;
         return this;
     }
 
+    @Override
     public boolean automaticMessageReceipts() {
         return automaticMessageReceipts;
     }
 
+    @Override
     public WhatsAppStore setAutomaticMessageReceipts(boolean automaticMessageReceipts) {
         this.automaticMessageReceipts = automaticMessageReceipts;
         return this;
     }
 
+    @Override
     public boolean checkPatchMacs() {
         return checkPatchMacs;
     }
 
+    @Override
     public WhatsAppStore setCheckPatchMacs(boolean checkPatchMacs) {
         this.checkPatchMacs = checkPatchMacs;
         return this;
     }
 
+    @Override
     public boolean syncedChats() {
         return syncedChats;
     }
 
+    @Override
     public WhatsAppStore setSyncedChats(boolean syncedChats) {
         this.syncedChats = syncedChats;
         return this;
     }
 
+    @Override
     public boolean syncedContacts() {
         return syncedContacts;
     }
 
+    @Override
     public WhatsAppStore setSyncedContacts(boolean syncedContacts) {
         this.syncedContacts = syncedContacts;
         return this;
     }
 
+    @Override
     public boolean syncedNewsletters() {
         return syncedNewsletters;
     }
 
+    @Override
     public WhatsAppStore setSyncedNewsletters(boolean syncedNewsletters) {
         this.syncedNewsletters = syncedNewsletters;
         return this;
     }
 
+    @Override
     public boolean syncedStatus() {
         return syncedStatus;
     }
 
+    @Override
     public WhatsAppStore setSyncedStatus(boolean syncedStatus) {
         this.syncedStatus = syncedStatus;
         return this;
     }
 
+    @Override
     public boolean syncedWebAppState() {
         return syncedWebAppState;
     }
 
+    @Override
     public WhatsAppStore setSyncedWebAppState(boolean syncedWebAppState) {
         this.syncedWebAppState = syncedWebAppState;
         return this;
     }
 
+    @Override
     public boolean syncedBusinessCertificate() {
         return this.syncedBusinessCertificate;
     }
+
+    @Override
     public WhatsAppStore setSyncedBusinessCertificate(boolean syncedBusinessCertificate) {
         this.syncedBusinessCertificate = syncedBusinessCertificate;
         return this;
     }
 
+    @Override
     public WhatsAppClientListener addListener(WhatsAppClientListener listener) {
         listeners.add(listener);
         return listener;
     }
 
+    @Override
     public boolean removeListener(WhatsAppClientListener listener) {
         return listeners.remove(listener);
     }
 
+    @Override
     public Collection<WhatsAppClientListener> listeners() {
         return Collections.unmodifiableCollection(listeners);
     }
 
-
+    @Override
     public MediaConnection awaitMediaConnection() throws InterruptedException {
         if(mediaConnection == null) {
             synchronized (mediaConnectionLock) {
@@ -1331,6 +1006,7 @@ public final class ProtobufWhatsAppStore implements WhatsAppStore {
         return mediaConnection;
     }
 
+    @Override
     public WhatsAppStore setMediaConnection(MediaConnection mediaConnection) {
         this.mediaConnection = mediaConnection;
         synchronized (mediaConnectionLock) {
@@ -1339,10 +1015,12 @@ public final class ProtobufWhatsAppStore implements WhatsAppStore {
         return this;
     }
 
+    @Override
     public WhatsAppClientOfflineResumeState offlineResumeState() {
         return offlineResumeState;
     }
 
+    @Override
     public WhatsAppStore setOfflineResumeState(WhatsAppClientOfflineResumeState state) {
         this.offlineResumeState = Objects.requireNonNull(state, "state cannot be null");
         if (state == WhatsAppClientOfflineResumeState.COMPLETE) {
@@ -1354,6 +1032,7 @@ public final class ProtobufWhatsAppStore implements WhatsAppStore {
         return this;
     }
 
+    @Override
     public void waitForOfflineDeliveryEnd() {
         if (offlineResumeState == WhatsAppClientOfflineResumeState.COMPLETE) {
             return;
@@ -1365,88 +1044,85 @@ public final class ProtobufWhatsAppStore implements WhatsAppStore {
         }
     }
 
+    @Override
     public boolean isResumeFromRestartComplete() {
         return offlineResumeState != WhatsAppClientOfflineResumeState.INIT
                && offlineResumeState != WhatsAppClientOfflineResumeState.RESUME_ON_RESTART;
     }
 
-    public Optional<SignedDeviceIdentity> signedDeviceIdentity() {
+    @Override
+    public Optional<ADVSignedDeviceIdentity> signedDeviceIdentity() {
         return Optional.ofNullable(signedDeviceIdentity);
     }
 
-    public WhatsAppStore setSignedDeviceIdentity(SignedDeviceIdentity signedDeviceIdentity) {
+    @Override
+    public WhatsAppStore setSignedDeviceIdentity(ADVSignedDeviceIdentity signedDeviceIdentity) {
         this.signedDeviceIdentity = signedDeviceIdentity;
         return this;
     }
 
+    @Override
     public SignalSignedKeyPair signedKeyPair() {
         return signedKeyPair;
     }
 
+    @Override
     public UUID fdid() {
         return fdid;
     }
 
+    @Override
     public byte[] deviceId() {
         return deviceId;
     }
 
+    @Override
     public UUID advertisingId() {
         return advertisingId;
     }
 
+    @Override
     public byte[] identityId() {
         return identityId;
     }
 
+    @Override
     public byte[] backupToken() {
         return backupToken;
     }
 
+    @Override
     public int registrationId() {
         return this.registrationId;
     }
 
+    @Override
     public SignalIdentityKeyPair noiseKeyPair() {
         return this.noiseKeyPair;
     }
 
+    @Override
     public SignalIdentityKeyPair identityKeyPair() {
         return this.identityKeyPair;
     }
 
-    public Optional<SignalIdentityKeyPair> companionKeyPair() {
-        return Optional.ofNullable(companionKeyPair);
-    }
-
-    public WhatsAppStore setCompanionKeyPair(SignalIdentityKeyPair companionKeyPair) {
-        this.companionKeyPair = companionKeyPair;
-        return this;
-    }
-
+    @Override
     public Optional<byte[]> advSecretKey() {
         return Optional.ofNullable(advSecretKey);
     }
 
+    @Override
     public WhatsAppStore setAdvSecretKey(byte[] advSecretKey) {
         this.advSecretKey = advSecretKey;
         return this;
     }
 
-    public byte[] generateAdvSecretKey() {
-        this.advSecretKey = SecureBytes.random(32);
-        return this.advSecretKey;
-    }
-
-    public WhatsAppStore clearAdvSecretKey() {
-        this.advSecretKey = null;
-        return this;
-    }
-
+    @Override
     public SequencedCollection<SignalPreKeyPair> preKeys() {
         return preKeys.sequencedValues();
     }
 
+    @Override
     public boolean hasPreKeys() {
         return !preKeys.isEmpty();
     }
@@ -1481,6 +1157,7 @@ public final class ProtobufWhatsAppStore implements WhatsAppStore {
         return Optional.ofNullable(sessions.get(address));
     }
 
+    @Override
     public void addSession(SignalProtocolAddress address, SignalSessionRecord record) {
         sessions.put(address, record);
     }
@@ -1495,53 +1172,72 @@ public final class ProtobufWhatsAppStore implements WhatsAppStore {
         senderKeys.put(name, newRecord);
     }
 
+    @Override
     public boolean removeSession(SignalProtocolAddress address) {
         return sessions.remove(address) != null;
     }
 
-    public void removeSenderKeysForDevice(Jid deviceJid) {
+    @Override
+    public void removeSenderKeys(Jid deviceJid) {
         var signalAddress = deviceJid.toSignalAddress();
         senderKeys.keySet().removeIf(name ->
                 name.sender().equals(signalAddress)
         );
     }
 
-
-    public void removeSenderKeysForDevice(SignalSenderKeyName senderKeyName) {
+    @Override
+    public void removeSenderKeys(SignalSenderKeyName senderKeyName) {
         Objects.requireNonNull(senderKeyName, "senderKeyName cannot be null");
         senderKeys.remove(senderKeyName);
     }
 
-    public void cleanupSignalSessionsForDevice(Jid deviceJid) {
+    @Override
+    public void cleanupSignalSessions(Jid deviceJid) {
         var signalAddress = deviceJid.toSignalAddress();
         removeSession(signalAddress);
-        removeSenderKeysForDevice(deviceJid);
+        removeSenderKeys(deviceJid);
     }
 
-    public void markUserNeedsSenderKeyRotation(Jid userJid) {
+    @Override
+    public void markKeyRotation(Jid userJid) {
         usersNeedingSenderKeyRotation.add(userJid.toUserJid());
     }
 
-    public boolean checkAndClearSenderKeyRotationNeeded(Jid userJid) {
+    @Override
+    public boolean clearKeyRotation(Jid userJid) {
         return usersNeedingSenderKeyRotation.remove(userJid.toUserJid());
     }
 
-    public boolean anyUserNeedsSenderKeyRotation(Collection<Jid> userJids) {
+    @Override
+    public boolean isKeyRotated(Collection<Jid> userJids) {
         return userJids.stream()
-                .map(Jid::toUserJid)
-                .anyMatch(usersNeedingSenderKeyRotation::contains);
+                .anyMatch(entry -> usersNeedingSenderKeyRotation.contains(entry.toUserJid()));
     }
 
-    public void markSenderKeyDistributed(Jid groupJid, Jid participantJid) {
-        Objects.requireNonNull(groupJid, "groupJid cannot be null");
-        Objects.requireNonNull(participantJid, "participantJid cannot be null");
-
-        var groupKey = groupJid.toString();
-        groupSenderKeyDistribution
-                .computeIfAbsent(groupKey, k -> ConcurrentHashMap.newKeySet())
-                .add(participantJid.toString());
+    @Override
+    public long updateIdentityRange(Collection<Jid> devices) {
+        var seq = encryptionSequence.incrementAndGet();
+        for (var device : devices) {
+            var address = device.toSignalAddress();
+            // WAWebSignalProtocolStoreUnifiedApi: only set if null or > seq
+            // (i.e. record the *earliest* sequence for this identity)
+            identityEncryptionRange.merge(address, seq, Math::min);
+        }
+        return seq;
     }
 
+    @Override
+    public boolean hasIdentityChanged(long sendSequence, Jid device) {
+        var recorded = identityEncryptionRange.get(device.toSignalAddress());
+        return recorded == null || recorded > sendSequence;
+    }
+
+    @Override
+    public void clearIdentityRange(Jid device) {
+        identityEncryptionRange.remove(device.toSignalAddress());
+    }
+
+    @Override
     public boolean hasSenderKeyDistributed(Jid groupJid, Jid participantJid) {
         Objects.requireNonNull(groupJid, "groupJid cannot be null");
         Objects.requireNonNull(participantJid, "participantJid cannot be null");
@@ -1554,11 +1250,24 @@ public final class ProtobufWhatsAppStore implements WhatsAppStore {
         return participants.contains(participantJid.toString());
     }
 
+    @Override
+    public void markSenderKeyDistributed(Jid groupJid, Jid participantJid) {
+        Objects.requireNonNull(groupJid, "groupJid cannot be null");
+        Objects.requireNonNull(participantJid, "participantJid cannot be null");
+
+        var groupKey = groupJid.toString();
+        groupSenderKeyDistribution
+                .computeIfAbsent(groupKey, k -> ConcurrentHashMap.newKeySet())
+                .add(participantJid.toString());
+    }
+
+    @Override
     public void clearSenderKeyDistribution(Jid groupJid) {
         Objects.requireNonNull(groupJid, "groupJid cannot be null");
         groupSenderKeyDistribution.remove(groupJid.toString());
     }
 
+    @Override
     public void clearSenderKeyDistributionForParticipant(Jid participantJid) {
         Objects.requireNonNull(participantJid, "participantJid cannot be null");
         var participantKey = participantJid.toString();
@@ -1568,26 +1277,7 @@ public final class ProtobufWhatsAppStore implements WhatsAppStore {
         }
     }
 
-    public long updateIdentityRange(Collection<Jid> devices) {
-        var seq = encryptionSequence.incrementAndGet();
-        for (var device : devices) {
-            var address = device.toSignalAddress();
-            // WAWebSignalProtocolStoreUnifiedApi: only set if null or > seq
-            // (i.e. record the *earliest* sequence for this identity)
-            identityEncryptionRange.merge(address, seq, Math::min);
-        }
-        return seq;
-    }
-
-    public boolean hasIdentityChanged(long sendSequence, Jid device) {
-        var recorded = identityEncryptionRange.get(device.toSignalAddress());
-        return recorded == null || recorded > sendSequence;
-    }
-
-    public void clearIdentityRange(Jid device) {
-        identityEncryptionRange.remove(device.toSignalAddress());
-    }
-
+    @Override
     public void forgetSenderKeyDistributed(Jid groupJid, Jid participantJid) {
         Objects.requireNonNull(groupJid, "groupJid cannot be null");
         Objects.requireNonNull(participantJid, "participantJid cannot be null");
@@ -1599,107 +1289,56 @@ public final class ProtobufWhatsAppStore implements WhatsAppStore {
         }
     }
 
-    public void markMessageAsRevoked(String messageId) {
-        Objects.requireNonNull(messageId, "messageId cannot be null");
-        revokedMessageIds.add(messageId);
-    }
-
-    public boolean isMessageOverwrittenByRevoke(String messageId) {
-        Objects.requireNonNull(messageId, "messageId cannot be null");
-        return revokedMessageIds.contains(messageId);
-    }
-
-    public void clearRevokeStatus(String messageId) {
-        Objects.requireNonNull(messageId, "messageId cannot be null");
-        revokedMessageIds.remove(messageId);
-    }
-
+    @Override
     public SequencedCollection<AppStateSyncKey> appStateKeys() {
         return Collections.unmodifiableSequencedCollection(appStateKeys.sequencedValues());
     }
 
+    @Override
     public Optional<AppStateSyncKey> findWebAppStateKeyById(byte[] id) {
         return Optional.ofNullable(appStateKeys.get(HexFormat.of().formatHex(id)));
     }
 
+    @Override
     public void addWebAppStateKeys(Collection<AppStateSyncKey> keys) {
         for (var key : keys) {
-            var keyId = key.keyId();
-            if(keyId == null) {
-                continue;
-            }
-
-            var keyIdValue = keyId.value();
-            if(keyIdValue == null) {
-                continue;
-            }
-
-            appStateKeys.put(HexFormat.of().formatHex(keyIdValue), key);
+            key.keyId()
+                    .flatMap(AppStateSyncKeyId::keyId)
+                    .ifPresent(keyId -> appStateKeys.put(HexFormat.of().formatHex(keyId), key));
         }
     }
 
-    public Optional<AppStateSyncHash> findWebAppHashStateByName(PatchType patchType) {
+    @Override
+    public Optional<SyncHashValue> findWebAppHashStateByName(SyncPatchType patchType) {
         return Optional.ofNullable(hashStates.get(patchType));
     }
 
-    public void addWebAppHashState(AppStateSyncHash state) {
+    @Override
+    public void addWebAppHashState(SyncHashValue state) {
         hashStates.put(state.type(), state);
     }
 
+    @Override
     public Collection<MissingDeviceSyncKey> missingSyncKeys() {
         return Collections.unmodifiableCollection(missingSyncKeys.values());
     }
 
+    @Override
     public Optional<MissingDeviceSyncKey> findMissingSyncKey(byte[] keyId) {
         return Optional.ofNullable(missingSyncKeys.get(HexFormat.of().formatHex(keyId)));
     }
 
+    @Override
     public void addMissingSyncKey(MissingDeviceSyncKey missingKey) {
         missingSyncKeys.put(HexFormat.of().formatHex(missingKey.keyId()), missingKey);
     }
 
+    @Override
     public void removeMissingSyncKey(byte[] keyId) {
         missingSyncKeys.remove(HexFormat.of().formatHex(keyId));
     }
 
-    public SequencedCollection<MissingDeviceSyncKey> findExpiredMissingSyncKeys(Duration timeout) {
-        var now = Instant.now();
-        return missingSyncKeys.values()
-                .stream()
-                .filter(key -> Duration.between(key.timestamp(), now).compareTo(timeout) > 0)
-                .toList();
-    }
-
-    public Optional<Instant> getEarliestMissingSyncKeyTimestamp() {
-        return missingSyncKeys.values().stream()
-                .map(MissingDeviceSyncKey::timestamp)
-                .min(Instant::compareTo);
-    }
-
-    public Optional<Duration> calculateMissingSyncKeyTimeoutDelay(Duration timeout) {
-        return getEarliestMissingSyncKeyTimestamp()
-                .map(earliest -> {
-                    var elapsed = Duration.between(earliest, Instant.now());
-                    var remaining = timeout.minus(elapsed);
-                    return remaining.isNegative() ? Duration.ZERO : remaining;
-                });
-    }
-
-    public void updateDeviceIdentityRange(String signalAddress, long messageTimestamp) {
-        deviceIdentityRanges.compute(signalAddress, (k, existing) ->
-                (existing == null || existing > messageTimestamp) ? messageTimestamp : existing);
-    }
-
-    public Long getDeviceIdentityRange(String signalAddress) {
-        return deviceIdentityRanges.get(signalAddress);
-    }
-
-    public boolean shouldIncludeDeviceInResend(String signalAddress, long originalTimestamp) {
-        var rangeTimestamp = deviceIdentityRanges.get(signalAddress);
-        // Include device if no range recorded OR range is <= original message
-        return rangeTimestamp == null || rangeTimestamp <= originalTimestamp;
-    }
-
+    @Override
     public void createOrMergeReceiptRecords(String messageId, Collection<Jid> recipientJids) {
         if (messageId == null || recipientJids == null || recipientJids.isEmpty()) {
             return;
@@ -1711,15 +1350,12 @@ public final class ProtobufWhatsAppStore implements WhatsAppStore {
         });
     }
 
-    public Set<Jid> findMessageRecipients(String messageId) {
-        var recipients = pendingMessageRecipients.get(messageId);
-        return recipients != null ? Collections.unmodifiableSet(recipients) : Set.of();
-    }
-
+    @Override
     public void removeReceiptRecords(String messageId) {
         pendingMessageRecipients.remove(messageId);
     }
 
+    @Override
     public Set<Jid> findReceiptRecords(String messageId) {
         if (messageId == null) {
             return Set.of();
@@ -1728,29 +1364,35 @@ public final class ProtobufWhatsAppStore implements WhatsAppStore {
         return recipients != null ? Set.copyOf(recipients) : Set.of();
     }
 
-    public void addPendingMutations(PatchType collectionName, Collection<? extends PendingMutation> patch) {
+    @Override
+    public void addPendingMutations(SyncPatchType collectionName, Collection<? extends SyncPendingMutation> patch) {
         webAppStatePendingMutations
                 .computeIfAbsent(collectionName, k -> new ArrayList<>())
                 .addAll(patch);
     }
 
-    public SequencedCollection<PendingMutation> findPendingMutations(PatchType collectionName) {
+    @Override
+    public SequencedCollection<SyncPendingMutation> findPendingMutations(SyncPatchType collectionName) {
         var collectionPending = webAppStatePendingMutations.get(collectionName);
         return collectionPending == null ? List.of() : Collections.unmodifiableSequencedCollection(collectionPending);
     }
 
-    public void removePendingMutations(PatchType collectionName) {
+    @Override
+    public void removePendingMutations(SyncPatchType collectionName) {
         webAppStatePendingMutations.remove(collectionName);
     }
 
-    public void clearPendingMutations(PatchType collectionName) {
+    @Override
+    public void clearPendingMutations(SyncPatchType collectionName) {
         webAppStatePendingMutations.remove(collectionName);
     }
 
+    @Override
     public boolean registered() {
         return this.registered;
     }
 
+    @Override
     public WhatsAppStore setRegistered(boolean registered) {
         this.registered = registered;
         return this;
@@ -1766,12 +1408,14 @@ public final class ProtobufWhatsAppStore implements WhatsAppStore {
 
     }
 
+    @Override
     public void saveIdentity(SignalProtocolAddress address, SignalIdentityPublicKey identityKey) {
         Objects.requireNonNull(address, "address cannot be null");
         Objects.requireNonNull(identityKey, "identityKey cannot be null");
         remoteIdentities.put(address, identityKey);
     }
 
+    @Override
     public Optional<SignalIdentityPublicKey> findIdentityByAddress(SignalProtocolAddress address) {
         if (address == null) {
             return Optional.empty();
@@ -1785,15 +1429,15 @@ public final class ProtobufWhatsAppStore implements WhatsAppStore {
         }
     }
 
-    public void markWebAppStateDirty(PatchType collectionName) {
+    public void markWebAppStateDirty(SyncPatchType collectionName) {
         webAppStateCollections.compute(collectionName, (_, current) -> {
-            if (current == null || current.state() == CollectionState.UP_TO_DATE) {
-                return new CollectionMetadata(
+            if (current == null || current.state() == SyncCollectionState.UP_TO_DATE) {
+                return new SyncCollectionMetadata(
                         collectionName,
                         current != null ? current.version() : 0,
                         current != null ? MutationLTHash.copy(current.ltHash()) : MutationLTHash.copy(MutationLTHash.EMPTY_HASH),
                         System.currentTimeMillis(),
-                        CollectionState.DIRTY,
+                        SyncCollectionState.DIRTY,
                         0,  // Reset retry count
                         0   // Reset error timestamp
                 );
@@ -1802,112 +1446,120 @@ public final class ProtobufWhatsAppStore implements WhatsAppStore {
         });
     }
 
-    public void markWebAppStateInFlight(PatchType collectionName) {
+    @Override
+    public void markWebAppStateInFlight(SyncPatchType collectionName) {
         webAppStateCollections.computeIfPresent(collectionName, (_, current) ->
-                new CollectionMetadata(
+                new SyncCollectionMetadata(
                         current.name(),
                         current.version(),
                         current.ltHash(),
                         current.lastSyncTimestamp(),
-                        CollectionState.IN_FLIGHT,
+                        SyncCollectionState.IN_FLIGHT,
                         current.retryCount(),
                         current.lastErrorTimestamp()
                 )
         );
     }
 
-    public void markWebAppStateUpToDate(PatchType collectionName) {
+    @Override
+    public void markWebAppStateUpToDate(SyncPatchType collectionName) {
         webAppStateCollections.computeIfPresent(collectionName, (_, current) ->
-                new CollectionMetadata(
+                new SyncCollectionMetadata(
                         current.name(),
                         current.version(),
                         current.ltHash(),
                         System.currentTimeMillis(),
-                        CollectionState.UP_TO_DATE,
+                        SyncCollectionState.UP_TO_DATE,
                         0,  // Reset retry count on success
                         0   // Reset error timestamp
                 )
         );
     }
 
-    public void markWebAppStatePending(PatchType collectionName) {
+    @Override
+    public void markWebAppStatePending(SyncPatchType collectionName) {
         webAppStateCollections.computeIfPresent(collectionName, (_, current) ->
-                new CollectionMetadata(
+                new SyncCollectionMetadata(
                         current.name(),
                         current.version(),
                         current.ltHash(),
                         current.lastSyncTimestamp(),
-                        CollectionState.PENDING,
+                        SyncCollectionState.PENDING,
                         current.retryCount(),
                         current.lastErrorTimestamp()
                 )
         );
     }
 
-    public void markWebAppStateBlocked(PatchType collectionName) {
+    @Override
+    public void markWebAppStateBlocked(SyncPatchType collectionName) {
         webAppStateCollections.computeIfPresent(collectionName, (_, current) ->
-                new CollectionMetadata(
+                new SyncCollectionMetadata(
                         current.name(),
                         current.version(),
                         current.ltHash(),
                         current.lastSyncTimestamp(),
-                        CollectionState.BLOCKED,
+                        SyncCollectionState.BLOCKED,
                         current.retryCount(),
                         System.currentTimeMillis()
                 )
         );
     }
 
-    public void markWebAppStateErrorRetry(PatchType collectionName) {
+    @Override
+    public void markWebAppStateErrorRetry(SyncPatchType collectionName) {
         webAppStateCollections.computeIfPresent(collectionName, (_, current) ->
-                new CollectionMetadata(
+                new SyncCollectionMetadata(
                         current.name(),
                         current.version(),
                         current.ltHash(),
                         current.lastSyncTimestamp(),
-                        CollectionState.ERROR_RETRY,
+                        SyncCollectionState.ERROR_RETRY,
                         current.retryCount() + 1,
                         System.currentTimeMillis()
                 )
         );
     }
 
-    public void markWebAppStateErrorFatal(PatchType collectionName) {
+    @Override
+    public void markWebAppStateErrorFatal(SyncPatchType collectionName) {
         webAppStateCollections.computeIfPresent(collectionName, (_, current) ->
-                new CollectionMetadata(
+                new SyncCollectionMetadata(
                         current.name(),
                         current.version(),
                         current.ltHash(),
                         current.lastSyncTimestamp(),
-                        CollectionState.ERROR_FATAL,
+                        SyncCollectionState.ERROR_FATAL,
                         current.retryCount(),
                         System.currentTimeMillis()
                 )
         );
     }
 
-    public CollectionMetadata findWebAppState(PatchType collectionName) {
+    @Override
+    public SyncCollectionMetadata findWebAppState(SyncPatchType collectionName) {
         return webAppStateCollections.computeIfAbsent(collectionName, key ->
-                new CollectionMetadata(
+                new SyncCollectionMetadata(
                         key,
                         0,
                         MutationLTHash.copy(MutationLTHash.EMPTY_HASH),
                         0,
-                        CollectionState.UP_TO_DATE,
+                        SyncCollectionState.UP_TO_DATE,
                         0,
                         0
                 )
         );
     }
 
-    public void updateWebAppStateVersion(PatchType collectionName, long newVersion, byte[] newLtHash) {
+    @Override
+    public void updateWebAppStateVersion(SyncPatchType collectionName, long newVersion, byte[] newLtHash) {
         webAppStateCollections.compute(collectionName, (_, current) ->
-                new CollectionMetadata(
+                new SyncCollectionMetadata(
                         collectionName,
                         newVersion,
                         MutationLTHash.copy(newLtHash),
                         System.currentTimeMillis(),
-                        current != null ? current.state() : CollectionState.UP_TO_DATE,
+                        current != null ? current.state() : SyncCollectionState.UP_TO_DATE,
                         0,  // Reset retry count on successful update
                         0   // Reset error timestamp
                 )
@@ -1915,8 +1567,329 @@ public final class ProtobufWhatsAppStore implements WhatsAppStore {
     }
 
     @Override
+    public Optional<PrivacySettingEntry> findPrivacySetting(PrivacySettingType type) {
+        return type == null
+                ? Optional.empty()
+                : Optional.ofNullable(privacySettings.get(type));
+    }
+
+    @Override
+    public void addPrivacySetting(PrivacySettingEntry entry) {
+        Objects.requireNonNull(entry, "entry cannot be null");
+        privacySettings.put(entry.type(), entry);
+    }
+
+    @Override
+    public boolean showSecurityNotifications() {
+        return showSecurityNotifications;
+    }
+
+    @Override
+    public WhatsAppStore setShowSecurityNotifications(boolean showSecurityNotifications) {
+        this.showSecurityNotifications = showSecurityNotifications;
+        return this;
+    }
+
+    @Override
+    public Optional<Sticker> findRecentSticker(String stickerHash) {
+        return Optional.ofNullable(recentStickers.get(stickerHash));
+    }
+
+    @Override
+    public void addRecentSticker(String stickerHash, Sticker sticker) {
+        Objects.requireNonNull(stickerHash, "stickerHash cannot be null");
+        Objects.requireNonNull(sticker, "sticker cannot be null");
+        recentStickers.put(stickerHash, sticker);
+    }
+
+    @Override
+    public Optional<Sticker> removeRecentSticker(String stickerHash) {
+        return Optional.ofNullable(recentStickers.remove(stickerHash));
+    }
+
+    @Override
+    public Optional<Sticker> findFavouriteSticker(String stickerHash) {
+        return Optional.ofNullable(favouriteStickers.get(stickerHash));
+    }
+
+    @Override
+    public void addFavouriteSticker(String stickerHash, Sticker sticker) {
+        Objects.requireNonNull(stickerHash, "stickerHash cannot be null");
+        Objects.requireNonNull(sticker, "sticker cannot be null");
+        favouriteStickers.put(stickerHash, sticker);
+    }
+
+    @Override
+    public Optional<Sticker> removeFavouriteSticker(String stickerHash) {
+        return Optional.ofNullable(favouriteStickers.remove(stickerHash));
+    }
+
+    @Override
+    public void addLabel(Label label) {
+        Objects.requireNonNull(label, "label cannot be null");
+        labels.put(label.id(), label);
+    }
+
+    @Override
+    public Optional<Label> removeLabel(int labelId) {
+        return Optional.ofNullable(labels.remove(labelId));
+    }
+
+    @Override
+    public Optional<Label> findLabel(int labelId) {
+        return Optional.ofNullable(labels.get(labelId));
+    }
+
+    @Override
+    public Optional<QuickReply> findQuickReply(String shortcut) {
+        return Optional.ofNullable(quickReplies.get(shortcut));
+    }
+
+    @Override
+    public void addQuickReply(QuickReply action) {
+        Objects.requireNonNull(action, "action cannot be null");
+        quickReplies.put(action.shortcut(), action);
+    }
+
+    @Override
+    public Optional<QuickReply> removeQuickReply(String shortcut) {
+        return shortcut == null
+                ? Optional.empty()
+                : Optional.ofNullable(quickReplies.remove(shortcut));
+    }
+
+    @Override
+    public ClientAppVersion clientVersion() {
+        if(clientVersion == null) {
+            synchronized (clientVersionLock) {
+                if(clientVersion == null) {
+                    clientVersion = WhatsAppClientInfo.of(device.platform()).version();
+                }
+            }
+        }
+        return clientVersion;
+    }
+
+    @Override
+    public WhatsAppStore setClientVersion(ClientAppVersion clientVersion) {
+        this.clientVersion = clientVersion;
+        return this;
+    }
+
+    @Override
+    public Optional<ClientAppVersion> companionVersion() {
+        return Optional.ofNullable(companionVersion);
+    }
+
+    @Override
+    public AbstractWhatsAppStore setCompanionVersion(ClientAppVersion companionVersion) {
+        this.companionVersion = companionVersion;
+        return this;
+    }
+
+    @Override
+    public Optional<ChatMetadata<?>> findChatMetadata(Jid groupJid) {
+        Objects.requireNonNull(groupJid, "groupJid cannot be null");
+        return Optional.ofNullable(chatMetadata.get(groupJid));
+    }
+
+    @Override
+    public void addChatMetadata(ChatMetadata<?> metadata) {
+        Objects.requireNonNull(metadata, "metadata cannot be null");
+        chatMetadata.put(metadata.jid(), metadata);
+    }
+
+    @Override
+    public void removeChatMetadata(Jid groupJid) {
+        Objects.requireNonNull(groupJid, "groupJid cannot be null");
+        chatMetadata.remove(groupJid);
+    }
+
+    @Override
+    public Optional<BusinessVerifiedNameCertificate> findVerifiedBusinessName(Jid jid) {
+        Objects.requireNonNull(jid, "jid cannot be null");
+        return Optional.ofNullable(verifiedBusinessNames.get(jid.toUserJid()));
+    }
+
+    @Override
+    public void addVerifiedBusinessName(Jid jid, BusinessVerifiedNameCertificate record) {
+        Objects.requireNonNull(jid, "jid cannot be null");
+        Objects.requireNonNull(record, "record cannot be null");
+        verifiedBusinessNames.put(jid.toUserJid(), record);
+    }
+
+    @Override
+    public void removeVerifiedBusinessName(Jid jid) {
+        Objects.requireNonNull(jid, "jid cannot be null");
+        verifiedBusinessNames.remove(jid.toUserJid());
+    }
+
+    @Override
+    public Optional<DeviceList> findDeviceList(Jid userJid) {
+        Objects.requireNonNull(userJid, "userJid cannot be null");
+
+        var deviceList = deviceLists.get(userJid);
+        if (deviceList != null) {
+            return Optional.of(deviceList);
+        }
+
+        Jid alternateJid;
+        if (userJid.hasUserServer()) {
+            alternateJid = findLidByPhone(userJid).orElse(null);
+        } else if (userJid.hasLidServer()) {
+            alternateJid = findPhoneByLid(userJid).orElse(null);
+        } else {
+            alternateJid = null;
+        }
+
+        if (alternateJid == null) {
+            return Optional.empty();
+        }
+
+        var alternateList = deviceLists.get(alternateJid);
+        return Optional.ofNullable(alternateList);
+    }
+
+    @Override
+    public SequencedCollection<DeviceList> deviceLists() {
+        return List.copyOf(deviceLists.sequencedValues());
+    }
+
+    @Override
+    public void addDeviceList(DeviceList deviceList) {
+        Objects.requireNonNull(deviceList, "deviceList cannot be null");
+
+        var userJid = deviceList.userJid();
+
+        // Evict oldest entry if cache is full
+        if (deviceLists.size() >= MAX_DEVICE_LISTS && !deviceLists.containsKey(userJid)) {
+            deviceLists.pollLastEntry();
+        }
+
+        // Update or add entry
+        deviceLists.put(userJid, deviceList);
+    }
+
+    @Override
+    public void removeDeviceList(Jid userJid) {
+        Objects.requireNonNull(userJid, "userJid cannot be null");
+        deviceLists.remove(userJid);
+    }
+
+    @Override
+    public void clearDeviceLists() {
+        deviceLists.clear();
+    }
+
+    @Override
+    public Optional<Instant> lastAdvCheckTime() {
+        return Optional.ofNullable(lastAdvCheckTime);
+    }
+
+    @Override
+    public void updateAdvCheckTime() {
+        this.lastAdvCheckTime = Instant.now();
+    }
+
+    @Override
+    public void addPendingDeviceSync(PendingDeviceSync sync) {
+        pendingDeviceSyncs.offer(sync);
+    }
+
+    @Override
+    public List<PendingDeviceSync> pendingDevicesSyncs() {
+        return List.copyOf(pendingDeviceSyncs);
+    }
+
+    @Override
+    public void removePendingDeviceSync(PendingDeviceSync sync) {
+        pendingDeviceSyncs.remove(sync);
+    }
+
+    @Override
+    public void clearPendingDeviceSyncs() {
+        pendingDeviceSyncs.clear();
+    }
+
+    @Override
+    public void markIdentityChange(Jid deviceJid) {
+        unconfirmedIdentityChanges.add(deviceJid);
+    }
+
+    @Override
+    public void confirmIdentityChange(Jid deviceJid) {
+        unconfirmedIdentityChanges.remove(deviceJid);
+    }
+
+    @Override
+    public Set<Jid> unconfirmedIdentityChanges() {
+        return Collections.unmodifiableSet(unconfirmedIdentityChanges);
+    }
+
+    @Override
+    public void clearUnconfirmedIdentityChanges() {
+        unconfirmedIdentityChanges.clear();
+    }
+
+    @Override
+    public void addToCoexHostedVerificationCache(Jid userJid) {
+        if (userJid != null) {
+            coexHostedVerificationCache.add(userJid.toUserJid());
+        }
+    }
+
+    @Override
+    public boolean isInCoexHostedVerificationCache(Jid userJid) {
+        if (userJid == null) {
+            return false;
+        }
+        return coexHostedVerificationCache.contains(userJid.toUserJid());
+    }
+
+    @Override
+    public void clearCoexHostedVerificationCache() {
+        coexHostedVerificationCache.clear();
+    }
+
+    @Override
+    public Optional<Jid> getPhoneNumberByLid(Jid lidJid) {
+        if (lidJid == null || !lidJid.hasLidServer()) {
+            return Optional.empty();
+        }
+        // Try to find phone number from contact with matching LID
+        return contacts.values().stream()
+                .filter(contact -> contact.lid().map(lid -> lid.equals(lidJid)).orElse(false))
+                .findFirst()
+                .map(Contact::jid);
+    }
+
+    @Override
+    public Optional<Jid> getLidByPhoneNumber(Jid phoneNumberJid) {
+        if (phoneNumberJid == null) {
+            return Optional.empty();
+        }
+        // Check if already a LID
+        if (phoneNumberJid.hasLidServer()) {
+            return Optional.of(phoneNumberJid);
+        }
+        // Try to find LID from contact
+        var contact = findContactByJid(phoneNumberJid).orElse(null);
+        if (contact != null) {
+            var contactLid = contact.lid();
+            if (contactLid.isPresent()) {
+                return contactLid;
+            }
+        }
+        // Try to find LID from chat
+        var chat = findChatByJid(phoneNumberJid).orElse(null);
+        if (chat != null) {
+            return chat.accountLid();
+        }
+        return Optional.empty();
+    }
+    @Override
     public boolean equals(Object o) {
-        return o == this || o instanceof ProtobufWhatsAppStore that
+        return o == this || o instanceof AbstractWhatsAppStore that
                             && initializationTimeStamp == that.initializationTimeStamp
                             && online == that.online
                             && unarchiveChats == that.unarchiveChats
@@ -1951,19 +1924,14 @@ public final class ProtobufWhatsAppStore implements WhatsAppStore {
                             && Objects.equals(businessWebsite, that.businessWebsite)
                             && Objects.equals(businessEmail, that.businessEmail)
                             && Objects.equals(businessCategory, that.businessCategory)
-                            && Objects.equals(chats, that.chats)
-                            && Objects.equals(newsletters, that.newsletters)
-                            && Objects.equals(status, that.status)
                             && Objects.equals(contacts, that.contacts)
                             && Objects.equals(calls, that.calls)
                             && Objects.equals(privacySettings, that.privacySettings)
-                            && Objects.equals(properties, that.properties)
                             && newChatsEphemeralTimer == that.newChatsEphemeralTimer
                             && Objects.equals(webHistoryPolicy, that.webHistoryPolicy)
                             && Objects.equals(registrationId, that.registrationId)
                             && Objects.equals(noiseKeyPair, that.noiseKeyPair)
                             && Objects.equals(identityKeyPair, that.identityKeyPair)
-                            && Objects.equals(companionKeyPair, that.companionKeyPair)
                             && Objects.equals(signedDeviceIdentity, that.signedDeviceIdentity)
                             && Objects.equals(signedKeyPair, that.signedKeyPair)
                             && Objects.equals(preKeys, that.preKeys)
@@ -1985,17 +1953,12 @@ public final class ProtobufWhatsAppStore implements WhatsAppStore {
                             && Objects.equals(lastAdvCheckTime, that.lastAdvCheckTime)
                             && Objects.equals(remoteIdentities, that.remoteIdentities)
                             && Objects.equals(identityEncryptionRange, that.identityEncryptionRange)
-                            && Objects.equals(encryptionSequence, that.encryptionSequence)
+                            && encryptionSequence.get() == that.encryptionSequence.get()
                             && Objects.equals(missingSyncKeys, that.missingSyncKeys)
                             && Objects.deepEquals(advSecretKey, that.advSecretKey)
-                            && Objects.equals(deviceIdentityRanges, that.deviceIdentityRanges)
                             && Objects.equals(verifiedBusinessNames, that.verifiedBusinessNames)
                             && Objects.equals(proxy, that.proxy)
                             && Objects.equals(directory, that.directory)
-                            && Objects.equals(storesHashCodes, that.storesHashCodes)
-                            && Objects.equals(jidsHashCodes, that.jidsHashCodes)
-                            && Objects.equals(storeLock, that.storeLock)
-                            && Objects.equals(attributionThread, that.attributionThread)
                             && Objects.equals(listeners, that.listeners)
                             && Objects.equals(lidToPhoneMappings, that.lidToPhoneMappings)
                             && Objects.equals(phoneToLidMappings, that.phoneToLidMappings)
@@ -2010,18 +1973,31 @@ public final class ProtobufWhatsAppStore implements WhatsAppStore {
                             && Objects.equals(clientVersionLock, that.clientVersionLock)
                             && Objects.equals(chatMetadata, that.chatMetadata)
                             && Objects.equals(deviceLists, that.deviceLists)
-                            && Objects.equals(deviceListsAccessOrder, that.deviceListsAccessOrder)
-                            && Objects.equals(offlineDeviceTimestamps, that.offlineDeviceTimestamps)
                             && Objects.equals(unconfirmedIdentityChanges, that.unconfirmedIdentityChanges)
                             && Objects.equals(coexHostedVerificationCache, that.coexHostedVerificationCache)
                             && Objects.equals(pendingDeviceSyncs, that.pendingDeviceSyncs)
-                            && Objects.equals(groupSenderKeyDistribution, that.groupSenderKeyDistribution)
-                            && Objects.equals(revokedMessageIds, that.revokedMessageIds);
+                            && Objects.equals(groupSenderKeyDistribution, that.groupSenderKeyDistribution);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(uuid, phoneNumber, clientType, initializationTimeStamp, device, releaseChannel, online, locale, name, verifiedName, profilePicture, about, jid, lid, businessAddress, businessLongitude, businessLatitude, businessDescription, businessWebsite, businessEmail, businessCategory, chats, newsletters, status, contacts, calls, privacySettings, properties, unarchiveChats, twentyFourHourFormat, newChatsEphemeralTimer, webHistoryPolicy, automaticPresenceUpdates, automaticMessageReceipts, checkPatchMacs, syncedChats, syncedContacts, syncedNewsletters, syncedStatus, syncedWebAppState, syncedBusinessCertificate, registrationId, noiseKeyPair, identityKeyPair, companionKeyPair, signedDeviceIdentity, signedKeyPair, preKeys, fdid, Arrays.hashCode(deviceId), advertisingId, Arrays.hashCode(identityId), Arrays.hashCode(backupToken), senderKeys, appStateKeys, sessions, hashStates, registered, showSecurityNotifications, recentStickers, favouriteStickers, quickReplies, labels, clientVersion, companionVersion, lastAdvCheckTime, remoteIdentities, identityEncryptionRange, encryptionSequence, missingSyncKeys, Arrays.hashCode(advSecretKey), deviceIdentityRanges, verifiedBusinessNames, proxy, directory, storesHashCodes, jidsHashCodes, storeLock, attributionThread, listeners, lidToPhoneMappings, phoneToLidMappings, mediaConnection, mediaConnectionLock, offlineResumeState, offlineDeliveryLatch, usersNeedingSenderKeyRotation, webAppStatePendingMutations, webAppStateCollections, pendingMessageRecipients, clientVersionLock, chatMetadata, deviceLists, deviceListsAccessOrder, offlineDeviceTimestamps, unconfirmedIdentityChanges, coexHostedVerificationCache, pendingDeviceSyncs, groupSenderKeyDistribution, revokedMessageIds);
+        return Objects.hash(uuid, phoneNumber, clientType, initializationTimeStamp,
+                device, releaseChannel, online, locale, name, verifiedName,
+                profilePicture, about, jid, lid, businessAddress, businessLongitude,
+                businessLatitude, businessDescription, businessWebsite, businessEmail,
+                businessCategory, contacts, calls, privacySettings,
+                unarchiveChats, twentyFourHourFormat, newChatsEphemeralTimer, webHistoryPolicy,
+                automaticPresenceUpdates, automaticMessageReceipts, checkPatchMacs, syncedChats,
+                syncedContacts, syncedNewsletters, syncedStatus, syncedWebAppState, syncedBusinessCertificate,
+                registrationId, noiseKeyPair, identityKeyPair, signedDeviceIdentity, signedKeyPair, preKeys,
+                fdid, Arrays.hashCode(deviceId), advertisingId, Arrays.hashCode(identityId), Arrays.hashCode(backupToken),
+                senderKeys, appStateKeys, sessions, hashStates, registered, showSecurityNotifications, recentStickers,
+                favouriteStickers, quickReplies, labels, clientVersion, companionVersion, lastAdvCheckTime,
+                remoteIdentities, identityEncryptionRange, encryptionSequence, missingSyncKeys, Arrays.hashCode(advSecretKey),
+                verifiedBusinessNames, proxy, directory, listeners, lidToPhoneMappings, phoneToLidMappings,
+                mediaConnection, mediaConnectionLock, offlineResumeState, offlineDeliveryLatch, usersNeedingSenderKeyRotation,
+                webAppStatePendingMutations, webAppStateCollections, pendingMessageRecipients, clientVersionLock, chatMetadata,
+                deviceLists, unconfirmedIdentityChanges, coexHostedVerificationCache, pendingDeviceSyncs, groupSenderKeyDistribution);
     }
 
     @Override
@@ -2032,380 +2008,5 @@ public final class ProtobufWhatsAppStore implements WhatsAppStore {
                ", clientType=" + clientType +
                ", jid=" + jid +
                ']';
-    }
-
-    public Optional<PrivacySettingEntry> findPrivacySetting(PrivacySettingType type) {
-        return type == null
-                ? Optional.empty()
-                : Optional.ofNullable(privacySettings.get(type));
-    }
-
-    public void addPrivacySetting(PrivacySettingEntry entry) {
-        Objects.requireNonNull(entry, "entry cannot be null");
-        privacySettings.put(entry.type(), entry);
-    }
-
-    public Optional<ChatMessageInfo> findChatMessageByKey(MessageKey key) {
-        var chat = chats.get(key.chatJid());
-        if(chat == null) {
-            return Optional.empty();
-        }
-
-        return chat.getMessageById(key.id());
-    }
-
-    public boolean showSecurityNotifications() {
-        return showSecurityNotifications;
-    }
-
-    public WhatsAppStore setShowSecurityNotifications(boolean showSecurityNotifications) {
-        this.showSecurityNotifications = showSecurityNotifications;
-        return this;
-    }
-
-    public Optional<Sticker> findRecentSticker(String stickerHash) {
-        return Optional.ofNullable(recentStickers.get(stickerHash));
-    }
-
-    public void addRecentSticker(String stickerHash, Sticker sticker) {
-        Objects.requireNonNull(stickerHash, "stickerHash cannot be null");
-        Objects.requireNonNull(sticker, "sticker cannot be null");
-        recentStickers.put(stickerHash, sticker);
-    }
-
-    public Optional<Sticker> removeRecentSticker(String stickerHash) {
-        return Optional.ofNullable(recentStickers.remove(stickerHash));
-    }
-
-    public Optional<Sticker> findFavouriteSticker(String stickerHash) {
-        return Optional.ofNullable(favouriteStickers.get(stickerHash));
-    }
-
-    public void addFavouriteSticker(String stickerHash, Sticker sticker) {
-        Objects.requireNonNull(stickerHash, "stickerHash cannot be null");
-        Objects.requireNonNull(sticker, "sticker cannot be null");
-        favouriteStickers.put(stickerHash, sticker);
-    }
-
-    public Optional<Sticker> removeFavouriteSticker(String stickerHash) {
-        return Optional.ofNullable(favouriteStickers.remove(stickerHash));
-    }
-
-    public Optional<QuickReply> findQuickReply(String shortcut) {
-        return Optional.ofNullable(quickReplies.get(shortcut));
-    }
-
-    public void addQuickReply(QuickReply action) {
-        Objects.requireNonNull(action, "action cannot be null");
-        quickReplies.put(action.shortcut(), action);
-    }
-
-    public Optional<Label> findLabel(int labelId) {
-        return Optional.ofNullable(labels.get(labelId));
-    }
-
-    public Optional<Label> removeLabel(int labelId) {
-        return Optional.ofNullable(labels.remove(labelId));
-    }
-
-    public void addLabel(Label label) {
-        Objects.requireNonNull(label, "label cannot be null");
-        labels.put(label.id(), label);
-    }
-
-    public Optional<QuickReply> removeQuickReply(String shortcut) {
-        return shortcut == null
-                ? Optional.empty()
-                : Optional.ofNullable(quickReplies.remove(shortcut));
-    }
-
-    public Version clientVersion() {
-        if(clientVersion == null) {
-            synchronized (clientVersionLock) {
-                if(clientVersion == null) {
-                    clientVersion = WhatsAppClientInfo.of(device.platform()).version();
-                }
-            }
-        }
-        return clientVersion;
-    }
-
-    public WhatsAppStore setClientVersion(Version clientVersion) {
-        this.clientVersion = clientVersion;
-        return this;
-    }
-
-    public Optional<Version> companionVersion() {
-        return Optional.ofNullable(companionVersion);
-    }
-
-    public ProtobufWhatsAppStore setCompanionVersion(Version companionVersion) {
-        this.companionVersion = companionVersion;
-        return this;
-    }
-
-    public Optional<ChatMetadata> findChatMetadata(Jid groupJid) {
-        Objects.requireNonNull(groupJid, "groupJid cannot be null");
-        return Optional.ofNullable(chatMetadata.get(groupJid));
-    }
-
-    public void addChatMetadata(ChatMetadata metadata) {
-        Objects.requireNonNull(metadata, "metadata cannot be null");
-        chatMetadata.put(metadata.jid(), metadata);
-    }
-
-    public void removeChatMetadata(Jid groupJid) {
-        Objects.requireNonNull(groupJid, "groupJid cannot be null");
-        chatMetadata.remove(groupJid);
-    }
-
-    public Optional<VerifiedBusinessName> findVerifiedBusinessName(Jid jid) {
-        Objects.requireNonNull(jid, "jid cannot be null");
-        return Optional.ofNullable(verifiedBusinessNames.get(jid.toUserJid().toString()));
-    }
-
-    public void addVerifiedBusinessName(BusinessVerifiedNameCertificate record) {
-        Objects.requireNonNull(record, "record cannot be null");
-        verifiedBusinessNames.put(record.jid().toUserJid().toString(), record);
-    }
-
-    public void removeVerifiedBusinessName(Jid jid) {
-        Objects.requireNonNull(jid, "jid cannot be null");
-        verifiedBusinessNames.remove(jid.toUserJid().toString());
-    }
-
-    public Optional<DeviceList> findDeviceList(Jid userJid) {
-        Objects.requireNonNull(userJid, "userJid cannot be null");
-
-        synchronized (deviceListsAccessOrder) {
-            var deviceList = deviceLists.get(userJid);
-            if (deviceList == null) {
-                // Check alternate JID (PN ↔ LID mapping)
-                Jid alternateJid;
-                if (userJid.hasUserServer()) {
-                    alternateJid = findLidByPhone(userJid).orElse(null);
-                } else if (userJid.hasLidServer()) {
-                    alternateJid = findPhoneByLid(userJid).orElse(null);
-                } else {
-                    alternateJid = null;
-                }
-
-                if (alternateJid != null) {
-                    var alternateList = deviceLists.get(alternateJid);
-                    if (alternateList != null) {
-                        deviceListsAccessOrder.remove(alternateJid);
-                        deviceListsAccessOrder.addLast(alternateJid);
-                        return Optional.of(alternateList);
-                    }
-                }
-
-                return Optional.empty();
-            }
-
-            // Update LRU access order
-            deviceListsAccessOrder.remove(userJid);
-            deviceListsAccessOrder.addLast(userJid);
-
-            return Optional.of(deviceList);
-        }
-    }
-
-    public Set<Jid> findDeviceJids(Jid userJid) {
-        return findDeviceList(userJid)
-                .map(DeviceList::deviceJids)
-                .orElse(Set.of());
-    }
-
-    public Collection<DeviceList> deviceLists() {
-        synchronized (deviceListsAccessOrder) {
-            return List.copyOf(deviceLists.values());
-        }
-    }
-
-    public void addDeviceList(DeviceList deviceList) {
-        Objects.requireNonNull(deviceList, "deviceList cannot be null");
-
-        synchronized (deviceListsAccessOrder) {
-            var userJid = deviceList.userJid();
-
-            // Evict oldest entry if cache is full
-            if (deviceLists.size() >= MAX_DEVICE_LISTS && !deviceLists.containsKey(userJid)) {
-                var oldest = deviceListsAccessOrder.removeFirst();
-                deviceLists.remove(oldest);
-            }
-
-            // Update or add entry
-            deviceLists.put(userJid, deviceList);
-            deviceListsAccessOrder.remove(userJid);
-            deviceListsAccessOrder.addLast(userJid);
-        }
-    }
-
-    public void removeDeviceList(Jid userJid) {
-        Objects.requireNonNull(userJid, "userJid cannot be null");
-        synchronized (deviceListsAccessOrder) {
-            deviceLists.remove(userJid);
-            deviceListsAccessOrder.remove(userJid);
-        }
-    }
-
-    public void clearDeviceLists() {
-        synchronized (deviceListsAccessOrder) {
-            deviceLists.clear();
-            deviceListsAccessOrder.clear();
-        }
-    }
-
-    public Optional<Instant> lastAdvCheckTime() {
-        return Optional.ofNullable(lastAdvCheckTime);
-    }
-
-    public void updateAdvCheckTime() {
-        this.lastAdvCheckTime = Instant.now();
-    }
-
-    public void markDeviceOffline(Jid deviceJid) {
-        offlineDeviceTimestamps.put(deviceJid, System.currentTimeMillis());
-    }
-
-    public boolean isDeviceOffline(Jid deviceJid) {
-        var timestamp = offlineDeviceTimestamps.get(deviceJid);
-        if (timestamp == null) {
-            return false;
-        }
-        var elapsed = System.currentTimeMillis() - timestamp;
-        return elapsed < 24 * 60 * 60 * 1000; // 24 hours in milliseconds
-    }
-
-    public void markDeviceOnline(Jid deviceJid) {
-        offlineDeviceTimestamps.remove(deviceJid);
-    }
-
-    public void cleanupExpiredOfflineDevices() {
-        var now = System.currentTimeMillis();
-        var expirationTime = 24 * 60 * 60 * 1000; // 24 hours
-
-        offlineDeviceTimestamps.entrySet().removeIf(entry ->
-                now - entry.getValue() >= expirationTime
-        );
-    }
-
-    public void addPendingDeviceSync(PendingDeviceSync sync) {
-        pendingDeviceSyncs.offer(sync);
-    }
-
-    public List<PendingDeviceSync> pendingDevicesSyncs() {
-        return List.copyOf(pendingDeviceSyncs);
-    }
-
-    public void removePendingDeviceSync(PendingDeviceSync sync) {
-        pendingDeviceSyncs.remove(sync);
-    }
-
-    public void clearPendingDeviceSyncs() {
-        pendingDeviceSyncs.clear();
-    }
-
-    public void cleanupExpiredPendingDeviceSyncs() {
-        pendingDeviceSyncs.removeIf(PendingDeviceSync::isExpired);
-    }
-
-    public void markIdentityChange(Jid deviceJid) {
-        unconfirmedIdentityChanges.add(deviceJid);
-    }
-
-    public void confirmIdentityChange(Jid deviceJid) {
-        unconfirmedIdentityChanges.remove(deviceJid);
-    }
-
-    public Set<Jid> unconfirmedIdentityChanges() {
-        return Collections.unmodifiableSet(unconfirmedIdentityChanges);
-    }
-
-    public void clearUnconfirmedIdentityChanges() {
-        unconfirmedIdentityChanges.clear();
-    }
-
-    public void addToCoexHostedVerificationCache(Jid userJid) {
-        if (userJid != null) {
-            coexHostedVerificationCache.add(userJid.toUserJid());
-        }
-    }
-
-    public boolean isInCoexHostedVerificationCache(Jid userJid) {
-        if (userJid == null) {
-            return false;
-        }
-        return coexHostedVerificationCache.contains(userJid.toUserJid());
-    }
-
-    public void assertCoexHostedVerification(Jid userJid) {
-        if (!isInCoexHostedVerificationCache(userJid)) {
-            throw new IllegalStateException(
-                    "User " + userJid + " not found in coex verification cache"
-            );
-        }
-    }
-
-    public void clearCoexHostedVerificationCache() {
-        coexHostedVerificationCache.clear();
-    }
-
-    public boolean hasJid(JidProvider entry) {
-        if(entry == null) {
-            return false;
-        } else {
-            var localJid = jid;
-            var localLid = lid;
-            var remoteJid = entry.toJid();
-            return remoteJid.equals(localJid) || remoteJid.equals(localLid);
-        }
-    }
-
-    public boolean hasUserJid(JidProvider entry) {
-        if(entry == null) {
-            return false;
-        } else {
-            var localJid = jid;
-            var localLid = lid;
-            var remoteJid = entry.toJid();
-            return (localJid != null && remoteJid.hasUser(localJid.user()))
-                   || (localLid != null && remoteJid.hasUser(localLid.user()));
-        }
-    }
-
-    public Optional<Jid> getPhoneNumberByLid(Jid lidJid) {
-        if (lidJid == null || !lidJid.hasLidServer()) {
-            return Optional.empty();
-        }
-        // Try to find phone number from contact with matching LID
-        return contacts.values().stream()
-                .filter(contact -> contact.lid().map(lid -> lid.equals(lidJid)).orElse(false))
-                .findFirst()
-                .map(Contact::jid);
-    }
-
-    public Optional<Jid> getLidByPhoneNumber(Jid phoneNumberJid) {
-        if (phoneNumberJid == null) {
-            return Optional.empty();
-        }
-        // Check if already a LID
-        if (phoneNumberJid.hasLidServer()) {
-            return Optional.of(phoneNumberJid);
-        }
-        // Try to find LID from contact
-        var contact = findContactByJid(phoneNumberJid).orElse(null);
-        if (contact != null) {
-            var contactLid = contact.lid();
-            if (contactLid.isPresent()) {
-                return contactLid;
-            }
-        }
-        // Try to find LID from chat
-        var chat = findChatByJid(phoneNumberJid).orElse(null);
-        if (chat != null) {
-            return chat.accountLid();
-        }
-        return Optional.empty();
     }
 }

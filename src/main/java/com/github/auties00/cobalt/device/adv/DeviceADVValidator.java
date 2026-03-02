@@ -2,14 +2,13 @@ package com.github.auties00.cobalt.device.adv;
 
 import com.github.auties00.cobalt.device.DeviceConstants;
 import com.github.auties00.cobalt.exception.WhatsAppAdvValidationException;
-import com.github.auties00.cobalt.model.device.pairing.*;
 import com.github.auties00.cobalt.model.device.identity.*;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.store.WhatsAppStore;
-import com.github.auties00.cobalt.util.SecureBytes;
+import com.github.auties00.cobalt.util.FastRandomUtils;
 import com.github.auties00.curve25519.Curve25519;
 import com.github.auties00.libsignal.SignalProtocolAddress;
 import com.github.auties00.libsignal.key.SignalIdentityKey;
@@ -146,7 +145,7 @@ public final class DeviceADVValidator {
             var isSMB = store.device().platform().isBusiness();
             if (isSMB && outerEncryptionType == ADVEncryptionType.HOSTED) {
                 // WAWebHandlePairSuccess: Binary.build(ADV_HOSTED_PREFIX_DEVICE_IDENTITY_ACCOUNT_SIGNATURE, details)
-                hmacInput = SecureBytes.concat(HOSTED_ACCOUNT_SIGNATURE_HEADER, details);
+                hmacInput = FastRandomUtils.concatByteArrays(HOSTED_ACCOUNT_SIGNATURE_HEADER, details);
             } else {
                 // E2EE, null, or non-SMB defaults to using details directly
                 hmacInput = details;
@@ -184,7 +183,7 @@ public final class DeviceADVValidator {
 
             // WAWebAdvSignatureApi: verifies account signature: sign(header + details + identityKey)
             var localIdentityKey = localIdentityKeyPair.publicKey().toEncodedPoint();
-            var message = SecureBytes.concat(accountSignatureHeader, deviceIdentity.details(), localIdentityKey);
+            var message = FastRandomUtils.concatByteArrays(accountSignatureHeader, deviceIdentity.details(), localIdentityKey);
             if (!Curve25519.verifySignature(deviceIdentity.accountSignatureKey(), message, deviceIdentity.accountSignature())) {
                 throw new WhatsAppAdvValidationException.AccountSignatureFailed(localJid);
             }
@@ -192,7 +191,7 @@ public final class DeviceADVValidator {
             // WAWebAdvSignatureApi (function O): creates device signature: sign(header + details + identityKey + accountSignatureKey)
             // IMPORTANT: WA Web ALWAYS uses E2EE header [6, 1] for device signature GENERATION
             // The HOSTED header [6, 6] is only used for VERIFICATION of remote devices
-            var deviceSignatureMessage = SecureBytes.concat(
+            var deviceSignatureMessage = FastRandomUtils.concatByteArrays(
                     E2EE_DEVICE_SIGNATURE_HEADER,
                     deviceIdentity.details(),
                     localIdentityKey,
@@ -306,14 +305,14 @@ public final class DeviceADVValidator {
 
         // WAWebAdvSignatureApi (function A): verify account signature: sign(header + details + identityKey)
         var remoteIdentityAccountSignature = Objects.requireNonNull(remoteIdentity.accountSignature(), "accountSignature cannot be null");
-        var accountMessage = SecureBytes.concat(accountSignatureHeader, remoteIdentityDetails, remoteIdentityKey);
+        var accountMessage = FastRandomUtils.concatByteArrays(accountSignatureHeader, remoteIdentityDetails, remoteIdentityKey);
         if (!Curve25519.verifySignature(remoteIdentityAccountSignatureKey, accountMessage, remoteIdentityAccountSignature)) {
             throw new WhatsAppAdvValidationException.AccountSignatureFailed(remoteJid);
         }
 
         // WAWebAdvSignatureApi (function B): verify device signature: sign(header + details + identityKey + accountSignatureKey)
         var remoteIdentityDeviceSignature = Objects.requireNonNull(remoteIdentity.deviceSignature(), "deviceSignature cannot be null");
-        var deviceMessage = SecureBytes.concat(deviceSignatureHeader, remoteIdentityDetails, remoteIdentityKey, remoteIdentityAccountSignatureKey);
+        var deviceMessage = FastRandomUtils.concatByteArrays(deviceSignatureHeader, remoteIdentityDetails, remoteIdentityKey, remoteIdentityAccountSignatureKey);
         if (!Curve25519.verifySignature(remoteIdentityKey, deviceMessage, remoteIdentityDeviceSignature)) {
             throw new WhatsAppAdvValidationException.DeviceSignatureFailed(remoteJid);
         }
@@ -355,7 +354,7 @@ public final class DeviceADVValidator {
             }
 
             // WAWebAdvSignatureApi (function G): verify signature with [6, 2] header
-            var message = SecureBytes.concat(KEY_INDEX_LIST_SIGNATURE_HEADER, signedKeyIndexList.details());
+            var message = FastRandomUtils.concatByteArrays(KEY_INDEX_LIST_SIGNATURE_HEADER, signedKeyIndexList.details());
             if (!Curve25519.verifySignature(accountSignatureKey, message, accountSignature)) {
                 return Optional.empty();
             }

@@ -6,17 +6,20 @@ import com.github.auties00.cobalt.model.sync.SyncActionArgs;
 /**
  * Index arguments for {@link MarketingMessageBroadcastAction}.
  *
- * @param first  the first string value
- * @param second the second string value
+ * <p>The sync index produced is
+ * {@code ["marketingMessageBroadcast", marketingMessageId, broadcastMessageId]}.
+ *
+ * @param marketingMessageId the unique identifier of the marketing (premium) message template
+ * @param broadcastMessageId the identifier of the individual broadcast message sent from the template
  */
-public record MarketingMessageBroadcastActionArgs(String first, String second) implements SyncActionArgs {
+public record MarketingMessageBroadcastActionArgs(String marketingMessageId, String broadcastMessageId) implements SyncActionArgs {
     /**
      * {@inheritDoc}
      *
-     * @return a two-element array containing both string values
+     * @return a two-element array containing the marketing message and broadcast message identifiers
      */
     @Override
     public String[] toIndexArgs() {
-        return new String[]{first, second};
+        return new String[]{marketingMessageId, broadcastMessageId};
     }
 }

@@ -7,16 +7,18 @@ import com.github.auties00.cobalt.model.sync.SyncActionArgs;
 /**
  * Index arguments for {@link MuteAction}.
  *
- * @param jid the JID to include in the index
+ * <p>The sync index produced is {@code ["mute", chatJid]}.
+ *
+ * @param chatJid the JID of the chat being muted or unmuted
  */
-public record MuteActionArgs(Jid jid) implements SyncActionArgs {
+public record MuteActionArgs(Jid chatJid) implements SyncActionArgs {
     /**
      * {@inheritDoc}
      *
-     * @return a single-element array containing the JID string
+     * @return a single-element array containing the chat JID string
      */
     @Override
     public String[] toIndexArgs() {
-        return new String[]{jid.toString()};
+        return new String[]{chatJid.toString()};
     }
 }

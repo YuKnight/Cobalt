@@ -233,12 +233,12 @@ public final class DeviceADVChecker implements AutoCloseable {
                 .stream()
                 .filter(device -> !device.isPrimary())
                 .map(device -> device.toDeviceJid(userJid.user(), userJid.server()))
-                .forEach(client.store()::cleanupSignalSessionsForDevice);
+                .forEach(client.store()::cleanupSignalSessions);
 
         // WAWebAdvUpdateParticipantApi.updateGroupParticipantsInTransaction: when devices are removed,
         // mark sender keys for rotation in all groups containing this user. This ensures removed devices
         // can't decrypt future group messages.
-        client.store().markUserNeedsSenderKeyRotation(userJid);
+        client.store().markKeyRotation(userJid);
 
         // WAWebIdentityUpdateDeviceTableApi.clearDeviceRecord: mark device list as deleted
         // For business coex: set deletedChangedToHost if the account type is HOSTED

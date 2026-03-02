@@ -13,10 +13,11 @@ import com.github.auties00.cobalt.node.binary.NodeDecoder;
 import com.github.auties00.cobalt.node.binary.NodeEncoder;
 import com.github.auties00.cobalt.node.binary.NodeTokens;
 import com.github.auties00.cobalt.socket.implementation.SocketClient;
-import com.github.auties00.cobalt.socket.implementation.SocketListener;
+import com.github.auties00.cobalt.socket.implementation.SocketClientListener;
+import com.github.auties00.cobalt.socket.implementation.websocket.WebSocketClient;
 import com.github.auties00.cobalt.store.WhatsAppStore;
 import com.github.auties00.cobalt.util.GcmUtils;
-import com.github.auties00.cobalt.util.SecureBytes;
+import com.github.auties00.cobalt.util.FastRandomUtils;
 import com.github.auties00.curve25519.Curve25519;
 import com.github.auties00.libsignal.key.SignalIdentityKeyPair;
 import com.github.auties00.libsignal.key.SignalIdentityPublicKey;
@@ -52,9 +53,9 @@ public final class WhatsAppSocketClient {
 
     private static final byte[] WHATSAPP_VERSION_HEADER = "WA".getBytes(StandardCharsets.UTF_8);
     private static final byte[] WEB_VERSION = new byte[]{6, NodeTokens.DICTIONARY_VERSION};
-    private static final byte[] WEB_PROLOGUE = SecureBytes.concat(WHATSAPP_VERSION_HEADER, WEB_VERSION);
+    private static final byte[] WEB_PROLOGUE = FastRandomUtils.concatByteArrays(WHATSAPP_VERSION_HEADER, WEB_VERSION);
     private static final byte[] MOBILE_VERSION = new byte[]{5, NodeTokens.DICTIONARY_VERSION};
-    private static final byte[] MOBILE_PROLOGUE = SecureBytes.concat(WHATSAPP_VERSION_HEADER, MOBILE_VERSION);
+    private static final byte[] MOBILE_PROLOGUE = FastRandomUtils.concatByteArrays(WHATSAPP_VERSION_HEADER, MOBILE_VERSION);
     private static final int HEADER_LENGTH = Integer.BYTES + Short.BYTES;
     private static final String ALGORITHM = "AES/GCM/NoPadding";
     private static final VarHandle INT_HANDLE = MethodHandles.byteArrayViewVarHandle(int[].class, ByteOrder.BIG_ENDIAN);
@@ -63,7 +64,10 @@ public final class WhatsAppSocketClient {
 
     private static final int DEFAULT_CONNECT_TIMEOUT = 30_000;
 
-    private final SocketClient socketClient;
+    private final com.github.auties00.cobalt.socket.implementation.SocketClient socketClient;
+    private final String hostname;
+    private final int port;
+    private final String path;
     private final WhatsAppStore store;
     private final AtomicReference<State> state;
 
@@ -81,7 +85,7 @@ public final class WhatsAppSocketClient {
     private volatile WhatsAppSocketListener listener;
     private volatile CompletableFuture<?> handshakeFuture;
 
-    private WhatsAppSocketClient(SocketClient socketClient, WhatsAppStore store) {
+    private WhatsAppSocketClient(com.github.auties00.cobalt.socket.implementation.SocketClient socketClient, WhatsAppStore store) {
         this.socketClient = socketClient;
         this.store = store;
         this.state = new AtomicReference<>(State.DISCONNECTED);
@@ -90,8 +94,11 @@ public final class WhatsAppSocketClient {
     public static WhatsAppSocketClient newCipheredSocketClient(WhatsAppStore store) {
         Objects.requireNonNull(store, "store");
         var proxy = store.proxy().orElse(null);
-        var plainSocketClient = SocketClient.newPlainSocketClient(proxy);
-        return new WhatsAppSocketClient(plainSocketClient, store);
+        var socketClient = switch (store.clientType()) {
+            case WEB -> WebSocketClient.newWebSocketClient(proxy);
+            case MOBILE -> SocketClient.newSocketClient(proxy);
+        };
+        return new WhatsAppSocketClient(socketClient, store);
     }
 
     public void connect(WhatsAppSocketListener listener) throws IOException, InterruptedException {
@@ -102,7 +109,7 @@ public final class WhatsAppSocketClient {
         this.listener = listener;
 
         try {
-            socketClient.connect(HOST_NAME, PORT, new SocketListener() {
+            socketClient.connect(hostname, port, path, new SocketClientListener() {
                 @Override
                 public void onDatagram(ByteBuffer buffer) {
                     onMessage(buffer);
@@ -398,10 +405,10 @@ public final class WhatsAppSocketClient {
     private DevicePairingRegistrationData createRegisterData() {
         var companion = new ClientPayloadDevicePairingRegistrationDataBuilder()
                 .buildHash(store.clientVersion().toHash())
-                .eRegid(SecureBytes.intToBytes(store.registrationId(), 4))
-                .eKeytype(SecureBytes.intToBytes(SignalIdentityPublicKey.type(), 1))
+                .eRegid(FastRandomUtils.intToBytes(store.registrationId(), 4))
+                .eKeytype(FastRandomUtils.intToBytes(SignalIdentityPublicKey.type(), 1))
                 .eIdent(store.identityKeyPair().publicKey().toEncodedPoint())
-                .eSkeyId(SecureBytes.intToBytes(store.signedKeyPair().id(), 3))
+                .eSkeyId(FastRandomUtils.intToBytes(store.signedKeyPair().id(), 3))
                 .eSkeyVal(store.signedKeyPair().publicKey().toEncodedPoint())
                 .eSkeySig(store.signedKeyPair().signature());
         if (store.clientType() == WhatsAppClientType.WEB) {

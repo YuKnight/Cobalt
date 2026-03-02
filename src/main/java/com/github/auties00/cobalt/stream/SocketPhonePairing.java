@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.stream;
 
 import com.github.auties00.cobalt.client.WhatsAppClientVerificationHandler;
-import com.github.auties00.cobalt.util.SecureBytes;
+import com.github.auties00.cobalt.util.FastRandomUtils;
 import com.github.auties00.libsignal.key.SignalIdentityPublicKey;
 
 import javax.crypto.Cipher;
@@ -25,7 +25,7 @@ public final class SocketPhonePairing {
         try {
             this.cipher = Cipher.getInstance("AES/CTR/NoPadding");
             this.cipherKeyFactory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
-            this.pairingKey = SecureBytes.randomHex(8);
+            this.pairingKey = FastRandomUtils.randomHex(8);
         }catch (NoSuchAlgorithmException | NoSuchPaddingException exception) {
             throw new InternalError("Cannot initialize phone pairing code", exception);
         }
@@ -39,8 +39,8 @@ public final class SocketPhonePairing {
     public byte[] encrypt(SignalIdentityPublicKey companionPublicKey) {
         Objects.requireNonNull(companionPublicKey, "companionPublicKey cannot be null");
         try {
-            var salt = SecureBytes.random(32);
-            var randomIv = SecureBytes.random(16);
+            var salt = FastRandomUtils.randomByteArray(32);
+            var randomIv = FastRandomUtils.randomByteArray(16);
             cipher.init(
                     Cipher.ENCRYPT_MODE,
                     getSaltedSecretKey(salt),

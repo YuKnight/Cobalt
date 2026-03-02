@@ -18,10 +18,8 @@ import com.github.auties00.cobalt.exception.WhatsAppDeviceSyncException;
 import com.github.auties00.cobalt.exception.WhatsAppWebAppStateSyncException;
 import com.github.auties00.cobalt.device.key.DevicePreKeyHandler;
 import com.github.auties00.cobalt.model.device.identity.ADVEncryptionType;
-import com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentity;
 import com.github.auties00.cobalt.model.chat.group.GroupParticipant;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfoBuilder;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.MessageKey;
 import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
@@ -693,7 +691,7 @@ public final class DeviceService {
                                 // WAWebIdentityUpdateDeviceTableApi: mark devices and cleanup Signal sessions
                                 for (var changedDevice : changes.identityChangedDevices()) {
                                     store.markIdentityChange(changedDevice);
-                                    store.cleanupSignalSessionsForDevice(changedDevice);
+                                    store.cleanupSignalSessions(changedDevice);
                                 }
 
                                 // WAWebClientListener: notify listeners about identity changes
@@ -707,7 +705,7 @@ public final class DeviceService {
                             // WAWebIdentityUpdateDeviceTableApi.clearDeviceRecord: cleanup removed device sessions
                             if (!changes.removedDevices().isEmpty()) {
                                 for (var removedDevice : changes.removedDevices()) {
-                                    store.cleanupSignalSessionsForDevice(removedDevice);
+                                    store.cleanupSignalSessions(removedDevice);
                                 }
                                 // WAWebSyncdStoreMissingKeys.updateMissingKeyDevices: track own device removals
                                 if (trackedList.userJid().equals(myJid)) {
@@ -719,7 +717,7 @@ public final class DeviceService {
                             // Mark user as needing sender key rotation if devices were added or removed
                             // This ensures group sender keys are properly updated
                             if (!changes.addedDevices().isEmpty() || !changes.removedDevices().isEmpty()) {
-                                store.markUserNeedsSenderKeyRotation(trackedList.userJid());
+                                store.markKeyRotation(trackedList.userJid());
                             }
                         }
 
@@ -1034,7 +1032,7 @@ public final class DeviceService {
     private void cleanupAllSessionsForUser(Jid userJid, DeviceList oldList) {
         for (var device : oldList.devices()) {
             var deviceJid = device.toDeviceJid(userJid.user(), userJid.server());
-            store.cleanupSignalSessionsForDevice(deviceJid);
+            store.cleanupSignalSessions(deviceJid);
         }
     }
 
@@ -1730,7 +1728,7 @@ public final class DeviceService {
             // WAWebIdentityUpdateDeviceTableApi.clearDeviceRecord: clear all Signal sessions
             for (var device : oldCachedList.devices()) {
                 var deviceJid = device.toDeviceJid(userJid.user(), userJid.server());
-                store.cleanupSignalSessionsForDevice(deviceJid);
+                store.cleanupSignalSessions(deviceJid);
             }
         }
 
@@ -1824,7 +1822,7 @@ public final class DeviceService {
             // WAWebIdentityUpdateDeviceTableApi: mark devices and cleanup stale Signal sessions
             for (var changedDevice : changes.identityChangedDevices()) {
                 store.markIdentityChange(changedDevice);
-                store.cleanupSignalSessionsForDevice(changedDevice);
+                store.cleanupSignalSessions(changedDevice);
             }
 
             // WAWebClientListener: notify listeners about identity changes
@@ -1838,7 +1836,7 @@ public final class DeviceService {
         // WAWebIdentityUpdateDeviceTableApi.clearDeviceRecord: cleanup sessions for removed devices
         if (!changes.removedDevices().isEmpty()) {
             for (var removedDevice : changes.removedDevices()) {
-                store.cleanupSignalSessionsForDevice(removedDevice);
+                store.cleanupSignalSessions(removedDevice);
             }
         }
 
@@ -1949,7 +1947,7 @@ public final class DeviceService {
                 .toList();
         for (var removedDevice : removedDevices) {
             var deviceJid = removedDevice.toDeviceJid(userJid.user(), userJid.server());
-            store.cleanupSignalSessionsForDevice(deviceJid);
+            store.cleanupSignalSessions(deviceJid);
         }
 
         // WAWebHandleAdvDeviceNotificationApi: create updated list preserving original timestamp

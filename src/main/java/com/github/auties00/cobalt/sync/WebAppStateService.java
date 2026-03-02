@@ -19,7 +19,7 @@ import com.github.auties00.cobalt.sync.exchange.MutationResponseParser;
 import com.github.auties00.cobalt.sync.exchange.MutationSyncResponse;
 import com.github.auties00.cobalt.sync.key.MissingSyncKeyRequestService;
 import com.github.auties00.cobalt.sync.key.MissingSyncKeyTimeoutScheduler;
-import com.github.auties00.cobalt.util.SecureBytes;
+import com.github.auties00.cobalt.util.FastRandomUtils;
 import it.auties.protobuf.stream.ProtobufInputStream;
 
 import java.io.InputStream;
@@ -382,7 +382,7 @@ public final class WebAppStateService {
         for (var mutation : mutations) {
             var indexMac = mutation.indexMac();
             var valueMac = mutation.valueMac();
-            var mutationHash = SecureBytes.concat(indexMac, valueMac);
+            var mutationHash = FastRandomUtils.concatByteArrays(indexMac, valueMac);
             if (mutation.operation() == SyncdOperation.SET) {
                 toAdd.add(mutationHash);
             } else {

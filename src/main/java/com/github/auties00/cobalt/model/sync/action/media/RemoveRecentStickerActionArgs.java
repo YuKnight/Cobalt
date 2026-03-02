@@ -6,16 +6,19 @@ import com.github.auties00.cobalt.model.sync.SyncActionArgs;
 /**
  * Index arguments for {@link RemoveRecentStickerAction}.
  *
- * @param value the string value to include in the index
+ * <p>The sync index produced is {@code ["removeRecentSticker", stickerFileHash]}.
+ * The file hash uniquely identifies the sticker in the recent-stickers collection.
+ *
+ * @param stickerFileHash the file hash of the sticker to remove from the recent list
  */
-public record RemoveRecentStickerActionArgs(String value) implements SyncActionArgs {
+public record RemoveRecentStickerActionArgs(String stickerFileHash) implements SyncActionArgs {
     /**
      * {@inheritDoc}
      *
-     * @return a single-element array containing the value
+     * @return a single-element array containing the sticker file hash
      */
     @Override
     public String[] toIndexArgs() {
-        return new String[]{value};
+        return new String[]{stickerFileHash};
     }
 }

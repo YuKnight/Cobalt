@@ -6,7 +6,7 @@ import com.github.auties00.cobalt.message.receive.crypto.MessageDecryption;
 import com.github.auties00.cobalt.message.receive.crypto.SenderKeyNameFactory;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.store.WhatsAppStore;
-import com.github.auties00.cobalt.util.SecureBytes;
+import com.github.auties00.cobalt.util.FastRandomUtils;
 import com.github.auties00.libsignal.SignalSessionCipher;
 import com.github.auties00.libsignal.groups.SignalGroupCipher;
 import com.github.auties00.libsignal.protocol.SignalSenderKeyDistributionMessage;
@@ -187,7 +187,7 @@ public final class MessageEncryption {
         Objects.requireNonNull(plaintext, "plaintext cannot be null");
 
         // Generate random padding length between 1 and 16
-        var paddingLength = MIN_PADDING + (SecureBytes.random(1)[0] & 0x0F);
+        var paddingLength = MIN_PADDING + (FastRandomUtils.randomByteArray(1)[0] & 0x0F);
 
         var padded = new byte[plaintext.length + paddingLength];
         System.arraycopy(plaintext, 0, padded, 0, plaintext.length);
@@ -252,7 +252,7 @@ public final class MessageEncryption {
 
         // WAWebSignal.Session.deleteGroupSenderKeyInfo(groupJid, senderJid)
         var senderKeyName = SenderKeyNameFactory.create(groupJid, senderJid);
-        store.removeSenderKeysForDevice(senderKeyName);
+        store.removeSenderKeys(senderKeyName);
 
         LOGGER.log(System.Logger.Level.DEBUG,
                 "Rotated sender key for group {0}, sender {1}",

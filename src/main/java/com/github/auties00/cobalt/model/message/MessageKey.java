@@ -9,7 +9,7 @@ import java.util.Optional;
 @ProtobufMessage(name = "MessageKey")
 public final class MessageKey {
     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
-    Jid chatJid;
+    Jid parentJid;
 
     @ProtobufProperty(index = 2, type = ProtobufType.BOOL)
     Boolean fromMe;
@@ -21,15 +21,15 @@ public final class MessageKey {
     Jid senderJid;
 
 
-    MessageKey(Jid chatJid, Boolean fromMe, String id, Jid senderJid) {
-        this.chatJid = chatJid;
+    MessageKey(Jid parentJid, Boolean fromMe, String id, Jid senderJid) {
+        this.parentJid = parentJid;
         this.fromMe = fromMe;
         this.id = id;
         this.senderJid = senderJid;
     }
 
-    public Optional<Jid> chatJid() {
-        return Optional.ofNullable(chatJid);
+    public Optional<Jid> parentJid() {
+        return Optional.ofNullable(parentJid);
     }
 
     public boolean fromMe() {
@@ -44,12 +44,12 @@ public final class MessageKey {
         if(senderJid != null) {
             return Optional.of(senderJid);
         } else {
-            return Optional.ofNullable(chatJid);
+            return Optional.ofNullable(parentJid);
         }
     }
 
-    public MessageKey setChatJid(Jid chatJid) {
-        this.chatJid = chatJid;
+    public MessageKey setParentJid(Jid chatJid) {
+        this.parentJid = chatJid;
         return this;
     }
 

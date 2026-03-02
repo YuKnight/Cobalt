@@ -1,10 +1,10 @@
 package com.github.auties00.cobalt.socket.implementation.tunnel;
 
 import com.github.auties00.cobalt.client.WhatsAppClientProxy;
-import com.github.auties00.cobalt.socket.implementation.SocketClient;
-import com.github.auties00.cobalt.socket.implementation.SocketListener;
-import com.github.auties00.cobalt.socket.implementation.context.SocketContext;
-import com.github.auties00.cobalt.socket.implementation.threading.CentralSelector;
+import com.github.auties00.cobalt.socket.implementation.threading.SocketContext;
+import com.github.auties00.cobalt.socket.implementation.threading.SocketSelector;
+import com.github.auties00.cobalt.socket.implementation.SocketClientListener;
+import com.github.auties00.cobalt.socket.implementation.transport.SocketClientTransport;
 
 import javax.net.ssl.SSLContext;
 import java.io.IOException;
@@ -25,7 +25,7 @@ import java.util.Map;
  * {@code HTTP CONNECT} request. Once the tunnel is established, the underlying
  * connection is transparent to higher-level protocols.
  */
-public final class HttpProxySocketClient extends SocketClient {
+final class HttpSocketClientTunnel extends SocketClientTunnel {
     /** Scheme identifier for plain HTTP, used for TLS endpoint identification. */
     private static final String HTTP_SCHEME = "http";
 
@@ -90,12 +90,8 @@ public final class HttpProxySocketClient extends SocketClient {
      */
     private ByteBuffer responseBuf;
 
-    /**
-     * Creates an HTTP proxy socket client.
-     *
-     * @param proxy the HTTP or HTTPS proxy configuration
-     */
-    public HttpProxySocketClient(WhatsAppClientProxy.Http proxy) {
+    HttpSocketClientTunnel(SocketClientTransport transport, WhatsAppClientProxy.Http proxy) {
+        super(transport);
         this.proxy = proxy;
     }
 
@@ -106,21 +102,20 @@ public final class HttpProxySocketClient extends SocketClient {
      * On each attempt, opens a TCP connection to the proxy, optionally wraps it in TLS
      * (for HTTPS proxies), and performs the CONNECT handshake.
      *
-     * @param host     the target hostname for the CONNECT tunnel
-     * @param port     the target port for the CONNECT tunnel
+     * @param endpoint the target for the CONNECT tunnel
      * @param listener the callback for data received through the tunnel
      * @throws IOException          if the connection or handshake fails
      * @throws InterruptedException if the thread is interrupted during connection
      */
     @Override
-    public void connect(String host, int port, SocketListener listener) throws IOException, InterruptedException {
-        this.host = host;
-        this.port = port;
+    public void connect(InetSocketAddress endpoint, SocketClientListener listener) throws IOException, InterruptedException {
+        this.host = endpoint.getHostString();
+        this.port = endpoint.getPort();
 
         var currentProxy = proxy;
         for (var redirects = 0; redirects <= MAX_REDIRECTS; redirects++) {
             var deadline = System.currentTimeMillis() + OVERALL_HANDSHAKE_TIMEOUT;
-            var ctx = super.openConnection(new InetSocketAddress(currentProxy.host(), currentProxy.port()), listener);
+            var ctx = transport.connect(new InetSocketAddress(currentProxy.host(), currentProxy.port()), listener);
 
             if (currentProxy instanceof WhatsAppClientProxy.Http.Secure) {
                 initProxyTls(ctx, currentProxy.host(), currentProxy.port());
@@ -128,10 +123,10 @@ public final class HttpProxySocketClient extends SocketClient {
 
             var redirect = authenticate(currentProxy, deadline);
             if (redirect == null) {
-                return;
+                return ctx;
             }
 
-            CentralSelector.INSTANCE.unregister(channel);
+            SocketSelector.INSTANCE.unregister(transport);
             currentProxy = redirect;
         }
         throw new IOException("HTTP proxy CONNECT exceeded maximum redirects (" + MAX_REDIRECTS + ")");
@@ -157,7 +152,7 @@ public final class HttpProxySocketClient extends SocketClient {
             params.setEndpointIdentificationAlgorithm(HTTP_SCHEME.toUpperCase());
             engine.setSSLParameters(params);
             ctx.initSsl(engine);
-            CentralSelector.INSTANCE.startTlsHandshake(channel, TLS_HANDSHAKE_TIMEOUT);
+            SocketSelector.INSTANCE.startTlsHandshake(transport, TLS_HANDSHAKE_TIMEOUT);
         } catch (NoSuchAlgorithmException e) {
             throw new IOException("Failed to create SSLContext", e);
         }
@@ -214,17 +209,17 @@ public final class HttpProxySocketClient extends SocketClient {
         skipHeaders(deadline);
 
         if (responseBuf != null && responseBuf.hasRemaining()) {
-            if (!CentralSelector.INSTANCE.preSeedDatagram(channel, responseBuf)) {
+            if (!SocketSelector.INSTANCE.preSeedDatagram(transport, responseBuf)) {
                 throw new IOException("Failed to pre-seed leftover bytes from proxy response");
             }
         }
         responseBuf = null;
 
-        if (!CentralSelector.INSTANCE.markReady(channel)) {
+        if (!SocketSelector.INSTANCE.markReady(transport)) {
             throw new IOException("Failed to authenticate with proxy: rejected");
         }
 
-        if (isHttps && !CentralSelector.INSTANCE.drainSslAppBuffer(channel)) {
+        if (isHttps && !SocketSelector.INSTANCE.drainSslAppBuffer(transport)) {
             throw new IOException("Failed to drain leftover SSL data after proxy authentication");
         }
 

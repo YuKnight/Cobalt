@@ -154,7 +154,7 @@ public final class MessageSendingService {
     public AckResult send(MessageInfo messageInfo) {
         Objects.requireNonNull(messageInfo, "messageInfo");
 
-        var parentId = messageInfo.key().chatJid();
+        var parentId = messageInfo.key().parentJid();
 
         // WAWebMessageDedupUtils: check if this message ID is already in flight
         var messageId = messageInfo.key().id();

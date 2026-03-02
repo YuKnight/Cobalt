@@ -7,16 +7,18 @@ import com.github.auties00.cobalt.model.sync.SyncActionArgs;
 /**
  * Index arguments for {@link ContactAction}.
  *
- * @param jid the JID to include in the index
+ * <p>The sync index produced is {@code ["contact", contactJid]}.
+ *
+ * @param contactJid the JID of the contact being synced
  */
-public record ContactActionArgs(Jid jid) implements SyncActionArgs {
+public record ContactActionArgs(Jid contactJid) implements SyncActionArgs {
     /**
      * {@inheritDoc}
      *
-     * @return a single-element array containing the JID string
+     * @return a single-element array containing the contact JID string
      */
     @Override
     public String[] toIndexArgs() {
-        return new String[]{jid.toString()};
+        return new String[]{contactJid.toString()};
     }
 }

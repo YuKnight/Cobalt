@@ -27,38 +27,6 @@ import java.util.logging.Logger;
  * buffers are allocated for each channel with pending events, each
  * capped at {@link #MAX_BUFFER_SIZE} bytes.
  *
- * <p>Each buffer is sent as an XMPP {@code <iq>} stanza to
- * {@code s.whatsapp.net} with namespace {@code w:stats}. Failed
- * uploads are retried with exponential backoff up to
- * {@link #MAX_RETRIES} attempts. Private-channel buffers use a
- * separate upload path with blinded-token authentication.
- *
- * <p>Session globals (app version, platform, device name, stream id,
- * device classification, official-client version, memory class, CPU
- * count, and more) are snapshotted once at {@link #initialize()} time
- * so that flush never races with store mutations. Only globals whose
- * value has changed since the last buffer are re-serialized (delta
- * encoding).
- *
- * <p>Sampling weights can be overridden at runtime via
- * {@link #setSamplingOverride(int, int)}. Beaconing (daily-sampled
- * event sequence numbers) and PS ID rotation for the private channel
- * are handled automatically.
- *
- * <p>No reflection is used at runtime: event metadata (id, channel,
- * weight) is accessed through the {@link WamEventSpec} interface
- * methods, which are implemented as literal returns by the generated
- * {@code *Impl} classes.
- *
- * <p>This class is thread-safe: the pending event lists use atomic
- * swap via {@link ConcurrentHashMap#compute}, and the sequence number
- * uses an {@link AtomicInteger} with wrapping at {@code 0xFFFF}.
- *
- * @apiNote WAWebWam: manages the WAM telemetry framework including
- * commit, flush scheduling, buffer rotation, and upload. WAWam:
- * per-channel serialization with WamBuffer. WAWebWamLibContext:
- * delta globals tracking and per-event commit-time / beaconing writes.
- *
  * @see WamEventSpec
  * @see WamGlobalEncoder
  * @see WamChannel

@@ -1,33 +1,22 @@
-package com.github.auties00.cobalt.socket.implementation.websocket;
+package com.github.auties00.cobalt.socket.implementation.websocket.frame;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.concurrent.ThreadLocalRandom;
 
-/**
- * Encodes client websocket frames.
- */
 public final class WebSocketFrameEncoder {
-    public static final byte OPCODE_BINARY = 0x2;
-    public static final byte OPCODE_CLOSE = 0x8;
-    public static final byte OPCODE_PING = 0x9;
-    public static final byte OPCODE_PONG = 0xA;
-
-    private static final int SMALL_PAYLOAD_LIMIT = 125;
-    private static final int EXTENDED_16_PAYLOAD_MARKER = 126;
-    private static final int EXTENDED_64_PAYLOAD_MARKER = 127;
     private static final ByteBuffer EMPTY_PAYLOAD = ByteBuffer.allocate(0);
 
     private WebSocketFrameEncoder() {
 
     }
 
-    public static EncodedFrame encodeBinaryFrame(ByteBuffer payload) {
-        return encodeFrame(OPCODE_BINARY, payload);
+    public static WebSocketEncodedFrame encodeBinaryFrame(ByteBuffer payload) {
+        return encodeFrame(WebSocketFrameConstants.OPCODE_BINARY, payload);
     }
 
-    public static EncodedFrame encodeControlFrame(byte opcode, byte[] payload, int length) {
-        if (length < 0 || length > SMALL_PAYLOAD_LIMIT) {
+    public static WebSocketEncodedFrame encodeControlFrame(byte opcode, byte[] payload, int length) {
+        if (length < 0 || length > WebSocketFrameConstants.CONTROL_PAYLOAD_MAX_LENGTH) {
             throw new IllegalArgumentException("Invalid control payload length: " + length);
         }
 
@@ -37,31 +26,31 @@ public final class WebSocketFrameEncoder {
         return encodeFrame(opcode, content);
     }
 
-    public static EncodedFrame encodeFrame(byte opcode, ByteBuffer payload) {
+    public static WebSocketEncodedFrame encodeFrame(byte opcode, ByteBuffer payload) {
         var payloadView = payload.duplicate();
         var payloadLength = payloadView.remaining();
         var maskKey = ThreadLocalRandom.current().nextInt();
 
         var header = ByteBuffer.allocate(headerLength(payloadLength));
         header.put((byte) (0x80 | (opcode & 0x0F)));
-        if (payloadLength <= SMALL_PAYLOAD_LIMIT) {
+        if (payloadLength <= WebSocketFrameConstants.SMALL_PAYLOAD_LIMIT) {
             header.put((byte) (0x80 | payloadLength));
         } else if (payloadLength <= 0xFFFF) {
-            header.put((byte) (0x80 | EXTENDED_16_PAYLOAD_MARKER));
+            header.put((byte) (0x80 | WebSocketFrameConstants.EXTENDED_16_PAYLOAD_MARKER));
             header.putShort((short) payloadLength);
         } else {
-            header.put((byte) (0x80 | EXTENDED_64_PAYLOAD_MARKER));
+            header.put((byte) (0x80 | WebSocketFrameConstants.EXTENDED_64_PAYLOAD_MARKER));
             header.putLong(payloadLength);
         }
         header.putInt(maskKey);
         header.flip();
 
         if (payloadLength == 0) {
-            return new EncodedFrame(header, EMPTY_PAYLOAD);
+            return new WebSocketEncodedFrame(header, EMPTY_PAYLOAD);
         }
 
         var maskedPayload = maskPayload(payloadView, maskKey);
-        return new EncodedFrame(header, maskedPayload);
+        return new WebSocketEncodedFrame(header, maskedPayload);
     }
 
     private static ByteBuffer maskPayload(ByteBuffer payload, int maskKey) {
@@ -76,7 +65,7 @@ public final class WebSocketFrameEncoder {
         var masked = ByteBuffer.allocate(payloadLength);
         var source = payload.duplicate();
         for (var i = 0; i < payloadLength; i++) {
-            var value = (byte) (source.get() ^ maskByte(maskKey, i));
+            var value = (byte) (source.get() ^ WebSocketFrameConstants.maskByte(maskKey, i));
             masked.put(value);
         }
         masked.flip();
@@ -85,21 +74,12 @@ public final class WebSocketFrameEncoder {
 
     private static void applyMask(byte[] array, int offset, int length, int maskKey, int maskOffset) {
         for (var i = 0; i < length; i++) {
-            array[offset + i] ^= maskByte(maskKey, maskOffset + i);
+            array[offset + i] ^= WebSocketFrameConstants.maskByte(maskKey, maskOffset + i);
         }
     }
 
-    public static byte maskByte(int maskKey, int index) {
-        return switch (index & 3) {
-            case 0 -> (byte) (maskKey >>> 24);
-            case 1 -> (byte) (maskKey >>> 16);
-            case 2 -> (byte) (maskKey >>> 8);
-            default -> (byte) maskKey;
-        };
-    }
-
     private static int headerLength(int payloadLength) {
-        if (payloadLength <= SMALL_PAYLOAD_LIMIT) {
+        if (payloadLength <= WebSocketFrameConstants.SMALL_PAYLOAD_LIMIT) {
             return 2 + Integer.BYTES;
         }
 
@@ -108,9 +88,5 @@ public final class WebSocketFrameEncoder {
         }
 
         return 2 + Long.BYTES + Integer.BYTES;
-    }
-
-    public record EncodedFrame(ByteBuffer header, ByteBuffer payload) {
-
     }
 }

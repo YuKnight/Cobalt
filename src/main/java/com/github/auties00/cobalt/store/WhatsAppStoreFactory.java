@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.store;
 
 import com.github.auties00.cobalt.client.WhatsAppClientSixPartsKeys;
 import com.github.auties00.cobalt.client.WhatsAppClientType;
+import com.github.auties00.cobalt.store.inMemory.InMemoryStoreFactory;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -9,35 +10,35 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface WhatsAppStoreFactory {
-    static WhatsAppStoreFactory discarding() {
-        throw new UnsupportedOperationException("Not supported yet.");
+    static WhatsAppStoreFactory inMemory() {
+        return new InMemoryStoreFactory();
     }
 
-    static WhatsAppStoreFactory toProtobuf() {
-        throw new UnsupportedOperationException("Not supported yet.");
+    static WhatsAppStoreFactory inMemory(Path directory) {
+        return new InMemoryStoreFactory(directory);
     }
 
-    static WhatsAppStoreFactory toProtobuf(Path path) {
-        throw new UnsupportedOperationException("Not supported yet.");
+    static WhatsAppStoreFactory persistent() {
+        // FIXME
+        throw new UnsupportedOperationException();
     }
 
-    static WhatsAppStoreFactory toDatabase(String connectionUrl) {
-        throw new UnsupportedOperationException("Not supported yet.");
+    static WhatsAppStoreFactory persistent(Path directory) {
+        // FIXME
+        throw new UnsupportedOperationException();
     }
 
-    static WhatsAppStoreFactory toMixed(String connectionUrl) {
-        throw new UnsupportedOperationException("Not supported yet.");
+    Optional<WhatsAppStore> load(WhatsAppClientType clientType, UUID uuid) throws IOException;
+
+    Optional<WhatsAppStore> load(WhatsAppClientType clientType, long phoneNumber) throws IOException;
+
+    default Optional<WhatsAppStore> load(WhatsAppClientType clientType, WhatsAppClientSixPartsKeys keys) throws IOException {
+        return load(clientType, keys.phoneNumber());
     }
 
-    static WhatsAppStoreFactory toMixed(String connectionUrl, Path path) {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    Optional<WhatsAppStore> load(WhatsAppClientType clientType, UUID uuid);
-    Optional<WhatsAppStore> load(WhatsAppClientType clientType, long phoneNumber);
-    Optional<WhatsAppStore> load(WhatsAppClientType clientType, WhatsAppClientSixPartsKeys keys);
-    Optional<WhatsAppStore> loadLatest(WhatsAppClientType clientType);
+    Optional<WhatsAppStore> loadLatest(WhatsAppClientType clientType) throws IOException;
 
     WhatsAppStore create(WhatsAppClientType clientType, UUID uuid) throws IOException;
+
     WhatsAppStore create(WhatsAppClientType clientType, long phoneNumber) throws IOException;
 }

@@ -3,7 +3,7 @@ package com.github.auties00.cobalt.util;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 
-public final class SecureBytes {
+public final class FastRandomUtils {
     private static final SecureRandom RANDOM;
     private static final byte[] EMPTY_BYTE_ARRAY = new byte[0];
     private static final char[] HEX_ALPHABET = new char[]{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
@@ -16,26 +16,26 @@ public final class SecureBytes {
         }
     }
 
-    private SecureBytes() {
+    private FastRandomUtils() {
         throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
     }
 
-    public static byte[] random(int from, int to) {
-        if(from < 0) {
-            throw new IllegalArgumentException("From cannot be negative: " + from);
+    public static byte[] randomByteArray(int minLength, int maxLength) {
+        if(minLength < 0) {
+            throw new IllegalArgumentException("From cannot be negative: " + minLength);
         }
 
-        if(from > to) {
-            throw new IllegalArgumentException("From cannot be greater than to: " + from + " > " + to);
+        if(minLength > maxLength) {
+            throw new IllegalArgumentException("From cannot be greater than to: " + minLength + " > " + maxLength);
         }
 
-        var size = RANDOM.nextInt(from, to);
+        var size = RANDOM.nextInt(minLength, maxLength);
         var bytes = new byte[size];
         RANDOM.nextBytes(bytes);
         return bytes;
     }
 
-    public static byte[] random(int length) {
+    public static byte[] randomByteArray(int length) {
         if(length < 0) {
             throw new IllegalArgumentException("Length cannot be negative: " + length);
         }
@@ -49,7 +49,7 @@ public final class SecureBytes {
         return bytes;
     }
 
-    public static void random(byte[] bytes, int offset, int length) {
+    public static void randomByteArray(byte[] bytes, int offset, int length) {
         if(length < 0) {
             throw new IllegalArgumentException("Length cannot be negative: " + length);
         }
@@ -59,7 +59,7 @@ public final class SecureBytes {
         System.arraycopy(payload, 0, bytes, offset, length);
     }
 
-    public static byte[] concat(byte[]... entries) {
+    public static byte[] concatByteArrays(byte[]... entries) {
         if(entries == null) {
             return EMPTY_BYTE_ARRAY;
         }
@@ -111,8 +111,19 @@ public final class SecureBytes {
         return result;
     }
 
-    public static int nextInt(int bound) {
+    public static int randomInt(int bound) {
         return RANDOM.nextInt(bound);
     }
 
+    public static int randomInt(int min, int max) {
+        return RANDOM.nextInt(min, max);
+    }
+
+    public static long randomLong(long bound) {
+        return RANDOM.nextLong(bound);
+    }
+
+    public static long randomLong(long min, long max) {
+        return RANDOM.nextLong(min, max);
+    }
 }

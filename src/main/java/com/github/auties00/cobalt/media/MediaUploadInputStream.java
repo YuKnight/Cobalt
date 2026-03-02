@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.media;
 
 import com.github.auties00.cobalt.exception.WhatsAppMediaException;
 import com.github.auties00.cobalt.model.media.MediaProvider;
-import com.github.auties00.cobalt.util.SecureBytes;
+import com.github.auties00.cobalt.util.FastRandomUtils;
 
 import javax.crypto.Cipher;
 import javax.crypto.Mac;
@@ -65,7 +65,7 @@ public abstract sealed class MediaUploadInputStream extends MediaInputStream {
             this.plaintextDigest = newHash();
             this.ciphertextDigest = newHash();
 
-            this.mediaKey = SecureBytes.random(32);
+            this.mediaKey = FastRandomUtils.randomByteArray(32);
             var expanded = deriveMediaKeyData(mediaKey, keyName);
             var iv = new IvParameterSpec(expanded, 0, IV_LENGTH);
             var cipherKey = new SecretKeySpec(expanded, IV_LENGTH, KEY_LENGTH, "AES");

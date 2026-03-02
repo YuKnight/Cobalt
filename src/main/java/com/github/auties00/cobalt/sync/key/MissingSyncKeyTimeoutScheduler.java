@@ -2,11 +2,13 @@ package com.github.auties00.cobalt.sync.key;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.exception.WhatsAppWebAppStateSyncException;
+import com.github.auties00.cobalt.model.device.sync.MissingDeviceSyncKey;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.store.WhatsAppStore;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -52,7 +54,15 @@ public final class MissingSyncKeyTimeoutScheduler {
         }
 
         var timeout = getTimeout();
-        var delay = store.calculateMissingSyncKeyTimeoutDelay(timeout);
+        var delay = store.missingSyncKeys()
+                .stream()
+                .map(MissingDeviceSyncKey::timestamp)
+                .min(Instant::compareTo)
+                .map(earliest -> {
+                    var elapsed = Duration.between(earliest, Instant.now());
+                    var remaining = timeout.minus(elapsed);
+                    return remaining.isNegative() ? Duration.ZERO : remaining;
+                });
 
         if (delay.isEmpty()) {
             // No missing keys, nothing to schedule
@@ -74,7 +84,11 @@ public final class MissingSyncKeyTimeoutScheduler {
      */
     private void checkForExpiredKeys() {
         var timeout = getTimeout();
-        var expiredMissingSyncKeys = store.findExpiredMissingSyncKeys(timeout);
+        var now = Instant.now();
+        var expiredMissingSyncKeys = store.missingSyncKeys()
+                .stream()
+                .filter(key -> Duration.between(key.timestamp(), now).compareTo(timeout) > 0)
+                .toList();
         if (expiredMissingSyncKeys.isEmpty()) {
             LOGGER.log(System.Logger.Level.DEBUG, "No expired missing sync keys");
             // Reschedule for any remaining keys

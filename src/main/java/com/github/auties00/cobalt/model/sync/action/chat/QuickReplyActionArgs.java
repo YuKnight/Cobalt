@@ -6,16 +6,18 @@ import com.github.auties00.cobalt.model.sync.SyncActionArgs;
 /**
  * Index arguments for {@link QuickReplyAction}.
  *
- * @param value the string value to include in the index
+ * <p>The sync index produced is {@code ["quick_reply", quickReplyId]}.
+ *
+ * @param quickReplyId the unique identifier of the quick reply template
  */
-public record QuickReplyActionArgs(String value) implements SyncActionArgs {
+public record QuickReplyActionArgs(String quickReplyId) implements SyncActionArgs {
     /**
      * {@inheritDoc}
      *
-     * @return a single-element array containing the value
+     * @return a single-element array containing the quick reply identifier
      */
     @Override
     public String[] toIndexArgs() {
-        return new String[]{value};
+        return new String[]{quickReplyId};
     }
 }

@@ -7,16 +7,18 @@ import com.github.auties00.cobalt.model.sync.SyncActionArgs;
 /**
  * Index arguments for {@link PnForLidChatAction}.
  *
- * @param jid the JID to include in the index
+ * <p>The sync index produced is {@code ["pnForLidChat", chatJid]}.
+ *
+ * @param chatJid the JID of the chat whose phone-number-for-LID mapping is being synced
  */
-public record PnForLidChatActionArgs(Jid jid) implements SyncActionArgs {
+public record PnForLidChatActionArgs(Jid chatJid) implements SyncActionArgs {
     /**
      * {@inheritDoc}
      *
-     * @return a single-element array containing the JID string
+     * @return a single-element array containing the chat JID string
      */
     @Override
     public String[] toIndexArgs() {
-        return new String[]{jid.toString()};
+        return new String[]{chatJid.toString()};
     }
 }

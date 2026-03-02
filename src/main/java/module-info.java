@@ -1,7 +1,4 @@
 module com.github.auties00.cobalt {
-    // Codegen
-    requires static com.palantir.javapoet;
-
     // Http client
     requires java.net.http;
 
@@ -13,7 +10,7 @@ module com.github.auties00.cobalt {
     requires com.google.zxing;
     requires com.google.zxing.javase;
     requires it.auties.qr;
-    requires static java.desktop;
+    requires static java.desktop; // Not necessary if the user doesn't want to open the QR on the Desktop
 
     // Serialization (Protobuf, JSON)
     requires it.auties.protobuf.base;
@@ -26,10 +23,14 @@ module com.github.auties00.cobalt {
     // Message store
     requires com.github.auties00.collections;
 
-    // Database storage (SQLite via jOOQ)
-    requires static org.jooq;
-    requires static java.sql;
-    requires static org.xerial.sqlitejdbc;
+    // Logging
+    requires java.logging;
+
+    // LMDB key-value store
+    requires static org.lmdbjava; // Not necessary if the user doesn't want a persistent store
+
+    // Codegen
+    requires static com.palantir.javapoet; // Only used during the codegen step for WAM
 
     // Mobile api
     requires net.dongliu.apkparser;

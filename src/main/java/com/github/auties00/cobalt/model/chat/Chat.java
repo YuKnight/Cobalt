@@ -7,7 +7,6 @@ import com.github.auties00.cobalt.model.media.MediaVisibility;
 import com.github.auties00.cobalt.model.message.PrivacySystemMessage;
 import com.github.auties00.cobalt.model.mixin.InstantMillisMixin;
 import com.github.auties00.cobalt.model.setting.WallpaperSettings;
-import com.github.auties00.collections.ConcurrentLinkedHashMap;
 import it.auties.protobuf.annotation.ProtobufEnum;
 import it.auties.protobuf.annotation.ProtobufEnumIndex;
 import it.auties.protobuf.annotation.ProtobufMessage;
@@ -18,173 +17,172 @@ import java.time.Instant;
 import java.util.*;
 
 @ProtobufMessage(name = "Conversation")
-public final class Chat implements JidProvider {
+public non-sealed abstract class Chat implements JidProvider {
     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
-    Jid jid;
+    protected Jid jid;
 
-    @ProtobufProperty(index = 2, type = ProtobufType.MESSAGE)
-    Messages messages;
+    // Messages are not deserialized by defualt because it's up to the implementation class to decide how to do so
+    // @ProtobufProperty(index = 2, type = ProtobufType.MESSAGE)
+    // protected ... messages;
 
     @ProtobufProperty(index = 3, type = ProtobufType.STRING)
-    Jid newJid;
+    protected Jid newJid;
 
     @ProtobufProperty(index = 4, type = ProtobufType.STRING)
-    Jid oldJid;
+    protected Jid oldJid;
 
     @ProtobufProperty(index = 5, type = ProtobufType.UINT64, mixins = InstantMillisMixin.class)
-    Instant lastMsgTimestamp;
+    protected Instant lastMsgTimestamp;
 
     @ProtobufProperty(index = 6, type = ProtobufType.UINT32)
-    Integer unreadCount;
+    protected Integer unreadCount;
 
     @ProtobufProperty(index = 7, type = ProtobufType.BOOL)
-    Boolean readOnly;
+    protected Boolean readOnly;
 
     @ProtobufProperty(index = 8, type = ProtobufType.BOOL)
-    Boolean endOfHistoryTransfer;
+    protected Boolean endOfHistoryTransfer;
 
     @ProtobufProperty(index = 9, type = ProtobufType.UINT32)
-    ChatEphemeralTimer ephemeralExpiration;
+    protected ChatEphemeralTimer ephemeralExpiration;
 
     @ProtobufProperty(index = 10, type = ProtobufType.INT64, mixins = InstantMillisMixin.class)
-    Instant ephemeralSettingTimestamp;
+    protected Instant ephemeralSettingTimestamp;
 
     @ProtobufProperty(index = 11, type = ProtobufType.ENUM)
-    EndOfHistoryTransferType endOfHistoryTransferType;
+    protected EndOfHistoryTransferType endOfHistoryTransferType;
 
     @ProtobufProperty(index = 12, type = ProtobufType.UINT64, mixins = InstantMillisMixin.class)
-    Instant conversationTimestamp;
+    protected Instant conversationTimestamp;
 
     @ProtobufProperty(index = 13, type = ProtobufType.STRING)
-    String name;
+    protected String name;
 
     @ProtobufProperty(index = 14, type = ProtobufType.STRING)
-    String pHash;
+    protected String pHash;
 
     @ProtobufProperty(index = 15, type = ProtobufType.BOOL)
-    Boolean notSpam;
+    protected Boolean notSpam;
 
     @ProtobufProperty(index = 16, type = ProtobufType.BOOL)
-    Boolean archived;
+    protected Boolean archived;
 
     @ProtobufProperty(index = 17, type = ProtobufType.MESSAGE)
-    ChatDisappearingMode disappearingMode;
+    protected ChatDisappearingMode disappearingMode;
 
     @ProtobufProperty(index = 18, type = ProtobufType.UINT32)
-    Integer unreadMentionCount;
+    protected Integer unreadMentionCount;
 
     @ProtobufProperty(index = 19, type = ProtobufType.BOOL)
-    Boolean markedAsUnread;
+    protected Boolean markedAsUnread;
 
     @ProtobufProperty(index = 20, type = ProtobufType.MESSAGE)
-    List<GroupParticipant> participant;
+    protected List<GroupParticipant> participant;
 
     @ProtobufProperty(index = 21, type = ProtobufType.BYTES)
-    byte[] tcToken;
+    protected byte[] tcToken;
 
     @ProtobufProperty(index = 22, type = ProtobufType.UINT64, mixins = InstantMillisMixin.class)
-    Instant tcTokenTimestamp;
+    protected Instant tcTokenTimestamp;
 
     @ProtobufProperty(index = 23, type = ProtobufType.BYTES)
-    byte[] contactPrimaryIdentityKey;
+    protected byte[] contactPrimaryIdentityKey;
 
     @ProtobufProperty(index = 24, type = ProtobufType.UINT32)
-    Integer pinned;
+    protected Integer pinned;
 
     @ProtobufProperty(index = 25, type = ProtobufType.UINT64)
-    ChatMute mute;
+    protected ChatMute mute;
 
     @ProtobufProperty(index = 26, type = ProtobufType.MESSAGE)
-    WallpaperSettings wallpaper;
+    protected WallpaperSettings wallpaper;
 
     @ProtobufProperty(index = 27, type = ProtobufType.ENUM)
-    MediaVisibility mediaVisibility;
+    protected MediaVisibility mediaVisibility;
 
     @ProtobufProperty(index = 28, type = ProtobufType.UINT64, mixins = InstantMillisMixin.class)
-    Instant tcTokenSenderTimestamp;
+    protected Instant tcTokenSenderTimestamp;
 
     @ProtobufProperty(index = 29, type = ProtobufType.BOOL)
-    Boolean suspended;
+    protected Boolean suspended;
 
     @ProtobufProperty(index = 30, type = ProtobufType.BOOL)
-    Boolean terminated;
+    protected Boolean terminated;
 
     @ProtobufProperty(index = 31, type = ProtobufType.UINT64)
-    Long createdAt;
+    protected Long createdAt;
 
     @ProtobufProperty(index = 32, type = ProtobufType.STRING)
-    String createdBy;
+    protected String createdBy;
 
     @ProtobufProperty(index = 33, type = ProtobufType.STRING)
-    String description;
+    protected String description;
 
     @ProtobufProperty(index = 34, type = ProtobufType.BOOL)
-    Boolean support;
+    protected Boolean support;
 
     @ProtobufProperty(index = 35, type = ProtobufType.BOOL)
-    Boolean isParentGroup;
+    protected Boolean isParentGroup;
 
     @ProtobufProperty(index = 37, type = ProtobufType.STRING)
-    String parentGroupId;
+    protected String parentGroupId;
 
     @ProtobufProperty(index = 36, type = ProtobufType.BOOL)
-    Boolean isDefaultSubgroup;
+    protected Boolean isDefaultSubgroup;
 
     @ProtobufProperty(index = 38, type = ProtobufType.STRING)
-    String displayName;
+    protected String displayName;
 
     @ProtobufProperty(index = 39, type = ProtobufType.STRING)
-    Jid phoneNumberJid;
+    protected Jid phoneNumberJid;
 
     @ProtobufProperty(index = 40, type = ProtobufType.BOOL)
-    Boolean shareOwnPhoneNumber;
+    protected Boolean shareOwnPhoneNumber;
 
     @ProtobufProperty(index = 41, type = ProtobufType.BOOL)
-    Boolean phoneNumberhDuplicateLidThread;
+    protected Boolean phoneNumberhDuplicateLidThread;
 
     @ProtobufProperty(index = 42, type = ProtobufType.STRING)
-    Jid lid;
+    protected Jid lid;
 
     @ProtobufProperty(index = 43, type = ProtobufType.STRING)
-    String username;
+    protected String username;
 
     @ProtobufProperty(index = 44, type = ProtobufType.STRING)
-    String lidOriginType;
+    protected String lidOriginType;
 
     @ProtobufProperty(index = 45, type = ProtobufType.UINT32)
-    Integer commentsCount;
+    protected Integer commentsCount;
 
     @ProtobufProperty(index = 46, type = ProtobufType.BOOL)
-    Boolean locked;
+    protected Boolean locked;
 
     @ProtobufProperty(index = 47, type = ProtobufType.ENUM)
-    PrivacySystemMessage systemMessageToInsert;
+    protected PrivacySystemMessage systemMessageToInsert;
 
     @ProtobufProperty(index = 48, type = ProtobufType.BOOL)
-    Boolean capiCreatedGroup;
+    protected Boolean capiCreatedGroup;
 
     @ProtobufProperty(index = 49, type = ProtobufType.STRING)
-    Jid accountLid;
+    protected Jid accountLid;
 
     @ProtobufProperty(index = 50, type = ProtobufType.BOOL)
-    Boolean limitSharing;
+    protected Boolean limitSharing;
 
     @ProtobufProperty(index = 51, type = ProtobufType.INT64, mixins = InstantMillisMixin.class)
-    Instant limitSharingSettingTimestamp;
+    protected Instant limitSharingSettingTimestamp;
 
     @ProtobufProperty(index = 52, type = ProtobufType.ENUM)
-    ChatLimitSharing.TriggerType limitSharingTrigger;
+    protected ChatLimitSharing.TriggerType limitSharingTrigger;
 
     @ProtobufProperty(index = 53, type = ProtobufType.BOOL)
-    Boolean limitSharingInitiatedByMe;
+    protected Boolean limitSharingInitiatedByMe;
 
     @ProtobufProperty(index = 54, type = ProtobufType.BOOL)
-    Boolean maibaAiThreadEnabled;
+    protected Boolean maibaAiThreadEnabled;
 
-
-    Chat(Jid jid, Messages messages, Jid newJid, Jid oldJid, Instant lastMsgTimestamp, Integer unreadCount, Boolean readOnly, Boolean endOfHistoryTransfer, ChatEphemeralTimer ephemeralExpiration, Instant ephemeralSettingTimestamp, EndOfHistoryTransferType endOfHistoryTransferType, Instant conversationTimestamp, String name, String pHash, Boolean notSpam, Boolean archived, ChatDisappearingMode disappearingMode, Integer unreadMentionCount, Boolean markedAsUnread, List<GroupParticipant> participant, byte[] tcToken, Instant tcTokenTimestamp, byte[] contactPrimaryIdentityKey, Integer pinned, ChatMute mute, WallpaperSettings wallpaper, MediaVisibility mediaVisibility, Instant tcTokenSenderTimestamp, Boolean suspended, Boolean terminated, Long createdAt, String createdBy, String description, Boolean support, Boolean isParentGroup, String parentGroupId, Boolean isDefaultSubgroup, String displayName, Jid phoneNumberJid, Boolean shareOwnPhoneNumber, Boolean phoneNumberhDuplicateLidThread, Jid lid, String username, String lidOriginType, Integer commentsCount, Boolean locked, PrivacySystemMessage systemMessageToInsert, Boolean capiCreatedGroup, Jid accountLid, Boolean limitSharing, Instant limitSharingSettingTimestamp, ChatLimitSharing.TriggerType limitSharingTrigger, Boolean limitSharingInitiatedByMe, Boolean maibaAiThreadEnabled) {
+    protected Chat(Jid jid, Jid newJid, Jid oldJid, Instant lastMsgTimestamp, Integer unreadCount, Boolean readOnly, Boolean endOfHistoryTransfer, ChatEphemeralTimer ephemeralExpiration, Instant ephemeralSettingTimestamp, EndOfHistoryTransferType endOfHistoryTransferType, Instant conversationTimestamp, String name, String pHash, Boolean notSpam, Boolean archived, ChatDisappearingMode disappearingMode, Integer unreadMentionCount, Boolean markedAsUnread, List<GroupParticipant> participant, byte[] tcToken, Instant tcTokenTimestamp, byte[] contactPrimaryIdentityKey, Integer pinned, ChatMute mute, WallpaperSettings wallpaper, MediaVisibility mediaVisibility, Instant tcTokenSenderTimestamp, Boolean suspended, Boolean terminated, Long createdAt, String createdBy, String description, Boolean support, Boolean isParentGroup, String parentGroupId, Boolean isDefaultSubgroup, String displayName, Jid phoneNumberJid, Boolean shareOwnPhoneNumber, Boolean phoneNumberhDuplicateLidThread, Jid lid, String username, String lidOriginType, Integer commentsCount, Boolean locked, PrivacySystemMessage systemMessageToInsert, Boolean capiCreatedGroup, Jid accountLid, Boolean limitSharing, Instant limitSharingSettingTimestamp, ChatLimitSharing.TriggerType limitSharingTrigger, Boolean limitSharingInitiatedByMe, Boolean maibaAiThreadEnabled) {
         this.jid = Objects.requireNonNull(jid);
-        this.messages = messages;
         this.newJid = newJid;
         this.oldJid = oldJid;
         this.lastMsgTimestamp = lastMsgTimestamp;
@@ -252,33 +250,17 @@ public final class Chat implements JidProvider {
      * Returns the messages in this chat as an unmodifiable sequenced collection
      * of {@link ChatMessageInfo}.
      *
-     * <p>The returned collection is a live, zero-copy view over the underlying
-     * {@code HistorySyncMsg} storage used for protobuf serialization. Changes
-     * to the chat's messages are reflected in previously returned views.
-     *
      * @return a non-null, unmodifiable sequenced collection of chat messages
      */
-    public SequencedCollection<ChatMessageInfo> messages() {
-        if (messages == null) {
-            return List.of();
-        }
-        return messages.messageInfoView();
-    }
+    public abstract SequencedCollection<ChatMessageInfo> messages();
 
     /**
-     * Adds a message to this chat, wrapping it in the history sync format
-     * used for protobuf serialization.
+     * Adds a message to this chat.
      *
      * @param info the message to add
      * @throws NullPointerException if {@code info} is {@code null}
      */
-    public void addMessage(ChatMessageInfo info) {
-        Objects.requireNonNull(info);
-        if (messages == null) {
-            messages = new Messages();
-        }
-        messages.addMessageInfo(info);
-    }
+    public abstract void addMessage(ChatMessageInfo info);
 
     /**
      * Removes the message with the specified key ID from this chat.
@@ -286,18 +268,12 @@ public final class Chat implements JidProvider {
      * @param id the message key ID to remove
      * @return {@code true} if a message was removed
      */
-    public boolean removeMessage(String id) {
-        return messages != null && messages.removeMessageInfoById(id);
-    }
+    public abstract boolean removeMessage(String id);
 
     /**
      * Removes all messages from this chat.
      */
-    public void removeMessages() {
-        if (messages != null) {
-            messages.clear();
-        }
-    }
+    public abstract void removeMessages();
 
     /**
      * Returns the message with the specified key ID, if present.
@@ -306,12 +282,7 @@ public final class Chat implements JidProvider {
      * @return an {@code Optional} containing the matching message, or empty
      *         if no message with the given ID exists in this chat
      */
-    public Optional<ChatMessageInfo> getMessageById(String id) {
-        if (messages == null) {
-            return Optional.empty();
-        }
-        return messages.getMessageInfoById(id);
-    }
+    public abstract Optional<ChatMessageInfo> getMessageById(String id);
 
     /**
      * Returns the newest (most recently added) message in this chat.
@@ -319,12 +290,7 @@ public final class Chat implements JidProvider {
      * @return an {@code Optional} containing the newest message, or empty
      *         if this chat has no messages
      */
-    public Optional<ChatMessageInfo> newestMessage() {
-        if (messages == null) {
-            return Optional.empty();
-        }
-        return messages.getNewestMessageInfo();
-    }
+    public abstract Optional<ChatMessageInfo> newestMessage();
 
     /**
      * Returns the oldest (earliest added) message in this chat.
@@ -332,12 +298,7 @@ public final class Chat implements JidProvider {
      * @return an {@code Optional} containing the oldest message, or empty
      *         if this chat has no messages
      */
-    public Optional<ChatMessageInfo> oldestMessage() {
-        if (messages == null) {
-            return Optional.empty();
-        }
-        return messages.getOldestMessageInfo();
-    }
+    public abstract Optional<ChatMessageInfo> oldestMessage();
 
     public Optional<Jid> newJid() {
         return Optional.ofNullable(newJid);
@@ -557,22 +518,16 @@ public final class Chat implements JidProvider {
      *
      * <p>After this operation the source chat's message collection is empty
      * and this chat owns every message that was previously in the source.
-     * The transfer is performed by swapping the underlying backing map,
-     * avoiding per-element copying.
      *
      * @param source the chat whose messages are transferred into this chat
      * @throws NullPointerException if {@code source} is {@code null}
      */
     public void transferMessages(Chat source) {
         Objects.requireNonNull(source);
-        if (source.messages == null || source.messages.isEmpty()) {
-            return;
+        for (var msg : source.messages()) {
+            addMessage(msg);
         }
-        if (this.messages == null) {
-            this.messages = new Messages();
-        }
-        this.messages.addAll(source.messages);
-        source.messages.clear();
+        source.removeMessages();
     }
 
     public Chat setNewJid(Jid newJid) {
@@ -836,7 +791,7 @@ public final class Chat implements JidProvider {
     }
 
     @ProtobufEnum(name = "Conversation.EndOfHistoryTransferType")
-    public static enum EndOfHistoryTransferType {
+    public enum EndOfHistoryTransferType {
         COMPLETE_BUT_MORE_MESSAGES_REMAIN_ON_PRIMARY(0),
         COMPLETE_AND_NO_MORE_MESSAGE_REMAIN_ON_PRIMARY(1),
         COMPLETE_ON_DEMAND_SYNC_BUT_MORE_MSG_REMAIN_ON_PRIMARY(2),
@@ -850,199 +805,6 @@ public final class Chat implements JidProvider {
 
         public int index() {
             return this.index;
-        }
-    }
-
-    static final class Messages extends AbstractCollection<HistorySyncMsg> {
-        private final ConcurrentLinkedHashMap<String, HistorySyncMsg> backing;
-
-        Messages() {
-            this.backing = new ConcurrentLinkedHashMap<>();
-        }
-
-        @Override
-        public boolean add(HistorySyncMsg msg) {
-            if (msg == null || msg.message == null) {
-                return false;
-            }
-            var id = messageId(msg.message);
-            if (id == null) {
-                return false;
-            }
-            backing.put(id, msg);
-            return true;
-        }
-
-        void addMessageInfo(ChatMessageInfo info) {
-            var id = messageId(info);
-            if (id != null) {
-                backing.put(id, new HistorySyncMsg(info, null));
-            }
-        }
-
-        Optional<ChatMessageInfo> getMessageInfoById(String id) {
-            if (id == null) {
-                return Optional.empty();
-            }
-            var msg = backing.get(id);
-            return msg != null ? Optional.ofNullable(msg.message) : Optional.empty();
-        }
-
-        boolean removeMessageInfoById(String id) {
-            return id != null && backing.remove(id) != null;
-        }
-
-        Optional<ChatMessageInfo> getNewestMessageInfo() {
-            var entry = backing.lastEntry();
-            return entry != null ? Optional.ofNullable(entry.getValue().message) : Optional.empty();
-        }
-
-        Optional<ChatMessageInfo> getOldestMessageInfo() {
-            var entry = backing.firstEntry();
-            return entry != null ? Optional.ofNullable(entry.getValue().message) : Optional.empty();
-        }
-
-        SequencedCollection<ChatMessageInfo> messageInfoView() {
-            return messageInfoView(backing.sequencedValues());
-        }
-
-        private SequencedCollection<ChatMessageInfo> messageInfoView(SequencedCollection<HistorySyncMsg> data) {
-            return new SequencedCollection<>() {
-                @Override
-                public SequencedCollection<ChatMessageInfo> reversed() {
-                    return messageInfoView(data.reversed());
-                }
-
-                @Override
-                public int size() {
-                    return data.size();
-                }
-
-                @Override
-                public boolean isEmpty() {
-                    return data.isEmpty();
-                }
-
-                @Override
-                public boolean contains(Object o) {
-                    return o instanceof ChatMessageInfo info
-                            && messageId(info) != null
-                            && backing.containsKey(messageId(info));
-                }
-
-                @Override
-                public Iterator<ChatMessageInfo> iterator() {
-                    var delegate = data.iterator();
-                    return new Iterator<>() {
-                        @Override
-                        public boolean hasNext() {
-                            return delegate.hasNext();
-                        }
-
-                        @Override
-                        public ChatMessageInfo next() {
-                            var result = delegate.next();
-                            return result != null ? result.message : null;
-                        }
-                    };
-                }
-
-                @Override
-                public Object[] toArray() {
-                    return data.toArray();
-                }
-
-                @Override
-                public <T> T[] toArray(T[] a) {
-                    return data.toArray(a);
-                }
-
-                @Override
-                public boolean add(ChatMessageInfo info) {
-                    throw new UnsupportedOperationException();
-                }
-
-                @Override
-                public boolean remove(Object o) {
-                    throw new UnsupportedOperationException();
-                }
-
-                @Override
-                public boolean containsAll(Collection<?> c) {
-                    for (var entry : c) {
-                        if (!contains(entry)) {
-                            return false;
-                        }
-                    }
-                    return true;
-                }
-
-                @Override
-                public boolean addAll(Collection<? extends ChatMessageInfo> c) {
-                    throw new UnsupportedOperationException();
-                }
-
-                @Override
-                public boolean removeAll(Collection<?> c) {
-                    throw new UnsupportedOperationException();
-                }
-
-                @Override
-                public boolean retainAll(Collection<?> c) {
-                    throw new UnsupportedOperationException();
-                }
-
-                @Override
-                public void clear() {
-                    throw new UnsupportedOperationException();
-                }
-            };
-        }
-
-        @Override
-        public Iterator<HistorySyncMsg> iterator() {
-            return backing.sequencedValues().iterator();
-        }
-
-        @Override
-        public int size() {
-            return backing.size();
-        }
-
-        private static String messageId(ChatMessageInfo info) {
-            return info.key().id().orElse(null);
-        }
-    }
-
-    @ProtobufMessage(name = "HistorySyncMsg")
-    static final class HistorySyncMsg {
-        @ProtobufProperty(index = 1, type = ProtobufType.MESSAGE)
-        ChatMessageInfo message;
-
-        @ProtobufProperty(index = 2, type = ProtobufType.UINT64)
-        Long msgOrderId;
-
-        HistorySyncMsg(ChatMessageInfo message, Long msgOrderId) {
-            this.message = message;
-            this.msgOrderId = msgOrderId;
-        }
-
-        public Optional<ChatMessageInfo> message() {
-            return Optional.ofNullable(message);
-        }
-
-        public OptionalLong msgOrderId() {
-            return msgOrderId == null ? OptionalLong.empty() : OptionalLong.of(msgOrderId);
-        }
-
-        public HistorySyncMsg setMessage(ChatMessageInfo message) {
-            this.message = message;
-            return this;
-        }
-
-        public HistorySyncMsg setMsgOrderId(Long msgOrderId) {
-            this.msgOrderId = msgOrderId;
-            return this;
         }
     }
 }

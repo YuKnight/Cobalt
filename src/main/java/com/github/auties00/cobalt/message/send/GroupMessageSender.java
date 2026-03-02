@@ -164,7 +164,7 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
 
                 // WAWebSendGroupSkmsgJob: rotate sender key if needed
                 // (triggered when participants are removed from the group)
-                var rotateKey = store.checkAndClearSenderKeyRotationNeeded(groupJid);
+                var rotateKey = store.clearKeyRotation(groupJid);
                 if (rotateKey) {
                     // WAWebSignal.Session.deleteGroupSenderKeyInfo
                     encryption.rotateSenderKey(groupJid, senderJid);

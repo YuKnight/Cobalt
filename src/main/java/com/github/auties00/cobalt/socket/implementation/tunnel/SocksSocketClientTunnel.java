@@ -2,9 +2,9 @@ package com.github.auties00.cobalt.socket.implementation.tunnel;
 
 import com.github.auties00.cobalt.client.WhatsAppClientProxy;
 import com.github.auties00.cobalt.client.WhatsAppClientProxyAuthenticator;
-import com.github.auties00.cobalt.socket.implementation.SocketClient;
-import com.github.auties00.cobalt.socket.implementation.SocketListener;
-import com.github.auties00.cobalt.socket.implementation.threading.CentralSelector;
+import com.github.auties00.cobalt.socket.implementation.threading.SocketSelector;
+import com.github.auties00.cobalt.socket.implementation.SocketClientListener;
+import com.github.auties00.cobalt.socket.implementation.transport.SocketClientTransport;
 
 import java.io.IOException;
 import java.net.Inet4Address;
@@ -13,6 +13,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.Objects;
 
 /**
  * SOCKS tunnel implementation for proxied socket connections.
@@ -21,7 +22,7 @@ import java.nio.charset.StandardCharsets;
  * SOCKS5 with local DNS resolution (RFC 1928), and SOCKS5h with remote DNS resolution.
  * SOCKS5 authentication is handled via RFC 1929 username/password sub-negotiation.
  */
-public final class SocksProxySocketClient extends SocketClient {
+final class SocksSocketClientTunnel extends SocketClientTunnel {
     /** SOCKS4 protocol version byte. */
     private static final byte SOCKS_VERSION_4 = 0x04;
     /** SOCKS5 protocol version byte (RFC 1928). */
@@ -107,7 +108,8 @@ public final class SocksProxySocketClient extends SocketClient {
      *
      * @param proxy the SOCKS proxy configuration
      */
-    public SocksProxySocketClient(WhatsAppClientProxy.Socks proxy) {
+    SocksSocketClientTunnel(SocketClientTransport transport, WhatsAppClientProxy.Socks proxy) {
+        super(transport);
         this.proxy = proxy;
     }
 
@@ -117,21 +119,24 @@ public final class SocksProxySocketClient extends SocketClient {
      * Opens a TCP connection to the proxy server and performs the appropriate
      * SOCKS handshake (4, 4a, or 5) based on the proxy configuration.
      *
-     * @param host     the target hostname for the tunnel
-     * @param port     the target port for the tunnel
+     * @param endpoint the address to connect to
      * @param listener the callback for data received through the tunnel
      * @throws IOException          if the connection or handshake fails
      * @throws InterruptedException if the thread is interrupted during connection
      */
+
     @Override
-    public void connect(String host, int port, SocketListener listener) throws IOException, InterruptedException {
-        this.host = host;
-        this.port = port;
+    public void connect(InetSocketAddress endpoint, SocketClientListener listener) throws IOException, InterruptedException {
+        Objects.requireNonNull(endpoint, "endpoint must not be null");
+        Objects.requireNonNull(listener, "listener must not be null");
+
+        this.host = endpoint.getHostString();
+        this.port = endpoint.getPort();
 
         var proxyHost = proxy.host();
         var proxyPort = proxy.port();
 
-        super.openConnection(new InetSocketAddress(proxyHost, proxyPort), listener);
+        var ctx = transport.connect(new InetSocketAddress(proxyHost, proxyPort), listener);
 
         switch (proxy) {
             case WhatsAppClientProxy.Socks.V4.Local v4 -> performSocks4Handshake(v4);
@@ -139,9 +144,11 @@ public final class SocksProxySocketClient extends SocketClient {
             case WhatsAppClientProxy.Socks.V5.Local v5 -> performSocks5Handshake(v5);
             case WhatsAppClientProxy.Socks.V5.Remote v5h -> performSocks5Handshake(v5h);
         }
-        if (!CentralSelector.INSTANCE.markReady(channel)) {
+        if (!SocketSelector.INSTANCE.markReady(transport)) {
             throw new IOException("Failed to authenticate with proxy: rejected");
         }
+
+        return ctx;
     }
 
     /**

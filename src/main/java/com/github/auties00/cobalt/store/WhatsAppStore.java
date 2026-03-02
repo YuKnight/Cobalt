@@ -11,15 +11,16 @@ import com.github.auties00.cobalt.model.chat.ChatEphemeralTimer;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.chat.ChatMetadata;
 import com.github.auties00.cobalt.model.contact.Contact;
-import com.github.auties00.cobalt.model.device.pairing.ClientAppVersion;
 import com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentity;
 import com.github.auties00.cobalt.model.device.info.DeviceList;
+import com.github.auties00.cobalt.model.device.pairing.ClientAppVersion;
 import com.github.auties00.cobalt.model.device.pairing.ClientPayload.ClientReleaseChannel;
 import com.github.auties00.cobalt.model.device.sync.MissingDeviceSyncKey;
 import com.github.auties00.cobalt.model.device.sync.PendingDeviceSync;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidDevice;
 import com.github.auties00.cobalt.model.jid.JidProvider;
+import com.github.auties00.cobalt.model.message.MessageInfo;
 import com.github.auties00.cobalt.model.message.MessageKey;
 import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKey;
 import com.github.auties00.cobalt.model.newsletter.Newsletter;
@@ -29,10 +30,10 @@ import com.github.auties00.cobalt.model.preference.QuickReply;
 import com.github.auties00.cobalt.model.preference.Sticker;
 import com.github.auties00.cobalt.model.privacy.PrivacySettingEntry;
 import com.github.auties00.cobalt.model.privacy.PrivacySettingType;
-import com.github.auties00.cobalt.model.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.model.sync.SyncCollectionMetadata;
 import com.github.auties00.cobalt.model.sync.SyncHashValue;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.model.sync.SyncPendingMutation;
 import com.github.auties00.libsignal.SignalProtocolAddress;
 import com.github.auties00.libsignal.SignalProtocolStore;
 import com.github.auties00.libsignal.groups.SignalSenderKeyName;
@@ -43,7 +44,6 @@ import com.github.auties00.libsignal.key.SignalSignedKeyPair;
 
 import java.io.IOException;
 import java.net.URI;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 
@@ -742,21 +742,21 @@ public interface WhatsAppStore extends SignalProtocolStore {
      *
      * @param deviceJid the device JID whose sender keys should be removed
      */
-    void removeSenderKeysForDevice(Jid deviceJid);
+    void removeSenderKeys(Jid deviceJid);
 
     /**
      * Removes the sender keys for a sender key name.
      *
      * @param senderKeyName the sender key name
      */
-    void removeSenderKeysForDevice(SignalSenderKeyName senderKeyName);
+    void removeSenderKeys(SignalSenderKeyName senderKeyName);
 
     /**
      * Cleans up all Signal sessions and sender keys for a device.
      *
      * @param deviceJid the device JID to clean up
      */
-    void cleanupSignalSessionsForDevice(Jid deviceJid);
+    void cleanupSignalSessions(Jid deviceJid);
 
     /**
      * Returns all contacts stored in this session.
@@ -853,14 +853,6 @@ public interface WhatsAppStore extends SignalProtocolStore {
     Optional<Chat> findChatByJid(JidProvider jid);
 
     /**
-     * Adds or updates a chat in the store.
-     *
-     * @param chat the chat to add or update, must not be {@code null}
-     * @return the chat that was added
-     */
-    Chat addChat(Chat chat);
-
-    /**
      * Adds a new empty chat for the given JID.
      *
      * @param chatJid the chat JID, must not be {@code null}
@@ -884,7 +876,16 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * @param id       the message id to search
      * @return an {@code Optional} containing the message if found
      */
-    Optional<? extends ChatMessageInfo> findMessageById(JidProvider provider, String id);
+    Optional<? extends MessageInfo> findMessageById(JidProvider provider, String id);
+
+    /**
+     * Queries the first message whose key matches the one provided in the
+     * specified chat or newsletter.
+     *
+     * @param key the message key to search
+     * @return an {@code Optional} containing the message if found
+     */
+    Optional<? extends MessageInfo> findMessageByKey(MessageKey key);
 
     /**
      * Queries the first message whose id matches the one provided in the
@@ -905,14 +906,6 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * @return an {@code Optional} containing the message if found
      */
     Optional<NewsletterMessageInfo> findMessageById(Newsletter newsletter, String id);
-
-    /**
-     * Finds a chat message by its key.
-     *
-     * @param key the message key to search
-     * @return an {@code Optional} containing the message if found
-     */
-    Optional<ChatMessageInfo> findChatMessageByKey(MessageKey key);
 
     /**
      * Returns all status updates stored in this session.
@@ -982,14 +975,6 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * @return an {@code Optional} containing the newsletter if found
      */
     Optional<Newsletter> findNewsletterByJid(JidProvider jid);
-
-    /**
-     * Adds or updates a newsletter in the store.
-     *
-     * @param newsletter the newsletter to add, must not be {@code null}
-     * @return the newsletter that was added
-     */
-    Newsletter addNewsletter(Newsletter newsletter);
 
     /**
      * Adds a new empty newsletter for the given JID.
@@ -1190,31 +1175,6 @@ public interface WhatsAppStore extends SignalProtocolStore {
     void removeMissingSyncKey(byte[] keyId);
 
     /**
-     * Finds expired missing sync keys.
-     *
-     * @param timeout the duration after which a key is considered expired
-     * @return a sequenced collection of expired keys
-     */
-    SequencedCollection<MissingDeviceSyncKey> findExpiredMissingSyncKeys(Duration timeout);
-
-    /**
-     * Gets the earliest timestamp of all missing sync keys.
-     *
-     * @return an {@code Optional} containing the earliest timestamp, or empty
-     *         if no missing keys
-     */
-    Optional<Instant> getEarliestMissingSyncKeyTimestamp();
-
-    /**
-     * Calculates the timeout delay for the missing sync key check.
-     *
-     * @param timeout the timeout duration
-     * @return an {@code Optional} containing the remaining delay, or empty
-     *         if no missing keys
-     */
-    Optional<Duration> calculateMissingSyncKeyTimeoutDelay(Duration timeout);
-
-    /**
      * Gets metadata for a web app state collection.
      *
      * @param collectionName the collection name
@@ -1354,7 +1314,7 @@ public interface WhatsAppStore extends SignalProtocolStore {
      *
      * @param userJid the user JID whose device list changed
      */
-    void markUserNeedsSenderKeyRotation(Jid userJid);
+    void markKeyRotation(Jid userJid);
 
     /**
      * Checks if a user needs sender key rotation and clears the flag.
@@ -1362,7 +1322,7 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * @param userJid the user JID to check
      * @return {@code true} if the user needed rotation (flag is cleared)
      */
-    boolean checkAndClearSenderKeyRotationNeeded(Jid userJid);
+    boolean clearKeyRotation(Jid userJid);
 
     /**
      * Checks if any of the provided users need sender key rotation.
@@ -1370,7 +1330,7 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * @param userJids the user JIDs to check
      * @return {@code true} if any user needs rotation
      */
-    boolean anyUserNeedsSenderKeyRotation(Collection<Jid> userJids);
+    boolean isKeyRotated(Collection<Jid> userJids);
 
     /**
      * Allocates a new send sequence number and records it against
@@ -1599,9 +1559,10 @@ public interface WhatsAppStore extends SignalProtocolStore {
     /**
      * Adds or replaces a verified business name record.
      *
+     * @param jid the jid that owns the record
      * @param record the record to store
      */
-    void addVerifiedBusinessName(BusinessVerifiedNameCertificate record);
+    void addVerifiedBusinessName(Jid jid, BusinessVerifiedNameCertificate record);
 
     /**
      * Removes the verified business name record for the given JID.

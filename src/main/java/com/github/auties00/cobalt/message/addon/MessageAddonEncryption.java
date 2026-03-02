@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.message.addon;
 
 import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.util.SecureBytes;
+import com.github.auties00.cobalt.util.FastRandomUtils;
 
 import javax.crypto.Cipher;
 import javax.crypto.KDF;
@@ -79,7 +79,7 @@ public final class MessageAddonEncryption {
             var useCaseSecret = deriveUseCaseSecret(messageSecret, stanzaId, originalSender, addonSender, useCaseType);
 
             // Generate random IV
-            var iv = SecureBytes.random(AES_GCM_IV_SIZE);
+            var iv = FastRandomUtils.randomByteArray(AES_GCM_IV_SIZE);
 
             // Encrypt with AES-256-GCM
             var cipher = Cipher.getInstance(AES_GCM_ALGORITHM);

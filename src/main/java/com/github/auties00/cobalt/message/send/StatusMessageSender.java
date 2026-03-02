@@ -104,7 +104,7 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
 
         // WAWebUserPrefsStatus.getStatusSkDistribList: rotate sender key
         // when viewers have been removed from the status audience
-        var rotateKey = store.checkAndClearSenderKeyRotationNeeded(statusJid);
+        var rotateKey = store.clearKeyRotation(statusJid);
         if (rotateKey) {
             encryption.rotateSenderKey(statusJid, selfJid);
             skDistribDevices.addAll(skExistingDevices);

@@ -1,51 +1,45 @@
 package com.github.auties00.cobalt.socket.implementation.threading;
 
-import com.github.auties00.cobalt.socket.implementation.SocketListener;
-import com.github.auties00.cobalt.socket.implementation.context.SocketContext;
-import com.github.auties00.cobalt.socket.implementation.context.SocketPendingRead;
-import com.github.auties00.cobalt.socket.implementation.context.SocketPendingWrites;
-import com.github.auties00.cobalt.socket.implementation.websocket.WebSocketFrameEncoder;
-import com.github.auties00.cobalt.socket.implementation.websocket.WebSocketState;
+import com.github.auties00.cobalt.socket.implementation.websocket.frame.WebSocketFrameConstants;
+import com.github.auties00.cobalt.socket.implementation.websocket.frame.WebSocketDecodedFrame;
+import com.github.auties00.cobalt.socket.implementation.websocket.frame.WebSocketFrameDecoder;
+import com.github.auties00.cobalt.socket.implementation.websocket.frame.WebSocketFrameEncoder;
 
 import javax.net.ssl.SSLEngineResult;
 import javax.net.ssl.SSLException;
 import java.io.IOException;
 import java.lang.System.Logger.Level;
 import java.nio.ByteBuffer;
-import java.nio.channels.*;
+import java.nio.channels.CancelledKeyException;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
+import java.nio.channels.SocketChannel;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 
-public final class CentralSelector implements Runnable {
-    public static final CentralSelector INSTANCE;
+public final class SocketSelector implements Runnable {
+    public static final SocketSelector INSTANCE;
 
     static {
         try {
-            INSTANCE = new CentralSelector();
+            INSTANCE = new SocketSelector();
         } catch (IOException ex) {
             throw new ExceptionInInitializerError(ex);
         }
     }
 
     private static final int MAX_MESSAGE_LENGTH = 1048576;
-    private static final long MAX_WEBSOCKET_FRAME_LENGTH = 16L * 1024 * 1024;
     private static final int WEBSOCKET_READ_BUFFER_SIZE = 16384;
     private static final long SAFETY_TIMEOUT_MS = 5000;
     private static final ByteBuffer EMPTY_BUFFER = ByteBuffer.allocate(0);
-    private static final byte WEBSOCKET_OPCODE_CONTINUATION = 0x0;
-    private static final byte WEBSOCKET_OPCODE_TEXT = 0x1;
-    private static final byte WEBSOCKET_OPCODE_BINARY = 0x2;
-    private static final byte WEBSOCKET_OPCODE_CLOSE = 0x8;
-    private static final byte WEBSOCKET_OPCODE_PING = 0x9;
-    private static final byte WEBSOCKET_OPCODE_PONG = 0xA;
 
     private final System.Logger logger;
     private final Selector selector;
     private final AtomicBoolean wakeupPending;
     private volatile Thread selectorThread;
 
-    private CentralSelector() throws IOException {
-        this.logger = System.getLogger(CentralSelector.class.getName());
+    private SocketSelector() throws IOException {
+        this.logger = System.getLogger(SocketSelector.class.getName());
         this.selector = Selector.open();
         this.wakeupPending = new AtomicBoolean();
     }
@@ -133,77 +127,6 @@ public final class CentralSelector implements Runnable {
         return ((SocketContext) key.attachment()).connected.get();
     }
 
-    public SocketContext context(SocketChannel channel) {
-        if (channel == null) {
-            return null;
-        }
-
-        var key = channel.keyFor(selector);
-        if (key == null) {
-            return null;
-        }
-
-        return (SocketContext) key.attachment();
-    }
-
-    public boolean preSeedDatagram(SocketChannel channel, ByteBuffer leftover) {
-        if (!leftover.hasRemaining()) {
-            return true;
-        }
-
-        var key = channel.keyFor(selector);
-        if (key == null) {
-            return false;
-        }
-
-        var ctx = (SocketContext) key.attachment();
-        return switch (ctx.framingMode) {
-            case DATAGRAM -> feedDatagram(ctx, leftover);
-            case WEBSOCKET -> feedWebSocket(ctx, leftover, key);
-        };
-    }
-
-    public boolean drainSslAppBuffer(SocketChannel channel) {
-        var key = channel.keyFor(selector);
-        if (key == null) {
-            return false;
-        }
-
-        var ctx = (SocketContext) key.attachment();
-        if (ctx.sslEngine == null || ctx.appInBuffer == null) {
-            return true;
-        }
-
-        ctx.appInBuffer.flip();
-        if (!ctx.appInBuffer.hasRemaining()) {
-            ctx.appInBuffer.compact();
-            return true;
-        }
-
-        var result = switch (ctx.framingMode) {
-            case DATAGRAM -> feedDatagram(ctx, ctx.appInBuffer);
-            case WEBSOCKET -> feedWebSocket(ctx, ctx.appInBuffer, key);
-        };
-        ctx.appInBuffer.compact();
-        return result;
-    }
-
-    private boolean feedDatagram(SocketContext ctx, ByteBuffer source) {
-        while (source.hasRemaining()) {
-            var noDatagram = ctx.datagramBuffer == null;
-            var target = noDatagram ? ctx.datagramLengthBuffer : ctx.datagramBuffer;
-            var count = Math.min(source.remaining(), target.remaining());
-            var savedLimit = source.limit();
-            source.limit(source.position() + count);
-            target.put(source);
-            source.limit(savedLimit);
-            if (!target.hasRemaining() && !advanceDatagram(ctx, noDatagram)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
     public boolean addRead(SocketChannel channel, SocketPendingRead read) {
         var key = channel.keyFor(selector);
         if (key == null || !key.isValid()) {
@@ -225,14 +148,6 @@ public final class CentralSelector implements Runnable {
     }
 
     public boolean markReady(SocketChannel channel) {
-        return markReady(channel, SocketContext.FramingMode.DATAGRAM);
-    }
-
-    public boolean markReadyWebSocket(SocketChannel channel) {
-        return markReady(channel, SocketContext.FramingMode.WEBSOCKET);
-    }
-
-    private boolean markReady(SocketChannel channel, SocketContext.FramingMode framingMode) {
         var key = channel.keyFor(selector);
         if (key == null || !key.isValid()) {
             return false;
@@ -241,9 +156,8 @@ public final class CentralSelector implements Runnable {
         var ctx = (SocketContext) key.attachment();
         ctx.startListenerExecutor();
         ctx.tunnelled = true;
-        ctx.framingMode = framingMode;
-        if (framingMode == SocketContext.FramingMode.WEBSOCKET && ctx.webSocketState == null) {
-            ctx.webSocketState = new WebSocketState();
+        if(ctx instanceof WebSocketContext webSocketContext && webSocketContext.webSocketFrameDecoder == null) {
+            webSocketContext.webSocketFrameDecoder = new WebSocketFrameDecoder();
             if (ctx.sslEngine == null && ctx.netInBuffer == null) {
                 ctx.netInBuffer = ByteBuffer.allocateDirect(WEBSOCKET_READ_BUFFER_SIZE);
             }
@@ -257,17 +171,28 @@ public final class CentralSelector implements Runnable {
         return true;
     }
 
-    public boolean addWrite(SocketChannel channel, ByteBuffer buffer) {
+    public boolean addWrite(SocketChannel channel, ByteBuffer... buffers) {
         var key = channel.keyFor(selector);
         if (key == null || !key.isValid()) {
             return false;
         }
-        var ctx = (SocketContext) key.attachment();
-        if (buffer == null || !buffer.hasRemaining()) {
+
+        if (buffers == null || buffers.length == 0) {
             return true;
         }
 
-        ctx.pendingWrites.offer(buffer);
+        var ctx = (SocketContext) key.attachment();
+        var hasWrites = false;
+        for (var buffer : buffers) {
+            if (buffer != null && buffer.hasRemaining()) {
+                ctx.pendingWrites.offer(buffer);
+                hasWrites = true;
+            }
+        }
+        if (!hasWrites) {
+            return true;
+        }
+
         try {
             key.interestOps(key.interestOps() | SelectionKey.OP_WRITE);
         } catch (CancelledKeyException _) {
@@ -277,29 +202,59 @@ public final class CentralSelector implements Runnable {
         return true;
     }
 
-    public boolean addWrite(SocketChannel channel, ByteBuffer first, ByteBuffer second) {
-        var key = channel.keyFor(selector);
-        if (key == null || !key.isValid()) {
-            return false;
-        }
-
-        if ((first == null || !first.hasRemaining()) && (second == null || !second.hasRemaining())) {
+    public boolean preSeedDatagram(SocketChannel channel, ByteBuffer leftover) {
+        if (!leftover.hasRemaining()) {
             return true;
         }
 
-        var ctx = (SocketContext) key.attachment();
-        if (first != null && first.hasRemaining()) {
-            ctx.pendingWrites.offer(first);
-        }
-        if (second != null && second.hasRemaining()) {
-            ctx.pendingWrites.offer(second);
-        }
-        try {
-            key.interestOps(key.interestOps() | SelectionKey.OP_WRITE);
-        } catch (CancelledKeyException _) {
+        var key = channel.keyFor(selector);
+        if (key == null) {
             return false;
         }
-        wakeup();
+
+        var ctx = (SocketContext) key.attachment();
+        return ctx instanceof WebSocketContext webSocketContext
+                ? feedWebSocket(webSocketContext, leftover, key)
+                : feedDatagram(ctx, leftover);
+    }
+
+    public boolean drainSslAppBuffer(SocketChannel channel) {
+        var key = channel.keyFor(selector);
+        if (key == null) {
+            return false;
+        }
+
+        var ctx = (SocketContext) key.attachment();
+        if (ctx.sslEngine == null || ctx.appInBuffer == null) {
+            return true;
+        }
+
+        ctx.appInBuffer.flip();
+        if (!ctx.appInBuffer.hasRemaining()) {
+            ctx.appInBuffer.compact();
+            return true;
+        }
+
+        var result = ctx instanceof WebSocketContext webSocketContext
+                ? feedWebSocket(webSocketContext, webSocketContext.appInBuffer, key)
+                : feedDatagram(ctx, ctx.appInBuffer);
+        ctx.appInBuffer.compact();
+        return result;
+    }
+
+    private boolean feedDatagram(SocketContext ctx, ByteBuffer source) {
+        while (source.hasRemaining()) {
+            var noDatagram = ctx.datagramBuffer == null;
+            var target = noDatagram ? ctx.datagramLengthBuffer : ctx.datagramBuffer;
+            var count = Math.min(source.remaining(), target.remaining());
+            var savedLimit = source.limit();
+            source.limit(source.position() + count);
+            target.put(source);
+            source.limit(savedLimit);
+            if (!target.hasRemaining() && !advanceDatagram(ctx, noDatagram)) {
+                return false;
+            }
+        }
         return true;
     }
 
@@ -529,7 +484,7 @@ public final class CentralSelector implements Runnable {
                     ctx.sslHandshaking = false;
                     ctx.sslHandshakeComplete = true;
                     ctx.appInBuffer.clear();
-                    resizeSslBuffers(ctx);
+                    ctx.resizeSslBuffers();
                     synchronized (ctx.sslHandshakeLock) {
                         ctx.sslHandshakeLock.notifyAll();
                     }
@@ -541,34 +496,18 @@ public final class CentralSelector implements Runnable {
         throw new IOException("Unexpected end of stream");
     }
 
-    private static void resizeSslBuffers(SocketContext ctx) {
-        var session = ctx.sslEngine.getSession();
-        var packetSize = session.getPacketBufferSize();
-        var appSize = session.getApplicationBufferSize();
-        if (ctx.netInBuffer.capacity() < packetSize) {
-            ctx.netInBuffer = ByteBuffer.allocateDirect(packetSize);
-        }
-        if (ctx.netOutBuffer.capacity() < packetSize) {
-            ctx.netOutBuffer = ByteBuffer.allocateDirect(packetSize);
-        }
-        if (ctx.appInBuffer.capacity() < appSize) {
-            ctx.appInBuffer = ByteBuffer.allocate(appSize);
-        }
-    }
-
     private boolean processRead(SocketChannel channel, SocketContext ctx, SelectionKey key) throws IOException {
         if (!ctx.tunnelled) {
             return processPreTunnelRead(channel, ctx, key);
-        }
-
-        return switch (ctx.framingMode) {
-            case DATAGRAM -> ctx.sslEngine != null
+        } else if(ctx instanceof WebSocketContext webSocketContext) {
+            return ctx.sslEngine != null
+                    ? processWebSocketSsl(channel, webSocketContext, key)
+                    : processWebSocketDirect(channel, webSocketContext, key);
+        } else {
+            return ctx.sslEngine != null
                     ? processDatagramSsl(channel, ctx)
                     : processDatagramDirect(channel, ctx);
-            case WEBSOCKET -> ctx.sslEngine != null
-                    ? processWebSocketSsl(channel, ctx, key)
-                    : processWebSocketDirect(channel, ctx, key);
-        };
+        }
     }
 
     private boolean processPreTunnelRead(SocketChannel channel, SocketContext ctx, SelectionKey key) throws IOException {
@@ -761,7 +700,7 @@ public final class CentralSelector implements Runnable {
         return false;
     }
 
-    private boolean processWebSocketDirect(SocketChannel channel, SocketContext ctx, SelectionKey key) throws IOException {
+    private boolean processWebSocketDirect(SocketChannel channel, WebSocketContext ctx, SelectionKey key) throws IOException {
         if (ctx.netInBuffer == null) {
             ctx.netInBuffer = ByteBuffer.allocateDirect(WEBSOCKET_READ_BUFFER_SIZE);
         }
@@ -790,7 +729,7 @@ public final class CentralSelector implements Runnable {
         return false;
     }
 
-    private boolean processWebSocketSsl(SocketChannel channel, SocketContext ctx, SelectionKey key) throws IOException {
+    private boolean processWebSocketSsl(SocketChannel channel, WebSocketContext ctx, SelectionKey key) throws IOException {
         while (ctx.connected.get()) {
             var bytesRead = channel.read(ctx.netInBuffer);
             if (bytesRead == -1) {
@@ -842,73 +781,28 @@ public final class CentralSelector implements Runnable {
         return false;
     }
 
-    private boolean feedWebSocket(SocketContext ctx, ByteBuffer source, SelectionKey key) {
-        if (ctx.webSocketState == null) {
-            ctx.webSocketState = new WebSocketState();
+    private boolean feedWebSocket(WebSocketContext ctx, ByteBuffer source, SelectionKey key) {
+        if (ctx.webSocketFrameDecoder == null) {
+            ctx.webSocketFrameDecoder = new WebSocketFrameDecoder();
         }
 
-        var state = ctx.webSocketState;
         while (source.hasRemaining()) {
-            switch (state.readState) {
-                case WebSocketState.READ_HEADER_FIRST -> {
-                    state.firstByte = source.get();
-                    state.readState = WebSocketState.READ_HEADER_SECOND;
+            var decodedFrame = ctx.webSocketFrameDecoder.decode(source);
+            switch (decodedFrame) {
+                case WebSocketDecodedFrame.None _ -> {
+                    return true;
                 }
-
-                case WebSocketState.READ_HEADER_SECOND -> {
-                    var secondByte = source.get();
-                    state.startFrame(state.firstByte, secondByte);
-                    var payloadLength = secondByte & 0x7F;
-                    if (payloadLength <= 125) {
-                        state.payloadLength = payloadLength;
-                        state.payloadRemaining = payloadLength;
-                        if (!validateWebSocketFrame(state)) {
-                            return false;
-                        }
-                        state.readState = state.masked ? WebSocketState.READ_MASK : WebSocketState.READ_PAYLOAD;
-                    } else {
-                        state.extendedLengthBytesRemaining = payloadLength == 126 ? 2 : 8;
-                        state.readState = WebSocketState.READ_EXTENDED_LENGTH;
-                    }
+                case WebSocketDecodedFrame.Invalid _ -> {
+                    return false;
                 }
-
-                case WebSocketState.READ_EXTENDED_LENGTH -> {
-                    while (source.hasRemaining() && state.extendedLengthBytesRemaining > 0) {
-                        state.extendedLengthValue = (state.extendedLengthValue << 8) | (source.get() & 0xFFL);
-                        state.extendedLengthBytesRemaining--;
-                    }
-
-                    if (state.extendedLengthBytesRemaining == 0) {
-                        state.payloadLength = state.extendedLengthValue;
-                        state.payloadRemaining = state.payloadLength;
-                        if (!validateWebSocketFrame(state)) {
-                            return false;
-                        }
-                        state.readState = state.masked ? WebSocketState.READ_MASK : WebSocketState.READ_PAYLOAD;
-                    }
-                }
-
-                case WebSocketState.READ_MASK -> {
-                    while (source.hasRemaining() && state.maskingKeyBytesRead < Integer.BYTES) {
-                        state.maskingKey = (state.maskingKey << 8) | (source.get() & 0xFF);
-                        state.maskingKeyBytesRead++;
-                    }
-
-                    if (state.maskingKeyBytesRead == Integer.BYTES) {
-                        state.readState = WebSocketState.READ_PAYLOAD;
-                    }
-                }
-
-                case WebSocketState.READ_PAYLOAD -> {
-                    if (!consumeWebSocketPayload(ctx, state, source)) {
+                case WebSocketDecodedFrame.Data data -> {
+                    if (!feedDatagram(ctx, data.payload())) {
                         return false;
                     }
-
-                    if (state.payloadRemaining == 0) {
-                        if (!finishWebSocketFrame(ctx, state, key)) {
-                            return false;
-                        }
-                        state.resetFrame();
+                }
+                case WebSocketDecodedFrame.Control control -> {
+                    if (!handleWebSocketControl(ctx, key, control.opcode(), control.payload(), control.length())) {
+                        return false;
                     }
                 }
             }
@@ -917,107 +811,22 @@ public final class CentralSelector implements Runnable {
         return true;
     }
 
-    private static boolean validateWebSocketFrame(WebSocketState state) {
-        if (state.payloadLength > MAX_WEBSOCKET_FRAME_LENGTH) {
-            return false;
-        }
-
-        if (isControlOpcode(state.opcode)) {
-            return state.finalFragment && state.payloadLength <= 125;
-        }
-
-        return true;
-    }
-
-    private boolean consumeWebSocketPayload(SocketContext ctx, WebSocketState state, ByteBuffer source) {
-        var readable = (int) Math.min(source.remaining(), state.payloadRemaining);
-        if (readable == 0) {
-            return true;
-        }
-
-        if (isDataOpcode(state.opcode)) {
-            return consumeWebSocketDataPayload(ctx, state, source, readable);
-        }
-
-        if (isControlOpcode(state.opcode)) {
-            consumeWebSocketControlPayload(state, source, readable);
-            return true;
-        }
-
-        if (state.opcode == WEBSOCKET_OPCODE_TEXT) {
-            source.position(source.position() + readable);
-            if (state.masked) {
-                state.maskOffset += readable;
-            }
-            state.payloadRemaining -= readable;
-            return true;
-        }
-
-        return false;
-    }
-
-    private boolean consumeWebSocketDataPayload(SocketContext ctx, WebSocketState state, ByteBuffer source, int readable) {
-        if (!state.masked) {
-            var savedLimit = source.limit();
-            source.limit(source.position() + readable);
-            var result = feedDatagram(ctx, source);
-            source.limit(savedLimit);
-            state.payloadRemaining -= readable;
-            return result;
-        }
-
-        var remaining = readable;
-        while (remaining > 0) {
-            var chunk = Math.min(remaining, state.unmaskBuffer.capacity());
-            state.unmaskBuffer.clear();
-            for (var i = 0; i < chunk; i++) {
-                var value = (byte) (source.get() ^ WebSocketFrameEncoder.maskByte(state.maskingKey, state.maskOffset++));
-                state.unmaskBuffer.put(value);
-            }
-            state.unmaskBuffer.flip();
-            if (!feedDatagram(ctx, state.unmaskBuffer)) {
-                return false;
-            }
-            state.payloadRemaining -= chunk;
-            remaining -= chunk;
-        }
-
-        return true;
-    }
-
-    private static void consumeWebSocketControlPayload(WebSocketState state, ByteBuffer source, int readable) {
-        for (var i = 0; i < readable; i++) {
-            var value = source.get();
-            if (state.masked) {
-                value = (byte) (value ^ WebSocketFrameEncoder.maskByte(state.maskingKey, state.maskOffset++));
-            }
-            state.controlPayload[state.controlPayloadRead++] = value;
-        }
-        state.payloadRemaining -= readable;
-    }
-
-    private boolean finishWebSocketFrame(SocketContext ctx, WebSocketState state, SelectionKey key) {
-        return switch (state.opcode) {
-            case WEBSOCKET_OPCODE_BINARY, WEBSOCKET_OPCODE_CONTINUATION, WEBSOCKET_OPCODE_TEXT, WEBSOCKET_OPCODE_PONG -> true;
-            case WEBSOCKET_OPCODE_PING -> key == null
-                    || enqueueWebSocketControlFrame(ctx, key, WEBSOCKET_OPCODE_PONG, state.controlPayload, state.controlPayloadRead);
-            case WEBSOCKET_OPCODE_CLOSE -> {
+    private boolean handleWebSocketControl(SocketContext ctx, SelectionKey key, byte opcode, byte[] payload, int length) {
+        return switch (opcode) {
+            case WebSocketFrameConstants.OPCODE_PING -> key == null
+                    || enqueueWebSocketControlFrame(ctx, key, WebSocketFrameConstants.OPCODE_PONG, payload, length);
+            case WebSocketFrameConstants.OPCODE_CLOSE -> {
                 if (key != null) {
-                    enqueueWebSocketControlFrame(ctx, key, WEBSOCKET_OPCODE_CLOSE, state.controlPayload, state.controlPayloadRead);
+                    enqueueWebSocketControlFrame(ctx, key, WebSocketFrameConstants.OPCODE_CLOSE, payload, length);
                 }
                 yield false;
             }
+            case WebSocketFrameConstants.OPCODE_PONG -> true;
             default -> false;
         };
     }
 
-    private boolean enqueueWebSocketControlFrame(
-            SocketContext ctx,
-            SelectionKey key,
-            byte opcode,
-            byte[] payload,
-            int length
-    ) {
+    private boolean enqueueWebSocketControlFrame(SocketContext ctx, SelectionKey key, byte opcode, byte[] payload, int length) {
         if (!key.isValid()) {
             return false;
         }
@@ -1037,16 +846,6 @@ public final class CentralSelector implements Runnable {
         }
         wakeup();
         return true;
-    }
-
-    private static boolean isDataOpcode(byte opcode) {
-        return opcode == WEBSOCKET_OPCODE_BINARY || opcode == WEBSOCKET_OPCODE_CONTINUATION;
-    }
-
-    private static boolean isControlOpcode(byte opcode) {
-        return opcode == WEBSOCKET_OPCODE_CLOSE
-               || opcode == WEBSOCKET_OPCODE_PING
-               || opcode == WEBSOCKET_OPCODE_PONG;
     }
 
     private boolean advanceDatagram(SocketContext ctx, boolean noDatagram) {

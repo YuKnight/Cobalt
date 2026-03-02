@@ -1,7 +1,6 @@
-package com.github.auties00.cobalt.socket.implementation.context;
+package com.github.auties00.cobalt.socket.implementation.threading;
 
-import com.github.auties00.cobalt.socket.implementation.SocketListener;
-import com.github.auties00.cobalt.socket.implementation.websocket.WebSocketState;
+import com.github.auties00.cobalt.socket.implementation.SocketClientListener;
 
 import javax.net.ssl.SSLEngine;
 import java.nio.ByteBuffer;
@@ -55,14 +54,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * @see SocketPendingWrites
  * @see SocketPendingRead
  */
-public final class SocketContext {
+public sealed class SocketContext permits WebSocketContext {
     private static final int INT24_BYTE_SIZE = 3;
     private static final int WRITES_CHUNK_CAPACITY = 64;
-
-    public enum FramingMode {
-        DATAGRAM,
-        WEBSOCKET
-    }
 
     /**
      * Whether the underlying channel is connected and registered with the
@@ -100,12 +94,6 @@ public final class SocketContext {
      * <p> Read and written exclusively by the selector thread.
      */
     public boolean tunnelled;
-
-    /**
-     * The framing mode used after the tunnel/authentication stage completes.
-     * Defaults to datagram framing.
-     */
-    public FramingMode framingMode;
 
     /**
      * The pending binary read request, or {@code null} if no read is
@@ -161,19 +149,13 @@ public final class SocketContext {
     public ByteBuffer datagramBuffer;
 
     /**
-     * Stateful websocket parser context. Initialized lazily when websocket
-     * framing is enabled for this channel.
-     */
-    public WebSocketState webSocketState;
-
-    /**
      * Callback invoked when a complete inbound datagram has been
      * reassembled.
      *
      * <p> The selector thread dispatches each datagram to the listener
      * on a virtual thread to avoid blocking the selection loop.
      */
-    public final SocketListener listener;
+    public final SocketClientListener listener;
 
     /**
      * The {@link SSLEngine} for this connection, or {@code null} if TLS
@@ -250,13 +232,12 @@ public final class SocketContext {
      *
      * @param listener  the callback to receive completed inbound datagrams
      */
-    public SocketContext(SocketListener listener) {
+    public SocketContext(SocketClientListener listener) {
         this.connectionLock = new Object();
         this.sslHandshakeLock = new Object();
         this.listener = listener;
         this.pendingWrites = new SocketPendingWrites(WRITES_CHUNK_CAPACITY);
         this.datagramLengthBuffer = ByteBuffer.allocate(INT24_BYTE_SIZE);
-        this.framingMode = FramingMode.DATAGRAM;
         this.listenerVirtualExecutorLock = new Object();
     }
 
@@ -302,5 +283,25 @@ public final class SocketContext {
         this.appInBuffer = ByteBuffer.allocate(session.getApplicationBufferSize());
         this.sslHandshaking = true;
         this.sslHandshakeComplete = false;
+    }
+
+    /**
+     * Resizes the TLS buffers, if necessary
+     */
+    public void resizeSslBuffers() {
+        var session = sslEngine.getSession();
+
+        var packetSize = session.getPacketBufferSize();
+        if (netInBuffer.capacity() < packetSize) {
+            netInBuffer = ByteBuffer.allocateDirect(packetSize);
+        }
+        if (netOutBuffer.capacity() < packetSize) {
+            netOutBuffer = ByteBuffer.allocateDirect(packetSize);
+        }
+
+        var appSize = session.getApplicationBufferSize();
+        if (appInBuffer.capacity() < appSize) {
+            appInBuffer = ByteBuffer.allocate(appSize);
+        }
     }
 }

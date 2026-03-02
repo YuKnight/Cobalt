@@ -53,8 +53,8 @@ import com.github.auties00.cobalt.store.WhatsAppStore;
 import com.github.auties00.cobalt.stream.SocketRequest;
 import com.github.auties00.cobalt.stream.SocketStream;
 import com.github.auties00.cobalt.sync.WebAppStateService;
-import com.github.auties00.cobalt.util.SecureBytes;
-import com.github.auties00.cobalt.util.WhatsAppIdGenerator;
+import com.github.auties00.cobalt.util.FastRandomUtils;
+import com.github.auties00.cobalt.util.RandomIdUtils;
 import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.curve25519.Curve25519;
 import com.github.auties00.libsignal.SignalSessionCipher;
@@ -300,7 +300,7 @@ public final class WhatsAppClient {
 
     public Node sendNode(NodeBuilder node, Function<Node, Boolean> filter) {
         if (!node.hasAttribute("id")) {
-            node.attribute("id", SecureBytes.randomHex(10));
+            node.attribute("id", FastRandomUtils.randomHex(10));
         }
 
         var outgoing = node.build();
@@ -493,7 +493,7 @@ public final class WhatsAppClient {
 
         var usyncNode = new NodeBuilder()
                 .description("usync")
-                .attribute("sid", WhatsAppIdGenerator.generateSid())
+                .attribute("sid", RandomIdUtils.generateSid())
                 .attribute("mode", "query")
                 .attribute("last", "true")
                 .attribute("index", "0")
@@ -658,7 +658,7 @@ public final class WhatsAppClient {
                 .build();
         var syncNode = new NodeBuilder()
                 .description("usync")
-                .attribute("sid", WhatsAppIdGenerator.generateSid())
+                .attribute("sid", RandomIdUtils.generateSid())
                 .attribute("mode", "query")
                 .attribute("last", "true")
                 .attribute("index", "0")
@@ -791,7 +791,7 @@ public final class WhatsAppClient {
                 .build();
         var syncNode = new NodeBuilder()
                 .description("usync")
-                .attribute("sid", WhatsAppIdGenerator.generateSid())
+                .attribute("sid", RandomIdUtils.generateSid())
                 .attribute("mode", "query")
                 .attribute("last", "true")
                 .attribute("index", "0")
@@ -1860,7 +1860,7 @@ public final class WhatsAppClient {
             encryptCipher.init(
                     Cipher.ENCRYPT_MODE,
                     retryKey,
-                    new GCMParameterSpec(128, SecureBytes.random(12))
+                    new GCMParameterSpec(128, FastRandomUtils.randomByteArray(12))
             );
             encryptCipher.updateAAD(aad);
             var ciphertext = encryptCipher.update(receipt);
@@ -1870,7 +1870,7 @@ public final class WhatsAppClient {
                     .build();
             var encIvNode = new NodeBuilder()
                     .description("enc_iv")
-                    .content(SecureBytes.random(12))
+                    .content(FastRandomUtils.randomByteArray(12))
                     .build();
             var encryptNode = new NodeBuilder()
                     .description("encrypt")
@@ -3063,7 +3063,7 @@ public final class WhatsAppClient {
         var bodyBuilder = new NodeBuilder()
                 .description("description");
         if (description != null) {
-            bodyBuilder.attribute("id", WhatsAppIdGenerator.generateSid());
+            bodyBuilder.attribute("id", RandomIdUtils.generateSid());
             var bodyNode = new NodeBuilder()
                     .description("body")
                     .content(description.getBytes(StandardCharsets.UTF_8))
@@ -3316,7 +3316,7 @@ public final class WhatsAppClient {
      * @return a CompletableFuture
      */
     public Optional<ChatMetadata> createCommunity(String subject, String body) {
-        var descriptionId = HexFormat.of().formatHex(SecureBytes.random(12));
+        var descriptionId = HexFormat.of().formatHex(FastRandomUtils.randomByteArray(12));
         var children = new ArrayList<Node>();
         var bodyNode = new NodeBuilder()
                 .description("body")
@@ -4014,7 +4014,7 @@ public final class WhatsAppClient {
                 .attribute("index", "0")
                 .attribute("last", "true")
                 .attribute("mode", "delta")
-                .attribute("sid", WhatsAppIdGenerator.generateSid())
+                .attribute("sid", RandomIdUtils.generateSid())
                 .content(queryNode, listNode, sideListNode)
                 .build();
         var iqNode = new NodeBuilder()
@@ -4754,7 +4754,7 @@ public final class WhatsAppClient {
             preKeys.add(preKeyPair);
             var id = new NodeBuilder()
                     .description("id")
-                    .content(SecureBytes.intToBytes(preKeyPair.id(), 3))
+                    .content(FastRandomUtils.intToBytes(preKeyPair.id(), 3))
                     .build();
             var value = new NodeBuilder()
                     .description("value")
@@ -4768,7 +4768,7 @@ public final class WhatsAppClient {
         }
         var registration = new NodeBuilder()
                 .description("registration")
-                .content(SecureBytes.intToBytes(store.registrationId(), 4))
+                .content(FastRandomUtils.intToBytes(store.registrationId(), 4))
                 .build();
         var type = new NodeBuilder()
                 .description("type")
@@ -4784,7 +4784,7 @@ public final class WhatsAppClient {
                 .build();
         var skeyId = new NodeBuilder()
                 .description("id")
-                .content(SecureBytes.intToBytes(store.signedKeyPair().id(), 3))
+                .content(FastRandomUtils.intToBytes(store.signedKeyPair().id(), 3))
                 .build();
         var skeyValue = new NodeBuilder()
                 .description("value")

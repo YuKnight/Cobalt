@@ -7,16 +7,18 @@ import com.github.auties00.cobalt.model.sync.SyncActionArgs;
 /**
  * Index arguments for {@link ArchiveChatAction}.
  *
- * @param jid the JID to include in the index
+ * <p>The sync index produced is {@code ["archive", chatJid]}.
+ *
+ * @param chatJid the JID of the chat being archived or unarchived
  */
-public record ArchiveChatActionArgs(Jid jid) implements SyncActionArgs {
+public record ArchiveChatActionArgs(Jid chatJid) implements SyncActionArgs {
     /**
      * {@inheritDoc}
      *
-     * @return a single-element array containing the JID string
+     * @return a single-element array containing the chat JID string
      */
     @Override
     public String[] toIndexArgs() {
-        return new String[]{jid.toString()};
+        return new String[]{chatJid.toString()};
     }
 }

@@ -3,14 +3,13 @@ package com.github.auties00.cobalt.message.receive.receipt;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.exception.WhatsAppMessageException;
 import com.github.auties00.cobalt.message.receive.stanza.MessageReceiveStanza;
-import com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentitySpec;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.model.message.MessageInfo;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.store.WhatsAppStore;
-import com.github.auties00.cobalt.util.SecureBytes;
+import com.github.auties00.cobalt.util.FastRandomUtils;
 import com.github.auties00.libsignal.key.SignalIdentityPublicKey;
 import com.github.auties00.libsignal.key.SignalPreKeyPair;
 
@@ -135,7 +134,7 @@ public final class MessageReceiptHandler {
 
         var registrationNode = new NodeBuilder()
                 .description("registration")
-                .content(SecureBytes.intToBytes(store.registrationId(), 4))
+                .content(FastRandomUtils.intToBytes(store.registrationId(), 4))
                 .build();
 
         var keysNode = retryCount >= RETRY_KEY_BUNDLE_THRESHOLD
@@ -275,7 +274,7 @@ public final class MessageReceiptHandler {
 
             var preKeyIdNode = new NodeBuilder()
                     .description("id")
-                    .content(SecureBytes.intToBytes(preKey.id(), 3))
+                    .content(FastRandomUtils.intToBytes(preKey.id(), 3))
                     .build();
             var preKeyValueNode = new NodeBuilder()
                     .description("value")
@@ -289,7 +288,7 @@ public final class MessageReceiptHandler {
             var signedKeyPair = store.signedKeyPair();
             var skeyIdNode = new NodeBuilder()
                     .description("id")
-                    .content(SecureBytes.intToBytes(signedKeyPair.id(), 3))
+                    .content(FastRandomUtils.intToBytes(signedKeyPair.id(), 3))
                     .build();
             var skeyValueNode = new NodeBuilder()
                     .description("value")

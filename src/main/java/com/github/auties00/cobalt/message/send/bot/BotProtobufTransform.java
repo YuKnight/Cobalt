@@ -120,7 +120,7 @@ public final class BotProtobufTransform {
         }
 
         pm.key().ifPresent(key -> {
-            key.setChatJid(null);
+            key.setParentJid(null);
             key.setSenderJid(null);
         });
     }
@@ -170,7 +170,7 @@ public final class BotProtobufTransform {
         }
 
         // Strip remoteJid from the protocol message key
-        pm.key().ifPresent(key -> key.setChatJid(null));
+        pm.key().ifPresent(key -> key.setParentJid(null));
 
         // Strip remoteJid from the bot feedback message key
         pm.botFeedbackMessage()

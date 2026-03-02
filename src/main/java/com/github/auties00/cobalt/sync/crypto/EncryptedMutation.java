@@ -4,7 +4,7 @@ import com.github.auties00.cobalt.model.sync.SyncActionDataBuilder;
 import com.github.auties00.cobalt.model.sync.SyncActionDataSpec;
 import com.github.auties00.cobalt.model.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
-import com.github.auties00.cobalt.util.SecureBytes;
+import com.github.auties00.cobalt.util.FastRandomUtils;
 
 import javax.crypto.Cipher;
 import javax.crypto.Mac;
@@ -29,7 +29,7 @@ public record EncryptedMutation(
             byte[] keyId
     ) throws GeneralSecurityException {
         // Create ActionDataSync
-        var padding = SecureBytes.random(1, MAX_PADDING_LENGTH + 1);
+        var padding = FastRandomUtils.randomByteArray(1, MAX_PADDING_LENGTH + 1);
         var mutation = patch.mutation();
         var actionVersion = mutation.value()
                 .version()
@@ -48,7 +48,7 @@ public record EncryptedMutation(
         var cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
         var ciphertextLength = cipher.getOutputSize(plaintext.length);
         var encryptedValue = new byte[IV_LENGTH + ciphertextLength +  MAC_LENGTH];
-        SecureBytes.random(encryptedValue, 0, IV_LENGTH);
+        FastRandomUtils.randomByteArray(encryptedValue, 0, IV_LENGTH);
         var ivSpec = new IvParameterSpec(encryptedValue, 0, IV_LENGTH);
         cipher.init(Cipher.ENCRYPT_MODE, keys.valueEncryptionKey(), ivSpec);
         if(cipher.doFinal(plaintext, 0, plaintext.length, encryptedValue, IV_LENGTH) != ciphertextLength) {
