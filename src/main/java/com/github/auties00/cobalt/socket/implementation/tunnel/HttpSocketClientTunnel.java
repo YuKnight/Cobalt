@@ -2,8 +2,8 @@ package com.github.auties00.cobalt.socket.implementation.tunnel;
 
 import com.github.auties00.cobalt.client.WhatsAppClientProxy;
 import com.github.auties00.cobalt.socket.implementation.context.AbstractSocketClientContext;
-import com.github.auties00.cobalt.socket.implementation.context.AbstractSocketSelector;
-import com.github.auties00.cobalt.socket.implementation.SocketClientListener;
+import com.github.auties00.cobalt.socket.implementation.context.AbstractSocketClientSelector;
+import com.github.auties00.cobalt.socket.implementation.client.tcp.SocketClientListener;
 import com.github.auties00.cobalt.socket.implementation.transport.SocketClientTransport;
 
 import javax.net.ssl.SSLContext;
@@ -126,7 +126,7 @@ final class HttpSocketClientTunnel extends SocketClientTunnel {
                 return;
             }
 
-            AbstractSocketSelector.INSTANCE.unregister(transport);
+            AbstractSocketClientSelector.INSTANCE.unregister(transport);
             currentProxy = redirect;
         }
         throw new IOException("HTTP proxy CONNECT exceeded maximum redirects (" + MAX_REDIRECTS + ")");
@@ -152,7 +152,7 @@ final class HttpSocketClientTunnel extends SocketClientTunnel {
             params.setEndpointIdentificationAlgorithm(HTTP_SCHEME.toUpperCase());
             engine.setSSLParameters(params);
             ctx.initSsl(engine);
-            AbstractSocketSelector.INSTANCE.startTlsHandshake(transport, TLS_HANDSHAKE_TIMEOUT);
+            AbstractSocketClientSelector.INSTANCE.startTlsHandshake(transport, TLS_HANDSHAKE_TIMEOUT);
         } catch (NoSuchAlgorithmException e) {
             throw new IOException("Failed to create SSLContext", e);
         }
@@ -209,17 +209,17 @@ final class HttpSocketClientTunnel extends SocketClientTunnel {
         skipHeaders(deadline);
 
         if (responseBuf != null && responseBuf.hasRemaining()) {
-            if (!AbstractSocketSelector.INSTANCE.preSeedDatagram(transport, responseBuf)) {
+            if (!AbstractSocketClientSelector.INSTANCE.preSeedDatagram(transport, responseBuf)) {
                 throw new IOException("Failed to pre-seed leftover bytes from proxy response");
             }
         }
         responseBuf = null;
 
-        if (!AbstractSocketSelector.INSTANCE.markReady(transport)) {
+        if (!transport.finishConnect()) {
             throw new IOException("Failed to authenticate with proxy: rejected");
         }
 
-        if (isHttps && !AbstractSocketSelector.INSTANCE.drainSslAppBuffer(transport)) {
+        if (isHttps && !AbstractSocketClientSelector.INSTANCE.drainSslAppBuffer(transport)) {
             throw new IOException("Failed to drain leftover SSL data after proxy authentication");
         }
 

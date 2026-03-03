@@ -1,8 +1,6 @@
 package com.github.auties00.cobalt.socket.implementation.transport.tcp;
 
-import com.github.auties00.cobalt.socket.implementation.context.AbstractSocketSelector;
-import com.github.auties00.cobalt.socket.implementation.SocketClientListener;
-import com.github.auties00.cobalt.socket.implementation.context.AbstractSocketClientContext;
+import com.github.auties00.cobalt.socket.implementation.client.tcp.SocketClientListener;
 import com.github.auties00.cobalt.socket.implementation.context.SocketPendingRead;
 import com.github.auties00.cobalt.socket.implementation.transport.SocketClientTransport;
 
@@ -25,7 +23,7 @@ public final class TCPSocketClientTransport implements SocketClientTransport {
     }
 
     @Override
-    public AbstractSocketClientContext connect(InetSocketAddress endpoint, SocketClientListener listener) throws IOException, InterruptedException {
+    public TCPSocketClientContext connect(InetSocketAddress endpoint, SocketClientListener listener) throws IOException, InterruptedException {
         Objects.requireNonNull(endpoint, "endpoint must not be null");
         Objects.requireNonNull(listener, "listener must not be null");
 
@@ -39,9 +37,9 @@ public final class TCPSocketClientTransport implements SocketClientTransport {
         channel.configureBlocking(false);
         var ctx = new TCPSocketClientContext(listener);
         if (channel.connect(endpoint)) {
-            AbstractSocketSelector.INSTANCE.register(channel, SelectionKey.OP_READ, ctx);
+            TCPSocketClientSelector.INSTANCE.register(channel, SelectionKey.OP_READ, ctx);
         } else {
-            AbstractSocketSelector.INSTANCE.register(channel, SelectionKey.OP_CONNECT, ctx);
+            TCPSocketClientSelector.INSTANCE.register(channel, SelectionKey.OP_CONNECT, ctx);
             synchronized (ctx.connectionLock) {
                 var deadline = System.currentTimeMillis() + DEFAULT_CONNECT_TIMEOUT;
                 while (!channel.isConnected() && channel.isOpen()) {
@@ -53,7 +51,7 @@ public final class TCPSocketClientTransport implements SocketClientTransport {
                 }
             }
             if (!channel.isConnected()) {
-                AbstractSocketSelector.INSTANCE.unregister(channel);
+                TCPSocketClientSelector.INSTANCE.unregister(channel);
                 throw new IOException("Connection timed out");
             }
         }
@@ -68,7 +66,7 @@ public final class TCPSocketClientTransport implements SocketClientTransport {
             throw new IOException("Socket is not connected");
         }
 
-        AbstractSocketSelector.INSTANCE.unregister(channel);
+        TCPSocketClientSelector.INSTANCE.unregister(channel);
     }
 
     @Override
@@ -77,14 +75,14 @@ public final class TCPSocketClientTransport implements SocketClientTransport {
             throw new IllegalStateException("Socket is not connected");
         }
 
-        if (!AbstractSocketSelector.INSTANCE.addWrite(channel, buffers)) {
+        if (!TCPSocketClientSelector.INSTANCE.addWrite(channel, buffers)) {
             throw new IllegalStateException("Failed to send binary");
         }
     }
 
     @Override
     public boolean isConnected() {
-        return AbstractSocketSelector.INSTANCE.isConnected(channel);
+        return TCPSocketClientSelector.INSTANCE.isConnected(channel);
     }
 
     @Override
@@ -94,7 +92,7 @@ public final class TCPSocketClientTransport implements SocketClientTransport {
         }
 
         var read = new SocketPendingRead(buffer, fully);
-        if(!AbstractSocketSelector.INSTANCE.addRead(channel, read)) {
+        if(!TCPSocketClientSelector.INSTANCE.addRead(channel, read)) {
             throw new IllegalStateException("Failed to read binary");
         }
 
@@ -116,7 +114,7 @@ public final class TCPSocketClientTransport implements SocketClientTransport {
 
         if(read.length == -1) {
             if (isConnected()) {
-                AbstractSocketSelector.INSTANCE.unregister(channel);
+                TCPSocketClientSelector.INSTANCE.unregister(channel);
                 throw new IOException("Read timed out");
             } else {
                 throw new IOException("Unexpected end of stream");

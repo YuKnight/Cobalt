@@ -12,9 +12,9 @@ import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.binary.NodeDecoder;
 import com.github.auties00.cobalt.node.binary.NodeEncoder;
 import com.github.auties00.cobalt.node.binary.NodeTokens;
-import com.github.auties00.cobalt.socket.implementation.SocketClient;
-import com.github.auties00.cobalt.socket.implementation.SocketClientListener;
-import com.github.auties00.cobalt.socket.implementation.websocket.WebSocketClient;
+import com.github.auties00.cobalt.socket.implementation.client.tcp.SocketClient;
+import com.github.auties00.cobalt.socket.implementation.client.tcp.SocketClientListener;
+import com.github.auties00.cobalt.socket.implementation.client.webSocket.WebSocketClient;
 import com.github.auties00.cobalt.store.WhatsAppStore;
 import com.github.auties00.cobalt.util.GcmUtils;
 import com.github.auties00.cobalt.util.FastRandomUtils;
@@ -64,7 +64,7 @@ public final class WhatsAppSocketClient {
 
     private static final int DEFAULT_CONNECT_TIMEOUT = 30_000;
 
-    private final com.github.auties00.cobalt.socket.implementation.SocketClient socketClient;
+    private final SocketClient socketClient;
     private final String hostname;
     private final int port;
     private final String path;
@@ -85,7 +85,7 @@ public final class WhatsAppSocketClient {
     private volatile WhatsAppSocketListener listener;
     private volatile CompletableFuture<?> handshakeFuture;
 
-    private WhatsAppSocketClient(com.github.auties00.cobalt.socket.implementation.SocketClient socketClient, WhatsAppStore store) {
+    private WhatsAppSocketClient(SocketClient socketClient, WhatsAppStore store) {
         this.socketClient = socketClient;
         this.store = store;
         this.state = new AtomicReference<>(State.DISCONNECTED);

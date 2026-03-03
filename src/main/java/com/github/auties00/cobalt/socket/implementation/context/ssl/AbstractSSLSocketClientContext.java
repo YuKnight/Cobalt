@@ -70,7 +70,6 @@ public abstract class AbstractSSLSocketClientContext extends AbstractSocketClien
      * Creates a context for a new connection.
      */
     public AbstractSSLSocketClientContext() {
-        super();
         this.sslHandshakeLock = new Object();
     }
 

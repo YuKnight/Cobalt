@@ -9,17 +9,20 @@ import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static java.lang.System.Logger.Level.ERROR;
 
-public abstract class AbstractSocketSelector {
+
+public abstract class AbstractSocketClientSelector {
     private static final long SAFETY_TIMEOUT_MS = 5000;
+    private static final int MAX_MESSAGE_LENGTH = 1048576;
 
-    private final System.Logger logger;
-    private final Selector selector;
-    private final AtomicBoolean wakeupPending;
-    private volatile Thread selectorThread;
+    protected final System.Logger logger;
+    protected final Selector selector;
+    protected final AtomicBoolean wakeupPending;
+    protected volatile Thread selectorThread;
 
-    protected AbstractSocketSelector() throws IOException {
-        this.logger = System.getLogger(AbstractSocketSelector.class.getName());
+    protected AbstractSocketClientSelector() throws IOException {
+        this.logger = System.getLogger(AbstractSocketClientSelector.class.getName());
         this.selector = Selector.open();
         this.wakeupPending = new AtomicBoolean();
     }
@@ -70,6 +73,12 @@ public abstract class AbstractSocketSelector {
         }
 
         ctx.stopListenerExecutor();
+
+        try {
+            ctx.onClose();
+        } catch (Throwable error) {
+            logger.log(ERROR, error);
+        }
 
         wakeup();
     }
@@ -196,14 +205,14 @@ public abstract class AbstractSocketSelector {
         }
     }
 
-    private boolean processPreTunnelRead(SocketChannel channel, AbstractSocketClientContext ctx, SelectionKey key) throws IOException {
+    protected boolean processPreTunnelRead(SocketChannel channel, AbstractSocketClientContext ctx, SelectionKey key) throws IOException {
         var pendingRead = ctx.pendingBinaryRead;
         if (pendingRead == null) {
             key.interestOps(key.interestOps() & ~SelectionKey.OP_READ);
             return true;
         }
 
-        var bytesRead = sslRead(channel, ctx, pendingRead.buffer);
+        var bytesRead = executePreTunnelRead(channel, ctx, pendingRead.buffer);
         if (bytesRead == -1) {
             pendingRead.length = -1;
             synchronized (pendingRead.lock) {
@@ -233,17 +242,39 @@ public abstract class AbstractSocketSelector {
         return true;
     }
 
-    protected abstract int sslRead(SocketChannel channel, AbstractSocketClientContext ctx, ByteBuffer target) throws IOException;
-
     protected void wakeup() {
         if (wakeupPending.compareAndSet(false, true)) {
             selector.wakeup();
         }
     }
 
+    protected boolean advanceDatagram(AbstractSocketClientContext ctx, boolean noDatagram) {
+        if (noDatagram) {
+            ctx.datagramLengthBuffer.flip();
+            var length = ((ctx.datagramLengthBuffer.get() & 0xFF) << 16)
+                         | ((ctx.datagramLengthBuffer.get() & 0xFF) << 8)
+                         | (ctx.datagramLengthBuffer.get() & 0xFF);
+            if (length > MAX_MESSAGE_LENGTH) {
+                return false;
+            }
+            ctx.datagramBuffer = ByteBuffer.allocate(length);
+            return true;
+        } else {
+            ctx.datagramBuffer.flip();
+            ctx.datagramLengthBuffer.clear();
+            var buffer = ctx.datagramBuffer;
+            ctx.datagramBuffer = null;
+            // Ordering is important at this stage
+            ctx.datagramListenerVirtualExecutor.execute(() -> ctx.transportListener.onDatagram(buffer));
+            return true;
+        }
+    }
+
     protected abstract boolean processRead(SocketChannel channel, AbstractSocketClientContext ctx, SelectionKey key) throws IOException;
 
-    protected abstract boolean processWrite(SocketChannel channel, AbstractSocketClientContext ctx);
+    protected abstract boolean processWrite(SocketChannel channel, AbstractSocketClientContext ctx) throws IOException;
+
+    protected abstract int executePreTunnelRead(SocketChannel channel, AbstractSocketClientContext ctx, ByteBuffer target) throws IOException;
 
     private void select() {
         try {

@@ -1,8 +1,8 @@
-package com.github.auties00.cobalt.socket.implementation.websocket;
+package com.github.auties00.cobalt.socket.implementation.client.webSocket;
 
 import com.github.auties00.cobalt.client.WhatsAppClientProxy;
-import com.github.auties00.cobalt.socket.implementation.SocketClient;
-import com.github.auties00.cobalt.socket.implementation.SocketClientListener;
+import com.github.auties00.cobalt.socket.implementation.client.tcp.SocketClient;
+import com.github.auties00.cobalt.socket.implementation.client.tcp.SocketClientListener;
 import com.github.auties00.cobalt.socket.implementation.context.AbstractSocketClientContext;
 import com.github.auties00.cobalt.socket.implementation.transport.websocket.frame.WebSocketFrameEncoder;
 

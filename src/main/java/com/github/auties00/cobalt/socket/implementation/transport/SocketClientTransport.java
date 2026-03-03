@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.socket.implementation.transport;
 
-import com.github.auties00.cobalt.socket.implementation.SocketClientListener;
+import com.github.auties00.cobalt.socket.implementation.client.tcp.SocketClientListener;
 import com.github.auties00.cobalt.socket.implementation.context.AbstractSocketClientContext;
 import com.github.auties00.cobalt.socket.implementation.transport.tcp.TCPSocketClientTransport;
 import com.github.auties00.cobalt.socket.implementation.transport.websocket.WebSocketClientTransport;
@@ -16,6 +16,8 @@ public sealed interface SocketClientTransport permits TCPSocketClientTransport, 
     }
 
     AbstractSocketClientContext connect(InetSocketAddress endpoint, SocketClientListener listener) throws IOException, InterruptedException;
+    boolean finishConnect();
+
     void disconnect() throws IOException;
     void sendBinary(ByteBuffer... buffers);
     boolean isConnected();

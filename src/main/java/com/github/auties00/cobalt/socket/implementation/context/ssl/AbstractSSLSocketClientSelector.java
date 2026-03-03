@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.socket.implementation.context.ssl;
 
 import com.github.auties00.cobalt.socket.implementation.context.AbstractSocketClientContext;
-import com.github.auties00.cobalt.socket.implementation.context.AbstractSocketSelector;
+import com.github.auties00.cobalt.socket.implementation.context.AbstractSocketClientSelector;
 
 import javax.net.ssl.SSLEngineResult;
 import javax.net.ssl.SSLException;
@@ -9,24 +9,16 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.CancelledKeyException;
 import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
-import java.util.concurrent.atomic.AtomicBoolean;
+
+import static java.lang.System.Logger.Level.ERROR;
 
 
-public abstract class AbstractSSLSocketSelector extends AbstractSocketSelector {
+public abstract class AbstractSSLSocketClientSelector extends AbstractSocketClientSelector {
     private static final ByteBuffer EMPTY_BUFFER = ByteBuffer.allocate(0);
 
-    private final System.Logger logger;
-    private final Selector selector;
-    private final AtomicBoolean wakeupPending;
-    private volatile Thread selectorThread;
-
-    private AbstractSSLSocketSelector() throws IOException {
+    protected AbstractSSLSocketClientSelector() throws IOException {
         super();
-        this.logger = System.getLogger(AbstractSSLSocketSelector.class.getName());
-        this.selector = Selector.open();
-        this.wakeupPending = new AtomicBoolean();
     }
 
     @Override
@@ -44,37 +36,43 @@ public abstract class AbstractSSLSocketSelector extends AbstractSocketSelector {
 
         }
 
-        var ctx = (AbstractSSLSocketClientContext) key.attachment();
+        var sslCtx = (AbstractSSLSocketClientContext) key.attachment();
 
         // Always notify waiting threads so they don't block until timeout
-        var pendingRead = ctx.pendingBinaryRead;
+        var pendingRead = sslCtx.pendingBinaryRead;
         if (pendingRead != null) {
             pendingRead.length = -1;
-            ctx.pendingBinaryRead = null;
+            sslCtx.pendingBinaryRead = null;
             synchronized (pendingRead.lock) {
                 pendingRead.lock.notifyAll();
             }
         }
 
-        synchronized (ctx.connectionLock) {
-            ctx.connectionLock.notifyAll();
+        synchronized (sslCtx.connectionLock) {
+            sslCtx.connectionLock.notifyAll();
         }
 
-        synchronized (ctx.sslHandshakeLock) {
-            ctx.sslHandshakeLock.notifyAll();
+        synchronized (sslCtx.sslHandshakeLock) {
+            sslCtx.sslHandshakeLock.notifyAll();
         }
 
         // Use connected CAS to guard listener notification and executor shutdown
-        if (!ctx.connected.compareAndSet(true, false)) {
+        if (!sslCtx.connected.compareAndSet(true, false)) {
             wakeup();
             return;
         }
 
-        if (ctx.sslEngine != null) {
-            ctx.sslEngine.closeOutbound();
+        if (sslCtx.sslEngine != null) {
+            sslCtx.sslEngine.closeOutbound();
         }
 
-        ctx.stopListenerExecutor();
+        sslCtx.stopListenerExecutor();
+
+        try {
+            sslCtx.onClose();
+        } catch (Throwable error) {
+            logger.log(ERROR, error);
+        }
 
         wakeup();
     }
@@ -85,12 +83,12 @@ public abstract class AbstractSSLSocketSelector extends AbstractSocketSelector {
             throw new IOException("Channel not registered");
         }
 
-        var ctx = (AbstractSSLSocketClientContext) key.attachment();
-        if (ctx.sslEngine == null) {
+        var sslCtx = (AbstractSSLSocketClientContext) key.attachment();
+        if (sslCtx.sslEngine == null) {
             throw new IOException("SSL not initialized on context");
         }
 
-        ctx.sslEngine.beginHandshake();
+        sslCtx.sslEngine.beginHandshake();
 
         try {
             key.interestOps(SelectionKey.OP_READ | SelectionKey.OP_WRITE);
@@ -99,15 +97,15 @@ public abstract class AbstractSSLSocketSelector extends AbstractSocketSelector {
         }
         wakeup();
 
-        synchronized (ctx.sslHandshakeLock) {
+        synchronized (sslCtx.sslHandshakeLock) {
             var deadline = System.currentTimeMillis() + timeout;
-            while (!ctx.sslHandshakeComplete && ctx.connected.get()) {
+            while (!sslCtx.sslHandshakeComplete && sslCtx.connected.get()) {
                 var remaining = deadline - System.currentTimeMillis();
                 if (remaining <= 0) {
                     throw new IOException("TLS handshake timed out");
                 }
                 try {
-                    ctx.sslHandshakeLock.wait(remaining);
+                    sslCtx.sslHandshakeLock.wait(remaining);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     throw new IOException("TLS handshake interrupted", e);
@@ -115,48 +113,48 @@ public abstract class AbstractSSLSocketSelector extends AbstractSocketSelector {
             }
         }
 
-        if (!ctx.sslHandshakeComplete) {
+        if (!sslCtx.sslHandshakeComplete) {
             throw new IOException("TLS handshake failed: connection lost");
         }
     }
 
     @Override
     protected void handleKey(SelectionKey key) {
-        var attachment = key.attachment();
-        if (!(attachment instanceof AbstractSSLSocketClientContext ctx)) {
-            return;
-        }
+        var sslCtx = (AbstractSSLSocketClientContext)key.attachment();
 
         var channel = (SocketChannel) key.channel();
         try {
             if (key.isConnectable()) {
                 if (channel.finishConnect()) {
                     key.interestOps(SelectionKey.OP_READ);
-                    synchronized (ctx.connectionLock) {
-                        ctx.connectionLock.notifyAll();
+                    synchronized (sslCtx.connectionLock) {
+                        sslCtx.connectionLock.notifyAll();
                     }
                 }
             }
 
-            if (ctx.sslEngine != null && ctx.sslHandshaking) {
-                if (ctx.sslTasksPending) {
+            if (sslCtx.sslEngine != null && sslCtx.sslHandshaking) {
+                if (sslCtx.sslTasksPending) {
                     return;
                 }
-                if (!driveHandshake(channel, ctx, key)) {
+                if (!driveHandshake(channel, sslCtx, key)) {
                     unregister(channel);
                 }
                 return;
             }
 
             if (key.isReadable()) {
-                if (!processRead(channel, ctx, key)) {
+                if(!processPreTunnelRead(channel, sslCtx, key)) {
+                    unregister(channel);
+                    return;
+                }else if (!processRead(channel, sslCtx, key)) {
                     unregister(channel);
                     return;
                 }
             }
             if (key.isWritable()) {
-                if (processWrite(channel, ctx)) {
-                    if (!ctx.pendingWrites.isEmpty()) {
+                if (processWrite(channel, sslCtx)) {
+                    if (!sslCtx.pendingWrites.isEmpty()) {
                         key.interestOps(key.interestOps() | SelectionKey.OP_WRITE);
                     } else {
                         key.interestOps(key.interestOps() & ~SelectionKey.OP_WRITE);
@@ -280,10 +278,129 @@ public abstract class AbstractSSLSocketSelector extends AbstractSocketSelector {
         throw new IOException("Unexpected end of stream");
     }
 
-    protected boolean processRead(SocketChannel channel, AbstractSocketClientContext ctx, SelectionKey key) throws IOException {
+    @Override
+    protected int executePreTunnelRead(SocketChannel channel, AbstractSocketClientContext ctx, ByteBuffer target) throws IOException {
+        var sslCtx = (AbstractSSLSocketClientContext) ctx;
+        if (sslCtx.sslEngine == null) {
+            return channel.read(target);
+        }
 
+        // Slow path: drain leftover decrypted data from previous unwrap
+        sslCtx.appInBuffer.flip();
+        if (sslCtx.appInBuffer.hasRemaining()) {
+            var transferred = transferBytes(sslCtx.appInBuffer, target);
+            sslCtx.appInBuffer.compact();
+            if (transferred > 0) {
+                return transferred;
+            }
+        } else {
+            sslCtx.appInBuffer.compact();
+        }
+
+        // Read encrypted data from channel into direct buffer
+        var bytesRead = channel.read(sslCtx.netInBuffer);
+        if (bytesRead == -1) {
+            return -1;
+        }
+        if (bytesRead == 0 && sslCtx.netInBuffer.position() == 0) {
+            return 0;
+        }
+
+        // Fast path: unwrap directly into target (avoids appInBuffer copy)
+        sslCtx.netInBuffer.flip();
+        SSLEngineResult result;
+        try {
+            result = sslCtx.sslEngine.unwrap(sslCtx.netInBuffer, target);
+        } catch (SSLException e) {
+            sslCtx.netInBuffer.compact();
+            throw new IOException("SSL unwrap failed", e);
+        }
+
+        switch (result.getStatus()) {
+            case OK -> {
+                sslCtx.netInBuffer.compact();
+                return result.bytesProduced();
+            }
+            case BUFFER_UNDERFLOW -> {
+                sslCtx.netInBuffer.compact();
+                return 0;
+            }
+            case BUFFER_OVERFLOW -> {
+                // Target too small for a full TLS record; unwrap into appInBuffer
+                try {
+                    result = sslCtx.sslEngine.unwrap(sslCtx.netInBuffer, sslCtx.appInBuffer);
+                } catch (SSLException e) {
+                    sslCtx.netInBuffer.compact();
+                    throw new IOException("SSL unwrap failed", e);
+                }
+                sslCtx.netInBuffer.compact();
+
+                if (result.getStatus() != SSLEngineResult.Status.OK) {
+                    return 0;
+                }
+
+                sslCtx.appInBuffer.flip();
+                var transferred = transferBytes(sslCtx.appInBuffer, target);
+                sslCtx.appInBuffer.compact();
+                return transferred;
+            }
+            case CLOSED -> {
+                sslCtx.netInBuffer.compact();
+                return -1;
+            }
+        }
+
+        sslCtx.netInBuffer.compact();
+        return 0;
     }
 
+    private static int transferBytes(ByteBuffer src, ByteBuffer dst) {
+        var count = Math.min(src.remaining(), dst.remaining());
+        if (count <= 0) {
+            return 0;
+        }
+        var savedLimit = src.limit();
+        src.limit(src.position() + count);
+        dst.put(src);
+        src.limit(savedLimit);
+        return count;
+    }
 
-    protected abstract boolean processWrite(SocketChannel channel, AbstractSocketClientContext ctx);
+    public boolean drainSslAppBuffer(SocketChannel channel) {
+        var key = channel.keyFor(selector);
+        if (key == null) {
+            return false;
+        }
+
+        var sslCtx = (AbstractSSLSocketClientContext) key.attachment();
+        if (sslCtx.sslEngine == null || sslCtx.appInBuffer == null) {
+            return true;
+        }
+
+        sslCtx.appInBuffer.flip();
+        if (!sslCtx.appInBuffer.hasRemaining()) {
+            sslCtx.appInBuffer.compact();
+            return true;
+        }
+
+        var result = feedDatagram(sslCtx, sslCtx.appInBuffer);
+        sslCtx.appInBuffer.compact();
+        return result;
+    }
+
+    private boolean feedDatagram(AbstractSocketClientContext ctx, ByteBuffer source) {
+        while (source.hasRemaining()) {
+            var noDatagram = ctx.datagramBuffer == null;
+            var target = noDatagram ? ctx.datagramLengthBuffer : ctx.datagramBuffer;
+            var count = Math.min(source.remaining(), target.remaining());
+            var savedLimit = source.limit();
+            source.limit(source.position() + count);
+            target.put(source);
+            source.limit(savedLimit);
+            if (!target.hasRemaining() && !advanceDatagram(ctx, noDatagram)) {
+                return false;
+            }
+        }
+        return true;
+    }
 }

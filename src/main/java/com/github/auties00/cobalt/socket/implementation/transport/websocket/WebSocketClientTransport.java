@@ -1,9 +1,8 @@
 package com.github.auties00.cobalt.socket.implementation.transport.websocket;
 
-import com.github.auties00.cobalt.socket.implementation.SocketClientListener;
+import com.github.auties00.cobalt.socket.implementation.client.tcp.SocketClientListener;
 import com.github.auties00.cobalt.socket.implementation.context.AbstractSocketClientContext;
 import com.github.auties00.cobalt.socket.implementation.context.SocketPendingRead;
-import com.github.auties00.cobalt.socket.implementation.context.AbstractSocketSelector;
 import com.github.auties00.cobalt.socket.implementation.transport.SocketClientTransport;
 import com.github.auties00.cobalt.socket.implementation.transport.tcp.TCPSocketClientContext;
 
@@ -26,7 +25,7 @@ public final class WebSocketClientTransport implements SocketClientTransport {
     }
 
     @Override
-    public AbstractSocketClientContext connect(InetSocketAddress endpoint, SocketClientListener listener) throws IOException, InterruptedException {
+    public WebSocketClientContext connect(InetSocketAddress endpoint, SocketClientListener listener) throws IOException, InterruptedException {
         Objects.requireNonNull(endpoint, "endpoint must not be null");
         Objects.requireNonNull(listener, "listener must not be null");
 
@@ -38,11 +37,11 @@ public final class WebSocketClientTransport implements SocketClientTransport {
         channel.setOption(StandardSocketOptions.TCP_NODELAY, true);
         channel.setOption(StandardSocketOptions.SO_KEEPALIVE, true);
         channel.configureBlocking(false);
-        var ctx = new TCPSocketClientContext(listener);
+        var ctx = new WebSocketClientContext(listener);
         if (channel.connect(endpoint)) {
-            AbstractSocketSelector.INSTANCE.register(channel, SelectionKey.OP_READ, ctx);
+            WebSocketClientSelector.INSTANCE.register(channel, SelectionKey.OP_READ, ctx);
         } else {
-            AbstractSocketSelector.INSTANCE.register(channel, SelectionKey.OP_CONNECT, ctx);
+            WebSocketClientSelector.INSTANCE.register(channel, SelectionKey.OP_CONNECT, ctx);
             synchronized (ctx.connectionLock) {
                 var deadline = System.currentTimeMillis() + DEFAULT_CONNECT_TIMEOUT;
                 while (!channel.isConnected() && channel.isOpen()) {
@@ -54,7 +53,7 @@ public final class WebSocketClientTransport implements SocketClientTransport {
                 }
             }
             if (!channel.isConnected()) {
-                AbstractSocketSelector.INSTANCE.unregister(channel);
+                WebSocketClientSelector.INSTANCE.unregister(channel);
                 throw new IOException("Connection timed out");
             }
         }
@@ -69,7 +68,7 @@ public final class WebSocketClientTransport implements SocketClientTransport {
             throw new IOException("Socket is not connected");
         }
 
-        AbstractSocketSelector.INSTANCE.unregister(channel);
+        WebSocketClientSelector.INSTANCE.unregister(channel);
     }
 
     @Override
@@ -78,14 +77,14 @@ public final class WebSocketClientTransport implements SocketClientTransport {
             throw new IllegalStateException("Socket is not connected");
         }
 
-        if (!AbstractSocketSelector.INSTANCE.addWrite(channel, buffers)) {
+        if (!WebSocketClientSelector.INSTANCE.addWrite(channel, buffers)) {
             throw new IllegalStateException("Failed to send binary");
         }
     }
 
     @Override
     public boolean isConnected() {
-        return AbstractSocketSelector.INSTANCE.isConnected(channel);
+        return WebSocketClientSelector.INSTANCE.isConnected(channel);
     }
 
     @Override
@@ -95,7 +94,7 @@ public final class WebSocketClientTransport implements SocketClientTransport {
         }
 
         var read = new SocketPendingRead(buffer, fully);
-        if(!AbstractSocketSelector.INSTANCE.addRead(channel, read)) {
+        if(!WebSocketClientSelector.INSTANCE.addRead(channel, read)) {
             throw new IllegalStateException("Failed to read binary");
         }
 
@@ -117,7 +116,7 @@ public final class WebSocketClientTransport implements SocketClientTransport {
 
         if(read.length == -1) {
             if (isConnected()) {
-                AbstractSocketSelector.INSTANCE.unregister(channel);
+                WebSocketClientSelector.INSTANCE.unregister(channel);
                 throw new IOException("Read timed out");
             } else {
                 throw new IOException("Unexpected end of stream");

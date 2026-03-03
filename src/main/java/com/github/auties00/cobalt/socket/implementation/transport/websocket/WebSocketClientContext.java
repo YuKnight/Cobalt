@@ -2,9 +2,19 @@ package com.github.auties00.cobalt.socket.implementation.transport.websocket;
 
 import com.github.auties00.cobalt.socket.implementation.context.ssl.AbstractSSLSocketClientContext;
 import com.github.auties00.cobalt.socket.implementation.transport.websocket.frame.WebSocketFrameDecoder;
-import com.github.auties00.cobalt.socket.implementation.websocket.WebSocketClientListener;
+import com.github.auties00.cobalt.socket.implementation.client.webSocket.WebSocketClientListener;
+
+import java.nio.ByteBuffer;
+import java.util.Objects;
 
 public final class WebSocketClientContext extends AbstractSSLSocketClientContext {
+    private static final int UNEXPECTED_CLOSURE = 1006;
+
+    /**
+     * The websocket listener.
+     */
+    public final WebSocketClientListener webSocketFrameListener;
+
     /**
      * Stateful websocket parser context. Initialized lazily when websocket
      * framing is enabled for this channel.
@@ -12,21 +22,22 @@ public final class WebSocketClientContext extends AbstractSSLSocketClientContext
     public final WebSocketFrameDecoder webSocketFrameDecoder;
 
     /**
-     * Callback invoked when a complete inbound datagram has been
-     * reassembled.
-     *
-     * <p> The selector thread dispatches each datagram to the listener
-     * on a virtual thread to avoid blocking the selection loop.
-     */
-    public final WebSocketClientListener listener;
-
-    /**
      * Creates a context for a new connection.
      *
-     * @param listener  the callback to receive completed inbound datagrams
+     * @param webSocketFrameListener the websocket listener.
      */
-    public WebSocketClientContext(WebSocketClientListener listener) {
+    public WebSocketClientContext(WebSocketClientListener webSocketFrameListener) {
+        this.webSocketFrameListener = Objects.requireNonNull(webSocketFrameListener, "webSocketFrameListener cannot be null");
         this.webSocketFrameDecoder = new WebSocketFrameDecoder();
-        this.listener = listener;
+    }
+
+    @Override
+    public void onDatagram(ByteBuffer datagram) {
+        webSocketFrameListener.onDatagram(datagram);
+    }
+
+    @Override
+    public void onClose() {
+        webSocketFrameListener.onClose(UNEXPECTED_CLOSURE, "");
     }
 }

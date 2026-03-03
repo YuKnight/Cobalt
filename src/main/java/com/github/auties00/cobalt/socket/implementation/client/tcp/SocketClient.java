@@ -1,4 +1,4 @@
-package com.github.auties00.cobalt.socket.implementation;
+package com.github.auties00.cobalt.socket.implementation.client.tcp;
 
 import com.github.auties00.cobalt.client.WhatsAppClientProxy;
 import com.github.auties00.cobalt.socket.implementation.tunnel.SocketClientTunnel;

@@ -8,6 +8,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public abstract class AbstractSocketClientContext {
+    private static final int INT24_BYTE_SIZE = 3;
     private static final int WRITES_CHUNK_CAPACITY = 64;
 
     /**
@@ -81,32 +82,54 @@ public abstract class AbstractSocketClientContext {
     /**
      * The virtual executor for listener events
      */
-    public volatile ExecutorService listenerVirtualExecutor;
+    public volatile ExecutorService datagramListenerVirtualExecutor;
 
     /**
      * The lock to create/destroy the virtual executor for listener events
      */
-    public final Object listenerVirtualExecutorLock;
+    public final Object datagramListenerVirtualExecutorLock;
+
+    /**
+     * Buffer for reading the 3-byte length prefix of the current inbound
+     * WhatsApp datagram.
+     *
+     * <p> Used only during the post-tunnel phase.  Accessed exclusively
+     * by the selector thread.  Cleared and reused after each complete
+     * datagram delivery.
+     */
+    public final ByteBuffer datagramLengthBuffer;
+
+    /**
+     * Buffer for accumulating the payload of the current inbound WhatsApp
+     * datagram, or {@code null} if the length prefix has not yet been
+     * fully read.
+     *
+     * <p> Allocated by the selector thread once the 3-byte length prefix
+     * is complete, sized to the decoded length.  Set back to {@code null}
+     * after the completed datagram is handed off.
+     * Accessed exclusively by the selector thread.
+     */
+    public ByteBuffer datagramBuffer;
 
     /**
      * Creates a context for a new connection.
-     *
      */
     public AbstractSocketClientContext() {
         this.connected = new AtomicBoolean(false);
         this.connectionLock = new Object();
         this.pendingWrites = new SocketPendingWrites(WRITES_CHUNK_CAPACITY);
-        this.listenerVirtualExecutorLock = new Object();
+        this.datagramListenerVirtualExecutorLock = new Object();
+        this.datagramLengthBuffer = ByteBuffer.allocate(INT24_BYTE_SIZE);
     }
 
     /**
      * Starts the virtual listener executor if one doesn't already exist
      */
     public void startListenerExecutor() {
-        if(listenerVirtualExecutor == null || listenerVirtualExecutor.isShutdown()) {
-            synchronized (listenerVirtualExecutorLock) {
-                if(listenerVirtualExecutor == null || listenerVirtualExecutor.isShutdown()) {
-                    listenerVirtualExecutor = Executors.newSingleThreadExecutor(Thread.ofVirtual().factory());
+        if(datagramListenerVirtualExecutor == null || datagramListenerVirtualExecutor.isShutdown()) {
+            synchronized (datagramListenerVirtualExecutorLock) {
+                if(datagramListenerVirtualExecutor == null || datagramListenerVirtualExecutor.isShutdown()) {
+                    datagramListenerVirtualExecutor = Executors.newSingleThreadExecutor(Thread.ofVirtual().factory());
                 }
             }
         }
@@ -116,13 +139,17 @@ public abstract class AbstractSocketClientContext {
      * Stops the virtual listener executor if one exists
      */
     public void stopListenerExecutor() {
-        if(listenerVirtualExecutor != null && !listenerVirtualExecutor.isShutdown()) {
-            synchronized (listenerVirtualExecutorLock) {
-                if(listenerVirtualExecutor != null && !listenerVirtualExecutor.isShutdown()) {
-                    listenerVirtualExecutor.shutdownNow();
-                    listenerVirtualExecutor = null;
+        if(datagramListenerVirtualExecutor != null && !datagramListenerVirtualExecutor.isShutdown()) {
+            synchronized (datagramListenerVirtualExecutorLock) {
+                if(datagramListenerVirtualExecutor != null && !datagramListenerVirtualExecutor.isShutdown()) {
+                    datagramListenerVirtualExecutor.shutdownNow();
+                    datagramListenerVirtualExecutor = null;
                 }
             }
         }
     }
+
+    public abstract void onDatagram(ByteBuffer datagram);
+
+    public abstract void onClose();
 }

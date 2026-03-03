@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.socket.implementation.tunnel;
 
-import com.github.auties00.cobalt.socket.implementation.SocketClientListener;
+import com.github.auties00.cobalt.socket.implementation.client.tcp.SocketClientListener;
 import com.github.auties00.cobalt.socket.implementation.transport.SocketClientTransport;
 
 import java.io.IOException;
