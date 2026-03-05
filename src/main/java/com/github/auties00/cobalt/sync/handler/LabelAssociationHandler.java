@@ -4,6 +4,7 @@ import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.model.sync.action.contact.LabelAssociationAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
@@ -23,49 +24,48 @@ public final class LabelAssociationHandler implements WebAppStateActionHandler {
 
     @Override
     public String actionName() {
-        return "labelAssociationAction";
+        return LabelAssociationAction.ACTION_NAME;
     }
 
     @Override
     public SyncPatchType collectionName() {
-        return SyncPatchType.REGULAR;
+        return LabelAssociationAction.COLLECTION_NAME;
     }
 
     @Override
     public int version() {
-        return 15;
+        return LabelAssociationAction.ACTION_VERSION;
     }
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        var action = mutation.value()
-                .labelAssociationAction()
-                .orElseThrow(() -> new IllegalArgumentException("Missing labelAssociationAction"));
+        if (!(mutation.value().action().orElse(null) instanceof LabelAssociationAction action)) {
+            return false;
+        }
 
-        // Extract info from index
+        // Web only supports SET; REMOVE is unsupported
+        if (mutation.operation() != SyncdOperation.SET) {
+            return true;
+        }
+
         var indexArray = JSON.parseArray(mutation.index());
         var targetJidString = indexArray.getString(1);
         var labelId = indexArray.getInteger(2);
+        if (targetJidString == null || labelId == null) {
+            return false;
+        }
 
         var targetJid = Jid.of(targetJidString);
 
-        // Find label
         var label = client.store()
                 .findLabel(labelId);
         if (label.isEmpty()) {
             return false;
         }
 
-        // Apply the action
-        if (mutation.operation() == SyncdOperation.SET) {
-            // Associate label
-            if (action.labeled()) {
-                label.get().addAssignment(targetJid);
-            } else {
-                label.get().removeAssignment(targetJid);
-            }
+        if (action.labeled()) {
+            label.get().addAssignment(targetJid);
         } else {
-            // Remove association
             label.get().removeAssignment(targetJid);
         }
 

@@ -5,7 +5,11 @@ import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.chat.ChatMute;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.model.sync.action.chat.MuteAction;
+import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.time.Instant;
 
 /**
  * Handles mute chat actions.
@@ -23,24 +27,32 @@ public final class MuteChatHandler implements WebAppStateActionHandler {
 
     @Override
     public String actionName() {
-        return "muteAction";
+        return MuteAction.ACTION_NAME;
     }
 
     @Override
     public SyncPatchType collectionName() {
-        return SyncPatchType.REGULAR_LOW;
+        return MuteAction.COLLECTION_NAME;
     }
 
     @Override
     public int version() {
-        return 4;
+        return MuteAction.ACTION_VERSION;
     }
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        var action = mutation.value()
-                .muteAction()
-                .orElseThrow(() -> new IllegalArgumentException("Missing muteAction"));
+        if (mutation.operation() != SyncdOperation.SET) {
+            return false;
+        }
+
+        if (!(mutation.value().action().orElse(null) instanceof MuteAction action)) {
+            return false;
+        }
+
+        if (action.muted() && action.muteEndTimestamp().isEmpty()) {
+            return false;
+        }
 
         var chatJidString = JSON.parseArray(mutation.index())
                 .getString(1);
@@ -52,11 +64,14 @@ public final class MuteChatHandler implements WebAppStateActionHandler {
             return false;
         }
 
-        switch (mutation.operation()) {
-            case SET -> action.muteEndTimestamp()
-                    .ifPresent(muteEndTimestamp -> chat.get().setMute(ChatMute.mutedUntil(muteEndTimestamp.getEpochSecond())));
-            case REMOVE -> chat.get().setMute(ChatMute.notMuted());
+        var muteEndSeconds = action.muteEndTimestamp()
+                .map(Instant::getEpochSecond)
+                .orElse(0L);
+        if (muteEndSeconds > 0 && muteEndSeconds < Instant.now().getEpochSecond()) {
+            muteEndSeconds = 0L;
         }
+
+        chat.get().setMute(ChatMute.mutedUntil(muteEndSeconds));
 
         return true;
     }

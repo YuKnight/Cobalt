@@ -7,14 +7,18 @@ import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.MessageInfo;
 import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.model.sync.action.contact.StarAction;
+import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 /**
  * Handles star message actions.
  *
  * <p>This handler processes mutations that star or unstar messages.
+ * Only SET operations are supported, matching the WhatsApp Web
+ * {@code WAWebStarMessageSync} module behavior.
  *
- * <p>Index format: ["starAction", "chatJid", "messageId", "fromMe", "participant"]
+ * <p>Index format: ["star", "chatJid", "messageId", "fromMe", "participant"]
  */
 public final class StarMessageHandler implements WebAppStateActionHandler {
     public static final StarMessageHandler INSTANCE = new StarMessageHandler();
@@ -25,23 +29,25 @@ public final class StarMessageHandler implements WebAppStateActionHandler {
 
     @Override
     public String actionName() {
-        return "starAction";
+        return StarAction.ACTION_NAME;
     }
 
     @Override
     public SyncPatchType collectionName() {
-        return SyncPatchType.REGULAR_HIGH;
+        return StarAction.COLLECTION_NAME;
     }
 
     @Override
     public int version() {
-        return 5;
+        return StarAction.ACTION_VERSION;
     }
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
 
-        var action = mutation.value().starAction().orElseThrow(() -> new IllegalArgumentException("Missing starAction"));
+        if (!(mutation.value().action().orElse(null) instanceof StarAction action)) {
+            return false;
+        }
 
         var indexArray = JSON.parseArray(mutation.index());
         if (indexArray.size() < 5) {
@@ -61,10 +67,12 @@ public final class StarMessageHandler implements WebAppStateActionHandler {
             return false;
         }
 
-        switch (mutation.operation()) {
-            case SET -> starMessage(message.get(), action.starred());
-            case REMOVE -> starMessage(message.get(), false);
+        // Web only supports SET for star mutations (REMOVE returns Unsupported)
+        if (mutation.operation() != SyncdOperation.SET) {
+            return true;
         }
+
+        starMessage(message.get(), action.starred());
 
         return true;
     }

@@ -1,7 +1,9 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.model.setting.ChatLockSettings;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 /**
@@ -25,21 +27,30 @@ public final class ChatLockSettingsHandler implements WebAppStateActionHandler {
 
     @Override
     public String actionName() {
-        return "setting_chatLock";
+        return ChatLockSettings.ACTION_NAME;
     }
 
     @Override
     public SyncPatchType collectionName() {
-        return SyncPatchType.REGULAR_LOW;
+        return ChatLockSettings.COLLECTION_NAME;
     }
 
     @Override
     public int version() {
-        return 7;
+        return ChatLockSettings.ACTION_VERSION;
     }
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        if (mutation.operation() != SyncdOperation.SET) {
+            return false;
+        }
+
+        if (!(mutation.value().chatLockSettings().orElse(null) instanceof ChatLockSettings settings)) {
+            return false;
+        }
+
+        client.store().setChatLockSettings(settings);
         return true;
     }
 }

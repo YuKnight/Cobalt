@@ -55,7 +55,6 @@ public final class WebAppStateHandlerRegistry {
 
         // Sticker and avatar actions
         registerHandler(FavoriteStickerHandler.INSTANCE);
-        registerHandler(StickerHandler.INSTANCE);
         registerHandler(RemoveRecentStickerHandler.INSTANCE);
         registerHandler(AvatarUpdatedHandler.INSTANCE);
 
@@ -71,7 +70,6 @@ public final class WebAppStateHandlerRegistry {
         // User preference actions
         registerHandler(UserStatusMuteHandler.INSTANCE);
         registerHandler(TimeFormatHandler.INSTANCE);
-        registerHandler(RecentEmojiWeightsHandler.INSTANCE);
         registerHandler(FavoritesHandler.INSTANCE);
 
         // System actions

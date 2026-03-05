@@ -1,16 +1,24 @@
 package com.github.auties00.cobalt.sync.handler;
 
+import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.device.pairing.ClientAppVersion;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.model.sync.action.device.PrimaryVersionAction;
+import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 /**
  * Handles primary version actions.
  *
  * <p>This handler processes mutations that track the primary WhatsApp client version.
+ *
+ * <p>Index format: ["primaryVersion", "current"|"session_start"]
  */
 public final class PrimaryVersionHandler implements WebAppStateActionHandler {
+    private static final String INDEX_CURRENT = "current";
+    private static final String INDEX_SESSION_START = "session_start";
+
     public static final PrimaryVersionHandler INSTANCE = new PrimaryVersionHandler();
 
     private PrimaryVersionHandler() {
@@ -19,24 +27,38 @@ public final class PrimaryVersionHandler implements WebAppStateActionHandler {
 
     @Override
     public String actionName() {
-        return "primaryVersionAction";
+        return PrimaryVersionAction.ACTION_NAME;
     }
 
     @Override
     public SyncPatchType collectionName() {
-        return SyncPatchType.REGULAR_LOW;
+        return PrimaryVersionAction.COLLECTION_NAME;
     }
 
     @Override
     public int version() {
-        return 7;
+        return PrimaryVersionAction.ACTION_VERSION;
     }
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        var action = mutation.value()
-                .primaryVersionAction()
-                .orElseThrow(() -> new IllegalArgumentException("Missing primaryVersionAction"));
+        // Web source (WAWebPrimaryVersionSync): only SET is supported.
+        // Validates indexParts[1] is "current" or "session_start".
+        // Validates primaryVersionAction.version is present.
+        // Web does not actually persist the version; we store it as companion version.
+        if (mutation.operation() != SyncdOperation.SET) {
+            return false;
+        }
+
+        if (!(mutation.value().action().orElse(null) instanceof PrimaryVersionAction action)) {
+            return false;
+        }
+
+        var indexArray = JSON.parseArray(mutation.index());
+        var subIndex = indexArray.getString(1);
+        if (subIndex == null || (!subIndex.equals(INDEX_CURRENT) && !subIndex.equals(INDEX_SESSION_START))) {
+            return false;
+        }
 
         action.version()
                 .map(ClientAppVersion::of)

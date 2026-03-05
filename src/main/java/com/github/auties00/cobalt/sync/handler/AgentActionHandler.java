@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.model.sync.action.device.AgentAction;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 /**
@@ -21,22 +22,24 @@ public final class AgentActionHandler implements WebAppStateActionHandler {
 
     @Override
     public String actionName() {
-        return "agentAction";
+        return AgentAction.ACTION_NAME;
     }
 
     @Override
     public SyncPatchType collectionName() {
-        return SyncPatchType.REGULAR;
+        return AgentAction.COLLECTION_NAME;
     }
 
     @Override
     public int version() {
-        return 7;
+        return AgentAction.ACTION_VERSION;
     }
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        // Not handled
+        // Web creates/merges agent records on SET (with name, deviceId, isDeleted)
+        // and removes agents on REMOVE. No agent model exists in the Java store,
+        // so this is a no-op.
         return true;
     }
 }

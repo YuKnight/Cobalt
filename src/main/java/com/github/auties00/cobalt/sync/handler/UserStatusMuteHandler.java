@@ -4,6 +4,8 @@ import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.model.sync.action.contact.UserStatusMuteAction;
+import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 /**
@@ -22,24 +24,28 @@ public final class UserStatusMuteHandler implements WebAppStateActionHandler {
 
     @Override
     public String actionName() {
-        return "userStatusMuteAction";
+        return UserStatusMuteAction.ACTION_NAME;
     }
 
     @Override
     public SyncPatchType collectionName() {
-        return SyncPatchType.REGULAR;
+        return UserStatusMuteAction.COLLECTION_NAME;
     }
 
     @Override
     public int version() {
-        return 7;
+        return UserStatusMuteAction.ACTION_VERSION;
     }
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        var action = mutation.value()
-                .userStatusMuteAction()
-                .orElseThrow(() -> new IllegalArgumentException("Missing userStatusMuteAction"));
+        if (mutation.operation() != SyncdOperation.SET) {
+            return true;
+        }
+
+        if (!(mutation.value().action().orElse(null) instanceof UserStatusMuteAction action)) {
+            return false;
+        }
 
         var indexArray = JSON.parseArray(mutation.index());
         var userJidString = indexArray.getString(1);
@@ -48,11 +54,7 @@ public final class UserStatusMuteHandler implements WebAppStateActionHandler {
         var contact = client.store()
                 .findContactByJid(userJid)
                 .orElseGet(() -> client.store().addNewContact(userJid));
-
-        switch (mutation.operation()) {
-            case SET -> contact.setStatusMuted(action.muted());
-            case REMOVE -> contact.setStatusMuted(false);
-        }
+        contact.setStatusMuted(action.muted());
 
         return true;
     }

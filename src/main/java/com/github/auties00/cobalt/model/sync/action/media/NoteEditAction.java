@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.model.sync.action.media;
 
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.SyncAction;
+import com.github.auties00.cobalt.model.sync.SyncPatchType;
 
 import it.auties.protobuf.annotation.*;
 import it.auties.protobuf.model.*;
@@ -19,6 +20,11 @@ public final class NoteEditAction implements SyncAction<NoteEditActionArgs> {
      * Canonical WhatsApp Web action version for this action type.
      */
     public static final int ACTION_VERSION = 7;
+
+    /**
+     * Canonical WhatsApp Web collection name for this action type.
+     */
+    public static final SyncPatchType COLLECTION_NAME = SyncPatchType.REGULAR_LOW;
 
     /**
      * {@inheritDoc}

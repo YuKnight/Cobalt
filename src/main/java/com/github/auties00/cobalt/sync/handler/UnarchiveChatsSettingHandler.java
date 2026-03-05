@@ -2,6 +2,8 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.model.sync.action.setting.UnarchiveChatsSetting;
+import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 /**
@@ -19,24 +21,28 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
 
     @Override
     public String actionName() {
-        return "unarchiveChats";
+        return UnarchiveChatsSetting.ACTION_NAME;
     }
 
     @Override
     public SyncPatchType collectionName() {
-        return SyncPatchType.REGULAR_LOW;
+        return UnarchiveChatsSetting.COLLECTION_NAME;
     }
 
     @Override
     public int version() {
-        return 4;
+        return UnarchiveChatsSetting.ACTION_VERSION;
     }
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        var setting = mutation.value()
-                .unarchiveChatsSetting()
-                .orElseThrow(() -> new IllegalArgumentException("Missing unarchiveChatsSetting"));
+        if (mutation.operation() != SyncdOperation.SET) {
+            return true;
+        }
+
+        if (!(mutation.value().action().orElse(null) instanceof UnarchiveChatsSetting setting)) {
+            return false;
+        }
 
         client.store()
                 .setUnarchiveChats(setting.unarchiveChats());

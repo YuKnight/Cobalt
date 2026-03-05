@@ -5,6 +5,7 @@ import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.ConflictResolutionState;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.model.sync.action.chat.ClearChatAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
@@ -25,17 +26,17 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
 
     @Override
     public String actionName() {
-        return "clearChatAction";
+        return ClearChatAction.ACTION_NAME;
     }
 
     @Override
     public SyncPatchType collectionName() {
-        return SyncPatchType.REGULAR;
+        return ClearChatAction.COLLECTION_NAME;
     }
 
     @Override
     public int version() {
-        return 6;
+        return ClearChatAction.ACTION_VERSION;
     }
 
     @Override
@@ -44,9 +45,9 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
             return false;
         }
 
-        var action = mutation.value()
-                .clearChatAction()
-                .orElseThrow(() -> new IllegalArgumentException("Missing clearChatAction"));
+        if (!(mutation.value().action().orElse(null) instanceof ClearChatAction action)) {
+            return false;
+        }
 
         var chatJidString = JSON.parseArray(mutation.index())
                 .getString(1);
@@ -76,11 +77,15 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
      */
     @Override
     public ConflictResolutionState resolveConflicts(DecryptedMutation.Trusted localMutation, DecryptedMutation.Trusted remoteMutation) {
-        var localRange = localMutation.value().clearChatAction()
-                .flatMap(a -> a.messageRange())
+        var localRange = localMutation.value().action()
+                .filter(a -> a instanceof ClearChatAction)
+                .map(a -> (ClearChatAction) a)
+                .flatMap(ClearChatAction::messageRange)
                 .orElse(null);
-        var remoteRange = remoteMutation.value().clearChatAction()
-                .flatMap(a -> a.messageRange())
+        var remoteRange = remoteMutation.value().action()
+                .filter(a -> a instanceof ClearChatAction)
+                .map(a -> (ClearChatAction) a)
+                .flatMap(ClearChatAction::messageRange)
                 .orElse(null);
 
         if (localRange == null || remoteRange == null) {

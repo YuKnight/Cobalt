@@ -2,6 +2,8 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.model.sync.action.device.PrimaryFeatureAction;
+import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 /**
@@ -25,21 +27,34 @@ public final class PrimaryFeatureHandler implements WebAppStateActionHandler {
 
     @Override
     public String actionName() {
-        return "primary_feature";
+        return PrimaryFeatureAction.ACTION_NAME;
     }
 
     @Override
     public SyncPatchType collectionName() {
-        return SyncPatchType.REGULAR;
+        return PrimaryFeatureAction.COLLECTION_NAME;
     }
 
     @Override
     public int version() {
-        return 7;
+        return PrimaryFeatureAction.ACTION_VERSION;
     }
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        if (mutation.operation() != SyncdOperation.SET) {
+            return false;
+        }
+
+        if (!(mutation.value().action().orElse(null) instanceof PrimaryFeatureAction action)) {
+            return false;
+        }
+
+        if (action.flags().isEmpty()) {
+            return false;
+        }
+
+        client.store().setPrimaryFeatures(action.flags());
         return true;
     }
 }

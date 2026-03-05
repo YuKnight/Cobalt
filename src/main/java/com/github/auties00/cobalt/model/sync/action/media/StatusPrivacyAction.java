@@ -3,6 +3,7 @@ package com.github.auties00.cobalt.model.sync.action.media;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.SyncActionEmptyArgs;
 import com.github.auties00.cobalt.model.sync.SyncAction;
+import com.github.auties00.cobalt.model.sync.SyncPatchType;
 
 import java.util.Collections;
 import java.util.List;
@@ -21,6 +22,11 @@ public final class StatusPrivacyAction implements SyncAction<SyncActionEmptyArgs
      * Canonical WhatsApp Web action version for this action type.
      */
     public static final int ACTION_VERSION = 7;
+
+    /**
+     * Canonical WhatsApp Web collection name for this action type.
+     */
+    public static final SyncPatchType COLLECTION_NAME = SyncPatchType.REGULAR_HIGH;
 
     /**
      * {@inheritDoc}

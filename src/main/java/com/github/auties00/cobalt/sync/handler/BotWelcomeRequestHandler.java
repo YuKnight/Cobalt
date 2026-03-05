@@ -2,15 +2,20 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.model.sync.action.bot.BotWelcomeRequestAction;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 /**
  * Handles bot welcome request actions.
  *
- * <p>This handler processes mutations related to bot welcome request state.
- * The mutation is acknowledged but not applied locally.
+ * <p>Per WhatsApp Web {@code WAWebBotWelcomeRequestSync}, this action only supports
+ * SET operations (REMOVE is unsupported). The web client extracts
+ * {@code botWelcomeRequestAction.isSent} (boolean), resolves a chat from index[1],
+ * and updates the chat's {@code hasRequestedWelcomeMsg} field in IndexedDB. Since
+ * this client's chat model does not track the welcome message request state, the
+ * mutation is acknowledged but not applied locally.
  *
- * <p>Index format: ["bot_welcome_request"]
+ * <p>Index format: ["bot_welcome_request", chatJid]
  */
 public final class BotWelcomeRequestHandler implements WebAppStateActionHandler {
     /**
@@ -24,17 +29,17 @@ public final class BotWelcomeRequestHandler implements WebAppStateActionHandler 
 
     @Override
     public String actionName() {
-        return "bot_welcome_request";
+        return BotWelcomeRequestAction.ACTION_NAME;
     }
 
     @Override
     public SyncPatchType collectionName() {
-        return SyncPatchType.REGULAR_LOW;
+        return BotWelcomeRequestAction.COLLECTION_NAME;
     }
 
     @Override
     public int version() {
-        return 2;
+        return BotWelcomeRequestAction.ACTION_VERSION;
     }
 
     @Override

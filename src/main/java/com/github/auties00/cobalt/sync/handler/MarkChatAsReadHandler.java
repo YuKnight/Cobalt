@@ -5,6 +5,8 @@ import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.ConflictResolutionState;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.model.sync.action.chat.MarkChatAsReadAction;
+import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 /**
@@ -23,24 +25,28 @@ public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
 
     @Override
     public String actionName() {
-        return "markChatAsReadAction";
+        return MarkChatAsReadAction.ACTION_NAME;
     }
 
     @Override
     public SyncPatchType collectionName() {
-        return SyncPatchType.REGULAR;
+        return MarkChatAsReadAction.COLLECTION_NAME;
     }
 
     @Override
     public int version() {
-        return 3;
+        return MarkChatAsReadAction.ACTION_VERSION;
     }
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        var action = mutation.value()
-                .markChatAsReadAction()
-                .orElseThrow(() -> new IllegalArgumentException("Missing markChatAsReadAction"));
+        if (mutation.operation() != SyncdOperation.SET) {
+            return false;
+        }
+
+        if (!(mutation.value().action().orElse(null) instanceof MarkChatAsReadAction action)) {
+            return false;
+        }
 
         var chatJidString = JSON.parseArray(mutation.index())
                 .getString(1);
@@ -52,15 +58,12 @@ public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
             return false;
         }
 
-        switch (mutation.operation()) {
-            case SET -> {
-                chat.get().setMarkedAsUnread(action.read());
-                chat.get().setUnreadCount(0);
-            }
-            case REMOVE -> {
-                chat.get().setMarkedAsUnread(true);
-                chat.get().setUnreadCount(-1);
-            }
+        if (action.read()) {
+            chat.get().setMarkedAsUnread(false);
+            chat.get().setUnreadCount(0);
+        } else {
+            chat.get().setMarkedAsUnread(true);
+            chat.get().setUnreadCount(-1);
         }
 
         return true;
@@ -79,11 +82,15 @@ public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
      */
     @Override
     public ConflictResolutionState resolveConflicts(DecryptedMutation.Trusted localMutation, DecryptedMutation.Trusted remoteMutation) {
-        var localRange = localMutation.value().markChatAsReadAction()
-                .flatMap(a -> a.messageRange())
+        var localRange = localMutation.value().action()
+                .filter(a -> a instanceof MarkChatAsReadAction)
+                .map(a -> (MarkChatAsReadAction) a)
+                .flatMap(MarkChatAsReadAction::messageRange)
                 .orElse(null);
-        var remoteRange = remoteMutation.value().markChatAsReadAction()
-                .flatMap(a -> a.messageRange())
+        var remoteRange = remoteMutation.value().action()
+                .filter(a -> a instanceof MarkChatAsReadAction)
+                .map(a -> (MarkChatAsReadAction) a)
+                .flatMap(MarkChatAsReadAction::messageRange)
                 .orElse(null);
 
         if (localRange == null || remoteRange == null) {

@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.model.sync.action.media.StatusPrivacyAction;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 /**
@@ -25,21 +26,26 @@ public final class StatusPrivacyHandler implements WebAppStateActionHandler {
 
     @Override
     public String actionName() {
-        return "status_privacy";
+        return StatusPrivacyAction.ACTION_NAME;
     }
 
     @Override
     public SyncPatchType collectionName() {
-        return SyncPatchType.REGULAR_HIGH;
+        return StatusPrivacyAction.COLLECTION_NAME;
     }
 
     @Override
     public int version() {
-        return 7;
+        return StatusPrivacyAction.ACTION_VERSION;
     }
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        // Web: WAWebStatusPrivacySettingSync — only SET is supported.
+        // Extracts statusPrivacy.mode (CONTACTS, ALLOW_LIST, DENY_LIST, CLOSE_FRIENDS)
+        // and statusPrivacy.userJid (allow/deny list JIDs), then stores them in IndexedDB
+        // and fires a BackendEventBus.triggerUpdateStatusPrivacySettings event.
+        // No equivalent store methods for status privacy settings in the Java data model.
         return true;
     }
 }

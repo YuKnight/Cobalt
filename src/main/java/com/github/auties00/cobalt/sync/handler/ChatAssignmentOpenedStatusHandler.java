@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.model.sync.action.chat.ChatAssignmentOpenedStatusAction;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 /**
@@ -21,22 +22,24 @@ public final class ChatAssignmentOpenedStatusHandler implements WebAppStateActio
 
     @Override
     public String actionName() {
-        return "chatAssignmentOpenedStatusAction";
+        return ChatAssignmentOpenedStatusAction.ACTION_NAME;
     }
 
     @Override
     public SyncPatchType collectionName() {
-        return SyncPatchType.REGULAR;
+        return ChatAssignmentOpenedStatusAction.COLLECTION_NAME;
     }
 
     @Override
     public int version() {
-        return 7;
+        return ChatAssignmentOpenedStatusAction.ACTION_VERSION;
     }
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        // Not handled
+        // Web updates the chatOpenedByAgent flag on an existing chat assignment on SET.
+        // REMOVE is unsupported. No chat assignment model exists in the Java store,
+        // so this is a no-op.
         return true;
     }
 }

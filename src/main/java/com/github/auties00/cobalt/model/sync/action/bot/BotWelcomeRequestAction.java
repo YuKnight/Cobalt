@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.model.sync.action.bot;
 
 import com.github.auties00.cobalt.model.sync.SyncAction;
+import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
@@ -16,6 +17,11 @@ public final class BotWelcomeRequestAction implements SyncAction<BotWelcomeReque
      * Canonical WhatsApp Web action version for this action type.
      */
     public static final int ACTION_VERSION = 2;
+
+    /**
+     * Canonical WhatsApp Web collection name for this action type.
+     */
+    public static final SyncPatchType COLLECTION_NAME = SyncPatchType.REGULAR_LOW;
 
     /**
      * {@inheritDoc}

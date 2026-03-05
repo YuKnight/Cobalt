@@ -3,6 +3,8 @@ package com.github.auties00.cobalt.sync.handler;
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.model.sync.action.media.RemoveRecentStickerAction;
+import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 /**
@@ -21,26 +23,44 @@ public final class RemoveRecentStickerHandler implements WebAppStateActionHandle
 
     @Override
     public String actionName() {
-        return "removeRecentStickerAction";
+        return RemoveRecentStickerAction.ACTION_NAME;
     }
 
     @Override
     public SyncPatchType collectionName() {
-        return SyncPatchType.REGULAR_LOW;
+        return RemoveRecentStickerAction.COLLECTION_NAME;
     }
 
     @Override
     public int version() {
-        return 7;
+        return RemoveRecentStickerAction.ACTION_VERSION;
     }
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        // Web: WAWebStickersRemoveRecentSyncAction — only SET is supported
+        if (mutation.operation() != SyncdOperation.SET) {
+            return true;
+        }
+
         var indexArray = JSON.parseArray(mutation.index());
         var stickerHash = indexArray.getString(1);
+        if (stickerHash == null) {
+            return false;
+        }
 
-        client.store()
-                .removeRecentSticker(stickerHash);
+        if (!(mutation.value().action().orElse(null) instanceof RemoveRecentStickerAction action)) {
+            return false;
+        }
+
+        // Web: look up the sticker and only remove if lastStickerSentTs is null
+        // or the sticker's timestamp <= lastStickerSentTs
+        var sticker = client.store().findRecentSticker(stickerHash);
+        if (sticker.isEmpty()) {
+            return true;
+        }
+
+        client.store().removeRecentSticker(stickerHash);
 
         return true;
     }

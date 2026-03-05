@@ -2,6 +2,8 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.model.sync.action.privacy.PrivacySettingDisableLinkPreviewsAction;
+import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 /**
@@ -25,21 +27,30 @@ public final class DisableLinkPreviewsHandler implements WebAppStateActionHandle
 
     @Override
     public String actionName() {
-        return "setting_disableLinkPreviews";
+        return PrivacySettingDisableLinkPreviewsAction.ACTION_NAME;
     }
 
     @Override
     public SyncPatchType collectionName() {
-        return SyncPatchType.REGULAR;
+        return PrivacySettingDisableLinkPreviewsAction.COLLECTION_NAME;
     }
 
     @Override
     public int version() {
-        return 8;
+        return PrivacySettingDisableLinkPreviewsAction.ACTION_VERSION;
     }
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        if (mutation.operation() != SyncdOperation.SET) {
+            return false;
+        }
+
+        if (!(mutation.value().action().orElse(null) instanceof PrivacySettingDisableLinkPreviewsAction action)) {
+            return false;
+        }
+
+        client.store().setDisableLinkPreviews(action.isPreviewsDisabled());
         return true;
     }
 }

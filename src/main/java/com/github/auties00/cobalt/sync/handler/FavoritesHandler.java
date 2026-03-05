@@ -1,7 +1,10 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.model.sync.action.media.FavoritesAction;
+import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 /**
@@ -18,21 +21,35 @@ public final class FavoritesHandler implements WebAppStateActionHandler {
 
     @Override
     public String actionName() {
-        return "favorites";
+        return FavoritesAction.ACTION_NAME;
     }
 
     @Override
     public SyncPatchType collectionName() {
-        return SyncPatchType.REGULAR_HIGH;
+        return FavoritesAction.COLLECTION_NAME;
     }
 
     @Override
     public int version() {
-        return 1;
+        return FavoritesAction.ACTION_VERSION;
     }
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        if (mutation.operation() != SyncdOperation.SET) {
+            return false;
+        }
+
+        if (!(mutation.value().action().orElse(null) instanceof FavoritesAction action)) {
+            return false;
+        }
+
+        var jids = action.favorites()
+                .stream()
+                .flatMap(fav -> fav.id().stream())
+                .map(Jid::of)
+                .toList();
+        client.store().setFavoriteChats(jids);
         return true;
     }
 }

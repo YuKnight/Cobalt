@@ -4,6 +4,8 @@ import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.model.sync.action.chat.LockChatAction;
+import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 /**
@@ -27,21 +29,29 @@ public final class LockChatHandler implements WebAppStateActionHandler {
 
     @Override
     public String actionName() {
-        return "lock";
+        return LockChatAction.ACTION_NAME;
     }
 
     @Override
     public SyncPatchType collectionName() {
-        return SyncPatchType.REGULAR_LOW;
+        return LockChatAction.COLLECTION_NAME;
     }
 
     @Override
     public int version() {
-        return 7;
+        return LockChatAction.ACTION_VERSION;
     }
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        if (mutation.operation() != SyncdOperation.SET) {
+            return false;
+        }
+
+        if (!(mutation.value().action().orElse(null) instanceof LockChatAction action)) {
+            return false;
+        }
+
         var chatJidString = JSON.parseArray(mutation.index()).getString(1);
         var chatJid = Jid.of(chatJidString);
 
@@ -51,15 +61,7 @@ public final class LockChatHandler implements WebAppStateActionHandler {
             return false;
         }
 
-        switch (mutation.operation()) {
-            case SET -> {
-                var action = mutation.value()
-                        .lockChatAction()
-                        .orElseThrow(() -> new IllegalArgumentException("Missing lockChatAction"));
-                chat.get().setLocked(action.locked());
-            }
-            case REMOVE -> chat.get().setLocked(false);
-        }
+        chat.get().setLocked(action.locked());
 
         return true;
     }

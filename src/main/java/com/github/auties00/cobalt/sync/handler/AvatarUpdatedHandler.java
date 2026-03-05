@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.model.sync.action.media.AvatarUpdatedAction;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 /**
@@ -18,21 +19,25 @@ public final class AvatarUpdatedHandler implements WebAppStateActionHandler {
 
     @Override
     public String actionName() {
-        return "avatar_updated_action";
+        return AvatarUpdatedAction.ACTION_NAME;
     }
 
     @Override
     public SyncPatchType collectionName() {
-        return SyncPatchType.REGULAR;
+        return AvatarUpdatedAction.COLLECTION_NAME;
     }
 
     @Override
     public int version() {
-        return 7;
+        return AvatarUpdatedAction.ACTION_VERSION;
     }
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        // Web: WAWebStickersAvatarUpdatedSyncAction — only SET is supported.
+        // Checks eventType (CREATED/UPDATED -> hasAvatar=true, DELETED -> hasAvatar=false)
+        // and removes all recent avatar stickers.
+        // No equivalent store methods for hasAvatar or avatar stickers in the Java data model.
         return true;
     }
 }

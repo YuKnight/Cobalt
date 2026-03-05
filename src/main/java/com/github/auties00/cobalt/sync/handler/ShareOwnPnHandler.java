@@ -7,11 +7,12 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 /**
  * Handles share own phone number actions.
  *
- * <p>This handler processes mutations that control whether the user's phone number
- * is shared with a specific contact. The mutation is acknowledged but not applied
- * locally.
+ * <p>The WhatsApp Web implementation ({@code WAWebShareOwnPnSync}) calls
+ * {@code updateLidMetadataJob} to update LID metadata with {@code shareOwnPn: true}.
+ * This is an internal background job with no equivalent data model mutation in the
+ * Java codebase, so this handler is intentionally a no-op.
  *
- * <p>Index format: ["shareOwnPn", "chatJid", "pnJid"]
+ * <p>Index format: ["shareOwnPn", "lidJid"]
  */
 public final class ShareOwnPnHandler implements WebAppStateActionHandler {
     /**

@@ -27,6 +27,7 @@ import com.github.auties00.cobalt.model.mixin.InstantMillisMixin;
 import com.github.auties00.cobalt.model.mixin.InstantSecondsMixin;
 import com.github.auties00.cobalt.model.mixin.PathMixin;
 import com.github.auties00.cobalt.model.newsletter.Newsletter;
+import com.github.auties00.cobalt.model.setting.ChatLockSettings;
 import com.github.auties00.cobalt.model.preference.Label;
 import com.github.auties00.cobalt.model.preference.QuickReply;
 import com.github.auties00.cobalt.model.preference.Sticker;
@@ -265,6 +266,24 @@ public abstract class AbstractWhatsAppStore implements WhatsAppStore {
     @ProtobufProperty(index = 72, type = ProtobufType.BOOL)
     protected boolean primaryDeviceSupportsSyncdRecovery;
 
+    @ProtobufProperty(index = 73, type = ProtobufType.BOOL)
+    protected boolean disableLinkPreviews;
+
+    @ProtobufProperty(index = 74, type = ProtobufType.BOOL)
+    protected boolean relayAllCalls;
+
+    @ProtobufProperty(index = 75, type = ProtobufType.BOOL)
+    protected boolean externalWebBeta;
+
+    @ProtobufProperty(index = 76, type = ProtobufType.MESSAGE)
+    protected ChatLockSettings chatLockSettings;
+
+    @ProtobufProperty(index = 77, type = ProtobufType.STRING)
+    protected List<Jid> favoriteChats;
+
+    @ProtobufProperty(index = 78, type = ProtobufType.STRING)
+    protected List<String> primaryFeatures;
+
     protected final ConcurrentMap<SignalProtocolAddress, Long> identityEncryptionRange;
 
     protected final AtomicLong encryptionSequence;
@@ -377,7 +396,13 @@ public abstract class AbstractWhatsAppStore implements WhatsAppStore {
             ConcurrentMap<String, MissingDeviceSyncKey> missingSyncKeys,
             byte[] advSecretKey,
             ConcurrentMap<Jid, BusinessVerifiedNameCertificate> verifiedBusinessNames,
-            Path directory
+            Path directory,
+            boolean disableLinkPreviews,
+            boolean relayAllCalls,
+            boolean externalWebBeta,
+            ChatLockSettings chatLockSettings,
+            List<Jid> favoriteChats,
+            List<String> primaryFeatures
     ) {
         this.uuid = Objects.requireNonNull(uuid, "uuid cannot be null");
         this.phoneNumber = phoneNumber;
@@ -463,6 +488,12 @@ public abstract class AbstractWhatsAppStore implements WhatsAppStore {
         this.advSecretKey = advSecretKey;
         this.verifiedBusinessNames = requireNonNullElseGet(verifiedBusinessNames, ConcurrentHashMap::new);
         this.directory = directory;
+        this.disableLinkPreviews = disableLinkPreviews;
+        this.relayAllCalls = relayAllCalls;
+        this.externalWebBeta = externalWebBeta;
+        this.chatLockSettings = chatLockSettings;
+        this.favoriteChats = requireNonNullElseGet(favoriteChats, ArrayList::new);
+        this.primaryFeatures = requireNonNullElseGet(primaryFeatures, ArrayList::new);
         this.identityEncryptionRange = new ConcurrentHashMap<>();
         this.encryptionSequence = new AtomicLong();
         this.logger = System.getLogger(this.getClass().getName());
@@ -1942,6 +1973,73 @@ public abstract class AbstractWhatsAppStore implements WhatsAppStore {
         }
         return Optional.empty();
     }
+
+    @Override
+    public boolean disableLinkPreviews() {
+        return disableLinkPreviews;
+    }
+
+    @Override
+    public WhatsAppStore setDisableLinkPreviews(boolean disableLinkPreviews) {
+        this.disableLinkPreviews = disableLinkPreviews;
+        return this;
+    }
+
+    @Override
+    public boolean relayAllCalls() {
+        return relayAllCalls;
+    }
+
+    @Override
+    public WhatsAppStore setRelayAllCalls(boolean relayAllCalls) {
+        this.relayAllCalls = relayAllCalls;
+        return this;
+    }
+
+    @Override
+    public boolean externalWebBeta() {
+        return externalWebBeta;
+    }
+
+    @Override
+    public WhatsAppStore setExternalWebBeta(boolean externalWebBeta) {
+        this.externalWebBeta = externalWebBeta;
+        return this;
+    }
+
+    @Override
+    public Optional<ChatLockSettings> chatLockSettings() {
+        return Optional.ofNullable(chatLockSettings);
+    }
+
+    @Override
+    public WhatsAppStore setChatLockSettings(ChatLockSettings chatLockSettings) {
+        this.chatLockSettings = chatLockSettings;
+        return this;
+    }
+
+    @Override
+    public List<Jid> favoriteChats() {
+        return Collections.unmodifiableList(favoriteChats);
+    }
+
+    @Override
+    public WhatsAppStore setFavoriteChats(List<Jid> favoriteChats) {
+        this.favoriteChats = new ArrayList<>(Objects.requireNonNull(favoriteChats, "favoriteChats cannot be null"));
+        return this;
+    }
+
+    @Override
+    public List<String> primaryFeatures() {
+        return Collections.unmodifiableList(primaryFeatures);
+    }
+
+    @Override
+    public WhatsAppStore setPrimaryFeatures(List<String> primaryFeatures) {
+        this.primaryFeatures = new ArrayList<>(Objects.requireNonNull(primaryFeatures, "primaryFeatures cannot be null"));
+        return this;
+    }
+
     @Override
     public boolean equals(Object o) {
         return o == this || o instanceof AbstractWhatsAppStore that
@@ -2031,7 +2129,13 @@ public abstract class AbstractWhatsAppStore implements WhatsAppStore {
                             && Objects.equals(unconfirmedIdentityChanges, that.unconfirmedIdentityChanges)
                             && Objects.equals(coexHostedVerificationCache, that.coexHostedVerificationCache)
                             && Objects.equals(pendingDeviceSyncs, that.pendingDeviceSyncs)
-                            && Objects.equals(groupSenderKeyDistribution, that.groupSenderKeyDistribution);
+                            && Objects.equals(groupSenderKeyDistribution, that.groupSenderKeyDistribution)
+                            && disableLinkPreviews == that.disableLinkPreviews
+                            && relayAllCalls == that.relayAllCalls
+                            && externalWebBeta == that.externalWebBeta
+                            && Objects.equals(chatLockSettings, that.chatLockSettings)
+                            && Objects.equals(favoriteChats, that.favoriteChats)
+                            && Objects.equals(primaryFeatures, that.primaryFeatures);
     }
 
     @Override
@@ -2052,7 +2156,8 @@ public abstract class AbstractWhatsAppStore implements WhatsAppStore {
                 verifiedBusinessNames, proxy, directory, listeners, lidToPhoneMappings, phoneToLidMappings,
                 mediaConnection, mediaConnectionLock, offlineResumeState, offlineDeliveryLatch, usersNeedingSenderKeyRotation,
                 webAppStatePendingMutations, webAppStateCollections, pendingMessageRecipients, clientVersionLock, chatMetadata,
-                deviceLists, unconfirmedIdentityChanges, coexHostedVerificationCache, pendingDeviceSyncs, groupSenderKeyDistribution);
+                deviceLists, unconfirmedIdentityChanges, coexHostedVerificationCache, pendingDeviceSyncs, groupSenderKeyDistribution,
+                disableLinkPreviews, relayAllCalls, externalWebBeta, chatLockSettings, favoriteChats, primaryFeatures);
     }
 
     @Override

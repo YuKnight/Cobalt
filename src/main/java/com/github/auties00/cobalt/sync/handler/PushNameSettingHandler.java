@@ -2,6 +2,8 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.model.sync.action.setting.PushNameSetting;
+import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 /**
@@ -18,26 +20,30 @@ public final class PushNameSettingHandler implements WebAppStateActionHandler {
 
     @Override
     public String actionName() {
-        return "pushName";
+        return PushNameSetting.ACTION_NAME;
     }
 
     @Override
     public SyncPatchType collectionName() {
-        return SyncPatchType.CRITICAL_BLOCK;
+        return PushNameSetting.COLLECTION_NAME;
     }
 
     @Override
     public int version() {
-        return 7;
+        return PushNameSetting.ACTION_VERSION;
     }
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        var setting = mutation.value()
-                .pushNameSetting()
-                .orElseThrow(() -> new IllegalArgumentException("Missing pushNameSetting"));
+        if (mutation.operation() != SyncdOperation.SET) {
+            return true;
+        }
 
-        var name = setting.name().orElse(null);
+        if (!(mutation.value().action().orElse(null) instanceof PushNameSetting setting)) {
+            return false;
+        }
+
+        var name = setting.name().orElse("");
 
         client.store()
                 .setName(name);

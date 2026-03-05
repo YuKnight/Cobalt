@@ -4,6 +4,8 @@ import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.model.sync.action.contact.PinAction;
+import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 import java.time.Instant;
@@ -24,24 +26,28 @@ public final class PinChatHandler implements WebAppStateActionHandler {
 
     @Override
     public String actionName() {
-        return "pinAction";
+        return PinAction.ACTION_NAME;
     }
 
     @Override
     public SyncPatchType collectionName() {
-        return SyncPatchType.REGULAR_LOW;
+        return PinAction.COLLECTION_NAME;
     }
 
     @Override
     public int version() {
-        return 5;
+        return PinAction.ACTION_VERSION;
     }
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        var action = mutation.value()
-                .pinAction()
-                .orElseThrow(() -> new IllegalArgumentException("Missing pinAction"));
+        if (mutation.operation() != SyncdOperation.SET) {
+            return false;
+        }
+
+        if (!(mutation.value().action().orElse(null) instanceof PinAction action)) {
+            return false;
+        }
 
         var chatJidString = JSON.parseArray(mutation.index()).getString(1);
         var chatJid = Jid.of(chatJidString);
@@ -52,15 +58,11 @@ public final class PinChatHandler implements WebAppStateActionHandler {
             return false;
         }
 
-        switch (mutation.operation()) {
-            case SET -> {
-                if (action.pinned()) {
-                    chat.get().setPinnedTimestamp((int) Instant.now().getEpochSecond());
-                } else {
-                    chat.get().setPinnedTimestamp(0);
-                }
-            }
-            case REMOVE -> chat.get().setPinnedTimestamp(0);
+        if (action.pinned()) {
+            chat.get().setPinnedTimestamp(Instant.ofEpochSecond(mutation.timestamp().getEpochSecond()));
+            chat.get().setArchived(false);
+        } else {
+            chat.get().setPinnedTimestamp(null);
         }
 
         return true;

@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.model.sync.action.chat;
 
 import com.github.auties00.cobalt.model.mixin.InstantSecondsMixin;
 import com.github.auties00.cobalt.model.sync.SyncAction;
+import com.github.auties00.cobalt.model.sync.SyncPatchType;
 
 import java.time.Instant;
 import it.auties.protobuf.annotation.*;
@@ -19,6 +20,11 @@ public final class DeleteMessageForMeAction implements SyncAction<DeleteMessageF
      * Canonical WhatsApp Web action version for this action type.
      */
     public static final int ACTION_VERSION = 3;
+
+    /**
+     * Canonical WhatsApp Web collection name for this action type.
+     */
+    public static final SyncPatchType COLLECTION_NAME = SyncPatchType.REGULAR_HIGH;
 
     /**
      * {@inheritDoc}

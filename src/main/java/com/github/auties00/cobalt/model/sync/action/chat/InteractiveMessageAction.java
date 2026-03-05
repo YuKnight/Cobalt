@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.model.sync.action.chat;
 
 import com.github.auties00.cobalt.model.sync.SyncAction;
+import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import it.auties.protobuf.annotation.ProtobufEnum;
 import it.auties.protobuf.annotation.ProtobufEnumIndex;
 import it.auties.protobuf.annotation.ProtobufMessage;
@@ -20,6 +21,11 @@ public final class InteractiveMessageAction implements SyncAction<InteractiveMes
      * Canonical WhatsApp Web action version for this action type.
      */
     public static final int ACTION_VERSION = 1;
+
+    /**
+     * Canonical WhatsApp Web collection name for this action type.
+     */
+    public static final SyncPatchType COLLECTION_NAME = SyncPatchType.REGULAR_LOW;
 
     /**
      * {@inheritDoc}

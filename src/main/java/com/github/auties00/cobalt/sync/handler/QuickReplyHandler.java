@@ -2,7 +2,10 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.model.preference.QuickReplyBuilder;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.model.sync.action.chat.QuickReplyAction;
+import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 /**
@@ -11,7 +14,7 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  * <p>This handler processes mutations that create, update, or delete quick reply templates
  * for business accounts.
  *
- * <p>Index format: ["quickReplyAction", "shortcut"]
+ * <p>Index format: ["quick_reply", "quickReplyId"]
  */
 public final class QuickReplyHandler implements WebAppStateActionHandler {
     public static final QuickReplyHandler INSTANCE = new QuickReplyHandler();
@@ -22,40 +25,56 @@ public final class QuickReplyHandler implements WebAppStateActionHandler {
 
     @Override
     public String actionName() {
-        return "quickReplyAction";
+        return QuickReplyAction.ACTION_NAME;
     }
 
     @Override
     public SyncPatchType collectionName() {
-        return SyncPatchType.REGULAR;
+        return QuickReplyAction.COLLECTION_NAME;
     }
 
     @Override
     public int version() {
-        return 8;
+        return QuickReplyAction.ACTION_VERSION;
     }
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        var action = mutation.value()
-                .quickReplyAction()
-                .orElseThrow(() -> new IllegalArgumentException("Missing quickReplyAction"));
+        if (!(mutation.value().action().orElse(null) instanceof QuickReplyAction action)) {
+            return false;
+        }
+
+        // Web only supports SET; REMOVE is unsupported
+        if (mutation.operation() != SyncdOperation.SET) {
+            return true;
+        }
 
         var indexArray = JSON.parseArray(mutation.index());
-        var shortcut = indexArray.getString(1);
+        var quickReplyId = indexArray.getString(1);
+        if (quickReplyId == null) {
+            return false;
+        }
 
-        switch (mutation.operation()) {
-            case SET -> {
-                if(action.deleted()) {
-                    client.store()
-                            .removeQuickReply(shortcut);
-                }else {
-                    client.store()
-                            .addQuickReply(action.toQuickReply());
-                }
+        if (action.deleted()) {
+            // Web removes by the index ID, which maps to the shortcut in our store
+            client.store()
+                    .removeQuickReply(quickReplyId);
+        } else {
+            var shortcut = action.shortcut().orElse(null);
+            var message = action.message().orElse(null);
+            if (shortcut == null || shortcut.isEmpty() || message == null || message.isEmpty()) {
+                return false;
             }
-            case REMOVE -> client.store()
-                    .removeQuickReply(shortcut);
+
+            var count = action.count().orElse(0);
+            var quickReply = new QuickReplyBuilder()
+                    .shortcut(shortcut)
+                    .message(message)
+                    .keywords(action.keywords())
+                    .count(count)
+                    .build();
+            client.store()
+                    .addQuickReply(quickReply);
         }
 
         return true;

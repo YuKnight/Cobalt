@@ -30,6 +30,7 @@ import com.github.auties00.cobalt.model.preference.QuickReply;
 import com.github.auties00.cobalt.model.preference.Sticker;
 import com.github.auties00.cobalt.model.privacy.PrivacySettingEntry;
 import com.github.auties00.cobalt.model.privacy.PrivacySettingType;
+import com.github.auties00.cobalt.model.setting.ChatLockSettings;
 import com.github.auties00.cobalt.model.sync.SyncActionEntry;
 import com.github.auties00.cobalt.model.sync.SyncCollectionMetadata;
 import com.github.auties00.cobalt.model.sync.SyncHashValue;
@@ -1740,4 +1741,96 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * Blocks until offline delivery is complete, or the timeout expires.
      */
     void waitForOfflineDeliveryEnd();
+
+    /**
+     * Returns whether link previews are disabled.
+     *
+     * @return {@code true} if link previews are disabled
+     */
+    boolean disableLinkPreviews();
+
+    /**
+     * Sets whether link previews are disabled.
+     *
+     * @param disableLinkPreviews {@code true} to disable link previews
+     * @return this store instance for method chaining
+     */
+    WhatsAppStore setDisableLinkPreviews(boolean disableLinkPreviews);
+
+    /**
+     * Returns whether all VoIP calls are relayed through WhatsApp servers
+     * to hide the user's IP address.
+     *
+     * @return {@code true} if relay is enabled
+     */
+    boolean relayAllCalls();
+
+    /**
+     * Sets whether all VoIP calls should be relayed.
+     *
+     * @param relayAllCalls {@code true} to relay all calls
+     * @return this store instance for method chaining
+     */
+    WhatsAppStore setRelayAllCalls(boolean relayAllCalls);
+
+    /**
+     * Returns whether the user has opted into the external web beta program.
+     *
+     * @return {@code true} if opted in
+     */
+    boolean externalWebBeta();
+
+    /**
+     * Sets whether the user has opted into the external web beta program.
+     *
+     * @param externalWebBeta {@code true} if opted in
+     * @return this store instance for method chaining
+     */
+    WhatsAppStore setExternalWebBeta(boolean externalWebBeta);
+
+    /**
+     * Returns the chat lock settings (hide locked chats flag, secret code).
+     *
+     * @return an {@code Optional} containing the chat lock settings, or empty
+     *         if not configured
+     */
+    Optional<ChatLockSettings> chatLockSettings();
+
+    /**
+     * Sets the chat lock settings.
+     *
+     * @param chatLockSettings the settings, may be {@code null} to clear
+     * @return this store instance for method chaining
+     */
+    WhatsAppStore setChatLockSettings(ChatLockSettings chatLockSettings);
+
+    /**
+     * Returns the ordered list of favorite chat JIDs.
+     *
+     * @return an unmodifiable list of favorite chat JIDs, never {@code null}
+     */
+    List<Jid> favoriteChats();
+
+    /**
+     * Sets the ordered list of favorite chat JIDs.
+     *
+     * @param favoriteChats the list of JIDs, must not be {@code null}
+     * @return this store instance for method chaining
+     */
+    WhatsAppStore setFavoriteChats(List<Jid> favoriteChats);
+
+    /**
+     * Returns the primary device feature flags.
+     *
+     * @return an unmodifiable list of feature flag names, never {@code null}
+     */
+    List<String> primaryFeatures();
+
+    /**
+     * Sets the primary device feature flags.
+     *
+     * @param primaryFeatures the list of feature flag names, must not be {@code null}
+     * @return this store instance for method chaining
+     */
+    WhatsAppStore setPrimaryFeatures(List<String> primaryFeatures);
 }

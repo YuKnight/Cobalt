@@ -4,6 +4,7 @@ import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.model.sync.action.chat.DeleteMessageForMeAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
@@ -13,7 +14,7 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  * <p>This handler processes mutations that delete messages locally
  * (not for everyone in the chat).
  *
- * <p>Index format: ["deleteMessageForMeAction", "chatJid", "fromMe", "messageId"]
+ * <p>Index format: ["deleteMessageForMe", "chatJid", "messageId", "fromMe", "participant"]
  */
 public final class DeleteMessageForMeHandler implements WebAppStateActionHandler {
     public static final DeleteMessageForMeHandler INSTANCE = new DeleteMessageForMeHandler();
@@ -24,17 +25,17 @@ public final class DeleteMessageForMeHandler implements WebAppStateActionHandler
 
     @Override
     public String actionName() {
-        return "deleteMessageForMeAction";
+        return DeleteMessageForMeAction.ACTION_NAME;
     }
 
     @Override
     public SyncPatchType collectionName() {
-        return SyncPatchType.REGULAR;
+        return DeleteMessageForMeAction.COLLECTION_NAME;
     }
 
     @Override
     public int version() {
-        return 3;
+        return DeleteMessageForMeAction.ACTION_VERSION;
     }
 
     @Override
@@ -43,14 +44,15 @@ public final class DeleteMessageForMeHandler implements WebAppStateActionHandler
             return false;
         }
 
-        var _ = mutation.value()
-                .deleteMessageForMeAction()
-                .orElseThrow(() -> new IllegalArgumentException("Missing deleteMessageForMeAction"));
+        if (!(mutation.value().action().orElse(null) instanceof DeleteMessageForMeAction _)) {
+            return false;
+        }
 
         var indexArray = JSON.parseArray(mutation.index());
         var chatJidString = indexArray.getString(1);
-        // var fromMe = indexArray.getBoolean(2);
-        var messageId = indexArray.getString(3);
+        var messageId = indexArray.getString(2);
+        // var fromMe = indexArray.getString(3);
+        // var participant = indexArray.getString(4);
 
         var chatJid = Jid.of(chatJidString);
 

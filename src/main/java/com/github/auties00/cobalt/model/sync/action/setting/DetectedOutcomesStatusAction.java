@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.model.sync.action.setting;
 
 import com.github.auties00.cobalt.model.sync.SyncActionEmptyArgs;
 import com.github.auties00.cobalt.model.sync.SyncAction;
+import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
@@ -17,6 +18,11 @@ public final class DetectedOutcomesStatusAction implements SyncAction<SyncAction
      * Canonical WhatsApp Web action version for this action type.
      */
     public static final int ACTION_VERSION = 1;
+
+    /**
+     * Canonical WhatsApp Web collection name for this action type.
+     */
+    public static final SyncPatchType COLLECTION_NAME = SyncPatchType.REGULAR;
 
     /**
      * {@inheritDoc}

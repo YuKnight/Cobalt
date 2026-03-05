@@ -5,6 +5,8 @@ import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.ConflictResolutionState;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.model.sync.action.chat.ArchiveChatAction;
+import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 /**
@@ -24,23 +26,28 @@ public final class ArchiveChatHandler implements WebAppStateActionHandler {
 
     @Override
     public String actionName() {
-        return "archiveChatAction";
+        return ArchiveChatAction.ACTION_NAME;
     }
 
     @Override
     public SyncPatchType collectionName() {
-        return SyncPatchType.REGULAR_LOW;
+        return ArchiveChatAction.COLLECTION_NAME;
     }
 
     @Override
     public int version() {
-        return 3;
+        return ArchiveChatAction.ACTION_VERSION;
     }
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        var action = mutation.value().archiveChatAction()
-                .orElseThrow(() -> new IllegalArgumentException("Missing archiveChatAction"));
+        if (mutation.operation() != SyncdOperation.SET) {
+            return false;
+        }
+
+        if (!(mutation.value().action().orElse(null) instanceof ArchiveChatAction action)) {
+            return false;
+        }
 
         var chatJidString = JSON.parseArray(mutation.index())
                 .getString(1);
@@ -52,10 +59,7 @@ public final class ArchiveChatHandler implements WebAppStateActionHandler {
             return false;
         }
 
-        switch (mutation.operation()) {
-            case SET -> chat.get().setArchived(action.archived());
-            case REMOVE -> chat.get().setArchived(false);
-        }
+        chat.get().setArchived(action.archived());
 
         return true;
     }
@@ -73,11 +77,15 @@ public final class ArchiveChatHandler implements WebAppStateActionHandler {
      */
     @Override
     public ConflictResolutionState resolveConflicts(DecryptedMutation.Trusted localMutation, DecryptedMutation.Trusted remoteMutation) {
-        var localRange = localMutation.value().archiveChatAction()
-                .flatMap(a -> a.messageRange())
+        var localRange = localMutation.value().action()
+                .filter(a -> a instanceof ArchiveChatAction)
+                .map(a -> (ArchiveChatAction) a)
+                .flatMap(ArchiveChatAction::messageRange)
                 .orElse(null);
-        var remoteRange = remoteMutation.value().archiveChatAction()
-                .flatMap(a -> a.messageRange())
+        var remoteRange = remoteMutation.value().action()
+                .filter(a -> a instanceof ArchiveChatAction)
+                .map(a -> (ArchiveChatAction) a)
+                .flatMap(ArchiveChatAction::messageRange)
                 .orElse(null);
 
         if (localRange == null || remoteRange == null) {

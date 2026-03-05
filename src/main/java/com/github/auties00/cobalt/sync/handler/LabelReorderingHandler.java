@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.model.sync.action.contact.LabelReorderingAction;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 /**
@@ -25,21 +26,24 @@ public final class LabelReorderingHandler implements WebAppStateActionHandler {
 
     @Override
     public String actionName() {
-        return "label_reordering";
+        return LabelReorderingAction.ACTION_NAME;
     }
 
     @Override
     public SyncPatchType collectionName() {
-        return SyncPatchType.REGULAR;
+        return LabelReorderingAction.COLLECTION_NAME;
     }
 
     @Override
     public int version() {
-        return 3;
+        return LabelReorderingAction.ACTION_VERSION;
     }
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        // Web calls WAWebDBLabelsReorder.updateLabelsSortOrder(sortedLabelIds) on SET;
+        // REMOVE is unsupported. No label ordering model exists in the Java store,
+        // so this is a no-op.
         return true;
     }
 }

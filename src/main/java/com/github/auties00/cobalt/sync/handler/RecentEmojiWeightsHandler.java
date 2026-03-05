@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.model.sync.action.media.RecentEmojiWeightsAction;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 /**
@@ -18,22 +19,24 @@ public final class RecentEmojiWeightsHandler implements WebAppStateActionHandler
 
     @Override
     public String actionName() {
-        return "recent_emoji_weights_action";
+        return RecentEmojiWeightsAction.ACTION_NAME;
     }
 
     @Override
     public SyncPatchType collectionName() {
-        return SyncPatchType.REGULAR_LOW;
+        return RecentEmojiWeightsAction.COLLECTION_NAME;
     }
 
     @Override
     public int version() {
-        return 11;
+        return RecentEmojiWeightsAction.ACTION_VERSION;
     }
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        // Not handled
+        // Web: no dedicated sync handler module for RecentEmojiWeights.
+        // The web stores emoji weights directly in its RecentEmojiCollection (IndexedDB).
+        // No equivalent store methods in the Java data model.
         return true;
     }
 }

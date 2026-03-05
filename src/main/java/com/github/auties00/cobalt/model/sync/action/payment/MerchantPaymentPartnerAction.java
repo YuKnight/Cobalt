@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.model.sync.action.payment;
 
 import com.github.auties00.cobalt.model.sync.SyncActionEmptyArgs;
 import com.github.auties00.cobalt.model.sync.SyncAction;
+import com.github.auties00.cobalt.model.sync.SyncPatchType;
 
 import java.util.Objects;
 import it.auties.protobuf.annotation.*;
@@ -19,6 +20,11 @@ public final class MerchantPaymentPartnerAction implements SyncAction<SyncAction
      * Canonical WhatsApp Web action version for this action type.
      */
     public static final int ACTION_VERSION = 7;
+
+    /**
+     * Canonical WhatsApp Web collection name for this action type.
+     */
+    public static final SyncPatchType COLLECTION_NAME = SyncPatchType.REGULAR_LOW;
 
     /**
      * {@inheritDoc}

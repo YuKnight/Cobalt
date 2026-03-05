@@ -34,8 +34,6 @@ import java.util.concurrent.ThreadLocalRandom;
  */
 public final class WebSocketClient {
     private static final byte[] WEBSOCKET_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11".getBytes(StandardCharsets.US_ASCII);
-    private static final int HTTP_VERSION_MAJOR = 1;
-    private static final int HTTP_VERSION_MINOR_MAX = 1;
     private static final byte CARRIAGE_RETURN = '\r';
     private static final byte LINE_FEED = '\n';
     private static final byte SPACE = ' ';
@@ -48,6 +46,39 @@ public final class WebSocketClient {
     private static final byte[] HEADER_ACCEPT = "sec-websocket-accept".getBytes(StandardCharsets.US_ASCII);
     private static final byte[] VALUE_WEBSOCKET = "websocket".getBytes(StandardCharsets.US_ASCII);
     private static final byte[] VALUE_UPGRADE = "upgrade".getBytes(StandardCharsets.US_ASCII);
+
+    /**
+     * Pre-encoded HTTP request line prefix: {@code "GET "}.
+     */
+    private static final byte[] REQ_LINE_PREFIX = "GET ".getBytes(StandardCharsets.US_ASCII);
+
+    /**
+     * Pre-encoded HTTP version and Host header prefix:
+     * {@code " HTTP/1.1\r\nHost: "}.
+     */
+    private static final byte[] REQ_HOST_HEADER = " HTTP/1.1\r\nHost: ".getBytes(StandardCharsets.US_ASCII);
+
+    /**
+     * Pre-encoded static headers block from the CRLF after Host through
+     * the {@code Sec-WebSocket-Key} value prefix.
+     */
+    private static final byte[] REQ_STATIC_BLOCK = (
+            "\r\nUpgrade: websocket\r\n" +
+            "Connection: Upgrade\r\n" +
+            "Sec-WebSocket-Version: 13\r\n" +
+            "Sec-WebSocket-Key: "
+    ).getBytes(StandardCharsets.US_ASCII);
+
+    /**
+     * Pre-encoded Origin header prefix including leading CRLF:
+     * {@code "\r\nOrigin: https://"}.
+     */
+    private static final byte[] REQ_ORIGIN = "\r\nOrigin: https://".getBytes(StandardCharsets.US_ASCII);
+
+    /**
+     * Pre-encoded request terminator: {@code "\r\n\r\n"}.
+     */
+    private static final byte[] REQ_END = "\r\n\r\n".getBytes(StandardCharsets.US_ASCII);
 
     /**
      * The transport layer stack (TCP + optional TLS + optional proxy).
@@ -156,6 +187,10 @@ public final class WebSocketClient {
     /**
      * Performs the HTTP/1.1 WebSocket upgrade handshake.
      *
+     * <p>The WebSocket key and expected accept value are kept as
+     * {@code byte[]} throughout to avoid intermediate {@link String}
+     * allocations and charset re-encoding.
+     *
      * @param host the target host name
      * @param port the target port
      * @param path the target path
@@ -169,42 +204,46 @@ public final class WebSocketClient {
         var deadline = System.currentTimeMillis() + UPGRADE_TIMEOUT;
         responseReader.reset();
 
-        var statusCode = readStatusLine(deadline);
+        var statusCode = responseReader.readStatusLine(deadline);
         if (statusCode != EXPECTED_STATUS_CODE) {
             throw new IOException("WebSocket upgrade failed with status code " + statusCode);
         }
 
-        consumeAndValidateHeaders(deadline, expectedAccept.getBytes(StandardCharsets.US_ASCII));
+        consumeAndValidateHeaders(deadline, expectedAccept);
         var leftover = responseReader.remainingBytes();
         responseReader.reset();
         transportLayer.finishConnect(leftover);
     }
 
     /**
-     * Generates a random 16-byte WebSocket key, Base64-encoded.
+     * Generates a random 16-byte WebSocket key, Base64-encoded as a
+     * {@code byte[]} to avoid an intermediate {@link String}.
      *
-     * @return the Base64-encoded key
+     * @return the Base64-encoded key as ASCII bytes
      */
-    private static String createWebSocketKey() {
+    private static byte[] createWebSocketKey() {
         var raw = new byte[16];
         ThreadLocalRandom.current().nextBytes(raw);
-        return Base64.getEncoder().encodeToString(raw);
+        return Base64.getEncoder().encode(raw);
     }
 
     /**
      * Computes the expected {@code Sec-WebSocket-Accept} value by hashing
      * the key concatenated with the WebSocket GUID using SHA-1.
      *
-     * @param websocketKey the client-generated key
-     * @return the expected Base64-encoded accept value
+     * <p>Both input and output are {@code byte[]} to avoid charset
+     * conversions.
+     *
+     * @param websocketKey the client-generated key as ASCII bytes
+     * @return the expected Base64-encoded accept value as ASCII bytes
      * @throws IOException if SHA-1 is not available
      */
-    private static String computeExpectedAccept(String websocketKey) throws IOException {
+    private static byte[] computeExpectedAccept(byte[] websocketKey) throws IOException {
         try {
             var digest = MessageDigest.getInstance("SHA-1");
-            digest.update(websocketKey.getBytes(StandardCharsets.US_ASCII));
+            digest.update(websocketKey);
             digest.update(WEBSOCKET_GUID);
-            return Base64.getEncoder().encodeToString(digest.digest());
+            return Base64.getEncoder().encode(digest.digest());
         } catch (NoSuchAlgorithmException exception) {
             throw new IOException("Cannot compute WebSocket accept key", exception);
         }
@@ -213,50 +252,63 @@ public final class WebSocketClient {
     /**
      * Sends the HTTP/1.1 WebSocket upgrade request.
      *
+     * <p>The request is assembled into a single pre-sized {@code byte[]}
+     * using pre-encoded static fragments and {@link System#arraycopy},
+     * avoiding {@link StringBuilder}, intermediate {@link String}
+     * allocations, and charset-encoder overhead entirely.
+     *
      * @param host         the target host
      * @param port         the target port
      * @param path         the target path
-     * @param websocketKey the client-generated key
+     * @param websocketKey the client-generated key as ASCII bytes
      * @throws IOException if the write fails
      */
-    private void sendUpgradeRequest(String host, int port, String path, String websocketKey) throws IOException {
-        var builder = new StringBuilder();
-        builder.append("GET ")
-                .append(path)
-                .append(" HTTP/")
-                .append(HTTP_VERSION_MAJOR)
-                .append('.')
-                .append(HTTP_VERSION_MINOR_MAX)
-                .append("\r\n");
-        builder.append("Host: ");
-        if (port == 443) {
-            builder.append(host);
-        } else {
-            builder.append(host).append(':').append(port);
-        }
-        builder.append("\r\n");
-        builder.append("Upgrade: websocket\r\n");
-        builder.append("Connection: Upgrade\r\n");
-        builder.append("Sec-WebSocket-Version: 13\r\n");
-        builder.append("Sec-WebSocket-Key: ")
-                .append(websocketKey)
-                .append("\r\n");
-        builder.append("Origin: https://")
-                .append(host)
-                .append("\r\n");
-        builder.append("\r\n");
-        transportLayer.sendBinary(ByteBuffer.wrap(builder.toString().getBytes(StandardCharsets.US_ASCII)));
-    }
+    private void sendUpgradeRequest(String host, int port, String path, byte[] websocketKey) throws IOException {
+        var hostBytes = host.getBytes(StandardCharsets.US_ASCII);
+        var pathBytes = path.getBytes(StandardCharsets.US_ASCII);
+        var portBytes = port != 443 ? Integer.toString(port).getBytes(StandardCharsets.US_ASCII) : null;
 
-    /**
-     * Parses the HTTP status line from the upgrade response.
-     *
-     * @param deadline the handshake deadline
-     * @return the 3-digit HTTP status code
-     * @throws IOException if the response is malformed or the deadline is exceeded
-     */
-    private int readStatusLine(long deadline) throws IOException {
-        return responseReader.readStatusLine(deadline);
+        var size = REQ_LINE_PREFIX.length + pathBytes.length + REQ_HOST_HEADER.length
+                + hostBytes.length + (portBytes != null ? 1 + portBytes.length : 0)
+                + REQ_STATIC_BLOCK.length + websocketKey.length
+                + REQ_ORIGIN.length + hostBytes.length + REQ_END.length;
+
+        var request = new byte[size];
+        var pos = 0;
+
+        System.arraycopy(REQ_LINE_PREFIX, 0, request, pos, REQ_LINE_PREFIX.length);
+        pos += REQ_LINE_PREFIX.length;
+
+        System.arraycopy(pathBytes, 0, request, pos, pathBytes.length);
+        pos += pathBytes.length;
+
+        System.arraycopy(REQ_HOST_HEADER, 0, request, pos, REQ_HOST_HEADER.length);
+        pos += REQ_HOST_HEADER.length;
+
+        System.arraycopy(hostBytes, 0, request, pos, hostBytes.length);
+        pos += hostBytes.length;
+
+        if (portBytes != null) {
+            request[pos++] = ':';
+            System.arraycopy(portBytes, 0, request, pos, portBytes.length);
+            pos += portBytes.length;
+        }
+
+        System.arraycopy(REQ_STATIC_BLOCK, 0, request, pos, REQ_STATIC_BLOCK.length);
+        pos += REQ_STATIC_BLOCK.length;
+
+        System.arraycopy(websocketKey, 0, request, pos, websocketKey.length);
+        pos += websocketKey.length;
+
+        System.arraycopy(REQ_ORIGIN, 0, request, pos, REQ_ORIGIN.length);
+        pos += REQ_ORIGIN.length;
+
+        System.arraycopy(hostBytes, 0, request, pos, hostBytes.length);
+        pos += hostBytes.length;
+
+        System.arraycopy(REQ_END, 0, request, pos, REQ_END.length);
+
+        transportLayer.sendBinary(ByteBuffer.wrap(request));
     }
 
     /**
@@ -275,12 +327,12 @@ public final class WebSocketClient {
         var hasConnectionUpgrade = false;
         var acceptValid = false;
 
-        skipToEndOfLine(deadline);
+        responseReader.skipToEndOfLine(deadline);
 
         while (transportLayer.isConnected()) {
-            var b = nextHeaderByte(deadline);
+            var b = responseReader.nextHeaderByte(deadline);
             if (b == CARRIAGE_RETURN) {
-                b = nextHeaderByte(deadline);
+                b = responseReader.nextHeaderByte(deadline);
             }
             if (b == LINE_FEED) {
                 break;
@@ -295,13 +347,13 @@ public final class WebSocketClient {
             } else if (lower == 's') {
                 candidate = HEADER_ACCEPT;
             } else {
-                skipToEndOfLine(deadline);
+                responseReader.skipToEndOfLine(deadline);
                 continue;
             }
 
             var matched = true;
             for (var i = 1; i < candidate.length; i++) {
-                b = nextHeaderByte(deadline);
+                b = responseReader.nextHeaderByte(deadline);
                 if ((b | 0x20) != candidate[i]) {
                     matched = false;
                     break;
@@ -309,18 +361,18 @@ public final class WebSocketClient {
             }
 
             if (!matched) {
-                skipToEndOfLine(deadline);
+                responseReader.skipToEndOfLine(deadline);
                 continue;
             }
 
-            b = nextHeaderByte(deadline);
+            b = responseReader.nextHeaderByte(deadline);
             if (b != ':') {
-                skipToEndOfLine(deadline);
+                responseReader.skipToEndOfLine(deadline);
                 continue;
             }
 
             do {
-                b = nextHeaderByte(deadline);
+                b = responseReader.nextHeaderByte(deadline);
             } while (b == SPACE);
 
             if (candidate == HEADER_UPGRADE) {
@@ -353,22 +405,22 @@ public final class WebSocketClient {
      */
     private boolean matchValueExactIgnoreCase(byte firstByte, byte[] expected, long deadline) throws IOException {
         if ((firstByte | 0x20) != expected[0]) {
-            skipToEndOfLine(deadline);
+            responseReader.skipToEndOfLine(deadline);
             return false;
         }
         for (var i = 1; i < expected.length; i++) {
-            var b = nextHeaderByte(deadline);
+            var b = responseReader.nextHeaderByte(deadline);
             if ((b | 0x20) != expected[i]) {
-                skipToEndOfLine(deadline);
+                responseReader.skipToEndOfLine(deadline);
                 return false;
             }
         }
-        var b = nextHeaderByte(deadline);
+        var b = responseReader.nextHeaderByte(deadline);
         while (b == SPACE) {
-            b = nextHeaderByte(deadline);
+            b = responseReader.nextHeaderByte(deadline);
         }
         if (b == CARRIAGE_RETURN) {
-            b = nextHeaderByte(deadline);
+            b = responseReader.nextHeaderByte(deadline);
         }
         return b == LINE_FEED;
     }
@@ -385,22 +437,25 @@ public final class WebSocketClient {
      */
     private boolean matchValueExact(byte firstByte, byte[] expected, long deadline) throws IOException {
         if (firstByte != expected[0]) {
-            skipToEndOfLine(deadline);
+            responseReader.skipToEndOfLine(deadline);
             return false;
         }
+
         for (var i = 1; i < expected.length; i++) {
-            var b = nextHeaderByte(deadline);
+            var b = responseReader.nextHeaderByte(deadline);
             if (b != expected[i]) {
-                skipToEndOfLine(deadline);
+                responseReader.skipToEndOfLine(deadline);
                 return false;
             }
         }
-        var b = nextHeaderByte(deadline);
-        while (b == SPACE) {
-            b = nextHeaderByte(deadline);
-        }
+
+        byte b;
+        do {
+            b = responseReader.nextHeaderByte(deadline);
+        } while (b == SPACE);
+
         if (b == CARRIAGE_RETURN) {
-            b = nextHeaderByte(deadline);
+            b = responseReader.nextHeaderByte(deadline);
         }
         return b == LINE_FEED;
     }
@@ -418,14 +473,14 @@ public final class WebSocketClient {
         var b = firstByte;
         while (true) {
             while (b == SPACE) {
-                b = nextHeaderByte(deadline);
+                b = responseReader.nextHeaderByte(deadline);
             }
 
             var matchIndex = 0;
             if ((b | 0x20) == VALUE_UPGRADE[0]) {
                 matchIndex = 1;
                 while (matchIndex < VALUE_UPGRADE.length) {
-                    b = nextHeaderByte(deadline);
+                    b = responseReader.nextHeaderByte(deadline);
                     if ((b | 0x20) != VALUE_UPGRADE[matchIndex]) {
                         break;
                     }
@@ -434,13 +489,13 @@ public final class WebSocketClient {
             }
 
             if (matchIndex == VALUE_UPGRADE.length) {
-                b = nextHeaderByte(deadline);
-                while (b == SPACE) {
-                    b = nextHeaderByte(deadline);
-                }
+                do {
+                    b = responseReader.nextHeaderByte(deadline);
+                } while (b == SPACE);
+
                 if (b == ',' || b == CARRIAGE_RETURN || b == LINE_FEED) {
                     if (b != LINE_FEED) {
-                        skipToEndOfLine(deadline);
+                        responseReader.skipToEndOfLine(deadline);
                     }
                     return true;
                 }
@@ -448,38 +503,17 @@ public final class WebSocketClient {
 
             while (b != ',' && b != LINE_FEED) {
                 if (b == CARRIAGE_RETURN) {
-                    b = nextHeaderByte(deadline);
+                    b = responseReader.nextHeaderByte(deadline);
                     continue;
                 }
-                b = nextHeaderByte(deadline);
+                b = responseReader.nextHeaderByte(deadline);
             }
 
             if (b == LINE_FEED) {
                 return false;
             }
 
-            b = nextHeaderByte(deadline);
+            b = responseReader.nextHeaderByte(deadline);
         }
-    }
-
-    /**
-     * Reads the next byte from the response stream during header parsing.
-     *
-     * @param deadline the handshake deadline
-     * @return the next byte
-     * @throws IOException if the limit is exceeded or the read fails
-     */
-    private byte nextHeaderByte(long deadline) throws IOException {
-        return responseReader.nextHeaderByte(deadline);
-    }
-
-    /**
-     * Skips all bytes until and including the next line feed.
-     *
-     * @param deadline the handshake deadline
-     * @throws IOException if a read fails or the deadline is exceeded
-     */
-    private void skipToEndOfLine(long deadline) throws IOException {
-        responseReader.skipToEndOfLine(deadline);
     }
 }

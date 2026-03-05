@@ -2,6 +2,8 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.model.sync.action.device.AndroidUnsupportedActions;
+import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 /**
@@ -25,21 +27,33 @@ public final class AndroidUnsupportedActionsHandler implements WebAppStateAction
 
     @Override
     public String actionName() {
-        return "android_unsupported_actions";
+        return AndroidUnsupportedActions.ACTION_NAME;
     }
 
     @Override
     public SyncPatchType collectionName() {
-        return SyncPatchType.REGULAR_LOW;
+        return AndroidUnsupportedActions.COLLECTION_NAME;
     }
 
     @Override
     public int version() {
-        return 4;
+        return AndroidUnsupportedActions.ACTION_VERSION;
     }
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        // Web source (WAWebAndroidUnsupportedActionsSync): only SET is supported.
+        // Reads value.androidUnsupportedActions (must be non-null).
+        // If allowed is true, sets the primaryAllowsAllMutations flag in localStorage.
+        // No equivalent flag exists in the Java data model.
+        if (mutation.operation() != SyncdOperation.SET) {
+            return false;
+        }
+
+        if (!(mutation.value().action().orElse(null) instanceof AndroidUnsupportedActions)) {
+            return false;
+        }
+
         return true;
     }
 }

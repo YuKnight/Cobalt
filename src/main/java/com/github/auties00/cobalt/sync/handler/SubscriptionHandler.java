@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.model.sync.action.device.SubscriptionAction;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 /**
@@ -20,22 +21,23 @@ public final class SubscriptionHandler implements WebAppStateActionHandler {
 
     @Override
     public String actionName() {
-        return "subscriptionAction";
+        return SubscriptionAction.ACTION_NAME;
     }
 
     @Override
     public SyncPatchType collectionName() {
-        return SyncPatchType.REGULAR_LOW;
+        return SubscriptionAction.COLLECTION_NAME;
     }
 
     @Override
     public int version() {
-        return 7;
+        return SubscriptionAction.ACTION_VERSION;
     }
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        // Not used in WhatsApp
+        // No dedicated web module for subscription sync.
+        // No subscription model exists in the Java store, so this is a no-op.
         return true;
     }
 }

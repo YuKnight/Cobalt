@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.model.sync.action.contact;
 
 import com.github.auties00.cobalt.model.mixin.InstantMillisMixin;
 import com.github.auties00.cobalt.model.sync.SyncAction;
+import com.github.auties00.cobalt.model.sync.SyncPatchType;
 
 import java.time.Instant;
 import it.auties.protobuf.annotation.*;
@@ -20,6 +21,11 @@ public final class LabelEditAction implements SyncAction<LabelEditActionArgs> {
      * Canonical WhatsApp Web action version for this action type.
      */
     public static final int ACTION_VERSION = 3;
+
+    /**
+     * Canonical WhatsApp Web collection name for this action type.
+     */
+    public static final SyncPatchType COLLECTION_NAME = SyncPatchType.REGULAR;
 
     /**
      * {@inheritDoc}
