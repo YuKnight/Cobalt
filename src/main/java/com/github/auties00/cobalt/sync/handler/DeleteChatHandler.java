@@ -5,6 +5,7 @@ import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.ConflictResolution;
 import com.github.auties00.cobalt.model.sync.ConflictResolutionState;
+import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.chat.DeleteChatAction;
@@ -43,23 +44,32 @@ public final class DeleteChatHandler implements WebAppStateActionHandler {
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS;
+    }
+
+    @Override
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
-            return false;
+            return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof DeleteChatAction action)) {
-            return false;
+        if (!(mutation.value().action().orElse(null) instanceof DeleteChatAction)) {
+            return MutationApplicationResult.malformed();
         }
 
-        var chatJidString = JSON.parseArray(mutation.index())
-                .getString(1);
+        var chatJidString = JSON.parseArray(mutation.index()).getString(1);
+        if (chatJidString == null || chatJidString.isEmpty()) {
+            return MutationApplicationResult.malformed();
+        }
         var chatJid = Jid.of(chatJidString);
 
-        client.store()
-                .findChatByJid(chatJid)
-                .ifPresent(client.store()::removeChat);
+        var chat = client.store().findChatByJid(chatJid);
+        if (chat.isEmpty()) {
+            return MutationApplicationResult.orphan(chatJidString, "Chat");
+        }
 
-        return true;
+        client.store().removeChat(chat.get());
+        return MutationApplicationResult.success();
     }
 
     /**

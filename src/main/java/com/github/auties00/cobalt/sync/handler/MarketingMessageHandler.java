@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.business.MarketingMessageAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
@@ -54,24 +55,36 @@ public final class MarketingMessageHandler implements WebAppStateActionHandler {
      */
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS;
+    }
+
+    @Override
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         var indexArray = JSON.parseArray(mutation.index());
         var messageId = indexArray.getString(1);
         if (messageId == null || messageId.isEmpty()) {
-            return true;
+            return MutationApplicationResult.malformed();
         }
 
         if (mutation.operation() != SyncdOperation.SET) {
-            return true;
+            return MutationApplicationResult.unsupported();
         }
 
         if (!(mutation.value().action().orElse(null) instanceof MarketingMessageAction action)) {
-            return true;
+            return MutationApplicationResult.malformed();
         }
 
         if (action.type().isEmpty()) {
-            return true;
+            return MutationApplicationResult.malformed();
         }
 
-        return true;
+        var messages = new java.util.HashMap<>(client.store().marketingMessages());
+        if (action.isDeleted()) {
+            messages.remove(messageId);
+        } else {
+            messages.put(messageId, action);
+        }
+        client.store().setMarketingMessages(messages);
+        return MutationApplicationResult.success();
     }
 }

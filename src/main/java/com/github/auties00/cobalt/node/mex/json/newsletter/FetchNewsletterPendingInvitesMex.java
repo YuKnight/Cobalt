@@ -1,12 +1,18 @@
 package com.github.auties00.cobalt.node.mex.json.newsletter;
 
 import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONArray;
+import com.alibaba.fastjson2.JSONObject;
 import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.node.mex.json.MexJsonOperation;
 import com.github.auties00.cobalt.node.Node;
+import com.github.auties00.cobalt.node.NodeBuilder;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.io.UncheckedIOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -34,17 +40,19 @@ public sealed interface FetchNewsletterPendingInvitesMex extends MexJsonOperatio
         /**
          * Builds the MEX IQ stanza for this request.
          *
-         * @return the IQ {@link Node} ready to be sent
+         * @return the IQ {@link NodeBuilder} ready to be sent
          */
-        public Node toNode() {
+        public NodeBuilder toNode() {
             try (var writer = JSONWriter.ofUTF8()) {
                 writer.startObject();
                 writer.writeName("variables");
                 writer.writeColon();
                 writer.startObject();
-                writer.writeName("newsletter_id");
-                writer.writeColon();
-                writer.writeString(newsletterId);
+                if (newsletterId != null) {
+                    writer.writeName("newsletter_id");
+                    writer.writeColon();
+                    writer.writeString(newsletterId);
+                }
                 writer.endObject();
                 writer.endObject();
                 try (var output = new StringWriter()) {
@@ -61,8 +69,12 @@ public sealed interface FetchNewsletterPendingInvitesMex extends MexJsonOperatio
      * The parsed response for this MEX query.
      */
     final class Response implements FetchNewsletterPendingInvitesMex {
+        private final List<PendingAdminInvites> pendingAdminInvites;
+        private final String id;
 
-        private Response() {
+        private Response(List<PendingAdminInvites> pendingAdminInvites, String id) {
+            this.pendingAdminInvites = pendingAdminInvites;
+            this.id = id;
         }
 
         /**
@@ -74,10 +86,146 @@ public sealed interface FetchNewsletterPendingInvitesMex extends MexJsonOperatio
         public static Optional<Response> of(Node node) {
             return node.getChild("result")
                     .flatMap(Node::toContentBytes)
-                    .flatMap(Response::parse);
+                    .flatMap(Response::of);
         }
 
-        private static Optional<Response> parse(byte[] json) {
+        /**
+         * Returns the {@code pending_admin_invites} field.
+         *
+         * @return the list of values, empty if absent
+         */
+        public List<PendingAdminInvites> pendingAdminInvites() {
+            return pendingAdminInvites;
+        }
+
+        /**
+         * Returns the {@code id} field.
+         *
+         * @return an {@link Optional} containing the value, or empty if absent
+         */
+        public Optional<String> id() {
+            return Optional.ofNullable(id);
+        }
+
+        /**
+         * A parsed {@code PendingAdminInvites} object.
+         */
+        public static final class PendingAdminInvites {
+            private final User user;
+
+            private PendingAdminInvites(User user) {
+                this.user = user;
+            }
+
+            /**
+             * Returns the {@code user} field.
+             *
+             * @return an {@link Optional} containing the value, or empty if absent
+             */
+            public Optional<User> user() {
+                return Optional.ofNullable(user);
+            }
+
+            /**
+             * A parsed {@code User} object.
+             */
+            public static final class User {
+                private final String pn;
+                private final String id;
+
+                private User(String pn, String id) {
+                    this.pn = pn;
+                    this.id = id;
+                }
+
+                /**
+                 * Returns the {@code pn} field.
+                 *
+                 * @return an {@link Optional} containing the value, or empty if absent
+                 */
+                public Optional<String> pn() {
+                    return Optional.ofNullable(pn);
+                }
+
+                /**
+                 * Returns the {@code id} field.
+                 *
+                 * @return an {@link Optional} containing the value, or empty if absent
+                 */
+                public Optional<String> id() {
+                    return Optional.ofNullable(id);
+                }
+
+                /**
+                 * Parses a {@code User} from the given JSON object.
+                 *
+                 * @param obj the JSON object to parse
+                 * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+                 */
+                static Optional<User> of(JSONObject obj) {
+                    if (obj == null) {
+                        return Optional.empty();
+                    }
+
+                    var pn = obj.getString("pn");
+                    var id = obj.getString("id");
+                    return Optional.of(new User(pn, id));
+                }
+
+                /**
+                 * Parses a list of {@code User} from the given JSON array.
+                 *
+                 * @param arr the JSON array to parse
+                 * @return the list of parsed results, empty if {@code arr} is {@code null}
+                 */
+                static List<User> ofArray(JSONArray arr) {
+                    if (arr == null) {
+                        return List.of();
+                    }
+
+                    var result = new ArrayList<User>(arr.size());
+                    for (int i = 0; i < arr.size(); i++) {
+                        of(arr.getJSONObject(i)).ifPresent(result::add);
+                    }
+                    return result;
+                }
+            }
+
+            /**
+             * Parses a {@code PendingAdminInvites} from the given JSON object.
+             *
+             * @param obj the JSON object to parse
+             * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+             */
+            static Optional<PendingAdminInvites> of(JSONObject obj) {
+                if (obj == null) {
+                    return Optional.empty();
+                }
+
+                var user = User.of(obj.getJSONObject("user")).orElse(null);
+                return Optional.of(new PendingAdminInvites(user));
+            }
+
+            /**
+             * Parses a list of {@code PendingAdminInvites} from the given JSON array.
+             *
+             * @param arr the JSON array to parse
+             * @return the list of parsed results, empty if {@code arr} is {@code null}
+             */
+            static List<PendingAdminInvites> ofArray(JSONArray arr) {
+                if (arr == null) {
+                    return List.of();
+                }
+
+                var result = new ArrayList<PendingAdminInvites>(arr.size());
+                for (int i = 0; i < arr.size(); i++) {
+                    of(arr.getJSONObject(i)).ifPresent(result::add);
+                }
+                return result;
+            }
+        }
+
+        private static Optional<Response> of(byte[] json) {
             var jsonObject = JSON.parseObject(json);
             if (jsonObject == null) {
                 return Optional.empty();
@@ -88,12 +236,15 @@ public sealed interface FetchNewsletterPendingInvitesMex extends MexJsonOperatio
                 return Optional.empty();
             }
 
-            var root = data.get("xwa2_newsletter_admin");
+            var root = data.getJSONObject("xwa2_newsletter_admin");
             if (root == null) {
                 return Optional.empty();
             }
 
-            return Optional.of(new Response());
+            var pendingAdminInvites = PendingAdminInvites.ofArray(root.getJSONArray("pending_admin_invites"));
+            var id = root.getString("id");
+
+            return Optional.of(new Response(pendingAdminInvites, id));
         }
     }
 }

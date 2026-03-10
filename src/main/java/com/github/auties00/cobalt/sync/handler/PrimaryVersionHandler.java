@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.device.PrimaryVersionAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
@@ -41,24 +42,27 @@ public final class PrimaryVersionHandler implements WebAppStateActionHandler {
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        // Web source (WAWebPrimaryVersionSync): only SET is supported.
-        // Validates indexParts[1] is "current" or "session_start".
-        // Validates primaryVersionAction.version is present.
-        // Web does not actually persist the version; it only validates and returns Success.
+        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS;
+    }
+
+    @Override
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
-            return true;
+            return MutationApplicationResult.unsupported();
         }
 
         if (!(mutation.value().action().orElse(null) instanceof PrimaryVersionAction action)) {
-            return false;
+            return MutationApplicationResult.malformed();
         }
 
         var indexArray = JSON.parseArray(mutation.index());
         var subIndex = indexArray.getString(1);
         if (subIndex == null || (!subIndex.equals(INDEX_CURRENT) && !subIndex.equals(INDEX_SESSION_START))) {
-            return false;
+            return MutationApplicationResult.malformed();
         }
 
-        return action.version().isPresent();
+        return action.version().isPresent()
+                ? MutationApplicationResult.success()
+                : MutationApplicationResult.malformed();
     }
 }

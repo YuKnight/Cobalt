@@ -46,6 +46,10 @@ public final class BroadcastListParticipantAction implements SyncAction<SyncActi
     Jid pnJid;
 
 
+    public BroadcastListParticipantAction() {
+
+    }
+
     BroadcastListParticipantAction(Jid lidJid, Jid pnJid) {
         this.lidJid = Objects.requireNonNull(lidJid);
         this.pnJid = pnJid;

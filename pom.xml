@@ -246,6 +246,11 @@
                         </configuration>
                     </execution>
                 </executions>
+                <configuration>
+                    <source>25</source>
+                    <target>25</target>
+                    <compilerArgs>--enable-preview</compilerArgs>
+                </configuration>
             </plugin>
 
             <!-- Test the library to be sure that everything works-->
@@ -266,9 +271,9 @@
 
     <dependencies>
         <dependency>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-compiler-plugin</artifactId>
-            <version>${maven.compiler.plugin.version}</version>
+            <groupId>com.github.auties00</groupId>
+            <artifactId>protobuf-serialization-plugin</artifactId>
+            <version>${protoc.version}</version>
         </dependency>
 
         <!-- Generate and print QR code (Web API) -->

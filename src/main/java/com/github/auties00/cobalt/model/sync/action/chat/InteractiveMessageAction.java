@@ -47,17 +47,29 @@ public final class InteractiveMessageAction implements SyncAction<InteractiveMes
     @ProtobufProperty(index = 1, type = ProtobufType.ENUM)
     InteractiveMessageActionMode type;
 
+    @ProtobufProperty(index = 2, type = ProtobufType.STRING)
+    String agmId;
 
-    InteractiveMessageAction(InteractiveMessageActionMode type) {
+    InteractiveMessageAction(InteractiveMessageActionMode type, String agmId) {
         this.type = Objects.requireNonNull(type);
+        this.agmId = agmId;
     }
 
     public InteractiveMessageActionMode type() {
         return type;
     }
 
+    public java.util.Optional<String> agmId() {
+        return java.util.Optional.ofNullable(agmId);
+    }
+
     public InteractiveMessageAction setType(InteractiveMessageActionMode type) {
         this.type = type;
+        return this;
+    }
+
+    public InteractiveMessageAction setAgmId(String agmId) {
+        this.agmId = agmId;
         return this;
     }
 

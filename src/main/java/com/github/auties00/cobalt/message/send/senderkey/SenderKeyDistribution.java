@@ -94,7 +94,7 @@ public final class SenderKeyDistribution {
         // WAWebGetGroupKeyDistributionMsg: build the distribution protobuf
         var skDistMessage = new SenderKeyDistributionMessageBuilder()
                 .groupJid(groupJid)
-                .data(senderKeyBytes)
+                .axolotlSenderKeyDistributionMessage(senderKeyBytes)
                 .build();
         var container = MessageContainer.of(skDistMessage);
 
@@ -123,7 +123,7 @@ public final class SenderKeyDistribution {
                     // WAWebDeviceSentMessageProtoUtils.wrapDeviceSentMessage
                     var dsm = new DeviceSentMessageBuilder()
                             .destinationJid(groupJid)
-                            .message(enriched)
+                            .messageContainer(enriched)
                             .build();
                     plaintext = MessageContainerSpec.encode(MessageContainer.of(dsm));
                 } else {

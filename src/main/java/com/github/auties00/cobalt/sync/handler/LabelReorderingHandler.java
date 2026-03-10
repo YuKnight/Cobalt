@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.contact.LabelReorderingAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
@@ -42,18 +43,37 @@ public final class LabelReorderingHandler implements WebAppStateActionHandler {
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS;
+    }
+
+    @Override
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
-            return true;
+            return MutationApplicationResult.unsupported();
         }
 
         if (!(mutation.value().action().orElse(null) instanceof LabelReorderingAction action)) {
-            return true;
+            return MutationApplicationResult.malformed();
         }
 
         if (action.sortedLabelIds().isEmpty()) {
-            return true;
+            return MutationApplicationResult.malformed();
         }
 
-        return true;
+        var labelsById = client.store().labels()
+                .stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        com.github.auties00.cobalt.model.preference.Label::id,
+                        java.util.function.Function.identity()
+                ));
+        for (int i = 0; i < action.sortedLabelIds().size(); i++) {
+            var labelId = action.sortedLabelIds().get(i);
+            var label = labelsById.get(labelId);
+            if (label != null) {
+                label.setOrderIndex(i);
+            }
+        }
+
+        return MutationApplicationResult.success();
     }
 }

@@ -1,8 +1,10 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.payment.CustomPaymentMethodsAction;
+import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
@@ -42,18 +44,28 @@ public final class CustomPaymentMethodsHandler implements WebAppStateActionHandl
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS;
+    }
+
+    @Override
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        if (client.store().device() == null || !client.store().device().platform().isBusiness()) {
+            return MutationApplicationResult.unsupported();
+        }
+
+        if (!client.abPropsService().getBool(ABProp.PAYMENTS_BR_PIX_PHASE_1_SELLER_SYNC_ENABLED)) {
+            return MutationApplicationResult.unsupported();
+        }
+
         if (mutation.operation() != SyncdOperation.SET) {
-            return true;
+            return MutationApplicationResult.unsupported();
         }
 
         if (!(mutation.value().action().orElse(null) instanceof CustomPaymentMethodsAction action)) {
-            return true;
+            return MutationApplicationResult.malformed();
         }
 
-        if (action.customPaymentMethods().isEmpty()) {
-            return true;
-        }
-
-        return true;
+        client.store().setCustomPaymentMethods(action.customPaymentMethods());
+        return MutationApplicationResult.success();
     }
 }

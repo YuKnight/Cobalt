@@ -1,8 +1,11 @@
 package com.github.auties00.cobalt.sync;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.model.chat.ChatMessageInfoBuilder;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.MessageContainerBuilder;
+import com.github.auties00.cobalt.model.message.MessageKey;
+import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
 import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
 import com.github.auties00.cobalt.model.message.system.ProtocolMessageBuilder;
 import com.github.auties00.cobalt.model.message.system.peer.PeerDataOperationRequestMessageBuilder;
@@ -220,7 +223,7 @@ public final class SnapshotRecoveryService {
         }
 
         var recoveryRequest = new PeerDataOperationRequestMessageSyncDCollectionFatalRecoveryRequestBuilder()
-                .collectionName(collectionName.name())
+                .collectionName(collectionName.toString())
                 .timestamp(Instant.now())
                 .build();
 
@@ -239,7 +242,24 @@ public final class SnapshotRecoveryService {
                 .build();
 
         LOGGER.info("Sending snapshot recovery request for collection " + collectionName + " to primary device " + primaryDevice);
-        client.sendMessage(primaryDevice, messageContainer);
+        var self = client.store().jid().orElse(null);
+        if (self == null) {
+            throw new IllegalStateException("Own JID not available for snapshot recovery request");
+        }
+
+        var messageKey = new MessageKeyBuilder()
+                .id(MessageKey.randomId(client.store().clientType()))
+                .chatJid(self)
+                .fromMe(true)
+                .senderJid(self)
+                .build();
+        var messageInfo = new ChatMessageInfoBuilder()
+                .key(messageKey)
+                .message(messageContainer)
+                .timestamp(Instant.now())
+                .senderJid(self)
+                .build();
+        client.sendPeerMessage(primaryDevice, messageInfo);
     }
 
     /**

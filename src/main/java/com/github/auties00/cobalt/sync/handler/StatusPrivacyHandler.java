@@ -1,10 +1,16 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.model.privacy.PrivacySettingEntryBuilder;
+import com.github.auties00.cobalt.model.privacy.PrivacySettingType;
+import com.github.auties00.cobalt.model.privacy.PrivacySettingValue;
+import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.media.StatusPrivacyAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.util.List;
 
 /**
  * Handles status privacy actions.
@@ -42,18 +48,47 @@ public final class StatusPrivacyHandler implements WebAppStateActionHandler {
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS;
+    }
+
+    @Override
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
-            return true;
+            return MutationApplicationResult.unsupported();
         }
 
         if (!(mutation.value().action().orElse(null) instanceof StatusPrivacyAction action)) {
-            return true;
+            return MutationApplicationResult.malformed();
         }
 
-        if (action.mode().isEmpty()) {
-            return true;
+        var mode = action.mode().orElse(null);
+        if (mode == null) {
+            return MutationApplicationResult.malformed();
         }
 
-        return true;
+        var entry = switch (mode) {
+            case CONTACTS -> new PrivacySettingEntryBuilder()
+                    .type(PrivacySettingType.STATUS)
+                    .value(PrivacySettingValue.CONTACTS)
+                    .excluded(List.of())
+                    .build();
+            case ALLOW_LIST -> new PrivacySettingEntryBuilder()
+                    .type(PrivacySettingType.STATUS)
+                    .value(PrivacySettingValue.CONTACTS_ONLY)
+                    .excluded(action.userJid())
+                    .build();
+            case DENY_LIST -> new PrivacySettingEntryBuilder()
+                    .type(PrivacySettingType.STATUS)
+                    .value(PrivacySettingValue.CONTACTS_EXCEPT)
+                    .excluded(action.userJid())
+                    .build();
+            case CLOSE_FRIENDS -> new PrivacySettingEntryBuilder()
+                    .type(PrivacySettingType.STATUS)
+                    .value(PrivacySettingValue.CONTACTS)
+                    .excluded(List.of())
+                    .build();
+        };
+        client.store().addPrivacySetting(entry);
+        return MutationApplicationResult.success();
     }
 }

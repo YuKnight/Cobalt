@@ -3,6 +3,7 @@ package com.github.auties00.cobalt.sync.handler;
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.bot.AiThreadRenameAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
@@ -42,36 +43,57 @@ public final class AiThreadRenameHandler implements WebAppStateActionHandler {
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS;
+    }
+
+    @Override
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
-            return true;
+            return MutationApplicationResult.unsupported();
+        }
+
+        var aiThreadSupported = client.store().primaryDeviceCapabilities()
+                .flatMap(com.github.auties00.cobalt.model.device.DeviceCapabilities::aiThread)
+                .flatMap(com.github.auties00.cobalt.model.device.DeviceCapabilities.AiThread::supportLevel)
+                .filter(level -> level != com.github.auties00.cobalt.model.device.DeviceCapabilities.AiThread.SupportLevel.NONE)
+                .isPresent();
+        if (!aiThreadSupported) {
+            return MutationApplicationResult.unsupported();
         }
 
         var indexArray = JSON.parseArray(mutation.index());
         if (indexArray.size() < 3) {
-            return true;
+            return MutationApplicationResult.malformed();
         }
 
         var chatJidString = indexArray.getString(1);
         var threadId = indexArray.getString(2);
         if (chatJidString == null || chatJidString.isBlank()
                 || threadId == null || threadId.isBlank()) {
-            return true;
+            return MutationApplicationResult.malformed();
         }
 
         var chatJid = Jid.of(chatJidString);
         if (!chatJid.hasBotServer()) {
-            return true;
+            return MutationApplicationResult.malformed();
         }
 
         if (!(mutation.value().action().orElse(null) instanceof AiThreadRenameAction action)) {
-            return true;
+            return MutationApplicationResult.malformed();
         }
 
         var newTitle = action.newTitle().orElse(null);
         if (newTitle == null || newTitle.isBlank()) {
-            return true;
+            return MutationApplicationResult.malformed();
         }
 
-        return true;
+        var titles = new java.util.HashMap<>(client.store().aiThreadTitles());
+        var key = chatJidString + "|" + threadId;
+        if (!titles.containsKey(key)) {
+            return MutationApplicationResult.orphan(key, "Thread");
+        }
+        titles.put(key, newTitle);
+        client.store().setAiThreadTitles(titles);
+        return MutationApplicationResult.success();
     }
 }

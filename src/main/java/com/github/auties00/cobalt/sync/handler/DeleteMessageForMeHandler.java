@@ -5,6 +5,7 @@ import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.ConflictResolution;
 import com.github.auties00.cobalt.model.sync.ConflictResolutionState;
+import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.chat.DeleteMessageForMeAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
@@ -42,20 +43,26 @@ public final class DeleteMessageForMeHandler implements WebAppStateActionHandler
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS;
+    }
+
+    @Override
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
-            return false;
+            return MutationApplicationResult.unsupported();
         }
 
         if (!(mutation.value().action().orElse(null) instanceof DeleteMessageForMeAction _)) {
-            return false;
+            return MutationApplicationResult.malformed();
         }
 
         var indexArray = JSON.parseArray(mutation.index());
         if (indexArray.size() < 5) {
-            return false;
+            return MutationApplicationResult.malformed();
         }
 
-        var chatJid = Jid.of(indexArray.getString(1));
+        var chatJidString = indexArray.getString(1);
+        var chatJid = Jid.of(chatJidString);
         var messageId = indexArray.getString(2);
         var fromMe = "1".equals(indexArray.getString(3));
         var participantString = indexArray.getString(4);
@@ -63,20 +70,25 @@ public final class DeleteMessageForMeHandler implements WebAppStateActionHandler
                 ? Jid.of(participantString)
                 : null;
 
-        var chat = client.store()
-                .findChatByJid(chatJid);
+        var chat = client.store().findChatByJid(chatJid);
         if (chat.isEmpty()) {
-            return false;
+            return MutationApplicationResult.orphan(chatJidString, "Chat");
         }
 
-        client.store()
+        var removed = client.store()
                 .findMessageById(chat.get(), messageId)
                 .filter(msg -> msg.key().fromMe() == fromMe)
                 .filter(msg -> participant == null || participant.toUserJid().equals(msg.key().senderJid().map(Jid::toUserJid).orElse(null)))
                 .flatMap(info -> info.key().id())
-                .ifPresent(id -> chat.get().removeMessage(id));
+                .map(id -> {
+                    chat.get().removeMessage(id);
+                    return id;
+                })
+                .isPresent();
 
-        return true;
+        return removed
+                ? MutationApplicationResult.success()
+                : MutationApplicationResult.orphan(messageId, "Msg");
     }
 
     /**

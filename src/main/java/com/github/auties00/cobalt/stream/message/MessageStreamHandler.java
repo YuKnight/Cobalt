@@ -20,6 +20,7 @@ import com.github.auties00.cobalt.model.message.context.ContextInfo;
 import com.github.auties00.cobalt.model.message.context.ContextualMessage;
 import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
 import com.github.auties00.cobalt.model.message.system.ProtocolMessageBuilder;
+import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyBuilder;
 import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyId;
 import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyShare;
 import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyShareBuilder;
@@ -39,10 +40,10 @@ import it.auties.protobuf.stream.ProtobufInputStream;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.util.Objects;
-import java.util.Optional;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.zip.GZIPInputStream;
 
 public final class MessageStreamHandler implements SocketStream.Handler {
@@ -572,38 +573,78 @@ public final class MessageStreamHandler implements SocketStream.Handler {
                 .ifPresent(this::resolveSnapshotRecovery);
 
         protocolMessage.appStateSyncKeyShare()
-                .ifPresent(this::processAppStateSyncKeyShare);
+                .ifPresent(keyShare -> processAppStateSyncKeyShare(info, keyShare));
 
         protocolMessage.appStateSyncKeyRequest()
                 .ifPresent(request -> processAppStateSyncKeyRequest(info, request));
     }
 
-    private void processAppStateSyncKeyShare(AppStateSyncKeyShare keyShare) {
+    private void processAppStateSyncKeyShare(ChatMessageInfo info, AppStateSyncKeyShare keyShare) {
         var keys = keyShare.keys();
-        if (keys.isEmpty()) {
-            return;
-        }
-
-        whatsapp.store().addWebAppStateKeys(keys);
+        var senderDeviceId = info.senderJid() != null ? info.senderJid().device() : -1;
+        var usableKeys = new ArrayList<com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKey>(keys.size());
 
         var resolvedAny = false;
+        var negativeResponseObserved = false;
         for (var key : keys) {
             var keyId = key.keyId()
                     .flatMap(AppStateSyncKeyId::keyId)
                     .orElse(null);
-            if (keyId != null && whatsapp.store().findMissingSyncKey(keyId).isPresent()) {
-                whatsapp.store().removeMissingSyncKey(keyId);
-                resolvedAny = true;
+            if (keyId == null) {
+                continue;
+            }
+
+            var hasKeyData = key.keyData()
+                    .flatMap(com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyData::keyData)
+                    .map(data -> data.length > 0)
+                    .orElse(false);
+            if (hasKeyData) {
+                usableKeys.add(key);
+                if (whatsapp.store().findMissingSyncKey(keyId).isPresent()) {
+                    whatsapp.store().removeMissingSyncKey(keyId);
+                    resolvedAny = true;
+                }
+                continue;
+            }
+
+            if (senderDeviceId < 0) {
+                continue;
+            }
+
+            var missingKey = whatsapp.store().findMissingSyncKey(keyId).orElse(null);
+            if (missingKey == null || !missingKey.wasAsked(senderDeviceId)) {
+                continue;
+            }
+
+            if (!missingKey.hasDeviceRespondedWithoutKey(senderDeviceId)) {
+                missingKey.markDeviceRespondedWithoutKey(senderDeviceId);
+                negativeResponseObserved = true;
+            }
+            if (missingKey.isMissingOnAllDevices()) {
+                whatsapp.scheduleAllDevicesRespondedCheck();
             }
         }
 
+        if (!usableKeys.isEmpty()) {
+            whatsapp.store().addWebAppStateKeys(usableKeys);
+        }
+
         if (resolvedAny) {
+            var blockedCollections = new ArrayList<SyncPatchType>();
             for (var patchType : SyncPatchType.values()) {
                 var metadata = whatsapp.store().findWebAppState(patchType);
                 if (metadata.state() == SyncCollectionState.BLOCKED) {
                     whatsapp.store().markWebAppStateDirty(patchType);
+                    blockedCollections.add(patchType);
                 }
             }
+            if (!blockedCollections.isEmpty()) {
+                whatsapp.pullWebAppState(blockedCollections.toArray(SyncPatchType[]::new));
+            }
+        }
+
+        if (resolvedAny || negativeResponseObserved) {
+            whatsapp.store().setSyncedWebAppState(false);
         }
     }
 
@@ -623,8 +664,13 @@ public final class MessageStreamHandler implements SocketStream.Handler {
                 continue;
             }
 
-            whatsapp.store().findWebAppStateKeyById(rawKeyId)
-                    .ifPresent(keysToShare::add);
+            var keyToShare = whatsapp.store().findWebAppStateKeyById(rawKeyId)
+                    .orElseGet(() -> new AppStateSyncKeyBuilder()
+                            .keyId(new com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyIdBuilder()
+                                    .keyId(rawKeyId)
+                                    .build())
+                            .build());
+            keysToShare.add(keyToShare);
         }
 
         if (keysToShare.isEmpty()) {

@@ -63,8 +63,16 @@ public final class MissingDeviceSyncKey {
         askedDevices.add(deviceId);
     }
 
+    public boolean wasAsked(int deviceId) {
+        return askedDevices.contains(deviceId);
+    }
+
     public void markDeviceRespondedWithoutKey(int deviceId) {
         respondedWithoutKey.add(deviceId);
+    }
+
+    public boolean hasDeviceRespondedWithoutKey(int deviceId) {
+        return respondedWithoutKey.contains(deviceId);
     }
 
     public void removeDevice(int deviceId) {

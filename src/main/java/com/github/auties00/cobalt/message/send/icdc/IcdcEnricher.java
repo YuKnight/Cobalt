@@ -1,9 +1,9 @@
 package com.github.auties00.cobalt.message.send.icdc;
 
 import com.github.auties00.cobalt.device.icdc.IcdcResult;
+import com.github.auties00.cobalt.model.chat.ChatMessageContextInfoBuilder;
 import com.github.auties00.cobalt.model.device.DeviceListMetadataBuilder;
 import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.sync.DeviceListMetadataBuilder;
 
 /**
  * Populates ICDC (Identity Change Detection Consistency) metadata on
@@ -52,21 +52,21 @@ public final class IcdcEnricher {
         var metadataBuilder = new DeviceListMetadataBuilder();
         if (senderIcdc != null) {
             senderIcdc.keyHash().ifPresent(metadataBuilder::senderKeyHash);
-            senderIcdc.timestamp().ifPresent(t -> metadataBuilder.senderTimestamp(t.getEpochSecond()));
+            senderIcdc.timestamp().ifPresent(metadataBuilder::senderTimestamp);
             metadataBuilder.senderKeyIndexes(senderIcdc.keyIndexes());
             senderIcdc.accountType().ifPresent(metadataBuilder::senderAccountType);
         }
         if (recipientIcdc != null) {
             recipientIcdc.keyHash().ifPresent(metadataBuilder::recipientKeyHash);
-            recipientIcdc.timestamp().ifPresent(t -> metadataBuilder.recipientTimestamp(t.getEpochSecond()));
+            recipientIcdc.timestamp().ifPresent(metadataBuilder::recipientTimestamp);
             metadataBuilder.recipientKeyIndexes(recipientIcdc.keyIndexes());
             recipientIcdc.accountType().ifPresent(metadataBuilder::receiverAccountType);
         }
 
         // WAWebE2EProtoGenerator.populateMessageContextInfo:
         // merges with existing messageContextInfo, preserving other fields
-        var existing = container.deviceInfo().orElse(null);
-        var infoBuilder = new DeviceContextInfoBuilder()
+        var existing = container.messageContextInfo().orElse(null);
+        var infoBuilder = new ChatMessageContextInfoBuilder()
                 .deviceListMetadata(metadataBuilder.build())
                 .deviceListMetadataVersion(2);
         if (existing != null) {
@@ -79,6 +79,6 @@ public final class IcdcEnricher {
             infoBuilder.threadId(existing.threadId());
         }
 
-        return container.withDeviceInfo(infoBuilder.build());
+        return container.withMessageContextInfo(infoBuilder.build());
     }
 }

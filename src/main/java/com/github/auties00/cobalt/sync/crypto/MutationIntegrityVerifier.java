@@ -61,14 +61,20 @@ public final class MutationIntegrityVerifier {
         var keyId = snapshot.keyId()
                 .flatMap(KeyId::id);
         if(keyId.isEmpty()) {
-            throw new IllegalArgumentException("Snapshot missing key id");
+            throw new WhatsAppWebAppStateSyncException.UnexpectedError(
+                    "Snapshot missing key id for " + collectionName + " at version " + version,
+                    null
+            );
         }
 
         var keyData = store.findWebAppStateKeyById(keyId.get())
-                .orElseThrow(() -> new InternalError("Unknown sync key for snapshot"))
+                .orElseThrow(() -> new WhatsAppWebAppStateSyncException.MissingKey(keyId.get()))
                 .keyData()
                 .flatMap(AppStateSyncKeyData::keyData)
-                .orElseThrow(() -> new IllegalArgumentException("Sync key had no key data"));
+                .orElseThrow(() -> new WhatsAppWebAppStateSyncException.UnexpectedError(
+                        "Snapshot sync key had no key data for " + collectionName + " at version " + version,
+                        null
+                ));
 
         try (var keys = MutationKeys.ofSyncKey(keyData)) {
             var expectedMac = computeSnapshotMac(keys.snapshotMacKey(), expectedHash, version, collectionName);
@@ -123,14 +129,20 @@ public final class MutationIntegrityVerifier {
         var keyId = patch.keyId()
                 .flatMap(KeyId::id);
         if (keyId.isEmpty()) {
-            throw new IllegalArgumentException("Patch missing key id");
+            throw new WhatsAppWebAppStateSyncException.UnexpectedError(
+                    "Patch missing key id for " + collectionName,
+                    null
+            );
         }
 
         var keyData = store.findWebAppStateKeyById(keyId.get())
-                .orElseThrow(() -> new InternalError("Unknown sync key for patch"))
+                .orElseThrow(() -> new WhatsAppWebAppStateSyncException.MissingKey(keyId.get()))
                 .keyData()
                 .flatMap(AppStateSyncKeyData::keyData)
-                .orElseThrow(() -> new IllegalArgumentException("Sync key had no key data"));
+                .orElseThrow(() -> new WhatsAppWebAppStateSyncException.UnexpectedError(
+                        "Patch sync key had no key data for " + collectionName,
+                        null
+                ));
 
         long patchVersion = patch.version()
                 .map(version -> version.version().orElse(0L))

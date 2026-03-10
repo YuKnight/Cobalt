@@ -1,12 +1,14 @@
 package com.github.auties00.cobalt.model.setting;
 
+import com.github.auties00.cobalt.model.sync.SyncAction;
+import com.github.auties00.cobalt.model.sync.SyncActionEmptyArgs;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import it.auties.protobuf.annotation.*;
 import it.auties.protobuf.model.*;
 import java.util.Optional;
 
 @ProtobufMessage(name = "ChatLockSettings")
-public final class ChatLockSettings {
+public final class ChatLockSettings implements SyncAction<SyncActionEmptyArgs> {
     /**
      * Canonical WhatsApp Web action name for this action type.
      */
@@ -21,6 +23,16 @@ public final class ChatLockSettings {
      * Canonical WhatsApp Web collection name for this action type.
      */
     public static final SyncPatchType COLLECTION_NAME = SyncPatchType.REGULAR_LOW;
+
+    @Override
+    public String actionName() {
+        return ACTION_NAME;
+    }
+
+    @Override
+    public int actionVersion() {
+        return ACTION_VERSION;
+    }
 
     @ProtobufProperty(index = 1, type = ProtobufType.BOOL)
     Boolean hideLockedChats;

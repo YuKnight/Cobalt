@@ -4,9 +4,11 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.node.mex.json.MexJsonOperation;
 import com.github.auties00.cobalt.node.Node;
+import com.github.auties00.cobalt.node.NodeBuilder;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.io.UncheckedIOException;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -26,11 +28,11 @@ public sealed interface SetUsernameMex extends MexJsonOperation permits SetUsern
      */
     final class Request implements SetUsernameMex {
         private final String input;
-        private final boolean reserved;
+        private final Boolean reserved;
         private final String sessionId;
         private final String source;
 
-        public Request(String input, boolean reserved, String sessionId, String source) {
+        public Request(String input, Boolean reserved, String sessionId, String source) {
             this.input = input;
             this.reserved = reserved;
             this.sessionId = sessionId;
@@ -40,26 +42,34 @@ public sealed interface SetUsernameMex extends MexJsonOperation permits SetUsern
         /**
          * Builds the MEX IQ stanza for this request.
          *
-         * @return the IQ {@link Node} ready to be sent
+         * @return the IQ {@link NodeBuilder} ready to be sent
          */
-        public Node toNode() {
+        public NodeBuilder toNode() {
             try (var writer = JSONWriter.ofUTF8()) {
                 writer.startObject();
                 writer.writeName("variables");
                 writer.writeColon();
                 writer.startObject();
-                writer.writeName("input");
-                writer.writeColon();
-                writer.writeString(input);
-                writer.writeName("reserved");
-                writer.writeColon();
-                writer.writeBool(reserved);
-                writer.writeName("session_id");
-                writer.writeColon();
-                writer.writeString(sessionId);
-                writer.writeName("source");
-                writer.writeColon();
-                writer.writeString(source);
+                if (input != null) {
+                    writer.writeName("input");
+                    writer.writeColon();
+                    writer.writeString(input);
+                }
+                if (reserved != null) {
+                    writer.writeName("reserved");
+                    writer.writeColon();
+                    writer.writeBool(reserved);
+                }
+                if (sessionId != null) {
+                    writer.writeName("session_id");
+                    writer.writeColon();
+                    writer.writeString(sessionId);
+                }
+                if (source != null) {
+                    writer.writeName("source");
+                    writer.writeColon();
+                    writer.writeString(source);
+                }
                 writer.endObject();
                 writer.endObject();
                 try (var output = new StringWriter()) {
@@ -91,7 +101,7 @@ public sealed interface SetUsernameMex extends MexJsonOperation permits SetUsern
         public static Optional<Response> of(Node node) {
             return node.getChild("result")
                     .flatMap(Node::toContentBytes)
-                    .flatMap(Response::parse);
+                    .flatMap(Response::of);
         }
 
         /**
@@ -103,7 +113,7 @@ public sealed interface SetUsernameMex extends MexJsonOperation permits SetUsern
             return Optional.ofNullable(result);
         }
 
-        private static Optional<Response> parse(byte[] json) {
+        private static Optional<Response> of(byte[] json) {
             var jsonObject = JSON.parseObject(json);
             if (jsonObject == null) {
                 return Optional.empty();

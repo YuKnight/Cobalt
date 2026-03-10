@@ -5,6 +5,7 @@ import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.ConflictResolution;
 import com.github.auties00.cobalt.model.sync.ConflictResolutionState;
+import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.chat.MarkChatAsReadAction;
@@ -43,22 +44,28 @@ public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS;
+    }
+
+    @Override
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
-            return false;
+            return MutationApplicationResult.unsupported();
         }
 
         if (!(mutation.value().action().orElse(null) instanceof MarkChatAsReadAction action)) {
-            return false;
+            return MutationApplicationResult.malformed();
         }
 
-        var chatJidString = JSON.parseArray(mutation.index())
-                .getString(1);
+        var chatJidString = JSON.parseArray(mutation.index()).getString(1);
+        if (chatJidString == null || chatJidString.isEmpty()) {
+            return MutationApplicationResult.malformed();
+        }
         var chatJid = Jid.of(chatJidString);
 
-        var chat = client.store()
-                .findChatByJid(chatJid);
+        var chat = client.store().findChatByJid(chatJid);
         if (chat.isEmpty()) {
-            return false;
+            return MutationApplicationResult.orphan(chatJidString, "Chat");
         }
 
         if (action.read()) {
@@ -69,7 +76,7 @@ public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
             chat.get().setUnreadCount(-1);
         }
 
-        return true;
+        return MutationApplicationResult.success();
     }
 
     /**

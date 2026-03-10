@@ -39,12 +39,15 @@ public record SyncRequest(
      * @param patchType  the collection type
      * @param newLtHash  the LT-Hash computed after applying outgoing mutations
      * @param newVersion the expected new collection version (local + 1)
+     * @param uploadedPendingMutationIds the IDs of the user-authored pending mutations
+     *                                  that were included in this upload
      * @param mutations  the per-mutation metadata for sync action entry persistence
      */
     public record UploadedPatchInfo(
             SyncPatchType patchType,
             byte[] newLtHash,
             long newVersion,
+            List<String> uploadedPendingMutationIds,
             List<UploadedMutationInfo> mutations
     ) {
     }

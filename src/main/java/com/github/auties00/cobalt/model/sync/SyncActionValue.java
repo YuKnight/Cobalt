@@ -10,6 +10,7 @@ import com.github.auties00.cobalt.model.sync.action.bot.UGCBotAction;
 import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastCampaignAction;
 import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastInsightsAction;
 import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastListAction;
+import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastAssociationAction;
 import com.github.auties00.cobalt.model.sync.action.business.CtwaPerCustomerDataSharingAction;
 import com.github.auties00.cobalt.model.sync.action.business.MarketingMessageAction;
 import com.github.auties00.cobalt.model.sync.action.business.MarketingMessageBroadcastAction;
@@ -210,6 +211,9 @@ public final class SyncActionValue {
     @ProtobufProperty(index = 64, type = ProtobufType.MESSAGE)
     final PrivacySettingChannelsPersonalisedRecommendationAction privacySettingChannelsPersonalisedRecommendationAction;
 
+    @ProtobufProperty(index = 65, type = ProtobufType.MESSAGE)
+    final BusinessBroadcastAssociationAction businessBroadcastAssociationAction;
+
     @ProtobufProperty(index = 66, type = ProtobufType.MESSAGE)
     final DetectedOutcomesStatusAction detectedOutcomesStatusAction;
 
@@ -256,7 +260,7 @@ public final class SyncActionValue {
     final BusinessBroadcastInsightsAction businessBroadcastInsightsAction;
 
 
-    SyncActionValue(Instant timestamp, StarAction starAction, ContactAction contactAction, MuteAction muteAction, PinAction pinAction, PushNameSetting pushNameSetting, QuickReplyAction quickReplyAction, RecentEmojiWeightsAction recentEmojiWeightsAction, LabelEditAction labelEditAction, LabelAssociationAction labelAssociationAction, LocaleSetting localeSetting, ArchiveChatAction archiveChatAction, DeleteMessageForMeAction deleteMessageForMeAction, KeyExpirationAction keyExpirationAction, MarkChatAsReadAction markChatAsReadAction, ClearChatAction clearChatAction, DeleteChatAction deleteChatAction, UnarchiveChatsSetting unarchiveChatsSetting, PrimaryFeatureAction primaryFeatureAction, AndroidUnsupportedActions androidUnsupportedActions, AgentAction agentAction, SubscriptionAction subscriptionAction, UserStatusMuteAction userStatusMuteAction, TimeFormatAction timeFormatAction, NuxAction nuxAction, PrimaryVersionAction primaryVersionAction, StickerAction stickerAction, RemoveRecentStickerAction removeRecentStickerAction, ChatAssignmentAction chatAssignment, ChatAssignmentOpenedStatusAction chatAssignmentOpenedStatus, PnForLidChatAction pnForLidChatAction, MarketingMessageAction marketingMessageAction, MarketingMessageBroadcastAction marketingMessageBroadcastAction, ExternalWebBetaAction externalWebBetaAction, PrivacySettingRelayAllCalls privacySettingRelayAllCalls, CallLogAction callLogAction, UGCBotAction ugcBotAction, StatusPrivacyAction statusPrivacy, BotWelcomeRequestAction botWelcomeRequestAction, DeleteIndividualCallLogAction deleteIndividualCallLog, LabelReorderingAction labelReorderingAction, PaymentInfoAction paymentInfoAction, CustomPaymentMethodsAction customPaymentMethodsAction, LockChatAction lockChatAction, ChatLockSettings chatLockSettings, WamoUserIdentifierAction wamoUserIdentifierAction, PrivacySettingDisableLinkPreviewsAction privacySettingDisableLinkPreviewsAction, DeviceCapabilities deviceCapabilities, NoteEditAction noteEditAction, FavoritesAction favoritesAction, MerchantPaymentPartnerAction merchantPaymentPartnerAction, WaffleAccountLinkStateAction waffleAccountLinkStateAction, UsernameChatStartModeAction usernameChatStartMode, NotificationActivitySettingAction notificationActivitySettingAction, LidContactAction lidContactAction, CtwaPerCustomerDataSharingAction ctwaPerCustomerDataSharingAction, PaymentTosAction paymentTosAction, PrivacySettingChannelsPersonalisedRecommendationAction privacySettingChannelsPersonalisedRecommendationAction, DetectedOutcomesStatusAction detectedOutcomesStatusAction, MaibaAIFeaturesControlAction maibaAiFeaturesControlAction, BusinessBroadcastListAction businessBroadcastListAction, MusicUserIdAction musicUserIdAction, StatusPostOptInNotificationPreferencesAction statusPostOptInNotificationPreferencesAction, AvatarUpdatedAction avatarUpdatedAction, PrivateProcessingSettingAction privateProcessingSettingAction, NewsletterSavedInterestsAction newsletterSavedInterestsAction, AiThreadRenameAction aiThreadRenameAction, InteractiveMessageAction interactiveMessageAction, SettingsSyncAction settingsSyncAction, OutContactAction outContactAction, NctSaltSyncAction nctSaltSyncAction, BusinessBroadcastCampaignAction businessBroadcastCampaignAction, BusinessBroadcastInsightsAction businessBroadcastInsightsAction) {
+    SyncActionValue(Instant timestamp, StarAction starAction, ContactAction contactAction, MuteAction muteAction, PinAction pinAction, PushNameSetting pushNameSetting, QuickReplyAction quickReplyAction, RecentEmojiWeightsAction recentEmojiWeightsAction, LabelEditAction labelEditAction, LabelAssociationAction labelAssociationAction, LocaleSetting localeSetting, ArchiveChatAction archiveChatAction, DeleteMessageForMeAction deleteMessageForMeAction, KeyExpirationAction keyExpirationAction, MarkChatAsReadAction markChatAsReadAction, ClearChatAction clearChatAction, DeleteChatAction deleteChatAction, UnarchiveChatsSetting unarchiveChatsSetting, PrimaryFeatureAction primaryFeatureAction, AndroidUnsupportedActions androidUnsupportedActions, AgentAction agentAction, SubscriptionAction subscriptionAction, UserStatusMuteAction userStatusMuteAction, TimeFormatAction timeFormatAction, NuxAction nuxAction, PrimaryVersionAction primaryVersionAction, StickerAction stickerAction, RemoveRecentStickerAction removeRecentStickerAction, ChatAssignmentAction chatAssignment, ChatAssignmentOpenedStatusAction chatAssignmentOpenedStatus, PnForLidChatAction pnForLidChatAction, MarketingMessageAction marketingMessageAction, MarketingMessageBroadcastAction marketingMessageBroadcastAction, ExternalWebBetaAction externalWebBetaAction, PrivacySettingRelayAllCalls privacySettingRelayAllCalls, CallLogAction callLogAction, UGCBotAction ugcBotAction, StatusPrivacyAction statusPrivacy, BotWelcomeRequestAction botWelcomeRequestAction, DeleteIndividualCallLogAction deleteIndividualCallLog, LabelReorderingAction labelReorderingAction, PaymentInfoAction paymentInfoAction, CustomPaymentMethodsAction customPaymentMethodsAction, LockChatAction lockChatAction, ChatLockSettings chatLockSettings, WamoUserIdentifierAction wamoUserIdentifierAction, PrivacySettingDisableLinkPreviewsAction privacySettingDisableLinkPreviewsAction, DeviceCapabilities deviceCapabilities, NoteEditAction noteEditAction, FavoritesAction favoritesAction, MerchantPaymentPartnerAction merchantPaymentPartnerAction, WaffleAccountLinkStateAction waffleAccountLinkStateAction, UsernameChatStartModeAction usernameChatStartMode, NotificationActivitySettingAction notificationActivitySettingAction, LidContactAction lidContactAction, CtwaPerCustomerDataSharingAction ctwaPerCustomerDataSharingAction, PaymentTosAction paymentTosAction, PrivacySettingChannelsPersonalisedRecommendationAction privacySettingChannelsPersonalisedRecommendationAction, BusinessBroadcastAssociationAction businessBroadcastAssociationAction, DetectedOutcomesStatusAction detectedOutcomesStatusAction, MaibaAIFeaturesControlAction maibaAiFeaturesControlAction, BusinessBroadcastListAction businessBroadcastListAction, MusicUserIdAction musicUserIdAction, StatusPostOptInNotificationPreferencesAction statusPostOptInNotificationPreferencesAction, AvatarUpdatedAction avatarUpdatedAction, PrivateProcessingSettingAction privateProcessingSettingAction, NewsletterSavedInterestsAction newsletterSavedInterestsAction, AiThreadRenameAction aiThreadRenameAction, InteractiveMessageAction interactiveMessageAction, SettingsSyncAction settingsSyncAction, OutContactAction outContactAction, NctSaltSyncAction nctSaltSyncAction, BusinessBroadcastCampaignAction businessBroadcastCampaignAction, BusinessBroadcastInsightsAction businessBroadcastInsightsAction) {
         this.timestamp = timestamp;
         this.starAction = starAction;
         this.contactAction = contactAction;
@@ -315,6 +319,7 @@ public final class SyncActionValue {
         this.ctwaPerCustomerDataSharingAction = ctwaPerCustomerDataSharingAction;
         this.paymentTosAction = paymentTosAction;
         this.privacySettingChannelsPersonalisedRecommendationAction = privacySettingChannelsPersonalisedRecommendationAction;
+        this.businessBroadcastAssociationAction = businessBroadcastAssociationAction;
         this.detectedOutcomesStatusAction = detectedOutcomesStatusAction;
         this.maibaAiFeaturesControlAction = maibaAiFeaturesControlAction;
         this.businessBroadcastListAction = businessBroadcastListAction;
@@ -380,8 +385,10 @@ public final class SyncActionValue {
         if (paymentInfoAction != null) return Optional.of(paymentInfoAction);
         if (customPaymentMethodsAction != null) return Optional.of(customPaymentMethodsAction);
         if (lockChatAction != null) return Optional.of(lockChatAction);
+        if (chatLockSettings != null) return Optional.of(chatLockSettings);
         if (wamoUserIdentifierAction != null) return Optional.of(wamoUserIdentifierAction);
         if (privacySettingDisableLinkPreviewsAction != null) return Optional.of(privacySettingDisableLinkPreviewsAction);
+        if (deviceCapabilities != null) return Optional.of(deviceCapabilities);
         if (noteEditAction != null) return Optional.of(noteEditAction);
         if (favoritesAction != null) return Optional.of(favoritesAction);
         if (merchantPaymentPartnerAction != null) return Optional.of(merchantPaymentPartnerAction);
@@ -392,6 +399,7 @@ public final class SyncActionValue {
         if (ctwaPerCustomerDataSharingAction != null) return Optional.of(ctwaPerCustomerDataSharingAction);
         if (paymentTosAction != null) return Optional.of(paymentTosAction);
         if (privacySettingChannelsPersonalisedRecommendationAction != null) return Optional.of(privacySettingChannelsPersonalisedRecommendationAction);
+        if (businessBroadcastAssociationAction != null) return Optional.of(businessBroadcastAssociationAction);
         if (detectedOutcomesStatusAction != null) return Optional.of(detectedOutcomesStatusAction);
         if (maibaAiFeaturesControlAction != null) return Optional.of(maibaAiFeaturesControlAction);
         if (businessBroadcastListAction != null) return Optional.of(businessBroadcastListAction);
@@ -408,14 +416,6 @@ public final class SyncActionValue {
         if (businessBroadcastCampaignAction != null) return Optional.of(businessBroadcastCampaignAction);
         if (businessBroadcastInsightsAction != null) return Optional.of(businessBroadcastInsightsAction);
         return Optional.empty();
-    }
-
-    public Optional<ChatLockSettings> chatLockSettings() {
-        return Optional.ofNullable(chatLockSettings);
-    }
-
-    public Optional<DeviceCapabilities> deviceCapabilities() {
-        return Optional.ofNullable(deviceCapabilities);
     }
 
     public SyncActionValue setTimestamp(Instant timestamp) {

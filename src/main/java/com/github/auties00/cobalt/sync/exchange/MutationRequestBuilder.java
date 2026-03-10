@@ -116,6 +116,13 @@ public final class MutationRequestBuilder {
     private record PatchBuildResult(byte[] bytes, SyncRequest.UploadedPatchInfo uploadInfo) {
     }
 
+    public record BatchedSyncRequest(
+            NodeBuilder node,
+            Map<SyncPatchType, SyncRequest.UploadedPatchInfo> uploadInfos,
+            Set<SyncPatchType> skippedUploads
+    ) {
+    }
+
     /**
      * Builds a serialized {@code SyncdPatch} protobuf containing encrypted
      * mutations with computed snapshotMac and patchMac.
@@ -129,7 +136,10 @@ public final class MutationRequestBuilder {
             throw new IllegalStateException("No app state sync keys available");
         }
 
-        var latestKey = keys.getLast();
+        var latestKey = SyncKeyUtils.findNewestKey(keys);
+        if (latestKey == null) {
+            throw new IllegalStateException("No usable app state sync key found");
+        }
         var latestKeyId = latestKey.keyId()
                 .flatMap(AppStateSyncKeyId::keyId)
                 .orElseThrow(() -> new IllegalArgumentException("No app state sync key found"));
@@ -160,7 +170,7 @@ public final class MutationRequestBuilder {
                     toAdd.add(encrypted.valueMac());
                 } else {
                     whatsapp.store()
-                            .removeSyncActionEntry(patchType, encrypted.indexMac())
+                            .findSyncActionEntry(patchType, encrypted.indexMac())
                             .ifPresent(existing -> toRemove.add(existing.valueMac()));
                 }
             }
@@ -170,11 +180,17 @@ public final class MutationRequestBuilder {
             var patchesIterator = patches.iterator();
             var keyRotationIterator = keyRotationSources.iterator();
             var uploadedMutations = new ArrayList<SyncRequest.UploadedMutationInfo>(encryptedMutations.size());
+            var uploadedPendingMutationIds = new ArrayList<String>(userMutationCount);
             var index = 0;
             for (var encrypted : encryptedMutations) {
-                var source = index < userMutationCount
-                        ? patchesIterator.next().mutation()
-                        : keyRotationIterator.next();
+                DecryptedMutation.Trusted source;
+                if (index < userMutationCount) {
+                    var pendingMutation = patchesIterator.next();
+                    uploadedPendingMutationIds.add(pendingMutation.mutationId());
+                    source = pendingMutation.mutation();
+                } else {
+                    source = keyRotationIterator.next();
+                }
                 uploadedMutations.add(new SyncRequest.UploadedMutationInfo(
                         encrypted.indexMac(),
                         encrypted.valueMac(),
@@ -223,7 +239,12 @@ public final class MutationRequestBuilder {
 
             // Capture upload metadata for post-response processing
             var uploadInfo = new SyncRequest.UploadedPatchInfo(
-                    patchType, newLtHash, newVersion, List.copyOf(uploadedMutations));
+                    patchType,
+                    newLtHash,
+                    newVersion,
+                    List.copyOf(uploadedPendingMutationIds),
+                    List.copyOf(uploadedMutations)
+            );
 
             // Step 5: Check if mutations should be uploaded externally
             var maxInlineCount = Math.min(2000, Math.max(100, abPropsService.getInt(ABProp.SYNCD_INLINE_MUTATIONS_MAX_COUNT)));
@@ -356,7 +377,7 @@ public final class MutationRequestBuilder {
                 .stream()
                 .sorted(Comparator.comparingInt(e -> SyncKeyUtils.getKeyEpoch(e.keyId())))
                 .toList();
-        var maxAdditional = Math.min(5, Math.max(1, abPropsService.getInt(ABProp.SYNCD_ADDITIONAL_MUTATIONS_COUNT)));
+        var maxAdditional = Math.min(5, Math.max(0, abPropsService.getInt(ABProp.SYNCD_ADDITIONAL_MUTATIONS_COUNT)));
         var result = new ArrayList<EncryptedMutation>();
 
         for (var entry : allEntries) {
@@ -455,8 +476,10 @@ public final class MutationRequestBuilder {
      * @param collectionPatches map of collection types to their pending mutations
      * @return the IQ request node builder
      */
-    public NodeBuilder buildBatchedSyncRequest(Map<SyncPatchType, SequencedCollection<SyncPendingMutation>> collectionPatches) {
+    public BatchedSyncRequest buildBatchedSyncRequest(Map<SyncPatchType, SequencedCollection<SyncPendingMutation>> collectionPatches) {
         var collectionNodes = new ArrayList<com.github.auties00.cobalt.node.Node>();
+        var uploadInfos = new LinkedHashMap<SyncPatchType, SyncRequest.UploadedPatchInfo>();
+        var skippedUploads = new LinkedHashSet<SyncPatchType>();
         for (var entry : collectionPatches.entrySet()) {
             var patchType = entry.getKey();
             var patches = entry.getValue();
@@ -479,6 +502,11 @@ public final class MutationRequestBuilder {
                         .content(buildResult.bytes())
                         .build();
                 collectionBuilder.content(patchNode);
+                if (buildResult.uploadInfo() != null) {
+                    uploadInfos.put(patchType, buildResult.uploadInfo());
+                }
+            } else if (!patches.isEmpty()) {
+                skippedUploads.add(patchType);
             }
 
             collectionNodes.add(collectionBuilder.build());
@@ -489,12 +517,16 @@ public final class MutationRequestBuilder {
                 .content(collectionNodes)
                 .build();
 
-        return new NodeBuilder()
-                .description("iq")
-                .attribute("type", "set")
-                .attribute("xmlns", "w:sync:app:state")
-                .attribute("to", Jid.userServer())
-                .content(syncNode);
+        return new BatchedSyncRequest(
+                new NodeBuilder()
+                        .description("iq")
+                        .attribute("type", "set")
+                        .attribute("xmlns", "w:sync:app:state")
+                        .attribute("to", Jid.userServer())
+                        .content(syncNode),
+                Collections.unmodifiableMap(uploadInfos),
+                Collections.unmodifiableSet(skippedUploads)
+        );
     }
 
     /**
@@ -545,10 +577,16 @@ public final class MutationRequestBuilder {
      * @return the compacted mutations
      */
     private SequencedCollection<SyncPendingMutation> compactPatch(SequencedCollection<SyncPendingMutation> patches) {
-        var byIndex = new LinkedHashMap<String, SyncPendingMutation>();
-        for (var patch : patches) {
-            byIndex.put(patch.mutation().index(), patch);
+        var reversed = new ArrayList<SyncPendingMutation>(patches);
+        Collections.reverse(reversed);
+        var seen = new HashSet<String>();
+        var deduplicated = new ArrayList<SyncPendingMutation>(reversed.size());
+        for (var patch : reversed) {
+            if (seen.add(patch.mutation().index())) {
+                deduplicated.add(patch);
+            }
         }
-        return List.copyOf(byIndex.values());
+        Collections.reverse(deduplicated);
+        return List.copyOf(deduplicated);
     }
 }

@@ -1,11 +1,14 @@
 package com.github.auties00.cobalt.message.receive;
 
+import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
 import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
 import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfoBuilder;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.MessageStatus;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.store.WhatsAppStore;
+
+import java.time.Instant;
 
 /**
  * Processes incoming plaintext newsletter messages.
@@ -44,7 +47,8 @@ final class NewsletterMessageReceiver extends MessageReceiver<NewsletterMessageI
     NewsletterMessageInfo receive(Node node, Jid fromJid) {
         var id = node.getRequiredAttributeAsString("id");
         var timestampSeconds = node.getRequiredAttributeAsLong("t");
-        var serverId = (int) node.getAttributeAsLong("server_id").orElse(0L);
+        var timestamp = Instant.ofEpochSecond(timestampSeconds);
+        var serverId = node.getRequiredAttributeAsInt("server_id");
 
         var plaintext = node.getChild("plaintext")
                 .or(() -> node.getChild("body"))
@@ -61,17 +65,18 @@ final class NewsletterMessageReceiver extends MessageReceiver<NewsletterMessageI
             return null;
         }
 
-        var newsletter = store.findNewsletterByJid(fromJid).orElse(null);
-        var info = new NewsletterMessageInfoBuilder()
+        var key = new MessageKeyBuilder()
                 .id(id)
+                .parentJid(fromJid)
+                .fromMe(false)
+                .build();
+        var info = new NewsletterMessageInfoBuilder()
+                .key(key)
                 .serverId(serverId)
-                .timestampSeconds(timestampSeconds)
+                .timestamp(timestamp)
                 .message(container)
                 .status(MessageStatus.DELIVERED)
                 .build();
-        if (newsletter != null) {
-            info.setNewsletter(newsletter);
-        }
 
         LOGGER.log(System.Logger.Level.DEBUG,
                 "Processed newsletter message {0} from {1}", id, fromJid);

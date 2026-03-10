@@ -3,6 +3,7 @@ package com.github.auties00.cobalt.sync.handler;
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.chat.LockChatAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
@@ -10,17 +11,8 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 /**
  * Handles lock chat actions.
- *
- * <p>This handler processes mutations that lock or unlock a chat. A locked chat
- * is hidden behind an authentication barrier (e.g., fingerprint or passcode)
- * and does not appear in the main chat list.
- *
- * <p>Index format: ["lock", "chatJid"]
  */
 public final class LockChatHandler implements WebAppStateActionHandler {
-    /**
-     * The singleton instance of {@code LockChatHandler}.
-     */
     public static final LockChatHandler INSTANCE = new LockChatHandler();
 
     private LockChatHandler() {
@@ -44,21 +36,27 @@ public final class LockChatHandler implements WebAppStateActionHandler {
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS;
+    }
+
+    @Override
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
-            return false;
+            return MutationApplicationResult.unsupported();
         }
 
         if (!(mutation.value().action().orElse(null) instanceof LockChatAction action)) {
-            return false;
+            return MutationApplicationResult.malformed();
         }
 
         var chatJidString = JSON.parseArray(mutation.index()).getString(1);
-        var chatJid = Jid.of(chatJidString);
+        if (chatJidString == null || chatJidString.isEmpty()) {
+            return MutationApplicationResult.malformed();
+        }
 
-        var chat = client.store()
-                .findChatByJid(chatJid);
+        var chat = client.store().findChatByJid(Jid.of(chatJidString));
         if (chat.isEmpty()) {
-            return false;
+            return MutationApplicationResult.orphan(chatJidString, "Chat");
         }
 
         chat.get().setLocked(action.locked());
@@ -66,7 +64,6 @@ public final class LockChatHandler implements WebAppStateActionHandler {
             chat.get().setArchived(false);
             chat.get().setPinnedTimestamp(null);
         }
-
-        return true;
+        return MutationApplicationResult.success();
     }
 }

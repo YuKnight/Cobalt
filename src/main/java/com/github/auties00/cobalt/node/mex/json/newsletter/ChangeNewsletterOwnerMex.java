@@ -4,9 +4,11 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.node.mex.json.MexJsonOperation;
 import com.github.auties00.cobalt.node.Node;
+import com.github.auties00.cobalt.node.NodeBuilder;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.io.UncheckedIOException;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -36,20 +38,24 @@ public sealed interface ChangeNewsletterOwnerMex extends MexJsonOperation permit
         /**
          * Builds the MEX IQ stanza for this request.
          *
-         * @return the IQ {@link Node} ready to be sent
+         * @return the IQ {@link NodeBuilder} ready to be sent
          */
-        public Node toNode() {
+        public NodeBuilder toNode() {
             try (var writer = JSONWriter.ofUTF8()) {
                 writer.startObject();
                 writer.writeName("variables");
                 writer.writeColon();
                 writer.startObject();
-                writer.writeName("newsletter_id");
-                writer.writeColon();
-                writer.writeString(newsletterId);
-                writer.writeName("user_id");
-                writer.writeColon();
-                writer.writeString(userId);
+                if (newsletterId != null) {
+                    writer.writeName("newsletter_id");
+                    writer.writeColon();
+                    writer.writeString(newsletterId);
+                }
+                if (userId != null) {
+                    writer.writeName("user_id");
+                    writer.writeColon();
+                    writer.writeString(userId);
+                }
                 writer.endObject();
                 writer.endObject();
                 try (var output = new StringWriter()) {
@@ -66,8 +72,10 @@ public sealed interface ChangeNewsletterOwnerMex extends MexJsonOperation permit
      * The parsed response for this MEX mutation.
      */
     final class Response implements ChangeNewsletterOwnerMex {
+        private final String id;
 
-        private Response() {
+        private Response(String id) {
+            this.id = id;
         }
 
         /**
@@ -79,10 +87,19 @@ public sealed interface ChangeNewsletterOwnerMex extends MexJsonOperation permit
         public static Optional<Response> of(Node node) {
             return node.getChild("result")
                     .flatMap(Node::toContentBytes)
-                    .flatMap(Response::parse);
+                    .flatMap(Response::of);
         }
 
-        private static Optional<Response> parse(byte[] json) {
+        /**
+         * Returns the {@code id} field.
+         *
+         * @return an {@link Optional} containing the value, or empty if absent
+         */
+        public Optional<String> id() {
+            return Optional.ofNullable(id);
+        }
+
+        private static Optional<Response> of(byte[] json) {
             var jsonObject = JSON.parseObject(json);
             if (jsonObject == null) {
                 return Optional.empty();
@@ -93,12 +110,14 @@ public sealed interface ChangeNewsletterOwnerMex extends MexJsonOperation permit
                 return Optional.empty();
             }
 
-            var root = data.get("xwa2_newsletter_change_owner");
+            var root = data.getJSONObject("xwa2_newsletter_change_owner");
             if (root == null) {
                 return Optional.empty();
             }
 
-            return Optional.of(new Response());
+            var id = root.getString("id");
+
+            return Optional.of(new Response(id));
         }
     }
 }

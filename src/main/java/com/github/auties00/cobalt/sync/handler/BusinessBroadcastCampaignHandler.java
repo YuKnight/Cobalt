@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastCampaignAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
@@ -53,22 +54,38 @@ public final class BusinessBroadcastCampaignHandler implements WebAppStateAction
      */
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS;
+    }
+
+    @Override
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         var indexArray = JSON.parseArray(mutation.index());
         var campaignId = indexArray.getString(1);
         if (campaignId == null || campaignId.isEmpty()) {
-            return true;
+            return MutationApplicationResult.malformed();
         }
 
-        if (mutation.operation() == SyncdOperation.SET) {
-            if (!(mutation.value().action().orElse(null) instanceof BusinessBroadcastCampaignAction action)) {
-                return true;
-            }
-
-            if (action.broadcastJid().isEmpty() || action.deviceId().isEmpty() || action.status().isEmpty()) {
-                return true;
-            }
+        var campaigns = new java.util.HashMap<>(client.store().businessBroadcastCampaigns());
+        if (mutation.operation() == SyncdOperation.REMOVE) {
+            campaigns.remove(campaignId);
+            client.store().setBusinessBroadcastCampaigns(campaigns);
+            return MutationApplicationResult.success();
         }
 
-        return true;
+        if (mutation.operation() != SyncdOperation.SET) {
+            return MutationApplicationResult.unsupported();
+        }
+
+        if (!(mutation.value().action().orElse(null) instanceof BusinessBroadcastCampaignAction action)) {
+            return MutationApplicationResult.malformed();
+        }
+
+        if (action.broadcastJid().isEmpty() || action.deviceId().isEmpty() || action.status().isEmpty()) {
+            return MutationApplicationResult.malformed();
+        }
+
+        campaigns.put(campaignId, action);
+        client.store().setBusinessBroadcastCampaigns(campaigns);
+        return MutationApplicationResult.success();
     }
 }

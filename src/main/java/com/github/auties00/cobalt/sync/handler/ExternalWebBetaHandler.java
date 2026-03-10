@@ -1,8 +1,10 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.device.ExternalWebBetaAction;
+import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
@@ -42,15 +44,24 @@ public final class ExternalWebBetaHandler implements WebAppStateActionHandler {
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS;
+    }
+
+    @Override
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        if (!client.abPropsService().getBool(ABProp.EXTERNAL_BETA_CAN_JOIN)) {
+            return MutationApplicationResult.unsupported();
+        }
+
         if (mutation.operation() != SyncdOperation.SET) {
-            return true;
+            return MutationApplicationResult.unsupported();
         }
 
         if (!(mutation.value().action().orElse(null) instanceof ExternalWebBetaAction action)) {
-            return true;
+            return MutationApplicationResult.malformed();
         }
 
         client.store().setExternalWebBeta(action.isOptIn());
-        return true;
+        return MutationApplicationResult.success();
     }
 }

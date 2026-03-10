@@ -2,8 +2,10 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.device.NuxAction;
+import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
@@ -44,16 +46,32 @@ public final class NuxActionHandler implements WebAppStateActionHandler {
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS;
+    }
+
+    @Override
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        if (!client.abPropsService().getBool(ABProp.NUX_SYNC)) {
+            return MutationApplicationResult.unsupported();
+        }
+
         if (mutation.operation() != SyncdOperation.SET) {
-            return true;
+            return MutationApplicationResult.unsupported();
         }
 
         var indexArray = JSON.parseArray(mutation.index());
         var nuxKey = indexArray.getString(1);
         if (nuxKey == null) {
-            return true;
+            return MutationApplicationResult.malformed();
         }
 
-        return true;
+        if (!(mutation.value().action().orElse(null) instanceof NuxAction action)) {
+            return MutationApplicationResult.malformed();
+        }
+
+        var states = new java.util.HashMap<>(client.store().nuxStates());
+        states.put(nuxKey, action.acknowledged());
+        client.store().setNuxStates(states);
+        return MutationApplicationResult.success();
     }
 }

@@ -23,7 +23,7 @@ public non-sealed interface MexJsonOperation extends MexOperation {
      * @param jsonPayload the JSON string containing the serialized variables
      * @return the IQ {@link Node} ready to be sent
      */
-    static Node createMexNode(String queryId, String jsonPayload) {
+    static NodeBuilder createMexNode(String queryId, String jsonPayload) {
         var queryNode = new NodeBuilder()
                 .description("query")
                 .attribute("query_id", queryId)
@@ -34,7 +34,6 @@ public non-sealed interface MexJsonOperation extends MexOperation {
                 .attribute("xmlns", "w:mex")
                 .attribute("to", JidServer.user())
                 .attribute("type", "get")
-                .content(queryNode)
-                .build();
+                .content(queryNode);
     }
 }

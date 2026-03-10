@@ -135,6 +135,37 @@ public final class MissingSyncKeyTimeoutScheduler {
     }
 
     /**
+     * Checks whether any tracked missing key has now received explicit negative
+     * responses from every device that was successfully asked.
+     *
+     * <p>This path is intentionally separate from the multi-day wait-for-key timeout:
+     * after all devices have replied without the key, WhatsApp Web only applies a
+     * short grace period before treating the key as unrecoverable.
+     */
+    private void checkForAllDevicesRespondedWithoutKey() {
+        var currentMissingKeys = store.missingSyncKeys();
+        if (currentMissingKeys.isEmpty()) {
+            LOGGER.log(System.Logger.Level.DEBUG, "No missing sync keys remain, all-devices-responded check skipped");
+            return;
+        }
+
+        var missingOnAllDevices = currentMissingKeys.stream()
+                .filter(key -> store.findMissingSyncKey(key.keyId()).isPresent())
+                .filter(MissingDeviceSyncKey::isMissingOnAllDevices)
+                .toList();
+        if (missingOnAllDevices.isEmpty()) {
+            LOGGER.log(System.Logger.Level.DEBUG, "No missing sync key has exhausted all device responses");
+            scheduleTimeoutCheck();
+            return;
+        }
+
+        LOGGER.log(System.Logger.Level.ERROR, "Fatal sync error: all asked devices responded without the requested sync key");
+        client.handleFailure(new WhatsAppWebAppStateSyncException.MissingKeyOnAllDevices(
+                missingOnAllDevices.getFirst().keyId()
+        ));
+    }
+
+    /**
      * Gets the timeout duration from AB props.
      */
     private Duration getTimeout() {
@@ -165,7 +196,7 @@ public final class MissingSyncKeyTimeoutScheduler {
                     .map(MissingDeviceSyncKey::keyId)
                     .toList();
             LOGGER.log(System.Logger.Level.INFO, "Periodic re-request for {0} missing sync key(s)", keyIds.size());
-            Thread.startVirtualThread(() -> requestService.requestMissingKeys(keyIds));
+            Thread.startVirtualThread(() -> requestService.reRequestMissingKeys(keyIds));
         }, RE_REQUEST_INTERVAL_HOURS, RE_REQUEST_INTERVAL_HOURS, TimeUnit.HOURS);
     }
 
@@ -183,7 +214,7 @@ public final class MissingSyncKeyTimeoutScheduler {
         }
 
         LOGGER.log(System.Logger.Level.DEBUG, "Scheduling 5-second grace period before missing key fatal");
-        scheduledCheck = scheduler.schedule(this::checkForExpiredKeys, 5, TimeUnit.SECONDS);
+        scheduledCheck = scheduler.schedule(this::checkForAllDevicesRespondedWithoutKey, 5, TimeUnit.SECONDS);
     }
 
     /**

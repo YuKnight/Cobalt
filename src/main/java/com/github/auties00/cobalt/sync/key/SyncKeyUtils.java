@@ -4,6 +4,7 @@ import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKey;
 import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyId;
 
 import java.nio.ByteBuffer;
+import java.util.Collection;
 
 /**
  * Utility methods for extracting metadata from sync key identifiers.
@@ -97,5 +98,49 @@ public final class SyncKeyUtils {
         buffer.putShort((short) deviceId);
         buffer.putInt(keyEpoch);
         return buffer.array();
+    }
+
+    /**
+     * Finds the newest sync key using the same ordering as WA Web:
+     * highest epoch first, then lowest device id among ties.
+     *
+     * @param keys the available sync keys
+     * @return the newest key, or {@code null} if none exist
+     */
+    public static AppStateSyncKey findNewestKey(Collection<AppStateSyncKey> keys) {
+        if (keys == null || keys.isEmpty()) {
+            return null;
+        }
+
+        var maxEpoch = Integer.MIN_VALUE;
+        for (var key : keys) {
+            var epoch = getKeyEpoch(key);
+            if (epoch > maxEpoch) {
+                maxEpoch = epoch;
+            }
+        }
+
+        AppStateSyncKey bestKey = null;
+        var bestDeviceId = Integer.MAX_VALUE;
+        for (var key : keys) {
+            if (getKeyEpoch(key) != maxEpoch) {
+                continue;
+            }
+
+            var keyIdBytes = key.keyId()
+                    .flatMap(AppStateSyncKeyId::keyId)
+                    .orElse(null);
+            if (keyIdBytes == null) {
+                continue;
+            }
+
+            var deviceId = getKeyDeviceId(keyIdBytes);
+            if (deviceId < bestDeviceId) {
+                bestDeviceId = deviceId;
+                bestKey = key;
+            }
+        }
+
+        return bestKey;
     }
 }

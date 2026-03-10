@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.business.CtwaPerCustomerDataSharingAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
@@ -45,24 +46,34 @@ public final class CtwaPerCustomerDataSharingHandler implements WebAppStateActio
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS;
+    }
+
+    @Override
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         var indexArray = JSON.parseArray(mutation.index());
 
         switch (mutation.operation()) {
             case SET -> {
                 var accountLid = indexArray.getString(1);
                 if (accountLid == null) {
-                    return true;
+                    return MutationApplicationResult.malformed();
                 }
 
                 if (!(mutation.value().action().orElse(null) instanceof CtwaPerCustomerDataSharingAction action)) {
-                    return true;
+                    return MutationApplicationResult.malformed();
                 }
 
                 client.store().setCtwaDataSharingEnabled(action.isCtwaPerCustomerDataSharingEnabled());
+                return MutationApplicationResult.success();
             }
-            case REMOVE -> client.store().setCtwaDataSharingEnabled(false);
+            case REMOVE -> {
+                client.store().setCtwaDataSharingEnabled(false);
+                return MutationApplicationResult.success();
+            }
+            default -> {
+                return MutationApplicationResult.unsupported();
+            }
         }
-
-        return true;
     }
 }

@@ -43,11 +43,17 @@ public final class MutationResponseParser {
 
         // Navigate to sync node
         var syncNode = responseNode.getChild("sync")
-                .orElseThrow(() -> new IllegalArgumentException("Response missing 'sync' node"));
+                .orElseThrow(() -> new WhatsAppWebAppStateSyncException.UnexpectedError(
+                        "Response missing 'sync' node",
+                        null
+                ));
 
         // Navigate to collection node
         var collectionNode = syncNode.getChild("collection")
-                .orElseThrow(() -> new IllegalArgumentException("Response missing 'collection' node"));
+                .orElseThrow(() -> new WhatsAppWebAppStateSyncException.UnexpectedError(
+                        "Response missing 'collection' node",
+                        null
+                ));
 
         // Check for error response
         var type = collectionNode.getAttributeAsString("type");
@@ -57,9 +63,15 @@ public final class MutationResponseParser {
 
         // Extract collection metadata
         var collectionName = collectionNode.getAttributeAsString("name")
-                .orElseThrow(() -> new IllegalArgumentException("Collection missing 'name' attribute"));
+                .orElseThrow(() -> new WhatsAppWebAppStateSyncException.UnexpectedError(
+                        "Collection missing 'name' attribute",
+                        null
+                ));
         var patchType = SyncPatchType.of(collectionName)
-                .orElseThrow(() -> new IllegalArgumentException("Invalid collection name: " + collectionName));
+                .orElseThrow(() -> new WhatsAppWebAppStateSyncException.UnexpectedError(
+                        "Invalid collection name: " + collectionName,
+                        null
+                ));
 
         var version = collectionNode.getAttributeAsLong("version")
                 .orElse(0L);
@@ -102,7 +114,10 @@ public final class MutationResponseParser {
         }
 
         var syncNode = responseNode.getChild("sync")
-                .orElseThrow(() -> new IllegalArgumentException("Response missing 'sync' node"));
+                .orElseThrow(() -> new WhatsAppWebAppStateSyncException.UnexpectedError(
+                        "Response missing 'sync' node",
+                        null
+                ));
 
         var collectionNodes = syncNode.getChildren("collection");
         var results = new ArrayList<MutationSyncResponse>(collectionNodes.size());
@@ -125,9 +140,15 @@ public final class MutationResponseParser {
         }
 
         var collectionName = collectionNode.getAttributeAsString("name")
-                .orElseThrow(() -> new IllegalArgumentException("Collection missing 'name' attribute"));
+                .orElseThrow(() -> new WhatsAppWebAppStateSyncException.UnexpectedError(
+                        "Collection missing 'name' attribute",
+                        null
+                ));
         var patchType = SyncPatchType.of(collectionName)
-                .orElseThrow(() -> new IllegalArgumentException("Invalid collection name: " + collectionName));
+                .orElseThrow(() -> new WhatsAppWebAppStateSyncException.UnexpectedError(
+                        "Invalid collection name: " + collectionName,
+                        null
+                ));
 
         var version = collectionNode.getAttributeAsLong("version")
                 .orElse(0L);
@@ -210,12 +231,15 @@ public final class MutationResponseParser {
      */
     private ExternalBlobReference parseSnapshotReference(Node snapshotNode) {
         var snapshotBytes = snapshotNode.toContentBytes()
-                .orElseThrow(() -> new IllegalArgumentException("Snapshot node has no content"));
+                .orElseThrow(() -> new WhatsAppWebAppStateSyncException.UnexpectedError(
+                        "Snapshot node has no content",
+                        null
+                ));
 
         try {
             return ExternalBlobReferenceSpec.decode(snapshotBytes);
         } catch (Exception e) {
-            throw new RuntimeException("Failed to decode snapshot reference", e);
+            throw new WhatsAppWebAppStateSyncException.UnexpectedError("Failed to decode snapshot reference", e);
         }
     }
 
@@ -232,13 +256,16 @@ public final class MutationResponseParser {
 
         for (var patchNode : patchNodes) {
             var patchBytes = patchNode.toContentBytes()
-                    .orElseThrow(() -> new IllegalArgumentException("Patch node has no content"));
+                    .orElseThrow(() -> new WhatsAppWebAppStateSyncException.UnexpectedError(
+                            "Patch node has no content",
+                            null
+                    ));
 
             try {
                 var patch = SyncdPatchSpec.decode(patchBytes);
                 patches.add(patch);
             } catch (Exception e) {
-                throw new RuntimeException("Failed to decode patch", e);
+                throw new WhatsAppWebAppStateSyncException.UnexpectedError("Failed to decode patch", e);
             }
         }
 

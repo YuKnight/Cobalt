@@ -4,9 +4,11 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.node.mex.json.MexJsonOperation;
 import com.github.auties00.cobalt.node.Node;
+import com.github.auties00.cobalt.node.NodeBuilder;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.io.UncheckedIOException;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -34,17 +36,19 @@ public sealed interface FetchNewsletterAdminCapabilitiesMex extends MexJsonOpera
         /**
          * Builds the MEX IQ stanza for this request.
          *
-         * @return the IQ {@link Node} ready to be sent
+         * @return the IQ {@link NodeBuilder} ready to be sent
          */
-        public Node toNode() {
+        public NodeBuilder toNode() {
             try (var writer = JSONWriter.ofUTF8()) {
                 writer.startObject();
                 writer.writeName("variables");
                 writer.writeColon();
                 writer.startObject();
-                writer.writeName("newsletter_id");
-                writer.writeColon();
-                writer.writeString(newsletterId);
+                if (newsletterId != null) {
+                    writer.writeName("newsletter_id");
+                    writer.writeColon();
+                    writer.writeString(newsletterId);
+                }
                 writer.endObject();
                 writer.endObject();
                 try (var output = new StringWriter()) {
@@ -62,9 +66,11 @@ public sealed interface FetchNewsletterAdminCapabilitiesMex extends MexJsonOpera
      */
     final class Response implements FetchNewsletterAdminCapabilitiesMex {
         private final String capabilities;
+        private final String id;
 
-        private Response(String capabilities) {
+        private Response(String capabilities, String id) {
             this.capabilities = capabilities;
+            this.id = id;
         }
 
         /**
@@ -76,7 +82,7 @@ public sealed interface FetchNewsletterAdminCapabilitiesMex extends MexJsonOpera
         public static Optional<Response> of(Node node) {
             return node.getChild("result")
                     .flatMap(Node::toContentBytes)
-                    .flatMap(Response::parse);
+                    .flatMap(Response::of);
         }
 
         /**
@@ -88,7 +94,16 @@ public sealed interface FetchNewsletterAdminCapabilitiesMex extends MexJsonOpera
             return Optional.ofNullable(capabilities);
         }
 
-        private static Optional<Response> parse(byte[] json) {
+        /**
+         * Returns the {@code id} field.
+         *
+         * @return an {@link Optional} containing the value, or empty if absent
+         */
+        public Optional<String> id() {
+            return Optional.ofNullable(id);
+        }
+
+        private static Optional<Response> of(byte[] json) {
             var jsonObject = JSON.parseObject(json);
             if (jsonObject == null) {
                 return Optional.empty();
@@ -105,8 +120,9 @@ public sealed interface FetchNewsletterAdminCapabilitiesMex extends MexJsonOpera
             }
 
             var capabilities = root.getString("capabilities");
+            var id = root.getString("id");
 
-            return Optional.of(new Response(capabilities));
+            return Optional.of(new Response(capabilities, id));
         }
     }
 }

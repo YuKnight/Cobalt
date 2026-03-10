@@ -1,8 +1,10 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.payment.PaymentInfoAction;
+import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
@@ -42,18 +44,33 @@ public final class PaymentInfoHandler implements WebAppStateActionHandler {
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS;
+    }
+
+    @Override
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        if (client.store().device() == null || !client.store().device().platform().isBusiness()) {
+            return MutationApplicationResult.unsupported();
+        }
+
+        if (!client.abPropsService().getBool(ABProp.ORDER_DETAILS_PAYMENT_INSTRUCTIONS_SYNC_ENABLED)) {
+            return MutationApplicationResult.unsupported();
+        }
+
         if (mutation.operation() != SyncdOperation.SET) {
-            return true;
+            return MutationApplicationResult.unsupported();
         }
 
         if (!(mutation.value().action().orElse(null) instanceof PaymentInfoAction action)) {
-            return true;
+            return MutationApplicationResult.malformed();
         }
 
-        if (action.cpi().isEmpty()) {
-            return true;
+        var cpi = action.cpi().orElse(null);
+        if (cpi == null) {
+            return MutationApplicationResult.malformed();
         }
 
-        return true;
+        client.store().setPaymentInstructionCpi(cpi);
+        return MutationApplicationResult.success();
     }
 }

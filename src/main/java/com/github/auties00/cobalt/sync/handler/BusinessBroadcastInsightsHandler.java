@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastInsightsAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
@@ -53,18 +54,34 @@ public final class BusinessBroadcastInsightsHandler implements WebAppStateAction
      */
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS;
+    }
+
+    @Override
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         var indexArray = JSON.parseArray(mutation.index());
         var campaignId = indexArray.getString(1);
         if (campaignId == null || campaignId.isEmpty()) {
-            return true;
+            return MutationApplicationResult.malformed();
         }
 
-        if (mutation.operation() == SyncdOperation.SET) {
-            if (!(mutation.value().action().orElse(null) instanceof BusinessBroadcastInsightsAction)) {
-                return true;
-            }
+        var insights = new java.util.HashMap<>(client.store().businessBroadcastInsights());
+        if (mutation.operation() == SyncdOperation.REMOVE) {
+            insights.remove(campaignId);
+            client.store().setBusinessBroadcastInsights(insights);
+            return MutationApplicationResult.success();
         }
 
-        return true;
+        if (mutation.operation() != SyncdOperation.SET) {
+            return MutationApplicationResult.unsupported();
+        }
+
+        if (!(mutation.value().action().orElse(null) instanceof BusinessBroadcastInsightsAction action)) {
+            return MutationApplicationResult.malformed();
+        }
+
+        insights.put(campaignId, action);
+        client.store().setBusinessBroadcastInsights(insights);
+        return MutationApplicationResult.success();
     }
 }

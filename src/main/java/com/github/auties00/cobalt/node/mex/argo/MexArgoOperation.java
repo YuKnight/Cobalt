@@ -20,7 +20,7 @@ public non-sealed interface MexArgoOperation extends MexOperation {
      * @param argoPayload the binary Argo-encoded payload
      * @return the IQ {@link Node} ready to be sent
      */
-    static Node createMexNode(String queryId, byte[] argoPayload) {
+    static NodeBuilder createMexNode(String queryId, byte[] argoPayload) {
         var queryNode = new NodeBuilder()
                 .description("query")
                 .attribute("query_id", queryId)
@@ -31,7 +31,6 @@ public non-sealed interface MexArgoOperation extends MexOperation {
                 .attribute("xmlns", "w:mex")
                 .attribute("to", JidServer.user())
                 .attribute("type", "get")
-                .content(queryNode)
-                .build();
+                .content(queryNode);
     }
 }

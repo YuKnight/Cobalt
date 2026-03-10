@@ -294,7 +294,7 @@ public sealed interface Node {
                 .orElseThrow(() -> new IllegalArgumentException("Cannot convert required attribute " + key + " to long. Attribute value: " + requiredAttribute));
     }
 
-    default long getRequiredAttributeAsInt(String key) {
+    default int getRequiredAttributeAsInt(String key) {
         var requiredAttribute = getRequiredAttribute(key);
         return requiredAttribute
                 .toInt()

@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.setting.PushNameSetting;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
@@ -8,8 +9,6 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 /**
  * Handles push name setting changes.
- *
- * <p>This handler processes mutations that update the user's display name (push name).
  */
 public final class PushNameSettingHandler implements WebAppStateActionHandler {
     public static final PushNameSettingHandler INSTANCE = new PushNameSettingHandler();
@@ -35,24 +34,25 @@ public final class PushNameSettingHandler implements WebAppStateActionHandler {
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS;
+    }
+
+    @Override
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
-            return true;
+            return MutationApplicationResult.unsupported();
         }
 
         if (!(mutation.value().action().orElse(null) instanceof PushNameSetting setting)) {
-            return false;
+            return MutationApplicationResult.malformed();
         }
 
         var name = setting.name().orElse("");
-
-        client.store()
-                .setName(name);
-
+        client.store().setName(name);
         client.store()
                 .jid()
                 .flatMap(entry -> client.store().findContactByJid(entry.withoutData()))
                 .ifPresent(contact -> contact.setChosenName(name));
-
-        return true;
+        return MutationApplicationResult.success();
     }
 }

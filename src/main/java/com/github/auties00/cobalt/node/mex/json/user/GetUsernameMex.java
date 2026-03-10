@@ -1,12 +1,15 @@
 package com.github.auties00.cobalt.node.mex.json.user;
 
 import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.node.mex.json.MexJsonOperation;
 import com.github.auties00.cobalt.node.Node;
+import com.github.auties00.cobalt.node.NodeBuilder;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.io.UncheckedIOException;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -32,9 +35,9 @@ public sealed interface GetUsernameMex extends MexJsonOperation permits GetUsern
         /**
          * Builds the MEX IQ stanza for this request.
          *
-         * @return the IQ {@link Node} ready to be sent
+         * @return the IQ {@link NodeBuilder} ready to be sent
          */
-        public Node toNode() {
+        public NodeBuilder toNode() {
             try (var writer = JSONWriter.ofUTF8()) {
                 writer.startObject();
                 writer.writeName("variables");
@@ -56,14 +59,10 @@ public sealed interface GetUsernameMex extends MexJsonOperation permits GetUsern
      * The parsed response for this MEX query.
      */
     final class Response implements GetUsernameMex {
-        private final String usernameInfoUsername;
-        private final String usernameInfoState;
-        private final String usernameInfoPin;
+        private final UsernameInfo usernameInfo;
 
-        private Response(String usernameInfoUsername, String usernameInfoState, String usernameInfoPin) {
-            this.usernameInfoUsername = usernameInfoUsername;
-            this.usernameInfoState = usernameInfoState;
-            this.usernameInfoPin = usernameInfoPin;
+        private Response(UsernameInfo usernameInfo) {
+            this.usernameInfo = usernameInfo;
         }
 
         /**
@@ -75,37 +74,96 @@ public sealed interface GetUsernameMex extends MexJsonOperation permits GetUsern
         public static Optional<Response> of(Node node) {
             return node.getChild("result")
                     .flatMap(Node::toContentBytes)
-                    .flatMap(Response::parse);
+                    .flatMap(Response::of);
         }
 
         /**
-         * Returns the {@code username_info.username} field.
+         * Returns the {@code username_info} field.
          *
          * @return an {@link Optional} containing the value, or empty if absent
          */
-        public Optional<String> usernameInfoUsername() {
-            return Optional.ofNullable(usernameInfoUsername);
+        public Optional<UsernameInfo> usernameInfo() {
+            return Optional.ofNullable(usernameInfo);
         }
 
         /**
-         * Returns the {@code username_info.state} field.
-         *
-         * @return an {@link Optional} containing the value, or empty if absent
+         * A parsed {@code UsernameInfo} object.
          */
-        public Optional<String> usernameInfoState() {
-            return Optional.ofNullable(usernameInfoState);
+        public static final class UsernameInfo {
+            private final String username;
+            private final String state;
+            private final String pin;
+
+            private UsernameInfo(String username, String state, String pin) {
+                this.username = username;
+                this.state = state;
+                this.pin = pin;
+            }
+
+            /**
+             * Returns the {@code username} field.
+             *
+             * @return an {@link Optional} containing the value, or empty if absent
+             */
+            public Optional<String> username() {
+                return Optional.ofNullable(username);
+            }
+
+            /**
+             * Returns the {@code state} field.
+             *
+             * @return an {@link Optional} containing the value, or empty if absent
+             */
+            public Optional<String> state() {
+                return Optional.ofNullable(state);
+            }
+
+            /**
+             * Returns the {@code pin} field.
+             *
+             * @return an {@link Optional} containing the value, or empty if absent
+             */
+            public Optional<String> pin() {
+                return Optional.ofNullable(pin);
+            }
+
+            /**
+             * Parses a {@code UsernameInfo} from the given JSON object.
+             *
+             * @param obj the JSON object to parse
+             * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+             */
+            static Optional<UsernameInfo> of(JSONObject obj) {
+                if (obj == null) {
+                    return Optional.empty();
+                }
+
+                var username = obj.getString("username");
+                var state = obj.getString("state");
+                var pin = obj.getString("pin");
+                return Optional.of(new UsernameInfo(username, state, pin));
+            }
+
+            /**
+             * Parses a list of {@code UsernameInfo} from the given JSON array.
+             *
+             * @param arr the JSON array to parse
+             * @return the list of parsed results, empty if {@code arr} is {@code null}
+             */
+            static List<UsernameInfo> ofArray(JSONArray arr) {
+                if (arr == null) {
+                    return List.of();
+                }
+
+                var result = new ArrayList<UsernameInfo>(arr.size());
+                for (int i = 0; i < arr.size(); i++) {
+                    of(arr.getJSONObject(i)).ifPresent(result::add);
+                }
+                return result;
+            }
         }
 
-        /**
-         * Returns the {@code username_info.pin} field.
-         *
-         * @return an {@link Optional} containing the value, or empty if absent
-         */
-        public Optional<String> usernameInfoPin() {
-            return Optional.ofNullable(usernameInfoPin);
-        }
-
-        private static Optional<Response> parse(byte[] json) {
+        private static Optional<Response> of(byte[] json) {
             var jsonObject = JSON.parseObject(json);
             if (jsonObject == null) {
                 return Optional.empty();
@@ -121,12 +179,9 @@ public sealed interface GetUsernameMex extends MexJsonOperation permits GetUsern
                 return Optional.empty();
             }
 
-            var usernameInfo = root.getJSONObject("username_info");
-            var usernameInfoUsername = usernameInfo != null ? usernameInfo.getString("username") : null;
-            var usernameInfoState = usernameInfo != null ? usernameInfo.getString("state") : null;
-            var usernameInfoPin = usernameInfo != null ? usernameInfo.getString("pin") : null;
+            var usernameInfo = UsernameInfo.of(root.getJSONObject("username_info")).orElse(null);
 
-            return Optional.of(new Response(usernameInfoUsername, usernameInfoState, usernameInfoPin));
+            return Optional.of(new Response(usernameInfo));
         }
     }
 }

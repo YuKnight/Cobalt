@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastListAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
@@ -53,18 +54,38 @@ public final class BusinessBroadcastListHandler implements WebAppStateActionHand
      */
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS;
+    }
+
+    @Override
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         var indexArray = JSON.parseArray(mutation.index());
         var listId = indexArray.getString(1);
         if (listId == null || listId.isEmpty()) {
-            return true;
+            return MutationApplicationResult.malformed();
         }
 
-        if (mutation.operation() == SyncdOperation.SET) {
-            if (!(mutation.value().action().orElse(null) instanceof BusinessBroadcastListAction)) {
-                return true;
-            }
+        var lists = new java.util.HashMap<>(client.store().businessBroadcastLists());
+        if (mutation.operation() == SyncdOperation.REMOVE) {
+            lists.remove(listId);
+            client.store().setBusinessBroadcastLists(lists);
+            return MutationApplicationResult.success();
         }
 
-        return true;
+        if (mutation.operation() != SyncdOperation.SET) {
+            return MutationApplicationResult.unsupported();
+        }
+
+        if (!(mutation.value().action().orElse(null) instanceof BusinessBroadcastListAction action)) {
+            return MutationApplicationResult.malformed();
+        }
+
+        if (action.deleted()) {
+            lists.remove(listId);
+        } else {
+            lists.put(listId, action);
+        }
+        client.store().setBusinessBroadcastLists(lists);
+        return MutationApplicationResult.success();
     }
 }

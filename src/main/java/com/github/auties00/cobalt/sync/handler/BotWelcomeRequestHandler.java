@@ -3,6 +3,7 @@ package com.github.auties00.cobalt.sync.handler;
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.bot.BotWelcomeRequestAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
@@ -40,30 +41,38 @@ public final class BotWelcomeRequestHandler implements WebAppStateActionHandler 
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS;
+    }
+
+    @Override
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() == SyncdOperation.REMOVE) {
-            return true;
+            return MutationApplicationResult.unsupported();
         }
 
         if (mutation.operation() != SyncdOperation.SET) {
-            return true;
+            return MutationApplicationResult.unsupported();
         }
 
         var indexArray = JSON.parseArray(mutation.index());
         var chatJidString = indexArray.getString(1);
         if (chatJidString == null || chatJidString.isEmpty()) {
-            return true;
+            return MutationApplicationResult.malformed();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof BotWelcomeRequestAction)) {
-            return true;
+        if (!(mutation.value().action().orElse(null) instanceof BotWelcomeRequestAction action)) {
+            return MutationApplicationResult.malformed();
         }
 
         var chatJid = Jid.of(chatJidString);
         var chat = client.store().findChatByJid(chatJid);
         if (chat.isEmpty()) {
-            return false;
+            return MutationApplicationResult.orphan(chatJidString, "Chat");
         }
 
-        return true;
+        var states = new java.util.HashMap<>(client.store().botWelcomeRequestStates());
+        states.put(chat.get().toJid().toString(), action.isSent());
+        client.store().setBotWelcomeRequestStates(states);
+        return MutationApplicationResult.success();
     }
 }

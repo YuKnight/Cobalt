@@ -1,10 +1,12 @@
 package com.github.auties00.cobalt.sync.key;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.model.chat.ChatMessageInfoBuilder;
 import com.github.auties00.cobalt.model.device.sync.MissingDeviceSyncKeyBuilder;
 import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainer;
 import com.github.auties00.cobalt.model.message.MessageContainerBuilder;
+import com.github.auties00.cobalt.model.message.MessageKey;
+import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
 import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
 import com.github.auties00.cobalt.model.message.system.ProtocolMessageBuilder;
 import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyIdBuilder;
@@ -12,9 +14,13 @@ import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyR
 import com.github.auties00.cobalt.store.WhatsAppStore;
 
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HexFormat;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -41,74 +47,7 @@ public final class MissingSyncKeyRequestService {
      * @param keyIds the IDs of the missing keys
      */
     public void requestMissingKeys(Collection<byte[]> keyIds) {
-        if (keyIds.isEmpty()) {
-            return;
-        }
-
-        // Filter out keys that were already requested (e.g., before restart)
-        // Per WhatsApp Web WAWebKeyManagementSendKeyRequestApi: avoid
-        // re-sending requests for keys that are already being tracked
-        var newKeyIds = keyIds.stream()
-                .filter(id -> store.findMissingSyncKey(id).isEmpty())
-                .toList();
-        if (newKeyIds.isEmpty()) {
-            LOGGER.log(System.Logger.Level.DEBUG, "All requested keys already have pending requests, skipping");
-            return;
-        }
-
-        // Get companion devices to request keys from
-        var companionDevices = getCompanionDevices();
-        if (companionDevices.isEmpty()) {
-            LOGGER.log(System.Logger.Level.WARNING, "No companion devices available to request missing keys from");
-            return;
-        }
-
-        // Create the key request
-        var keyIdList = newKeyIds.stream()
-                .map(id -> new AppStateSyncKeyIdBuilder()
-                        .keyId(id)
-                        .build())
-                .toList();
-        var keyRequest = new AppStateSyncKeyRequestBuilder()
-                .keyIds(keyIdList)
-                .build();
-
-        // Create the protocol message
-        var protocolMessage = new ProtocolMessageBuilder()
-                .type(ProtocolMessage.Type.APP_STATE_SYNC_KEY_REQUEST)
-                .appStateSyncKeyRequest(keyRequest)
-                .build();
-
-        var messageContainer = new MessageContainerBuilder()
-                .protocolMessage(protocolMessage)
-                .build();
-
-        // Track which devices we're requesting from
-        var deviceIds = companionDevices.stream()
-                .map(Jid::device)
-                .collect(Collectors.toSet());
-
-        // Log the request
-        var keyIdHexes = newKeyIds.stream()
-                .map(id -> HexFormat.of().formatHex(id))
-                .toList();
-        LOGGER.log(System.Logger.Level.INFO, "Requesting missing sync keys {0} from companion devices {1}",
-                keyIdHexes, deviceIds);
-
-        // Add missing key entries to track responses
-        for (var keyId : newKeyIds) {
-            var missingKey = new MissingDeviceSyncKeyBuilder()
-                    .keyId(keyId)
-                    .timestamp(Instant.now())
-                    .askedDevices(deviceIds)
-                    .build();
-            store.addMissingSyncKey(missingKey);
-        }
-
-        // Send to each companion device
-        for (var device : companionDevices) {
-            sendKeyRequest(device, messageContainer);
-        }
+        requestMissingKeysInternal(keyIds, false);
     }
 
     /**
@@ -118,6 +57,18 @@ public final class MissingSyncKeyRequestService {
      */
     public void requestMissingKey(byte[] keyId) {
         requestMissingKeys(List.of(keyId));
+    }
+
+    /**
+     * Re-requests missing sync keys that are already being tracked.
+     *
+     * <p>Per WhatsApp Web {@code requestAllSyncdMissingKeysJob}, periodic retries
+     * must re-send requests for tracked keys instead of filtering them out as duplicates.
+     *
+     * @param keyIds the IDs of the missing keys to re-request
+     */
+    public void reRequestMissingKeys(Collection<byte[]> keyIds) {
+        requestMissingKeysInternal(keyIds, true);
     }
 
     /**
@@ -150,14 +101,104 @@ public final class MissingSyncKeyRequestService {
     /**
      * Sends a key request message to a specific device.
      */
-    private void sendKeyRequest(Jid device, MessageContainer messageContainer) {
+    private void requestMissingKeysInternal(Collection<byte[]> keyIds, boolean includeTracked) {
+        if (keyIds.isEmpty()) {
+            return;
+        }
+
+        var requestedKeyIds = keyIds.stream()
+                .filter(Objects::nonNull)
+                .map(id -> Arrays.copyOf(id, id.length))
+                .filter(id -> includeTracked || store.findMissingSyncKey(id).isEmpty())
+                .toList();
+        if (requestedKeyIds.isEmpty()) {
+            LOGGER.log(System.Logger.Level.DEBUG, "All requested keys are already tracked, skipping duplicate request");
+            return;
+        }
+
+        var companionDevices = getCompanionDevices();
+        var requestedDeviceIds = companionDevices.stream()
+                .map(Jid::device)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        var keyIdHexes = requestedKeyIds.stream()
+                .map(id -> HexFormat.of().formatHex(id))
+                .toList();
+        LOGGER.log(System.Logger.Level.INFO, "Requesting missing sync keys {0} from companion devices {1}",
+                keyIdHexes, requestedDeviceIds);
+
+        if (companionDevices.isEmpty()) {
+            trackMissingKeys(requestedKeyIds, Set.of());
+            LOGGER.log(System.Logger.Level.WARNING, "No companion devices available to request missing keys from");
+            return;
+        }
+
+        var keyIdList = requestedKeyIds.stream()
+                .map(id -> new AppStateSyncKeyIdBuilder()
+                        .keyId(id)
+                        .build())
+                .toList();
+        var keyRequest = new AppStateSyncKeyRequestBuilder()
+                .keyIds(keyIdList)
+                .build();
+
+        var successfulDeviceIds = new LinkedHashSet<Integer>();
+        for (var device : companionDevices) {
+            if (sendKeyRequest(device, keyRequest)) {
+                successfulDeviceIds.add(device.device());
+            }
+        }
+
+        trackMissingKeys(requestedKeyIds, successfulDeviceIds);
+    }
+
+    private void trackMissingKeys(Collection<byte[]> keyIds, Set<Integer> successfulDeviceIds) {
+        for (var keyId : keyIds) {
+            var missingKey = store.findMissingSyncKey(keyId)
+                    .orElseGet(() -> new MissingDeviceSyncKeyBuilder()
+                            .keyId(keyId)
+                            .timestamp(Instant.now())
+                            .askedDevices(Set.of())
+                            .build());
+            successfulDeviceIds.forEach(missingKey::markDeviceAsked);
+            store.addMissingSyncKey(missingKey);
+        }
+    }
+
+    private boolean sendKeyRequest(
+            Jid device,
+            com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyRequest keyRequest
+    ) {
         try {
-            // Send the protocol message to the companion device
-            // This uses the peer message mechanism
-            client.sendMessage(device, messageContainer);
+            var self = store.jid().orElse(null);
+            if (self == null) {
+                return false;
+            }
+
+            var protocolMessage = new ProtocolMessageBuilder()
+                    .type(ProtocolMessage.Type.APP_STATE_SYNC_KEY_REQUEST)
+                    .appStateSyncKeyRequest(keyRequest)
+                    .build();
+            var messageContainer = new MessageContainerBuilder()
+                    .protocolMessage(protocolMessage)
+                    .build();
+            var messageKey = new MessageKeyBuilder()
+                    .id(MessageKey.randomId(store.clientType()))
+                    .chatJid(self)
+                    .fromMe(true)
+                    .senderJid(self)
+                    .build();
+            var messageInfo = new ChatMessageInfoBuilder()
+                    .key(messageKey)
+                    .message(messageContainer)
+                    .timestamp(Instant.now())
+                    .senderJid(self)
+                    .build();
+            client.sendPeerMessage(device, messageInfo);
+            return true;
         } catch (Exception e) {
             LOGGER.log(System.Logger.Level.WARNING, "Failed to send key request to device {0}: {1}",
                     device, e.getMessage());
+            return false;
         }
     }
 }

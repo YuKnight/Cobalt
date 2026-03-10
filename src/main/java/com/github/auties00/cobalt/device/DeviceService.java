@@ -3,31 +3,29 @@ package com.github.auties00.cobalt.device;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.device.adv.DeviceADVChecker;
 import com.github.auties00.cobalt.device.adv.DeviceADVValidator;
+import com.github.auties00.cobalt.device.adv.ValidatedKeyIndexListResult;
 import com.github.auties00.cobalt.device.fanout.DeviceFanoutCalculator;
-import com.github.auties00.cobalt.device.icdc.IcdcComputer;
-import com.github.auties00.cobalt.device.icdc.IcdcResult;
+import com.github.auties00.cobalt.device.fanout.DeviceGroupFanoutResult;
 import com.github.auties00.cobalt.device.fanout.DevicePhashCalculator;
 import com.github.auties00.cobalt.device.fanout.DevicePhashVersion;
-import com.github.auties00.cobalt.device.fanout.DeviceGroupFanoutResult;
-import com.github.auties00.cobalt.device.adv.ValidatedKeyIndexListResult;
+import com.github.auties00.cobalt.device.icdc.IcdcComputer;
+import com.github.auties00.cobalt.device.icdc.IcdcResult;
+import com.github.auties00.cobalt.device.key.DevicePreKeyHandler;
 import com.github.auties00.cobalt.device.stanza.DeviceUSyncQueryBuilder;
 import com.github.auties00.cobalt.device.stanza.DeviceUSyncResponseParser;
 import com.github.auties00.cobalt.device.timestamp.DeviceExpectedTsUtils;
 import com.github.auties00.cobalt.exception.WhatsAppAdvValidationException;
 import com.github.auties00.cobalt.exception.WhatsAppDeviceSyncException;
-import com.github.auties00.cobalt.exception.WhatsAppWebAppStateSyncException;
-import com.github.auties00.cobalt.device.key.DevicePreKeyHandler;
-import com.github.auties00.cobalt.model.device.identity.ADVEncryptionType;
-import com.github.auties00.cobalt.model.chat.group.GroupParticipant;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfoBuilder;
+import com.github.auties00.cobalt.model.chat.group.GroupParticipant;
+import com.github.auties00.cobalt.model.device.identity.ADVEncryptionType;
+import com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentity;
+import com.github.auties00.cobalt.model.device.info.*;
+import com.github.auties00.cobalt.model.device.sync.PendingDeviceSync;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.MessageKey;
 import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
 import com.github.auties00.cobalt.model.message.MessageStatus;
-import com.github.auties00.cobalt.model.device.info.DeviceInfo;
-import com.github.auties00.cobalt.model.device.info.DeviceList;
-import com.github.auties00.cobalt.model.device.info.DeviceListHashInfo;
-import com.github.auties00.cobalt.model.device.sync.PendingDeviceSync;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.props.ABProp;
@@ -2085,7 +2083,7 @@ public final class DeviceService {
      * verifies account signature, and generates device signature using local identity key.
      * Uses advSecretKey (not companion public key) for HMAC verification.
      */
-    public Optional<SignedDeviceIdentity> extractAndValidateLocalSignedDeviceIdentity(Node deviceIdentityNode) {
+    public Optional<ADVSignedDeviceIdentity> extractAndValidateLocalSignedDeviceIdentity(Node deviceIdentityNode) {
         try {
             var signedDeviceIdentity = advValidator.extractAndValidateLocalSignedDeviceIdentity(deviceIdentityNode);
             return Optional.of(signedDeviceIdentity);

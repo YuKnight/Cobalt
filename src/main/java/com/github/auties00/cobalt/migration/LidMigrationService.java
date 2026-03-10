@@ -250,6 +250,16 @@ public final class LidMigrationService {
         }
     }
 
+    public void observeChatDbMigrationTimestamp(Instant timestamp) {
+        if (timestamp == null) {
+            return;
+        }
+
+        if (chatDbMigrationTimestamp == null || timestamp.isAfter(chatDbMigrationTimestamp)) {
+            chatDbMigrationTimestamp = timestamp;
+        }
+    }
+
     /**
      * Processes LID mappings from a HistorySync message.
      *

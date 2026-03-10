@@ -4,19 +4,15 @@ import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.chat.ChatMute;
 import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.chat.MuteAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-
-import java.time.Instant;
 
 /**
  * Handles mute chat actions.
- *
- * <p>This handler processes mutations that mute or unmute chat notifications.
- *
- * <p>Index format: ["muteAction", "chatJid"]
  */
 public final class MuteChatHandler implements WebAppStateActionHandler {
     public static final MuteChatHandler INSTANCE = new MuteChatHandler();
@@ -42,53 +38,50 @@ public final class MuteChatHandler implements WebAppStateActionHandler {
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS;
+    }
+
+    @Override
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
-            return true;
+            return MutationApplicationResult.unsupported();
         }
 
         if (!(mutation.value().action().orElse(null) instanceof MuteAction action)) {
-            return false;
+            return MutationApplicationResult.malformed();
         }
 
         if (action.muted() && action.muteEndTimestamp().isEmpty()) {
-            return false;
+            return MutationApplicationResult.malformed();
         }
 
-        var chatJidString = JSON.parseArray(mutation.index())
-                .getString(1);
+        var chatJidString = JSON.parseArray(mutation.index()).getString(1);
+        if (chatJidString == null || chatJidString.isEmpty()) {
+            return MutationApplicationResult.malformed();
+        }
+
         var chatJid = Jid.of(chatJidString);
-
-        var chat = client.store()
-                .findChatByJid(chatJid);
+        var chat = client.store().findChatByJid(chatJid);
         if (chat.isEmpty()) {
-            return false;
+            return MutationApplicationResult.orphan(chatJidString, "Chat");
         }
 
-        // Per WA Web: protobuf value is millis, check expiration in millis,
-        // then convert to seconds for storage
-        var muteEndMillis = action.muteEndTimestamp()
-                .map(Instant::toEpochMilli)
-                .orElse(0L);
-        long muteEndSeconds;
-        if (muteEndMillis > 0 && muteEndMillis < System.currentTimeMillis()) {
-            muteEndSeconds = 0L;
-        } else {
-            muteEndSeconds = muteEndMillis / 1000;
-        }
-
+        var muteEndMillis = action.muteEndTimestamp().map(java.time.Instant::toEpochMilli).orElse(0L);
+        var muteEndSeconds = muteEndMillis > 0 && muteEndMillis < System.currentTimeMillis()
+                ? 0L
+                : muteEndMillis / 1000;
         chat.get().setMute(ChatMute.mutedUntil(muteEndSeconds));
 
-        action.muteEveryoneMentionEndTimestamp().ifPresent(mentionTs -> {
-            var mentionMillis = mentionTs.toEpochMilli();
-            long mentionSeconds;
-            if (mentionMillis > 0 && mentionMillis < System.currentTimeMillis()) {
-                mentionSeconds = 0L;
-            } else {
-                mentionSeconds = mentionMillis / 1000;
-            }
-            client.store().setMentionEveryoneMuteExpiration(chatJid, ChatMute.mutedUntil(mentionSeconds));
-        });
+        if (chatJid.hasGroupServer() && client.abPropsService().getBool(ABProp.ENABLE_MENTION_EVERYONE_RECEIVER_WEB)) {
+            action.muteEveryoneMentionEndTimestamp().ifPresent(mentionTs -> {
+                var mentionMillis = mentionTs.toEpochMilli();
+                var mentionSeconds = mentionMillis > 0 && mentionMillis < System.currentTimeMillis()
+                        ? 0L
+                        : mentionMillis / 1000;
+                client.store().setMentionEveryoneMuteExpiration(chatJid, ChatMute.mutedUntil(mentionSeconds));
+            });
+        }
 
-        return true;
+        return MutationApplicationResult.success();
     }
 }

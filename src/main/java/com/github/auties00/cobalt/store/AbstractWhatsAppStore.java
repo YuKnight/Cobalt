@@ -37,7 +37,21 @@ import com.github.auties00.cobalt.model.preference.Sticker;
 import com.github.auties00.cobalt.model.privacy.PrivacySettingEntry;
 import com.github.auties00.cobalt.model.privacy.PrivacySettingType;
 import com.github.auties00.cobalt.model.sync.*;
+import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastCampaignAction;
+import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastInsightsAction;
+import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastListAction;
+import com.github.auties00.cobalt.model.sync.action.bot.MaibaAIFeaturesControlAction;
+import com.github.auties00.cobalt.model.sync.action.business.MarketingMessageAction;
+import com.github.auties00.cobalt.model.sync.action.chat.UsernameChatStartModeAction;
+import com.github.auties00.cobalt.model.sync.action.device.AgentAction;
 import com.github.auties00.cobalt.model.sync.action.device.WaffleAccountLinkStateAction;
+import com.github.auties00.cobalt.model.sync.action.media.MusicUserIdAction;
+import com.github.auties00.cobalt.model.sync.action.media.RecentEmojiWeight;
+import com.github.auties00.cobalt.model.sync.action.privacy.PrivateProcessingSettingAction;
+import com.github.auties00.cobalt.model.sync.action.payment.CustomPaymentMethod;
+import com.github.auties00.cobalt.model.sync.action.payment.MerchantPaymentPartnerAction;
+import com.github.auties00.cobalt.model.sync.action.payment.PaymentTosAction;
+import com.github.auties00.cobalt.model.sync.action.setting.NotificationActivitySettingAction;
 import com.github.auties00.cobalt.model.payment.OrphanPaymentNotification;
 import com.github.auties00.cobalt.sync.crypto.MutationLTHash;
 import com.github.auties00.cobalt.util.FastRandomUtils;
@@ -340,6 +354,8 @@ public abstract class AbstractWhatsAppStore implements WhatsAppStore {
 
     protected volatile WaffleAccountLinkStateAction.AccountLinkState waffleAccountLinkState;
 
+    protected volatile Instant waffleAccountLinkStateTimestamp;
+
     protected volatile boolean hostedAutomationOnboarded;
 
     protected final ConcurrentLinkedQueue<PendingDeviceSync> pendingDeviceSyncs;
@@ -382,84 +398,87 @@ public abstract class AbstractWhatsAppStore implements WhatsAppStore {
 
     protected boolean detectedOutcomesEnabled;
 
+    protected boolean primaryAllowsAllMutations;
+
+    protected Map<String, AgentAction> agentStates;
+
+    protected Map<String, String> chatAssignmentStates;
+
+    protected Map<String, Boolean> chatAssignmentOpenedStates;
+
+    protected String paymentInstructionCpi;
+
+    protected List<CustomPaymentMethod> customPaymentMethods;
+
+    protected MerchantPaymentPartnerAction merchantPaymentPartner;
+
+    protected PaymentTosAction paymentTos;
+
+    protected Map<String, MarketingMessageAction> marketingMessages;
+
+    protected Map<String, String> marketingMessageBroadcasts;
+
+    protected Map<String, BusinessBroadcastListAction> businessBroadcastLists;
+
+    protected Map<String, BusinessBroadcastCampaignAction> businessBroadcastCampaigns;
+
+    protected Map<String, BusinessBroadcastInsightsAction> businessBroadcastInsights;
+
+    protected byte[] nctSalt;
+
+    protected Map<String, Boolean> nuxStates;
+
+    protected com.github.auties00.cobalt.model.device.DeviceCapabilities primaryDeviceCapabilities;
+
+    protected Map<String, com.github.auties00.cobalt.model.device.DeviceCapabilities> deviceCapabilitiesStates;
+
+    protected Map<String, Boolean> shareOwnPnStates;
+
+    protected Map<String, com.github.auties00.cobalt.model.sync.action.setting.SettingsSyncAction> settingsSyncStates;
+
+    protected Map<String, com.github.auties00.cobalt.model.sync.action.chat.InteractiveMessageAction> interactiveMessageStates;
+
+    protected Map<String, com.github.auties00.cobalt.model.sync.action.media.NoteEditAction> noteStates;
+
+    protected Map<String, Boolean> groupStatusMuteStates;
+
+    protected Map<String, Instant> newsletterPinStates;
+
+    protected Boolean hasAvatar;
+
+    protected Map<String, com.github.auties00.cobalt.model.call.CallLog> callLogStates;
+
+    protected Map<String, Boolean> botWelcomeRequestStates;
+
+    protected Map<String, String> aiThreadTitles;
+
+    protected UsernameChatStartModeAction.ChatStartMode usernameChatStartMode;
+
+    protected NotificationActivitySettingAction.NotificationActivitySetting notificationActivitySetting;
+
+    protected List<RecentEmojiWeight> recentEmojiWeights;
+
+    protected String wamoUserIdentifier;
+
+    protected MusicUserIdAction musicUserIdState;
+
+    protected String newsletterSavedInterests;
+
+    protected Boolean statusPostOptInNotificationPreferencesEnabled;
+
+    protected PrivateProcessingSettingAction.PrivateProcessingStatus privateProcessingStatus;
+
+    protected Boolean channelsPersonalisedRecommendationOptOut;
+
+    protected byte[] ugcBotDefinition;
+
+    protected MaibaAIFeaturesControlAction.MaibaAIFeatureStatus maibaAiFeatureStatus;
+
     protected final System.Logger logger;
 
     protected AbstractWhatsAppStore(
-            UUID uuid,
-            Long phoneNumber,
-            WhatsAppClientType clientType,
-            Instant initializationTimeStamp,
-            JidDevice device,
-            ClientReleaseChannel releaseChannel,
-            boolean online,
-            String locale,
-            String name,
-            String verifiedName,
-            URI profilePicture,
-            String about,
-            Jid jid,
-            Jid lid,
-            String businessAddress,
-            Double businessLongitude,
-            Double businessLatitude,
-            String businessDescription,
-            String businessWebsite,
-            String businessEmail,
-            BusinessCategory businessCategory,
-            ConcurrentHashMap<Jid, Contact> contacts,
-            ConcurrentHashMap<String, CallOffer> calls,
-            ConcurrentHashMap<PrivacySettingType, PrivacySettingEntry> privacySettings,
-            boolean unarchiveChats,
-            boolean twentyFourHourFormat,
-            ChatEphemeralTimer newChatsEphemeralTimer,
-            WhatsAppWebClientHistory webHistoryPolicy,
-            boolean automaticPresenceUpdates,
-            boolean automaticMessageReceipts,
-            boolean checkPatchMacs,
-            boolean syncedChats,
-            boolean syncedContacts,
-            boolean syncedNewsletters,
-            boolean syncedStatus,
-            boolean syncedWebAppState,
-            boolean syncedBusinessCertificate,
-            Integer registrationId,
-            SignalIdentityKeyPair noiseKeyPair,
-            SignalIdentityKeyPair identityKeyPair,
-            ADVSignedDeviceIdentity signedDeviceIdentity,
-            SignalSignedKeyPair signedKeyPair,
-            LinkedHashMap<Integer, SignalPreKeyPair> preKeys,
-            UUID fdid,
-            byte[] deviceId,
-            UUID advertisingId,
-            byte[] identityId,
-            byte[] backupToken,
-            ConcurrentMap<SignalSenderKeyName, SignalSenderKeyRecord> senderKeys,
-            LinkedHashMap<String, AppStateSyncKey> appStateKeys,
-            ConcurrentMap<SignalProtocolAddress, SignalSessionRecord> sessions,
-            ConcurrentMap<SyncPatchType, SyncHashValue> hashStates,
-            boolean registered,
-            boolean showSecurityNotifications,
-            ConcurrentMap<String, Sticker> recentStickers,
-            ConcurrentMap<String, Sticker> favouriteStickers,
-            ConcurrentMap<String, QuickReply> quickReplies,
-            ConcurrentMap<String, Label> labels,
-            ClientAppVersion clientVersion,
-            ClientAppVersion companionVersion,
-            Instant lastAdvCheckTime,
-            ConcurrentMap<SignalProtocolAddress, SignalIdentityPublicKey> remoteIdentities,
-            ConcurrentMap<String, MissingDeviceSyncKey> missingSyncKeys,
-            byte[] advSecretKey,
-            ConcurrentMap<Jid, BusinessVerifiedNameCertificate> verifiedBusinessNames,
-            Path directory,
-            boolean primaryDeviceSupportsSyncdRecovery,
-            boolean disableLinkPreviews,
-            boolean relayAllCalls,
-            boolean externalWebBeta,
-            ChatLockSettings chatLockSettings,
-            List<Jid> favoriteChats,
-            List<String> primaryFeatures,
-            ConcurrentMap<Jid, ChatMute> mentionEveryoneMuteExpirations
-    ) {
+            java.util.UUID uuid, java.lang.Long phoneNumber, com.github.auties00.cobalt.client.WhatsAppClientType clientType, java.time.Instant initializationTimeStamp, com.github.auties00.cobalt.model.jid.JidDevice device, com.github.auties00.cobalt.model.device.pairing.ClientPayload.ClientReleaseChannel releaseChannel, boolean online, java.lang.String locale, java.lang.String name, java.lang.String verifiedName, java.net.URI profilePicture, java.lang.String about, com.github.auties00.cobalt.model.jid.Jid jid, com.github.auties00.cobalt.model.jid.Jid lid, java.lang.String businessAddress, java.lang.Double businessLongitude, java.lang.Double businessLatitude, java.lang.String businessDescription, java.lang.String businessWebsite, java.lang.String businessEmail, com.github.auties00.cobalt.model.business.profile.BusinessCategory businessCategory, java.util.concurrent.ConcurrentHashMap<com.github.auties00.cobalt.model.jid.Jid,com.github.auties00.cobalt.model.contact.Contact> contacts, java.util.concurrent.ConcurrentHashMap<java.lang.String,com.github.auties00.cobalt.model.call.CallOffer> calls, java.util.concurrent.ConcurrentHashMap<com.github.auties00.cobalt.model.privacy.PrivacySettingType,com.github.auties00.cobalt.model.privacy.PrivacySettingEntry> privacySettings, boolean unarchiveChats, boolean twentyFourHourFormat, com.github.auties00.cobalt.model.chat.ChatEphemeralTimer newChatsEphemeralTimer, com.github.auties00.cobalt.client.WhatsAppWebClientHistory webHistoryPolicy, boolean automaticPresenceUpdates, boolean automaticMessageReceipts, boolean checkPatchMacs, boolean syncedChats, boolean syncedContacts, boolean syncedNewsletters, boolean syncedStatus, boolean syncedWebAppState, boolean syncedBusinessCertificate, java.lang.Integer registrationId, com.github.auties00.libsignal.key.SignalIdentityKeyPair noiseKeyPair, com.github.auties00.libsignal.key.SignalIdentityKeyPair identityKeyPair, com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentity signedDeviceIdentity, com.github.auties00.libsignal.key.SignalSignedKeyPair signedKeyPair, java.util.LinkedHashMap<java.lang.Integer,com.github.auties00.libsignal.key.SignalPreKeyPair> preKeys, java.util.UUID fdid, byte[] deviceId, java.util.UUID advertisingId, byte[] identityId, byte[] backupToken, java.util.concurrent.ConcurrentMap<com.github.auties00.libsignal.groups.SignalSenderKeyName,com.github.auties00.libsignal.groups.state.SignalSenderKeyRecord> senderKeys, java.util.LinkedHashMap<java.lang.String,com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKey> appStateKeys, java.util.concurrent.ConcurrentMap<com.github.auties00.libsignal.SignalProtocolAddress,com.github.auties00.libsignal.state.SignalSessionRecord> sessions, java.util.concurrent.ConcurrentMap<com.github.auties00.cobalt.model.sync.SyncPatchType,com.github.auties00.cobalt.model.sync.SyncHashValue> hashStates, boolean registered, boolean showSecurityNotifications, java.util.concurrent.ConcurrentMap<java.lang.String,com.github.auties00.cobalt.model.preference.Sticker> recentStickers, java.util.concurrent.ConcurrentMap<java.lang.String,com.github.auties00.cobalt.model.preference.Sticker> favouriteStickers, java.util.concurrent.ConcurrentMap<java.lang.String,com.github.auties00.cobalt.model.preference.QuickReply> quickReplies, java.util.concurrent.ConcurrentMap<java.lang.String,com.github.auties00.cobalt.model.preference.Label> labels, com.github.auties00.cobalt.model.device.pairing.ClientAppVersion clientVersion, com.github.auties00.cobalt.model.device.pairing.ClientAppVersion companionVersion, java.time.Instant lastAdvCheckTime, java.util.concurrent.ConcurrentMap<com.github.auties00.libsignal.SignalProtocolAddress,com.github.auties00.libsignal.key.SignalIdentityPublicKey> remoteIdentities, java.util.concurrent.ConcurrentMap<java.lang.String,com.github.auties00.cobalt.model.device.sync.MissingDeviceSyncKey> missingSyncKeys, byte[] advSecretKey, java.util.concurrent.ConcurrentMap<com.github.auties00.cobalt.model.jid.Jid,com.github.auties00.cobalt.model.business.BusinessVerifiedNameCertificate> verifiedBusinessNames, java.nio.file.Path directory, boolean primaryDeviceSupportsSyncdRecovery, boolean disableLinkPreviews, boolean relayAllCalls, boolean externalWebBeta, com.github.auties00.cobalt.model.setting.ChatLockSettings chatLockSettings, java.util.List<com.github.auties00.cobalt.model.jid.Jid> favoriteChats, java.util.List<java.lang.String> primaryFeatures, java.util.concurrent.ConcurrentMap<com.github.auties00.cobalt.model.jid.Jid,com.github.auties00.cobalt.model.chat.ChatMute> mentionEveryoneMuteExpirations, java.util.concurrent.ConcurrentMap<com.github.auties00.cobalt.model.sync.SyncPatchType,com.github.auties00.cobalt.store.AbstractWhatsAppStore.OrphanMutationEntries> orphanMutationEntries
+            ) {
         this.uuid = Objects.requireNonNull(uuid, "uuid cannot be null");
         this.phoneNumber = phoneNumber;
         this.clientType = Objects.requireNonNull(clientType, "clientType cannot be null");
@@ -560,6 +579,27 @@ public abstract class AbstractWhatsAppStore implements WhatsAppStore {
         this.chatLockSettings = chatLockSettings;
         this.favoriteChats = requireNonNullElseGet(favoriteChats, ArrayList::new);
         this.primaryFeatures = requireNonNullElseGet(primaryFeatures, ArrayList::new);
+        this.agentStates = new ConcurrentHashMap<>();
+        this.chatAssignmentStates = new ConcurrentHashMap<>();
+        this.chatAssignmentOpenedStates = new ConcurrentHashMap<>();
+        this.customPaymentMethods = new ArrayList<>();
+        this.marketingMessages = new ConcurrentHashMap<>();
+        this.marketingMessageBroadcasts = new ConcurrentHashMap<>();
+        this.businessBroadcastLists = new ConcurrentHashMap<>();
+        this.businessBroadcastCampaigns = new ConcurrentHashMap<>();
+        this.businessBroadcastInsights = new ConcurrentHashMap<>();
+        this.nuxStates = new ConcurrentHashMap<>();
+        this.deviceCapabilitiesStates = new ConcurrentHashMap<>();
+        this.shareOwnPnStates = new ConcurrentHashMap<>();
+        this.settingsSyncStates = new ConcurrentHashMap<>();
+        this.interactiveMessageStates = new ConcurrentHashMap<>();
+        this.noteStates = new ConcurrentHashMap<>();
+        this.groupStatusMuteStates = new ConcurrentHashMap<>();
+        this.newsletterPinStates = new ConcurrentHashMap<>();
+        this.callLogStates = new ConcurrentHashMap<>();
+        this.botWelcomeRequestStates = new ConcurrentHashMap<>();
+        this.aiThreadTitles = new ConcurrentHashMap<>();
+        this.recentEmojiWeights = new CopyOnWriteArrayList<>();
         this.mentionEveryoneMuteExpirations = requireNonNullElseGet(mentionEveryoneMuteExpirations, ConcurrentHashMap::new);
         this.orphanMutationEntries = new ConcurrentHashMap<>();
         this.identityEncryptionRange = new ConcurrentHashMap<>();
@@ -693,6 +733,17 @@ public abstract class AbstractWhatsAppStore implements WhatsAppStore {
     @Override
     public WhatsAppStore setWaffleAccountLinkState(WaffleAccountLinkStateAction.AccountLinkState state) {
         this.waffleAccountLinkState = state;
+        return this;
+    }
+
+    @Override
+    public Optional<Instant> waffleAccountLinkStateTimestamp() {
+        return Optional.ofNullable(waffleAccountLinkStateTimestamp);
+    }
+
+    @Override
+    public WhatsAppStore setWaffleAccountLinkStateTimestamp(Instant timestamp) {
+        this.waffleAccountLinkStateTimestamp = timestamp;
         return this;
     }
 
@@ -1719,6 +1770,13 @@ public abstract class AbstractWhatsAppStore implements WhatsAppStore {
     @Override
     public void addWebAppStateKeys(Collection<AppStateSyncKey> keys) {
         for (var key : keys) {
+            var hasKeyData = key.keyData()
+                    .flatMap(AppStateSyncKeyData::keyData)
+                    .map(data -> data.length > 0)
+                    .orElse(false);
+            if (!hasKeyData) {
+                continue;
+            }
             key.keyId()
                     .flatMap(AppStateSyncKeyId::keyId)
                     .ifPresent(keyId -> appStateKeys.put(HexFormat.of().formatHex(keyId), key));
@@ -1735,6 +1793,17 @@ public abstract class AbstractWhatsAppStore implements WhatsAppStore {
             if (timestamp != null && !timestamp.isAfter(threshold)) {
                 key.keyData().ifPresent(data -> data.setTimestamp(Instant.EPOCH));
             }
+        }
+    }
+
+    @Override
+    public void expireAppStateKeysByEpoch(int epoch) {
+        for (var key : appStateKeys.values()) {
+            if (com.github.auties00.cobalt.sync.key.SyncKeyUtils.getKeyEpoch(key) != epoch) {
+                continue;
+            }
+
+            key.keyData().ifPresent(data -> data.setTimestamp(Instant.EPOCH));
         }
     }
 
@@ -1835,7 +1904,7 @@ public abstract class AbstractWhatsAppStore implements WhatsAppStore {
     @Override
     public void addPendingMutations(SyncPatchType collectionName, Collection<? extends SyncPendingMutation> patch) {
         webAppStatePendingMutations
-                .computeIfAbsent(collectionName, k -> new ArrayList<>())
+                .computeIfAbsent(collectionName, _ -> new ConcurrentLinkedDeque<>())
                 .addAll(patch);
     }
 
@@ -1848,6 +1917,21 @@ public abstract class AbstractWhatsAppStore implements WhatsAppStore {
     @Override
     public void removePendingMutations(SyncPatchType collectionName) {
         webAppStatePendingMutations.remove(collectionName);
+    }
+
+    @Override
+    public void removePendingMutations(SyncPatchType collectionName, Collection<String> mutationIds) {
+        if (mutationIds == null || mutationIds.isEmpty()) {
+            return;
+        }
+
+        var mutationIdsSet = mutationIds instanceof Set<String> ids
+                ? ids
+                : new HashSet<>(mutationIds);
+        webAppStatePendingMutations.computeIfPresent(collectionName, (_, pendingMutations) -> {
+            pendingMutations.removeIf(pendingMutation -> mutationIdsSet.contains(pendingMutation.mutationId()));
+            return pendingMutations.isEmpty() ? null : pendingMutations;
+        });
     }
 
     @Override
@@ -1940,20 +2024,32 @@ public abstract class AbstractWhatsAppStore implements WhatsAppStore {
 
     public void markWebAppStateDirty(SyncPatchType collectionName) {
         webAppStateCollections.compute(collectionName, (_, current) -> {
-            if (current == null || current.state() == SyncCollectionState.UP_TO_DATE) {
+            if (current == null) {
                 return new SyncCollectionMetadata(
                         collectionName,
-                        current != null ? current.version() : 0,
-                        current != null ? MutationLTHash.copy(current.ltHash()) : MutationLTHash.copy(MutationLTHash.EMPTY_HASH),
+                        0,
+                        MutationLTHash.copy(MutationLTHash.EMPTY_HASH),
                         System.currentTimeMillis(),
                         SyncCollectionState.DIRTY,
-                        0,  // Reset retry count
-                        0,  // Reset error timestamp
-                        current != null && current.macMismatch(),
-                        current != null && current.bootstrapped()
+                        0,
+                        0,
+                        false,
+                        false
                 );
             }
-            return current;
+            var preserveFailureWindow = current.state() == SyncCollectionState.ERROR_RETRY
+                    || current.state() == SyncCollectionState.BLOCKED;
+            return new SyncCollectionMetadata(
+                    current.name(),
+                    current.version(),
+                    MutationLTHash.copy(current.ltHash()),
+                    System.currentTimeMillis(),
+                    SyncCollectionState.DIRTY,
+                    preserveFailureWindow ? current.retryCount() : 0,
+                    preserveFailureWindow ? current.lastErrorTimestamp() : 0,
+                    current.macMismatch(),
+                    current.bootstrapped()
+            );
         });
     }
 
@@ -2181,6 +2277,11 @@ public abstract class AbstractWhatsAppStore implements WhatsAppStore {
     public void addLabel(Label label) {
         Objects.requireNonNull(label, "label cannot be null");
         labels.put(label.id(), label);
+    }
+
+    @Override
+    public Collection<Label> labels() {
+        return Collections.unmodifiableCollection(labels.values());
     }
 
     @Override
@@ -2508,6 +2609,430 @@ public abstract class AbstractWhatsAppStore implements WhatsAppStore {
     }
 
     @Override
+    public boolean primaryAllowsAllMutations() {
+        return primaryAllowsAllMutations;
+    }
+
+    @Override
+    public WhatsAppStore setPrimaryAllowsAllMutations(boolean primaryAllowsAllMutations) {
+        this.primaryAllowsAllMutations = primaryAllowsAllMutations;
+        return this;
+    }
+
+    @Override
+    public Map<String, AgentAction> agentStates() {
+        return Collections.unmodifiableMap(agentStates);
+    }
+
+    @Override
+    public WhatsAppStore setAgentStates(Map<String, AgentAction> states) {
+        this.agentStates = new ConcurrentHashMap<>(Objects.requireNonNull(states, "states cannot be null"));
+        return this;
+    }
+
+    @Override
+    public Map<String, String> chatAssignmentStates() {
+        return Collections.unmodifiableMap(chatAssignmentStates);
+    }
+
+    @Override
+    public WhatsAppStore setChatAssignmentStates(Map<String, String> states) {
+        this.chatAssignmentStates = new ConcurrentHashMap<>(Objects.requireNonNull(states, "states cannot be null"));
+        return this;
+    }
+
+    @Override
+    public Map<String, Boolean> chatAssignmentOpenedStates() {
+        return Collections.unmodifiableMap(chatAssignmentOpenedStates);
+    }
+
+    @Override
+    public WhatsAppStore setChatAssignmentOpenedStates(Map<String, Boolean> states) {
+        this.chatAssignmentOpenedStates = new ConcurrentHashMap<>(Objects.requireNonNull(states, "states cannot be null"));
+        return this;
+    }
+
+    @Override
+    public Optional<String> paymentInstructionCpi() {
+        return Optional.ofNullable(paymentInstructionCpi);
+    }
+
+    @Override
+    public WhatsAppStore setPaymentInstructionCpi(String cpi) {
+        this.paymentInstructionCpi = cpi;
+        return this;
+    }
+
+    @Override
+    public List<CustomPaymentMethod> customPaymentMethods() {
+        return Collections.unmodifiableList(customPaymentMethods);
+    }
+
+    @Override
+    public WhatsAppStore setCustomPaymentMethods(List<CustomPaymentMethod> methods) {
+        this.customPaymentMethods = new ArrayList<>(Objects.requireNonNull(methods, "methods cannot be null"));
+        return this;
+    }
+
+    @Override
+    public Optional<MerchantPaymentPartnerAction> merchantPaymentPartner() {
+        return Optional.ofNullable(merchantPaymentPartner);
+    }
+
+    @Override
+    public WhatsAppStore setMerchantPaymentPartner(MerchantPaymentPartnerAction partner) {
+        this.merchantPaymentPartner = partner;
+        return this;
+    }
+
+    @Override
+    public Optional<PaymentTosAction> paymentTos() {
+        return Optional.ofNullable(paymentTos);
+    }
+
+    @Override
+    public WhatsAppStore setPaymentTos(PaymentTosAction tos) {
+        this.paymentTos = tos;
+        return this;
+    }
+
+    @Override
+    public Map<String, MarketingMessageAction> marketingMessages() {
+        return Collections.unmodifiableMap(marketingMessages);
+    }
+
+    @Override
+    public WhatsAppStore setMarketingMessages(Map<String, MarketingMessageAction> messages) {
+        this.marketingMessages = new ConcurrentHashMap<>(Objects.requireNonNull(messages, "messages cannot be null"));
+        return this;
+    }
+
+    @Override
+    public Map<String, String> marketingMessageBroadcasts() {
+        return Collections.unmodifiableMap(marketingMessageBroadcasts);
+    }
+
+    @Override
+    public WhatsAppStore setMarketingMessageBroadcasts(Map<String, String> broadcasts) {
+        this.marketingMessageBroadcasts = new ConcurrentHashMap<>(Objects.requireNonNull(broadcasts, "broadcasts cannot be null"));
+        return this;
+    }
+
+    @Override
+    public Map<String, BusinessBroadcastListAction> businessBroadcastLists() {
+        return Collections.unmodifiableMap(businessBroadcastLists);
+    }
+
+    @Override
+    public WhatsAppStore setBusinessBroadcastLists(Map<String, BusinessBroadcastListAction> lists) {
+        this.businessBroadcastLists = new ConcurrentHashMap<>(Objects.requireNonNull(lists, "lists cannot be null"));
+        return this;
+    }
+
+    @Override
+    public Map<String, BusinessBroadcastCampaignAction> businessBroadcastCampaigns() {
+        return Collections.unmodifiableMap(businessBroadcastCampaigns);
+    }
+
+    @Override
+    public WhatsAppStore setBusinessBroadcastCampaigns(Map<String, BusinessBroadcastCampaignAction> campaigns) {
+        this.businessBroadcastCampaigns = new ConcurrentHashMap<>(Objects.requireNonNull(campaigns, "campaigns cannot be null"));
+        return this;
+    }
+
+    @Override
+    public Map<String, BusinessBroadcastInsightsAction> businessBroadcastInsights() {
+        return Collections.unmodifiableMap(businessBroadcastInsights);
+    }
+
+    @Override
+    public WhatsAppStore setBusinessBroadcastInsights(Map<String, BusinessBroadcastInsightsAction> insights) {
+        this.businessBroadcastInsights = new ConcurrentHashMap<>(Objects.requireNonNull(insights, "insights cannot be null"));
+        return this;
+    }
+
+    @Override
+    public Optional<byte[]> nctSalt() {
+        return Optional.ofNullable(nctSalt);
+    }
+
+    @Override
+    public WhatsAppStore setNctSalt(byte[] salt) {
+        this.nctSalt = salt;
+        return this;
+    }
+
+    @Override
+    public Map<String, Boolean> nuxStates() {
+        return Collections.unmodifiableMap(nuxStates);
+    }
+
+    @Override
+    public WhatsAppStore setNuxStates(Map<String, Boolean> states) {
+        this.nuxStates = new ConcurrentHashMap<>(Objects.requireNonNull(states, "states cannot be null"));
+        return this;
+    }
+
+    @Override
+    public Optional<com.github.auties00.cobalt.model.device.DeviceCapabilities> primaryDeviceCapabilities() {
+        return Optional.ofNullable(primaryDeviceCapabilities);
+    }
+
+    @Override
+    public WhatsAppStore setPrimaryDeviceCapabilities(com.github.auties00.cobalt.model.device.DeviceCapabilities capabilities) {
+        this.primaryDeviceCapabilities = capabilities;
+        return this;
+    }
+
+    @Override
+    public Map<String, com.github.auties00.cobalt.model.device.DeviceCapabilities> deviceCapabilitiesStates() {
+        return Collections.unmodifiableMap(deviceCapabilitiesStates);
+    }
+
+    @Override
+    public WhatsAppStore setDeviceCapabilitiesStates(
+            Map<String, com.github.auties00.cobalt.model.device.DeviceCapabilities> states
+    ) {
+        this.deviceCapabilitiesStates = new ConcurrentHashMap<>(Objects.requireNonNull(states, "states cannot be null"));
+        return this;
+    }
+
+    @Override
+    public Map<String, Boolean> shareOwnPnStates() {
+        return Collections.unmodifiableMap(shareOwnPnStates);
+    }
+
+    @Override
+    public WhatsAppStore setShareOwnPnStates(Map<String, Boolean> states) {
+        this.shareOwnPnStates = new ConcurrentHashMap<>(Objects.requireNonNull(states, "states cannot be null"));
+        return this;
+    }
+
+    @Override
+    public Map<String, com.github.auties00.cobalt.model.sync.action.setting.SettingsSyncAction> settingsSyncStates() {
+        return Collections.unmodifiableMap(settingsSyncStates);
+    }
+
+    @Override
+    public WhatsAppStore setSettingsSyncStates(
+            Map<String, com.github.auties00.cobalt.model.sync.action.setting.SettingsSyncAction> states
+    ) {
+        this.settingsSyncStates = new ConcurrentHashMap<>(Objects.requireNonNull(states, "states cannot be null"));
+        return this;
+    }
+
+    @Override
+    public Map<String, com.github.auties00.cobalt.model.sync.action.chat.InteractiveMessageAction> interactiveMessageStates() {
+        return Collections.unmodifiableMap(interactiveMessageStates);
+    }
+
+    @Override
+    public WhatsAppStore setInteractiveMessageStates(
+            Map<String, com.github.auties00.cobalt.model.sync.action.chat.InteractiveMessageAction> states
+    ) {
+        this.interactiveMessageStates = new ConcurrentHashMap<>(Objects.requireNonNull(states, "states cannot be null"));
+        return this;
+    }
+
+    @Override
+    public Map<String, com.github.auties00.cobalt.model.sync.action.media.NoteEditAction> noteStates() {
+        return Collections.unmodifiableMap(noteStates);
+    }
+
+    @Override
+    public WhatsAppStore setNoteStates(Map<String, com.github.auties00.cobalt.model.sync.action.media.NoteEditAction> states) {
+        this.noteStates = new ConcurrentHashMap<>(Objects.requireNonNull(states, "states cannot be null"));
+        return this;
+    }
+
+    @Override
+    public Map<String, Boolean> groupStatusMuteStates() {
+        return Collections.unmodifiableMap(groupStatusMuteStates);
+    }
+
+    @Override
+    public WhatsAppStore setGroupStatusMuteStates(Map<String, Boolean> states) {
+        this.groupStatusMuteStates = new ConcurrentHashMap<>(Objects.requireNonNull(states, "states cannot be null"));
+        return this;
+    }
+
+    @Override
+    public Map<String, Instant> newsletterPinStates() {
+        return Collections.unmodifiableMap(newsletterPinStates);
+    }
+
+    @Override
+    public WhatsAppStore setNewsletterPinStates(Map<String, Instant> states) {
+        this.newsletterPinStates = new ConcurrentHashMap<>(Objects.requireNonNull(states, "states cannot be null"));
+        return this;
+    }
+
+    @Override
+    public Optional<Boolean> hasAvatar() {
+        return Optional.ofNullable(hasAvatar);
+    }
+
+    @Override
+    public WhatsAppStore setHasAvatar(Boolean hasAvatar) {
+        this.hasAvatar = hasAvatar;
+        return this;
+    }
+
+    @Override
+    public Map<String, com.github.auties00.cobalt.model.call.CallLog> callLogStates() {
+        return Collections.unmodifiableMap(callLogStates);
+    }
+
+    @Override
+    public WhatsAppStore setCallLogStates(Map<String, com.github.auties00.cobalt.model.call.CallLog> states) {
+        this.callLogStates = new ConcurrentHashMap<>(Objects.requireNonNull(states, "states cannot be null"));
+        return this;
+    }
+
+    @Override
+    public Map<String, Boolean> botWelcomeRequestStates() {
+        return Collections.unmodifiableMap(botWelcomeRequestStates);
+    }
+
+    @Override
+    public WhatsAppStore setBotWelcomeRequestStates(Map<String, Boolean> states) {
+        this.botWelcomeRequestStates = new ConcurrentHashMap<>(Objects.requireNonNull(states, "states cannot be null"));
+        return this;
+    }
+
+    @Override
+    public Map<String, String> aiThreadTitles() {
+        return Collections.unmodifiableMap(aiThreadTitles);
+    }
+
+    @Override
+    public WhatsAppStore setAiThreadTitles(Map<String, String> titles) {
+        this.aiThreadTitles = new ConcurrentHashMap<>(Objects.requireNonNull(titles, "titles cannot be null"));
+        return this;
+    }
+
+    @Override
+    public Optional<UsernameChatStartModeAction.ChatStartMode> usernameChatStartMode() {
+        return Optional.ofNullable(usernameChatStartMode);
+    }
+
+    @Override
+    public WhatsAppStore setUsernameChatStartMode(UsernameChatStartModeAction.ChatStartMode mode) {
+        this.usernameChatStartMode = mode;
+        return this;
+    }
+
+    @Override
+    public Optional<NotificationActivitySettingAction.NotificationActivitySetting> notificationActivitySetting() {
+        return Optional.ofNullable(notificationActivitySetting);
+    }
+
+    @Override
+    public WhatsAppStore setNotificationActivitySetting(NotificationActivitySettingAction.NotificationActivitySetting setting) {
+        this.notificationActivitySetting = setting;
+        return this;
+    }
+
+    @Override
+    public List<RecentEmojiWeight> recentEmojiWeights() {
+        return List.copyOf(recentEmojiWeights);
+    }
+
+    @Override
+    public WhatsAppStore setRecentEmojiWeights(List<RecentEmojiWeight> weights) {
+        this.recentEmojiWeights = new CopyOnWriteArrayList<>(Objects.requireNonNull(weights, "weights cannot be null"));
+        return this;
+    }
+
+    @Override
+    public Optional<String> wamoUserIdentifier() {
+        return Optional.ofNullable(wamoUserIdentifier);
+    }
+
+    @Override
+    public WhatsAppStore setWamoUserIdentifier(String identifier) {
+        this.wamoUserIdentifier = identifier;
+        return this;
+    }
+
+    @Override
+    public Optional<MusicUserIdAction> musicUserIdState() {
+        return Optional.ofNullable(musicUserIdState);
+    }
+
+    @Override
+    public WhatsAppStore setMusicUserIdState(MusicUserIdAction action) {
+        this.musicUserIdState = action;
+        return this;
+    }
+
+    @Override
+    public Optional<String> newsletterSavedInterests() {
+        return Optional.ofNullable(newsletterSavedInterests);
+    }
+
+    @Override
+    public WhatsAppStore setNewsletterSavedInterests(String interests) {
+        this.newsletterSavedInterests = interests;
+        return this;
+    }
+
+    @Override
+    public Optional<Boolean> statusPostOptInNotificationPreferencesEnabled() {
+        return Optional.ofNullable(statusPostOptInNotificationPreferencesEnabled);
+    }
+
+    @Override
+    public WhatsAppStore setStatusPostOptInNotificationPreferencesEnabled(Boolean enabled) {
+        this.statusPostOptInNotificationPreferencesEnabled = enabled;
+        return this;
+    }
+
+    @Override
+    public Optional<PrivateProcessingSettingAction.PrivateProcessingStatus> privateProcessingStatus() {
+        return Optional.ofNullable(privateProcessingStatus);
+    }
+
+    @Override
+    public WhatsAppStore setPrivateProcessingStatus(PrivateProcessingSettingAction.PrivateProcessingStatus status) {
+        this.privateProcessingStatus = status;
+        return this;
+    }
+
+    @Override
+    public Optional<Boolean> channelsPersonalisedRecommendationOptOut() {
+        return Optional.ofNullable(channelsPersonalisedRecommendationOptOut);
+    }
+
+    @Override
+    public WhatsAppStore setChannelsPersonalisedRecommendationOptOut(Boolean optOut) {
+        this.channelsPersonalisedRecommendationOptOut = optOut;
+        return this;
+    }
+
+    @Override
+    public Optional<byte[]> ugcBotDefinition() {
+        return Optional.ofNullable(ugcBotDefinition);
+    }
+
+    @Override
+    public WhatsAppStore setUgcBotDefinition(byte[] definition) {
+        this.ugcBotDefinition = definition;
+        return this;
+    }
+
+    @Override
+    public Optional<MaibaAIFeaturesControlAction.MaibaAIFeatureStatus> maibaAiFeatureStatus() {
+        return Optional.ofNullable(maibaAiFeatureStatus);
+    }
+
+    @Override
+    public WhatsAppStore setMaibaAiFeatureStatus(MaibaAIFeaturesControlAction.MaibaAIFeatureStatus status) {
+        this.maibaAiFeatureStatus = status;
+        return this;
+    }
+
+    @Override
     public Optional<ChatMute> mentionEveryoneMuteExpiration(Jid chatJid) {
         Objects.requireNonNull(chatJid, "chatJid cannot be null");
         return Optional.ofNullable(mentionEveryoneMuteExpirations.get(chatJid));
@@ -2653,7 +3178,7 @@ public abstract class AbstractWhatsAppStore implements WhatsAppStore {
     }
 
     @ProtobufMessage
-    final static class OrphanMutationEntries {
+    public static final class OrphanMutationEntries {
         @ProtobufProperty(index = 1, type = ProtobufType.MESSAGE)
         final List<OrphanMutationEntry> data;
 
@@ -2662,7 +3187,7 @@ public abstract class AbstractWhatsAppStore implements WhatsAppStore {
         }
 
         OrphanMutationEntries() {
-            this.data = new ArrayList<>();
+            this.data = new CopyOnWriteArrayList<>();
         }
 
         public List<OrphanMutationEntry> data() {

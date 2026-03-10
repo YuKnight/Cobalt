@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.privacy.PrivacySettingDisableLinkPreviewsAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
@@ -45,16 +46,7 @@ public final class DisableLinkPreviewsHandler implements WebAppStateActionHandle
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        if (mutation.operation() != SyncdOperation.SET) {
-            return true;
-        }
-
-        if (!(mutation.value().action().orElse(null) instanceof PrivacySettingDisableLinkPreviewsAction action)) {
-            return false;
-        }
-
-        client.store().setDisableLinkPreviews(action.isPreviewsDisabled());
-        return true;
+        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS;
     }
 
     /**
@@ -66,24 +58,24 @@ public final class DisableLinkPreviewsHandler implements WebAppStateActionHandle
      * persists the accumulated value once.
      */
     @Override
-    public List<Boolean> applyMutationBatch(WhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
+    public List<MutationApplicationResult> applyMutationBatchResults(WhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
         if (mutations.isEmpty()) {
             return List.of();
         }
 
         Boolean lastValid = null;
-        var results = new ArrayList<Boolean>(mutations.size());
+        var results = new ArrayList<MutationApplicationResult>(mutations.size());
         for (var mutation : mutations) {
             if (mutation.operation() != SyncdOperation.SET) {
-                results.add(true);
+                results.add(MutationApplicationResult.unsupported());
                 continue;
             }
 
             if (mutation.value().action().orElse(null) instanceof PrivacySettingDisableLinkPreviewsAction action) {
                 lastValid = action.isPreviewsDisabled();
-                results.add(true);
+                results.add(MutationApplicationResult.success());
             } else {
-                results.add(true);
+                results.add(MutationApplicationResult.malformed());
             }
         }
 
@@ -92,5 +84,19 @@ public final class DisableLinkPreviewsHandler implements WebAppStateActionHandle
         }
 
         return results;
+    }
+
+    @Override
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        if (mutation.operation() != SyncdOperation.SET) {
+            return MutationApplicationResult.unsupported();
+        }
+
+        if (!(mutation.value().action().orElse(null) instanceof PrivacySettingDisableLinkPreviewsAction action)) {
+            return MutationApplicationResult.malformed();
+        }
+
+        client.store().setDisableLinkPreviews(action.isPreviewsDisabled());
+        return MutationApplicationResult.success();
     }
 }

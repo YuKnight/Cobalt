@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.device.AgentAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
@@ -53,18 +54,38 @@ public final class AgentActionHandler implements WebAppStateActionHandler {
      */
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS;
+    }
+
+    @Override
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         var indexArray = JSON.parseArray(mutation.index());
         var agentId = indexArray.getString(1);
         if (agentId == null || agentId.isEmpty()) {
-            return true;
+            return MutationApplicationResult.malformed();
         }
 
-        if (mutation.operation() == SyncdOperation.SET) {
-            if (!(mutation.value().action().orElse(null) instanceof AgentAction)) {
-                return true;
-            }
+        var states = new java.util.HashMap<>(client.store().agentStates());
+        if (mutation.operation() == SyncdOperation.REMOVE) {
+            states.remove(agentId);
+            client.store().setAgentStates(states);
+            return MutationApplicationResult.success();
         }
 
-        return true;
+        if (mutation.operation() != SyncdOperation.SET) {
+            return MutationApplicationResult.unsupported();
+        }
+
+        if (!(mutation.value().action().orElse(null) instanceof AgentAction action)) {
+            return MutationApplicationResult.malformed();
+        }
+
+        if (action.isDeleted()) {
+            states.remove(agentId);
+        } else {
+            states.put(agentId, action);
+        }
+        client.store().setAgentStates(states);
+        return MutationApplicationResult.success();
     }
 }

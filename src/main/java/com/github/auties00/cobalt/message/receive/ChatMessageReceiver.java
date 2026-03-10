@@ -18,6 +18,7 @@ import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
 import com.github.auties00.cobalt.model.message.MessageContainer;
 import com.github.auties00.cobalt.model.message.MessageStatus;
 import com.github.auties00.cobalt.model.message.system.DeviceSentMessage;
+import com.github.auties00.cobalt.model.message.text.HighlyStructuredMessage;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.store.WhatsAppStore;
 
@@ -137,7 +138,7 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
 
         if (container.content() instanceof DeviceSentMessage dsm) {
             effectiveContainer = unwrapDeviceSentMessage(dsm, stanza);
-            chatJid = dsm.destinationJid();
+            chatJid = dsm.destinationJid().orElse(null);
         } else if (shouldHaveDeviceSentMessage(stanza)) {
             throw new WhatsAppMessageException.Receive.InvalidDeviceSentMessage(
                     DsmErrorType.MISSING_DSM);
@@ -614,7 +615,7 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
             throw new WhatsAppMessageException.Receive.InvalidDeviceSentMessage(
                     DsmErrorType.INVALID_DSM);
         }
-        return inner;
+        return inner.get();
     }
 
     /**
@@ -640,7 +641,7 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
 
         var key = new MessageKeyBuilder()
                 .id(stanza.id())
-                .chatJid(chatJid)
+                .parentJid(chatJid)
                 .fromMe(fromMe)
                 .senderJid(senderJid)
                 .build();

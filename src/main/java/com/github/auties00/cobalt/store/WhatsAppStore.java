@@ -34,7 +34,21 @@ import com.github.auties00.cobalt.model.preference.Sticker;
 import com.github.auties00.cobalt.model.privacy.PrivacySettingEntry;
 import com.github.auties00.cobalt.model.privacy.PrivacySettingType;
 import com.github.auties00.cobalt.model.setting.ChatLockSettings;
+import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastCampaignAction;
+import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastInsightsAction;
+import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastListAction;
+import com.github.auties00.cobalt.model.sync.action.bot.MaibaAIFeaturesControlAction;
+import com.github.auties00.cobalt.model.sync.action.business.MarketingMessageAction;
+import com.github.auties00.cobalt.model.sync.action.chat.UsernameChatStartModeAction;
+import com.github.auties00.cobalt.model.sync.action.device.AgentAction;
+import com.github.auties00.cobalt.model.sync.action.payment.CustomPaymentMethod;
+import com.github.auties00.cobalt.model.sync.action.payment.MerchantPaymentPartnerAction;
+import com.github.auties00.cobalt.model.sync.action.payment.PaymentTosAction;
 import com.github.auties00.cobalt.model.sync.action.device.WaffleAccountLinkStateAction;
+import com.github.auties00.cobalt.model.sync.action.media.MusicUserIdAction;
+import com.github.auties00.cobalt.model.sync.action.media.RecentEmojiWeight;
+import com.github.auties00.cobalt.model.sync.action.privacy.PrivateProcessingSettingAction;
+import com.github.auties00.cobalt.model.sync.action.setting.NotificationActivitySettingAction;
 import com.github.auties00.cobalt.model.sync.OrphanMutationEntry;
 import com.github.auties00.cobalt.model.sync.SyncActionEntry;
 import com.github.auties00.cobalt.model.sync.SyncCollectionMetadata;
@@ -819,6 +833,10 @@ public interface WhatsAppStore extends SignalProtocolStore {
 
     WhatsAppStore setWaffleAccountLinkState(WaffleAccountLinkStateAction.AccountLinkState state);
 
+    Optional<Instant> waffleAccountLinkStateTimestamp();
+
+    WhatsAppStore setWaffleAccountLinkStateTimestamp(Instant timestamp);
+
     boolean hostedAutomationOnboarded();
 
     WhatsAppStore setHostedAutomationOnboarded(boolean onboarded);
@@ -1231,6 +1249,13 @@ public interface WhatsAppStore extends SignalProtocolStore {
     void addLabel(Label label);
 
     /**
+     * Returns all labels in the store.
+     *
+     * @return an unmodifiable collection of labels
+     */
+    Collection<Label> labels();
+
+    /**
      * Removes a label from the store.
      *
      * @param labelId the label ID
@@ -1271,6 +1296,13 @@ public interface WhatsAppStore extends SignalProtocolStore {
      *                  this value are removed
      */
     void expireAppStateKeys(Instant threshold);
+
+    /**
+     * Expires all app state sync keys whose derived epoch matches the provided epoch.
+     *
+     * @param epoch the sync key epoch to expire
+     */
+    void expireAppStateKeysByEpoch(int epoch);
 
     /**
      * Finds a hash state by patch type.
@@ -1459,6 +1491,14 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * @param collectionName the collection name
      */
     void removePendingMutations(SyncPatchType collectionName);
+
+    /**
+     * Removes the pending mutations with the specified IDs from a collection.
+     *
+     * @param collectionName the collection name
+     * @param mutationIds the mutation IDs to remove
+     */
+    void removePendingMutations(SyncPatchType collectionName, Collection<String> mutationIds);
 
     /**
      * Clears all pending mutations for a collection.
@@ -2011,6 +2051,164 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * @return this store instance for method chaining
      */
     WhatsAppStore setPrimaryFeatures(List<String> primaryFeatures);
+
+    boolean primaryAllowsAllMutations();
+
+    WhatsAppStore setPrimaryAllowsAllMutations(boolean primaryAllowsAllMutations);
+
+    Map<String, AgentAction> agentStates();
+
+    WhatsAppStore setAgentStates(Map<String, AgentAction> states);
+
+    Map<String, String> chatAssignmentStates();
+
+    WhatsAppStore setChatAssignmentStates(Map<String, String> states);
+
+    Map<String, Boolean> chatAssignmentOpenedStates();
+
+    WhatsAppStore setChatAssignmentOpenedStates(Map<String, Boolean> states);
+
+    Optional<String> paymentInstructionCpi();
+
+    WhatsAppStore setPaymentInstructionCpi(String cpi);
+
+    List<CustomPaymentMethod> customPaymentMethods();
+
+    WhatsAppStore setCustomPaymentMethods(List<CustomPaymentMethod> methods);
+
+    Optional<MerchantPaymentPartnerAction> merchantPaymentPartner();
+
+    WhatsAppStore setMerchantPaymentPartner(MerchantPaymentPartnerAction partner);
+
+    Optional<PaymentTosAction> paymentTos();
+
+    WhatsAppStore setPaymentTos(PaymentTosAction tos);
+
+    Map<String, MarketingMessageAction> marketingMessages();
+
+    WhatsAppStore setMarketingMessages(Map<String, MarketingMessageAction> messages);
+
+    Map<String, String> marketingMessageBroadcasts();
+
+    WhatsAppStore setMarketingMessageBroadcasts(Map<String, String> broadcasts);
+
+    Map<String, BusinessBroadcastListAction> businessBroadcastLists();
+
+    WhatsAppStore setBusinessBroadcastLists(Map<String, BusinessBroadcastListAction> lists);
+
+    Map<String, BusinessBroadcastCampaignAction> businessBroadcastCampaigns();
+
+    WhatsAppStore setBusinessBroadcastCampaigns(Map<String, BusinessBroadcastCampaignAction> campaigns);
+
+    Map<String, BusinessBroadcastInsightsAction> businessBroadcastInsights();
+
+    WhatsAppStore setBusinessBroadcastInsights(Map<String, BusinessBroadcastInsightsAction> insights);
+
+    Optional<byte[]> nctSalt();
+
+    WhatsAppStore setNctSalt(byte[] salt);
+
+    Map<String, Boolean> nuxStates();
+
+    WhatsAppStore setNuxStates(Map<String, Boolean> states);
+
+    Optional<com.github.auties00.cobalt.model.device.DeviceCapabilities> primaryDeviceCapabilities();
+
+    WhatsAppStore setPrimaryDeviceCapabilities(com.github.auties00.cobalt.model.device.DeviceCapabilities capabilities);
+
+    Map<String, com.github.auties00.cobalt.model.device.DeviceCapabilities> deviceCapabilitiesStates();
+
+    WhatsAppStore setDeviceCapabilitiesStates(
+            Map<String, com.github.auties00.cobalt.model.device.DeviceCapabilities> states
+    );
+
+    Map<String, Boolean> shareOwnPnStates();
+
+    WhatsAppStore setShareOwnPnStates(Map<String, Boolean> states);
+
+    Map<String, com.github.auties00.cobalt.model.sync.action.setting.SettingsSyncAction> settingsSyncStates();
+
+    WhatsAppStore setSettingsSyncStates(
+            Map<String, com.github.auties00.cobalt.model.sync.action.setting.SettingsSyncAction> states
+    );
+
+    Map<String, com.github.auties00.cobalt.model.sync.action.chat.InteractiveMessageAction> interactiveMessageStates();
+
+    WhatsAppStore setInteractiveMessageStates(
+            Map<String, com.github.auties00.cobalt.model.sync.action.chat.InteractiveMessageAction> states
+    );
+
+    Map<String, com.github.auties00.cobalt.model.sync.action.media.NoteEditAction> noteStates();
+
+    WhatsAppStore setNoteStates(Map<String, com.github.auties00.cobalt.model.sync.action.media.NoteEditAction> states);
+
+    Map<String, Boolean> groupStatusMuteStates();
+
+    WhatsAppStore setGroupStatusMuteStates(Map<String, Boolean> states);
+
+    Map<String, Instant> newsletterPinStates();
+
+    WhatsAppStore setNewsletterPinStates(Map<String, Instant> states);
+
+    Optional<Boolean> hasAvatar();
+
+    WhatsAppStore setHasAvatar(Boolean hasAvatar);
+
+    Map<String, com.github.auties00.cobalt.model.call.CallLog> callLogStates();
+
+    WhatsAppStore setCallLogStates(Map<String, com.github.auties00.cobalt.model.call.CallLog> states);
+
+    Map<String, Boolean> botWelcomeRequestStates();
+
+    WhatsAppStore setBotWelcomeRequestStates(Map<String, Boolean> states);
+
+    Map<String, String> aiThreadTitles();
+
+    WhatsAppStore setAiThreadTitles(Map<String, String> titles);
+
+    Optional<UsernameChatStartModeAction.ChatStartMode> usernameChatStartMode();
+
+    WhatsAppStore setUsernameChatStartMode(UsernameChatStartModeAction.ChatStartMode mode);
+
+    Optional<NotificationActivitySettingAction.NotificationActivitySetting> notificationActivitySetting();
+
+    WhatsAppStore setNotificationActivitySetting(NotificationActivitySettingAction.NotificationActivitySetting setting);
+
+    List<RecentEmojiWeight> recentEmojiWeights();
+
+    WhatsAppStore setRecentEmojiWeights(List<RecentEmojiWeight> weights);
+
+    Optional<String> wamoUserIdentifier();
+
+    WhatsAppStore setWamoUserIdentifier(String identifier);
+
+    Optional<MusicUserIdAction> musicUserIdState();
+
+    WhatsAppStore setMusicUserIdState(MusicUserIdAction action);
+
+    Optional<String> newsletterSavedInterests();
+
+    WhatsAppStore setNewsletterSavedInterests(String interests);
+
+    Optional<Boolean> statusPostOptInNotificationPreferencesEnabled();
+
+    WhatsAppStore setStatusPostOptInNotificationPreferencesEnabled(Boolean enabled);
+
+    Optional<PrivateProcessingSettingAction.PrivateProcessingStatus> privateProcessingStatus();
+
+    WhatsAppStore setPrivateProcessingStatus(PrivateProcessingSettingAction.PrivateProcessingStatus status);
+
+    Optional<Boolean> channelsPersonalisedRecommendationOptOut();
+
+    WhatsAppStore setChannelsPersonalisedRecommendationOptOut(Boolean optOut);
+
+    Optional<byte[]> ugcBotDefinition();
+
+    WhatsAppStore setUgcBotDefinition(byte[] definition);
+
+    Optional<MaibaAIFeaturesControlAction.MaibaAIFeatureStatus> maibaAiFeatureStatus();
+
+    WhatsAppStore setMaibaAiFeatureStatus(MaibaAIFeaturesControlAction.MaibaAIFeatureStatus status);
 
     /**
      * Returns the mention-everyone mute expiration for a chat.

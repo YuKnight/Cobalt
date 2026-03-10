@@ -43,7 +43,7 @@ public sealed class WhatsAppClientBuilder {
      * @return a non-null web client instance
      */
     public Client.Web webClient() {
-        return new Client.Web(WhatsAppStoreFactory.toProtobuf());
+        return new Client.Web(WhatsAppStoreFactory.inMemory());
     }
 
     /**
@@ -64,7 +64,7 @@ public sealed class WhatsAppClientBuilder {
      * @return a non-null mobile client instance
      */
     public Client.Mobile mobileClient() {
-        return new Client.Mobile(WhatsAppStoreFactory.toProtobuf());
+        return new Client.Mobile(WhatsAppStoreFactory.inMemory());
     }
 
     /**
@@ -109,7 +109,7 @@ public sealed class WhatsAppClientBuilder {
          * @return a non-null options selector
          * @throws NullPointerException if sixParts is null
          */
-        public abstract Optional<? extends Options> loadConnection(WhatsAppClientSixPartsKeys sixParts);
+        public abstract Optional<? extends Options> loadConnection(WhatsAppClientSixPartsKeys sixParts) throws IOException;
 
         /**
          * Loads the last serialized connection.
@@ -117,7 +117,7 @@ public sealed class WhatsAppClientBuilder {
          *
          * @return an {@link Optional} containing the last serialized connection, empty otherwise
          */
-        public abstract Optional<Options> loadLatestConnection();
+        public abstract Optional<Options> loadLatestConnection() throws IOException;
 
         /**
          * Loads the last serialized connection.
@@ -134,7 +134,7 @@ public sealed class WhatsAppClientBuilder {
          * @param uuid the id to use for the connection; can be null
          * @return an {@link Optional} containing the connection whose id matches {@code uuid}, empty otherwise
          */
-        public abstract Optional<? extends Options> loadConnection(UUID uuid);
+        public abstract Optional<? extends Options> loadConnection(UUID uuid) throws IOException;
 
         /**
          * Loads the connection whose id matches {@code uuid}.
@@ -152,7 +152,7 @@ public sealed class WhatsAppClientBuilder {
          * @param phoneNumber the phone value to use to create the connection, can be null (will generate a random UUID)
          * @return a non-null options selector
          */
-        public abstract Optional<? extends Options> loadConnection(Long phoneNumber);
+        public abstract Optional<? extends Options> loadConnection(Long phoneNumber) throws IOException;
 
         /**
          * Loads the connection whose id matches {@code phoneNumber}.
@@ -185,7 +185,7 @@ public sealed class WhatsAppClientBuilder {
             }
 
             @Override
-            public Optional<Options> loadConnection(UUID uuid) {
+            public Optional<Options> loadConnection(UUID uuid) throws IOException {
                 if (uuid == null) {
                     return Optional.empty();
                 }
@@ -216,7 +216,7 @@ public sealed class WhatsAppClientBuilder {
             }
 
             @Override
-            public Optional<Options> loadConnection(Long phoneNumber) {
+            public Optional<Options> loadConnection(Long phoneNumber) throws IOException {
                 if (phoneNumber == null) {
                     return Optional.empty();
                 }
@@ -247,7 +247,7 @@ public sealed class WhatsAppClientBuilder {
             }
             
             @Override
-            public Optional<Options.Web> loadConnection(WhatsAppClientSixPartsKeys sixParts) {
+            public Optional<Options.Web> loadConnection(WhatsAppClientSixPartsKeys sixParts) throws IOException {
                 if (sixParts == null) {
                     return Optional.empty();
                 }
@@ -262,7 +262,7 @@ public sealed class WhatsAppClientBuilder {
             }
 
             @Override
-            public Optional<Options> loadLatestConnection() {
+            public Optional<Options> loadLatestConnection() throws IOException {
                 var store = factory.loadLatest(WhatsAppClientType.WEB);
                 if (store.isEmpty()) {
                     return Optional.empty();
@@ -295,7 +295,7 @@ public sealed class WhatsAppClientBuilder {
             }
 
             @Override
-            public Optional<Options> loadConnection(UUID uuid) {
+            public Optional<Options> loadConnection(UUID uuid) throws IOException {
                 if (uuid == null) {
                     return Optional.empty();
                 }
@@ -326,7 +326,7 @@ public sealed class WhatsAppClientBuilder {
             }
 
             @Override
-            public Optional<Options> loadConnection(Long phoneNumber) {
+            public Optional<Options> loadConnection(Long phoneNumber) throws IOException {
                 if (phoneNumber == null) {
                     return Optional.empty();
                 }
@@ -357,7 +357,7 @@ public sealed class WhatsAppClientBuilder {
             }
 
             @Override
-            public Optional<Options.Mobile> loadConnection(WhatsAppClientSixPartsKeys sixParts) {
+            public Optional<Options.Mobile> loadConnection(WhatsAppClientSixPartsKeys sixParts) throws IOException {
                 if (sixParts == null) {
                     return Optional.empty();
                 }
@@ -372,7 +372,7 @@ public sealed class WhatsAppClientBuilder {
             }
 
             @Override
-            public Optional<Options> loadLatestConnection() {
+            public Optional<Options> loadLatestConnection() throws IOException {
                 var store = factory.loadLatest(WhatsAppClientType.MOBILE);
                 if (store.isEmpty()) {
                     return Optional.empty();

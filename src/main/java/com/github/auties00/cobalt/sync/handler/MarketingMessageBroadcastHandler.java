@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.business.MarketingMessageBroadcastAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
@@ -56,18 +57,30 @@ public final class MarketingMessageBroadcastHandler implements WebAppStateAction
      */
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS;
+    }
+
+    @Override
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         var indexArray = JSON.parseArray(mutation.index());
         var premiumMessageId = indexArray.getString(1);
         var messageId = indexArray.getString(2);
         if (premiumMessageId == null || premiumMessageId.isEmpty()
                 || messageId == null || messageId.isEmpty()) {
-            return true;
+            return MutationApplicationResult.malformed();
         }
 
         if (mutation.operation() != SyncdOperation.SET) {
-            return true;
+            return MutationApplicationResult.unsupported();
         }
 
-        return false;
+        if (!client.store().marketingMessages().containsKey(premiumMessageId)) {
+            return MutationApplicationResult.orphan(premiumMessageId, "MarketingMessage");
+        }
+
+        var broadcasts = new java.util.HashMap<>(client.store().marketingMessageBroadcasts());
+        broadcasts.put(messageId, premiumMessageId);
+        client.store().setMarketingMessageBroadcasts(broadcasts);
+        return MutationApplicationResult.success();
     }
 }

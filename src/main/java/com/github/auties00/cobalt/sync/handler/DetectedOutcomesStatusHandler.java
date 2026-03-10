@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.setting.DetectedOutcomesStatusAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
@@ -42,15 +43,20 @@ public final class DetectedOutcomesStatusHandler implements WebAppStateActionHan
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS;
+    }
+
+    @Override
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
-            return true;
+            return MutationApplicationResult.unsupported();
         }
 
         if (!(mutation.value().action().orElse(null) instanceof DetectedOutcomesStatusAction action)) {
-            return true;
+            return MutationApplicationResult.malformed();
         }
 
         client.store().setDetectedOutcomesEnabled(action.isEnabled());
-        return true;
+        return MutationApplicationResult.success();
     }
 }

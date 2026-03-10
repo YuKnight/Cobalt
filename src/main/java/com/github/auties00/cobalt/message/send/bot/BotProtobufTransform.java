@@ -45,7 +45,7 @@ public final class BotProtobufTransform {
      */
     public void transformForCapi(MessageContainer container, byte[] botMessageSecret) {
         // Replace messageSecret with botMessageSecret
-        container.deviceInfo().ifPresent(info -> {
+        container.messageContextInfo().ifPresent(info -> {
             info.setMessageSecret(null);
             info.setBotMessageSecret(botMessageSecret);
         });
@@ -71,7 +71,9 @@ public final class BotProtobufTransform {
             return;
         }
 
-        var participant = contextInfo.quotedMessageSenderJid().orElse(null);
+        var participant = contextInfo.quotedMessage()
+                .map(quotedMessage -> store.findMessageById(quotedMessage))
+                .orElse(null);
         if (participant == null || participant.hasBotServer()) {
             return;
         }

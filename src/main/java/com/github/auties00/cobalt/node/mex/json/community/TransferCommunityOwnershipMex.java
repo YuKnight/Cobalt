@@ -1,12 +1,15 @@
 package com.github.auties00.cobalt.node.mex.json.community;
 
 import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.node.mex.json.MexJsonOperation;
 import com.github.auties00.cobalt.node.Node;
+import com.github.auties00.cobalt.node.NodeBuilder;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.io.UncheckedIOException;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -34,17 +37,19 @@ public sealed interface TransferCommunityOwnershipMex extends MexJsonOperation p
         /**
          * Builds the MEX IQ stanza for this request.
          *
-         * @return the IQ {@link Node} ready to be sent
+         * @return the IQ {@link NodeBuilder} ready to be sent
          */
-        public Node toNode() {
+        public NodeBuilder toNode() {
             try (var writer = JSONWriter.ofUTF8()) {
                 writer.startObject();
                 writer.writeName("variables");
                 writer.writeColon();
                 writer.startObject();
-                writer.writeName("input");
-                writer.writeColon();
-                writer.writeString(input);
+                if (input != null) {
+                    writer.writeName("input");
+                    writer.writeColon();
+                    writer.writeString(input);
+                }
                 writer.endObject();
                 writer.endObject();
                 try (var output = new StringWriter()) {
@@ -62,11 +67,11 @@ public sealed interface TransferCommunityOwnershipMex extends MexJsonOperation p
      */
     final class Response implements TransferCommunityOwnershipMex {
         private final String groupId;
-        private final String lidMigrationStateAddressingMode;
+        private final LidMigrationState lidMigrationState;
 
-        private Response(String groupId, String lidMigrationStateAddressingMode) {
+        private Response(String groupId, LidMigrationState lidMigrationState) {
             this.groupId = groupId;
-            this.lidMigrationStateAddressingMode = lidMigrationStateAddressingMode;
+            this.lidMigrationState = lidMigrationState;
         }
 
         /**
@@ -78,7 +83,7 @@ public sealed interface TransferCommunityOwnershipMex extends MexJsonOperation p
         public static Optional<Response> of(Node node) {
             return node.getChild("result")
                     .flatMap(Node::toContentBytes)
-                    .flatMap(Response::parse);
+                    .flatMap(Response::of);
         }
 
         /**
@@ -91,15 +96,68 @@ public sealed interface TransferCommunityOwnershipMex extends MexJsonOperation p
         }
 
         /**
-         * Returns the {@code lid_migration_state.addressing_mode} field.
+         * Returns the {@code lid_migration_state} field.
          *
          * @return an {@link Optional} containing the value, or empty if absent
          */
-        public Optional<String> lidMigrationStateAddressingMode() {
-            return Optional.ofNullable(lidMigrationStateAddressingMode);
+        public Optional<LidMigrationState> lidMigrationState() {
+            return Optional.ofNullable(lidMigrationState);
         }
 
-        private static Optional<Response> parse(byte[] json) {
+        /**
+         * A parsed {@code LidMigrationState} object.
+         */
+        public static final class LidMigrationState {
+            private final String addressingMode;
+
+            private LidMigrationState(String addressingMode) {
+                this.addressingMode = addressingMode;
+            }
+
+            /**
+             * Returns the {@code addressing_mode} field.
+             *
+             * @return an {@link Optional} containing the value, or empty if absent
+             */
+            public Optional<String> addressingMode() {
+                return Optional.ofNullable(addressingMode);
+            }
+
+            /**
+             * Parses a {@code LidMigrationState} from the given JSON object.
+             *
+             * @param obj the JSON object to parse
+             * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+             */
+            static Optional<LidMigrationState> of(JSONObject obj) {
+                if (obj == null) {
+                    return Optional.empty();
+                }
+
+                var addressingMode = obj.getString("addressing_mode");
+                return Optional.of(new LidMigrationState(addressingMode));
+            }
+
+            /**
+             * Parses a list of {@code LidMigrationState} from the given JSON array.
+             *
+             * @param arr the JSON array to parse
+             * @return the list of parsed results, empty if {@code arr} is {@code null}
+             */
+            static List<LidMigrationState> ofArray(JSONArray arr) {
+                if (arr == null) {
+                    return List.of();
+                }
+
+                var result = new ArrayList<LidMigrationState>(arr.size());
+                for (int i = 0; i < arr.size(); i++) {
+                    of(arr.getJSONObject(i)).ifPresent(result::add);
+                }
+                return result;
+            }
+        }
+
+        private static Optional<Response> of(byte[] json) {
             var jsonObject = JSON.parseObject(json);
             if (jsonObject == null) {
                 return Optional.empty();
@@ -116,10 +174,9 @@ public sealed interface TransferCommunityOwnershipMex extends MexJsonOperation p
             }
 
             var groupId = root.getString("group_id");
-            var lidMigrationState = root.getJSONObject("lid_migration_state");
-            var lidMigrationStateAddressingMode = lidMigrationState != null ? lidMigrationState.getString("addressing_mode") : null;
+            var lidMigrationState = LidMigrationState.of(root.getJSONObject("lid_migration_state")).orElse(null);
 
-            return Optional.of(new Response(groupId, lidMigrationStateAddressingMode));
+            return Optional.of(new Response(groupId, lidMigrationState));
         }
     }
 }

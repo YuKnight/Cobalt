@@ -4,9 +4,11 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.node.mex.json.MexJsonOperation;
 import com.github.auties00.cobalt.node.Node;
+import com.github.auties00.cobalt.node.NodeBuilder;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.io.UncheckedIOException;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -32,9 +34,9 @@ public sealed interface FetchReachoutTimelockMex extends MexJsonOperation permit
         /**
          * Builds the MEX IQ stanza for this request.
          *
-         * @return the IQ {@link Node} ready to be sent
+         * @return the IQ {@link NodeBuilder} ready to be sent
          */
-        public Node toNode() {
+        public NodeBuilder toNode() {
             try (var writer = JSONWriter.ofUTF8()) {
                 writer.startObject();
                 writer.writeName("variables");
@@ -56,11 +58,11 @@ public sealed interface FetchReachoutTimelockMex extends MexJsonOperation permit
      * The parsed response for this MEX query.
      */
     final class Response implements FetchReachoutTimelockMex {
-        private final String isActive;
+        private final Boolean isActive;
         private final String timeEnforcementEnds;
         private final String enforcementType;
 
-        private Response(String isActive, String timeEnforcementEnds, String enforcementType) {
+        private Response(Boolean isActive, String timeEnforcementEnds, String enforcementType) {
             this.isActive = isActive;
             this.timeEnforcementEnds = timeEnforcementEnds;
             this.enforcementType = enforcementType;
@@ -75,16 +77,16 @@ public sealed interface FetchReachoutTimelockMex extends MexJsonOperation permit
         public static Optional<Response> of(Node node) {
             return node.getChild("result")
                     .flatMap(Node::toContentBytes)
-                    .flatMap(Response::parse);
+                    .flatMap(Response::of);
         }
 
         /**
          * Returns the {@code is_active} field.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+         * @return {@code true} if the value is present and true, {@code false} otherwise
          */
-        public Optional<String> isActive() {
-            return Optional.ofNullable(isActive);
+        public boolean isActive() {
+            return isActive != null && isActive;
         }
 
         /**
@@ -105,7 +107,7 @@ public sealed interface FetchReachoutTimelockMex extends MexJsonOperation permit
             return Optional.ofNullable(enforcementType);
         }
 
-        private static Optional<Response> parse(byte[] json) {
+        private static Optional<Response> of(byte[] json) {
             var jsonObject = JSON.parseObject(json);
             if (jsonObject == null) {
                 return Optional.empty();
@@ -121,7 +123,7 @@ public sealed interface FetchReachoutTimelockMex extends MexJsonOperation permit
                 return Optional.empty();
             }
 
-            var isActive = root.getString("is_active");
+            var isActive = root.getBoolean("is_active");
             var timeEnforcementEnds = root.getString("time_enforcement_ends");
             var enforcementType = root.getString("enforcement_type");
 

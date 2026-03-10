@@ -3,6 +3,7 @@ package com.github.auties00.cobalt.sync.handler;
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.contact.ContactAction;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
@@ -39,21 +40,25 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS;
+    }
+
+    @Override
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (!(mutation.value().action().orElse(null) instanceof ContactAction action)) {
-            return false;
+            return MutationApplicationResult.malformed();
         }
 
         var indexArray = JSON.parseArray(mutation.index());
         var contactJidString = indexArray.getString(1);
         if (contactJidString == null || contactJidString.isEmpty()) {
-            return false;
+            return MutationApplicationResult.malformed();
         }
 
         var contactJid = Jid.of(contactJidString);
 
-        // Web skips LID contacts in the regular contact sync handler
         if (contactJid.hasLidServer()) {
-            return true;
+            return MutationApplicationResult.skipped();
         }
 
         switch (mutation.operation()) {
@@ -61,10 +66,8 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
                 var contact = client.store()
                         .findContactByJid(contactJid)
                         .orElseGet(() -> client.store().addNewContact(contactJid));
-                // Web: fullName ?? "" (coalesces absent to empty string)
                 var fullName = action.fullName().orElse("");
                 contact.setFullName(fullName);
-                // Web: firstName ?? getShortName(fullName) ?? ""
                 var shortName = action.firstName()
                         .orElseGet(() -> deriveShortName(fullName));
                 contact.setShortName(shortName);
@@ -73,21 +76,21 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
                     contact.setLid(lid);
                     client.store().registerLidMapping(contactJid, lid);
                 });
+                return MutationApplicationResult.success();
             }
             case REMOVE -> {
-                // Web: setNotMyContact() clears name, shortName, sets type
-                // to "out", and sets isUsernameContact to false
-                var contact = client.store()
-                        .findContactByJid(contactJid);
+                var contact = client.store().findContactByJid(contactJid);
                 if (contact.isPresent()) {
                     contact.get().setFullName(null);
                     contact.get().setShortName(null);
                     contact.get().setUsername(null);
                 }
+                return MutationApplicationResult.success();
+            }
+            default -> {
+                return MutationApplicationResult.unsupported();
             }
         }
-
-        return true;
     }
 
     /**

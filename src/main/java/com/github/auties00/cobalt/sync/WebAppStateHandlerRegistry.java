@@ -35,7 +35,6 @@ public final class WebAppStateHandlerRegistry {
         // Contact actions
         registerHandler(ContactActionHandler.INSTANCE);
         registerHandler(LidContactHandler.INSTANCE);
-        registerHandler(OutContactHandler.INSTANCE);
         registerHandler(PnForLidChatHandler.INSTANCE);
         registerHandler(ShareOwnPnHandler.INSTANCE);
 
@@ -47,12 +46,12 @@ public final class WebAppStateHandlerRegistry {
         // Business actions
         registerHandler(QuickReplyHandler.INSTANCE);
         registerHandler(AgentActionHandler.INSTANCE);
-        registerHandler(SubscriptionHandler.INSTANCE);
         registerHandler(ChatAssignmentHandler.INSTANCE);
         registerHandler(ChatAssignmentOpenedStatusHandler.INSTANCE);
         registerHandler(MarketingMessageHandler.INSTANCE);
         registerHandler(MarketingMessageBroadcastHandler.INSTANCE);
         registerHandler(BusinessBroadcastListHandler.INSTANCE);
+        registerHandler(BusinessBroadcastAssociationHandler.INSTANCE);
         registerHandler(BusinessBroadcastCampaignHandler.INSTANCE);
         registerHandler(BusinessBroadcastInsightsHandler.INSTANCE);
         registerHandler(MerchantPaymentPartnerHandler.INSTANCE);
@@ -61,11 +60,16 @@ public final class WebAppStateHandlerRegistry {
         // Sticker and avatar actions
         registerHandler(FavoriteStickerHandler.INSTANCE);
         registerHandler(RemoveRecentStickerHandler.INSTANCE);
+        registerHandler(RecentEmojiWeightsHandler.INSTANCE);
         registerHandler(AvatarUpdatedHandler.INSTANCE);
+        registerHandler(MusicUserIdHandler.INSTANCE);
+        registerHandler(NewsletterSavedInterestsHandler.INSTANCE);
 
         // AI actions
         registerHandler(AiThreadDeleteHandler.INSTANCE);
         registerHandler(AiThreadRenameHandler.INSTANCE);
+        registerHandler(MaibaAIFeaturesControlHandler.INSTANCE);
+        registerHandler(UGCBotHandler.INSTANCE);
 
         // Payment actions
         registerHandler(PaymentInfoHandler.INSTANCE);
@@ -76,6 +80,10 @@ public final class WebAppStateHandlerRegistry {
         registerHandler(UserStatusMuteHandler.INSTANCE);
         registerHandler(TimeFormatHandler.INSTANCE);
         registerHandler(FavoritesHandler.INSTANCE);
+        registerHandler(SubscriptionHandler.INSTANCE);
+        registerHandler(StatusPostOptInNotificationPreferencesHandler.INSTANCE);
+        registerHandler(NotificationActivitySettingHandler.INSTANCE);
+        registerHandler(WamoUserIdentifierHandler.INSTANCE);
 
         // System actions
         registerHandler(NuxActionHandler.INSTANCE);
@@ -94,6 +102,8 @@ public final class WebAppStateHandlerRegistry {
         registerHandler(LocaleSettingHandler.INSTANCE);
         registerHandler(UnarchiveChatsSettingHandler.INSTANCE);
         registerHandler(StatusPrivacyHandler.INSTANCE);
+        registerHandler(PrivacySettingChannelsPersonalisedRecommendationHandler.INSTANCE);
+        registerHandler(PrivateProcessingSettingHandler.INSTANCE);
         registerHandler(DisableLinkPreviewsHandler.INSTANCE);
         registerHandler(VoipRelayAllCallsHandler.INSTANCE);
         registerHandler(ChatLockSettingsHandler.INSTANCE);
@@ -101,6 +111,9 @@ public final class WebAppStateHandlerRegistry {
         registerHandler(SettingsSyncHandler.INSTANCE);
         registerHandler(NctSaltSyncHandler.INSTANCE);
         registerHandler(CallLogHandler.INSTANCE);
+        registerHandler(DeleteIndividualCallLogHandler.INSTANCE);
+        registerHandler(UsernameChatStartModeHandler.INSTANCE);
+        registerHandler(OutContactHandler.INSTANCE);
     }
 
     public void registerHandler(WebAppStateActionHandler handler) {

@@ -1,6 +1,9 @@
 package com.github.auties00.cobalt.model.device;
 
 import com.github.auties00.cobalt.model.mixin.InstantSecondsMixin;
+import com.github.auties00.cobalt.model.sync.SyncAction;
+import com.github.auties00.cobalt.model.sync.SyncActionEmptyArgs;
+import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import it.auties.protobuf.annotation.ProtobufEnum;
 import it.auties.protobuf.annotation.ProtobufEnumIndex;
 import it.auties.protobuf.annotation.ProtobufMessage;
@@ -11,7 +14,21 @@ import java.time.Instant;
 import java.util.Optional;
 
 @ProtobufMessage(name = "DeviceCapabilities")
-public final class DeviceCapabilities {
+public final class DeviceCapabilities implements SyncAction<SyncActionEmptyArgs> {
+    public static final String ACTION_NAME = "device_capabilities";
+    public static final int ACTION_VERSION = 7;
+    public static final SyncPatchType COLLECTION_NAME = SyncPatchType.REGULAR_LOW;
+
+    @Override
+    public String actionName() {
+        return ACTION_NAME;
+    }
+
+    @Override
+    public int actionVersion() {
+        return ACTION_VERSION;
+    }
+
     @ProtobufProperty(index = 1, type = ProtobufType.ENUM)
     ChatLockSupportLevel chatLockSupportLevel;
 

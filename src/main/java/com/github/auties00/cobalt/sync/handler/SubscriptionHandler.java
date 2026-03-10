@@ -1,19 +1,13 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.device.SubscriptionAction;
+import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
-/**
- * Handles subscription actions.
- *
- * <p>Index format: ["subscription"]
- */
 public final class SubscriptionHandler implements WebAppStateActionHandler {
-    /**
-     * The singleton instance of {@code SubscriptionHandler}.
-     */
     public static final SubscriptionHandler INSTANCE = new SubscriptionHandler();
 
     private SubscriptionHandler() {
@@ -37,14 +31,29 @@ public final class SubscriptionHandler implements WebAppStateActionHandler {
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        if (!(mutation.value().action().orElse(null) instanceof SubscriptionAction action)) {
-            return true;
+        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS;
+    }
+
+    @Override
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        if (mutation.operation() == SyncdOperation.REMOVE) {
+            client.store().setSubscriptionDeactivated(false);
+            client.store().setSubscriptionAutoRenewing(false);
+            client.store().setSubscriptionExpirationDate(null);
+            return MutationApplicationResult.success();
         }
 
-        client.store()
-                .setSubscriptionDeactivated(action.isDeactivated())
-                .setSubscriptionAutoRenewing(action.isAutoRenewing())
-                .setSubscriptionExpirationDate(action.expirationDate().isPresent() ? action.expirationDate().getAsLong() : null);
-        return true;
+        if (mutation.operation() != SyncdOperation.SET) {
+            return MutationApplicationResult.unsupported();
+        }
+
+        if (!(mutation.value().action().orElse(null) instanceof SubscriptionAction action)) {
+            return MutationApplicationResult.malformed();
+        }
+
+        client.store().setSubscriptionDeactivated(action.isDeactivated());
+        client.store().setSubscriptionAutoRenewing(action.isAutoRenewing());
+        client.store().setSubscriptionExpirationDate(action.expirationDate().isPresent() ? action.expirationDate().getAsLong() : null);
+        return MutationApplicationResult.success();
     }
 }

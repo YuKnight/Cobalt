@@ -1,12 +1,18 @@
 package com.github.auties00.cobalt.node.mex.json.newsletter;
 
 import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONArray;
+import com.alibaba.fastjson2.JSONObject;
 import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.node.mex.json.MexJsonOperation;
 import com.github.auties00.cobalt.node.Node;
+import com.github.auties00.cobalt.node.NodeBuilder;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.io.UncheckedIOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -34,17 +40,19 @@ public sealed interface FetchNewsletterIsDomainPreviewableMex extends MexJsonOpe
         /**
          * Builds the MEX IQ stanza for this request.
          *
-         * @return the IQ {@link Node} ready to be sent
+         * @return the IQ {@link NodeBuilder} ready to be sent
          */
-        public Node toNode() {
+        public NodeBuilder toNode() {
             try (var writer = JSONWriter.ofUTF8()) {
                 writer.startObject();
                 writer.writeName("variables");
                 writer.writeColon();
                 writer.startObject();
-                writer.writeName("url_domains");
-                writer.writeColon();
-                writer.writeString(urlDomains);
+                if (urlDomains != null) {
+                    writer.writeName("url_domains");
+                    writer.writeColon();
+                    writer.writeString(urlDomains);
+                }
                 writer.endObject();
                 writer.endObject();
                 try (var output = new StringWriter()) {
@@ -61,8 +69,10 @@ public sealed interface FetchNewsletterIsDomainPreviewableMex extends MexJsonOpe
      * The parsed response for this MEX query.
      */
     final class Response implements FetchNewsletterIsDomainPreviewableMex {
+        private final List<UrlPreviews> urlPreviews;
 
-        private Response() {
+        private Response(List<UrlPreviews> urlPreviews) {
+            this.urlPreviews = urlPreviews;
         }
 
         /**
@@ -74,10 +84,84 @@ public sealed interface FetchNewsletterIsDomainPreviewableMex extends MexJsonOpe
         public static Optional<Response> of(Node node) {
             return node.getChild("result")
                     .flatMap(Node::toContentBytes)
-                    .flatMap(Response::parse);
+                    .flatMap(Response::of);
         }
 
-        private static Optional<Response> parse(byte[] json) {
+        /**
+         * Returns the {@code url_previews} field.
+         *
+         * @return the list of values, empty if absent
+         */
+        public List<UrlPreviews> urlPreviews() {
+            return urlPreviews;
+        }
+
+        /**
+         * A parsed {@code UrlPreviews} object.
+         */
+        public static final class UrlPreviews {
+            private final String urlDomain;
+            private final Boolean isPreviewable;
+
+            private UrlPreviews(String urlDomain, Boolean isPreviewable) {
+                this.urlDomain = urlDomain;
+                this.isPreviewable = isPreviewable;
+            }
+
+            /**
+             * Returns the {@code url_domain} field.
+             *
+             * @return an {@link Optional} containing the value, or empty if absent
+             */
+            public Optional<String> urlDomain() {
+                return Optional.ofNullable(urlDomain);
+            }
+
+            /**
+             * Returns the {@code is_previewable} field.
+             *
+             * @return {@code true} if the value is present and true, {@code false} otherwise
+             */
+            public boolean isPreviewable() {
+                return isPreviewable != null && isPreviewable;
+            }
+
+            /**
+             * Parses a {@code UrlPreviews} from the given JSON object.
+             *
+             * @param obj the JSON object to parse
+             * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+             */
+            static Optional<UrlPreviews> of(JSONObject obj) {
+                if (obj == null) {
+                    return Optional.empty();
+                }
+
+                var urlDomain = obj.getString("url_domain");
+                var isPreviewable = obj.getBoolean("is_previewable");
+                return Optional.of(new UrlPreviews(urlDomain, isPreviewable));
+            }
+
+            /**
+             * Parses a list of {@code UrlPreviews} from the given JSON array.
+             *
+             * @param arr the JSON array to parse
+             * @return the list of parsed results, empty if {@code arr} is {@code null}
+             */
+            static List<UrlPreviews> ofArray(JSONArray arr) {
+                if (arr == null) {
+                    return List.of();
+                }
+
+                var result = new ArrayList<UrlPreviews>(arr.size());
+                for (int i = 0; i < arr.size(); i++) {
+                    of(arr.getJSONObject(i)).ifPresent(result::add);
+                }
+                return result;
+            }
+        }
+
+        private static Optional<Response> of(byte[] json) {
             var jsonObject = JSON.parseObject(json);
             if (jsonObject == null) {
                 return Optional.empty();
@@ -88,12 +172,14 @@ public sealed interface FetchNewsletterIsDomainPreviewableMex extends MexJsonOpe
                 return Optional.empty();
             }
 
-            var root = data.get("xwa2_newsletter_message_integrity");
+            var root = data.getJSONObject("xwa2_newsletter_message_integrity");
             if (root == null) {
                 return Optional.empty();
             }
 
-            return Optional.of(new Response());
+            var urlPreviews = UrlPreviews.ofArray(root.getJSONArray("url_previews"));
+
+            return Optional.of(new Response(urlPreviews));
         }
     }
 }

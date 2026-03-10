@@ -3,6 +3,7 @@ package com.github.auties00.cobalt.sync.handler;
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.chat.ChatAssignmentOpenedStatusAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
@@ -43,27 +44,40 @@ public final class ChatAssignmentOpenedStatusHandler implements WebAppStateActio
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS;
+    }
+
+    @Override
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         var indexArray = JSON.parseArray(mutation.index());
         var chatJidString = indexArray.getString(1);
         var agentId = indexArray.getString(2);
         if (chatJidString == null || agentId == null) {
-            return true;
+            return MutationApplicationResult.malformed();
         }
 
         if (mutation.operation() != SyncdOperation.SET) {
-            return true;
+            return MutationApplicationResult.unsupported();
         }
 
         var chatJid = Jid.of(chatJidString);
         var chat = client.store().findChatByJid(chatJid);
         if (chat.isEmpty()) {
-            return false;
+            return MutationApplicationResult.orphan(chatJidString, "Chat");
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof ChatAssignmentOpenedStatusAction)) {
-            return true;
+        if (!(mutation.value().action().orElse(null) instanceof ChatAssignmentOpenedStatusAction action)) {
+            return MutationApplicationResult.malformed();
         }
 
-        return true;
+        var assignmentKey = chat.get().toJid().toString();
+        if (!agentId.equals(client.store().chatAssignmentStates().get(assignmentKey))) {
+            return MutationApplicationResult.orphan(assignmentKey + "_" + agentId, "ChatAssignment");
+        }
+
+        var states = new java.util.HashMap<>(client.store().chatAssignmentOpenedStates());
+        states.put(assignmentKey + "_" + agentId, action.chatOpened());
+        client.store().setChatAssignmentOpenedStates(states);
+        return MutationApplicationResult.success();
     }
 }

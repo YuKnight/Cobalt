@@ -3,6 +3,7 @@ package com.github.auties00.cobalt.sync.handler;
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.contact.UserStatusMuteAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
@@ -10,10 +11,6 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 /**
  * Handles user status mute actions.
- *
- * <p>This handler processes mutations that mute or unmute a contact's status updates.
- *
- * <p>Index format: ["userStatusMuteAction", "userJid"]
  */
 public final class UserStatusMuteHandler implements WebAppStateActionHandler {
     public static final UserStatusMuteHandler INSTANCE = new UserStatusMuteHandler();
@@ -39,34 +36,38 @@ public final class UserStatusMuteHandler implements WebAppStateActionHandler {
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        // Web: only SET is supported; non-SET returns Unsupported
+        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS;
+    }
+
+    @Override
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
-            return true;
+            return MutationApplicationResult.unsupported();
         }
 
         if (!(mutation.value().action().orElse(null) instanceof UserStatusMuteAction action)) {
-            return false;
+            return MutationApplicationResult.malformed();
         }
 
-        var indexArray = JSON.parseArray(mutation.index());
-        var userJidString = indexArray.getString(1);
+        var userJidString = JSON.parseArray(mutation.index()).getString(1);
+        if (userJidString == null || userJidString.isEmpty()) {
+            return MutationApplicationResult.malformed();
+        }
+
         var userJid = Jid.of(userJidString);
-
-        // Web: handles both user contacts and group metadata.
-        // Group status mute (muting a group's status updates) is stored in
-        // the group metadata table; we acknowledge it without acting since
-        // our Chat model does not track per-group status mute.
         if (userJid.hasGroupServer()) {
-            return true;
+            var states = new java.util.HashMap<>(client.store().groupStatusMuteStates());
+            states.put(userJidString, action.muted());
+            client.store().setGroupStatusMuteStates(states);
+            return MutationApplicationResult.success();
         }
 
-        // Web: returns Orphan if contact not found (does NOT create a new contact)
         var contact = client.store().findContactByJid(userJid);
         if (contact.isEmpty()) {
-            return false;
+            return MutationApplicationResult.orphan(userJidString, "UserStatusMute");
         }
-        contact.get().setStatusMuted(action.muted());
 
-        return true;
+        contact.get().setStatusMuted(action.muted());
+        return MutationApplicationResult.success();
     }
 }

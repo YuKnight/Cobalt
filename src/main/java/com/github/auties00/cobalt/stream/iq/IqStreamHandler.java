@@ -3,6 +3,8 @@ package com.github.auties00.cobalt.stream.iq;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.client.WhatsAppClientVerificationHandler;
 import com.github.auties00.cobalt.device.DeviceService;
+import com.github.auties00.cobalt.model.device.pairing.ClientPairingProps;
+import com.github.auties00.cobalt.model.device.pairing.ClientPairingPropsSpec;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
@@ -10,6 +12,7 @@ import com.github.auties00.cobalt.stream.SocketStream;
 import com.github.auties00.cobalt.util.FastRandomUtils;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashSet;
 import java.util.Objects;
@@ -209,6 +212,8 @@ public final class IqStreamHandler implements SocketStream.Handler {
                     }
                 });
 
+        extractPairingProps(pairSuccess)
+                .ifPresent(props -> store.setPrimaryDeviceSupportsSyncdRecovery(props.isSyncdSnapshotRecoveryEnabled()));
         store.setRegistered(true);
         store.setOnline(true);
         safeSave("pair-success");
@@ -244,6 +249,30 @@ public final class IqStreamHandler implements SocketStream.Handler {
                     return Optional.of(parsed);
                 }
             } catch (RuntimeException ignored) {
+            }
+        }
+
+        return Optional.empty();
+    }
+
+    private Optional<ClientPairingProps> extractPairingProps(Node pairSuccess) {
+        var candidates = new ArrayList<Node>();
+        candidates.add(pairSuccess);
+        for (var child : pairSuccess.children()) {
+            if ("props".equals(child.description())) {
+                candidates.add(child);
+            }
+        }
+
+        for (var candidate : candidates) {
+            var bytes = candidate.toContentBytes().orElse(null);
+            if (bytes == null || bytes.length == 0) {
+                continue;
+            }
+
+            try {
+                return Optional.of(ClientPairingPropsSpec.decode(bytes));
+            } catch (Throwable ignored) {
             }
         }
 

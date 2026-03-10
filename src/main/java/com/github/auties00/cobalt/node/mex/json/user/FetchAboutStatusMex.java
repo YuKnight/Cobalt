@@ -1,12 +1,18 @@
 package com.github.auties00.cobalt.node.mex.json.user;
 
 import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONArray;
+import com.alibaba.fastjson2.JSONObject;
 import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.node.mex.json.MexJsonOperation;
 import com.github.auties00.cobalt.node.Node;
+import com.github.auties00.cobalt.node.NodeBuilder;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.io.UncheckedIOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -34,17 +40,19 @@ public sealed interface FetchAboutStatusMex extends MexJsonOperation permits Fet
         /**
          * Builds the MEX IQ stanza for this request.
          *
-         * @return the IQ {@link Node} ready to be sent
+         * @return the IQ {@link NodeBuilder} ready to be sent
          */
-        public Node toNode() {
+        public NodeBuilder toNode() {
             try (var writer = JSONWriter.ofUTF8()) {
                 writer.startObject();
                 writer.writeName("variables");
                 writer.writeColon();
                 writer.startObject();
-                writer.writeName("user");
-                writer.writeColon();
-                writer.writeString(user);
+                if (user != null) {
+                    writer.writeName("user");
+                    writer.writeColon();
+                    writer.writeString(user);
+                }
                 writer.endObject();
                 writer.endObject();
                 try (var output = new StringWriter()) {
@@ -61,8 +69,10 @@ public sealed interface FetchAboutStatusMex extends MexJsonOperation permits Fet
      * The parsed response for this MEX query.
      */
     final class Response implements FetchAboutStatusMex {
+        private final List<Item> items;
 
-        private Response() {
+        private Response(List<Item> items) {
+            this.items = items;
         }
 
         /**
@@ -74,10 +84,125 @@ public sealed interface FetchAboutStatusMex extends MexJsonOperation permits Fet
         public static Optional<Response> of(Node node) {
             return node.getChild("result")
                     .flatMap(Node::toContentBytes)
-                    .flatMap(Response::parse);
+                    .flatMap(Response::of);
         }
 
-        private static Optional<Response> parse(byte[] json) {
+        /**
+         * Returns the list of items in this response.
+         *
+         * @return the list of items, empty if absent
+         */
+        public List<Item> items() {
+            return items;
+        }
+
+        /**
+         * A parsed {@code Item} object.
+         */
+        public static final class Item {
+            private final List<Updates> updates;
+
+            private Item(List<Updates> updates) {
+                this.updates = updates;
+            }
+
+            /**
+             * Returns the {@code updates} field.
+             *
+             * @return the list of values, empty if absent
+             */
+            public List<Updates> updates() {
+                return updates;
+            }
+
+            /**
+             * A parsed {@code Updates} object.
+             */
+            public static final class Updates {
+                private final String text;
+
+                private Updates(String text) {
+                    this.text = text;
+                }
+
+                /**
+                 * Returns the {@code text} field.
+                 *
+                 * @return an {@link Optional} containing the value, or empty if absent
+                 */
+                public Optional<String> text() {
+                    return Optional.ofNullable(text);
+                }
+
+                /**
+                 * Parses a {@code Updates} from the given JSON object.
+                 *
+                 * @param obj the JSON object to parse
+                 * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+                 */
+                static Optional<Updates> of(JSONObject obj) {
+                    if (obj == null) {
+                        return Optional.empty();
+                    }
+
+                    var text = obj.getString("text");
+                    return Optional.of(new Updates(text));
+                }
+
+                /**
+                 * Parses a list of {@code Updates} from the given JSON array.
+                 *
+                 * @param arr the JSON array to parse
+                 * @return the list of parsed results, empty if {@code arr} is {@code null}
+                 */
+                static List<Updates> ofArray(JSONArray arr) {
+                    if (arr == null) {
+                        return List.of();
+                    }
+
+                    var result = new ArrayList<Updates>(arr.size());
+                    for (int i = 0; i < arr.size(); i++) {
+                        of(arr.getJSONObject(i)).ifPresent(result::add);
+                    }
+                    return result;
+                }
+            }
+
+            /**
+             * Parses a {@code Item} from the given JSON object.
+             *
+             * @param obj the JSON object to parse
+             * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+             */
+            static Optional<Item> of(JSONObject obj) {
+                if (obj == null) {
+                    return Optional.empty();
+                }
+
+                var updates = Updates.ofArray(obj.getJSONArray("updates"));
+                return Optional.of(new Item(updates));
+            }
+
+            /**
+             * Parses a list of {@code Item} from the given JSON array.
+             *
+             * @param arr the JSON array to parse
+             * @return the list of parsed results, empty if {@code arr} is {@code null}
+             */
+            static List<Item> ofArray(JSONArray arr) {
+                if (arr == null) {
+                    return List.of();
+                }
+
+                var result = new ArrayList<Item>(arr.size());
+                for (int i = 0; i < arr.size(); i++) {
+                    of(arr.getJSONObject(i)).ifPresent(result::add);
+                }
+                return result;
+            }
+        }
+
+        private static Optional<Response> of(byte[] json) {
             var jsonObject = JSON.parseObject(json);
             if (jsonObject == null) {
                 return Optional.empty();
@@ -88,12 +213,10 @@ public sealed interface FetchAboutStatusMex extends MexJsonOperation permits Fet
                 return Optional.empty();
             }
 
-            var root = data.get("xwa2_users_updates_since");
-            if (root == null) {
-                return Optional.empty();
-            }
+            var rootArr = data.getJSONArray("xwa2_users_updates_since");
+            var items = Item.ofArray(rootArr);
 
-            return Optional.of(new Response());
+            return Optional.of(new Response(items));
         }
     }
 }

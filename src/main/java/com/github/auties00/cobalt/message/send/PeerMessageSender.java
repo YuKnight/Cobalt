@@ -8,6 +8,7 @@ import com.github.auties00.cobalt.message.send.ack.AckResult;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.MessageContainerSpec;
+import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
 import com.github.auties00.cobalt.node.NodeBuilder;
 
 import java.util.List;
@@ -86,7 +87,8 @@ final class PeerMessageSender extends MessageSender<ChatMessageInfo> {
                 .description("message")
                 .attribute("id", messageInfo.key().id())
                 .attribute("to", targetDevice)
-                .attribute("type", resolveStanzaType(container))
+                .attribute("type", resolvePeerStanzaType(container))
+                .attribute("subtype", resolvePeerStanzaSubtype(container))
                 .attribute("category", "peer")
                 .attribute("push_priority", "high")
                 .content(
@@ -98,5 +100,24 @@ final class PeerMessageSender extends MessageSender<ChatMessageInfo> {
         flushStore();
         var ackNode = client.sendNode(stanza);
         return AckParser.parse(ackNode);
+    }
+
+    private String resolvePeerStanzaType(com.github.auties00.cobalt.model.message.MessageContainer container) {
+        return container.content() instanceof ProtocolMessage ? "protocol" : resolveStanzaType(container);
+    }
+
+    private String resolvePeerStanzaSubtype(com.github.auties00.cobalt.model.message.MessageContainer container) {
+        if (!(container.content() instanceof ProtocolMessage protocolMessage)) {
+            return null;
+        }
+
+        return switch (protocolMessage.protocolType()) {
+            case APP_STATE_SYNC_KEY_SHARE -> "app_state_sync_key_share";
+            case APP_STATE_SYNC_KEY_REQUEST -> "app_state_sync_key_request";
+            case APP_STATE_FATAL_EXCEPTION_NOTIFICATION -> "app_state_fatal_exception_notification";
+            case PEER_DATA_OPERATION_REQUEST_MESSAGE -> "peer_data_operation_request_message";
+            case PEER_DATA_OPERATION_REQUEST_RESPONSE_MESSAGE -> "peer_data_operation_request_response_message";
+            default -> null;
+        };
     }
 }

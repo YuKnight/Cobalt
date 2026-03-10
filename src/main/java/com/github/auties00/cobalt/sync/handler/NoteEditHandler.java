@@ -3,20 +3,17 @@ package com.github.auties00.cobalt.sync.handler;
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.media.NoteEditAction;
+import com.github.auties00.cobalt.model.sync.action.media.NoteEditActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 /**
  * Handles note edit actions.
- *
- * <p>Index format: ["note_edit", "noteId"]
  */
 public final class NoteEditHandler implements WebAppStateActionHandler {
-    /**
-     * The singleton instance of {@code NoteEditHandler}.
-     */
     public static final NoteEditHandler INSTANCE = new NoteEditHandler();
 
     private NoteEditHandler() {
@@ -40,38 +37,51 @@ public final class NoteEditHandler implements WebAppStateActionHandler {
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS;
+    }
+
+    @Override
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
-            return true;
+            return MutationApplicationResult.unsupported();
         }
 
-        var indexArray = JSON.parseArray(mutation.index());
-        var noteId = indexArray.getString(1);
+        var noteId = JSON.parseArray(mutation.index()).getString(1);
         if (noteId == null || noteId.isEmpty()) {
-            return true;
+            return MutationApplicationResult.malformed();
         }
 
         if (!(mutation.value().action().orElse(null) instanceof NoteEditAction action)) {
-            return true;
+            return MutationApplicationResult.malformed();
         }
 
+        var states = new java.util.HashMap<>(client.store().noteStates());
         if (action.deleted()) {
-            return true;
+            states.remove(noteId);
+            states.keySet().removeIf(key -> key.endsWith("|" + noteId));
+            client.store().setNoteStates(states);
+            return MutationApplicationResult.success();
         }
 
-        if (action.type().isEmpty()) {
-            return true;
+        if (action.type().isEmpty() || action.chatJid().isEmpty()) {
+            return MutationApplicationResult.malformed();
         }
 
-        var chatJid = action.chatJid();
-        if (chatJid.isEmpty()) {
-            return true;
-        }
-
-        var chat = client.store().findChatByJid(chatJid.get());
+        var chatJid = action.chatJid().orElse(Jid.of(""));
+        var chat = client.store().findChatByJid(chatJid);
         if (chat.isEmpty()) {
-            return false;
+            return MutationApplicationResult.orphan(chatJid.toString(), "Chat");
         }
 
-        return true;
+        var normalizedAction = new NoteEditActionBuilder()
+                .type(action.type().orElseThrow())
+                .chatJid(chat.get().jid())
+                .createdAt(action.createdAt().orElse(0L))
+                .deleted(false)
+                .unstructuredContent(action.unstructuredContent().orElse(""))
+                .build();
+        states.put("%s|%s".formatted(chat.get().jid(), noteId), normalizedAction);
+        client.store().setNoteStates(states);
+        return MutationApplicationResult.success();
     }
 }

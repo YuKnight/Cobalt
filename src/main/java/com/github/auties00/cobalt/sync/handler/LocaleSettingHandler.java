@@ -1,6 +1,8 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
+import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.setting.LocaleSetting;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
@@ -8,8 +10,6 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 /**
  * Handles locale setting changes.
- *
- * <p>This handler processes mutations that update the user's language preference.
  */
 public final class LocaleSettingHandler implements WebAppStateActionHandler {
     public static final LocaleSettingHandler INSTANCE = new LocaleSettingHandler();
@@ -35,31 +35,33 @@ public final class LocaleSettingHandler implements WebAppStateActionHandler {
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS;
+    }
+
+    @Override
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        if (client.store().device() != null && client.store().device().platform() == ClientPlatformType.WINDOWS) {
+            return MutationApplicationResult.skipped();
+        }
+
         if (mutation.operation() != SyncdOperation.SET) {
-            return true;
+            return MutationApplicationResult.unsupported();
         }
 
         if (!(mutation.value().action().orElse(null) instanceof LocaleSetting setting)) {
-            return false;
+            return MutationApplicationResult.malformed();
         }
 
-        var newLocale = setting.locale()
-                .orElse(null);
+        var newLocale = setting.locale().orElse(null);
         if (newLocale == null) {
-            return true;
+            return MutationApplicationResult.skipped();
         }
 
-        var oldLocale = client.store()
-                .locale()
-                .orElse(null);
-
-        client.store()
-                .setLocale(newLocale);
-
-        for(var listener : client.store().listeners()) {
+        var oldLocale = client.store().locale().orElse(null);
+        client.store().setLocale(newLocale);
+        for (var listener : client.store().listeners()) {
             Thread.startVirtualThread(() -> listener.onLocaleChanged(client, oldLocale, newLocale));
         }
-
-        return true;
+        return MutationApplicationResult.success();
     }
 }

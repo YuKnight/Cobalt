@@ -1,12 +1,15 @@
 package com.github.auties00.cobalt.node.mex.json.newsletter;
 
 import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.node.mex.json.MexJsonOperation;
 import com.github.auties00.cobalt.node.Node;
+import com.github.auties00.cobalt.node.NodeBuilder;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.io.UncheckedIOException;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -34,17 +37,19 @@ public sealed interface UpdateNewsletterUserSettingMex extends MexJsonOperation 
         /**
          * Builds the MEX IQ stanza for this request.
          *
-         * @return the IQ {@link Node} ready to be sent
+         * @return the IQ {@link NodeBuilder} ready to be sent
          */
-        public Node toNode() {
+        public NodeBuilder toNode() {
             try (var writer = JSONWriter.ofUTF8()) {
                 writer.startObject();
                 writer.writeName("variables");
                 writer.writeColon();
                 writer.startObject();
-                writer.writeName("input");
-                writer.writeColon();
-                writer.writeString(input);
+                if (input != null) {
+                    writer.writeName("input");
+                    writer.writeColon();
+                    writer.writeString(input);
+                }
                 writer.endObject();
                 writer.endObject();
                 try (var output = new StringWriter()) {
@@ -62,11 +67,11 @@ public sealed interface UpdateNewsletterUserSettingMex extends MexJsonOperation 
      */
     final class Response implements UpdateNewsletterUserSettingMex {
         private final String id;
-        private final String stateType;
+        private final State state;
 
-        private Response(String id, String stateType) {
+        private Response(String id, State state) {
             this.id = id;
-            this.stateType = stateType;
+            this.state = state;
         }
 
         /**
@@ -78,7 +83,7 @@ public sealed interface UpdateNewsletterUserSettingMex extends MexJsonOperation 
         public static Optional<Response> of(Node node) {
             return node.getChild("result")
                     .flatMap(Node::toContentBytes)
-                    .flatMap(Response::parse);
+                    .flatMap(Response::of);
         }
 
         /**
@@ -91,15 +96,68 @@ public sealed interface UpdateNewsletterUserSettingMex extends MexJsonOperation 
         }
 
         /**
-         * Returns the {@code state.type} field.
+         * Returns the {@code state} field.
          *
          * @return an {@link Optional} containing the value, or empty if absent
          */
-        public Optional<String> stateType() {
-            return Optional.ofNullable(stateType);
+        public Optional<State> state() {
+            return Optional.ofNullable(state);
         }
 
-        private static Optional<Response> parse(byte[] json) {
+        /**
+         * A parsed {@code State} object.
+         */
+        public static final class State {
+            private final String type;
+
+            private State(String type) {
+                this.type = type;
+            }
+
+            /**
+             * Returns the {@code type} field.
+             *
+             * @return an {@link Optional} containing the value, or empty if absent
+             */
+            public Optional<String> type() {
+                return Optional.ofNullable(type);
+            }
+
+            /**
+             * Parses a {@code State} from the given JSON object.
+             *
+             * @param obj the JSON object to parse
+             * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+             */
+            static Optional<State> of(JSONObject obj) {
+                if (obj == null) {
+                    return Optional.empty();
+                }
+
+                var type = obj.getString("type");
+                return Optional.of(new State(type));
+            }
+
+            /**
+             * Parses a list of {@code State} from the given JSON array.
+             *
+             * @param arr the JSON array to parse
+             * @return the list of parsed results, empty if {@code arr} is {@code null}
+             */
+            static List<State> ofArray(JSONArray arr) {
+                if (arr == null) {
+                    return List.of();
+                }
+
+                var result = new ArrayList<State>(arr.size());
+                for (int i = 0; i < arr.size(); i++) {
+                    of(arr.getJSONObject(i)).ifPresent(result::add);
+                }
+                return result;
+            }
+        }
+
+        private static Optional<Response> of(byte[] json) {
             var jsonObject = JSON.parseObject(json);
             if (jsonObject == null) {
                 return Optional.empty();
@@ -116,10 +174,9 @@ public sealed interface UpdateNewsletterUserSettingMex extends MexJsonOperation 
             }
 
             var id = root.getString("id");
-            var state = root.getJSONObject("state");
-            var stateType = state != null ? state.getString("type") : null;
+            var state = State.of(root.getJSONObject("state")).orElse(null);
 
-            return Optional.of(new Response(id, stateType));
+            return Optional.of(new Response(id, state));
         }
     }
 }

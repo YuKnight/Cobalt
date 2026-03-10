@@ -4,6 +4,7 @@ import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.exception.WhatsAppMessageException;
 import com.github.auties00.cobalt.message.receive.stanza.MessageReceiveStanza;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentitySpec;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.MessageInfo;
 import com.github.auties00.cobalt.node.Node;
@@ -306,7 +307,7 @@ public final class MessageReceiptHandler {
             var deviceIdentityNode = store.signedDeviceIdentity()
                     .map(id -> new NodeBuilder()
                             .description("device-identity")
-                            .content(SignedDeviceIdentitySpec.encode(id))
+                            .content(ADVSignedDeviceIdentitySpec.encode(id))
                             .build())
                     .orElse(null);
 

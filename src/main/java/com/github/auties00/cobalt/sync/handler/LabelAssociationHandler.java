@@ -4,6 +4,7 @@ import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.preference.LabelBuilder;
+import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.contact.LabelAssociationAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
@@ -11,8 +12,6 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 /**
  * Handles label association actions.
- *
- * <p>This handler processes mutations that assign labels to chats or messages.
  *
  * <p>Index format: ["label_jid", "labelId", "chatJid"]
  */
@@ -40,26 +39,26 @@ public final class LabelAssociationHandler implements WebAppStateActionHandler {
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        // Web only supports SET; REMOVE is unsupported
+        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS;
+    }
+
+    @Override
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
-            return true;
+            return MutationApplicationResult.unsupported();
         }
 
         var indexArray = JSON.parseArray(mutation.index());
         var labelId = indexArray.getString(1);
         var targetJidString = indexArray.getString(2);
-        if (labelId == null || labelId.isEmpty() || targetJidString == null) {
-            return false;
+        if (labelId == null || labelId.isEmpty() || targetJidString == null || targetJidString.isEmpty()) {
+            return MutationApplicationResult.malformed();
         }
 
         if (!(mutation.value().action().orElse(null) instanceof LabelAssociationAction action)) {
-            return false;
+            return MutationApplicationResult.malformed();
         }
 
-        var targetJid = Jid.of(targetJidString);
-
-        // Per WA Web: associations are stored regardless of whether the label exists.
-        // Create a skeleton label if not found.
         var label = client.store()
                 .findLabel(labelId)
                 .orElseGet(() -> {
@@ -72,12 +71,13 @@ public final class LabelAssociationHandler implements WebAppStateActionHandler {
                     return newLabel;
                 });
 
+        var targetJid = Jid.of(targetJidString);
         if (action.labeled()) {
             label.addAssignment(targetJid);
         } else {
             label.removeAssignment(targetJid);
         }
 
-        return true;
+        return MutationApplicationResult.success();
     }
 }

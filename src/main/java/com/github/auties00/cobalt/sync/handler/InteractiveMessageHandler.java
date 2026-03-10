@@ -2,6 +2,8 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.chat.InteractiveMessageAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
@@ -9,11 +11,6 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 /**
  * Handles interactive message actions.
- *
- * <p>Per WhatsApp Web {@code WAWebInteractiveMessageSync}, only SET operations
- * are supported. The handler validates that all 5 index parts (chatJid, messageId,
- * fromMe, participant, subId) are present and non-empty, and that the action value
- * contains a non-null {@code interactiveMessageAction}.
  *
  * <p>Index format: ["interactive_message_action", "chatJid", "messageId", "fromMe", "participant", "subId"]
  */
@@ -41,13 +38,18 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS;
+    }
+
+    @Override
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
-            return true;
+            return MutationApplicationResult.unsupported();
         }
 
         var indexArray = JSON.parseArray(mutation.index());
         if (indexArray.size() < 6) {
-            return true;
+            return MutationApplicationResult.malformed();
         }
 
         var chatJid = indexArray.getString(1);
@@ -60,13 +62,37 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
                 || fromMe == null || fromMe.isEmpty()
                 || participant == null || participant.isEmpty()
                 || subId == null || subId.isEmpty()) {
-            return true;
+            return MutationApplicationResult.malformed();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof InteractiveMessageAction)) {
-            return true;
+        if (!(mutation.value().action().orElse(null) instanceof InteractiveMessageAction action)) {
+            return MutationApplicationResult.malformed();
         }
 
-        return true;
+        var states = new java.util.HashMap<>(client.store().interactiveMessageStates());
+        action.agmId().ifPresent(agmId -> states.put("agmId|" + agmId, action));
+
+        var message = client.store().findMessageById(Jid.of(chatJid), messageId).orElse(null);
+        if (message == null) {
+            if (action.agmId().isPresent()) {
+                client.store().setInteractiveMessageStates(states);
+                return MutationApplicationResult.success();
+            }
+
+            return MutationApplicationResult.orphan("%s:%s:%s:%s".formatted(chatJid, messageId, fromMe, participant), "Msg");
+        }
+
+        if (action.type() != InteractiveMessageAction.InteractiveMessageActionMode.DISABLE_CTA) {
+            return MutationApplicationResult.skipped();
+        }
+
+        if (!(message instanceof com.github.auties00.cobalt.model.chat.ChatMessageInfo chatMessageInfo)) {
+            return MutationApplicationResult.skipped();
+        }
+
+        states.put("messageId|" + chatMessageInfo.key().id(), action);
+        states.put("%s|%s|%s|%s|%s".formatted(chatJid, messageId, fromMe, participant, subId), action);
+        client.store().setInteractiveMessageStates(states);
+        return MutationApplicationResult.success();
     }
 }

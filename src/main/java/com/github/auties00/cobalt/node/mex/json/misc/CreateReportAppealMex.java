@@ -1,12 +1,16 @@
 package com.github.auties00.cobalt.node.mex.json.misc;
 
 import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.node.mex.json.MexJsonOperation;
 import com.github.auties00.cobalt.node.Node;
+import com.github.auties00.cobalt.node.NodeBuilder;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.io.UncheckedIOException;
+import java.time.Instant;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -36,20 +40,24 @@ public sealed interface CreateReportAppealMex extends MexJsonOperation permits C
         /**
          * Builds the MEX IQ stanza for this request.
          *
-         * @return the IQ {@link Node} ready to be sent
+         * @return the IQ {@link NodeBuilder} ready to be sent
          */
-        public Node toNode() {
+        public NodeBuilder toNode() {
             try (var writer = JSONWriter.ofUTF8()) {
                 writer.startObject();
                 writer.writeName("variables");
                 writer.writeColon();
                 writer.startObject();
-                writer.writeName("reason");
-                writer.writeColon();
-                writer.writeString(reason);
-                writer.writeName("report_id");
-                writer.writeColon();
-                writer.writeString(reportId);
+                if (reason != null) {
+                    writer.writeName("reason");
+                    writer.writeColon();
+                    writer.writeString(reason);
+                }
+                if (reportId != null) {
+                    writer.writeName("report_id");
+                    writer.writeColon();
+                    writer.writeString(reportId);
+                }
                 writer.endObject();
                 writer.endObject();
                 try (var output = new StringWriter()) {
@@ -68,20 +76,16 @@ public sealed interface CreateReportAppealMex extends MexJsonOperation permits C
     final class Response implements CreateReportAppealMex {
         private final String reportId;
         private final String status;
-        private final String creationTime;
-        private final String lastUpdateTime;
+        private final Long creationTime;
+        private final Long lastUpdateTime;
         private final String channelName;
         private final String channelJid;
         private final String serverMsgId;
         private final String responseServerMsgId;
         private final String notifyName;
-        private final String appealState;
-        private final String appealAppealReason;
-        private final String appealCreationTime;
-        private final String appealReportId;
-        private final String appealAppealId;
+        private final Appeal appeal;
 
-        private Response(String reportId, String status, String creationTime, String lastUpdateTime, String channelName, String channelJid, String serverMsgId, String responseServerMsgId, String notifyName, String appealState, String appealAppealReason, String appealCreationTime, String appealReportId, String appealAppealId) {
+        private Response(String reportId, String status, Long creationTime, Long lastUpdateTime, String channelName, String channelJid, String serverMsgId, String responseServerMsgId, String notifyName, Appeal appeal) {
             this.reportId = reportId;
             this.status = status;
             this.creationTime = creationTime;
@@ -91,11 +95,7 @@ public sealed interface CreateReportAppealMex extends MexJsonOperation permits C
             this.serverMsgId = serverMsgId;
             this.responseServerMsgId = responseServerMsgId;
             this.notifyName = notifyName;
-            this.appealState = appealState;
-            this.appealAppealReason = appealAppealReason;
-            this.appealCreationTime = appealCreationTime;
-            this.appealReportId = appealReportId;
-            this.appealAppealId = appealAppealId;
+            this.appeal = appeal;
         }
 
         /**
@@ -107,7 +107,7 @@ public sealed interface CreateReportAppealMex extends MexJsonOperation permits C
         public static Optional<Response> of(Node node) {
             return node.getChild("result")
                     .flatMap(Node::toContentBytes)
-                    .flatMap(Response::parse);
+                    .flatMap(Response::of);
         }
 
         /**
@@ -131,19 +131,19 @@ public sealed interface CreateReportAppealMex extends MexJsonOperation permits C
         /**
          * Returns the {@code creation_time} field.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+         * @return an {@link Optional} containing the value as an {@link Instant}, or empty if absent
          */
-        public Optional<String> creationTime() {
-            return Optional.ofNullable(creationTime);
+        public Optional<Instant> creationTime() {
+            return Optional.ofNullable(creationTime).map(Instant::ofEpochSecond);
         }
 
         /**
          * Returns the {@code last_update_time} field.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+         * @return an {@link Optional} containing the value as an {@link Instant}, or empty if absent
          */
-        public Optional<String> lastUpdateTime() {
-            return Optional.ofNullable(lastUpdateTime);
+        public Optional<Instant> lastUpdateTime() {
+            return Optional.ofNullable(lastUpdateTime).map(Instant::ofEpochSecond);
         }
 
         /**
@@ -192,51 +192,116 @@ public sealed interface CreateReportAppealMex extends MexJsonOperation permits C
         }
 
         /**
-         * Returns the {@code appeal.state} field.
+         * Returns the {@code appeal} field.
          *
          * @return an {@link Optional} containing the value, or empty if absent
          */
-        public Optional<String> appealState() {
-            return Optional.ofNullable(appealState);
+        public Optional<Appeal> appeal() {
+            return Optional.ofNullable(appeal);
         }
 
         /**
-         * Returns the {@code appeal.appeal_reason} field.
-         *
-         * @return an {@link Optional} containing the value, or empty if absent
+         * A parsed {@code Appeal} object.
          */
-        public Optional<String> appealAppealReason() {
-            return Optional.ofNullable(appealAppealReason);
+        public static final class Appeal {
+            private final String state;
+            private final String appealReason;
+            private final Long creationTime;
+            private final String reportId;
+            private final String appealId;
+
+            private Appeal(String state, String appealReason, Long creationTime, String reportId, String appealId) {
+                this.state = state;
+                this.appealReason = appealReason;
+                this.creationTime = creationTime;
+                this.reportId = reportId;
+                this.appealId = appealId;
+            }
+
+            /**
+             * Returns the {@code state} field.
+             *
+             * @return an {@link Optional} containing the value, or empty if absent
+             */
+            public Optional<String> state() {
+                return Optional.ofNullable(state);
+            }
+
+            /**
+             * Returns the {@code appeal_reason} field.
+             *
+             * @return an {@link Optional} containing the value, or empty if absent
+             */
+            public Optional<String> appealReason() {
+                return Optional.ofNullable(appealReason);
+            }
+
+            /**
+             * Returns the {@code creation_time} field.
+             *
+             * @return an {@link Optional} containing the value as an {@link Instant}, or empty if absent
+             */
+            public Optional<Instant> creationTime() {
+                return Optional.ofNullable(creationTime).map(Instant::ofEpochSecond);
+            }
+
+            /**
+             * Returns the {@code report_id} field.
+             *
+             * @return an {@link Optional} containing the value, or empty if absent
+             */
+            public Optional<String> reportId() {
+                return Optional.ofNullable(reportId);
+            }
+
+            /**
+             * Returns the {@code appeal_id} field.
+             *
+             * @return an {@link Optional} containing the value, or empty if absent
+             */
+            public Optional<String> appealId() {
+                return Optional.ofNullable(appealId);
+            }
+
+            /**
+             * Parses a {@code Appeal} from the given JSON object.
+             *
+             * @param obj the JSON object to parse
+             * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+             */
+            static Optional<Appeal> of(JSONObject obj) {
+                if (obj == null) {
+                    return Optional.empty();
+                }
+
+                var state = obj.getString("state");
+                var appealReason = obj.getString("appeal_reason");
+                var creationTime = obj.getLong("creation_time");
+                var reportId = obj.getString("report_id");
+                var appealId = obj.getString("appeal_id");
+                return Optional.of(new Appeal(state, appealReason, creationTime, reportId, appealId));
+            }
+
+            /**
+             * Parses a list of {@code Appeal} from the given JSON array.
+             *
+             * @param arr the JSON array to parse
+             * @return the list of parsed results, empty if {@code arr} is {@code null}
+             */
+            static List<Appeal> ofArray(JSONArray arr) {
+                if (arr == null) {
+                    return List.of();
+                }
+
+                var result = new ArrayList<Appeal>(arr.size());
+                for (int i = 0; i < arr.size(); i++) {
+                    of(arr.getJSONObject(i)).ifPresent(result::add);
+                }
+                return result;
+            }
         }
 
-        /**
-         * Returns the {@code appeal.creation_time} field.
-         *
-         * @return an {@link Optional} containing the value, or empty if absent
-         */
-        public Optional<String> appealCreationTime() {
-            return Optional.ofNullable(appealCreationTime);
-        }
-
-        /**
-         * Returns the {@code appeal.report_id} field.
-         *
-         * @return an {@link Optional} containing the value, or empty if absent
-         */
-        public Optional<String> appealReportId() {
-            return Optional.ofNullable(appealReportId);
-        }
-
-        /**
-         * Returns the {@code appeal.appeal_id} field.
-         *
-         * @return an {@link Optional} containing the value, or empty if absent
-         */
-        public Optional<String> appealAppealId() {
-            return Optional.ofNullable(appealAppealId);
-        }
-
-        private static Optional<Response> parse(byte[] json) {
+        private static Optional<Response> of(byte[] json) {
             var jsonObject = JSON.parseObject(json);
             if (jsonObject == null) {
                 return Optional.empty();
@@ -254,21 +319,16 @@ public sealed interface CreateReportAppealMex extends MexJsonOperation permits C
 
             var reportId = root.getString("report_id");
             var status = root.getString("status");
-            var creationTime = root.getString("creation_time");
-            var lastUpdateTime = root.getString("last_update_time");
+            var creationTime = root.getLong("creation_time");
+            var lastUpdateTime = root.getLong("last_update_time");
             var channelName = root.getString("channel_name");
             var channelJid = root.getString("channel_jid");
             var serverMsgId = root.getString("server_msg_id");
             var responseServerMsgId = root.getString("response_server_msg_id");
             var notifyName = root.getString("notify_name");
-            var appeal = root.getJSONObject("appeal");
-            var appealState = appeal != null ? appeal.getString("state") : null;
-            var appealAppealReason = appeal != null ? appeal.getString("appeal_reason") : null;
-            var appealCreationTime = appeal != null ? appeal.getString("creation_time") : null;
-            var appealReportId = appeal != null ? appeal.getString("report_id") : null;
-            var appealAppealId = appeal != null ? appeal.getString("appeal_id") : null;
+            var appeal = Appeal.of(root.getJSONObject("appeal")).orElse(null);
 
-            return Optional.of(new Response(reportId, status, creationTime, lastUpdateTime, channelName, channelJid, serverMsgId, responseServerMsgId, notifyName, appealState, appealAppealReason, appealCreationTime, appealReportId, appealAppealId));
+            return Optional.of(new Response(reportId, status, creationTime, lastUpdateTime, channelName, channelJid, serverMsgId, responseServerMsgId, notifyName, appeal));
         }
     }
 }

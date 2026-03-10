@@ -3,18 +3,16 @@ package com.github.auties00.cobalt.sync.handler;
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.contact.LidContactAction;
+import com.github.auties00.cobalt.model.sync.action.contact.UserStatusMuteAction;
+import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 /**
  * Handles LID contact actions.
- *
- * <p>This handler processes mutations that create, update, or remove contacts
- * identified by a LID (Linked Identity) JID. It mirrors the logic in the
- * WhatsApp Web {@code WAWebLidContactSync} module.
- *
- * <p>Index format: ["lid_contact", "lidJid"]
  */
 public final class LidContactHandler implements WebAppStateActionHandler {
     public static final LidContactHandler INSTANCE = new LidContactHandler();
@@ -40,39 +38,55 @@ public final class LidContactHandler implements WebAppStateActionHandler {
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        var indexArray = JSON.parseArray(mutation.index());
-        var lidJidString = indexArray.getString(1);
+        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS;
+    }
+
+    @Override
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        if (!client.abPropsService().getBool(ABProp.USERNAME_CONTACT_SYNCD_SUPPORT_ENABLE)) {
+            return MutationApplicationResult.unsupported();
+        }
+
+        var lidJidString = JSON.parseArray(mutation.index()).getString(1);
         if (lidJidString == null || lidJidString.isEmpty()) {
-            return false;
+            return MutationApplicationResult.malformed();
         }
 
         var lidJid = Jid.of(lidJidString);
         if (!lidJid.hasLidServer()) {
-            return false;
+            return MutationApplicationResult.malformed();
         }
 
-        switch (mutation.operation()) {
+        return switch (mutation.operation()) {
             case SET -> {
                 if (!(mutation.value().action().orElse(null) instanceof LidContactAction action)) {
-                    return false;
+                    yield MutationApplicationResult.malformed();
                 }
 
-                var contact = client.store()
-                        .findContactByJid(lidJid)
+                var contact = client.store().findContactByJid(lidJid)
                         .orElseGet(() -> client.store().addNewContact(lidJid));
-                // Web: fullName ?? "" (coalesces absent to empty string)
                 var fullName = action.fullName().orElse("");
+                var shortName = action.firstName().orElseGet(() -> {
+                    if (fullName.isBlank()) {
+                        return "";
+                    }
+
+                    var separator = fullName.indexOf(' ');
+                    return separator == -1 ? fullName : fullName.substring(0, separator);
+                });
                 contact.setFullName(fullName);
-                // Web: firstName ?? getShortName(firstName) ?? ""
-                var shortName = action.firstName().orElse("");
                 contact.setShortName(shortName);
-                action.username().ifPresent(contact::setUsername);
+                if (client.abPropsService().getBool(ABProp.USERNAME_CONTACT_DISPLAY)) {
+                    var username = action.username()
+                            .map(entry -> entry.startsWith("@") ? entry.substring(1) : entry)
+                            .orElse(null);
+                    contact.setUsername(username);
+                    contact.setAddedByUsername(username != null && !username.isBlank());
+                }
+                retryOrphanStatusMutes(client, lidJidString);
+                yield MutationApplicationResult.success();
             }
             case REMOVE -> {
-                // Web: calls setNotAddressBookContacts and
-                // setContactsNotMyUsernameContacts, which clears name,
-                // shortName, sets type to "out", and clears username
-                // Only applies to contacts that were added via username flow
                 client.store().findContactByJid(lidJid).ifPresent(contact -> {
                     if (contact.isAddedByUsername()) {
                         contact.setFullName(null);
@@ -81,9 +95,35 @@ public final class LidContactHandler implements WebAppStateActionHandler {
                         contact.setAddedByUsername(false);
                     }
                 });
+                yield MutationApplicationResult.success();
+            }
+            default -> MutationApplicationResult.unsupported();
+        };
+    }
+
+    private void retryOrphanStatusMutes(WhatsAppClient client, String lidJidString) {
+        var entries = client.store().findOrphanMutationsByModel(UserStatusMuteAction.COLLECTION_NAME, lidJidString);
+        if (entries.isEmpty()) {
+            return;
+        }
+
+        var applied = new java.util.ArrayList<com.github.auties00.cobalt.model.sync.OrphanMutationEntry>();
+        for (var entry : entries) {
+            var mutation = new DecryptedMutation.Trusted(
+                    entry.index(),
+                    entry.value(),
+                    entry.operation(),
+                    entry.timestamp(),
+                    entry.actionVersion()
+            );
+            var result = UserStatusMuteHandler.INSTANCE.applyMutationResult(client, mutation);
+            if (result.actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS) {
+                applied.add(entry);
             }
         }
 
-        return true;
+        if (!applied.isEmpty()) {
+            client.store().removeOrphanMutations(UserStatusMuteAction.COLLECTION_NAME, applied);
+        }
     }
 }

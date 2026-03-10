@@ -1,8 +1,10 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.media.AvatarUpdatedAction;
+import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
@@ -39,18 +41,32 @@ public final class AvatarUpdatedHandler implements WebAppStateActionHandler {
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS;
+    }
+
+    @Override
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        if (!client.abPropsService().getBool(ABProp.ENABLE_AVATARS_ON_WEB_COMPANION)) {
+            return MutationApplicationResult.unsupported();
+        }
+
         if (mutation.operation() != SyncdOperation.SET) {
-            return true;
+            return MutationApplicationResult.unsupported();
         }
 
         if (!(mutation.value().action().orElse(null) instanceof AvatarUpdatedAction action)) {
-            return true;
+            return MutationApplicationResult.malformed();
         }
 
-        if (action.eventType().isEmpty()) {
-            return true;
+        var eventType = action.eventType().orElse(null);
+        if (eventType == null) {
+            return MutationApplicationResult.malformed();
         }
 
-        return true;
+        switch (eventType) {
+            case CREATED, UPDATED -> client.store().setHasAvatar(true);
+            case DELETED -> client.store().setHasAvatar(false);
+        }
+        return MutationApplicationResult.success();
     }
 }

@@ -3,6 +3,7 @@ package com.github.auties00.cobalt.sync.handler;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.sync.ConflictResolution;
 import com.github.auties00.cobalt.model.sync.ConflictResolutionState;
+import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
@@ -92,6 +93,49 @@ public interface WebAppStateActionHandler {
     }
 
     /**
+     * Applies a single mutation and returns a richer WA-style outcome.
+     *
+     * <p>The default implementation preserves legacy behavior where {@code true}
+     * is treated as success and {@code false} is treated as orphan.
+     *
+     * @param client the WhatsApp client
+     * @param mutation the mutation to apply
+     * @return the detailed application result
+     */
+    default MutationApplicationResult applyMutationResult(
+            WhatsAppClient client,
+            DecryptedMutation.Trusted mutation
+    ) {
+        return applyMutation(client, mutation)
+                ? MutationApplicationResult.success()
+                : MutationApplicationResult.orphan();
+    }
+
+    /**
+     * Applies a batch of mutations and returns richer WA-style outcomes.
+     *
+     * <p>The default implementation preserves legacy behavior where {@code true}
+     * is treated as success and {@code false} is treated as orphan.
+     *
+     * @param client the WhatsApp client
+     * @param mutations the mutations to apply
+     * @return the detailed application results
+     */
+    default List<MutationApplicationResult> applyMutationBatchResults(
+            WhatsAppClient client,
+            List<DecryptedMutation.Trusted> mutations
+    ) {
+        var legacy = applyMutationBatch(client, mutations);
+        var results = new ArrayList<MutationApplicationResult>(legacy.size());
+        for (var applied : legacy) {
+            results.add(applied
+                    ? MutationApplicationResult.success()
+                    : MutationApplicationResult.orphan());
+        }
+        return results;
+    }
+
+    /**
      * Resolves a conflict between a local pending mutation and an incoming
      * remote mutation with the same index.
      *
@@ -110,5 +154,20 @@ public interface WebAppStateActionHandler {
         } else {
             return ConflictResolution.of(ConflictResolutionState.SKIP_REMOTE);
         }
+    }
+
+    /**
+     * Allows a handler to drop a remote mutation when a different pending local
+     * mutation makes it obsolete, mirroring WA's cross-index conflict hook.
+     *
+     * @param remoteMutation the candidate remote mutation
+     * @param pendingByIndex all pending mutations indexed by mutation index
+     * @return whether the remote mutation should be dropped
+     */
+    default boolean dropMutationDueToCrossIndexConflict(
+            DecryptedMutation.Trusted remoteMutation,
+            java.util.Map<String, DecryptedMutation.Trusted> pendingByIndex
+    ) {
+        return false;
     }
 }

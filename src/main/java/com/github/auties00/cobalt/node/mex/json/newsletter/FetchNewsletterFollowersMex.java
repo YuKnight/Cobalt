@@ -1,12 +1,19 @@
 package com.github.auties00.cobalt.node.mex.json.newsletter;
 
 import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONArray;
+import com.alibaba.fastjson2.JSONObject;
 import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.node.mex.json.MexJsonOperation;
 import com.github.auties00.cobalt.node.Node;
+import com.github.auties00.cobalt.node.NodeBuilder;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.io.UncheckedIOException;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -34,17 +41,19 @@ public sealed interface FetchNewsletterFollowersMex extends MexJsonOperation per
         /**
          * Builds the MEX IQ stanza for this request.
          *
-         * @return the IQ {@link Node} ready to be sent
+         * @return the IQ {@link NodeBuilder} ready to be sent
          */
-        public Node toNode() {
+        public NodeBuilder toNode() {
             try (var writer = JSONWriter.ofUTF8()) {
                 writer.startObject();
                 writer.writeName("variables");
                 writer.writeColon();
                 writer.startObject();
-                writer.writeName("input");
-                writer.writeColon();
-                writer.writeString(input);
+                if (input != null) {
+                    writer.writeName("input");
+                    writer.writeColon();
+                    writer.writeString(input);
+                }
                 writer.endObject();
                 writer.endObject();
                 try (var output = new StringWriter()) {
@@ -61,8 +70,10 @@ public sealed interface FetchNewsletterFollowersMex extends MexJsonOperation per
      * The parsed response for this MEX query.
      */
     final class Response implements FetchNewsletterFollowersMex {
+        private final Followers followers;
 
-        private Response() {
+        private Response(Followers followers) {
+            this.followers = followers;
         }
 
         /**
@@ -74,10 +85,291 @@ public sealed interface FetchNewsletterFollowersMex extends MexJsonOperation per
         public static Optional<Response> of(Node node) {
             return node.getChild("result")
                     .flatMap(Node::toContentBytes)
-                    .flatMap(Response::parse);
+                    .flatMap(Response::of);
         }
 
-        private static Optional<Response> parse(byte[] json) {
+        /**
+         * Returns the {@code followers} field.
+         *
+         * @return an {@link Optional} containing the value, or empty if absent
+         */
+        public Optional<Followers> followers() {
+            return Optional.ofNullable(followers);
+        }
+
+        /**
+         * A parsed {@code Followers} object.
+         */
+        public static final class Followers {
+            private final List<Edges> edges;
+
+            private Followers(List<Edges> edges) {
+                this.edges = edges;
+            }
+
+            /**
+             * Returns the {@code edges} field.
+             *
+             * @return the list of values, empty if absent
+             */
+            public List<Edges> edges() {
+                return edges;
+            }
+
+            /**
+             * A parsed {@code Edges} object.
+             */
+            public static final class Edges {
+                private final Node node;
+                private final Long followTime;
+                private final String role;
+
+                private Edges(Node node, Long followTime, String role) {
+                    this.node = node;
+                    this.followTime = followTime;
+                    this.role = role;
+                }
+
+                /**
+                 * Returns the {@code node} field.
+                 *
+                 * @return an {@link Optional} containing the value, or empty if absent
+                 */
+                public Optional<Node> node() {
+                    return Optional.ofNullable(node);
+                }
+
+                /**
+                 * Returns the {@code follow_time} field.
+                 *
+                 * @return an {@link Optional} containing the value as an {@link Instant}, or empty if absent
+                 */
+                public Optional<Instant> followTime() {
+                    return Optional.ofNullable(followTime).map(Instant::ofEpochSecond);
+                }
+
+                /**
+                 * Returns the {@code role} field.
+                 *
+                 * @return an {@link Optional} containing the value, or empty if absent
+                 */
+                public Optional<String> role() {
+                    return Optional.ofNullable(role);
+                }
+
+                /**
+                 * A parsed {@code Node} object.
+                 */
+                public static final class Node {
+                    private final String id;
+                    private final String displayName;
+                    private final String pn;
+                    private final UsernameInfo usernameInfo;
+
+                    private Node(String id, String displayName, String pn, UsernameInfo usernameInfo) {
+                        this.id = id;
+                        this.displayName = displayName;
+                        this.pn = pn;
+                        this.usernameInfo = usernameInfo;
+                    }
+
+                    /**
+                     * Returns the {@code id} field.
+                     *
+                     * @return an {@link Optional} containing the value, or empty if absent
+                     */
+                    public Optional<String> id() {
+                        return Optional.ofNullable(id);
+                    }
+
+                    /**
+                     * Returns the {@code display_name} field.
+                     *
+                     * @return an {@link Optional} containing the value, or empty if absent
+                     */
+                    public Optional<String> displayName() {
+                        return Optional.ofNullable(displayName);
+                    }
+
+                    /**
+                     * Returns the {@code pn} field.
+                     *
+                     * @return an {@link Optional} containing the value, or empty if absent
+                     */
+                    public Optional<String> pn() {
+                        return Optional.ofNullable(pn);
+                    }
+
+                    /**
+                     * Returns the {@code username_info} field.
+                     *
+                     * @return an {@link Optional} containing the value, or empty if absent
+                     */
+                    public Optional<UsernameInfo> usernameInfo() {
+                        return Optional.ofNullable(usernameInfo);
+                    }
+
+                    /**
+                     * A parsed {@code UsernameInfo} object.
+                     */
+                    public static final class UsernameInfo {
+                        private final String username;
+
+                        private UsernameInfo(String username) {
+                            this.username = username;
+                        }
+
+                        /**
+                         * Returns the {@code username} field.
+                         *
+                         * @return an {@link Optional} containing the value, or empty if absent
+                         */
+                        public Optional<String> username() {
+                            return Optional.ofNullable(username);
+                        }
+
+                        /**
+                         * Parses a {@code UsernameInfo} from the given JSON object.
+                         *
+                         * @param obj the JSON object to parse
+                         * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+                         */
+                        static Optional<UsernameInfo> of(JSONObject obj) {
+                            if (obj == null) {
+                                return Optional.empty();
+                            }
+
+                            var username = obj.getString("username");
+                            return Optional.of(new UsernameInfo(username));
+                        }
+
+                        /**
+                         * Parses a list of {@code UsernameInfo} from the given JSON array.
+                         *
+                         * @param arr the JSON array to parse
+                         * @return the list of parsed results, empty if {@code arr} is {@code null}
+                         */
+                        static List<UsernameInfo> ofArray(JSONArray arr) {
+                            if (arr == null) {
+                                return List.of();
+                            }
+
+                            var result = new ArrayList<UsernameInfo>(arr.size());
+                            for (int i = 0; i < arr.size(); i++) {
+                                of(arr.getJSONObject(i)).ifPresent(result::add);
+                            }
+                            return result;
+                        }
+                    }
+
+                    /**
+                     * Parses a {@code Node} from the given JSON object.
+                     *
+                     * @param obj the JSON object to parse
+                     * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+                     */
+                    static Optional<Node> of(JSONObject obj) {
+                        if (obj == null) {
+                            return Optional.empty();
+                        }
+
+                        var id = obj.getString("id");
+                        var displayName = obj.getString("display_name");
+                        var pn = obj.getString("pn");
+                        var usernameInfo = UsernameInfo.of(obj.getJSONObject("username_info")).orElse(null);
+                        return Optional.of(new Node(id, displayName, pn, usernameInfo));
+                    }
+
+                    /**
+                     * Parses a list of {@code Node} from the given JSON array.
+                     *
+                     * @param arr the JSON array to parse
+                     * @return the list of parsed results, empty if {@code arr} is {@code null}
+                     */
+                    static List<Node> ofArray(JSONArray arr) {
+                        if (arr == null) {
+                            return List.of();
+                        }
+
+                        var result = new ArrayList<Node>(arr.size());
+                        for (int i = 0; i < arr.size(); i++) {
+                            of(arr.getJSONObject(i)).ifPresent(result::add);
+                        }
+                        return result;
+                    }
+                }
+
+                /**
+                 * Parses a {@code Edges} from the given JSON object.
+                 *
+                 * @param obj the JSON object to parse
+                 * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+                 */
+                static Optional<Edges> of(JSONObject obj) {
+                    if (obj == null) {
+                        return Optional.empty();
+                    }
+
+                    var node = Node.of(obj.getJSONObject("node")).orElse(null);
+                    var followTime = obj.getLong("follow_time");
+                    var role = obj.getString("role");
+                    return Optional.of(new Edges(node, followTime, role));
+                }
+
+                /**
+                 * Parses a list of {@code Edges} from the given JSON array.
+                 *
+                 * @param arr the JSON array to parse
+                 * @return the list of parsed results, empty if {@code arr} is {@code null}
+                 */
+                static List<Edges> ofArray(JSONArray arr) {
+                    if (arr == null) {
+                        return List.of();
+                    }
+
+                    var result = new ArrayList<Edges>(arr.size());
+                    for (int i = 0; i < arr.size(); i++) {
+                        of(arr.getJSONObject(i)).ifPresent(result::add);
+                    }
+                    return result;
+                }
+            }
+
+            /**
+             * Parses a {@code Followers} from the given JSON object.
+             *
+             * @param obj the JSON object to parse
+             * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+             */
+            static Optional<Followers> of(JSONObject obj) {
+                if (obj == null) {
+                    return Optional.empty();
+                }
+
+                var edges = Edges.ofArray(obj.getJSONArray("edges"));
+                return Optional.of(new Followers(edges));
+            }
+
+            /**
+             * Parses a list of {@code Followers} from the given JSON array.
+             *
+             * @param arr the JSON array to parse
+             * @return the list of parsed results, empty if {@code arr} is {@code null}
+             */
+            static List<Followers> ofArray(JSONArray arr) {
+                if (arr == null) {
+                    return List.of();
+                }
+
+                var result = new ArrayList<Followers>(arr.size());
+                for (int i = 0; i < arr.size(); i++) {
+                    of(arr.getJSONObject(i)).ifPresent(result::add);
+                }
+                return result;
+            }
+        }
+
+        private static Optional<Response> of(byte[] json) {
             var jsonObject = JSON.parseObject(json);
             if (jsonObject == null) {
                 return Optional.empty();
@@ -88,12 +380,14 @@ public sealed interface FetchNewsletterFollowersMex extends MexJsonOperation per
                 return Optional.empty();
             }
 
-            var root = data.get("xwa2_newsletter_followers");
+            var root = data.getJSONObject("xwa2_newsletter_followers");
             if (root == null) {
                 return Optional.empty();
             }
 
-            return Optional.of(new Response());
+            var followers = Followers.of(root.getJSONObject("followers")).orElse(null);
+
+            return Optional.of(new Response(followers));
         }
     }
 }

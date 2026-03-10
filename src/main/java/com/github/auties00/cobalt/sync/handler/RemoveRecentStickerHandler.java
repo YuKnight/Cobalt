@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.media.RemoveRecentStickerAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
@@ -9,13 +10,8 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 /**
  * Handles remove recent sticker actions.
- *
- * <p>This handler processes mutations that remove stickers from the recent list.
- *
- * <p>Index format: ["removeRecentStickerAction", "stickerHash"]
  */
 public final class RemoveRecentStickerHandler implements WebAppStateActionHandler {
-
     public static final RemoveRecentStickerHandler INSTANCE = new RemoveRecentStickerHandler();
 
     private RemoveRecentStickerHandler() {
@@ -38,26 +34,26 @@ public final class RemoveRecentStickerHandler implements WebAppStateActionHandle
 
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        // Web: WAWebStickersRemoveRecentSyncAction — only SET is supported
+        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS;
+    }
+
+    @Override
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
-            return true;
+            return MutationApplicationResult.unsupported();
         }
 
-        var indexArray = JSON.parseArray(mutation.index());
-        var stickerHash = indexArray.getString(1);
-        if (stickerHash == null) {
-            return false;
+        var stickerHash = JSON.parseArray(mutation.index()).getString(1);
+        if (stickerHash == null || stickerHash.isEmpty()) {
+            return MutationApplicationResult.malformed();
         }
 
-        // Web: returns Orphan if sticker is not in the collection
         var sticker = client.store().findRecentSticker(stickerHash);
         if (sticker.isEmpty()) {
-            return false;
+            return MutationApplicationResult.orphan(stickerHash, "RecentSticker");
         }
 
-        // Web: reads removeRecentStickerAction?.lastStickerSentTs
-        // If action is missing, lastStickerSentTs is null and sticker is still removed
-        var action = mutation.value().action().orElse(null) instanceof RemoveRecentStickerAction a ? a : null;
+        var action = mutation.value().action().orElse(null) instanceof RemoveRecentStickerAction entry ? entry : null;
         var lastStickerSentTs = action != null
                 ? action.lastStickerSentTs().map(java.time.Instant::getEpochSecond).orElse(null)
                 : null;
@@ -66,6 +62,6 @@ public final class RemoveRecentStickerHandler implements WebAppStateActionHandle
             client.store().removeRecentSticker(stickerHash);
         }
 
-        return true;
+        return MutationApplicationResult.success();
     }
 }
