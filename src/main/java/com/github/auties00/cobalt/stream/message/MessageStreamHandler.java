@@ -561,6 +561,13 @@ public final class MessageStreamHandler implements SocketStream.Handler {
                     .flatMap(AppStateSyncKeyId::keyId)
                     .orElse(null);
             if (keyId == null) {
+                continue; // WAWebKeyManagementHandleKeyShareApi: skip keys with missing keyID
+            }
+
+            // WAWebKeyManagementHandleKeyShareApi: key ID must be exactly 6 bytes
+            if (keyId.length != 6) {
+                LOGGER.log(System.Logger.Level.ERROR,
+                        "syncd: key share key id has invalid bytelength of {0}", keyId.length);
                 continue;
             }
 
@@ -687,6 +694,10 @@ public final class MessageStreamHandler implements SocketStream.Handler {
     private void resolveSnapshotRecovery(PeerDataOperationRequestResponseMessage response) {
         if (response.peerDataOperationRequestType().orElse(null)
                 != PeerDataOperationRequestType.COMPANION_SYNCD_SNAPSHOT_FATAL_RECOVERY) {
+            return;
+        }
+
+        if (!snapshotRecoveryService.isRecoveryEnabled()) { // WAWebNonMessageDataRequestHandler: syncdSnapshotRecoveryEnabled() === false
             return;
         }
 

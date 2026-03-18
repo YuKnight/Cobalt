@@ -3,6 +3,7 @@ package com.github.auties00.cobalt.media;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.github.auties00.cobalt.exception.WhatsAppMediaException;
+import com.github.auties00.cobalt.model.media.ExternalBlobReference;
 import com.github.auties00.cobalt.model.media.MediaProvider;
 
 import java.io.IOException;
@@ -74,7 +75,8 @@ public final class MediaConnection {
                             .getString("direct_path");
                     var url = uploadResult.get()
                             .getString("url");
-                    // var handle = jsonObject.getString("handle");
+                    var handle = uploadResult.get()
+                            .getString("handle"); // WAWebSyncdMMSUpload.buildExternalBlobReference — e.handle
 
                     provider.setMediaSha256(fileSha256);
                     provider.setMediaEncryptedSha256(fileEncSha256);
@@ -83,6 +85,9 @@ public final class MediaConnection {
                     provider.setMediaDirectPath(directPath);
                     provider.setMediaUrl(url);
                     provider.setMediaKeyTimestamp(timestamp);
+                    if (provider instanceof ExternalBlobReference externalBlobReference) { // WAWebSyncdMMSUpload.buildExternalBlobReference — handle: a
+                        externalBlobReference.setHandle(handle);
+                    }
 
                     return true;
                 }

@@ -2114,7 +2114,7 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
                         current.lastSyncTimestamp(),
                         SyncCollectionState.BLOCKED,
                         current.retryCount(),
-                        System.currentTimeMillis(),
+                        current.lastErrorTimestamp(), // WAWebSyncdCollectionsStateMachine.moveCollectionsToBlocked: preserves finiteFailureStartTime
                         current.macMismatch(),
                         current.bootstrapped()
                 )
@@ -2148,7 +2148,7 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
                         current.lastSyncTimestamp(),
                         SyncCollectionState.ERROR_FATAL,
                         current.retryCount(),
-                        System.currentTimeMillis(),
+                        current.lastErrorTimestamp(), // WAWebSyncdCollectionsStateMachine.moveCollectionsToFatal: does not set finiteFailureStartTime
                         current.macMismatch(),
                         current.bootstrapped()
                 )

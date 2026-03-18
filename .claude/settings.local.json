@@ -1,0 +1,25 @@
+{
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
+  "permissions": {
+    "allow": [
+      "mcp__whatsapp-mcp__search_modules",
+      "mcp__whatsapp-mcp__search_code",
+      "mcp__whatsapp-mcp__get_module_source",
+      "mcp__whatsapp-mcp__get_exports",
+      "Bash(mvn compile:*)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(target=\"/c/Users/Alessandro Autiero/.claude/projects/C--Users-Alessandro-Autiero-Desktop-Cobalt1/178f5644-65b5-4bca-b16e-92b02a9a7c24/subagents/agent-ac8136aa14bbd6613.jsonl\" head -1 \"$target\")",
+      "WebSearch",
+      "Bash(echo:*)",
+      "mcp__whatsapp-mcp__get_symbol_source",
+      "Bash(ls:*)",
+      "mcp__whatsapp-mcp__find_references",
+      "Bash(mvn clean:*)",
+      "Bash(javac --enable-preview --release 25 -d /tmp/test_compile -cp src/main/java \"src/main/java/com/github/auties00/cobalt/sync/WebAppStateBackoffScheduler.java\")",
+      "mcp__whatsapp-mcp__trace_dependencies",
+      "mcp__whatsapp-mcp__get_module_metadata"
+    ]
+  }
+}

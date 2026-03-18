@@ -6,121 +6,157 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ * Registry mapping action names to their handlers.
+ *
+ * <p>Per WhatsApp Web {@code WAWebSyncdGetActionHandler}: the registry stores
+ * all action handlers and provides lookup by action name and a global
+ * max-supported-version query for version gating.
+ *
+ * @implNote WAWebSyncdGetActionHandler.setActionHandlers, WAWebSyncdGetActionHandler.getActionHandler, WAWebSyncdGetActionHandler.maxSupportedVersion
+ */
 public final class WebAppStateHandlerRegistry {
-    private final Map<String, WebAppStateActionHandler> handlers;
+    private final Map<String, WebAppStateActionHandler> handlers; // WAWebSyncdGetActionHandler: var e (lazy Map keyed by getAction())
 
     /**
      * Constructs a new handler registry and registers the default handlers.
+     *
+     * @implNote WAWebSyncdGetActionHandler.setActionHandlers, WAWebCollectionHandlerActions.ActionHandlers
      */
     public WebAppStateHandlerRegistry() {
-        this.handlers = new HashMap<>();
-        registerDefaultHandlers();
+        this.handlers = new HashMap<>(); // ADAPTED: WAWebSyncdGetActionHandler (eagerly created vs WA Web lazy Map)
+        registerDefaultHandlers(); // WAWebHandleSuccess -> WAWebSyncdGetActionHandler.setActionHandlers(WAWebCollectionHandlerActions.ActionHandlers)
     }
 
-    private void registerDefaultHandlers() {
+    private void registerDefaultHandlers() { // WAWebCollectionHandlerActions.ActionHandlers
         // Chat actions
-        registerHandler(ArchiveChatHandler.INSTANCE);
-        registerHandler(PinChatHandler.INSTANCE);
-        registerHandler(MuteChatHandler.INSTANCE);
-        registerHandler(MarkChatAsReadHandler.INSTANCE);
-        registerHandler(ClearChatHandler.INSTANCE);
-        registerHandler(DeleteChatHandler.INSTANCE);
-        registerHandler(LockChatHandler.INSTANCE);
+        registerHandler(ArchiveChatHandler.INSTANCE); // WAWebArchiveChatSync
+        registerHandler(PinChatHandler.INSTANCE); // WAWebPinChatSync
+        registerHandler(MuteChatHandler.INSTANCE); // WAWebMuteChatSync
+        registerHandler(MarkChatAsReadHandler.INSTANCE); // WAWebMarkChatAsReadSync
+        registerHandler(ClearChatHandler.INSTANCE); // WAWebClearChatSync
+        registerHandler(DeleteChatHandler.INSTANCE); // WAWebDeleteChatSync
+        registerHandler(LockChatHandler.INSTANCE); // WAWebLockChatSync
 
         // Message actions
-        registerHandler(StarMessageHandler.INSTANCE);
-        registerHandler(DeleteMessageForMeHandler.INSTANCE);
-        registerHandler(InteractiveMessageHandler.INSTANCE);
+        registerHandler(StarMessageHandler.INSTANCE); // WAWebStarMessageSync
+        registerHandler(DeleteMessageForMeHandler.INSTANCE); // WAWebDeleteMessageForMeSync
+        registerHandler(InteractiveMessageHandler.INSTANCE); // WAWebInteractiveMessageSync
 
         // Contact actions
-        registerHandler(ContactActionHandler.INSTANCE);
-        registerHandler(LidContactHandler.INSTANCE);
-        registerHandler(PnForLidChatHandler.INSTANCE);
-        registerHandler(ShareOwnPnHandler.INSTANCE);
+        registerHandler(ContactActionHandler.INSTANCE); // WAWebContactSync
+        registerHandler(LidContactHandler.INSTANCE); // WAWebLidContactSync
+        registerHandler(PnForLidChatHandler.INSTANCE); // WAWebPnForLidChatSync
+        registerHandler(ShareOwnPnHandler.INSTANCE); // WAWebShareOwnPnSync
 
         // Label actions
-        registerHandler(LabelEditHandler.INSTANCE);
-        registerHandler(LabelAssociationHandler.INSTANCE);
-        registerHandler(LabelReorderingHandler.INSTANCE);
+        registerHandler(LabelEditHandler.INSTANCE); // WAWebLabelSync
+        registerHandler(LabelAssociationHandler.INSTANCE); // WAWebLabelJidSync
+        registerHandler(LabelReorderingHandler.INSTANCE); // WAWebLabelReorderingSync
 
         // Business actions
-        registerHandler(QuickReplyHandler.INSTANCE);
-        registerHandler(AgentActionHandler.INSTANCE);
-        registerHandler(ChatAssignmentHandler.INSTANCE);
-        registerHandler(ChatAssignmentOpenedStatusHandler.INSTANCE);
-        registerHandler(MarketingMessageHandler.INSTANCE);
-        registerHandler(MarketingMessageBroadcastHandler.INSTANCE);
-        registerHandler(BusinessBroadcastListHandler.INSTANCE);
-        registerHandler(BusinessBroadcastAssociationHandler.INSTANCE);
-        registerHandler(BusinessBroadcastCampaignHandler.INSTANCE);
-        registerHandler(BusinessBroadcastInsightsHandler.INSTANCE);
-        registerHandler(MerchantPaymentPartnerHandler.INSTANCE);
-        registerHandler(NoteEditHandler.INSTANCE);
+        registerHandler(QuickReplyHandler.INSTANCE); // WAWebQuickRepliesSync
+        registerHandler(AgentActionHandler.INSTANCE); // WAWebAgentSync
+        registerHandler(ChatAssignmentHandler.INSTANCE); // WAWebChatAssignmentSync
+        registerHandler(ChatAssignmentOpenedStatusHandler.INSTANCE); // WAWebChatAssignmentOpenedStatusSync
+        registerHandler(MarketingMessageHandler.INSTANCE); // WAWebPremiumMessageSync
+        registerHandler(MarketingMessageBroadcastHandler.INSTANCE); // WAWebPremiumMessageBroadcastSync
+        registerHandler(BusinessBroadcastListHandler.INSTANCE); // WAWebBroadcastListSync
+        registerHandler(BusinessBroadcastCampaignHandler.INSTANCE); // WAWebBroadcastCampaignSync
+        registerHandler(BusinessBroadcastInsightsHandler.INSTANCE); // WAWebBusinessBroadcastInsightsSync
+        registerHandler(CustomerDataHandler.INSTANCE); // WAWebCustomerDataSync
+        registerHandler(MerchantPaymentPartnerHandler.INSTANCE); // WAWebMerchantPaymentPartnerSync
+        registerHandler(NoteEditHandler.INSTANCE); // WAWebNoteSync
 
         // Sticker and avatar actions
-        registerHandler(FavoriteStickerHandler.INSTANCE);
-        registerHandler(RemoveRecentStickerHandler.INSTANCE);
-        registerHandler(RecentEmojiWeightsHandler.INSTANCE);
-        registerHandler(AvatarUpdatedHandler.INSTANCE);
-        registerHandler(MusicUserIdHandler.INSTANCE);
-        registerHandler(NewsletterSavedInterestsHandler.INSTANCE);
+        registerHandler(FavoriteStickerHandler.INSTANCE); // WAWebStickersFavoriteSyncAction
+        registerHandler(RemoveRecentStickerHandler.INSTANCE); // WAWebStickersRemoveRecentSyncAction
+        registerHandler(AvatarUpdatedHandler.INSTANCE); // WAWebStickersAvatarUpdatedSyncAction
 
         // AI actions
-        registerHandler(AiThreadDeleteHandler.INSTANCE);
-        registerHandler(AiThreadRenameHandler.INSTANCE);
-        registerHandler(MaibaAIFeaturesControlHandler.INSTANCE);
-        registerHandler(UGCBotHandler.INSTANCE);
+        registerHandler(AiThreadDeleteHandler.INSTANCE); // WAWebAiThreadDeleteSync
+        registerHandler(AiThreadRenameHandler.INSTANCE); // WAWebAiThreadRenameSync
 
         // Payment actions
-        registerHandler(PaymentInfoHandler.INSTANCE);
-        registerHandler(PaymentTosHandler.INSTANCE);
-        registerHandler(CustomPaymentMethodsHandler.INSTANCE);
+        registerHandler(PaymentInfoHandler.INSTANCE); // WAWebPaymentInfoSync
+        registerHandler(PaymentTosHandler.INSTANCE); // WAWebPaymentTosSync
+        registerHandler(CustomPaymentMethodsHandler.INSTANCE); // WAWebCustomPaymentMethodsSync
 
         // User preference actions
-        registerHandler(UserStatusMuteHandler.INSTANCE);
-        registerHandler(TimeFormatHandler.INSTANCE);
-        registerHandler(FavoritesHandler.INSTANCE);
-        registerHandler(SubscriptionHandler.INSTANCE);
-        registerHandler(StatusPostOptInNotificationPreferencesHandler.INSTANCE);
-        registerHandler(NotificationActivitySettingHandler.INSTANCE);
-        registerHandler(WamoUserIdentifierHandler.INSTANCE);
+        registerHandler(UserStatusMuteHandler.INSTANCE); // WAWebUserStatusMuteSync
+        registerHandler(TimeFormatHandler.INSTANCE); // WAWebTimeFormatSync
+        registerHandler(FavoritesHandler.INSTANCE); // WAWebFavoritesSync
 
         // System actions
-        registerHandler(NuxActionHandler.INSTANCE);
-        registerHandler(PrimaryVersionHandler.INSTANCE);
-        registerHandler(SentinelHandler.INSTANCE);
-        registerHandler(PrimaryFeatureHandler.INSTANCE);
-        registerHandler(AndroidUnsupportedActionsHandler.INSTANCE);
-        registerHandler(DeviceCapabilitiesHandler.INSTANCE);
-        registerHandler(BotWelcomeRequestHandler.INSTANCE);
-        registerHandler(DetectedOutcomesStatusHandler.INSTANCE);
-        registerHandler(WaffleAccountLinkStateHandler.INSTANCE);
-        registerHandler(CtwaPerCustomerDataSharingHandler.INSTANCE);
+        registerHandler(NuxActionHandler.INSTANCE); // WAWebNuxSync
+        registerHandler(PrimaryVersionHandler.INSTANCE); // WAWebPrimaryVersionSync
+        registerHandler(SentinelHandler.INSTANCE); // WAWebSentinelMutationSync
+        registerHandler(PrimaryFeatureHandler.INSTANCE); // WAWebPrimaryFeatureSync
+        registerHandler(AndroidUnsupportedActionsHandler.INSTANCE); // WAWebAndroidUnsupportedActionsSync
+        registerHandler(DeviceCapabilitiesHandler.INSTANCE); // WAWebDeviceCapabilitiesSync
+        registerHandler(BotWelcomeRequestHandler.INSTANCE); // WAWebBotWelcomeRequestSync
+        registerHandler(DetectedOutcomesStatusHandler.INSTANCE); // WAWebDetectedOutcomesStatusSync
+        registerHandler(WaffleAccountLinkStateHandler.INSTANCE); // WAWebWaffleAccountLinkStateSync
+        registerHandler(CtwaPerCustomerDataSharingHandler.INSTANCE); // WAWebCtwaPerCustomerDataSharingSync
 
         // Settings
-        registerHandler(PushNameSettingHandler.INSTANCE);
-        registerHandler(LocaleSettingHandler.INSTANCE);
-        registerHandler(UnarchiveChatsSettingHandler.INSTANCE);
-        registerHandler(StatusPrivacyHandler.INSTANCE);
-        registerHandler(PrivacySettingChannelsPersonalisedRecommendationHandler.INSTANCE);
-        registerHandler(PrivateProcessingSettingHandler.INSTANCE);
-        registerHandler(DisableLinkPreviewsHandler.INSTANCE);
-        registerHandler(VoipRelayAllCallsHandler.INSTANCE);
-        registerHandler(ChatLockSettingsHandler.INSTANCE);
-        registerHandler(ExternalWebBetaHandler.INSTANCE);
-        registerHandler(SettingsSyncHandler.INSTANCE);
-        registerHandler(NctSaltSyncHandler.INSTANCE);
-        registerHandler(CallLogHandler.INSTANCE);
-        registerHandler(DeleteIndividualCallLogHandler.INSTANCE);
-        registerHandler(UsernameChatStartModeHandler.INSTANCE);
-        registerHandler(OutContactHandler.INSTANCE);
+        registerHandler(PushNameSettingHandler.INSTANCE); // WAWebPushNameSync
+        registerHandler(LocaleSettingHandler.INSTANCE); // WAWebLocaleSettingSync
+        registerHandler(UnarchiveChatsSettingHandler.INSTANCE); // WAWebArchiveSettingSync
+        registerHandler(StatusPrivacyHandler.INSTANCE); // WAWebStatusPrivacySettingSync
+        registerHandler(DisableLinkPreviewsHandler.INSTANCE); // WAWebDisableLinkPreviewsSync
+        registerHandler(VoipRelayAllCallsHandler.INSTANCE); // WAWebVoipRelayAllCallsSettingSync
+        registerHandler(ChatLockSettingsHandler.INSTANCE); // WAWebChatLockSettingsSync
+        registerHandler(ExternalWebBetaHandler.INSTANCE); // WAWebExternalWebBetaSync
+        registerHandler(SettingsSyncHandler.INSTANCE); // WAWebSettingsSync
+        registerHandler(NctSaltSyncHandler.INSTANCE); // WAWebNctSaltSync
+        registerHandler(CallLogHandler.INSTANCE); // WAWebCallLogSync
+        registerHandler(OutContactHandler.INSTANCE); // WAWebOutContactSync
     }
 
+    /**
+     * Registers a handler for its declared action name.
+     *
+     * <p>Per WhatsApp Web {@code WAWebSyncdGetActionHandler.setActionHandlers}:
+     * the array of handlers is stored and lazily indexed by action name via
+     * {@code e.getAction()}.
+     *
+     * @param handler the handler to register
+     * @implNote WAWebSyncdGetActionHandler.setActionHandlers
+     */
     public void registerHandler(WebAppStateActionHandler handler) {
-        handlers.put(handler.actionName(), handler);
+        handlers.put(handler.actionName(), handler); // WAWebSyncdGetActionHandler.setActionHandlers
     }
 
+    /**
+     * Finds a handler by action name.
+     *
+     * <p>Per WhatsApp Web {@code WAWebSyncdGetActionHandler.getActionHandler}:
+     * looks up the handler map by action string. Returns {@code Optional.empty()}
+     * when no handler is registered for the given action.
+     *
+     * @param actionName the action name to look up
+     * @return the handler, or empty if not registered
+     * @implNote WAWebSyncdGetActionHandler.getActionHandler
+     */
     public Optional<WebAppStateActionHandler> findHandler(String actionName) {
-        return Optional.ofNullable(handlers.get(actionName));
+        return Optional.ofNullable(handlers.get(actionName)); // ADAPTED: WAWebSyncdGetActionHandler.getActionHandler (returns Optional instead of undefined, no lazy Map init)
+    }
+
+    /**
+     * Returns the maximum version supported by any registered handler.
+     *
+     * <p>Per WhatsApp Web {@code WAWebSyncdGetActionHandler.maxSupportedVersion}:
+     * computes the maximum of all handler versions. Used for fast pre-filtering
+     * of mutations whose version exceeds any handler's capability.
+     *
+     * @return the maximum supported version across all handlers
+     * @implNote WAWebSyncdGetActionHandler.maxSupportedVersion
+     */
+    public int maxSupportedVersion() {
+        return handlers.values().stream() // ADAPTED: WAWebSyncdGetActionHandler.maxSupportedVersion (recomputes each call vs WA Web lazy cache in var s)
+                .mapToInt(WebAppStateActionHandler::version) // WAWebSyncdGetActionHandler.maxSupportedVersion: e.getVersion()
+                .max() // WAWebSyncdGetActionHandler.maxSupportedVersion: Math.max.apply(Math, ...)
+                .orElse(0); // ADAPTED: returns 0 when empty vs WA Web returns -Infinity (impossible in practice)
     }
 }

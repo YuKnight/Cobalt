@@ -17,11 +17,52 @@ import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.Arrays;
 
+/**
+ * Represents the result of decrypting a sync mutation.
+ *
+ * <p>Two variants exist: {@link Untrusted} (freshly decrypted with full MAC verification
+ * metadata) and {@link Trusted} (validated and ready for application).
+ *
+ * @implNote WAWebSyncdDecryptMutations.syncdDecryptMutation,
+ *           WAWebSyncdDecryptMutationsWrapper.tryDecryptSnapshot,
+ *           WAWebSyncdDecryptMutationsWrapper.tryDecryptPatch
+ */
 public sealed interface DecryptedMutation {
+    /**
+     * Returns the index string identifying this mutation's target.
+     *
+     * @return the index string
+     */
     String index();
+
+    /**
+     * Returns the sync operation type (SET or REMOVE).
+     *
+     * @return the operation type
+     */
     SyncdOperation operation();
+
+    /**
+     * Returns the timestamp of the action.
+     *
+     * @return the action timestamp
+     */
     Instant timestamp();
 
+    /**
+     * Represents a freshly decrypted mutation that has passed MAC verification
+     * but retains all cryptographic metadata.
+     *
+     * @param index         the decoded index string from the action data
+     * @param indexMac      the verified index MAC bytes
+     * @param valueMac      the verified value MAC bytes (last 32 bytes of encrypted value)
+     * @param value         the decoded sync action value
+     * @param operation     the sync operation type
+     * @param timestamp     the action timestamp
+     * @param keyId         the sync key ID used for decryption
+     * @param actionVersion the action version from the decoded action data
+     * @implNote WAWebSyncdDecryptMutations.syncdDecryptMutation
+     */
     record Untrusted(
             String index,
             byte[] indexMac,
@@ -32,9 +73,39 @@ public sealed interface DecryptedMutation {
             byte[] keyId,
             int actionVersion
     ) implements DecryptedMutation {
-        private static final int IV_LENGTH = 16;
-        private static final int MAC_LENGTH = 32;
+        private static final int IV_LENGTH = 16; // WAWebSyncdCryptoConst.IV_LENGTH
+        private static final int MAC_LENGTH = 32; // WAWebSyncdCryptoConst.MAC_LENGTH
 
+        /**
+         * Decrypts and verifies an encrypted mutation value.
+         *
+         * <p>Performs the following steps matching WA Web's {@code syncdDecryptMutation}:
+         * <ol>
+         *   <li>Extracts value MAC from last 32 bytes</li>
+         *   <li>Splits encrypted value into IV, ciphertext, and MAC</li>
+         *   <li>Verifies value MAC via HMAC-SHA512 truncated to 32 bytes</li>
+         *   <li>Decrypts ciphertext with AES-256-CBC</li>
+         *   <li>Decodes and validates the {@code SyncActionData} protobuf</li>
+         *   <li>Verifies index MAC via HMAC-SHA256</li>
+         * </ol>
+         *
+         * @param encryptedValue the wire encrypted value bytes (IV || ciphertext || MAC)
+         * @param indexMac       the wire index MAC bytes to verify against
+         * @param keys           the derived mutation keys
+         * @param operation      the sync operation type
+         * @param keyId          the sync key ID bytes
+         * @return a new {@code Untrusted} instance with the decrypted data
+         * @throws GeneralSecurityException if any cryptographic operation fails
+         * @throws WhatsAppWebAppStateSyncException.ValueMacMismatch if value MAC verification fails
+         * @throws WhatsAppWebAppStateSyncException.IndexMacMismatch if index MAC verification fails
+         * @implNote WAWebSyncdDecryptMutations.syncdDecryptMutation,
+         *           WAWebSyncdMutationsCryptoUtils.generateMac,
+         *           WAWebSyncdMutationsCryptoUtils.generateAssociatedData,
+         *           WAWebSyncdMutationsCryptoUtils.decryptCipherText,
+         *           WAWebSyncdCrypto.generateIndexMac,
+         *           WAWebSyncdDecode.decodeSyncActionData,
+         *           WAWebSyncdValidateSyncActionProtobuf.validateSyncActionDataProtobuf
+         */
         public static Untrusted of(
                 byte[] encryptedValue,
                 byte[] indexMac,
@@ -46,61 +117,61 @@ public sealed interface DecryptedMutation {
                 throw new IllegalArgumentException("Encrypted value too short");
             }
 
-            // Extract value MAC (last 32 bytes)
+            // Extract value MAC (last 32 bytes) — WAWebSyncdCrypto.valueMacFromIndexAndValueCipherText
             var valueMac = Arrays.copyOfRange(encryptedValue, encryptedValue.length - MAC_LENGTH, encryptedValue.length);
 
-            // Build associated data: [opByte] || keyIdBytes
+            // Build associated data: [opByte] || keyIdBytes — WAWebSyncdMutationsCryptoUtils.generateAssociatedData
             var associatedData = new byte[1 + keyId.length];
-            associatedData[0] = operation.content();
+            associatedData[0] = operation.content(); // WAWebSyncdCryptoConst.OPERATION_SET_HEX / OPERATION_REMOVE_HEX
             System.arraycopy(keyId, 0, associatedData, 1, keyId.length);
 
-            // Build 8-byte length suffix: last byte = associatedData.length
-            var lengthSuffix = new byte[8];
+            // Build 8-byte length suffix: last byte = associatedData.length — WAWebSyncdMutationsCryptoUtils.generateMac
+            var lengthSuffix = new byte[8]; // WAWebSyncdCryptoConst.OCTET_LENGTH = 8
             lengthSuffix[7] = (byte) associatedData.length;
 
-            // Verify value MAC using HMAC-SHA-512 truncated to 32 bytes
-            var mac = Mac.getInstance("HmacSHA512");
+            // Verify value MAC using HMAC-SHA-512 truncated to 32 bytes — WAWebSyncdMutationsCryptoUtils.generateMac
+            var mac = Mac.getInstance("HmacSHA512"); // WACryptoHmac.hmacSha512
             mac.init(keys.valueMacKey());
-            mac.update(associatedData);
+            mac.update(associatedData); // WAWebSyncdCryptoUtils.combine([associatedData, iv_ciphertext, lengthSuffix])
             mac.update(encryptedValue, 0, encryptedValue.length - MAC_LENGTH); // IV || ciphertext
             mac.update(lengthSuffix);
             var fullMac = mac.doFinal();
-            var expectedMac = Arrays.copyOf(fullMac, MAC_LENGTH);
-            if (!MessageDigest.isEqual(valueMac, expectedMac)) {
-                throw new WhatsAppWebAppStateSyncException.ValueMacMismatch();
+            var expectedMac = Arrays.copyOf(fullMac, MAC_LENGTH); // WAWebSyncdCryptoConst.MAC_LENGTH = 32
+            if (!MessageDigest.isEqual(valueMac, expectedMac)) { // WACryptoUtils.arrayBuffersEqual
+                throw new WhatsAppWebAppStateSyncException.ValueMacMismatch(); // WAWebSyncdError.SyncdFatalError("decryption failure: valueMAC mismatch")
             }
 
-            // Decrypt payload with AES-256-CBC and decode protobuf
-            var cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-            var ivSpec = new IvParameterSpec(encryptedValue, 0, IV_LENGTH);
+            // Decrypt payload with AES-256-CBC and decode protobuf — WAWebSyncdMutationsCryptoUtils.decryptCipherText
+            var cipher = Cipher.getInstance("AES/CBC/PKCS5Padding"); // ADAPTED: WACryptoAesCbc.aesCbcDecrypt
+            var ivSpec = new IvParameterSpec(encryptedValue, 0, IV_LENGTH); // WAWebSyncdCryptoUtils.split — iv part
             cipher.init(Cipher.DECRYPT_MODE, keys.valueEncryptionKey(), ivSpec);
-            var ciphertextStream = new ByteArrayInputStream(encryptedValue, IV_LENGTH, encryptedValue.length - IV_LENGTH - MAC_LENGTH);
+            var ciphertextStream = new ByteArrayInputStream(encryptedValue, IV_LENGTH, encryptedValue.length - IV_LENGTH - MAC_LENGTH); // WAWebSyncdCryptoUtils.split — ciphertext part
             var plaintextStream = new CipherInputStream(ciphertextStream, cipher);
-            var actionData = SyncActionDataSpec.decode(ProtobufInputStream.fromStream(plaintextStream));
+            var actionData = SyncActionDataSpec.decode(ProtobufInputStream.fromStream(plaintextStream)); // WAWebSyncdDecode.decodeSyncActionData
 
-            // Verify index MAC
-            var actionIndex = actionData.index()
+            // Verify index MAC — WAWebSyncdCrypto.generateIndexMac
+            var actionIndex = actionData.index() // WAWebSyncdValidateSyncActionProtobuf.validateSyncActionDataProtobuf — index check
                     .orElseThrow(() -> new WhatsAppWebAppStateSyncException.UnexpectedError("Missing index from action data", null));
-            var actionValue = actionData.value()
+            var actionValue = actionData.value() // ADAPTED: WAWebSyncdValidateMutations.validateAndTypeSetMutations checks this for SET mutations only; Cobalt checks eagerly for all mutations
                     .orElseThrow(() -> new WhatsAppWebAppStateSyncException.UnexpectedError("Missing value from action data", null));
-            var actionTimestamp = actionValue.timestamp()
+            var actionTimestamp = actionValue.timestamp() // ADAPTED: WAWebSyncdValidateMutations.validateAndTypeSetMutations extracts timestamp for SET mutations only; Cobalt extracts eagerly
                     .orElseThrow(WhatsAppWebAppStateSyncException.MissingActionTimestamp::new);
-            var indexMac2 = Mac.getInstance("HmacSHA256");
+            var indexMac2 = Mac.getInstance("HmacSHA256"); // WAWebSyncdCrypto.generateIndexMac — WACryptoHmac.hmacSha256
             indexMac2.init(keys.indexKey());
             var expectedIndexMac = indexMac2.doFinal(actionIndex);
-            if (!MessageDigest.isEqual(indexMac, expectedIndexMac)) {
-                throw new WhatsAppWebAppStateSyncException.IndexMacMismatch();
+            if (!MessageDigest.isEqual(indexMac, expectedIndexMac)) { // WACryptoUtils.arrayBuffersEqual
+                throw new WhatsAppWebAppStateSyncException.IndexMacMismatch(); // WAWebSyncdError.SyncdFatalError("decryption failure: indexMAC mismatch")
             }
 
-            // Per WA Web: missing version is a fatal error, not a default-to-0 case
+            // WAWebSyncdValidateSyncActionProtobuf.validateSyncActionDataProtobuf — version check
             var actionVersion = actionData.version()
                     .orElseThrow(() -> new WhatsAppWebAppStateSyncException.UnexpectedError(
                             "Missing version in action data", null));
             return new Untrusted(
-                    new String(actionIndex, StandardCharsets.UTF_8),
-                    indexMac,
-                    valueMac,
-                    actionValue,
+                    new String(actionIndex, StandardCharsets.UTF_8), // WAArrayBufferUtils equivalent
+                    indexMac,  // WAWebSyncdDecryptMutations: indexMac: c
+                    valueMac,  // WAWebSyncdDecryptMutations: valueMac: m
+                    actionValue, // ADAPTED: stored as object, WA Web re-encodes to binary
                     operation,
                     actionTimestamp,
                     keyId,
@@ -109,6 +180,17 @@ public sealed interface DecryptedMutation {
         }
     }
 
+    /**
+     * Represents a validated mutation ready for application to the local store.
+     *
+     * @param index         the index string identifying the mutation target
+     * @param value         the sync action value to apply
+     * @param operation     the sync operation type (SET or REMOVE)
+     * @param timestamp     the action timestamp
+     * @param actionVersion the action version number
+     * @implNote ADAPTED: Cobalt-specific post-verification type, no direct WA Web equivalent.
+     *           WA Web passes raw fields after anti-tampering; Cobalt wraps them in a sealed variant.
+     */
     record Trusted(
             String index,
             SyncActionValue value,

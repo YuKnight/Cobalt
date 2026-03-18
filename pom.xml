@@ -191,9 +191,11 @@
         <lmdbjava.version>0.9.0</lmdbjava.version>
         <javapoet.version>0.6.0</javapoet.version>
         <jmh.version>1.37</jmh.version>
+        <cobalt.build.dir>${project.basedir}/target</cobalt.build.dir>
     </properties>
 
     <build>
+        <directory>${cobalt.build.dir}</directory>
         <plugins>
             <!-- Compile the project with protobuf annotation processing -->
             <plugin>

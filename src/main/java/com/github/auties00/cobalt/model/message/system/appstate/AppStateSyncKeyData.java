@@ -4,7 +4,7 @@ import com.github.auties00.cobalt.model.message.Message;
 
 import java.time.Instant;
 
-import com.github.auties00.cobalt.model.mixin.InstantSecondsMixin;
+import com.github.auties00.cobalt.model.mixin.InstantMillisMixin;
 import it.auties.protobuf.annotation.*;
 import it.auties.protobuf.model.*;
 import java.util.Optional;
@@ -17,7 +17,7 @@ public final class AppStateSyncKeyData implements Message {
     @ProtobufProperty(index = 2, type = ProtobufType.MESSAGE)
     AppStateSyncKeyFingerprint fingerprint;
 
-    @ProtobufProperty(index = 3, type = ProtobufType.INT64, mixins = InstantSecondsMixin.class)
+    @ProtobufProperty(index = 3, type = ProtobufType.INT64, mixins = InstantMillisMixin.class)
     Instant timestamp;
 
 

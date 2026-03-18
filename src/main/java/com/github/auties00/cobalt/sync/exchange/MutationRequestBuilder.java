@@ -36,6 +36,9 @@ import java.util.logging.Logger;
  * <p>Per WhatsApp Web behavior, outgoing patches are serialized as
  * {@code SyncdPatch} protobuf blobs containing encrypted mutations,
  * computed snapshotMac and patchMac, key ID, and device metadata.
+ *
+ * @implNote WAWebSyncdRequestBuilder.default, WAWebSyncdRequestBuilderBuild.buildSyncIqNode,
+ *           WAWebSyncdRequestBuilderBuild._generateMutationsToUpload
  */
 public final class MutationRequestBuilder {
     private static final Logger LOGGER = Logger.getLogger(MutationRequestBuilder.class.getName());
@@ -62,32 +65,32 @@ public final class MutationRequestBuilder {
      * upload metadata so the caller can run the {@code _uploadSuccessful}
      * path after a successful server response.
      *
+     * @implNote WAWebSyncdRequestBuilderBuild.buildSyncIqNode,
+     *           WAWebSyncdRequestBuilderBuild._buildCollectionNodes
      * @param patchType the collection type to sync
      * @param patches   the pending mutations to include
      * @return the sync request containing the IQ node and optional upload info
      */
     public SyncRequest buildSyncRequest(SyncPatchType patchType, SequencedCollection<SyncPendingMutation> patches) {
-        // Get current hash state for this collection
+        // ADAPTED: WAWebSyncdRequestBuilderBuild._buildCollectionNodes — getCollectionVersionInTransaction
         var hashState = whatsapp.store()
                 .findWebAppHashStateByName(patchType)
                 .orElseGet(() -> new SyncHashValue(patchType));
 
-        // Build collection node
+        // WAWebSyncdRequestBuilderBuild._buildCollectionNodes — wap("collection", ...)
         var collectionBuilder = new NodeBuilder()
                 .description("collection")
-                .attribute("name", patchType.toString())
-                .attribute("version", hashState.version())
-                .attribute("return_snapshot", !whatsapp.store().findWebAppState(patchType).bootstrapped() ? "true" : "false");
+                .attribute("name", patchType.toString()) // WAWebSyncdRequestBuilderBuild._buildCollectionNodes — CUSTOM_STRING(t)
+                .attribute("version", hashState.version()) // WAWebSyncdRequestBuilderBuild._buildCollectionNodes — INT(a ?? DEFAULT_COLLECTION_VERSION)
+                .attribute("return_snapshot", !whatsapp.store().findWebAppState(patchType).bootstrapped() ? "true" : "false"); // WAWebSyncdRequestBuilderBuild._buildCollectionNodes — a === void 0
 
-        // Compact: deduplicate by index, keeping the last mutation for each index
-        var compacted = compactPatch(patches);
+        var compacted = compactPatch(patches); // WAWebSyncdRequestBuilderUtils.compactPatch
 
-        // Build patch node if we have mutations
         SyncRequest.UploadedPatchInfo uploadInfo = null;
         if (!compacted.isEmpty()) {
-            var buildResult = buildPatchProtobuf(patchType, compacted, hashState);
+            var buildResult = buildPatchProtobuf(patchType, compacted, hashState); // WAWebSyncdRequestBuilderBuild.C
             var patchNode = new NodeBuilder()
-                    .description("patch")
+                    .description("patch") // WAWebSyncdRequestBuilderBuild.C — wap("patch", null, C)
                     .content(buildResult.bytes())
                     .build();
             collectionBuilder.content(patchNode);
@@ -96,19 +99,20 @@ public final class MutationRequestBuilder {
 
         var collectionNode = collectionBuilder.build();
 
-        // Build sync node
+        // WAWebSyncdRequestBuilderBuild.buildSyncIqNode — wap("sync", null, r)
         var syncNode = new NodeBuilder()
                 .description("sync")
                 .content(collectionNode)
                 .build();
 
-        // Build IQ request
+        // WAWebSyncdRequestBuilderBuild.g — wap("iq", {...}, e)
         var node = new NodeBuilder()
                 .description("iq")
-                .attribute("type", "set")
-                .attribute("xmlns", "w:sync:app:state")
-                .attribute("to", Jid.userServer())
+                .attribute("type", "set") // WAWebSyncdRequestBuilderBuild.g
+                .attribute("xmlns", "w:sync:app:state") // WAWebSyncdRequestBuilderBuild.g
+                .attribute("to", Jid.userServer()) // ADAPTED: WAWebSyncdRequestBuilderBuild.g — S_WHATSAPP_NET
                 .content(syncNode);
+        // ADAPTED: id attribute added automatically by WhatsAppClient.sendNode — WAWebSyncdRequestBuilderBuild.g — generateId()
 
         return new SyncRequest(node, uploadInfo);
     }
@@ -129,14 +133,26 @@ public final class MutationRequestBuilder {
      *
      * <p>Also captures upload metadata for post-response processing via
      * {@link SyncRequest.UploadedPatchInfo}.
+     *
+     * @implNote WAWebSyncdRequestBuilderBuild._buildCollectionNodes (inner function C/b),
+     *           WAWebSyncdAntiTampering.computeOutgoingSnapshotAndPatchMacs,
+     *           WAWebSyncdMMSUpload.exceedInlineMutationCount,
+     *           WAWebSyncdMMSUpload.exceedPatchProtobufSize,
+     *           WAWebSyncdMMSUpload.uploadPatch,
+     *           WAWebSyncdRequestBuilderBuild.L (inline patch builder)
+     * @param patchType the collection type
+     * @param patches   the compacted pending mutations
+     * @param hashState the current hash state for this collection
+     * @return the serialized patch bytes and upload metadata
      */
     private PatchBuildResult buildPatchProtobuf(SyncPatchType patchType, SequencedCollection<SyncPendingMutation> patches, SyncHashValue hashState) {
+        // ADAPTED: WAWebSyncdKeyManagement.getActiveKey — get latest key
         var keys = whatsapp.store().appStateKeys();
         if (keys.isEmpty()) {
             throw new IllegalStateException("No app state sync keys available");
         }
 
-        var latestKey = SyncKeyUtils.findNewestKey(keys);
+        var latestKey = SyncKeyUtils.findNewestKey(keys); // ADAPTED: WAWebSyncdKeyManagement.getNewestKeyPair
         if (latestKey == null) {
             throw new IllegalStateException("No usable app state sync key found");
         }
@@ -148,33 +164,34 @@ public final class MutationRequestBuilder {
                 .orElseThrow(() -> new IllegalStateException("Latest app state sync key data has no ID"));
 
         try (var derivedKeys = MutationKeys.ofSyncKey(latestKeyData)) {
-            // Step 1: Encrypt all mutations
+            // WAWebSyncdRequestBuilderBuild.C — encrypt all mutations
             var encryptedMutations = encryptMutations(patchType, patches, derivedKeys, latestKeyId);
             var userMutationCount = encryptedMutations.size();
 
-            // Step 1b: Key rotation — re-encrypt old-key entries with the latest key
+            // WAWebSyncdRequestBuilderBuild._generateMutationsToUpload — key rotation mutations
             var keyRotationSources = new ArrayList<DecryptedMutation.Trusted>();
             var keyRotationMutations = buildKeyRotationMutations(patchType, patches, derivedKeys, latestKeyId, keyRotationSources);
             encryptedMutations.addAll(keyRotationMutations);
 
-            // Step 2: Compute new LT-Hash from encrypted mutations
+            // WAWebSyncdAntiTampering.computeLtHash — compute new LT-Hash
             var currentLtHash = hashState.hash() != null ? hashState.hash() : MutationLTHash.EMPTY_HASH;
             var toAdd = new ArrayList<byte[]>(encryptedMutations.size());
             var toRemove = new ArrayList<byte[]>();
             for (var encrypted : encryptedMutations) {
                 if (encrypted.operation() == SyncdOperation.SET) {
-                    // Check for existing entry to subtract
+                    // WAWebSyncdAntiTampering.computeLtHash — macsToOverwrite for existing, macsToAdd for new
                     whatsapp.store()
                             .findSyncActionEntry(patchType, encrypted.indexMac())
                             .ifPresent(existing -> toRemove.add(existing.valueMac()));
                     toAdd.add(encrypted.valueMac());
                 } else {
+                    // WAWebSyncdAntiTampering.computeLtHash — macsToRemove for REMOVE ops
                     whatsapp.store()
                             .findSyncActionEntry(patchType, encrypted.indexMac())
                             .ifPresent(existing -> toRemove.add(existing.valueMac()));
                 }
             }
-            var newLtHash = MutationLTHash.subtractThenAdd(currentLtHash, toAdd, toRemove);
+            var newLtHash = MutationLTHash.subtractThenAdd(currentLtHash, toAdd, toRemove).ltHash(); // WAWebSyncdAntiTampering.computeLtHash — subtractThenAdd
 
             // Build upload metadata by pairing encrypted mutations with source data
             var patchesIterator = patches.iterator();
@@ -203,39 +220,39 @@ public final class MutationRequestBuilder {
                 index++;
             }
 
-            // Step 3: Compute MACs
-            var newVersion = hashState.version() + 1;
-            var snapshotMac = MutationIntegrityVerifier.computeSnapshotMac(
+            // WAWebSyncdAntiTampering.computeOutgoingSnapshotAndPatchMacs — compute MACs
+            var newVersion = hashState.version() + 1; // WAWebSyncdAntiTampering.computeOutgoingSnapshotAndPatchMacs — (version ?? DEFAULT) + 1
+            var snapshotMac = MutationIntegrityVerifier.computeSnapshotMac( // WAWebSyncdAntiTampering.computeOutgoingSnapshotAndPatchMacs — generateSnapshotMac
                     derivedKeys.snapshotMacKey(), newLtHash, newVersion, patchType);
             var valueMacs = encryptedMutations.stream()
                     .map(EncryptedMutation::valueMac)
                     .toList();
-            var patchMac = MutationIntegrityVerifier.computePatchMac(
+            var patchMac = MutationIntegrityVerifier.computePatchMac( // WAWebSyncdAntiTampering.computeOutgoingSnapshotAndPatchMacs — generatePatchMac
                     derivedKeys.patchMacKey(), snapshotMac, valueMacs, newVersion, patchType);
 
-            // Step 4: Build SyncdMutation list
+            // WAWebSyncdRequestBuilderBuild.k — build SyncdMutation records
             var syncdMutations = new ArrayList<SyncdMutation>(encryptedMutations.size());
             for (var encrypted : encryptedMutations) {
                 var record = new SyncdRecordBuilder()
-                        .index(new SyncdIndexBuilder().blob(encrypted.indexMac()).build())
-                        .value(new SyncdValueBuilder().blob(encrypted.encryptedValue()).build())
-                        .keyId(new KeyIdBuilder().id(encrypted.keyId()).build())
+                        .index(new SyncdIndexBuilder().blob(encrypted.indexMac()).build()) // WAWebSyncdRequestBuilderBuild.k — index: {blob: indexMac}
+                        .value(new SyncdValueBuilder().blob(encrypted.encryptedValue()).build()) // WAWebSyncdRequestBuilderBuild.k — value: {blob: indexAndValueCipherText}
+                        .keyId(new KeyIdBuilder().id(encrypted.keyId()).build()) // WAWebSyncdRequestBuilderBuild.k — keyId: {id: fromSyncKeyId(keyId)}
                         .build();
                 syncdMutations.add(new SyncdMutationBuilder()
-                        .operation(encrypted.operation())
+                        .operation(encrypted.operation()) // WAWebSyncdRequestBuilderBuild.k — operation
                         .record(record)
                         .build());
             }
 
-            // Per WA Web: include deviceIndex (companion device ID) and clientDebugData
+            // WAWebSyncdRequestBuilderBuild.L — deviceIndex and clientDebugData
             var deviceIndex = whatsapp.store().jid()
-                    .map(jid -> jid.device())
+                    .map(jid -> jid.device()) // WAWebSyncdRequestBuilderBuild.L — extractDeviceId(getMyDeviceJid())
                     .orElse(0);
             var debugData = new PatchDebugDataBuilder()
-                    .isSenderPrimary(false)
-                    .senderPlatform(PatchDebugData.Platform.WEB)
+                    .isSenderPrimary(false) // WAWebSyncdRequestBuilderBuild.L — isSenderPrimary: false
+                    .senderPlatform(PatchDebugData.Platform.WEB) // WAWebSyncdRequestBuilderBuild.L — PatchDebugData$Platform.WEB
                     .build();
-            var clientDebugData = PatchDebugDataSpec.encode(debugData);
+            var clientDebugData = PatchDebugDataSpec.encode(debugData); // WAWebSyncdRequestBuilderBuild.L — encodeProtobuf(PatchDebugDataSpec, ...)
 
             // Capture upload metadata for post-response processing
             var uploadInfo = new SyncRequest.UploadedPatchInfo(
@@ -246,43 +263,43 @@ public final class MutationRequestBuilder {
                     List.copyOf(uploadedMutations)
             );
 
-            // Step 5: Check if mutations should be uploaded externally
-            var maxInlineCount = Math.min(2000, Math.max(100, abPropsService.getInt(ABProp.SYNCD_INLINE_MUTATIONS_MAX_COUNT)));
+            // WAWebSyncdMMSUpload.exceedInlineMutationCount — check mutation count threshold
+            var maxInlineCount = Math.min(2000, Math.max(100, abPropsService.getInt(ABProp.SYNCD_INLINE_MUTATIONS_MAX_COUNT))); // WAWebSyncdMMSUpload.exceedInlineMutationCount — Math.min(s=2000, Math.max(getSyncdInlineMutationsMaxCount(), e=100))
             var externalRef = (ExternalBlobReference) null;
             if (syncdMutations.size() > maxInlineCount) {
-                externalRef = uploadExternalMutations(syncdMutations);
+                externalRef = uploadExternalMutations(syncdMutations); // WAWebSyncdMMSUpload.uploadPatch
             } else {
-                // Check encoded size against threshold
+                // WAWebSyncdRequestBuilderBuild.L — build inline patch
+                // Per WA Web WAWebSyncdRequestBuilderBuild.L: inline patches include
+                // clientDebugData but no version field
                 var inlinePatch = new SyncdPatchBuilder()
-                        .version(new SyncdVersionBuilder().version(newVersion).build())
-                        .mutations(syncdMutations)
-                        .snapshotMac(snapshotMac)
-                        .patchMac(patchMac)
-                        .keyId(new KeyIdBuilder().id(latestKeyId).build())
-                        .deviceIndex(deviceIndex)
-                        .clientDebugData(clientDebugData)
+                        .mutations(syncdMutations) // WAWebSyncdRequestBuilderBuild.L — mutations: e
+                        .snapshotMac(snapshotMac) // WAWebSyncdRequestBuilderBuild.L — snapshotMac: n
+                        .patchMac(patchMac) // WAWebSyncdRequestBuilderBuild.L — patchMac: r
+                        .keyId(new KeyIdBuilder().id(latestKeyId).build()) // WAWebSyncdRequestBuilderBuild.L — keyId: {id: fromSyncKeyId(t)}
+                        .deviceIndex(deviceIndex) // WAWebSyncdRequestBuilderBuild.L — deviceIndex: a
+                        .clientDebugData(clientDebugData) // WAWebSyncdRequestBuilderBuild.L — clientDebugData: i
                         .build();
-                var inlineBytes = SyncdPatchSpec.encode(inlinePatch);
-                var maxSizeBytes = Math.min(100, Math.max(10, abPropsService.getInt(ABProp.SYNCD_PATCH_PROTOBUF_MAX_SIZE))) * 1000L;
+                var inlineBytes = SyncdPatchSpec.encode(inlinePatch); // WAWebSyncdRequestEncode.encodeSyncdPatch
+                // WAWebSyncdMMSUpload.exceedPatchProtobufSize — check encoded size threshold
+                var maxSizeBytes = Math.min(100, Math.max(10, abPropsService.getInt(ABProp.SYNCD_PATCH_PROTOBUF_MAX_SIZE))) * 1000L; // WAWebSyncdMMSUpload.exceedPatchProtobufSize — Math.min(c=100, Math.max(getSyncdPatchProtobufMaxSize(), u=10)) * 1e3
                 if (inlineBytes.length > maxSizeBytes) {
-                    externalRef = uploadExternalMutations(syncdMutations);
+                    externalRef = uploadExternalMutations(syncdMutations); // WAWebSyncdMMSUpload.uploadPatch
                 } else {
                     return new PatchBuildResult(inlineBytes, uploadInfo);
                 }
             }
 
-            // Build patch with external reference instead of inline mutations
+            // WAWebSyncdMMSUpload.f — build external patch (no clientDebugData, no version)
             var syncdPatch = new SyncdPatchBuilder()
-                    .version(new SyncdVersionBuilder().version(newVersion).build())
-                    .externalMutations(externalRef)
-                    .snapshotMac(snapshotMac)
-                    .patchMac(patchMac)
-                    .keyId(new KeyIdBuilder().id(latestKeyId).build())
-                    .deviceIndex(deviceIndex)
-                    .clientDebugData(clientDebugData)
+                    .externalMutations(externalRef) // WAWebSyncdMMSUpload.f — externalMutations: e
+                    .snapshotMac(snapshotMac) // WAWebSyncdMMSUpload.f — snapshotMac: n
+                    .patchMac(patchMac) // WAWebSyncdMMSUpload.f — patchMac: r
+                    .keyId(new KeyIdBuilder().id(latestKeyId).build()) // WAWebSyncdMMSUpload.f — keyId: {id: fromSyncKeyId(t)}
+                    .deviceIndex(deviceIndex) // WAWebSyncdMMSUpload.f — deviceIndex: a
                     .build();
 
-            return new PatchBuildResult(SyncdPatchSpec.encode(syncdPatch), uploadInfo);
+            return new PatchBuildResult(SyncdPatchSpec.encode(syncdPatch), uploadInfo); // WAWebSyncdRequestEncode.encodeSyncdPatch
         } catch (GeneralSecurityException exception) {
             throw new IllegalStateException("Failed to build outgoing patch", exception);
         }
@@ -290,6 +307,18 @@ public final class MutationRequestBuilder {
 
     /**
      * Encrypts pending mutations into {@code EncryptedMutation} objects.
+     *
+     * <p>Per WhatsApp Web {@code WAWebSyncdEncryptMutationsWrapper.encryptMutation}:
+     * for SET operations the latest key is used, for REMOVE operations the
+     * original key from the stored entry is looked up and used instead.
+     *
+     * @implNote WAWebSyncdEncryptMutationsWrapper.encryptMutation
+     * @param patchType   the collection type
+     * @param patches     the pending mutations to encrypt
+     * @param derivedKeys the derived keys from the latest sync key
+     * @param latestKeyId the latest key ID
+     * @return the encrypted mutations
+     * @throws GeneralSecurityException if encryption fails
      */
     private SequencedCollection<EncryptedMutation> encryptMutations(
             SyncPatchType patchType,
@@ -302,32 +331,35 @@ public final class MutationRequestBuilder {
             var mutation = patch.mutation();
             EncryptedMutation encrypted;
 
+            // WAWebSyncdEncryptMutationsWrapper.encryptMutation — switch on operation
             if (mutation.operation() == SyncdOperation.REMOVE) {
-                // For REMOVE: look up the original SET mutation's key from store
+                // WAWebSyncdEncryptMutationsWrapper.encryptMutation — REMOVE branch: look up original key
                 var indexBytes = mutation.index().getBytes(StandardCharsets.UTF_8);
                 var indexMac = Mac.getInstance("HmacSHA256");
                 indexMac.init(derivedKeys.indexKey());
                 var indexMacResult = indexMac.doFinal(indexBytes);
 
+                // WAWebSyncdEncryptMutationsWrapper.encryptMutation — getSyncActionInTransaction(a)
                 var originalEntry = whatsapp.store()
                         .findSyncActionEntry(patchType, indexMacResult)
-                        .orElseThrow(() -> new IllegalStateException(
+                        .orElseThrow(() -> new IllegalStateException( // WAWebSyncdEncryptMutationsWrapper.encryptMutation — SyncdFatalError("no corresponding set mutation")
                                 "Cannot find original key for REMOVE operation on index: " + mutation.index()
                         ));
 
+                // WAWebSyncdEncryptMutationsWrapper.encryptMutation — getKeyData(c)
                 var originalKeyData = whatsapp.store()
                         .findWebAppStateKeyById(originalEntry.keyId())
                         .flatMap(AppStateSyncKey::keyData)
                         .flatMap(AppStateSyncKeyData::keyData)
-                        .orElseThrow(() -> new IllegalStateException(
+                        .orElseThrow(() -> new IllegalStateException( // WAWebSyncdEncryptMutationsWrapper.encryptMutation — SyncdFatalError("no key data for corresponding mutation")
                                 "Original sync key not found for REMOVE operation"
                         ));
 
                 try (var originalDerivedKeys = MutationKeys.ofSyncKey(originalKeyData)) {
-                    encrypted = EncryptedMutation.of(patch, originalDerivedKeys, originalEntry.keyId());
+                    encrypted = EncryptedMutation.of(patch, originalDerivedKeys, originalEntry.keyId()); // WAWebSyncdEncryptMutationsWrapper.encryptMutation — l=c, s=d
                 }
             } else {
-                encrypted = EncryptedMutation.of(patch, derivedKeys, latestKeyId);
+                encrypted = EncryptedMutation.of(patch, derivedKeys, latestKeyId); // WAWebSyncdEncryptMutationsWrapper.encryptMutation — SET: use active key
             }
 
             result.add(encrypted);
@@ -350,6 +382,9 @@ public final class MutationRequestBuilder {
      * is not the latest. This tells the server to explicitly remove the old-key
      * entry before the new-key entry is applied.
      *
+     * @implNote WAWebSyncdRequestBuilderBuild._generateMutationsToUpload (function I/T),
+     *           WAWebSyncdRequestBuilderBuild.D (rotation SET generation),
+     *           WAWebSyncdRequestBuilderBuild.x (rotation REMOVE generation)
      * @param patchType   the collection type
      * @param patches     the core mutations being sent (to exclude from rotation)
      * @param derivedKeys the derived keys from the latest sync key
@@ -365,46 +400,44 @@ public final class MutationRequestBuilder {
             byte[] latestKeyId,
             List<DecryptedMutation.Trusted> keyRotationSourcesOut
     ) throws GeneralSecurityException {
-        // Collect indices already in the current batch to avoid duplicates
+        // WAWebSyncdRequestBuilderBuild.D — collect indices from current batch
         var batchIndices = new HashSet<String>();
         for (var patch : patches) {
             batchIndices.add(patch.mutation().index());
         }
 
-        // Find entries with old keys that are not in the current batch
-        // Per WA Web: sort by key epoch ascending to rotate oldest keys first
+        // ADAPTED: WAWebSyncdRequestBuilderBuild.D — getSyncActionsByCollectionsInTransaction([e])
+        // then filter by !a.has(e.index) && !syncKeyIdsEqual(e.keyId, n)
+        // then sortBy(e => getKeyEpoch(e.keyId))
         var allEntries = whatsapp.store().getSyncActionEntries(patchType)
                 .stream()
-                .sorted(Comparator.comparingInt(e -> SyncKeyUtils.getKeyEpoch(e.keyId())))
+                .sorted(Comparator.comparingInt(e -> SyncKeyUtils.getKeyEpoch(e.keyId()))) // WAWebSyncdRequestBuilderBuild.D — sortBy(getKeyEpoch)
                 .toList();
-        var maxAdditional = Math.min(5, Math.max(0, abPropsService.getInt(ABProp.SYNCD_ADDITIONAL_MUTATIONS_COUNT)));
+        var maxAdditional = Math.min(5, Math.max(0, abPropsService.getInt(ABProp.SYNCD_ADDITIONAL_MUTATIONS_COUNT))); // WAWebSyncdRequestBuilderBuild.D — Math.min(p=5, getABPropConfigValue("syncd_additional_mutations_count"))
         var result = new ArrayList<EncryptedMutation>();
 
         for (var entry : allEntries) {
-            if (result.size() >= maxAdditional) {
+            if (result.size() >= maxAdditional) { // WAWebSyncdRequestBuilderBuild.D — i.slice(0, l)
                 break;
             }
 
-            // Skip entries already using the latest key
-            if (Arrays.equals(entry.keyId(), latestKeyId)) {
+            if (Arrays.equals(entry.keyId(), latestKeyId)) { // WAWebSyncdRequestBuilderBuild.D — !syncKeyIdsEqual(e.keyId, n)
                 continue;
             }
 
-            // Skip entries without stored plaintext (e.g., from older sessions)
             if (entry.actionIndex() == null || entry.actionValue() == null) {
                 continue;
             }
 
-            // Skip entries whose index is already in the current batch
-            if (batchIndices.contains(entry.actionIndex())) {
+            if (batchIndices.contains(entry.actionIndex())) { // WAWebSyncdRequestBuilderBuild.D — !a.has(e.index)
                 continue;
             }
 
-            // Re-encrypt with the latest key as a SET mutation
+            // ADAPTED: WAWebSyncdRequestBuilderTypesConverter.syncActionsToPendingMutations — re-encode as SET
             var trusted = new DecryptedMutation.Trusted(
                     entry.actionIndex(),
                     entry.actionValue(),
-                    SyncdOperation.SET,
+                    SyncdOperation.SET, // WAWebSyncdRequestBuilderBuild.D — SyncdMutation$SyncdOperation.SET
                     Instant.now(),
                     entry.actionVersion()
             );
@@ -413,43 +446,44 @@ public final class MutationRequestBuilder {
             result.add(EncryptedMutation.of(pending, derivedKeys, latestKeyId));
         }
 
-        // Per WA Web: generate REMOVE mutations for old-key entries whose index
-        // is being SET (either by user mutations or rotation SETs above).
-        // Collect all SET indices from user mutations + rotation SETs.
-        var allSetIndices = new HashSet<>(batchIndices);
+        // WAWebSyncdRequestBuilderBuild.x — generate REMOVE mutations for old-key entries
+        // Per WA Web: only SET operations' indices are collected (not REMOVE), matching
+        // t.filter(e => e.operation === SET).map(e => e.index)
+        var allSetIndices = new HashSet<String>();
+        for (var patch : patches) {
+            if (patch.mutation().operation() == SyncdOperation.SET) { // WAWebSyncdRequestBuilderBuild.x — filter to SET operations only
+                allSetIndices.add(patch.mutation().index());
+            }
+        }
         for (var rotationSource : keyRotationSourcesOut) {
-            allSetIndices.add(rotationSource.index());
+            allSetIndices.add(rotationSource.index()); // WAWebSyncdRequestBuilderBuild.x — rotation SETs always have SET operation
         }
 
         for (var entry : allEntries) {
-            // Only process entries whose index appears as a SET
-            if (entry.actionIndex() == null || !allSetIndices.contains(entry.actionIndex())) {
+            if (entry.actionIndex() == null || !allSetIndices.contains(entry.actionIndex())) { // WAWebSyncdRequestBuilderBuild.x — r.has(e.index)
                 continue;
             }
 
-            // Only generate REMOVE for entries with an old key
-            if (Arrays.equals(entry.keyId(), latestKeyId)) {
+            if (Arrays.equals(entry.keyId(), latestKeyId)) { // WAWebSyncdRequestBuilderBuild.x — !syncKeyIdsEqual(e.keyId, n)
                 continue;
             }
 
-            // Skip entries without stored plaintext
             if (entry.actionValue() == null) {
                 continue;
             }
 
+            // ADAPTED: WAWebSyncdRequestBuilderTypesConverter.syncActionsToPendingMutations — re-encode as REMOVE
             var removeTrusted = new DecryptedMutation.Trusted(
                     entry.actionIndex(),
                     entry.actionValue(),
-                    SyncdOperation.REMOVE,
+                    SyncdOperation.REMOVE, // WAWebSyncdRequestBuilderBuild.x — SyncdMutation$SyncdOperation.REMOVE
                     Instant.now(),
                     entry.actionVersion()
             );
             keyRotationSourcesOut.add(removeTrusted);
             var removePending = new SyncPendingMutation(removeTrusted, 0);
 
-            // Per WA Web: REMOVE mutations must be encrypted with the original key
-            // that was used for the stored entry, not the latest key. This mirrors
-            // the logic in encryptMutations() for user-initiated REMOVEs.
+            // WAWebSyncdEncryptMutationsWrapper.encryptMutation — REMOVE uses original key
             var originalKeyData = whatsapp.store()
                     .findWebAppStateKeyById(entry.keyId())
                     .flatMap(AppStateSyncKey::keyData)
@@ -473,6 +507,8 @@ public final class MutationRequestBuilder {
      * are batched into a single IQ with one {@code <sync>} node containing
      * multiple {@code <collection>} children.
      *
+     * @implNote WAWebSyncdRequestBuilder.default, WAWebSyncdRequestBuilderBuild.buildSyncIqNode,
+     *           WAWebSyncdRequestBuilderBuild._buildCollectionNodes
      * @param collectionPatches map of collection types to their pending mutations
      * @return the IQ request node builder
      */
@@ -538,6 +574,8 @@ public final class MutationRequestBuilder {
      * the media connection, and referenced by an {@link ExternalBlobReference}
      * in the outgoing {@code SyncdPatch}.
      *
+     * @implNote WAWebSyncdMMSUpload.uploadPatch, WAWebSyncdMMSUpload.buildExternalBlobReference,
+     *           WAWebSyncdRequestEncode.encodeSyncdMutations
      * @param mutations the list of mutations to upload externally
      * @return the populated {@code ExternalBlobReference} with CDN metadata
      */
@@ -545,16 +583,17 @@ public final class MutationRequestBuilder {
         var syncdMutations = new SyncdMutationsBuilder()
                 .mutations(mutations)
                 .build();
-        var encoded = SyncdMutationsSpec.encode(syncdMutations);
+        var encoded = SyncdMutationsSpec.encode(syncdMutations); // WAWebSyncdRequestEncode.encodeSyncdMutations — E(h)
+        // ADAPTED: WAWebSyncdMMSUpload.uploadPatch — uploadSyncExternalPatch(e)
         var externalRef = new ExternalBlobReferenceBuilder().build();
         try {
             var uploaded = whatsapp.store()
                     .awaitMediaConnection()
-                    .upload(externalRef, new ByteArrayInputStream(encoded));
+                    .upload(externalRef, new ByteArrayInputStream(encoded)); // WAWebSyncdNetCallbacksApi.uploadSyncExternalPatch
             if (!uploaded) {
                 throw new IllegalStateException("Failed to upload external mutations to CDN");
             }
-            return externalRef;
+            return externalRef; // ADAPTED: WAWebSyncdMMSUpload.buildExternalBlobReference — fields populated by upload service
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Interrupted while uploading external mutations", exception);
@@ -573,20 +612,22 @@ public final class MutationRequestBuilder {
      * the same index (e.g., rapidly toggling a setting), only the final state
      * is sent to the server.
      *
+     * @implNote WAWebSyncdRequestBuilderUtils.compactPatch
      * @param patches the pending mutations to compact
      * @return the compacted mutations
      */
     private SequencedCollection<SyncPendingMutation> compactPatch(SequencedCollection<SyncPendingMutation> patches) {
+        // WAWebSyncdRequestBuilderUtils.compactPatch — e.reverse(), deduplicate, .reverse()
         var reversed = new ArrayList<SyncPendingMutation>(patches);
-        Collections.reverse(reversed);
+        Collections.reverse(reversed); // WAWebSyncdRequestBuilderUtils.compactPatch — e.reverse()
         var seen = new HashSet<String>();
         var deduplicated = new ArrayList<SyncPendingMutation>(reversed.size());
         for (var patch : reversed) {
-            if (seen.add(patch.mutation().index())) {
+            if (seen.add(patch.mutation().index())) { // WAWebSyncdRequestBuilderUtils.l — unique by index
                 deduplicated.add(patch);
             }
         }
-        Collections.reverse(deduplicated);
+        Collections.reverse(deduplicated); // WAWebSyncdRequestBuilderUtils.compactPatch — .reverse()
         return List.copyOf(deduplicated);
     }
 }

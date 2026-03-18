@@ -45,4 +45,18 @@ public enum SyncPatchType {
     public byte[] toBytes() {
         return bytes;
     }
+
+    /**
+     * Returns whether this collection type is a critical collection.
+     *
+     * <p>Critical collections are {@link #CRITICAL_BLOCK} and
+     * {@link #CRITICAL_UNBLOCK_LOW}. During bootstrap, only critical
+     * collections are processed from server sync notifications.
+     *
+     * @return {@code true} if this is a critical collection
+     * @implNote WAWebSyncdCollectionUtils.isCriticalCollection
+     */
+    public boolean isCritical() {
+        return this == CRITICAL_BLOCK || this == CRITICAL_UNBLOCK_LOW;
+    }
 }

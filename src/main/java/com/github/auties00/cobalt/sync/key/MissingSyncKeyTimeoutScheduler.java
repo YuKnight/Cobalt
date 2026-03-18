@@ -20,18 +20,21 @@ import java.util.concurrent.TimeUnit;
  * Per WhatsApp Web WAWebSyncdStoreMissingKeys: when sync keys are missing,
  * a timeout is scheduled. If the keys are still missing after the timeout,
  * a fatal sync error is triggered.
+ *
+ * @implNote WAWebSyncdStoreMissingKeys, WAWebSyncdRequestAllSyncdMissingKeysJob
  */
 public final class MissingSyncKeyTimeoutScheduler {
     private static final System.Logger LOGGER = System.getLogger(MissingSyncKeyTimeoutScheduler.class.getName());
 
-    private static final long RE_REQUEST_INTERVAL_HOURS = 6;
+    private static final long RE_REQUEST_INTERVAL_HOURS = 6; // WAWebTasksDefinitions: HOUR_SECONDS * 6
 
     private final WhatsAppClient client;
     private final WhatsAppStore store;
     private final ABPropsService abPropsService;
     private final MissingSyncKeyRequestService requestService;
     private final ScheduledExecutorService scheduler;
-    private volatile ScheduledFuture<?> scheduledCheck;
+    private volatile ScheduledFuture<?> scheduledCheck; // WAWebSyncdStoreMissingKeys: S (timeout timer)
+    private volatile ScheduledFuture<?> allDevicesCheck; // WAWebSyncdStoreMissingKeys._checkMissingKeyOnAllClients: asyncSleep(5e3) — independent of scheduledCheck
     private volatile ScheduledFuture<?> reRequestJob;
 
     /**
@@ -57,27 +60,29 @@ public final class MissingSyncKeyTimeoutScheduler {
      * Schedules or reschedules the timeout check for missing sync keys.
      * <p>
      * Per WhatsApp Web: calculates timeout based on earliest missing key timestamp
-     * and schedules a check when that timeout expires.
+     * and schedules a check when that timeout expires. Wraps the internal
+     * {@code _setMissingKeyTimeout} logic and is the equivalent of calling
+     * {@code setMissingKeyTimeoutInTransaction} (exported as {@code k}).
+     *
+     * @implNote WAWebSyncdStoreMissingKeys.setMissingKeyTimeoutInTransaction, WAWebSyncdStoreMissingKeys._setMissingKeyTimeout
      */
     public synchronized void scheduleTimeoutCheck() {
-        // Cancel any existing scheduled check
-        if (scheduledCheck != null && !scheduledCheck.isDone()) {
+        if (scheduledCheck != null && !scheduledCheck.isDone()) { // WAWebSyncdStoreMissingKeys._setMissingKeyTimeout: clearTimeout(S)
             scheduledCheck.cancel(false);
         }
 
-        var timeout = getTimeout();
-        var delay = store.missingSyncKeys()
+        var timeout = getTimeout(); // WAWebSyncdStoreMissingKeys._setMissingKeyTimeout: getSyncdWaitForKeyTimeoutDays() * DAY_MILLISECONDS
+        var delay = store.missingSyncKeys() // WAWebSyncdStoreMissingKeys._setMissingKeyTimeout: yield t.getAll()
                 .stream()
                 .map(MissingDeviceSyncKey::timestamp)
-                .min(Instant::compareTo)
+                .min(Instant::compareTo) // WAWebSyncdStoreMissingKeys._setMissingKeyTimeout: n.reduce((e,t) => e.timestamp < t.timestamp ? e : t)
                 .map(earliest -> {
-                    var elapsed = Duration.between(earliest, Instant.now());
-                    var remaining = timeout.minus(elapsed);
-                    return remaining.isNegative() ? Duration.ZERO : remaining;
+                    var elapsed = Duration.between(earliest, Instant.now()); // WAWebSyncdStoreMissingKeys._setMissingKeyTimeout: -r.timestamp + unixTimeMs()
+                    var remaining = timeout.minus(elapsed); // WAWebSyncdStoreMissingKeys._setMissingKeyTimeout: timeoutMs - elapsed
+                    return remaining.isNegative() ? Duration.ZERO : remaining; // ADAPTED: JS setTimeout with negative fires immediately, Java clamps to 0
                 });
 
-        if (delay.isEmpty()) {
-            // No missing keys, nothing to schedule
+        if (delay.isEmpty()) { // WAWebSyncdStoreMissingKeys._setMissingKeyTimeout: if(n.length !== 0) — inverted guard
             LOGGER.log(System.Logger.Level.DEBUG, "No missing sync keys, timeout check not scheduled");
             return;
         }
@@ -85,7 +90,7 @@ public final class MissingSyncKeyTimeoutScheduler {
         var delayMs = delay.get().toMillis();
         LOGGER.log(System.Logger.Level.DEBUG, "Scheduling missing sync key timeout check in {0}ms", delayMs);
 
-        scheduledCheck = scheduler.schedule(this::checkForExpiredKeys, delayMs, TimeUnit.MILLISECONDS);
+        scheduledCheck = scheduler.schedule(this::checkForExpiredKeys, delayMs, TimeUnit.MILLISECONDS); // WAWebSyncdStoreMissingKeys._setMissingKeyTimeout: S = setTimeout(D, a)
     }
 
     /**
@@ -95,43 +100,42 @@ public final class MissingSyncKeyTimeoutScheduler {
      * re-verifies that keys are still missing before triggering a fatal error,
      * since they may have arrived between scheduling and firing. Triggers a
      * single global fatal error rather than per-key errors.
+     *
+     * @implNote WAWebSyncdStoreMissingKeys._timeoutWhileWaitingForMissingKey, WAWebSyncdStoreMissingKeys.hasExpiredKeys
      */
     private void checkForExpiredKeys() {
-        // Re-verify: keys may have been received since the timeout was scheduled
-        var currentMissingKeys = store.missingSyncKeys();
+        var currentMissingKeys = store.missingSyncKeys(); // WAWebSyncdStoreMissingKeys.hasExpiredKeys: getAllMissingKeysInTransaction()
         if (currentMissingKeys.isEmpty()) {
             LOGGER.log(System.Logger.Level.DEBUG, "No missing sync keys remain, timeout check skipped");
             return;
         }
 
-        var timeout = getTimeout();
-        var now = Instant.now();
-        var expiredMissingSyncKeys = currentMissingKeys
+        // WAWebSyncdStoreMissingKeys.hasExpiredKeys: cross-reference with getAllSyncKeysInTransaction()
+        var actuallyMissing = currentMissingKeys.stream()
+                .filter(key -> store.findWebAppStateKeyById(key.keyId()).isEmpty()) // WAWebSyncdStoreMissingKeys.hasExpiredKeys: !allKeys.includes(key.keyHex)
+                .toList();
+        if (actuallyMissing.isEmpty()) {
+            LOGGER.log(System.Logger.Level.DEBUG, "All tracked missing keys have been received");
+            return;
+        }
+
+        var timeout = getTimeout(); // WAWebSyncdStoreMissingKeys.hasExpiredKeys: getSyncdWaitForKeyTimeoutDays() * DAY_MILLISECONDS
+        var now = Instant.now(); // WAWebSyncdStoreMissingKeys.hasExpiredKeys: unixTimeMs()
+        var expiredMissingSyncKeys = actuallyMissing
                 .stream()
-                .filter(key -> Duration.between(key.timestamp(), now).compareTo(timeout) > 0)
+                .filter(key -> Duration.between(key.timestamp(), now).compareTo(timeout) > 0) // WAWebSyncdStoreMissingKeys.hasExpiredKeys: timeoutMs < unixTimeMs() - e.timestamp
                 .toList();
         if (expiredMissingSyncKeys.isEmpty()) {
             LOGGER.log(System.Logger.Level.DEBUG, "No expired missing sync keys");
-            // Reschedule for any remaining keys
-            scheduleTimeoutCheck();
+            scheduleTimeoutCheck(); // ADAPTED: defensive reschedule not in WA Web (WA Web relies on next setMissingKeyTimeoutInTransaction call)
             return;
         }
 
-        // Re-verify each expired key still hasn't been resolved
-        var stillMissingKeyIds = expiredMissingSyncKeys.stream()
-                .filter(key -> store.findMissingSyncKey(key.keyId()).isPresent())
-                .map(MissingDeviceSyncKey::keyId)
-                .toList();
-        if (stillMissingKeyIds.isEmpty()) {
-            LOGGER.log(System.Logger.Level.DEBUG, "All expired keys were resolved before timeout action");
-            scheduleTimeoutCheck();
-            return;
-        }
-
-        // Trigger a single global fatal error for all expired keys
+        // WAWebSyncdStoreMissingKeys._timeoutWhileWaitingForMissingKey: reportSyncdFatalError + handleSyncdFatal
         LOGGER.log(System.Logger.Level.ERROR, "Fatal sync error: timeout while waiting for {0} missing sync key(s)",
-                stillMissingKeyIds.size());
-        client.handleFailure(new WhatsAppWebAppStateSyncException.MissingKeyOnAllDevices(stillMissingKeyIds.getFirst()));
+                expiredMissingSyncKeys.size());
+        client.handleFailure(new WhatsAppWebAppStateSyncException.MissingKeyOnAllDevices( // ADAPTED: Cobalt error model — WA Web uses SyncdFatalErrorType.TIMEOUT_WHILE_WAITING_FOR_MISSING_KEY
+                expiredMissingSyncKeys.getFirst().keyId()));
     }
 
     /**
@@ -141,24 +145,27 @@ public final class MissingSyncKeyTimeoutScheduler {
      * <p>This path is intentionally separate from the multi-day wait-for-key timeout:
      * after all devices have replied without the key, WhatsApp Web only applies a
      * short grace period before treating the key as unrecoverable.
+     *
+     * @implNote WAWebSyncdStoreMissingKeys._checkMissingKeyOnAllClients
      */
     private void checkForAllDevicesRespondedWithoutKey() {
-        var currentMissingKeys = store.missingSyncKeys();
+        var currentMissingKeys = store.missingSyncKeys(); // WAWebSyncdStoreMissingKeys._checkMissingKeyOnAllClients: yield t.getAll()
         if (currentMissingKeys.isEmpty()) {
             LOGGER.log(System.Logger.Level.DEBUG, "No missing sync keys remain, all-devices-responded check skipped");
             return;
         }
 
         var missingOnAllDevices = currentMissingKeys.stream()
-                .filter(key -> store.findMissingSyncKey(key.keyId()).isPresent())
-                .filter(MissingDeviceSyncKey::isMissingOnAllDevices)
+                .filter(key -> store.findMissingSyncKey(key.keyId()).isPresent()) // ADAPTED: defensive re-lookup
+                .filter(MissingDeviceSyncKey::isMissingOnAllDevices) // WAWebSyncdStoreMissingKeys._checkMissingKeyOnAllClients: all deviceResponses non-null check
                 .toList();
         if (missingOnAllDevices.isEmpty()) {
             LOGGER.log(System.Logger.Level.DEBUG, "No missing sync key has exhausted all device responses");
-            scheduleTimeoutCheck();
+            scheduleTimeoutCheck(); // ADAPTED: defensive reschedule
             return;
         }
 
+        // WAWebSyncdStoreMissingKeys._checkMissingKeyOnAllClients: reportSyncdFatalError(MISSING_KEY_ON_ALL_CLIENTS) + handleSyncdFatal
         LOGGER.log(System.Logger.Level.ERROR, "Fatal sync error: all asked devices responded without the requested sync key");
         client.handleFailure(new WhatsAppWebAppStateSyncException.MissingKeyOnAllDevices(
                 missingOnAllDevices.getFirst().keyId()
@@ -167,10 +174,13 @@ public final class MissingSyncKeyTimeoutScheduler {
 
     /**
      * Gets the timeout duration from AB props.
+     *
+     * @implNote WAWebSyncdGatingUtils.getSyncdWaitForKeyTimeoutDays
+     * @return the timeout as a {@link Duration}
      */
     private Duration getTimeout() {
-        var days = abPropsService.getInt(ABProp.SYNCD_WAIT_FOR_KEY_TIMEOUT_DAYS);
-        return Duration.ofDays(days);
+        var days = abPropsService.getInt(ABProp.SYNCD_WAIT_FOR_KEY_TIMEOUT_DAYS); // WAWebSyncdGatingUtils.getSyncdWaitForKeyTimeoutDays
+        return Duration.ofDays(days); // ADAPTED: WA Web multiplies by DAY_MILLISECONDS; Cobalt uses Duration.ofDays
     }
 
     /**
@@ -180,13 +190,15 @@ public final class MissingSyncKeyTimeoutScheduler {
      * <p>Per WhatsApp Web {@code requestAllSyncdMissingKeysJob}: periodically
      * re-sends key requests for all tracked missing keys to handle cases
      * where the original request was lost or a new companion device joined.
+     *
+     * @implNote WAWebSyncdRequestAllSyncdMissingKeysJob.requestAllSyncdMissingKeysJob, WAWebSyncdHandleMissingKeys.requestAllMissingKeys
      */
     public synchronized void startPeriodicReRequestJob() {
         if (reRequestJob != null && !reRequestJob.isDone()) {
             return;
         }
 
-        reRequestJob = scheduler.scheduleAtFixedRate(() -> {
+        reRequestJob = scheduler.scheduleAtFixedRate(() -> { // WAWebTasksDefinitions: HOUR_SECONDS * 6 interval
             var missingKeys = store.missingSyncKeys();
             if (missingKeys.isEmpty()) {
                 return;
@@ -196,7 +208,10 @@ public final class MissingSyncKeyTimeoutScheduler {
                     .map(MissingDeviceSyncKey::keyId)
                     .toList();
             LOGGER.log(System.Logger.Level.INFO, "Periodic re-request for {0} missing sync key(s)", keyIds.size());
-            Thread.startVirtualThread(() -> requestService.reRequestMissingKeys(keyIds));
+            Thread.startVirtualThread(() -> {
+                requestService.reRequestMissingKeys(keyIds); // WAWebSyncdRequestAllSyncdMissingKeysJob: yield requestAllMissingKeys()
+                scheduler.schedule(() -> scheduleTimeoutCheck(), 20, TimeUnit.SECONDS); // WAWebSyncdRequestAllSyncdMissingKeysJob: setTimeout(setMissingKeyTimeoutInTransaction, 1000 * 20)
+            });
         }, RE_REQUEST_INTERVAL_HOURS, RE_REQUEST_INTERVAL_HOURS, TimeUnit.HOURS);
     }
 
@@ -207,14 +222,16 @@ public final class MissingSyncKeyTimeoutScheduler {
      * <p>Per WhatsApp Web behavior, a 5-second grace period is added before
      * declaring a key as missing on all devices. This allows for late-arriving
      * key share responses that may resolve the missing key.
+     *
+     * @implNote WAWebSyncdStoreMissingKeys._checkMissingKeyOnAllClients
      */
     public synchronized void scheduleAllDevicesRespondedCheck() {
-        if (scheduledCheck != null && !scheduledCheck.isDone()) {
-            scheduledCheck.cancel(false);
+        if (allDevicesCheck != null && !allDevicesCheck.isDone()) { // ADAPTED: cancel previous grace-period check if already pending
+            allDevicesCheck.cancel(false);
         }
 
         LOGGER.log(System.Logger.Level.DEBUG, "Scheduling 5-second grace period before missing key fatal");
-        scheduledCheck = scheduler.schedule(this::checkForAllDevicesRespondedWithoutKey, 5, TimeUnit.SECONDS);
+        allDevicesCheck = scheduler.schedule(this::checkForAllDevicesRespondedWithoutKey, 5, TimeUnit.SECONDS); // ADAPTED: WAWebSyncdStoreMissingKeys._checkMissingKeyOnAllClients: asyncSleep(5e3) moved to schedule delay
     }
 
     /**
@@ -231,6 +248,9 @@ public final class MissingSyncKeyTimeoutScheduler {
      */
     public void shutdown() {
         cancel();
+        if (allDevicesCheck != null && !allDevicesCheck.isDone()) {
+            allDevicesCheck.cancel(false);
+        }
         if (reRequestJob != null && !reRequestJob.isDone()) {
             reRequestJob.cancel(false);
         }

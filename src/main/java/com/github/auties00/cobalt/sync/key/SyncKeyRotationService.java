@@ -10,15 +10,8 @@ import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
 import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
 import com.github.auties00.cobalt.model.message.system.ProtocolMessageBuilder;
 import com.github.auties00.cobalt.model.message.system.appstate.*;
-import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.SyncPendingMutation;
-import com.github.auties00.cobalt.model.sync.action.device.KeyExpirationAction;
-import com.github.auties00.cobalt.model.sync.action.device.KeyExpirationActionBuilder;
-import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
-import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 import com.github.auties00.cobalt.util.SchedulerUtils;
 
 import java.security.SecureRandom;
@@ -37,9 +30,8 @@ import java.util.logging.Logger;
  * <p>Per WhatsApp Web {@code WAWebSyncdKeyManagement}: before pushing mutations,
  * the active key is checked. If the key has expired (age exceeds
  * {@code syncd_key_max_use_days}) or a companion device has been removed
- * (fingerprint mismatch), a new key is generated, shared with companion
- * devices, and sentinel mutations are queued to notify all collections
- * about the old key epoch's expiration.
+ * (fingerprint mismatch), a new key is generated and shared with companion
+ * devices.
  *
  * <p>The rotation flow is:
  * <ol>
@@ -47,8 +39,9 @@ import java.util.logging.Logger;
  * <li>Generate a new key with incremented epoch and fresh random key data
  * <li>Store the new key locally
  * <li>Share the new key with companion devices via {@code AppStateSyncKeyShare}
- * <li>Queue sentinel mutations for all collections
  * </ol>
+ *
+ * @implNote WAWebSyncdKeyManagement, WAWebSyncdRotateKey, WAWebSyncdKeyCallbacksApi
  */
 public final class SyncKeyRotationService {
     private static final Logger LOGGER = Logger.getLogger(SyncKeyRotationService.class.getName());
@@ -91,47 +84,42 @@ public final class SyncKeyRotationService {
      *
      * <p>Per WhatsApp Web {@code WAWebSyncdKeyManagement.getActiveKey}:
      * gets the newest key pair, checks if it has expired or if a device
-     * was removed, and rotates if needed. After rotation, sentinel mutations
-     * are generated and queued.
+     * was removed, and rotates if needed.
      *
      * @param triggerRotation whether to trigger rotation if the key is stale
      *                        (set to {@code false} for read-only checks)
+     * @implNote WAWebSyncdKeyManagement.getActiveKey (function m/p/_)
      */
     public void ensureActiveKey(boolean triggerRotation) {
-        var newestKey = findNewestKey();
+        var newestKey = findNewestKey(); // WAWebSyncdKeyManagement.getActiveKey: yield f() (getNewestKeyPair)
+        var currentFingerprint = getCurrentDeviceFingerprint(); // WAWebSyncdKeyManagement.getActiveKey: yield getDeviceFingerprint()
         if (newestKey == null) {
-            LOGGER.warning("No sync keys available; cannot check rotation");
-            return;
+            throw new IllegalStateException("syncd: No sync key available"); // WAWebSyncdKeyManagement.getActiveKey: throw err("syncd: No sync key available")
         }
 
-        var expired = hasKeyExpired(newestKey);
-        var deviceRemoved = hasADeviceBeenRemoved(newestKey);
+        var expired = hasKeyExpired(newestKey); // WAWebSyncdKeyManagement.getActiveKey: i = hasKeyExpired(n)
+        var deviceRemoved = hasADeviceBeenRemoved(newestKey, currentFingerprint); // WAWebSyncdKeyManagement.getActiveKey: l = hasADeviceBeenRemoved(n, a)
 
         if (!triggerRotation || (!expired && !deviceRemoved)) {
-            return;
+            return; // WAWebSyncdKeyManagement.getActiveKey: if (!t || !i && !l) return {keyId, keyData}
         }
 
-        // Rotate
+        var rotatedKey = rotateKey(currentFingerprint, newestKey); // WAWebSyncdKeyManagement.getActiveKey: d = rotateKey(a, n)
+        if (rotatedKey == null) {
+            return; // ADAPTED: defensive null check, WA Web rotateKey always returns a value
+        }
+
+        LOGGER.info("syncd: stored key rotation key id " + SyncKeyUtils.syncKeyIdToHex(rotatedKey)); // WAWebSyncdKeyManagement.getActiveKey: LOG("syncd: stored key rotation key id", syncKeyIdToHex(d.keyId))
+        whatsapp.store().addWebAppStateKeys(List.of(rotatedKey)); // WAWebSyncdKeyManagement.getActiveKey: yield setSyncKeyInTransaction(d)
+        shareKeyWithCompanionDevices(rotatedKey); // WAWebSyncdKeyManagement.getActiveKey: yield sendSyncdKeyRotation([d])
+
+        // WAWebSyncdKeyManagement.getActiveKey: logging happens AFTER rotation+store+send
         if (expired) {
-            LOGGER.info("Sync key rotation triggered: key expired");
+            LOGGER.info("syncd: key rotation due to key expiry"); // WAWebSyncdKeyManagement.getActiveKey: LOG("syncd: key rotation due to key expiry")
         }
         if (deviceRemoved) {
-            LOGGER.info("Sync key rotation triggered: device removed");
+            LOGGER.info("syncd: key rotation due to device removal"); // WAWebSyncdKeyManagement.getActiveKey: LOG("syncd: key rotation due to device removal")
         }
-
-        var rotatedKey = rotateKey(newestKey);
-        if (rotatedKey == null) {
-            return;
-        }
-
-        // Store the new key
-        whatsapp.store().addWebAppStateKeys(List.of(rotatedKey));
-
-        // Share with companion devices
-        shareKeyWithCompanionDevices(rotatedKey);
-
-        // Generate and queue sentinel mutations for all collections
-        queueSentinelMutations(rotatedKey);
     }
 
     /**
@@ -142,43 +130,10 @@ public final class SyncKeyRotationService {
      * pick the one with the minimum device ID.
      *
      * @return the newest key, or {@code null} if no keys exist
+     * @implNote WAWebSyncdKeyManagement.getNewestKeyPair (function f/g)
      */
     private AppStateSyncKey findNewestKey() {
-        var keys = whatsapp.store().appStateKeys();
-        if (keys.isEmpty()) {
-            return null;
-        }
-
-        var maxEpoch = Integer.MIN_VALUE;
-        for (var key : keys) {
-            var epoch = SyncKeyUtils.getKeyEpoch(key);
-            if (epoch > maxEpoch) {
-                maxEpoch = epoch;
-            }
-        }
-
-        AppStateSyncKey bestKey = null;
-        var bestDeviceId = Integer.MAX_VALUE;
-        for (var key : keys) {
-            if (SyncKeyUtils.getKeyEpoch(key) != maxEpoch) {
-                continue;
-            }
-
-            var keyIdBytes = key.keyId()
-                    .flatMap(AppStateSyncKeyId::keyId)
-                    .orElse(null);
-            if (keyIdBytes == null) {
-                continue;
-            }
-
-            var deviceId = SyncKeyUtils.getKeyDeviceId(keyIdBytes);
-            if (deviceId < bestDeviceId) {
-                bestDeviceId = deviceId;
-                bestKey = key;
-            }
-        }
-
-        return bestKey;
+        return SyncKeyUtils.findNewestKey(whatsapp.store().appStateKeys()); // WAWebSyncdKeyManagement.getNewestKeyPair: yield getAllSyncKeysInTransaction() -> max epoch, min deviceId
     }
 
     /**
@@ -191,18 +146,21 @@ public final class SyncKeyRotationService {
      *
      * @param key the key to check
      * @return {@code true} if the key has expired
+     * @implNote WAWebSyncdRotateKey.hasKeyExpired (function u)
      */
     private boolean hasKeyExpired(AppStateSyncKey key) {
-        var timestamp = key.keyData()
+        var timestamp = key.keyData() // WAWebSyncdRotateKey.hasKeyExpired: var n = t.timestamp
                 .flatMap(AppStateSyncKeyData::timestamp)
                 .orElse(null);
         if (timestamp == null) {
             return false;
         }
 
+        // WAWebSyncdRotateKey.hasKeyExpired: r = Math.min(s, Math.max(e, getSyncdKeyMaxUseDays()))
         var maxDays = Math.min(MAX_KEY_MAX_USE_DAYS,
                 Math.max(MIN_KEY_MAX_USE_DAYS,
                         abPropsService.getInt(ABProp.SYNCD_KEY_MAX_USE_DAYS)));
+        // WAWebSyncdRotateKey.hasKeyExpired: a = r * DAY_MILLISECONDS, i = unixTimeMs() - n, return i > a
         var maxAge = Duration.ofDays(maxDays);
         var age = Duration.between(timestamp, Instant.now());
         return age.compareTo(maxAge) > 0;
@@ -217,36 +175,37 @@ public final class SyncKeyRotationService {
      * list's {@code currentIndex} and compares with the current device indexes.
      * A mismatch (rawId change or device set difference) indicates removal.
      *
-     * @param key the key whose fingerprint to check
+     * @param key                the key whose fingerprint to check
+     * @param currentFingerprint the current device fingerprint snapshot
      * @return {@code true} if a device has been removed since the key was created
+     * @implNote WAWebSyncdRotateKey.hasADeviceBeenRemoved (function c)
      */
-    private boolean hasADeviceBeenRemoved(AppStateSyncKey key) {
-        var fingerprint = key.keyData()
+    private boolean hasADeviceBeenRemoved(AppStateSyncKey key, DeviceFingerprint currentFingerprint) {
+        var fingerprint = key.keyData() // WAWebSyncdRotateKey.hasADeviceBeenRemoved: var n = e.fingerprint
                 .flatMap(AppStateSyncKeyData::fingerprint)
                 .orElse(null);
         if (fingerprint == null) {
             return false;
         }
 
-        var currentFingerprint = getCurrentDeviceFingerprint();
         if (currentFingerprint == null) {
             return false;
         }
 
-        // Check rawId mismatch
+        // WAWebSyncdRotateKey.hasADeviceBeenRemoved: n.rawId !== i
         var keyRawId = fingerprint.rawId().orElse(-1);
         if (keyRawId != currentFingerprint.rawId) {
             return true;
         }
 
-        // Expand the key's device indexes up to currentIndex
+        // WAWebSyncdRotateKey.hasADeviceBeenRemoved: new Set(n.deviceIndexes), expand from n.currentIndex+1 to o
         var keyDeviceIndexes = new HashSet<>(fingerprint.deviceIndexes());
         var keyCurrentIndex = fingerprint.currentIndex().orElse(0);
         for (int i = keyCurrentIndex + 1; i <= currentFingerprint.currentIndex; i++) {
             keyDeviceIndexes.add(i);
         }
 
-        // Compare with current device indexes
+        // WAWebSyncdRotateKey.hasADeviceBeenRemoved: !equalsSet(l, new Set(a))
         return !keyDeviceIndexes.equals(currentFingerprint.deviceIndexes);
     }
 
@@ -258,8 +217,10 @@ public final class SyncKeyRotationService {
      * values), and rawId.
      *
      * @return the current fingerprint, or {@code null} if unavailable
+     * @implNote WAWebSyncdKeyCallbacksApi.getDeviceFingerprint (function s)
      */
     private DeviceFingerprint getCurrentDeviceFingerprint() {
+        // ADAPTED: WAWebSyncdKeyCallbacksApi.getDeviceFingerprint: yield getMyDeviceList()
         var myJid = whatsapp.store().jid().orElse(null);
         if (myJid == null) {
             return null;
@@ -271,8 +232,8 @@ public final class SyncKeyRotationService {
         }
 
         var deviceList = deviceListOpt.get();
-        var currentIndex = deviceList.currentIndex();
-        var rawId = deviceList.rawId();
+        var currentIndex = deviceList.currentIndex(); // WAWebSyncdKeyCallbacksApi.getDeviceFingerprint: n = t.currentIndex
+        var rawId = deviceList.rawId(); // WAWebSyncdKeyCallbacksApi.getDeviceFingerprint: i = t.rawId
         var rawIdInt = -1;
         if (rawId != null) {
             try {
@@ -281,11 +242,13 @@ public final class SyncKeyRotationService {
             }
         }
 
+        // WAWebSyncdKeyCallbacksApi.getDeviceFingerprint: a = t.devices.map(e => e.keyIndex)
         var deviceIndexes = new HashSet<Integer>();
         for (var device : deviceList.devices()) {
             deviceIndexes.add(device.keyIndex());
         }
 
+        // WAWebSyncdKeyCallbacksApi.getDeviceFingerprint: return {currentIndex: n, deviceIndexes: a, rawId: i}
         return new DeviceFingerprint(currentIndex, deviceIndexes, rawIdInt);
     }
 
@@ -297,11 +260,13 @@ public final class SyncKeyRotationService {
      * fresh random 32-byte key data, the current device fingerprint, and
      * the current timestamp.
      *
-     * @param previousKey the key being rotated out
+     * @param currentFingerprint the current device fingerprint snapshot
+     * @param previousKey        the key being rotated out
      * @return the new key, or {@code null} if rotation cannot proceed
+     * @implNote WAWebSyncdRotateKey.rotateKey (function d), WAWebSyncdRotateKey (function m, function p)
      */
-    private AppStateSyncKey rotateKey(AppStateSyncKey previousKey) {
-        var previousKeyIdBytes = previousKey.keyId()
+    private AppStateSyncKey rotateKey(DeviceFingerprint currentFingerprint, AppStateSyncKey previousKey) {
+        var previousKeyIdBytes = previousKey.keyId() // WAWebSyncdRotateKey.m: e.keyId
                 .flatMap(AppStateSyncKeyId::keyId)
                 .orElse(null);
         if (previousKeyIdBytes == null) {
@@ -315,28 +280,30 @@ public final class SyncKeyRotationService {
             return null;
         }
 
-        var currentFingerprint = getCurrentDeviceFingerprint();
         if (currentFingerprint == null) {
             LOGGER.warning("Cannot rotate key: device fingerprint not available");
             return null;
         }
 
-        // Generate new epoch and key ID
+        // WAWebSyncdRotateKey.m: t = generateNewKeyEpoch(e.keyId)
         var newEpoch = SyncKeyUtils.generateNewKeyEpoch(previousKeyIdBytes);
+        // WAWebSyncdRotateKey.m: r = interpretAsNumber(extractDeviceId(getMyDeviceJid()))
         var myDeviceId = myJid.device();
+        // WAWebSyncdRotateKey.m: keyId = toSyncKeyId(concat(intToBytes(2, r), intToBytes(4, t)))
         var newKeyId = SyncKeyUtils.buildKeyId(myDeviceId, newEpoch);
 
-        // Generate random key data
+        // WAWebSyncdRotateKey.p: getRandomValues(new Uint8Array(32))
         var newKeyData = new byte[32];
         SECURE_RANDOM.nextBytes(newKeyData);
 
-        // Build fingerprint from current device state
+        // WAWebSyncdRotateKey.d: fingerprint: e (the passed-in fingerprint)
         var fingerprint = new AppStateSyncKeyFingerprintBuilder()
                 .rawId(currentFingerprint.rawId)
                 .currentIndex(currentFingerprint.currentIndex)
                 .deviceIndexes(new ArrayList<>(currentFingerprint.deviceIndexes))
                 .build();
 
+        // WAWebSyncdRotateKey.d: timestamp: unixTimeMs()
         var keyData = new AppStateSyncKeyDataBuilder()
                 .keyData(newKeyData)
                 .fingerprint(fingerprint)
@@ -347,6 +314,7 @@ public final class SyncKeyRotationService {
                 .keyId(newKeyId)
                 .build();
 
+        // WAWebSyncdRotateKey.d: return {keyId: a, keyEpoch: r, keyData: i, fingerprint: e, timestamp: l}
         return new AppStateSyncKeyBuilder()
                 .keyId(keyIdProto)
                 .keyData(keyData)
@@ -361,6 +329,7 @@ public final class SyncKeyRotationService {
      * {@code key_rotation} and sends it to all peer devices.
      *
      * @param key the new key to share
+     * @implNote WAWebSyncdKeyCallbacksApi.sendSyncdKeyRotation (function u), WAWebKeyManagementSendKeyShareApi.sendAppStateSyncKeyShare
      */
     private void shareKeyWithCompanionDevices(AppStateSyncKey key) {
         var companionDevices = getCompanionDevices();
@@ -394,7 +363,7 @@ public final class SyncKeyRotationService {
         for (var device : companionDevices) {
             try {
                 var messageKey = new MessageKeyBuilder()
-                        .id(MessageIdGenerator.generate(MessageIdVersion.V2, myJid))
+                        .id(MessageIdGenerator.generate(MessageIdVersion.V1, myJid)) // WAWebMsgKey.newId_DEPRECATED
                         .parentJid(myJid)
                         .fromMe(true)
                         .senderJid(myJid)
@@ -413,73 +382,38 @@ public final class SyncKeyRotationService {
     }
 
     /**
-     * Generates sentinel mutations for all collections and queues them
-     * as pending mutations.
-     *
-     * <p>Per WhatsApp Web {@code WAWebSentinel} + {@code WAWebSentinelMutationSync.getSentinelMutations}:
-     * gets the newest key pair's epoch and creates SET sentinel mutations
-     * with {@code {keyExpiration: {expiredKeyEpoch: epoch}}} for every collection.
-     * These mutations are then added as pending mutations and the collections
-     * are marked dirty.
-     *
-     * @param newKey the newly created key (used to determine the epoch to expire)
-     */
-    private void queueSentinelMutations(AppStateSyncKey newKey) {
-        // The epoch to expire is the new key's epoch (the key that was just created).
-        // Per WA Web: getSentinelMutations() gets getNewestKeyPair().keyEpoch
-        // which at this point IS the new key (we just stored it).
-        var newEpoch = SyncKeyUtils.getKeyEpoch(newKey);
-        if (newEpoch < 0) {
-            LOGGER.warning("Cannot generate sentinel mutations: invalid key epoch");
-            return;
-        }
-
-        var timestamp = Instant.now();
-        var actionValue = new SyncActionValueBuilder()
-                .keyExpirationAction(new KeyExpirationActionBuilder()
-                        .expiredKeyEpoch(newEpoch)
-                        .build())
-                .build();
-
-        for (var collection : SyncPatchType.values()) {
-            var index = "[\"sentinel\",\"" + collection + "\"]";
-            var mutation = new DecryptedMutation.Trusted(
-                    index,
-                    actionValue,
-                    SyncdOperation.SET,
-                    timestamp,
-                    KeyExpirationAction.ACTION_VERSION
-            );
-            var pendingMutation = new SyncPendingMutation(mutation, 0);
-            whatsapp.store().addPendingMutations(collection, List.of(pendingMutation));
-            whatsapp.store().markWebAppStateDirty(collection);
-        }
-
-        LOGGER.info("Queued sentinel mutations for " + SyncPatchType.values().length + " collections with epoch " + newEpoch);
-    }
-
-    /**
      * Gets companion device JIDs (all devices except our own).
      *
+     * <p>Per WhatsApp Web {@code WAWebKeyManagementUtils.getPeerDevices}:
+     * returns all peer devices from the device list, falling back to
+     * the primary device (device 0) if the device list cannot be retrieved.
+     *
      * @return the list of companion device JIDs
+     * @implNote WAWebKeyManagementUtils.getPeerDevices
      */
     private List<Jid> getCompanionDevices() {
-        var myJid = whatsapp.store().jid().orElse(null);
+        var myJid = whatsapp.store().jid().orElse(null); // WAWebKeyManagementUtils.getPeerDevices: getMeDevicePnOrThrow()
         if (myJid == null) {
             return List.of();
         }
 
-        var myDeviceList = whatsapp.store().findDeviceList(myJid.toUserJid());
-        if (myDeviceList.isEmpty()) {
-            return List.of();
-        }
+        try {
+            var myDeviceList = whatsapp.store().findDeviceList(myJid.toUserJid()); // WAWebKeyManagementUtils.getPeerDevices: yield getMyDeviceList()
+            if (myDeviceList.isEmpty()) {
+                return List.of();
+            }
 
-        return myDeviceList.get()
-                .devices()
-                .stream()
-                .filter(device -> device.id() != myJid.device())
-                .map(device -> device.toDeviceJid(myJid.user(), myJid.server()))
-                .toList();
+            return myDeviceList.get()
+                    .devices()
+                    .stream()
+                    .filter(device -> device.id() != myJid.device()) // WAWebKeyManagementUtils.getPeerDevices: e.id !== n.getDeviceId()
+                    .map(device -> device.toDeviceJid(myJid.user(), myJid.server())) // WAWebKeyManagementUtils.getPeerDevices: createDeviceWidFromUserAndDevice
+                    .toList();
+        } catch (Exception e) {
+            // WAWebKeyManagementUtils.getPeerDevices: catch -> fallback to primary device
+            LOGGER.warning("[syncd] getPeerDevices: " + e.getMessage() + ". Key reqs->primary only");
+            return List.of(Jid.of(myJid.user(), myJid.server(), 0, 0));
+        }
     }
 
     /**
