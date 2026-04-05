@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "whatsapp": {
+      "command": "node",
+      "args": [
+        "tooling/web-mcp-server-new/dist/index.js"
+      ],
+      "env": {
+        "MCP_TRANSPORT": "stdio",
+        "WEB_MCP_PLATFORM": "web",
+        "WEB_MCP_LOG_LEVEL": "warn"
+      }
+    }
+  }
+}
