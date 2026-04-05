@@ -8,8 +8,19 @@ The user invokes this command as: `/validate <feature-area>`
 ## Preconditions
 
 - Work from the Cobalt repository root.
-- The `whatsapp` MCP server must be available (registered in `.mcp.json`).
 - Preserve existing validation outputs under `validation/<feature>/` unless re-running intentionally.
+
+### Verify MCP Server
+
+Before doing anything else, verify the whatsapp MCP server is reachable:
+
+1. Run `curl -s -o /dev/null -w "%{http_code}" http://localhost:8787/mcp` (or call any lightweight MCP tool like `mcp__whatsapp__get_active_snapshot`).
+2. If the server is NOT running, start it:
+   ```bash
+   cd tooling/web-mcp-server-new && node dist/index.js &
+   ```
+   Wait a few seconds, then re-check. The server runs on port 8787 by default in HTTP mode.
+3. If the server cannot be started (missing build, missing data), stop and tell the user.
 
 ## Output Layout
 
