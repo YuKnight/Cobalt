@@ -177,12 +177,15 @@ Spawn `validate-module` sub-agents one at a time. Each agent works directly on t
 
 ### Agent Assignment
 
-Each agent gets exactly ONE WA Web module and its Cobalt counterpart(s). Optimize for granularity:
+Each agent gets exactly ONE WA Web module and its Cobalt counterpart(s). This is a hard rule, not a guideline:
 
 - Correct: one agent for `WAWebSyncdResponseParser` against `MutationResponseParser.java`
 - Wrong: one agent for a broad "sync layer" bundling unrelated modules
+- Wrong: batching multiple independent modules into one agent to reduce agent count
 
-Very small utility modules with one or two exports may be grouped with their parent ONLY when they are inseparable implementation details of the same behavior.
+**Do not batch independent modules together for efficiency, practicality, or any other reason.** If discovery produces N modules, the plan must have N agents. The number of agents is a consequence of the module count, not something to be minimized. If you find yourself wanting to group modules to "keep the agent count manageable," that impulse is the exact thing this rule exists to prevent — each module deserves isolated, focused validation.
+
+Very small utility modules with one or two exports may be grouped with their parent ONLY when they are inseparable implementation details of the same behavior (e.g., a `*Helper` or `*Const` module used exclusively by its parent). Two modules that happen to share the same Cobalt file or the same interface are NOT inseparable — they must still get separate agents.
 
 ### File Ownership Assignment
 
