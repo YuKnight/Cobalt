@@ -160,13 +160,23 @@ Each agent gets exactly ONE WA Web module and its Cobalt counterpart(s). Optimiz
 
 Very small utility modules with one or two exports may be grouped with their parent ONLY when they are inseparable implementation details of the same behavior.
 
+### File Ownership Assignment
+
+For each agent, determine precisely which files it owns (may edit) vs which files it needs for context (read-only):
+
+- **Owned files**: Only the Java file(s) whose behavior directly corresponds to the WA Web module being validated. For example, if validating `WAWebSyncdResponseParser`, the owned file is `MutationResponseParser.java` — NOT the entire handler directory.
+- **Context files**: Other files the agent may need to read to understand call interfaces, types, or dependencies (e.g., shared store classes, model classes, other handlers that are called). These are read-only.
+
+Getting this right is critical. An agent that owns too many files will rewrite things outside its scope.
+
 ### Spawning
 
 1. Spawn agents in batches of up to 5, using `isolation: "worktree"` for each.
 2. Each agent prompt must include:
    - The WA Web module name
    - The full export list for that module (from manifest)
-   - The Cobalt file path(s)
+   - The owned file(s) — precisely scoped
+   - The context file(s) — files needed for understanding but not editing
    - The export-to-method mapping (from manifest)
    - The unmapped exports and methods for that module
    - The output path: `validation/<feature>/reports/<ModuleName>.md`
@@ -184,8 +194,11 @@ Validate WA Web module `{waModule}` against Cobalt.
 ## Exports to Validate
 {for each export: exportName -> cobaltMethod or "unmapped"}
 
-## Cobalt Files
-{list of Java file paths}
+## Owned Files (you may edit these)
+{list of Java file paths this agent owns}
+
+## Context Files (read-only, do not edit)
+{list of Java file paths for reference only}
 
 ## Unmapped Cobalt Methods
 {methods with no WA Web counterpart}
@@ -193,7 +206,7 @@ Validate WA Web module `{waModule}` against Cobalt.
 ## Report Output Path
 validation/{feature}/reports/{waModule}.md
 
-Validate every export exhaustively. Fix all issues. Write the report.
+Validate every export exhaustively. Fix all issues in owned files. Report issues found in context files without fixing them. Write the report.
 ```
 
 ---
@@ -205,29 +218,48 @@ After all agents complete:
 ### Step 4.1: Collect Results
 
 1. Read every module report from `validation/<feature>/reports/`.
-2. For each agent that ran in a worktree: check if it made changes (the agent result will include the worktree path and branch if changes were made).
+2. For each agent that ran in a worktree: record the worktree path and branch name from the agent result. Only agents that made changes will have a branch.
+3. Check module reports for `## Issues in Context Files` sections. If any agent reported issues in files it couldn't edit, note these for re-routing to the agent that owns those files.
 
-### Step 4.2: Integrate Changes
+### Step 4.2: Integrate Changes via Sequential Git Merge
 
-For each agent that produced changes in a worktree:
+Merge agent branches one at a time into the current branch using `git merge`. This ensures that:
+- Conflicts between agents modifying the same file are detected explicitly.
+- No agent's changes silently overwrite another's work.
+- The merge history is preserved.
 
-1. Review the changes with `git diff` in the worktree.
-2. Cherry-pick the commit(s) into the main branch.
-3. After each cherry-pick batch (5-10 commits), verify compilation:
+For each agent branch (in deterministic order, e.g., sorted by module name):
+
+1. Run `git merge <branch> --no-edit`.
+2. If the merge succeeds cleanly, continue to the next branch.
+3. If the merge conflicts:
+   - Inspect the conflicting file(s) and identify the conflicting methods/regions.
+   - Use the MCP tools to read the original WA Web source for the functions involved (`mcp__whatsapp__get_symbol_source`). Compare both sides of the conflict against the WA Web source to determine which side (or which combination) is correct.
+   - Resolve the conflict so the merged result matches WA Web behavior, then `git add` the resolved files and `git merge --continue`.
+   - If the conflict involves fundamentally incompatible rewrites of the same logic that you cannot confidently resolve against the WA Web source, stop and report the conflict to the user.
+4. After every 5 successful merges, verify compilation:
    ```
    mvn compile -pl . -q "-Dcobalt.build.dir=target-validate-batch-N"
    ```
-4. Delete the batch build directory after successful compilation.
-5. If a cherry-pick conflicts, resolve trivially or re-run the specific module agent.
+5. Delete the batch build directory after successful compilation.
+6. If compilation fails after a merge, identify the breaking merge by bisecting. Revert the breaking merge and report it.
 
-### Step 4.3: Completeness Check
+### Step 4.3: Route Context File Issues
+
+If any module reports listed issues in context files:
+
+1. Identify which agent owns the affected file.
+2. If that agent has already run, spawn a follow-up agent for just the affected file with the specific issues to fix.
+3. Merge the follow-up agent's branch using the same sequential merge process.
+
+### Step 4.4: Completeness Check
 
 Update the manifest: for every export, verify it has a verdict from a module report.
 
 - If any export has `status: "pending"` still, the validation is INCOMPLETE. Investigate and re-run.
 - Every export must be one of: MATCH, MISMATCH (fixed), MISSING_IN_COBALT (implemented), ADAPTED, or SKIPPED (WAM/telemetry with reason).
 
-### Step 4.4: Final Compilation
+### Step 4.5: Final Compilation
 
 ```
 mvn compile -pl . -q "-Dcobalt.build.dir=target-validate-final"
@@ -235,7 +267,16 @@ mvn compile -pl . -q "-Dcobalt.build.dir=target-validate-final"
 
 Delete `target-validate-final` after success.
 
-### Step 4.5: Write Synthesis Report
+### Step 4.6: Clean Up Worktrees
+
+After all merges succeed and final compilation passes:
+
+1. List all agent worktrees: `git worktree list`.
+2. Remove each agent worktree: `git worktree remove <path>`.
+3. Delete the corresponding agent branches: `git branch -d <branch>`.
+4. If a worktree removal fails (e.g., uncommitted changes), warn the user and skip it.
+
+### Step 4.7: Write Synthesis Report
 
 Write `validation/<feature>/report.md`:
 
@@ -285,5 +326,5 @@ Write `validation/<feature>/report.md`:
 - Do not cancel running agents. Wait for them to finish.
 - Every issue must be fixed, not only reported.
 - Do not skip compilation verification.
-- Cherry-pick agent commits into the main branch. Do not merge worktree branches.
+- Integrate agent branches via sequential `git merge`. Use MCP to resolve conflicts against WA Web source. Clean up worktrees after successful integration.
 - When searching WA Web, try multiple keyword forms: synonyms, abbreviations, subfeatures.

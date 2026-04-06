@@ -26,10 +26,18 @@ You receive a task description containing:
 
 - `WA Web Module`: the module name (e.g., `WAWebSyncdMutationParser`)
 - `Exports`: the full list of exported functions to validate
-- `Cobalt Files`: the Java file(s) that implement this module's behavior
+- `Owned Files`: the Java file(s) you are allowed to edit. You may ONLY modify these files.
+- `Context Files`: additional Java file(s) you may read for understanding but MUST NOT edit.
 - `Export-to-Method Mapping`: known mappings from WA Web exports to Cobalt methods (from `@implNote` tags)
 - `Unmapped Exports`: WA Web exports with no known Cobalt counterpart (candidates for MISSING_IN_COBALT)
 - `Unmapped Methods`: Cobalt methods with no known WA Web export (candidates for MISSING_IN_WA_WEB)
+
+### File Ownership Rule
+
+You MUST respect the owned/context distinction:
+- **Owned files**: You may read, edit, and create new files in the same package. These are the files whose behavior corresponds to the WA Web module you are validating.
+- **Context files**: You may read these to understand call interfaces, types, and dependencies. You MUST NOT edit, rewrite, or replace them. If you find issues in context files, report them in your findings but do not fix them.
+- If you need to create a new file (e.g., a missing class), create it in the same package as the owned files.
 
 ## Procedure
 
@@ -104,7 +112,7 @@ For each Cobalt method with no WA Web export:
 
 ### Step 5: Apply Fixes
 
-For every issue found:
+Apply fixes ONLY to owned files. For every issue found:
 
 1. Fix `MISMATCH` issues by updating Cobalt to match WA Web behavior exactly.
 2. Implement `MISSING_IN_COBALT` items following Cobalt patterns (constructor DI, `fieldName()` getters, `Optional<T>`, builders, virtual threads).
@@ -114,6 +122,8 @@ For every issue found:
    - Lines with a WA Web counterpart: `// WAModuleName.functionName`
    - Lines with no WA Web basis: `// NO_WA_BASIS`
    - Java-specific adaptations: `// ADAPTED: WAModuleName.functionName`
+
+If you find issues in context files, report them in a `## Issues in Context Files` section of the report so the orchestrator can route them to the correct agent.
 
 ### Step 6: Write Report
 
