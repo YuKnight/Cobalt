@@ -2,6 +2,8 @@
 name: validate-module
 description: Validates one WA Web module against its Cobalt counterpart(s) by comparing every exported function for behavioral parity, then applies fixes.
 model: opus
+mcpServers:
+  - whatsapp
 tools:
   - Read
   - Write
@@ -9,7 +11,6 @@ tools:
   - Bash
   - Glob
   - Grep
-  - mcp__whatsapp__*
 ---
 
 # Module Validation Agent

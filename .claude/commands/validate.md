@@ -72,9 +72,10 @@ Using MCP tools, find all WA Web modules for this feature:
 
 ### Step 1.4: User Confirmation
 
-Present the full discovered scope to the user before proceeding:
+Present EVERY Cobalt file discovered in Step 1.1 — do not summarize, abbreviate, or omit files that seem less critical. Verify the count of files you present matches the count from your glob results. If they differ, you silently dropped files.
 
-- Total Cobalt files found (list them)
+- Total Cobalt files found with explicit count reconciliation (glob returned N files, presenting N files)
+- List every file, grouped by subpackage for readability but with no omissions
 - Total WA Web modules found (list them)
 - Any packages or subpackages that were discovered
 
