@@ -155,7 +155,31 @@ Before writing the plan, verify full coverage from both sides:
 2. Every discovered WA Web module must appear in at least one agent assignment. If any module is unassigned, find its Cobalt counterpart(s) and create an agent for it.
 3. The plan is not complete until both checks pass.
 
-### Step 2.5: Write the Plan
+### Step 2.5: Build the Dependency Graph and Topological Order
+
+This step is critical. Validation order determines whether dependencies are in place when consumers run, which determines whether agents can fix issues in their own files or have to flag them as context-file issues.
+
+For every Cobalt file in the discovered set, parse its `import` statements and build a directed graph where `A -> B` means "file A imports from file B AND B is also in the discovered set." Imports outside the discovered set are ignored — they're external dependencies, not part of this validation pass.
+
+Use `grep -h "^import com.github.auties00" <file>` or read each file directly to extract imports. Resolve each import to a discovered file path via the package-to-path mapping.
+
+Then:
+
+1. Compute strongly-connected components (SCCs). Files in the same SCC have circular dependencies and must be validated together as one unit.
+2. Topologically sort the SCCs. Leaves (no outgoing edges to discovered files) come first; top-level consumers (no incoming edges) come last.
+3. Within an SCC, the agent owns all files in that component.
+4. Record the order in the manifest as a `validationOrder` array.
+
+The result is a strict order where every agent runs only after all its Cobalt-internal dependencies have been validated. This means by the time a consumer agent runs:
+
+- The store accessors it needs already exist (the store agent ran earlier)
+- The action model fields it needs already exist (the model agent ran earlier)
+- The utility methods it should delegate to already exist (the utility agent ran earlier)
+- The exception subtypes it needs already exist (the exception agent ran earlier)
+
+Each agent must validate its file against its WA Web counterpart EXHAUSTIVELY — adding every export WA Web has, regardless of whether any current consumer uses it. This is what makes the dependency ordering work: leaves are made complete before consumers ask anything of them.
+
+### Step 2.6: Write the Plan
 
 Write `validation/<feature>/plan.md` with:
 
@@ -163,17 +187,19 @@ Write `validation/<feature>/plan.md` with:
 - Full module-to-file mapping table.
 - Export counts per module.
 - Unmapped exports and methods.
-- Validation agent assignments (which modules will be validated together).
+- Validation agent assignments in topological order (which modules will be validated together, in dependency order).
 - Coverage: N/N Cobalt files and N/N WA Web modules covered by agent assignments.
+- Dependency layers: explicit listing of which files are leaves, which are middle, which are top-level consumers.
 
 ---
 
-## Phase 3: Validation (Sequential Agents)
+## Phase 3: Validation (Sequential Agents in Topological Order)
 
-Spawn `validate-module` sub-agents one at a time. Each agent works directly on the main codebase — no worktrees, no merging. This means:
+Spawn `validate-module` sub-agents one at a time, in the topological order computed in Step 2.5. Each agent works directly on the main codebase — no worktrees, no merging. This means:
 - Each agent sees the full codebase including all fixes from previous agents.
 - No merge conflicts. No silent overwrites.
-- Shared files (e.g., `WhatsAppStore.java`) are edited in place and immediately available to the next agent.
+- Dependencies are validated before consumers, so by the time a consumer runs, every utility, store accessor, model field, and exception type it needs already exists.
+- Shared files (e.g., `WhatsAppStore.java`) are edited in place and immediately available to subsequent agents.
 
 ### Agent Assignment
 
@@ -198,18 +224,21 @@ Getting this right is critical. An agent that owns too many files will rewrite t
 
 ### Spawning
 
-Spawn agents one at a time, sequentially:
+Spawn agents one at a time, in the topological order from Step 2.5:
 
-1. Spawn a single `validate-module` agent (no `isolation: "worktree"`, no `run_in_background`).
-2. Wait for it to complete.
-3. Review its report from `validation/<feature>/reports/<ModuleName>.md`.
-4. Verify compilation after each agent:
+1. Take the next module/SCC in the validation order.
+2. Spawn a single `validate-module` agent (no `isolation: "worktree"`, no `run_in_background`).
+3. Wait for it to complete.
+4. Review its report from `validation/<feature>/reports/<ModuleName>.md`.
+5. Verify compilation:
    ```
    mvn compile -pl . -q "-Dcobalt.build.dir=target-validate-<module-slug>"
    ```
-5. Delete the build directory after successful compilation.
-6. If compilation fails, inspect the agent's changes and fix the issue before continuing.
-7. Move to the next module. Repeat until all modules are validated.
+6. Delete the build directory after successful compilation.
+7. If compilation fails, inspect the agent's changes and fix the issue before continuing.
+8. Move to the next module in the topological order. Repeat until all modules are validated.
+
+Each agent must validate its file EXHAUSTIVELY against WA Web — adding every export the WA Web counterpart has, even if no current Cobalt consumer uses it. This is what makes dependency ordering work: by the time a consumer runs, every method/field/type it might need from a leaf is already in place.
 
 Each agent prompt must include:
 - The WA Web module name
@@ -243,31 +272,69 @@ Validate WA Web module `{waModule}` against Cobalt.
 ## Report Output Path
 validation/{feature}/reports/{waModule}.md
 
-Validate every export exhaustively. Fix all issues in owned files. Report issues found in context files without fixing them. Write the report.
+Validate every export exhaustively against WA Web. Add every method/field/type WA Web has, even if no current Cobalt consumer uses it — leaves must be complete so consumers can rely on them. Fix all issues in owned files. Report issues found in context files without fixing them. Write the report.
 ```
+
+---
+
+## Phase 3.5: Cross-Cutting Flow Validation
+
+After every module has been validated in topological order, spawn a single `validate-flow` agent to handle cross-file architectural patterns that no single-file validator can see. Examples of patterns this catches:
+
+- "Module A inlines logic that should delegate to Module B's helper" (when both are correct in isolation but the call relationship is wrong)
+- "Stream handler X processes raw response when WA Web's equivalent processes a decoded object" (type mismatch that spans the dispatcher and the service)
+- "Service Y is called with the wrong JID variant from caller Z" (correct internally, wrong at the boundary)
+- "Caller does N work that should be done in M batches" (per-key vs batched calls across files)
+
+The orchestrator constructs a list of cross-cutting issues to investigate by collecting:
+
+1. Every `## Issues in Context Files` section from Phase 3 module reports.
+2. Any "should delegate to" / "should route through" / "double-decodes" findings noted by individual agents.
+3. Any cross-file inconsistencies the orchestrator noticed while reviewing reports.
+
+Spawn the `validate-flow` agent with:
+
+- The list of cross-cutting issues from Phase 3 reports
+- All discovered Cobalt files (read access)
+- Edit access to any file in the discovered set
+- The output path: `validation/<feature>/flow-report.md`
+
+Verify compilation after the agent completes.
+
+---
+
+## Phase 3.6: Phantom Code Sweep
+
+After cross-cutting flow validation, spawn a single `validate-phantom` agent to remove dead code introduced by previous validation passes or already present in the codebase.
+
+The phantom sweep agent:
+
+1. For every public/protected method, field, class, and enum constant in the discovered set, runs `Grep` to find references in the discovered files.
+2. For any member with zero references in the discovered set, queries the WA Web MCP (`mcp__whatsapp__find_references`, `mcp__whatsapp__search_code`) to verify there is also no WA Web counterpart that justifies its presence.
+3. If the member has neither Cobalt references nor WA Web justification, removes it.
+4. Defensive null checks, `AutoCloseable` patterns, builder helpers, and other Java-specific adaptations are kept (these are `ADAPTED`, not phantom).
+
+Spawn the `validate-phantom` agent with:
+
+- All discovered Cobalt files (read and edit access)
+- The output path: `validation/<feature>/phantom-report.md`
+
+Verify compilation after the agent completes.
 
 ---
 
 ## Phase 4: Synthesis (You Do This Inline)
 
-After all agents have completed sequentially (compilation already verified after each one):
+After all agents have completed (Phases 3, 3.5, and 3.6):
 
-### Step 4.1: Route Context File Issues
-
-Collect `## Issues in Context Files` sections from all module reports. If any agent reported issues in files it couldn't edit:
-
-1. Identify which agent owns the affected file (check the manifest's file ownership).
-2. Spawn a follow-up agent for just the affected file with the specific issues to fix.
-3. Verify compilation after the follow-up agent completes.
-
-### Step 4.2: Completeness Check
+### Step 4.1: Completeness Check
 
 Update the manifest: for every export, verify it has a verdict from a module report.
 
 - If any export has `status: "pending"` still, the validation is INCOMPLETE. Investigate and re-run.
 - Every export must be one of: MATCH, MISMATCH (fixed), MISSING_IN_COBALT (implemented), ADAPTED, or SKIPPED (WAM/telemetry with reason).
 
-### Step 4.3: Final Compilation
+### Step 4.2: Final Compilation
 
 ```
 mvn compile -pl . -q "-Dcobalt.build.dir=target-validate-final"
@@ -275,19 +342,20 @@ mvn compile -pl . -q "-Dcobalt.build.dir=target-validate-final"
 
 Delete `target-validate-final` after success.
 
-### Step 4.4: Re-validation Pass
+### Step 4.3: Re-validation Pass (Safety Net)
 
-If any agent in Phase 3 reported MISMATCH, MISSING_IN_COBALT, or MISSING_IN_WA_WEB issues (i.e., it made fixes), re-run the entire validation from Phase 3:
+If any agent in Phase 3 reported MISMATCH, MISSING_IN_COBALT, or MISSING_IN_WA_WEB issues (i.e., it made fixes), or if Phase 3.5 / 3.6 made changes, re-run the entire validation from Phase 3:
 
 1. Clear the reports directory.
-2. Re-run all agents sequentially against the now-fixed codebase.
+2. Re-run all module agents in topological order against the now-fixed codebase.
 3. Verify compilation after each agent.
-4. If the re-validation pass produces zero MISMATCH, zero MISSING_IN_COBALT, and zero MISSING_IN_WA_WEB across all agents, the validation is complete.
-5. If it still finds issues, fix them and re-run again. Repeat until a clean pass is achieved.
+4. Re-run Phase 3.5 and Phase 3.6.
+5. If the re-validation pass produces zero MISMATCH, zero MISSING_IN_COBALT, and zero MISSING_IN_WA_WEB across all agents, the validation is complete.
+6. If it still finds issues, fix them and re-run again. Repeat until a clean pass is achieved.
 
-This guarantees that fixes introduced by one agent didn't break another module's parity, and that the final state is fully validated — not just the diff.
+With dependency ordering most issues should be fixed in the first pass, so re-validation usually converges quickly. It exists as a safety net to catch fixes introduced by one agent that broke another module's parity.
 
-### Step 4.5: Write Synthesis Report
+### Step 4.4: Write Synthesis Report
 
 Write `validation/<feature>/report.md`:
 
@@ -331,6 +399,8 @@ Write `validation/<feature>/report.md`:
 ## Rules
 
 - **Exhaustiveness is mandatory.** Every WA Web export must have a verdict. The manifest is the checklist.
+- **Topological order is mandatory.** Leaves first, consumers last. By the time a consumer runs, every utility, accessor, model field, and exception type it needs must already exist.
+- **Leaves must be made complete against WA Web**, not just against current consumer needs. This is what makes dependency ordering work.
 - Validate feature and behavior parity, not file structure parity.
 - Cast a wide net during discovery. Better to surface false positives than miss modules.
 - Prefer the smallest defensible validation unit. One module per agent.
@@ -339,3 +409,4 @@ Write `validation/<feature>/report.md`:
 - Do not skip compilation verification.
 - Agents run sequentially on the main codebase. No worktrees, no merging. Verify compilation after each agent.
 - When searching WA Web, try multiple keyword forms: synonyms, abbreviations, subfeatures.
+- After per-module validation, run the cross-cutting flow agent (Phase 3.5) and the phantom sweep agent (Phase 3.6) before final synthesis.
