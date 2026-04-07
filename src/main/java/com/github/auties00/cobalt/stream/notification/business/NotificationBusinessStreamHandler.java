@@ -54,7 +54,7 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
                 case "subscriptions" -> handleSubscriptions(actionNode);
                 case "ctwa_suggestion" -> LOGGER.log(System.Logger.Level.DEBUG,
                         "Received ctwa_suggestion business notification");
-                case "privacy" -> handlePrivacy(actionNode);
+                case "privacy" -> handlePrivacy(targetJid, actionNode);
                 case "wa_ad_account_nonce" -> handleNonce(actionNode);
                 case "mm_campaign" -> handleCampaign(actionNode);
                 case "feature_flags" -> handleFeatureFlags(actionNode);
@@ -183,10 +183,13 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
         whatsapp.store().setBusinessSubscriptionCreationTimes(creationTimes);
     }
 
-    private void handlePrivacy(Node actionNode) {
+    private void handlePrivacy(Jid targetJid, Node actionNode) {
+        if (targetJid == null) {
+            return;
+        }
         var enabled = actionNode.getAttributeAsString("smb_data_sharing_setting", null);
         if (enabled != null) {
-            whatsapp.store().setCtwaDataSharingEnabled("true".equalsIgnoreCase(enabled));
+            whatsapp.store().setCtwaDataSharing(targetJid.toString(), "true".equalsIgnoreCase(enabled));
         }
     }
 

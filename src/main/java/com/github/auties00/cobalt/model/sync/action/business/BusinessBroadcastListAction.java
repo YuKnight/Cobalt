@@ -56,12 +56,25 @@ public final class BusinessBroadcastListAction implements SyncAction<BusinessBro
     @ProtobufProperty(index = 4, type = ProtobufType.STRING)
     List<String> labelIds;
 
+    /**
+     * The compiled audience expression that selects which contacts receive this
+     * broadcast list. WhatsApp Web encodes the user-authored audience query as a
+     * boolean expression over labels and contact attributes; the resolved
+     * expression is persisted alongside the participant snapshot for replay on
+     * other devices.
+     *
+     * @implNote WAWebProtobufSyncAction.pb BusinessBroadcastListAction.audienceExpression
+     */
+    @ProtobufProperty(index = 5, type = ProtobufType.STRING)
+    String audienceExpression;
 
-    BusinessBroadcastListAction(Boolean deleted, List<BroadcastListParticipantAction> participants, String listName, List<String> labelIds) {
+
+    BusinessBroadcastListAction(Boolean deleted, List<BroadcastListParticipantAction> participants, String listName, List<String> labelIds, String audienceExpression) {
         this.deleted = deleted;
         this.participants = participants;
         this.listName = listName;
         this.labelIds = labelIds;
+        this.audienceExpression = audienceExpression;
     }
 
     public boolean deleted() {
@@ -80,6 +93,21 @@ public final class BusinessBroadcastListAction implements SyncAction<BusinessBro
         return labelIds == null ? List.of() : Collections.unmodifiableList(labelIds);
     }
 
+    /**
+     * Returns the compiled audience expression for this broadcast list.
+     *
+     * <p>The audience expression encodes the user-authored predicate (e.g. label
+     * membership combined with contact attributes) that determines which
+     * contacts receive the broadcast. WhatsApp Web persists the resolved
+     * expression so the same selection can be reproduced on linked devices.
+     *
+     * @implNote WAWebProtobufSyncAction.pb BusinessBroadcastListAction.audienceExpression
+     * @return the audience expression, or {@link Optional#empty()} if none was supplied
+     */
+    public Optional<String> audienceExpression() {
+        return Optional.ofNullable(audienceExpression);
+    }
+
     public void setDeleted(Boolean deleted) {
         this.deleted = deleted;
     }
@@ -94,6 +122,16 @@ public final class BusinessBroadcastListAction implements SyncAction<BusinessBro
 
     public void setLabelIds(List<String> labelIds) {
         this.labelIds = labelIds;
+    }
+
+    /**
+     * Sets the compiled audience expression for this broadcast list.
+     *
+     * @implNote WAWebProtobufSyncAction.pb BusinessBroadcastListAction.audienceExpression
+     * @param audienceExpression the audience expression to store, or {@code null} to clear it
+     */
+    public void setAudienceExpression(String audienceExpression) {
+        this.audienceExpression = audienceExpression;
     }
 
 

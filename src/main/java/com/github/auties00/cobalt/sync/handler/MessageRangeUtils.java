@@ -15,10 +15,14 @@ import java.util.*;
  * the set of messages an action applies to. When a local and remote mutation
  * conflict on the same index, the range comparison determines which mutation
  * covers a broader scope of messages.
+ *
+ * @implNote WAWebMessageRangeUtils.compareMessageRanges, WAWebMessageRangeUtils.mergeMessageRanges
  */
 final class MessageRangeUtils {
     /**
      * The result of comparing two message ranges.
+     *
+     * @implNote WAWebMessageRangeUtils.MessageRangeEncloseType
      */
     enum EnclosureType {
         /**
@@ -42,6 +46,11 @@ final class MessageRangeUtils {
         RANGES_NOT_ENCLOSING
     }
 
+    /**
+     * Private constructor to prevent instantiation of this utility class.
+     *
+     * @implNote NO_WA_BASIS — Java utility class pattern
+     */
     private MessageRangeUtils() {
     }
 
@@ -51,6 +60,7 @@ final class MessageRangeUtils {
      * <p>Per WhatsApp Web {@code compareMessageRanges}: checks in both
      * directions whether one range encloses the other.
      *
+     * @implNote WAWebMessageRangeUtils.compareMessageRanges
      * @param rangeA the first range (typically remote)
      * @param rangeB the second range (typically local)
      * @return the enclosure relationship between the two ranges
@@ -79,10 +89,11 @@ final class MessageRangeUtils {
      *       {@code >=} the max timestamp; among duplicates (same key ID),
      *       keeps the one with the higher timestamp
      *   <li>Takes the maximum of both {@code lastSystemMessageTimestamp}
-     *       values, but only sets it if it exceeds the merged
+     *       values, but only sets it if it strictly exceeds the merged
      *       {@code lastMessageTimestamp}
      * </ul>
      *
+     * @implNote WAWebMessageRangeUtils.mergeMessageRanges
      * @param rangeA the first range (typically remote)
      * @param rangeB the second range (typically local)
      * @return a new merged range covering both inputs
@@ -105,7 +116,7 @@ final class MessageRangeUtils {
         var bSystemTimestamp = toEpochSeconds(rangeB.lastSystemMessageTimestamp().orElse(null));
         if (aSystemTimestamp != 0 || bSystemTimestamp != 0) {
             var maxSystemTimestamp = Math.max(aSystemTimestamp, bSystemTimestamp);
-            if (maxTimestamp == 0 || maxSystemTimestamp > maxTimestamp) {
+            if (maxSystemTimestamp > maxTimestamp) { // WAWebMessageRangeUtils.mergeMessageRanges: (l == null || m > l) — l is always a number, so equivalent to m > l
                 builder.lastSystemMessageTimestamp(Instant.ofEpochSecond(maxSystemTimestamp));
             }
         }
@@ -120,6 +131,7 @@ final class MessageRangeUtils {
      * is {@code >=} the given threshold. Among messages with the same key ID,
      * the one with the higher timestamp wins.
      *
+     * @implNote WAWebMessageRangeUtils (function g — merge helper)
      * @param messagesA     the first message list
      * @param messagesB     the second message list
      * @param maxTimestamp   the threshold timestamp (epoch seconds)
@@ -165,6 +177,7 @@ final class MessageRangeUtils {
      *       must be strictly less than A's {@code lastMessageTimestamp}
      * </ul>
      *
+     * @implNote WAWebMessageRangeUtils (function m — encloses helper)
      * @param encloser the range that should enclose
      * @param enclosed the range that should be enclosed
      * @return {@code true} if {@code encloser} encloses {@code enclosed}
@@ -212,6 +225,9 @@ final class MessageRangeUtils {
      * for {@code null} values. Mirrors the WhatsApp Web convention of
      * treating missing timestamps as {@code 0}.
      *
+     * @implNote ADAPTED: WAWebMessageRangeUtils — WA Web uses
+     *           {@code WALongInt.numberOrThrowIfTooLarge(val ?? 0)}; Cobalt uses
+     *           epoch seconds conversion with null coalescing to 0
      * @param instant the instant to convert, may be {@code null}
      * @return the epoch seconds, or {@code 0} if {@code null}
      */

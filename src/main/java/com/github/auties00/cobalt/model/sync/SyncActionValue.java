@@ -101,9 +101,6 @@ public final class SyncActionValue {
     @ProtobufProperty(index = 27, type = ProtobufType.MESSAGE)
     final AgentAction agentAction;
 
-    @ProtobufProperty(index = 28, type = ProtobufType.MESSAGE)
-    final SubscriptionAction subscriptionAction;
-
     @ProtobufProperty(index = 29, type = ProtobufType.MESSAGE)
     final UserStatusMuteAction userStatusMuteAction;
 
@@ -263,8 +260,11 @@ public final class SyncActionValue {
     @ProtobufProperty(index = 83, type = ProtobufType.MESSAGE)
     final CustomerDataAction customerDataAction;
 
+    @ProtobufProperty(index = 84, type = ProtobufType.MESSAGE)
+    final SubscriptionsSyncV2Action subscriptionsSyncV2Action;
 
-    SyncActionValue(Instant timestamp, StarAction starAction, ContactAction contactAction, MuteAction muteAction, PinAction pinAction, PushNameSetting pushNameSetting, QuickReplyAction quickReplyAction, RecentEmojiWeightsAction recentEmojiWeightsAction, LabelEditAction labelEditAction, LabelAssociationAction labelAssociationAction, LocaleSetting localeSetting, ArchiveChatAction archiveChatAction, DeleteMessageForMeAction deleteMessageForMeAction, KeyExpirationAction keyExpirationAction, MarkChatAsReadAction markChatAsReadAction, ClearChatAction clearChatAction, DeleteChatAction deleteChatAction, UnarchiveChatsSetting unarchiveChatsSetting, PrimaryFeatureAction primaryFeatureAction, AndroidUnsupportedActions androidUnsupportedActions, AgentAction agentAction, SubscriptionAction subscriptionAction, UserStatusMuteAction userStatusMuteAction, TimeFormatAction timeFormatAction, NuxAction nuxAction, PrimaryVersionAction primaryVersionAction, StickerAction stickerAction, RemoveRecentStickerAction removeRecentStickerAction, ChatAssignmentAction chatAssignment, ChatAssignmentOpenedStatusAction chatAssignmentOpenedStatus, PnForLidChatAction pnForLidChatAction, MarketingMessageAction marketingMessageAction, MarketingMessageBroadcastAction marketingMessageBroadcastAction, ExternalWebBetaAction externalWebBetaAction, PrivacySettingRelayAllCalls privacySettingRelayAllCalls, CallLogAction callLogAction, UGCBotAction ugcBotAction, StatusPrivacyAction statusPrivacy, BotWelcomeRequestAction botWelcomeRequestAction, DeleteIndividualCallLogAction deleteIndividualCallLog, LabelReorderingAction labelReorderingAction, PaymentInfoAction paymentInfoAction, CustomPaymentMethodsAction customPaymentMethodsAction, LockChatAction lockChatAction, ChatLockSettings chatLockSettings, WamoUserIdentifierAction wamoUserIdentifierAction, PrivacySettingDisableLinkPreviewsAction privacySettingDisableLinkPreviewsAction, DeviceCapabilities deviceCapabilities, NoteEditAction noteEditAction, FavoritesAction favoritesAction, MerchantPaymentPartnerAction merchantPaymentPartnerAction, WaffleAccountLinkStateAction waffleAccountLinkStateAction, UsernameChatStartModeAction usernameChatStartMode, NotificationActivitySettingAction notificationActivitySettingAction, LidContactAction lidContactAction, CtwaPerCustomerDataSharingAction ctwaPerCustomerDataSharingAction, PaymentTosAction paymentTosAction, PrivacySettingChannelsPersonalisedRecommendationAction privacySettingChannelsPersonalisedRecommendationAction, BusinessBroadcastAssociationAction businessBroadcastAssociationAction, DetectedOutcomesStatusAction detectedOutcomesStatusAction, MaibaAIFeaturesControlAction maibaAiFeaturesControlAction, BusinessBroadcastListAction businessBroadcastListAction, MusicUserIdAction musicUserIdAction, StatusPostOptInNotificationPreferencesAction statusPostOptInNotificationPreferencesAction, AvatarUpdatedAction avatarUpdatedAction, PrivateProcessingSettingAction privateProcessingSettingAction, NewsletterSavedInterestsAction newsletterSavedInterestsAction, AiThreadRenameAction aiThreadRenameAction, InteractiveMessageAction interactiveMessageAction, SettingsSyncAction settingsSyncAction, OutContactAction outContactAction, NctSaltSyncAction nctSaltSyncAction, BusinessBroadcastCampaignAction businessBroadcastCampaignAction, BusinessBroadcastInsightsAction businessBroadcastInsightsAction, CustomerDataAction customerDataAction) {
+
+    SyncActionValue(Instant timestamp, StarAction starAction, ContactAction contactAction, MuteAction muteAction, PinAction pinAction, PushNameSetting pushNameSetting, QuickReplyAction quickReplyAction, RecentEmojiWeightsAction recentEmojiWeightsAction, LabelEditAction labelEditAction, LabelAssociationAction labelAssociationAction, LocaleSetting localeSetting, ArchiveChatAction archiveChatAction, DeleteMessageForMeAction deleteMessageForMeAction, KeyExpirationAction keyExpirationAction, MarkChatAsReadAction markChatAsReadAction, ClearChatAction clearChatAction, DeleteChatAction deleteChatAction, UnarchiveChatsSetting unarchiveChatsSetting, PrimaryFeatureAction primaryFeatureAction, AndroidUnsupportedActions androidUnsupportedActions, AgentAction agentAction, UserStatusMuteAction userStatusMuteAction, TimeFormatAction timeFormatAction, NuxAction nuxAction, PrimaryVersionAction primaryVersionAction, StickerAction stickerAction, RemoveRecentStickerAction removeRecentStickerAction, ChatAssignmentAction chatAssignment, ChatAssignmentOpenedStatusAction chatAssignmentOpenedStatus, PnForLidChatAction pnForLidChatAction, MarketingMessageAction marketingMessageAction, MarketingMessageBroadcastAction marketingMessageBroadcastAction, ExternalWebBetaAction externalWebBetaAction, PrivacySettingRelayAllCalls privacySettingRelayAllCalls, CallLogAction callLogAction, UGCBotAction ugcBotAction, StatusPrivacyAction statusPrivacy, BotWelcomeRequestAction botWelcomeRequestAction, DeleteIndividualCallLogAction deleteIndividualCallLog, LabelReorderingAction labelReorderingAction, PaymentInfoAction paymentInfoAction, CustomPaymentMethodsAction customPaymentMethodsAction, LockChatAction lockChatAction, ChatLockSettings chatLockSettings, WamoUserIdentifierAction wamoUserIdentifierAction, PrivacySettingDisableLinkPreviewsAction privacySettingDisableLinkPreviewsAction, DeviceCapabilities deviceCapabilities, NoteEditAction noteEditAction, FavoritesAction favoritesAction, MerchantPaymentPartnerAction merchantPaymentPartnerAction, WaffleAccountLinkStateAction waffleAccountLinkStateAction, UsernameChatStartModeAction usernameChatStartMode, NotificationActivitySettingAction notificationActivitySettingAction, LidContactAction lidContactAction, CtwaPerCustomerDataSharingAction ctwaPerCustomerDataSharingAction, PaymentTosAction paymentTosAction, PrivacySettingChannelsPersonalisedRecommendationAction privacySettingChannelsPersonalisedRecommendationAction, BusinessBroadcastAssociationAction businessBroadcastAssociationAction, DetectedOutcomesStatusAction detectedOutcomesStatusAction, MaibaAIFeaturesControlAction maibaAiFeaturesControlAction, BusinessBroadcastListAction businessBroadcastListAction, MusicUserIdAction musicUserIdAction, StatusPostOptInNotificationPreferencesAction statusPostOptInNotificationPreferencesAction, AvatarUpdatedAction avatarUpdatedAction, PrivateProcessingSettingAction privateProcessingSettingAction, NewsletterSavedInterestsAction newsletterSavedInterestsAction, AiThreadRenameAction aiThreadRenameAction, InteractiveMessageAction interactiveMessageAction, SettingsSyncAction settingsSyncAction, OutContactAction outContactAction, NctSaltSyncAction nctSaltSyncAction, BusinessBroadcastCampaignAction businessBroadcastCampaignAction, BusinessBroadcastInsightsAction businessBroadcastInsightsAction, CustomerDataAction customerDataAction, SubscriptionsSyncV2Action subscriptionsSyncV2Action) {
         this.timestamp = timestamp;
         this.starAction = starAction;
         this.contactAction = contactAction;
@@ -286,7 +286,6 @@ public final class SyncActionValue {
         this.primaryFeatureAction = primaryFeatureAction;
         this.androidUnsupportedActions = androidUnsupportedActions;
         this.agentAction = agentAction;
-        this.subscriptionAction = subscriptionAction;
         this.userStatusMuteAction = userStatusMuteAction;
         this.timeFormatAction = timeFormatAction;
         this.nuxAction = nuxAction;
@@ -340,6 +339,7 @@ public final class SyncActionValue {
         this.businessBroadcastCampaignAction = businessBroadcastCampaignAction;
         this.businessBroadcastInsightsAction = businessBroadcastInsightsAction;
         this.customerDataAction = customerDataAction;
+        this.subscriptionsSyncV2Action = subscriptionsSyncV2Action;
     }
 
     public Optional<Instant> timestamp() {
@@ -367,7 +367,6 @@ public final class SyncActionValue {
         if (primaryFeatureAction != null) return Optional.of(primaryFeatureAction);
         if (androidUnsupportedActions != null) return Optional.of(androidUnsupportedActions);
         if (agentAction != null) return Optional.of(agentAction);
-        if (subscriptionAction != null) return Optional.of(subscriptionAction);
         if (userStatusMuteAction != null) return Optional.of(userStatusMuteAction);
         if (timeFormatAction != null) return Optional.of(timeFormatAction);
         if (nuxAction != null) return Optional.of(nuxAction);
@@ -421,6 +420,7 @@ public final class SyncActionValue {
         if (businessBroadcastCampaignAction != null) return Optional.of(businessBroadcastCampaignAction);
         if (businessBroadcastInsightsAction != null) return Optional.of(businessBroadcastInsightsAction);
         if (customerDataAction != null) return Optional.of(customerDataAction);
+        if (subscriptionsSyncV2Action != null) return Optional.of(subscriptionsSyncV2Action);
         return Optional.empty();
     }
 

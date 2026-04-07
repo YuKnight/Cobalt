@@ -9,8 +9,10 @@ import com.github.auties00.cobalt.model.sync.data.SyncdPatchSpec;
 import com.github.auties00.cobalt.node.Node;
 
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.SequencedCollection;
+import java.util.logging.Logger;
 
 /**
  * Parses sync response nodes into {@link MutationSyncResponse} objects.
@@ -19,9 +21,20 @@ import java.util.SequencedCollection;
  * for server-side error codes (409, 400, 404).
  *
  * @implNote WAWebSyncdResponseParser.syncResponseParser, WAWebSyncdServerSync.k,
- *           WAParseIqResponse.parseIqResponse
+ *           WAParseIqResponse.parseIqResponse,
+ *           WAWebSyncdDecode.decodeExternalBlobReference,
+ *           WAWebSyncdDecode.decodeSyncdPatch
  */
 public final class MutationResponseParser {
+    /**
+     * Logger used for diagnostic output, including decoded {@code clientDebugData}
+     * from incoming {@link SyncdPatch} messages.
+     *
+     * @implNote WAWebSyncdApplyPatch._applyPatch — logs {@code clientDebugData.currentLthash}
+     *           and {@code clientDebugData.newLthash} for employee-visible debugging
+     */
+    private static final Logger LOGGER = Logger.getLogger(MutationResponseParser.class.getName());
+
     /**
      * Parses a single-collection sync response node into a {@link MutationSyncResponse}.
      *
@@ -327,6 +340,7 @@ public final class MutationResponseParser {
             try {
                 // WAWebSyncdDecode.decodeSyncdPatch — decodeProtobuf(SyncdPatchSpec, t)
                 var patch = SyncdPatchSpec.decode(patchBytes);
+                logClientDebugData(patch);
                 patches.add(patch);
             } catch (Exception e) {
                 // WAWebSyncdDecode.decodeSyncdPatch — throw SyncdFatalError
@@ -335,5 +349,31 @@ public final class MutationResponseParser {
         }
 
         return patches;
+    }
+
+    /**
+     * Decodes and logs the {@code clientDebugData} field of a {@link SyncdPatch} for
+     * diagnostic purposes when the {@link Logger} is enabled at {@link java.util.logging.Level#FINE FINE}.
+     *
+     * <p>Mirrors WhatsApp Web's {@code _applyPatch} which logs the decoded
+     * {@code currentLthash} and {@code newLthash} from the patch debug data so that
+     * server-side LT hash transitions can be cross-checked against client computations
+     * during diagnosis. Decoding is best-effort and never throws.
+     *
+     * @implNote WAWebSyncdValidateServerSyncProtobuf.validatePatchProtobuf — decodes
+     *           {@code clientDebugData} via {@code decodeProtobuf(PatchDebugDataSpec, ...)};
+     *           WAWebSyncdApplyPatch._applyPatch — logs {@code currentLthash}/{@code newLthash}
+     * @param patch the patch whose debug data should be logged, never {@code null}
+     */
+    private void logClientDebugData(SyncdPatch patch) {
+        if (!LOGGER.isLoggable(java.util.logging.Level.FINE)) {
+            return;
+        }
+        patch.decodedClientDebugData().ifPresent(debug -> {
+            var hex = HexFormat.of();
+            var current = debug.currentLthash().map(hex::formatHex).orElse("<none>");
+            var next = debug.newLthash().map(hex::formatHex).orElse("<none>");
+            LOGGER.fine(() -> "patch debug: currentLthash=" + current + " newLthash=" + next);
+        });
     }
 }

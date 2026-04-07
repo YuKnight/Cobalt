@@ -22,25 +22,104 @@ import java.util.*;
 /**
  * Service for requesting missing sync keys from companion devices.
  * <p>
- * Per WhatsApp Web WAWebKeyManagementSendKeyRequestApi: when a sync key is missing,
- * the client sends an AppStateSyncKeyRequest protocol message to all companion devices.
- * Companion devices that have the key respond with AppStateSyncKeyShare.
+ * Per WhatsApp Web {@code WAWebSyncdHandleMissingKeys}: when a sync key is missing
+ * during snapshot or patch decryption, the client detects the missing key IDs,
+ * filters out already-tracked keys, sends an {@code AppStateSyncKeyRequest}
+ * protocol message to all companion devices, and records the missing keys
+ * in the store for timeout tracking.
+ * <p>
+ * In WA Web, {@code handleMissingKeysInSnapshot} and {@code handleMissingKeysInPatches}
+ * are separate exported functions that collect missing key IDs from snapshot records
+ * or patch mutations respectively, then delegate to the common {@code handleMissingKeys}.
+ * In Cobalt, the collection of missing key IDs is performed inline during decryption
+ * in {@code WebAppStateService}, which then calls into this service.
+ * <p>
+ * Per WhatsApp Web {@code WAWebKeyManagementSendKeyRequestApi}: the actual
+ * key request is sent as a peer message to all companion devices.
+ * Companion devices that have the key respond with {@code AppStateSyncKeyShare}.
+ * <p>
+ * Per WhatsApp Web {@code WAWebSyncdRequestAllSyncdMissingKeysJob}: a periodic job
+ * (every 6 hours via {@code WAWebTasksDefinitions}) wraps the {@code requestAllMissingKeys}
+ * call in a NonPersistedJob with BEST_EFFORT priority and 30-second timeout, then
+ * schedules {@code setMissingKeyTimeoutInTransaction} after 20 seconds. In Cobalt,
+ * the periodic scheduling is in {@link MissingSyncKeyTimeoutScheduler#startPeriodicReRequestJob()}
+ * and the core request logic is in {@link #reRequestMissingKeys(java.util.Collection)}.
  *
- * @implNote WAWebSyncdHandleMissingKeys.handleMissingKeys, WAWebKeyManagementSendKeyRequestApi.sendAppStateSyncKeyRequest
+ * @implNote WAWebSyncdHandleMissingKeys (handleMissingKeys, handleMissingKeysInSnapshot,
+ *     handleMissingKeysInPatches, requestAllMissingKeys),
+ *     WAWebSyncdRequestAllSyncdMissingKeysJob.requestAllSyncdMissingKeysJob,
+ *     WAWebKeyManagementSendKeyRequestApi.sendAppStateSyncKeyRequest
  */
 public final class MissingSyncKeyRequestService {
+    /**
+     * Logger for this service.
+     *
+     * @implNote WAWebSyncdHandleMissingKeys: WALogger.LOG usage
+     */
     private static final System.Logger LOGGER = System.getLogger(MissingSyncKeyRequestService.class.getName());
 
+    /**
+     * The WhatsApp client instance, used for sending peer messages.
+     *
+     * @implNote ADAPTED: Cobalt DI pattern (constructor injection)
+     */
     private final WhatsAppClient client;
+
+    /**
+     * The WhatsApp store, used for querying and tracking missing keys.
+     *
+     * @implNote ADAPTED: Cobalt DI pattern (constructor injection)
+     */
     private final WhatsAppStore store;
 
+    /**
+     * The timeout scheduler used to (re)schedule the missing-key timeout check
+     * inline at the end of {@link #trackMissingKeys(java.util.Collection, java.util.Set)},
+     * mirroring WA Web's {@code addMissingKeys} which calls
+     * {@code setMissingKeyTimeoutInTransaction} as its final step.
+     *
+     * <p>This dependency is wired via {@link #setTimeoutScheduler(MissingSyncKeyTimeoutScheduler)}
+     * after construction because {@link MissingSyncKeyTimeoutScheduler} also depends on
+     * this service, creating a circular construction dependency.
+     *
+     * @implNote WAWebSyncdStoreMissingKeys.addMissingKeys (calls setMissingKeyTimeoutInTransaction inline)
+     */
+    private MissingSyncKeyTimeoutScheduler timeoutScheduler;
+
+    /**
+     * Creates a new missing sync key request service.
+     *
+     * @param client the WhatsApp client instance
+     * @implNote WAWebSyncdHandleMissingKeys (module-level dependencies: WAWebGetSyncKey, WAWebGetMissingKey,
+     *     WAWebSyncdKeyCallbacksApi, WAWebSyncdStoreMissingKeys, WAWebOfflineHandler)
+     */
     public MissingSyncKeyRequestService(WhatsAppClient client) {
         this.client = client;
         this.store = client.store();
     }
 
     /**
+     * Wires the timeout scheduler dependency after construction.
+     *
+     * <p>{@link MissingSyncKeyTimeoutScheduler} cannot be supplied via the constructor
+     * because the scheduler also depends on this service for its periodic re-request
+     * job, producing a circular dependency. The owning {@link com.github.auties00.cobalt.sync.WebAppStateService}
+     * constructs both collaborators and then invokes this method to complete the wiring.
+     *
+     * @param timeoutScheduler the timeout scheduler instance
+     * @implNote WAWebSyncdStoreMissingKeys.addMissingKeys (collaborator wiring for inline timeout reschedule)
+     */
+    public void setTimeoutScheduler(MissingSyncKeyTimeoutScheduler timeoutScheduler) {
+        this.timeoutScheduler = timeoutScheduler;
+    }
+
+    /**
      * Requests missing sync keys from companion devices.
+     * <p>
+     * Per WA Web, this is the entry point called after {@code handleMissingKeysInSnapshot}
+     * or {@code handleMissingKeysInPatches} has collected the set of missing key IDs.
+     * In Cobalt, the collection is done inline during decryption and this method is called
+     * directly with the detected missing key IDs.
      *
      * @implNote WAWebSyncdHandleMissingKeys.handleMissingKeys
      * @param keyIds the IDs of the missing keys
@@ -66,7 +145,14 @@ public final class MissingSyncKeyRequestService {
      * then sends a key request without checking resume state or re-tracking the keys
      * (they are already stored in the missing key store).
      *
-     * @implNote WAWebSyncdHandleMissingKeys.requestAllMissingKeys
+     * <p>This method provides the core logic for the
+     * {@code WAWebSyncdRequestAllSyncdMissingKeysJob.requestAllSyncdMissingKeysJob}
+     * periodic job. The job framework wrapper (NonPersistedJob with BEST_EFFORT priority
+     * and 30-second timeout) is handled by
+     * {@link MissingSyncKeyTimeoutScheduler#startPeriodicReRequestJob()}.
+     *
+     * @implNote WAWebSyncdHandleMissingKeys.requestAllMissingKeys,
+     *     WAWebSyncdRequestAllSyncdMissingKeysJob.requestAllSyncdMissingKeysJob
      * @param keyIds the IDs of the missing keys to re-request
      */
     public void reRequestMissingKeys(Collection<byte[]> keyIds) {
@@ -188,7 +274,7 @@ public final class MissingSyncKeyRequestService {
         var messages = buildKeyRequestMessages(companionDevices, keyRequest);
 
         var keyIdHexes = keyRequest.keyIds().stream() // WAWebSyncdCryptoUtils.syncKeyIdToHex
-                .map(id -> id.keyId().map(k -> HexFormat.of().formatHex(k)).orElse("?"))
+                .map(id -> id.keyId().map(SyncKeyUtils::syncKeyIdToHex).orElse("?"))
                 .toList();
         var deviceIds = companionDevices.stream() // WAWebKeyManagementSendKeyRequestApi.sendAppStateSyncKeyRequest: a.map(e => e.getDeviceId())
                 .map(Jid::device)
@@ -282,14 +368,18 @@ public final class MissingSyncKeyRequestService {
     }
 
     /**
-     * Tracks missing keys in the store, always creating fresh entries for each key.
+     * Tracks missing keys in the store, always creating fresh entries for each key,
+     * then (re)schedules the missing-key timeout check.
      *
      * <p>Per WhatsApp Web: each entry is created with the current timestamp and a
      * {@code deviceResponses} map of {@code deviceId -> null} for every successfully
      * contacted device. Existing entries for the same key are overwritten (upsert
-     * via {@code bulkUpdateMissingKeysInTransaction}).
+     * via {@code bulkUpdateMissingKeysInTransaction}). After the bulk update,
+     * {@code addMissingKeys} calls {@code setMissingKeyTimeoutInTransaction} inline
+     * as its final step so that the tracker always reschedules its expiry check
+     * whenever new missing keys are recorded.
      *
-     * @implNote WAWebSyncdStoreMissingKeys.addMissingKeys
+     * @implNote WAWebSyncdStoreMissingKeys.addMissingKeys — invokes setMissingKeyTimeoutInTransaction inline at end
      * @param keyIds the IDs of the missing keys
      * @param successfulDeviceIds the set of device IDs that were successfully asked
      */
@@ -301,6 +391,11 @@ public final class MissingSyncKeyRequestService {
                     .askedDevices(Set.copyOf(successfulDeviceIds)) // ADAPTED: WAWebSyncdStoreMissingKeys.addMissingKeys: deviceResponses: n() — Map<deviceId, null> mapped to Set<Integer>
                     .build();
             store.addMissingSyncKey(missingKey); // WAWebGetMissingKey.bulkUpdateMissingKeysInTransaction
+        }
+
+        // WAWebSyncdStoreMissingKeys.addMissingKeys — invokes setMissingKeyTimeoutInTransaction inline at end
+        if (timeoutScheduler != null) {
+            timeoutScheduler.scheduleTimeoutCheck(); // WAWebSyncdStoreMissingKeys.addMissingKeys: yield k() (setMissingKeyTimeoutInTransaction)
         }
     }
 }

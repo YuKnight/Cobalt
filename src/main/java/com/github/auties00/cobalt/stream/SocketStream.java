@@ -36,11 +36,12 @@ public final class SocketStream {
 
     public SocketStream(WhatsAppClient whatsapp, WhatsAppClientVerificationHandler.Web webVerificationHandler, LidMigrationService lidMigrationService, InactiveGroupLidMigrationService inactiveGroupLidMigrationService, MessageService messageService, ABPropsService abPropsService, DeviceService deviceService, WamService wamService, SnapshotRecoveryService snapshotRecoveryService, WebAppStateService webAppStateService) {
         var result = new HashMap<String, Handler>();
-        addHandler(result, "iq", new IqStreamHandler(whatsapp, webVerificationHandler, deviceService));
+        addHandler(result, "iq", new IqStreamHandler(whatsapp, webVerificationHandler, deviceService, snapshotRecoveryService));
         addHandler(result, "message", new MessageStreamHandler(
                 whatsapp,
                 messageService,
                 snapshotRecoveryService,
+                webAppStateService,
                 lidMigrationService
         ));
         addHandler(result, "receipt", new ReceiptStreamHandler(whatsapp, messageService));

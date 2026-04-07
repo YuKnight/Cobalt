@@ -6,6 +6,8 @@ import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
 
+import java.util.Optional;
+
 @ProtobufMessage(name = "SyncActionValue.UserStatusMuteAction")
 public final class UserStatusMuteAction implements SyncAction<UserStatusMuteActionArgs> {
     /**
@@ -48,10 +50,44 @@ public final class UserStatusMuteAction implements SyncAction<UserStatusMuteActi
         this.muted = muted;
     }
 
+    /**
+     * Returns whether the user status is muted, coalescing an absent value to
+     * {@code false}.
+     *
+     * @implNote {@code WAWebUserStatusMuteSyncAction.apply} treats both an
+     *           absent value and an explicit {@code false} as "not muted";
+     *           callers that must distinguish the two cases should use
+     *           {@link #rawMuted()}.
+     * @return {@code true} if the user status is muted, otherwise {@code false}
+     */
     public boolean muted() {
         return muted != null && muted;
     }
 
+    /**
+     * Returns the raw nullable {@code muted} flag as provided by the remote
+     * sync action, preserving the distinction between an absent field and an
+     * explicitly set value.
+     *
+     * @implNote WA Web treats absent muted as malformed; this accessor exposes
+     *           the raw nullable value for handlers that need to distinguish
+     *           absent from explicit false.
+     * @return an {@link Optional} containing the raw {@link Boolean} value, or
+     *         an empty {@code Optional} if the field was not present on the
+     *         wire
+     */
+    public Optional<Boolean> rawMuted() {
+        return Optional.ofNullable(muted);
+    }
+
+    /**
+     * Sets the {@code muted} flag, which indicates whether the user status is
+     * muted.
+     *
+     * @implNote {@code WAWebUserStatusMuteSyncAction.apply} mirrors updates to
+     *           this flag from the primary device.
+     * @param muted the new flag value, or {@code null} to clear the field
+     */
     public void setMuted(Boolean muted) {
         this.muted = muted;
     }

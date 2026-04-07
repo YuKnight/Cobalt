@@ -27,11 +27,17 @@ import java.util.List;
  *   <li>{@link #collectionName()} — the sync collection this action belongs to</li>
  *   <li>{@link #version()} — the mutation format version for version gating</li>
  * </ul>
+ *
+ * @implNote WAWeb*Sync (e.g., WAWebArchiveChatSync, WAWebPinChatSync, etc.) — each
+ *           concrete handler extends the common base class pattern with {@code getAction()},
+ *           {@code getVersion()}, {@code collectionName}, and {@code applyMutations()}
  */
 public interface WebAppStateActionHandler {
     /**
      * Gets the action type name this handler processes.
      *
+     * @implNote WAWeb*Sync.getAction — returns the {@code WASyncdConst.Actions} constant
+     *           for this handler (e.g., {@code "archive"}, {@code "pin_v1"})
      * @return the action type name
      */
     String actionName();
@@ -42,6 +48,8 @@ public interface WebAppStateActionHandler {
      * <p>Per WhatsApp Web, each handler declares which collection its mutations
      * are stored in (e.g., {@code REGULAR}, {@code CRITICAL_BLOCK}).
      *
+     * @implNote WAWeb*Sync.collectionName — set in constructor from
+     *           {@code WASyncdConst.CollectionName} (e.g., {@code RegularLow}, {@code CriticalBlock})
      * @return the sync patch type / collection name
      */
     SyncPatchType collectionName();
@@ -53,13 +61,52 @@ public interface WebAppStateActionHandler {
      * version gating. Mutations with a version higher than this value are
      * skipped to avoid processing with incompatible logic.
      *
+     * @implNote WAWeb*Sync.getVersion — returns the version constant for this handler
      * @return the handler's supported mutation version
      */
     int version();
 
     /**
+     * Returns a malformed result for an invalid action index.
+     *
+     * <p>Per WhatsApp Web {@code WAWebSyncdAction.malformedActionIndex}: the base
+     * class method delegates to {@code WAWebSyncdIndexUtils.malformedActionIndex}
+     * passing the handler's {@code collectionName} and {@code getAction()} values.
+     * The utility uploads a WAM critical event metric and returns
+     * {@code {actionState: Malformed}}.
+     *
+     * <p>In Cobalt, WAM telemetry is intentionally omitted, but the return value
+     * semantics are preserved.
+     *
+     * @implNote WAWebSyncdAction.malformedActionIndex, WAWebSyncdIndexUtils.malformedActionIndex
+     * @return a {@link MutationApplicationResult} with {@code MALFORMED} state
+     */
+    default MutationApplicationResult malformedActionIndex() {
+        return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName()); // WAWebSyncdAction.malformedActionIndex -> WAWebSyncdIndexUtils.malformedActionIndex(e.collectionName, e.getAction())
+    }
+
+    /**
+     * Returns a malformed result for an invalid action value.
+     *
+     * <p>Per WhatsApp Web, individual handlers call
+     * {@code WAWebSyncdIndexUtils.malformedActionValue(collectionName)} directly
+     * when the sync action value cannot be decoded or validated.
+     *
+     * <p>In Cobalt, this method provides a convenient default that passes the
+     * handler's {@code collectionName} to the underlying utility.
+     *
+     * @implNote WAWebSyncdIndexUtils.malformedActionValue
+     * @return a {@link MutationApplicationResult} with {@code MALFORMED} state
+     */
+    default MutationApplicationResult malformedActionValue() {
+        return SyncdIndexUtils.malformedActionValue(collectionName().name()); // WAWebSyncdIndexUtils.malformedActionValue(a.collectionName)
+    }
+
+    /**
      * Applies mutation to local state.
      *
+     * @implNote WAWeb*Sync.applyMutations — per-mutation application logic within
+     *           the batch handler. Returns {@code true} on success, {@code false} on orphan.
      * @param client   the WhatsAppClient instance linked to the mutation
      * @param mutation the mutation to apply
      * @return {@code true} if the mutation was applied successfully, {@code false} otherwise
@@ -79,6 +126,8 @@ public interface WebAppStateActionHandler {
      * {@link #applyMutation(WhatsAppClient, DecryptedMutation.Trusted)}.
      * Handlers that need batch-level deduplication should override this method.
      *
+     * @implNote WAWeb*Sync.applyMutations — the main entry point for batch mutation
+     *           application in each handler
      * @param client    the WhatsAppClient instance linked to the mutations
      * @param mutations the batch of mutations to apply (already version-gated)
      * @return a list of results parallel to the input, where {@code true}
@@ -98,6 +147,9 @@ public interface WebAppStateActionHandler {
      * <p>The default implementation preserves legacy behavior where {@code true}
      * is treated as success and {@code false} is treated as orphan.
      *
+     * @implNote ADAPTED: WAWeb*Sync.applyMutations — WA Web returns
+     *           {@code WASyncdConst.SyncActionState} values directly; Cobalt wraps them
+     *           in {@link MutationApplicationResult} for type safety
      * @param client the WhatsApp client
      * @param mutation the mutation to apply
      * @return the detailed application result
@@ -117,6 +169,9 @@ public interface WebAppStateActionHandler {
      * <p>The default implementation preserves legacy behavior where {@code true}
      * is treated as success and {@code false} is treated as orphan.
      *
+     * @implNote ADAPTED: WAWeb*Sync.applyMutations — WA Web returns per-mutation
+     *           {@code WASyncdConst.SyncActionState} values; Cobalt wraps them in
+     *           {@link MutationApplicationResult} for type safety
      * @param client the WhatsApp client
      * @param mutations the mutations to apply
      * @return the detailed application results
@@ -143,6 +198,8 @@ public interface WebAppStateActionHandler {
      * with the later (or equal) timestamp wins. Subclasses can override this
      * to implement specialized logic (e.g., message-range merging).
      *
+     * @implNote WAWebSyncdAction.resolveConflicts — default timestamp-based
+     *           resolution; some handlers override with message-range merging
      * @param localMutation  the local pending mutation
      * @param remoteMutation the incoming remote mutation
      * @return the conflict resolution indicating which mutation to keep and
@@ -160,6 +217,8 @@ public interface WebAppStateActionHandler {
      * Allows a handler to drop a remote mutation when a different pending local
      * mutation makes it obsolete, mirroring WA's cross-index conflict hook.
      *
+     * @implNote WAWebSyncdAction.dropMutationDueToCrossIndexConflict — cross-index conflict
+     *           check; most handlers return {@code false} (no cross-index conflicts)
      * @param remoteMutation the candidate remote mutation
      * @param pendingByIndex all pending mutations indexed by mutation index
      * @return whether the remote mutation should be dropped

@@ -1,53 +1,183 @@
 package com.github.auties00.cobalt.sync.handler;
 
+import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
+import com.github.auties00.cobalt.model.sync.SyncActionState;
+import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.model.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.model.sync.action.privacy.PrivacySettingRelayAllCalls;
+import com.github.auties00.cobalt.model.sync.action.privacy.PrivacySettingRelayAllCallsBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
+import java.time.Instant;
+import java.util.List;
+
 /**
- * Handles VoIP relay all calls setting actions.
+ * Handles VoIP relay-all-calls setting sync actions.
+ *
+ * <p>This handler processes mutations that control whether all VoIP calls
+ * are relayed through WhatsApp servers (hiding the user's IP address from
+ * the call peer). It maps to the singleton instance exported as
+ * {@code default} from the WA Web module, which extends
+ * {@code AccountSyncdActionBase} with collection {@code Regular},
+ * version {@code 1}, and action {@code "setting_relayAllCalls"}.
+ *
+ * <p>Index format: {@code ["setting_relayAllCalls"]}
+ *
+ * @implNote WAWebVoipRelayAllCallsSettingSync.default (singleton instance of the
+ *           VoipRelayAllCallsSettingSync class extending AccountSyncdActionBase)
  */
 public final class VoipRelayAllCallsHandler implements WebAppStateActionHandler {
+    /**
+     * The singleton instance of {@code VoipRelayAllCallsHandler}.
+     *
+     * @implNote WAWebVoipRelayAllCallsSettingSync.default — {@code var m = new d; l.default = m}
+     */
     public static final VoipRelayAllCallsHandler INSTANCE = new VoipRelayAllCallsHandler();
 
+    /**
+     * Creates a new {@code VoipRelayAllCallsHandler}.
+     *
+     * @implNote WAWebVoipRelayAllCallsSettingSync — constructor sets
+     *           {@code this.collectionName = WASyncdConst.CollectionName.Regular}
+     */
     private VoipRelayAllCallsHandler() {
 
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * @implNote WAWebVoipRelayAllCallsSettingSync.getAction — returns
+     *           {@code WASyncdConst.Actions.VoipRelayAllCalls} which is
+     *           {@code "setting_relayAllCalls"}
+     */
     @Override
     public String actionName() {
-        return PrivacySettingRelayAllCalls.ACTION_NAME;
+        return PrivacySettingRelayAllCalls.ACTION_NAME; // WAWebVoipRelayAllCallsSettingSync.getAction
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * @implNote WAWebVoipRelayAllCallsSettingSync — constructor field
+     *           {@code this.collectionName = WASyncdConst.CollectionName.Regular}
+     *           which is {@code "regular"}
+     */
     @Override
     public SyncPatchType collectionName() {
-        return PrivacySettingRelayAllCalls.COLLECTION_NAME;
+        return PrivacySettingRelayAllCalls.COLLECTION_NAME; // WAWebVoipRelayAllCallsSettingSync.collectionName
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * @implNote WAWebVoipRelayAllCallsSettingSync.getVersion — returns {@code 1}
+     */
     @Override
     public int version() {
-        return PrivacySettingRelayAllCalls.ACTION_VERSION;
+        return PrivacySettingRelayAllCalls.ACTION_VERSION; // WAWebVoipRelayAllCallsSettingSync.getVersion
     }
 
+    /**
+     * Applies a single VoIP relay-all-calls mutation.
+     *
+     * <p>Delegates to {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
+     * and returns {@code true} if the result state is {@code SUCCESS}.
+     *
+     * @implNote ADAPTED: WAWebVoipRelayAllCallsSettingSync.applyMutations — WA Web returns
+     *           {@code SyncActionState} values directly; Cobalt wraps in
+     *           {@link MutationApplicationResult} for type safety
+     * @param client   the WhatsApp client instance
+     * @param mutation the mutation to apply
+     * @return {@code true} if applied successfully, {@code false} otherwise
+     */
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS;
+        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: WAWebVoipRelayAllCallsSettingSync.applyMutations
     }
 
+    /**
+     * Applies a single VoIP relay-all-calls mutation and returns a detailed result.
+     *
+     * <p>Per WhatsApp Web {@code WAWebVoipRelayAllCallsSettingSync.applyMutations}
+     * (single-mutation path within the {@code Promise.all(r.map(...))} batch):
+     * <ol>
+     *   <li>If the operation is not {@code SET}, increments the unsupported counter
+     *       and returns {@code Unsupported}.</li>
+     *   <li>Extracts {@code privacySettingRelayAllCalls} from the value. If absent,
+     *       increments the malformed counter and returns
+     *       {@code malformedActionValue(collectionName)}.</li>
+     *   <li>Reads {@code isEnabled}. WA Web counts {@code null} values separately
+     *       and skips the backend persist call, but still returns {@code Success}.
+     *       In Cobalt, the existing nullable boolean accessor coalesces {@code null}
+     *       to {@code false} per the project's nullable-boolean-accessor convention.</li>
+     *   <li>Otherwise, persists the value via
+     *       {@code WAWebBackendApi.frontendSendAndReceive("setRelayAllCallsToUserPrefs", {disallowAllP2p: s})}
+     *       and returns {@code Success}.</li>
+     * </ol>
+     *
+     * <p>Per the Cobalt error model, the WA Web {@code try/catch} that converts
+     * any thrown error into {@code {actionState: Failed}} is intentionally not
+     * replicated; thrown {@code WhatsAppException} subtypes propagate to the
+     * pluggable error handler instead.
+     *
+     * @implNote WAWebVoipRelayAllCallsSettingSync.applyMutations (single-mutation semantics)
+     * @param client   the WhatsApp client instance
+     * @param mutation the mutation to apply
+     * @return the detailed application result
+     */
     @Override
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        if (mutation.operation() != SyncdOperation.SET) {
-            return MutationApplicationResult.unsupported();
+        if (mutation.operation() != SyncdOperation.SET) { // WAWebVoipRelayAllCallsSettingSync.applyMutations: if (e.operation === "set") ... else l++, return {actionState: Unsupported}
+            return MutationApplicationResult.unsupported(); // WAWebVoipRelayAllCallsSettingSync.applyMutations: {actionState: SyncActionState.Unsupported}
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof PrivacySettingRelayAllCalls action)) {
-            return MutationApplicationResult.malformed();
+        if (!(mutation.value().action().orElse(null) instanceof PrivacySettingRelayAllCalls action)) { // WAWebVoipRelayAllCallsSettingSync.applyMutations: var r = n.privacySettingRelayAllCalls; if (!r) return a++, malformedActionValue(t.collectionName)
+            return MutationApplicationResult.malformed(); // WAWebVoipRelayAllCallsSettingSync.applyMutations: malformedActionValue(t.collectionName)
         }
 
-        client.store().setRelayAllCalls(action.isEnabled());
-        return MutationApplicationResult.success();
+        client.store().setRelayAllCalls(action.isEnabled()); // ADAPTED: WAWebBackendApi.frontendSendAndReceive("setRelayAllCallsToUserPrefs", {disallowAllP2p: s}) -> direct store call
+        return MutationApplicationResult.success(); // WAWebVoipRelayAllCallsSettingSync.applyMutations: {actionState: SyncActionState.Success}
+    }
+
+    /**
+     * Builds a pending SET mutation for the VoIP relay-all-calls setting.
+     *
+     * <p>Per WhatsApp Web {@code WAWebVoipRelayAllCallsSettingSync.getMutation}:
+     * <ol>
+     *   <li>Wraps the value in a {@code privacySettingRelayAllCalls} object:
+     *       {@code {isEnabled: n}}</li>
+     *   <li>Delegates to {@code WAWebSyncdActionUtils.buildPendingMutation} with
+     *       collection={@code Regular}, indexArgs={@code []},
+     *       operation={@code SET}, version={@code 1},
+     *       action={@code "setting_relayAllCalls"}</li>
+     * </ol>
+     *
+     * @implNote WAWebVoipRelayAllCallsSettingSync.getMutation
+     * @param timestamp the mutation timestamp
+     * @param isEnabled whether VoIP relay-all-calls should be enabled
+     * @return the pending mutation ready for sync upload
+     */
+    public SyncPendingMutation getMutation(Instant timestamp, boolean isEnabled) {
+        var action = new PrivacySettingRelayAllCallsBuilder() // WAWebVoipRelayAllCallsSettingSync.getMutation: {privacySettingRelayAllCalls: {isEnabled: n}}
+                .isEnabled(isEnabled) // WAWebVoipRelayAllCallsSettingSync.getMutation: isEnabled: n
+                .build();
+        var value = new SyncActionValueBuilder() // WAWebSyncdActionUtils.buildPendingMutation: encodeProtobuf(SyncActionValueSpec, {...l, timestamp: i})
+                .timestamp(timestamp) // WAWebSyncdActionUtils.buildPendingMutation: timestamp: t
+                .privacySettingRelayAllCalls(action) // WAWebVoipRelayAllCallsSettingSync.getMutation: value: {privacySettingRelayAllCalls: {...}}
+                .build();
+        var index = JSON.toJSONString(List.of(actionName())); // WAWebSyncdActionUtils.buildPendingMutation: index = JSON.stringify([action].concat(indexArgs)) where indexArgs = []
+        var mutation = new DecryptedMutation.Trusted( // WAWebSyncdActionUtils.buildPendingMutation: return { collection, index, binarySyncAction, version, operation, timestamp, action }
+                index, // WAWebSyncdActionUtils.buildPendingMutation: index
+                value, // WAWebSyncdActionUtils.buildPendingMutation: binarySyncAction
+                SyncdOperation.SET, // WAWebVoipRelayAllCallsSettingSync.getMutation: operation: SyncdMutation$SyncdOperation.SET
+                timestamp, // WAWebSyncdActionUtils.buildPendingMutation: timestamp
+                version() // WAWebSyncdActionUtils.buildPendingMutation: version: this.getVersion()
+        );
+        return new SyncPendingMutation(mutation, 0); // WAWebSyncdActionUtils.buildPendingMutation
     }
 }

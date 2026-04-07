@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.model.sync.action.media;
 
 import com.github.auties00.cobalt.model.media.MediaPath;
 import com.github.auties00.cobalt.model.media.MediaProvider;
+import com.github.auties00.cobalt.model.mixin.InstantSecondsMixin;
 import com.github.auties00.cobalt.model.preference.Sticker;
 import com.github.auties00.cobalt.model.preference.StickerBuilder;
 import com.github.auties00.cobalt.model.sync.SyncAction;
@@ -88,8 +89,11 @@ public final class StickerAction implements SyncAction<StickerActionArgs>, Media
     @ProtobufProperty(index = 13, type = ProtobufType.BOOL)
     Boolean isAvatarSticker;
 
+    @ProtobufProperty(index = 14, type = ProtobufType.INT64, mixins = InstantSecondsMixin.class)
+    Instant mediaKeyTimestamp;
 
-    StickerAction(String mediaUrl, byte[] mediaEncryptedSha256, byte[] mediaKey, String mimetype, Integer height, Integer width, String mediaDirectPath, Long mediaSize, Boolean isFavorite, Integer deviceIdHint, Boolean isLottie, String imageHash, Boolean isAvatarSticker) {
+
+    StickerAction(String mediaUrl, byte[] mediaEncryptedSha256, byte[] mediaKey, String mimetype, Integer height, Integer width, String mediaDirectPath, Long mediaSize, Boolean isFavorite, Integer deviceIdHint, Boolean isLottie, String imageHash, Boolean isAvatarSticker, Instant mediaKeyTimestamp) {
         this.mediaUrl = mediaUrl;
         this.mediaEncryptedSha256 = mediaEncryptedSha256;
         this.mediaKey = mediaKey;
@@ -103,6 +107,7 @@ public final class StickerAction implements SyncAction<StickerActionArgs>, Media
         this.isLottie = isLottie;
         this.imageHash = imageHash;
         this.isAvatarSticker = isAvatarSticker;
+        this.mediaKeyTimestamp = mediaKeyTimestamp;
     }
 
     public Optional<String> url() {
@@ -177,6 +182,20 @@ public final class StickerAction implements SyncAction<StickerActionArgs>, Media
         return isAvatarSticker != null && isAvatarSticker;
     }
 
+    /**
+     * Returns the {@link Instant} at which the sticker's media key was
+     * generated.
+     *
+     * @implNote {@code WAWebStickersFavoriteSyncAction.apply} threads the media
+     *           key timestamp through the rehydrated sticker so the CDN can
+     *           verify key freshness on subsequent downloads.
+     * @return an {@link Optional} containing the media key timestamp, or empty
+     *         if the field is not set
+     */
+    public Optional<Instant> mediaKeyTimestamp() {
+        return Optional.ofNullable(mediaKeyTimestamp);
+    }
+
     @Override
     public Optional<byte[]> mediaSha256() {
         return Optional.empty();
@@ -248,11 +267,43 @@ public final class StickerAction implements SyncAction<StickerActionArgs>, Media
     public void setMediaSha256(byte[] bytes) {
     }
 
+    /**
+     * Stores the epoch-second timestamp at which this sticker's media key was
+     * generated.
+     *
+     * @implNote {@code WAWebStickersFavoriteSyncAction} records the CDN media
+     *           key timestamp on the sticker action so downstream consumers
+     *           can verify key freshness when the sticker is later
+     *           rehydrated; mirrors the {@code MediaProvider} contract shared
+     *           with other media-bearing types.
+     * @param timestamp the media key timestamp, or {@code null} to clear the
+     *                  field
+     */
     @Override
     public void setMediaKeyTimestamp(Instant timestamp) {
+        this.mediaKeyTimestamp = timestamp;
     }
 
+    /**
+     * Converts this sticker action into a {@link Sticker} preference entry,
+     * copying over the media descriptors and feature flags.
+     *
+     * @implNote {@code WAWebStickersFavoriteSyncAction.apply} rehydrates a
+     *           {@code Sticker} model from the sync payload; this method
+     *           mirrors that conversion. TODO: propagate
+     *           {@link #mediaKeyTimestamp} once {@code Sticker} exposes a
+     *           dedicated {@code mediaKeyTimestamp} field - the current
+     *           {@code Sticker.timestamp} field represents a generic sticker
+     *           timestamp, not the media key timestamp, so this conversion
+     *           intentionally drops the media key timestamp until the
+     *           {@code Sticker} model is extended.
+     * @return a {@link Sticker} populated with the fields that currently have
+     *         a matching {@code Sticker} representation
+     */
     public Sticker toSticker() {
+        // TODO: propagate mediaKeyTimestamp once Sticker exposes a dedicated
+        //       mediaKeyTimestamp field. Sticker.timestamp is a generic
+        //       sticker timestamp, not a media key timestamp.
         return new StickerBuilder()
                 .mediaUrl(mediaUrl)
                 .mediaEncryptedSha256(mediaEncryptedSha256)
@@ -264,6 +315,7 @@ public final class StickerAction implements SyncAction<StickerActionArgs>, Media
                 .mediaSize(mediaSize)
                 .favorite(isFavorite())
                 .deviceIdHint(deviceIdHint)
+                .isAvatar(isAvatarSticker())
                 .build();
     }
 }

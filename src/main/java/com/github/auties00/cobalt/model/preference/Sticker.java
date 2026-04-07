@@ -44,7 +44,10 @@ public final class Sticker implements MediaProvider {
     @ProtobufProperty(index = 11, type = ProtobufType.UINT64)
     Long timestamp;
 
-    Sticker(String mediaUrl, byte[] mediaEncryptedSha256, byte[] mediaKey, String mimetype, Integer height, Integer width, String mediaDirectPath, Long mediaSize, boolean favorite, Integer deviceIdHint, Long timestamp) {
+    @ProtobufProperty(index = 12, type = ProtobufType.BOOL)
+    final boolean isAvatar;
+
+    Sticker(String mediaUrl, byte[] mediaEncryptedSha256, byte[] mediaKey, String mimetype, Integer height, Integer width, String mediaDirectPath, Long mediaSize, boolean favorite, Integer deviceIdHint, Long timestamp, boolean isAvatar) {
         this.mediaUrl = mediaUrl;
         this.mediaEncryptedSha256 = mediaEncryptedSha256;
         this.mediaKey = mediaKey;
@@ -56,6 +59,7 @@ public final class Sticker implements MediaProvider {
         this.favorite = favorite;
         this.deviceIdHint = deviceIdHint;
         this.timestamp = timestamp;
+        this.isAvatar = isAvatar;
     }
 
     @Override
@@ -105,6 +109,10 @@ public final class Sticker implements MediaProvider {
 
     public OptionalLong timestamp() {
         return timestamp == null ? OptionalLong.empty() : OptionalLong.of(timestamp);
+    }
+
+    public boolean isAvatar() {
+        return isAvatar;
     }
 
     @Override
@@ -161,6 +169,7 @@ public final class Sticker implements MediaProvider {
                && Objects.equals(width, that.width)
                && Objects.equals(mediaSize, that.mediaSize)
                && favorite == that.favorite
+               && isAvatar == that.isAvatar
                && Objects.equals(mediaUrl, that.mediaUrl)
                && Objects.deepEquals(mediaEncryptedSha256, that.mediaEncryptedSha256)
                && Objects.deepEquals(mediaKey, that.mediaKey)
@@ -172,7 +181,7 @@ public final class Sticker implements MediaProvider {
 
     @Override
     public int hashCode() {
-        return Objects.hash(mediaUrl, Arrays.hashCode(mediaEncryptedSha256), Arrays.hashCode(mediaKey), mimetype, height, width, mediaDirectPath, mediaSize, favorite, deviceIdHint, timestamp);
+        return Objects.hash(mediaUrl, Arrays.hashCode(mediaEncryptedSha256), Arrays.hashCode(mediaKey), mimetype, height, width, mediaDirectPath, mediaSize, favorite, deviceIdHint, timestamp, isAvatar);
     }
 
     @Override
@@ -188,6 +197,7 @@ public final class Sticker implements MediaProvider {
                "mediaSize=" + mediaSize + ", " +
                "favorite=" + favorite + ", " +
                "deviceIdHint=" + deviceIdHint + ", " +
-               "timestamp=" + timestamp + ']';
+               "timestamp=" + timestamp + ", " +
+               "isAvatar=" + isAvatar + ']';
     }
 }

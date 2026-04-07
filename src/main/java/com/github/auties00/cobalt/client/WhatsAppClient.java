@@ -40,6 +40,7 @@ import com.github.auties00.cobalt.store.WhatsAppStore;
 import com.github.auties00.cobalt.stream.SocketStream;
 import com.github.auties00.cobalt.sync.SnapshotRecoveryService;
 import com.github.auties00.cobalt.sync.WebAppStateService;
+import com.github.auties00.cobalt.sync.key.SyncKeyUtils;
 import com.github.auties00.cobalt.util.FastRandomUtils;
 import com.github.auties00.cobalt.util.RandomIdUtils;
 import com.github.auties00.cobalt.wam.WamService;
@@ -233,14 +234,12 @@ public final class WhatsAppClient {
 
     private void disconnect(WhatsAppClientDisconnectReason reason, boolean canRemoveShutdownHook) {
         // Per WA Web WAWebSocketModel.sendLogout: flush pending sentinel
-        // mutations before disconnecting so key expiration is propagated
+        // mutations before disconnecting so key expiration is propagated.
+        // WA Web bounds the wait via Math.min(20, Math.max(0, getSyncdSentinelTimeoutSeconds())) * 1000
+        // so the logout cannot block indefinitely if a flush stalls.
         if (reason == WhatsAppClientDisconnectReason.LOGGED_OUT
                 || reason == WhatsAppClientDisconnectReason.DISCONNECTED) {
-            try {
-                webAppStateService.flushDirtyCollections();
-            } catch (Exception e) {
-                // Best-effort: don't let flush failures block disconnect
-            }
+            flushDirtyCollectionsWithTimeout();
         }
 
         wamService.close();
@@ -281,6 +280,61 @@ public final class WhatsAppClient {
 
         if (reason == WhatsAppClientDisconnectReason.RECONNECTING) {
             connect(reason);
+        }
+    }
+
+    /**
+     * Flushes any dirty syncd collections on a virtual thread bounded by the
+     * {@code syncd_sentinel_timeout_seconds} AB prop, mirroring WA Web's
+     * {@code WAWebSocketModel.sendLogout} which awaits the sentinel flush only
+     * for {@code Math.min(20, Math.max(0, getSyncdSentinelTimeoutSeconds())) * 1000}
+     * milliseconds before proceeding with the disconnect.
+     *
+     * <p>The flush is performed on a daemon virtual thread joined with the
+     * configured timeout. If the join times out or the join is interrupted, the
+     * disconnect proceeds anyway and a warning is logged. Exceptions thrown by
+     * the flush itself are swallowed (best-effort) so a flush failure cannot
+     * block disconnect.
+     *
+     * @implNote WAWebSocketModel.sendLogout — bounded sentinel flush wait;
+     *           {@link SyncKeyUtils#getSyncdSentinelTimeoutSeconds(ABPropsService)}
+     *           supplies the configured timeout.
+     */
+    private void flushDirtyCollectionsWithTimeout() {
+        // WAWebSocketModel.sendLogout: var t = Math.min(20, Math.max(0, getSyncdSentinelTimeoutSeconds())) * 1000
+        var configuredTimeoutSeconds = SyncKeyUtils.getSyncdSentinelTimeoutSeconds(abPropsService);
+        var clampedSeconds = Math.min(20, Math.max(0, configuredTimeoutSeconds));
+        var timeoutMs = clampedSeconds * 1000L;
+
+        var flushThread = Thread.ofVirtual()
+                .name("CobaltSentinelFlush")
+                .unstarted(() -> {
+                    try {
+                        webAppStateService.flushDirtyCollections();
+                    } catch (Exception ignored) {
+                        // Best-effort: don't let flush failures block disconnect
+                    }
+                });
+        flushThread.start();
+
+        if (timeoutMs == 0L) {
+            // WAWebSocketModel.sendLogout: when t === 0 the await resolves immediately
+            return;
+        }
+
+        try {
+            flushThread.join(timeoutMs);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            return;
+        }
+
+        if (flushThread.isAlive()) {
+            // WAWebSocketModel.sendLogout: timeoutPromise resolves and the await proceeds even if the flush is still inflight
+            System.getLogger(WhatsAppClient.class.getName())
+                    .log(System.Logger.Level.WARNING,
+                            "Sentinel flush did not complete within {0}ms, proceeding with disconnect",
+                            timeoutMs);
         }
     }
 

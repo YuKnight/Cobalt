@@ -2,74 +2,309 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.model.contact.OutContactBuilder;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
+import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.contact.OutContactAction;
-import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
+import java.util.logging.Logger;
+
+/**
+ * Handles outgoing contact sync actions from the {@code regular_low} collection.
+ *
+ * <p>This handler processes mutations that synchronize outgoing contact entries —
+ * contact records used by the "invite by contact" feature on WhatsApp Web for macOS.
+ * An outgoing contact is a locally stored reference to a phone-number-identified
+ * person used to invite new users to WhatsApp. Each record stores only the contact's
+ * JID, full name and first name.
+ *
+ * <p>It processes both {@code SET} operations (create or update an outgoing contact)
+ * and {@code REMOVE} operations (delete an outgoing contact entry). Operations other
+ * than {@code SET} and {@code REMOVE} are treated as malformed.
+ *
+ * <p>Index format: {@code ["outContact", userJid]}.
+ *
+ * <p>Per WhatsApp Web {@code WAWebOutContactInviteGating.isOutContactInviteEnabled},
+ * this handler is gated behind the {@code out_contact_invites_enabled} AB prop
+ * (code 28170, int). When the gate is closed, every mutation in the batch is
+ * reported as {@link MutationApplicationResult#unsupported()}.
+ *
+ * @implNote WAWebOutContactSync.default — singleton instance of the out-contact
+ *           sync action handler extending {@code AccountSyncdActionBase}; the
+ *           class constructor sets
+ *           {@code collectionName = WASyncdConst.CollectionName.RegularLow}
+ */
 public final class OutContactHandler implements WebAppStateActionHandler {
+    /**
+     * The singleton instance of this handler.
+     *
+     * @implNote WAWebOutContactSync — module-level singleton {@code _ = new d()}
+     */
     public static final OutContactHandler INSTANCE = new OutContactHandler();
 
+    /**
+     * Logger for diagnostic messages emitted during out-contact sync processing.
+     *
+     * @implNote ADAPTED: WAWebOutContactSync uses {@code WALogger}; Cobalt uses
+     *           {@code java.util.logging}
+     */
+    private static final Logger LOGGER = Logger.getLogger(OutContactHandler.class.getName()); // ADAPTED: WAWebOutContactSync — WALogger
+
+    /**
+     * Value of the {@code out_contact_invites_enabled} AB prop that enables the
+     * outgoing-contact invite flow.
+     *
+     * @implNote WAWebOutContactInviteGating.isOutContactInviteEnabled —
+     *           {@code getABPropConfigValue("out_contact_invites_enabled") === 1}
+     */
+    private static final int OUT_CONTACT_INVITES_ENABLED_VALUE = 1; // WAWebOutContactInviteGating.isOutContactInviteEnabled: ... === e where e = 1
+
+    /**
+     * Private constructor preventing external instantiation.
+     *
+     * @implNote WAWebOutContactSync — class {@code d} constructor sets
+     *           {@code collectionName = RegularLow}
+     */
     private OutContactHandler() {
 
     }
 
+    /**
+     * Returns the action name for this handler.
+     *
+     * @implNote WAWebOutContactSync.getAction — returns
+     *           {@code WASyncdConst.Actions.OutContact} (value: {@code "out_contact"})
+     * @return the action name string
+     */
     @Override
     public String actionName() {
-        return OutContactAction.ACTION_NAME;
+        return OutContactAction.ACTION_NAME; // WAWebOutContactSync.getAction
     }
 
+    /**
+     * Returns the sync collection this handler belongs to.
+     *
+     * @implNote WAWebOutContactSync — constructor sets
+     *           {@code collectionName = WASyncdConst.CollectionName.RegularLow}
+     * @return the sync patch type
+     */
     @Override
     public SyncPatchType collectionName() {
-        return OutContactAction.COLLECTION_NAME;
+        return OutContactAction.COLLECTION_NAME; // WAWebOutContactSync.collectionName
     }
 
+    /**
+     * Returns the mutation format version for this handler.
+     *
+     * @implNote WAWebOutContactSync.getVersion — returns {@code 1}
+     * @return the version number
+     */
     @Override
     public int version() {
-        return OutContactAction.ACTION_VERSION;
+        return OutContactAction.ACTION_VERSION; // WAWebOutContactSync.getVersion
     }
 
+    /**
+     * Applies a single out-contact mutation and returns whether it succeeded.
+     *
+     * @implNote WAWebOutContactSync.applyMutations — per-mutation logic within the
+     *           batch handler, delegating to
+     *           {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
+     * @param client   the WhatsApp client instance
+     * @param mutation the mutation to apply
+     * @return {@code true} if the mutation was applied successfully
+     */
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS;
+        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebOutContactSync.applyMutations
     }
 
+    /**
+     * Applies a single out-contact mutation and returns a detailed result.
+     *
+     * <p>Gated on {@code out_contact_invites_enabled}: when the gate is closed the
+     * handler returns {@link MutationApplicationResult#unsupported()} for every
+     * mutation, mirroring WA Web's early return of {@code {actionState: Unsupported}}
+     * for every entry in the batch.
+     *
+     * <p>The JID at {@code indexParts[1]} is validated: per WA Web, it must resolve to a
+     * {@code phoneUser} JID (i.e. {@code hasUserServer() == true}). Any other JID type
+     * is logged and treated as malformed.
+     *
+     * <p>For {@code SET} operations, this method:
+     * <ul>
+     *   <li>Validates the mutation value is an {@link OutContactAction}</li>
+     *   <li>Extracts {@code fullName} and {@code firstName}; empty strings are
+     *       coalesced to {@code null} mirroring WA Web's {@code m(e)} helper</li>
+     *   <li>When {@code firstName} is absent, derives it from the first
+     *       whitespace-separated token of {@code fullName} mirroring WA Web's
+     *       {@code p(e)} helper</li>
+     *   <li>Writes the resulting record to the dedicated outgoing contact
+     *       store on {@link com.github.auties00.cobalt.store.WhatsAppStore},
+     *       which mirrors WA Web's separate {@code out-contact} IndexedDB
+     *       table</li>
+     * </ul>
+     *
+     * <p>For {@code REMOVE} operations, this method removes the record keyed by the
+     * validated phone-user JID.
+     *
+     * <p>Anything other than {@code SET} or {@code REMOVE} is reported as
+     * malformed, matching WA Web's {@code else} arm which increments the malformed
+     * counter and pushes {@code malformedActionValue(collectionName)}.
+     *
+     * @implNote WAWebOutContactSync.applyMutations — per-mutation processing within
+     *           the batch {@code applyMutations(t)} generator. WA Web buffers SET
+     *           and REMOVE mutations into {@code r} and {@code a} arrays and then
+     *           calls {@code putOutContactBatch}, {@code removeOutContactBatch} and
+     *           {@code frontendFireAndForget('bulkUpsertOutContacts'/'bulkRemoveOutContacts')}
+     *           once at the end of the batch. Cobalt applies each mutation
+     *           synchronously against the dedicated {@code outContacts} store on
+     *           {@link com.github.auties00.cobalt.store.WhatsAppStore}, so the
+     *           batch flush and frontend bridge calls are ADAPTED into direct
+     *           per-mutation writes.
+     * @param client   the WhatsApp client instance
+     * @param mutation the mutation to apply
+     * @return the detailed application result
+     */
     @Override
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        if (mutation.operation() != SyncdOperation.SET) {
-            return MutationApplicationResult.unsupported();
+        // WAWebOutContactSync.applyMutations: if (!o("WAWebOutContactInviteGating").isOutContactInviteEnabled())
+        //     return t.map(function() { return {actionState: Unsupported} })
+        var gateValue = client.abPropsService().getInt(ABProp.OUT_CONTACT_INVITES_ENABLED); // WAWebOutContactInviteGating.isOutContactInviteEnabled: getABPropConfigValue("out_contact_invites_enabled")
+        if (gateValue != OUT_CONTACT_INVITES_ENABLED_VALUE) { // WAWebOutContactInviteGating.isOutContactInviteEnabled: ... === e (1)
+            return MutationApplicationResult.unsupported(); // WAWebOutContactSync.applyMutations: return t.map(() => ({actionState: Unsupported}))
         }
 
-        var indexArray = JSON.parseArray(mutation.index());
-        if (indexArray.size() < 2) {
-            return MutationApplicationResult.malformed();
+        var indexArray = JSON.parseArray(mutation.index()); // WAWebOutContactSync.applyMutations: var d = l.indexParts[1]
+        var userJidString = indexArray.getString(1); // WAWebOutContactSync.applyMutations: var d = l.indexParts[1]
+        if (userJidString == null) { // WAWebOutContactSync.applyMutations: if (d == null)
+            return malformedActionValue(); // WAWebOutContactSync.applyMutations: n++; i.push(WAWebSyncdIndexUtils.malformedActionValue(this.collectionName))
         }
 
-        var userJidString = indexArray.getString(1);
-        if (userJidString == null || userJidString.isBlank()) {
-            return MutationApplicationResult.malformed();
+        Jid userJid;
+        try {
+            userJid = Jid.of(userJidString); // WAWebOutContactSync.applyMutations: var _ = o("WAJids").interpretAndValidateJid(d)
+        } catch (Exception e) { // ADAPTED: WAWebOutContactSync.applyMutations — WAJids.interpretAndValidateJid returns {jidType: "unknown"} instead of throwing; Cobalt's Jid.of throws WhatsAppMalformedJidException on unparsable strings
+            LOGGER.fine(() -> "OutContactSync: malformed JID: " + userJidString); // ADAPTED: WAWebOutContactSync.applyMutations — WALogger.ERROR("OutContactSync: JID missing expected domain: %s", d)
+            return malformedActionValue(); // WAWebOutContactSync.applyMutations: n++; i.push(malformedActionValue(...))
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof OutContactAction action)) {
-            return MutationApplicationResult.malformed();
+        if (!userJid.hasUserServer()) { // WAWebOutContactSync.applyMutations: if (_.jidType !== "phoneUser")
+            LOGGER.fine(() -> "OutContactSync: JID missing expected domain: " + userJidString); // WAWebOutContactSync.applyMutations: WALogger.ERROR("OutContactSync: JID missing expected domain: %s", d)
+            return malformedActionValue(); // WAWebOutContactSync.applyMutations: n++; i.push(WAWebSyncdIndexUtils.malformedActionValue(this.collectionName))
         }
 
-        var contact = client.store().findContactByJid(Jid.of(userJidString))
-                .orElseGet(() -> client.store().addNewContact(Jid.of(userJidString)));
-        action.fullName().ifPresent(value -> {
-            contact.setFullName(value);
-            if (contact.chosenName().isEmpty()) {
-                contact.setChosenName(value);
+        return switch (mutation.operation()) {
+            case SET -> { // WAWebOutContactSync.applyMutations: if (l.operation === "set")
+                if (!(mutation.value().action().orElse(null) instanceof OutContactAction action)) { // WAWebOutContactSync.applyMutations: var h = l.value.outContactAction; if (h == null)
+                    yield malformedActionValue(); // WAWebOutContactSync.applyMutations: n++; i.push(malformedActionValue(this.collectionName))
+                }
+
+                // WAWebOutContactSync.applyMutations: var y = m(h.fullName)
+                // WAWebOutContactSync m(e): return e == null || e === "" ? null : e
+                var fullName = coalesceEmpty(action.fullName().orElse(null)); // WAWebOutContactSync.m: empty string coalesced to null
+                // WAWebOutContactSync.applyMutations: var C = (g = m(h.firstName)) != null ? g : p(y)
+                // WAWebOutContactSync p(e): return e == null ? null : (var t = e.trim().split(" ")[0]; t || null)
+                var explicitFirstName = coalesceEmpty(action.firstName().orElse(null)); // WAWebOutContactSync.m
+                var firstName = explicitFirstName != null ? explicitFirstName : deriveFirstWord(fullName); // WAWebOutContactSync.applyMutations: (g = m(h.firstName)) != null ? g : p(y)
+
+                // WAWebOutContactSync.applyMutations: r.push({id: f, fullName: y, firstName: C})
+                // WAWebOutContactSync routes batch writes through
+                // WAWebDBOutContactDatabaseApi.putOutContactBatch into a dedicated
+                // `out-contact` IndexedDB table (see WAWebSchemaOutContact). Cobalt now
+                // owns a parallel OutContact store on AbstractWhatsAppStore, so the
+                // record is written there directly rather than mirrored onto the
+                // shared Contact collection — preserving the (id, fullName, firstName)
+                // tuple WA Web relies on when rendering the invite-by-contact flow.
+                var outContact = new OutContactBuilder() // WAWebDBOutContactDatabaseApi.putOutContactBatch — dedicated outContacts store write
+                        .jid(userJid)
+                        .fullName(fullName) // WAWebOutContactSync.applyMutations: record.fullName = y
+                        .firstName(firstName) // WAWebOutContactSync.applyMutations: record.firstName = C
+                        .build();
+                client.store().addOutContact(outContact); // WAWebDBOutContactDatabaseApi.putOutContactBatch — bulk upsert into the dedicated out-contact table
+
+                // WAWebOutContactSync.applyMutations: o("WALogger").LOG("OutContactSync: set %s", d)
+                LOGGER.fine(() -> "OutContactSync: set " + userJidString); // ADAPTED: WAWebOutContactSync.applyMutations — WALogger.LOG replaced with j.u.l FINE
+
+                // WAWebOutContactSync.applyMutations: o("WAWebBackendApi").frontendFireAndForget("bulkUpsertOutContacts", {contacts: r})
+                // SKIPPED: WA Web dispatches an IPC notification to its Electron frontend so
+                // the macOS UI can refresh the invite-by-contact list. Cobalt has no such
+                // frontend bridge and the contact mutation above is sufficient to keep the
+                // in-memory store consistent.
+
+                yield MutationApplicationResult.success(); // WAWebOutContactSync.applyMutations: i.push({actionState: Success})
             }
-        });
-        action.firstName().ifPresent(value -> {
-            contact.setShortName(value);
-            if (contact.chosenName().isEmpty()) {
-                contact.setChosenName(value);
+            case REMOVE -> { // WAWebOutContactSync.applyMutations: else if (l.operation === "remove")
+                // WAWebOutContactSync.applyMutations: a.push(f)
+                // WAWebDBOutContactDatabaseApi.removeOutContactBatch — Cobalt now drops
+                // the record from the dedicated outContacts store rather than the shared
+                // Contact collection, preserving address-book entries that happen to
+                // share the same phone JID.
+                client.store().removeOutContact(userJid); // WAWebDBOutContactDatabaseApi.removeOutContactBatch — bulk removal from the dedicated out-contact table
+
+                // WAWebOutContactSync.applyMutations: o("WALogger").LOG("OutContactSync: remove %s", d)
+                LOGGER.fine(() -> "OutContactSync: remove " + userJidString); // ADAPTED: WAWebOutContactSync.applyMutations — WALogger.LOG replaced with j.u.l FINE
+
+                // WAWebOutContactSync.applyMutations: o("WAWebBackendApi").frontendFireAndForget("bulkRemoveOutContacts", {ids: a})
+                // SKIPPED: Electron-frontend IPC notification; no Cobalt equivalent.
+
+                yield MutationApplicationResult.success(); // WAWebOutContactSync.applyMutations: i.push({actionState: Success})
             }
-        });
-        return MutationApplicationResult.success();
+            default -> { // WAWebOutContactSync.applyMutations: else { n++; i.push(malformedActionValue(...)) }
+                // SyncdOperation only has SET and REMOVE today, but mirroring WA Web's
+                // catch-all branch keeps the handler structurally aligned with the batch
+                // generator.
+                yield malformedActionValue(); // WAWebOutContactSync.applyMutations: n++; i.push(malformedActionValue(this.collectionName))
+            }
+        };
+    }
+
+    /**
+     * Coalesces a {@code null} or empty string into {@code null}.
+     *
+     * <p>This mirrors WA Web's inline helper {@code m(e)}:
+     * {@code return e == null || e === "" ? null : e}. It is used to normalise
+     * {@link OutContactAction#fullName()} and {@link OutContactAction#firstName()}
+     * before deciding whether to derive a fallback or skip the field entirely.
+     *
+     * @implNote WAWebOutContactSync.m — module-local helper {@code function m(e)}
+     * @param value the value to normalise, possibly {@code null}
+     * @return {@code null} if the input is {@code null} or empty, otherwise the
+     *         original value unchanged
+     */
+    private static String coalesceEmpty(String value) {
+        if (value == null || value.isEmpty()) { // WAWebOutContactSync.m: e == null || e === ""
+            return null; // WAWebOutContactSync.m: return null
+        }
+        return value; // WAWebOutContactSync.m: return e
+    }
+
+    /**
+     * Returns the first whitespace-separated token of the given string, trimmed,
+     * or {@code null} if no non-empty token can be produced.
+     *
+     * <p>This mirrors WA Web's inline helper {@code p(e)}:
+     * {@code var t = e.trim().split(" ")[0]; return t || null;}. WA Web splits on
+     * the literal ASCII space character {@code " "} (rather than any Unicode
+     * whitespace), so this implementation uses the same delimiter to preserve
+     * exact parity with the source.
+     *
+     * @implNote WAWebOutContactSync.p — module-local helper {@code function p(e)}
+     * @param value the value to extract the first word from, possibly {@code null}
+     * @return the first whitespace-delimited token of the trimmed value, or
+     *         {@code null} when the input is {@code null} or empty after trimming
+     */
+    private static String deriveFirstWord(String value) {
+        if (value == null) { // WAWebOutContactSync.p: if (e == null) return null
+            return null; // WAWebOutContactSync.p: return null
+        }
+        var trimmed = value.trim(); // WAWebOutContactSync.p: var t = e.trim()
+        var spaceIndex = trimmed.indexOf(' '); // WAWebOutContactSync.p: .split(" ")[0] — literal ASCII space
+        var firstToken = spaceIndex == -1 ? trimmed : trimmed.substring(0, spaceIndex); // WAWebOutContactSync.p: [0]
+        return firstToken.isEmpty() ? null : firstToken; // WAWebOutContactSync.p: return t || null (empty string is falsy)
     }
 }

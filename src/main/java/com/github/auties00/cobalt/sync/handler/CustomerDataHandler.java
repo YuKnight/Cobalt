@@ -4,6 +4,7 @@ import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
+import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.business.CustomerDataAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
@@ -22,22 +23,44 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 public final class CustomerDataHandler implements WebAppStateActionHandler {
     /**
      * The singleton instance of {@code CustomerDataHandler}.
+     *
+     * @implNote WAWebCustomerDataSync — module-level singleton: {@code var p = new m; l.default = p}
      */
     public static final CustomerDataHandler INSTANCE = new CustomerDataHandler();
 
+    /**
+     * Creates a new {@code CustomerDataHandler}.
+     *
+     * @implNote WAWebCustomerDataSync — private constructor for singleton pattern
+     */
     private CustomerDataHandler() {
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * @implNote WAWebCustomerDataSync.getAction — returns {@code WASyncdConst.Actions.CustomerData}
+     */
     @Override
     public String actionName() {
         return CustomerDataAction.ACTION_NAME;
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * @implNote WAWebCustomerDataSync constructor — {@code this.collectionName = WASyncdConst.CollectionName.RegularLow}
+     */
     @Override
     public SyncPatchType collectionName() {
         return CustomerDataAction.COLLECTION_NAME;
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * @implNote WAWebCustomerDataSync.getVersion — returns {@code 1}
+     */
     @Override
     public int version() {
         return CustomerDataAction.ACTION_VERSION;
@@ -57,41 +80,63 @@ public final class CustomerDataHandler implements WebAppStateActionHandler {
      */
     @Override
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS;
+        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
+    /**
+     * Applies a customer data mutation and returns a detailed result.
+     *
+     * <p>Per WhatsApp Web {@code WAWebCustomerDataSync.applyMutations}, each mutation
+     * is processed as follows:
+     * <ul>
+     *   <li><b>SET:</b> validates chatJid from index, validates the customerDataAction
+     *       field on the value, then stores the customer data record via
+     *       {@code $CustomerDataSync$p_1}.</li>
+     *   <li><b>REMOVE:</b> if chatJid is present and valid, removes the customer data
+     *       record via {@code $CustomerDataSync$p_2}; otherwise silently succeeds.</li>
+     *   <li><b>Unknown:</b> returns unsupported.</li>
+     * </ul>
+     *
+     * @implNote WAWebCustomerDataSync.applyMutations
+     * @param client   the WhatsApp client instance
+     * @param mutation the mutation to apply
+     * @return the detailed application result
+     */
     @Override
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        var indexArray = JSON.parseArray(mutation.index()); // WAWebCustomerDataSync.applyMutations — indexParts
-        if (indexArray.size() < 2) {
-            return MutationApplicationResult.malformed(); // WAWebCustomerDataSync.applyMutations — missing chatJid
-        }
+        var indexArray = JSON.parseArray(mutation.index()); // WAWebCustomerDataSync.applyMutations — var n = t.indexParts
+        var chatJidString = indexArray.size() >= 2 ? indexArray.getString(1) : null; // WAWebCustomerDataSync.applyMutations — u = n[1]
 
-        var chatJidString = indexArray.getString(1); // WAWebCustomerDataSync.applyMutations — indexParts[1]
-        if (chatJidString == null || chatJidString.isBlank()) {
-            return MutationApplicationResult.malformed(); // WAWebCustomerDataSync.applyMutations — malformedActionValue
-        }
-
-        var chatJid = Jid.of(chatJidString); // WAWebCustomerDataSync.applyMutations — validateChatJid(u)
-
-        if (mutation.operation() == SyncdOperation.SET) { // WAWebCustomerDataSync.applyMutations — operation === "set"
-            if (mutation.value() == null) {
-                return MutationApplicationResult.success(); // WAWebCustomerDataSync.applyMutations — if (!s) return success
+        if (mutation.operation() == SyncdOperation.SET) { // WAWebCustomerDataSync.applyMutations — t.operation === "set"
+            if (chatJidString == null || chatJidString.isBlank()) { // WAWebCustomerDataSync.applyMutations — if (!u)
+                return malformedActionValue(); // WAWebCustomerDataSync.applyMutations — return a++, malformedActionValue(r.collectionName)
             }
 
-            if (!(mutation.value().action().orElse(null) instanceof CustomerDataAction)) {
-                return MutationApplicationResult.malformed(); // WAWebCustomerDataSync.applyMutations — customerDataAction == null
+            var chatJid = Jid.of(chatJidString); // ADAPTED: WAWebCustomerDataSync.applyMutations — validateChatJid(u); Cobalt uses Jid.of which is more lenient than validateChatJid
+            if (chatJid == null) { // WAWebCustomerDataSync.applyMutations — if (c == null)
+                return malformedActionValue(); // WAWebCustomerDataSync.applyMutations — return a++, malformedActionValue(r.collectionName)
             }
 
-            // ADAPTED: WAWebCustomerDataSync.$CustomerDataSync$p_1 — addOrEditCustomerData
+            if (mutation.value() == null) { // WAWebCustomerDataSync.applyMutations — if (s)
+                return MutationApplicationResult.success(); // WAWebCustomerDataSync.applyMutations — value is falsy, fall through to success
+            }
+
+            if (!(mutation.value().action().orElse(null) instanceof CustomerDataAction)) { // WAWebCustomerDataSync.applyMutations — var d = s.customerDataAction; if (d == null)
+                return malformedActionValue(); // WAWebCustomerDataSync.applyMutations — return i++, malformedActionValue(r.collectionName)
+            }
+
+            // ADAPTED: WAWebCustomerDataSync.$CustomerDataSync$p_1 — addOrEditCustomerData + frontendFireAndForget
             // Cobalt does not have a dedicated customer data store; the action is acknowledged
-            return MutationApplicationResult.success();
-        } else if (mutation.operation() == SyncdOperation.REMOVE) { // WAWebCustomerDataSync.applyMutations — operation === "remove"
-            // ADAPTED: WAWebCustomerDataSync.$CustomerDataSync$p_2 — removeCustomerDataByChatJid
-            // Cobalt does not have a dedicated customer data store; the action is acknowledged
-            return MutationApplicationResult.success();
+            return MutationApplicationResult.success(); // WAWebCustomerDataSync.applyMutations — return {actionState: Success}
+        } else if (mutation.operation() == SyncdOperation.REMOVE) { // WAWebCustomerDataSync.applyMutations — t.operation === "remove"
+            if (chatJidString != null && !chatJidString.isBlank()) { // WAWebCustomerDataSync.applyMutations — if (u)
+                // WAWebCustomerDataSync.applyMutations — var p = validateChatJid(u); p != null && $p_2(p)
+                // ADAPTED: WAWebCustomerDataSync.$CustomerDataSync$p_2 — removeCustomerDataByChatJid + frontendFireAndForget
+                // Cobalt does not have a dedicated customer data store; valid JID removal is acknowledged
+            }
+            return MutationApplicationResult.success(); // WAWebCustomerDataSync.applyMutations — return {actionState: Success}
         } else {
-            return MutationApplicationResult.unsupported(); // WAWebCustomerDataSync.applyMutations — unsupported operation
+            return MutationApplicationResult.unsupported(); // WAWebCustomerDataSync.applyMutations — return {actionState: Unsupported}
         }
     }
 }

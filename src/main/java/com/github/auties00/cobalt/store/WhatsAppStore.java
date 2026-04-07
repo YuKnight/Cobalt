@@ -9,6 +9,7 @@ import com.github.auties00.cobalt.model.call.CallOffer;
 import com.github.auties00.cobalt.model.chat.*;
 import com.github.auties00.cobalt.model.contact.Contact;
 import com.github.auties00.cobalt.model.contact.ContactTextStatus;
+import com.github.auties00.cobalt.model.contact.OutContact;
 import com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentity;
 import com.github.auties00.cobalt.model.device.info.DeviceList;
 import com.github.auties00.cobalt.model.device.pairing.ClientAppVersion;
@@ -874,9 +875,62 @@ public interface WhatsAppStore extends SignalProtocolStore {
 
     WhatsAppStore setBusinessAccountNonce(String nonce);
 
-    Optional<Boolean> ctwaDataSharingEnabled();
+    /**
+     * Returns the per-customer data sharing preferences keyed by account LID
+     * raw string.
+     *
+     * <p>Each entry indicates whether click-to-WhatsApp (CTWA) per-customer
+     * data sharing is enabled for the business account identified by the LID.
+     * The map is an unmodifiable snapshot view of the underlying live store.
+     *
+     * @implNote WAWebSchemaCtwaPerCustomerDataSharing (data-sharing-3pd-lid-v2 IDB table) —
+     *           the WA Web schema persists one row per {@code lidRawString}
+     *           with the {@code dataSharing3pdEnabled} boolean
+     * @return an unmodifiable map of account LID raw strings to enabled flags,
+     *         never {@code null}
+     */
+    Map<String, Boolean> ctwaPerCustomerDataSharing();
 
-    WhatsAppStore setCtwaDataSharingEnabled(Boolean enabled);
+    /**
+     * Returns the CTWA per-customer data sharing preference for the given
+     * account LID, if any.
+     *
+     * @implNote WAWebSchemaCtwaPerCustomerDataSharing (data-sharing-3pd-lid-v2 IDB table) —
+     *           equivalent to a {@code get(lidRawString)} read on the underlying
+     *           IndexedDB table
+     * @param accountLid the account LID raw string identifying the customer,
+     *                   may be {@code null}
+     * @return an {@link Optional} containing the enabled flag if a preference
+     *         is recorded for the given LID, otherwise {@link Optional#empty()}
+     */
+    Optional<Boolean> findCtwaDataSharing(String accountLid);
+
+    /**
+     * Stores or updates the CTWA per-customer data sharing preference for the
+     * given account LID.
+     *
+     * @implNote WAWebSchemaCtwaPerCustomerDataSharing (data-sharing-3pd-lid-v2 IDB table) —
+     *           equivalent to a {@code createOrReplace} write on the underlying
+     *           IndexedDB table with the row {@code (lidRawString, dataSharing3pdEnabled)}
+     * @param accountLid the account LID raw string identifying the customer,
+     *                   must not be {@code null}
+     * @param enabled    the enabled flag, must not be {@code null}
+     * @return this store instance for method chaining
+     */
+    WhatsAppStore setCtwaDataSharing(String accountLid, Boolean enabled);
+
+    /**
+     * Removes the CTWA per-customer data sharing preference for the given
+     * account LID.
+     *
+     * @implNote WAWebSchemaCtwaPerCustomerDataSharing (data-sharing-3pd-lid-v2 IDB table) —
+     *           equivalent to a {@code remove(lidRawString)} delete on the
+     *           underlying IndexedDB table
+     * @param accountLid the account LID raw string identifying the customer,
+     *                   may be {@code null}
+     * @return this store instance for method chaining
+     */
+    WhatsAppStore removeCtwaDataSharing(String accountLid);
 
     Map<String, String> businessSubscriptionStatuses();
 
@@ -889,18 +943,6 @@ public interface WhatsAppStore extends SignalProtocolStore {
     Map<String, Long> businessSubscriptionCreationTimes();
 
     WhatsAppStore setBusinessSubscriptionCreationTimes(Map<String, Long> creationTimes);
-
-    boolean subscriptionDeactivated();
-
-    WhatsAppStore setSubscriptionDeactivated(boolean deactivated);
-
-    boolean subscriptionAutoRenewing();
-
-    WhatsAppStore setSubscriptionAutoRenewing(boolean autoRenewing);
-
-    Optional<Long> subscriptionExpirationDate();
-
-    WhatsAppStore setSubscriptionExpirationDate(Long expirationDate);
 
     boolean detectedOutcomesEnabled();
 
@@ -921,6 +963,56 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * @return an {@code Optional} containing the removed contact if it existed
      */
     Optional<Contact> removeContact(JidProvider contactJid);
+
+    /**
+     * Returns all outgoing contacts stored in this session.
+     *
+     * <p>Outgoing contacts power the WhatsApp Web "invite by contact" feature
+     * and are persisted independently from regular {@link Contact} records.
+     * The returned map is keyed by phone-number JID and is read-only.
+     *
+     * @return an unmodifiable view of the outgoing contact store keyed by JID
+     * @implNote WAWebDBOutContactDatabaseApi — replaces the {@code out-contact}
+     *           IndexedDB table accessor exposed by the WA Web database API
+     */
+    Map<Jid, OutContact> outContacts();
+
+    /**
+     * Finds an outgoing contact by its phone-number JID.
+     *
+     * @param jid the JID of the outgoing contact to look up, may be {@code null}
+     * @return an {@code Optional} containing the outgoing contact if it exists
+     * @implNote WAWebDBOutContactDatabaseApi — mirrors the lookup performed by
+     *           the {@code getOutContact} accessor on the WA Web database API
+     */
+    Optional<OutContact> findOutContact(Jid jid);
+
+    /**
+     * Adds or updates an outgoing contact in the store.
+     *
+     * <p>If an entry with the same {@linkplain OutContact#jid() JID} is already
+     * present, its {@code fullName} and {@code firstName} fields are merged
+     * from the supplied record. This mirrors WhatsApp Web's batched
+     * {@code putOutContactBatch} upsert semantics, where the latest record for
+     * a given JID overwrites the previous one.
+     *
+     * @param outContact the outgoing contact to add or merge, must not be
+     *                   {@code null}
+     * @return this store instance for method chaining
+     * @implNote WAWebDBOutContactDatabaseApi.putOutContactBatch — bulk upsert
+     *           into the {@code out-contact} table
+     */
+    WhatsAppStore addOutContact(OutContact outContact);
+
+    /**
+     * Removes an outgoing contact from the store by its phone-number JID.
+     *
+     * @param jid the JID of the outgoing contact to remove, may be {@code null}
+     * @return this store instance for method chaining
+     * @implNote WAWebDBOutContactDatabaseApi.removeOutContactBatch — bulk
+     *           removal from the {@code out-contact} table
+     */
+    WhatsAppStore removeOutContact(Jid jid);
 
     /**
      * Registers a bidirectional LID mapping for a contact.
@@ -1210,27 +1302,38 @@ public interface WhatsAppStore extends SignalProtocolStore {
     Optional<Sticker> removeFavouriteSticker(String stickerHash);
 
     /**
-     * Finds a quick reply by its shortcut.
+     * Finds a quick reply by its stable identifier.
      *
-     * @param shortcut the quick reply shortcut
+     * <p>The {@code id} parameter is the same value used as the second element
+     * of the sync index ({@code indexParts[1]}) and as the primary key of
+     * WhatsApp Web's {@code WAWebSchemaQuickReply} IndexedDB table.
+     *
+     * @param id the quick reply identifier
      * @return an {@code Optional} containing the quick reply if found
+     * @implNote WAWebSchemaQuickReply.getQuickReplyTable().get(id)
      */
-    Optional<QuickReply> findQuickReply(String shortcut);
+    Optional<QuickReply> findQuickReply(String id);
 
     /**
-     * Adds a quick reply to the store.
+     * Adds or replaces a quick reply in the store.
      *
-     * @param action the quick reply, must not be {@code null}
+     * <p>The quick reply is keyed by its {@link QuickReply#id() id} field, so
+     * mutations that change the {@code shortcut} while preserving the
+     * {@code id} replace the existing entry rather than leaking duplicates.
+     *
+     * @param quickReply the quick reply, must not be {@code null} and must have a non-{@code null} id
+     * @implNote WAWebSchemaQuickReply.getQuickReplyTable().createOrReplace
      */
-    void addQuickReply(QuickReply action);
+    void addQuickReply(QuickReply quickReply);
 
     /**
-     * Removes a quick reply from the store.
+     * Removes a quick reply from the store by its stable identifier.
      *
-     * @param shortcut the quick reply shortcut
+     * @param id the quick reply identifier
      * @return an {@code Optional} containing the removed quick reply if it existed
+     * @implNote WAWebSchemaQuickReply.getQuickReplyTable().remove(id)
      */
-    Optional<QuickReply> removeQuickReply(String shortcut);
+    Optional<QuickReply> removeQuickReply(String id);
 
     /**
      * Finds a label by its ID.
@@ -2153,16 +2256,6 @@ public interface WhatsAppStore extends SignalProtocolStore {
             Map<String, com.github.auties00.cobalt.model.device.DeviceCapabilities> states
     );
 
-    Map<String, Boolean> shareOwnPnStates();
-
-    WhatsAppStore setShareOwnPnStates(Map<String, Boolean> states);
-
-    Map<String, com.github.auties00.cobalt.model.sync.action.setting.SettingsSyncAction> settingsSyncStates();
-
-    WhatsAppStore setSettingsSyncStates(
-            Map<String, com.github.auties00.cobalt.model.sync.action.setting.SettingsSyncAction> states
-    );
-
     Map<String, com.github.auties00.cobalt.model.sync.action.chat.InteractiveMessageAction> interactiveMessageStates();
 
     WhatsAppStore setInteractiveMessageStates(
@@ -2172,10 +2265,6 @@ public interface WhatsAppStore extends SignalProtocolStore {
     Map<String, com.github.auties00.cobalt.model.sync.action.media.NoteEditAction> noteStates();
 
     WhatsAppStore setNoteStates(Map<String, com.github.auties00.cobalt.model.sync.action.media.NoteEditAction> states);
-
-    Map<String, Boolean> groupStatusMuteStates();
-
-    WhatsAppStore setGroupStatusMuteStates(Map<String, Boolean> states);
 
     Map<String, Instant> newsletterPinStates();
 
@@ -2213,8 +2302,27 @@ public interface WhatsAppStore extends SignalProtocolStore {
 
     WhatsAppStore setWamoUserIdentifier(String identifier);
 
+    /**
+     * Returns the most recent {@code MusicUserIdAction} sync action received
+     * for this account, if any.
+     *
+     * <p>WhatsApp Web persists this action via the {@code MusicUserIdAction}
+     * sync action protobuf. The value is currently forward-looking: no WA Web
+     * read path consumes it yet, so it is stored verbatim for round-trip
+     * fidelity.
+     *
+     * @implNote WAWebProtobufSyncAction.pb.MusicUserIdAction
+     * @return an {@code Optional} containing the action if one has been received
+     */
     Optional<MusicUserIdAction> musicUserIdState();
 
+    /**
+     * Sets the most recent {@code MusicUserIdAction} sync action.
+     *
+     * @implNote WAWebProtobufSyncAction.pb.MusicUserIdAction
+     * @param action the action to store, or {@code null} to clear
+     * @return this store instance for method chaining
+     */
     WhatsAppStore setMusicUserIdState(MusicUserIdAction action);
 
     Optional<String> newsletterSavedInterests();
@@ -2229,17 +2337,177 @@ public interface WhatsAppStore extends SignalProtocolStore {
 
     WhatsAppStore setPrivateProcessingStatus(PrivateProcessingSettingAction.PrivateProcessingStatus status);
 
+    /**
+     * Returns the user's opt-out preference for personalised channel
+     * recommendations, if it has been set by a sync action.
+     *
+     * <p>WhatsApp Web persists this preference via the
+     * {@code PrivacySettingChannelsPersonalisedRecommendationAction} sync
+     * action. The value is currently forward-looking: no WA Web read path
+     * consumes it yet, so it is stored verbatim for round-trip fidelity.
+     *
+     * @implNote WAWebProtobufSyncAction.pb.PrivacySettingChannelsPersonalisedRecommendationAction
+     * @return an {@code Optional} containing the opt-out flag if it has been set
+     */
     Optional<Boolean> channelsPersonalisedRecommendationOptOut();
 
+    /**
+     * Sets the user's opt-out preference for personalised channel
+     * recommendations.
+     *
+     * @implNote WAWebProtobufSyncAction.pb.PrivacySettingChannelsPersonalisedRecommendationAction
+     * @param optOut the opt-out flag, or {@code null} to clear
+     * @return this store instance for method chaining
+     */
     WhatsAppStore setChannelsPersonalisedRecommendationOptOut(Boolean optOut);
 
     Optional<byte[]> ugcBotDefinition();
 
     WhatsAppStore setUgcBotDefinition(byte[] definition);
 
+    /**
+     * Returns the most recent Maiba AI feature control state received via the
+     * {@code MaibaAIFeaturesControlAction} sync action, if any.
+     *
+     * <p>WhatsApp Web persists this status via the
+     * {@code MaibaAIFeaturesControlAction} sync action protobuf. The value is
+     * currently forward-looking: no WA Web read path consumes it yet, so it is
+     * stored verbatim for round-trip fidelity.
+     *
+     * @implNote WAWebProtobufSyncAction.pb.MaibaAIFeaturesControlAction
+     * @return an {@code Optional} containing the status if one has been received
+     */
     Optional<MaibaAIFeaturesControlAction.MaibaAIFeatureStatus> maibaAiFeatureStatus();
 
+    /**
+     * Sets the Maiba AI feature control status.
+     *
+     * @implNote WAWebProtobufSyncAction.pb.MaibaAIFeaturesControlAction
+     * @param status the status to store, or {@code null} to clear
+     * @return this store instance for method chaining
+     */
     WhatsAppStore setMaibaAiFeatureStatus(MaibaAIFeaturesControlAction.MaibaAIFeatureStatus status);
+
+    /**
+     * Returns the timestamp at which this companion device was paired with
+     * the primary device.
+     *
+     * <p>WhatsApp Web persists this timestamp in the multi-device user
+     * preferences and uses it to filter events that predate pairing — e.g.
+     * avatar updates and call log entries that arrive during initial history
+     * sync but actually originated before this device became part of the
+     * account.
+     *
+     * @implNote WAWebUserPrefsMultiDevice.getPairingTimestamp
+     * @return an {@code Optional} containing the pairing timestamp if known
+     */
+    Optional<Instant> pairingTimestamp();
+
+    /**
+     * Sets the timestamp at which this companion device was paired with the
+     * primary device.
+     *
+     * @implNote WAWebUserPrefsMultiDevice.getPairingTimestamp
+     * @param pairingTimestamp the pairing timestamp, or {@code null} to clear
+     * @return this store instance for method chaining
+     */
+    WhatsAppStore setPairingTimestamp(Instant pairingTimestamp);
+
+    /**
+     * Returns the unmodifiable map of label identifiers to their server
+     * assigned predefined identifiers.
+     *
+     * <p>WhatsApp Web maintains this mapping inside
+     * {@code WAWebLabelCollection} as a private {@code Map} keyed by the label
+     * id and valued by the predefined id. Labels of type
+     * {@code SERVER_ASSIGNED} are intentionally not added to the main label
+     * collection; instead, their predefined id is registered here so the UI
+     * can resolve their well-known semantics.
+     *
+     * @implNote WAWebLabelCollection.addToServerAssignedLabelIdMap
+     * @return an unmodifiable map of label id to predefined id
+     */
+    Map<String, Integer> serverAssignedLabelIdMap();
+
+    /**
+     * Registers a predefined identifier for a server-assigned label, mirroring
+     * WhatsApp Web's {@code addToServerAssignedLabelIdMap} method.
+     *
+     * <p>The mutator is a no-op when {@code predefinedId} is {@code null} or
+     * when {@code labelId} already has a registered mapping. WhatsApp Web's
+     * {@code $LabelCollectionImpl$p_1.set(labelId, predefinedId)} likewise
+     * does not overwrite an existing entry: the JS implementation only inserts
+     * when the key is absent.
+     *
+     * @implNote WAWebLabelCollection.addToServerAssignedLabelIdMap
+     * @param labelId      the label identifier, must not be {@code null}
+     * @param predefinedId the predefined identifier to associate with the
+     *                     label, may be {@code null} (in which case the call
+     *                     is a no-op)
+     */
+    void addServerAssignedLabelId(String labelId, Integer predefinedId);
+
+    /**
+     * Returns the user's preference for crossposting status updates to
+     * Facebook.
+     *
+     * <p>WhatsApp Web persists this preference via the
+     * {@code WAWebStatusPrivacySettingSync} {@code persistShareToFB} branch,
+     * which writes the value to the user prefs IndexedDB store under the
+     * {@code STATUS_SHARE_TO_FB} key.
+     *
+     * @implNote WAWebStatusPrivacySettingSync.persistShareToFB
+     * @return an {@code Optional} containing the preference if it has been set
+     */
+    Optional<Boolean> shareStatusToFacebook();
+
+    /**
+     * Sets the user's preference for crossposting status updates to Facebook.
+     *
+     * @implNote WAWebStatusPrivacySettingSync.persistShareToFB
+     * @param value the preference, or {@code null} to clear
+     * @return this store instance for method chaining
+     */
+    WhatsAppStore setShareStatusToFacebook(Boolean value);
+
+    /**
+     * Returns the user's preference for crossposting status updates to
+     * Instagram.
+     *
+     * <p>WhatsApp Web persists this preference via the
+     * {@code WAWebStatusPrivacySettingSync} {@code persistShareToIG} branch,
+     * which writes the value to the user prefs IndexedDB store under the
+     * {@code STATUS_SHARE_TO_IG} key.
+     *
+     * @implNote WAWebStatusPrivacySettingSync.persistShareToIG
+     * @return an {@code Optional} containing the preference if it has been set
+     */
+    Optional<Boolean> shareStatusToInstagram();
+
+    /**
+     * Sets the user's preference for crossposting status updates to Instagram.
+     *
+     * @implNote WAWebStatusPrivacySettingSync.persistShareToIG
+     * @param value the preference, or {@code null} to clear
+     * @return this store instance for method chaining
+     */
+    WhatsAppStore setShareStatusToInstagram(Boolean value);
+
+    /**
+     * Removes every recent sticker that is flagged as an avatar sticker and
+     * returns the number of entries removed.
+     *
+     * <p>WhatsApp Web exposes this operation on
+     * {@code WAWebRecentStickerCollectionMd} as
+     * {@code removeAllRecentAvatarStickers}, which iterates the recent sticker
+     * collection and drops every entry whose {@code isAvatar} attribute is
+     * truthy. Cobalt mirrors that semantic against the in-memory recent
+     * sticker map.
+     *
+     * @implNote WAWebRecentStickerCollectionMd.removeAllRecentAvatarStickers
+     * @return the number of recent avatar stickers that were removed
+     */
+    int removeAllRecentAvatarStickers();
 
     /**
      * Returns the mention-everyone mute expiration for a chat.

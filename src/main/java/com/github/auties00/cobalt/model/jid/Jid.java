@@ -11,6 +11,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.regex.Pattern;
 
 import static com.github.auties00.cobalt.model.jid.JidConstants.*;
 
@@ -50,6 +51,19 @@ public record Jid(String user, JidServer server, int device, int agent) implemen
      * used for unknown server types that lack pre-allocated singletons.
      */
     private static final ConcurrentMap<JidServer, Jid> JID_SERVER_CACHE = new ConcurrentHashMap<>();
+
+    /**
+     * A compiled regular expression matching the phone number ranges reserved by
+     * WhatsApp for PN-based (phone-number) bot accounts on the standard user server.
+     * The pattern matches either {@code 1313555XXXX} (ten-digit bots in the
+     * {@code 1313555} range) or {@code 131655500XX} (eleven-digit bots in the
+     * {@code 131655500} range), mirroring WA Web's {@code Wid.isPnBot} literal
+     * regular expression.
+     *
+     * @implNote WAWebWid.isPnBot — WA Web uses the literal regex
+     *           {@code /^1313555\d{4}$|^131655500\d{2}$/} to test the user number.
+     */
+    private static final Pattern PN_BOT_PATTERN = Pattern.compile("^(1313555\\d{4}|131655500\\d{2})$");
 
     /**
      * The singleton server-only JID for the legacy user domain ({@code c.us}).
@@ -844,6 +858,47 @@ public record Jid(String user, JidServer server, int device, int agent) implemen
      */
     public boolean hasBotServer() {
         return hasServer(JidServer.bot());
+    }
+
+    /**
+     * Returns whether this JID identifies a WhatsApp bot account, covering both
+     * the FBID-based bot server and the phone-number bot ranges hosted on the
+     * standard user server.
+     * <p>
+     * A JID is considered a bot if either of the following holds:
+     * <ul>
+     *   <li>It has the {@code bot} server domain (FBID-based bots), as reported
+     *       by {@link #hasBotServer()}.</li>
+     *   <li>It has the standard user server ({@code s.whatsapp.net}) and its
+     *       user number matches one of the reserved PN bot ranges
+     *       ({@code 1313555XXXX} or {@code 131655500XX}).</li>
+     * </ul>
+     * <p>
+     * This method preserves {@link #hasBotServer()} for backward compatibility
+     * while adding detection of phone-number bots that live on the user server,
+     * matching WA Web's {@code Wid.isBot} check which combines the {@code isPnBot}
+     * and {@code isFbidBot} predicates.
+     *
+     * @return {@code true} if this JID identifies either a PN bot or an FBID bot,
+     *         {@code false} otherwise
+     * @implNote WAWebWid.isBot (combines isPnBot and isFbidBot checks) — WA Web's
+     *           {@code Wid.isBot} returns {@code this.isPnBot() || this.isFbidBot()},
+     *           where {@code isPnBot} tests the PN regex
+     *           {@code /^1313555\d{4}$|^131655500\d{2}$/} against the user number on
+     *           the {@code c.us} server and {@code isFbidBot} tests for the
+     *           {@code bot} server. Cobalt uses {@link JidServer#user()} for the PN
+     *           side because Cobalt normalizes {@code c.us} to the standard user
+     *           server representation.
+     * @see #hasBotServer()
+     */
+    public boolean isBot() {
+        if (hasBotServer()) {
+            return true;
+        }
+        if (user == null || !hasServer(JidServer.user())) {
+            return false;
+        }
+        return PN_BOT_PATTERN.matcher(user).matches();
     }
 
     /**

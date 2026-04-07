@@ -16,6 +16,16 @@ import java.util.Optional;
  * @implNote WAWebSyncdGetActionHandler.setActionHandlers, WAWebSyncdGetActionHandler.getActionHandler, WAWebSyncdGetActionHandler.maxSupportedVersion
  */
 public final class WebAppStateHandlerRegistry {
+    /**
+     * Map of action names to their registered handlers.
+     *
+     * <p>Per WhatsApp Web {@code WAWebSyncdGetActionHandler}: this corresponds to the
+     * lazily-constructed {@code Map} variable {@code e}, keyed by each handler's
+     * {@code getAction()} value. In Cobalt, the map is eagerly constructed at
+     * registry creation time.
+     *
+     * @implNote WAWebSyncdGetActionHandler (var e)
+     */
     private final Map<String, WebAppStateActionHandler> handlers; // WAWebSyncdGetActionHandler: var e (lazy Map keyed by getAction())
 
     /**
@@ -28,6 +38,16 @@ public final class WebAppStateHandlerRegistry {
         registerDefaultHandlers(); // WAWebHandleSuccess -> WAWebSyncdGetActionHandler.setActionHandlers(WAWebCollectionHandlerActions.ActionHandlers)
     }
 
+    /**
+     * Registers all default action handlers that correspond to the WhatsApp Web
+     * {@code WAWebCollectionHandlerActions.ActionHandlers} array.
+     *
+     * <p>Per WhatsApp Web, this array is passed to
+     * {@code WAWebSyncdGetActionHandler.setActionHandlers} during the success
+     * handler flow ({@code WAWebHandleSuccess}).
+     *
+     * @implNote WAWebCollectionHandlerActions.ActionHandlers
+     */
     private void registerDefaultHandlers() { // WAWebCollectionHandlerActions.ActionHandlers
         // Chat actions
         registerHandler(ArchiveChatHandler.INSTANCE); // WAWebArchiveChatSync
@@ -111,6 +131,7 @@ public final class WebAppStateHandlerRegistry {
         registerHandler(SettingsSyncHandler.INSTANCE); // WAWebSettingsSync
         registerHandler(NctSaltSyncHandler.INSTANCE); // WAWebNctSaltSync
         registerHandler(CallLogHandler.INSTANCE); // WAWebCallLogSync
+        registerHandler(SubscriptionHandler.INSTANCE); // WAWebSubscriptionsSyncV2Sync
         registerHandler(OutContactHandler.INSTANCE); // WAWebOutContactSync
     }
 

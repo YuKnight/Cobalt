@@ -411,6 +411,21 @@ public final class GroupMetadata implements ChatMetadata {
     boolean participantLabelEnabled;
 
     /**
+     * Whether the status updates posted by this group are muted for the
+     * current user. When muted, the group's status updates are hidden from
+     * the status tab but messages in the group itself remain unaffected.
+     *
+     * <p>In the WhatsApp Web client this corresponds to the
+     * {@code statusMute} column on {@code WAWebDBGroupsGroupMetadata}, set
+     * by the {@code userStatusMute} sync action handler via a bulk merge
+     * onto the group metadata table.
+     *
+     * @implNote WAWebGroupMetadata.statusMute
+     */
+    @ProtobufProperty(index = 45, type = ProtobufType.BOOL)
+    boolean statusMuted;
+
+    /**
      * Whether this group has the open Meta AI bot feature enabled. This
      * field is not serialized as a protobuf property and is instead populated
      * programmatically from the group query response when bot participants
@@ -497,6 +512,8 @@ public final class GroupMetadata implements ChatMetadata {
      *                                     {@code null}
      * @param participantLabelEnabled      whether participant labels are
      *                                     enabled
+     * @param statusMuted                  whether this group's status updates
+     *                                     are muted for the current user
      */
     GroupMetadata(
             Jid jid,
@@ -542,7 +559,8 @@ public final class GroupMetadata implements ChatMetadata {
             boolean disappearingModeInitiatedByMe,
             boolean limitSharingEnabled,
             Integer evolutionVersion,
-            boolean participantLabelEnabled
+            boolean participantLabelEnabled,
+            boolean statusMuted
     ) {
         this.jid = Objects.requireNonNull(jid, "jid cannot be null");
         this.subject = Objects.requireNonNull(subject, "subject cannot be null");
@@ -588,6 +606,7 @@ public final class GroupMetadata implements ChatMetadata {
         this.limitSharingEnabled = limitSharingEnabled;
         this.evolutionVersion = evolutionVersion;
         this.participantLabelEnabled = participantLabelEnabled;
+        this.statusMuted = statusMuted;
     }
 
     /**
@@ -1469,6 +1488,36 @@ public final class GroupMetadata implements ChatMetadata {
      */
     public void setParticipantLabelEnabled(boolean participantLabelEnabled) {
         this.participantLabelEnabled = participantLabelEnabled;
+    }
+
+    /**
+     * Returns whether the status updates posted by this group are muted for
+     * the current user.
+     *
+     * <p>The state is updated by the {@code userStatusMute} sync action
+     * handler when a user mutes or unmutes a group's status.
+     *
+     * @return {@code true} if status updates from this group are muted,
+     *         {@code false} otherwise
+     * @implNote WAWebGroupMetadata.statusMute
+     */
+    public boolean statusMuted() {
+        return statusMuted;
+    }
+
+    /**
+     * Sets whether the status updates posted by this group are muted for the
+     * current user.
+     *
+     * @param statusMuted {@code true} to mute status updates,
+     *                    {@code false} to unmute
+     * @return this {@code GroupMetadata} instance
+     * @implNote WAWebGroupMetadata.statusMute setter — mirrors the
+     *           {@code Contact.setStatusMuted} pattern for typed access
+     */
+    public GroupMetadata setStatusMuted(boolean statusMuted) {
+        this.statusMuted = statusMuted;
+        return this;
     }
 
     /**

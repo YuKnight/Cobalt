@@ -21851,6 +21851,13 @@ public record ABProp(int code, String defaultValue, String debugDefaultValue) {
     public static final ABProp P2P_PILLS_ENABLED = new ABProp(27959, "false", "false");
 
     /**
+     * This constant was generated automatically by {@code tooling/web-ab-props-extractor}.
+     *
+     * @apiNote WAWebABPropsConfigs: out_contact_invites_enabled:[28170,"int",0,1]
+     */
+    public static final ABProp OUT_CONTACT_INVITES_ENABLED = new ABProp(28170, "0", "1");
+
+    /**
      * Constructs a new {@code ABProp} definition.
      *
      * @throws NullPointerException if {@code defaultValue} or {@code debugDefaultValue}

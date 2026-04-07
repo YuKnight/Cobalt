@@ -13,6 +13,7 @@ import com.github.auties00.cobalt.model.chat.ChatMute;
 import com.github.auties00.cobalt.model.contact.Contact;
 import com.github.auties00.cobalt.model.contact.ContactBuilder;
 import com.github.auties00.cobalt.model.contact.ContactTextStatus;
+import com.github.auties00.cobalt.model.contact.OutContact;
 import com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentity;
 import com.github.auties00.cobalt.model.device.info.DeviceList;
 import com.github.auties00.cobalt.model.device.pairing.ClientAppVersion;
@@ -312,6 +313,24 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
     @ProtobufProperty(index = 80, type = ProtobufType.MAP, mapKeyType = ProtobufType.INT32, mapValueType = ProtobufType.MESSAGE)
     protected final ConcurrentMap<SyncPatchType, OrphanMutationEntries> orphanMutationEntries;
 
+    /**
+     * The dedicated outgoing contact store, keyed by phone-number JID.
+     *
+     * <p>This field is the persistent backing store for the WhatsApp Web
+     * "invite by contact" feature, mirroring the dedicated {@code out-contact}
+     * IndexedDB table that WA Web maintains separately from its regular
+     * contact table. The map is owned exclusively by the
+     * {@link com.github.auties00.cobalt.sync.handler.OutContactHandler outgoing
+     * contact sync handler}, which routes both upserts and removals through
+     * the public store accessors below.
+     *
+     * @implNote WAWebDBOutContactDatabaseApi — backs the {@code out-contact}
+     *           table accessed exclusively through this database API; the
+     *           protobuf index slot {@code 81} is reserved for this field
+     */
+    @ProtobufProperty(index = 81, type = ProtobufType.MAP, mapKeyType = ProtobufType.STRING, mapValueType = ProtobufType.MESSAGE)
+    protected ConcurrentHashMap<Jid, OutContact> outContacts;
+
     protected final ConcurrentMap<SignalProtocolAddress, Long> identityEncryptionRange;
 
     protected final AtomicLong encryptionSequence;
@@ -390,13 +409,7 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
 
     protected String businessAccountNonce;
 
-    protected Boolean ctwaDataSharingEnabled;
-
-    protected boolean subscriptionDeactivated;
-
-    protected boolean subscriptionAutoRenewing;
-
-    protected Long subscriptionExpirationDate;
+    protected ConcurrentHashMap<String, Boolean> ctwaPerCustomerDataSharing;
 
     protected boolean detectedOutcomesEnabled;
 
@@ -434,15 +447,9 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
 
     protected Map<String, com.github.auties00.cobalt.model.device.DeviceCapabilities> deviceCapabilitiesStates;
 
-    protected Map<String, Boolean> shareOwnPnStates;
-
-    protected Map<String, com.github.auties00.cobalt.model.sync.action.setting.SettingsSyncAction> settingsSyncStates;
-
     protected Map<String, com.github.auties00.cobalt.model.sync.action.chat.InteractiveMessageAction> interactiveMessageStates;
 
     protected Map<String, com.github.auties00.cobalt.model.sync.action.media.NoteEditAction> noteStates;
-
-    protected Map<String, Boolean> groupStatusMuteStates;
 
     protected Map<String, Instant> newsletterPinStates;
 
@@ -476,11 +483,19 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
 
     protected MaibaAIFeaturesControlAction.MaibaAIFeatureStatus maibaAiFeatureStatus;
 
+    protected Instant pairingTimestamp;
+
+    protected ConcurrentHashMap<String, Integer> serverAssignedLabelIdMap;
+
+    protected Boolean shareStatusToFacebook;
+
+    protected Boolean shareStatusToInstagram;
+
     protected final ConcurrentMap<String, com.github.auties00.cobalt.model.chat.ChatMessageInfo> peerMessages;
 
     protected final System.Logger logger;
 
-    AbstractWhatsAppStore(java.util.UUID uuid, java.lang.Long phoneNumber, com.github.auties00.cobalt.client.WhatsAppClientType clientType, java.time.Instant initializationTimeStamp, com.github.auties00.cobalt.model.jid.JidDevice device, com.github.auties00.cobalt.model.device.pairing.ClientPayload.ClientReleaseChannel releaseChannel, boolean online, java.lang.String locale, java.lang.String name, java.lang.String verifiedName, java.net.URI profilePicture, java.lang.String about, com.github.auties00.cobalt.model.jid.Jid jid, com.github.auties00.cobalt.model.jid.Jid lid, java.lang.String businessAddress, java.lang.Double businessLongitude, java.lang.Double businessLatitude, java.lang.String businessDescription, java.lang.String businessWebsite, java.lang.String businessEmail, com.github.auties00.cobalt.model.business.profile.BusinessCategory businessCategory, java.util.concurrent.ConcurrentHashMap<com.github.auties00.cobalt.model.jid.Jid,com.github.auties00.cobalt.model.contact.Contact> contacts, java.util.concurrent.ConcurrentHashMap<java.lang.String,com.github.auties00.cobalt.model.call.CallOffer> calls, java.util.concurrent.ConcurrentHashMap<com.github.auties00.cobalt.model.privacy.PrivacySettingType,com.github.auties00.cobalt.model.privacy.PrivacySettingEntry> privacySettings, boolean unarchiveChats, boolean twentyFourHourFormat, com.github.auties00.cobalt.model.chat.ChatEphemeralTimer newChatsEphemeralTimer, com.github.auties00.cobalt.client.WhatsAppWebClientHistory webHistoryPolicy, boolean automaticPresenceUpdates, boolean automaticMessageReceipts, boolean checkPatchMacs, boolean syncedChats, boolean syncedContacts, boolean syncedNewsletters, boolean syncedStatus, boolean syncedWebAppState, boolean syncedBusinessCertificate, java.lang.Integer registrationId, com.github.auties00.libsignal.key.SignalIdentityKeyPair noiseKeyPair, com.github.auties00.libsignal.key.SignalIdentityKeyPair identityKeyPair, com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentity signedDeviceIdentity, com.github.auties00.libsignal.key.SignalSignedKeyPair signedKeyPair, java.util.LinkedHashMap<java.lang.Integer,com.github.auties00.libsignal.key.SignalPreKeyPair> preKeys, java.util.UUID fdid, byte[] deviceId, java.util.UUID advertisingId, byte[] identityId, byte[] backupToken, java.util.concurrent.ConcurrentMap<com.github.auties00.libsignal.groups.SignalSenderKeyName,com.github.auties00.libsignal.groups.state.SignalSenderKeyRecord> senderKeys, java.util.LinkedHashMap<java.lang.String,com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKey> appStateKeys, java.util.concurrent.ConcurrentMap<com.github.auties00.libsignal.SignalProtocolAddress,com.github.auties00.libsignal.state.SignalSessionRecord> sessions, java.util.concurrent.ConcurrentMap<com.github.auties00.cobalt.model.sync.SyncPatchType,com.github.auties00.cobalt.model.sync.SyncHashValue> hashStates, boolean registered, boolean showSecurityNotifications, java.util.concurrent.ConcurrentMap<java.lang.String,com.github.auties00.cobalt.model.preference.Sticker> recentStickers, java.util.concurrent.ConcurrentMap<java.lang.String,com.github.auties00.cobalt.model.preference.Sticker> favouriteStickers, java.util.concurrent.ConcurrentMap<java.lang.String,com.github.auties00.cobalt.model.preference.QuickReply> quickReplies, java.util.concurrent.ConcurrentMap<java.lang.String,com.github.auties00.cobalt.model.preference.Label> labels, com.github.auties00.cobalt.model.device.pairing.ClientAppVersion clientVersion, com.github.auties00.cobalt.model.device.pairing.ClientAppVersion companionVersion, java.time.Instant lastAdvCheckTime, java.util.concurrent.ConcurrentMap<com.github.auties00.libsignal.SignalProtocolAddress,com.github.auties00.libsignal.key.SignalIdentityPublicKey> remoteIdentities, java.util.concurrent.ConcurrentMap<java.lang.String,com.github.auties00.cobalt.model.device.sync.MissingDeviceSyncKey> missingSyncKeys, byte[] advSecretKey, java.util.concurrent.ConcurrentMap<com.github.auties00.cobalt.model.jid.Jid,com.github.auties00.cobalt.model.business.BusinessVerifiedName> verifiedBusinessNames, java.nio.file.Path directory, boolean primaryDeviceSupportsSyncdRecovery, boolean disableLinkPreviews, boolean relayAllCalls, boolean externalWebBeta, com.github.auties00.cobalt.model.setting.ChatLockSettings chatLockSettings, java.util.List<com.github.auties00.cobalt.model.jid.Jid> favoriteChats, java.util.List<java.lang.String> primaryFeatures, java.util.concurrent.ConcurrentMap<com.github.auties00.cobalt.model.jid.Jid,com.github.auties00.cobalt.model.chat.ChatMute> mentionEveryoneMuteExpirations, java.util.concurrent.ConcurrentMap<com.github.auties00.cobalt.model.sync.SyncPatchType,com.github.auties00.cobalt.store.AbstractWhatsAppStore.OrphanMutationEntries> orphanMutationEntries) {
+    AbstractWhatsAppStore(java.util.UUID uuid, java.lang.Long phoneNumber, com.github.auties00.cobalt.client.WhatsAppClientType clientType, java.time.Instant initializationTimeStamp, com.github.auties00.cobalt.model.jid.JidDevice device, com.github.auties00.cobalt.model.device.pairing.ClientPayload.ClientReleaseChannel releaseChannel, boolean online, java.lang.String locale, java.lang.String name, java.lang.String verifiedName, java.net.URI profilePicture, java.lang.String about, com.github.auties00.cobalt.model.jid.Jid jid, com.github.auties00.cobalt.model.jid.Jid lid, java.lang.String businessAddress, java.lang.Double businessLongitude, java.lang.Double businessLatitude, java.lang.String businessDescription, java.lang.String businessWebsite, java.lang.String businessEmail, com.github.auties00.cobalt.model.business.profile.BusinessCategory businessCategory, java.util.concurrent.ConcurrentHashMap<com.github.auties00.cobalt.model.jid.Jid,com.github.auties00.cobalt.model.contact.Contact> contacts, java.util.concurrent.ConcurrentHashMap<java.lang.String,com.github.auties00.cobalt.model.call.CallOffer> calls, java.util.concurrent.ConcurrentHashMap<com.github.auties00.cobalt.model.privacy.PrivacySettingType,com.github.auties00.cobalt.model.privacy.PrivacySettingEntry> privacySettings, boolean unarchiveChats, boolean twentyFourHourFormat, com.github.auties00.cobalt.model.chat.ChatEphemeralTimer newChatsEphemeralTimer, com.github.auties00.cobalt.client.WhatsAppWebClientHistory webHistoryPolicy, boolean automaticPresenceUpdates, boolean automaticMessageReceipts, boolean checkPatchMacs, boolean syncedChats, boolean syncedContacts, boolean syncedNewsletters, boolean syncedStatus, boolean syncedWebAppState, boolean syncedBusinessCertificate, java.lang.Integer registrationId, com.github.auties00.libsignal.key.SignalIdentityKeyPair noiseKeyPair, com.github.auties00.libsignal.key.SignalIdentityKeyPair identityKeyPair, com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentity signedDeviceIdentity, com.github.auties00.libsignal.key.SignalSignedKeyPair signedKeyPair, java.util.LinkedHashMap<java.lang.Integer,com.github.auties00.libsignal.key.SignalPreKeyPair> preKeys, java.util.UUID fdid, byte[] deviceId, java.util.UUID advertisingId, byte[] identityId, byte[] backupToken, java.util.concurrent.ConcurrentMap<com.github.auties00.libsignal.groups.SignalSenderKeyName,com.github.auties00.libsignal.groups.state.SignalSenderKeyRecord> senderKeys, java.util.LinkedHashMap<java.lang.String,com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKey> appStateKeys, java.util.concurrent.ConcurrentMap<com.github.auties00.libsignal.SignalProtocolAddress,com.github.auties00.libsignal.state.SignalSessionRecord> sessions, java.util.concurrent.ConcurrentMap<com.github.auties00.cobalt.model.sync.SyncPatchType,com.github.auties00.cobalt.model.sync.SyncHashValue> hashStates, boolean registered, boolean showSecurityNotifications, java.util.concurrent.ConcurrentMap<java.lang.String,com.github.auties00.cobalt.model.preference.Sticker> recentStickers, java.util.concurrent.ConcurrentMap<java.lang.String,com.github.auties00.cobalt.model.preference.Sticker> favouriteStickers, java.util.concurrent.ConcurrentMap<java.lang.String,com.github.auties00.cobalt.model.preference.QuickReply> quickReplies, java.util.concurrent.ConcurrentMap<java.lang.String,com.github.auties00.cobalt.model.preference.Label> labels, com.github.auties00.cobalt.model.device.pairing.ClientAppVersion clientVersion, com.github.auties00.cobalt.model.device.pairing.ClientAppVersion companionVersion, java.time.Instant lastAdvCheckTime, java.util.concurrent.ConcurrentMap<com.github.auties00.libsignal.SignalProtocolAddress,com.github.auties00.libsignal.key.SignalIdentityPublicKey> remoteIdentities, java.util.concurrent.ConcurrentMap<java.lang.String,com.github.auties00.cobalt.model.device.sync.MissingDeviceSyncKey> missingSyncKeys, byte[] advSecretKey, java.util.concurrent.ConcurrentMap<com.github.auties00.cobalt.model.jid.Jid,com.github.auties00.cobalt.model.business.BusinessVerifiedName> verifiedBusinessNames, java.nio.file.Path directory, boolean primaryDeviceSupportsSyncdRecovery, boolean disableLinkPreviews, boolean relayAllCalls, boolean externalWebBeta, com.github.auties00.cobalt.model.setting.ChatLockSettings chatLockSettings, java.util.List<com.github.auties00.cobalt.model.jid.Jid> favoriteChats, java.util.List<java.lang.String> primaryFeatures, java.util.concurrent.ConcurrentMap<com.github.auties00.cobalt.model.jid.Jid,com.github.auties00.cobalt.model.chat.ChatMute> mentionEveryoneMuteExpirations, java.util.concurrent.ConcurrentMap<com.github.auties00.cobalt.model.sync.SyncPatchType,com.github.auties00.cobalt.store.AbstractWhatsAppStore.OrphanMutationEntries> orphanMutationEntries, java.util.concurrent.ConcurrentHashMap<com.github.auties00.cobalt.model.jid.Jid,com.github.auties00.cobalt.model.contact.OutContact> outContacts) {
         this.uuid = Objects.requireNonNull(uuid, "uuid cannot be null");
         this.phoneNumber = phoneNumber;
         this.clientType = Objects.requireNonNull(clientType, "clientType cannot be null");
@@ -501,6 +516,8 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
         this.lid = lid;
         this.contacts = Objects.requireNonNull(contacts, "contacts cannot be null");
         this.contactTextStatuses = new ConcurrentHashMap<>();
+        this.outContacts = requireNonNullElseGet(outContacts, ConcurrentHashMap::new); // WAWebDBOutContactDatabaseApi — initialise the dedicated out-contact store
+
         this.privacySettings = Objects.requireNonNull(privacySettings, "privacySettings cannot be null");
         this.calls = Objects.requireNonNull(calls, "calls cannot be null");
         this.unarchiveChats = unarchiveChats;
@@ -568,6 +585,7 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
         this.businessSubscriptionStatuses = new ConcurrentHashMap<>();
         this.businessSubscriptionExpirations = new ConcurrentHashMap<>();
         this.businessSubscriptionCreationTimes = new ConcurrentHashMap<>();
+        this.ctwaPerCustomerDataSharing = new ConcurrentHashMap<>();
         this.lastAdvCheckTime = lastAdvCheckTime;
         this.remoteIdentities = requireNonNullElseGet(remoteIdentities, ConcurrentHashMap::new);
         this.missingSyncKeys = requireNonNullElseGet(missingSyncKeys, ConcurrentHashMap::new);
@@ -592,15 +610,13 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
         this.businessBroadcastInsights = new ConcurrentHashMap<>();
         this.nuxStates = new ConcurrentHashMap<>();
         this.deviceCapabilitiesStates = new ConcurrentHashMap<>();
-        this.shareOwnPnStates = new ConcurrentHashMap<>();
-        this.settingsSyncStates = new ConcurrentHashMap<>();
         this.interactiveMessageStates = new ConcurrentHashMap<>();
         this.noteStates = new ConcurrentHashMap<>();
-        this.groupStatusMuteStates = new ConcurrentHashMap<>();
         this.newsletterPinStates = new ConcurrentHashMap<>();
         this.callLogStates = new ConcurrentHashMap<>();
         this.botWelcomeRequestStates = new ConcurrentHashMap<>();
         this.aiThreadTitles = new ConcurrentHashMap<>();
+        this.serverAssignedLabelIdMap = new ConcurrentHashMap<>();
         this.recentEmojiWeights = new CopyOnWriteArrayList<>();
         this.mentionEveryoneMuteExpirations = requireNonNullElseGet(mentionEveryoneMuteExpirations, ConcurrentHashMap::new);
         this.orphanMutationEntries = new ConcurrentHashMap<>();
@@ -912,47 +928,61 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
         return this;
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * @implNote WAWebSchemaCtwaPerCustomerDataSharing (data-sharing-3pd-lid-v2 IDB table) —
+     *           returns an unmodifiable view backed by the live
+     *           {@link ConcurrentHashMap} keyed by account LID raw string
+     */
     @Override
-    public Optional<Boolean> ctwaDataSharingEnabled() {
-        return Optional.ofNullable(ctwaDataSharingEnabled);
+    public Map<String, Boolean> ctwaPerCustomerDataSharing() {
+        return Collections.unmodifiableMap(ctwaPerCustomerDataSharing);
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * @implNote WAWebSchemaCtwaPerCustomerDataSharing (data-sharing-3pd-lid-v2 IDB table) —
+     *           equivalent to a {@code get(lidRawString)} read on the IDB table;
+     *           returns {@link Optional#empty()} when {@code accountLid} is
+     *           {@code null} or no entry exists for it
+     */
     @Override
-    public WhatsAppStore setCtwaDataSharingEnabled(Boolean enabled) {
-        this.ctwaDataSharingEnabled = enabled;
+    public Optional<Boolean> findCtwaDataSharing(String accountLid) {
+        if (accountLid == null) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(ctwaPerCustomerDataSharing.get(accountLid));
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @implNote WAWebSchemaCtwaPerCustomerDataSharing (data-sharing-3pd-lid-v2 IDB table) —
+     *           equivalent to a {@code createOrReplace} write on the IDB table
+     *           with the row {@code (lidRawString, dataSharing3pdEnabled)}
+     */
+    @Override
+    public WhatsAppStore setCtwaDataSharing(String accountLid, Boolean enabled) {
+        Objects.requireNonNull(accountLid, "accountLid cannot be null");
+        Objects.requireNonNull(enabled, "enabled cannot be null");
+        ctwaPerCustomerDataSharing.put(accountLid, enabled);
         return this;
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * @implNote WAWebSchemaCtwaPerCustomerDataSharing (data-sharing-3pd-lid-v2 IDB table) —
+     *           equivalent to a {@code remove(lidRawString)} delete on the IDB
+     *           table; a {@code null} {@code accountLid} is a no-op
+     */
     @Override
-    public boolean subscriptionDeactivated() {
-        return subscriptionDeactivated;
-    }
-
-    @Override
-    public WhatsAppStore setSubscriptionDeactivated(boolean deactivated) {
-        this.subscriptionDeactivated = deactivated;
-        return this;
-    }
-
-    @Override
-    public boolean subscriptionAutoRenewing() {
-        return subscriptionAutoRenewing;
-    }
-
-    @Override
-    public WhatsAppStore setSubscriptionAutoRenewing(boolean autoRenewing) {
-        this.subscriptionAutoRenewing = autoRenewing;
-        return this;
-    }
-
-    @Override
-    public Optional<Long> subscriptionExpirationDate() {
-        return Optional.ofNullable(subscriptionExpirationDate);
-    }
-
-    @Override
-    public WhatsAppStore setSubscriptionExpirationDate(Long expirationDate) {
-        this.subscriptionExpirationDate = expirationDate;
+    public WhatsAppStore removeCtwaDataSharing(String accountLid) {
+        if (accountLid != null) {
+            ctwaPerCustomerDataSharing.remove(accountLid);
+        }
         return this;
     }
 
@@ -964,6 +994,91 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
     @Override
     public WhatsAppStore setDetectedOutcomesEnabled(boolean enabled) {
         this.detectedOutcomesEnabled = enabled;
+        return this;
+    }
+
+    /**
+     * Returns the underlying outgoing contact map for protobuf serialization.
+     *
+     * <p>This package-private accessor exposes the live mutable map so that
+     * generated protobuf encode/decode glue can iterate the entries directly
+     * without the unmodifiable wrapper applied by {@link #outContacts()}.
+     *
+     * @return the live {@code ConcurrentHashMap} backing the outgoing contact
+     *         store
+     * @implNote WAWebDBOutContactDatabaseApi — internal accessor used to
+     *           serialise the dedicated {@code out-contact} table
+     */
+    protected ConcurrentHashMap<Jid, OutContact> outContactsField() {
+        return outContacts;
+    }
+
+    /**
+     * Returns an unmodifiable view of all outgoing contacts.
+     *
+     * @return an unmodifiable map of outgoing contacts keyed by JID
+     * @implNote WAWebDBOutContactDatabaseApi — replaces the
+     *           {@code getAllOutContacts} accessor on the WA Web database API
+     */
+    @Override
+    public Map<Jid, OutContact> outContacts() {
+        return Collections.unmodifiableMap(outContacts);
+    }
+
+    /**
+     * Finds an outgoing contact by its phone-number JID.
+     *
+     * @param jid the JID to look up, may be {@code null}
+     * @return an {@code Optional} containing the outgoing contact if it exists
+     * @implNote WAWebDBOutContactDatabaseApi — mirrors the
+     *           {@code getOutContact} lookup on the WA Web database API
+     */
+    @Override
+    public Optional<OutContact> findOutContact(Jid jid) {
+        if (jid == null) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(outContacts.get(jid));
+    }
+
+    /**
+     * Adds or merges an outgoing contact in the store.
+     *
+     * <p>If an entry with the same JID is already present, its name fields are
+     * overwritten with the values supplied by the new record. This mirrors the
+     * batched upsert semantics used by WA Web's
+     * {@code putOutContactBatch} call.
+     *
+     * @param outContact the outgoing contact to add or merge, must not be
+     *                   {@code null}
+     * @return this store instance for method chaining
+     * @implNote WAWebDBOutContactDatabaseApi.putOutContactBatch — bulk upsert
+     *           into the {@code out-contact} table
+     */
+    @Override
+    public WhatsAppStore addOutContact(OutContact outContact) {
+        Objects.requireNonNull(outContact, "outContact cannot be null");
+        outContacts.merge(outContact.jid(), outContact, (existing, incoming) -> {
+            existing.setFullName(incoming.fullName().orElse(null));
+            existing.setFirstName(incoming.firstName().orElse(null));
+            return existing;
+        });
+        return this;
+    }
+
+    /**
+     * Removes an outgoing contact from the store by its phone-number JID.
+     *
+     * @param jid the JID of the outgoing contact to remove, may be {@code null}
+     * @return this store instance for method chaining
+     * @implNote WAWebDBOutContactDatabaseApi.removeOutContactBatch — bulk
+     *           removal from the {@code out-contact} table
+     */
+    @Override
+    public WhatsAppStore removeOutContact(Jid jid) {
+        if (jid != null) {
+            outContacts.remove(jid);
+        }
         return this;
     }
 
@@ -2318,21 +2433,23 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
     }
 
     @Override
-    public Optional<QuickReply> findQuickReply(String shortcut) {
-        return Optional.ofNullable(quickReplies.get(shortcut));
-    }
-
-    @Override
-    public void addQuickReply(QuickReply action) {
-        Objects.requireNonNull(action, "action cannot be null");
-        quickReplies.put(action.shortcut(), action);
-    }
-
-    @Override
-    public Optional<QuickReply> removeQuickReply(String shortcut) {
-        return shortcut == null
+    public Optional<QuickReply> findQuickReply(String id) {
+        return id == null
                 ? Optional.empty()
-                : Optional.ofNullable(quickReplies.remove(shortcut));
+                : Optional.ofNullable(quickReplies.get(id));
+    }
+
+    @Override
+    public void addQuickReply(QuickReply quickReply) {
+        Objects.requireNonNull(quickReply, "quickReply cannot be null");
+        quickReplies.put(quickReply.id(), quickReply);
+    }
+
+    @Override
+    public Optional<QuickReply> removeQuickReply(String id) {
+        return id == null
+                ? Optional.empty()
+                : Optional.ofNullable(quickReplies.remove(id));
     }
 
     @Override
@@ -2821,30 +2938,6 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
     }
 
     @Override
-    public Map<String, Boolean> shareOwnPnStates() {
-        return Collections.unmodifiableMap(shareOwnPnStates);
-    }
-
-    @Override
-    public WhatsAppStore setShareOwnPnStates(Map<String, Boolean> states) {
-        this.shareOwnPnStates = new ConcurrentHashMap<>(Objects.requireNonNull(states, "states cannot be null"));
-        return this;
-    }
-
-    @Override
-    public Map<String, com.github.auties00.cobalt.model.sync.action.setting.SettingsSyncAction> settingsSyncStates() {
-        return Collections.unmodifiableMap(settingsSyncStates);
-    }
-
-    @Override
-    public WhatsAppStore setSettingsSyncStates(
-            Map<String, com.github.auties00.cobalt.model.sync.action.setting.SettingsSyncAction> states
-    ) {
-        this.settingsSyncStates = new ConcurrentHashMap<>(Objects.requireNonNull(states, "states cannot be null"));
-        return this;
-    }
-
-    @Override
     public Map<String, com.github.auties00.cobalt.model.sync.action.chat.InteractiveMessageAction> interactiveMessageStates() {
         return Collections.unmodifiableMap(interactiveMessageStates);
     }
@@ -2865,17 +2958,6 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
     @Override
     public WhatsAppStore setNoteStates(Map<String, com.github.auties00.cobalt.model.sync.action.media.NoteEditAction> states) {
         this.noteStates = new ConcurrentHashMap<>(Objects.requireNonNull(states, "states cannot be null"));
-        return this;
-    }
-
-    @Override
-    public Map<String, Boolean> groupStatusMuteStates() {
-        return Collections.unmodifiableMap(groupStatusMuteStates);
-    }
-
-    @Override
-    public WhatsAppStore setGroupStatusMuteStates(Map<String, Boolean> states) {
-        this.groupStatusMuteStates = new ConcurrentHashMap<>(Objects.requireNonNull(states, "states cannot be null"));
         return this;
     }
 
@@ -2978,11 +3060,21 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
         return this;
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * @implNote WAWebProtobufSyncAction.pb.MusicUserIdAction
+     */
     @Override
     public Optional<MusicUserIdAction> musicUserIdState() {
         return Optional.ofNullable(musicUserIdState);
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * @implNote WAWebProtobufSyncAction.pb.MusicUserIdAction
+     */
     @Override
     public WhatsAppStore setMusicUserIdState(MusicUserIdAction action) {
         this.musicUserIdState = action;
@@ -3022,11 +3114,21 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
         return this;
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * @implNote WAWebProtobufSyncAction.pb.PrivacySettingChannelsPersonalisedRecommendationAction
+     */
     @Override
     public Optional<Boolean> channelsPersonalisedRecommendationOptOut() {
         return Optional.ofNullable(channelsPersonalisedRecommendationOptOut);
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * @implNote WAWebProtobufSyncAction.pb.PrivacySettingChannelsPersonalisedRecommendationAction
+     */
     @Override
     public WhatsAppStore setChannelsPersonalisedRecommendationOptOut(Boolean optOut) {
         this.channelsPersonalisedRecommendationOptOut = optOut;
@@ -3044,15 +3146,135 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
         return this;
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * @implNote WAWebProtobufSyncAction.pb.MaibaAIFeaturesControlAction
+     */
     @Override
     public Optional<MaibaAIFeaturesControlAction.MaibaAIFeatureStatus> maibaAiFeatureStatus() {
         return Optional.ofNullable(maibaAiFeatureStatus);
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * @implNote WAWebProtobufSyncAction.pb.MaibaAIFeaturesControlAction
+     */
     @Override
     public WhatsAppStore setMaibaAiFeatureStatus(MaibaAIFeaturesControlAction.MaibaAIFeatureStatus status) {
         this.maibaAiFeatureStatus = status;
         return this;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @implNote WAWebUserPrefsMultiDevice.getPairingTimestamp
+     */
+    @Override
+    public Optional<Instant> pairingTimestamp() {
+        return Optional.ofNullable(pairingTimestamp);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @implNote WAWebUserPrefsMultiDevice.getPairingTimestamp
+     */
+    @Override
+    public WhatsAppStore setPairingTimestamp(Instant pairingTimestamp) {
+        this.pairingTimestamp = pairingTimestamp;
+        return this;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @implNote WAWebLabelCollection.addToServerAssignedLabelIdMap
+     */
+    @Override
+    public Map<String, Integer> serverAssignedLabelIdMap() {
+        return Collections.unmodifiableMap(serverAssignedLabelIdMap);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @implNote WAWebLabelCollection.addToServerAssignedLabelIdMap
+     */
+    @Override
+    public void addServerAssignedLabelId(String labelId, Integer predefinedId) {
+        Objects.requireNonNull(labelId, "labelId cannot be null");
+        if (predefinedId == null) { // WAWebLabelCollection.addToServerAssignedLabelIdMap: no-op when predefinedId is undefined
+            return;
+        }
+        // WAWebLabelCollection.addToServerAssignedLabelIdMap:
+        // $LabelCollectionImpl$p_1.set(labelId, predefinedId) — JS Map#set unconditionally writes,
+        // but the WA Web call site only fires once per label-id and never overwrites afterwards;
+        // putIfAbsent preserves that single-write semantic against repeated invocations.
+        serverAssignedLabelIdMap.putIfAbsent(labelId, predefinedId);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @implNote WAWebStatusPrivacySettingSync.persistShareToFB
+     */
+    @Override
+    public Optional<Boolean> shareStatusToFacebook() {
+        return Optional.ofNullable(shareStatusToFacebook);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @implNote WAWebStatusPrivacySettingSync.persistShareToFB
+     */
+    @Override
+    public WhatsAppStore setShareStatusToFacebook(Boolean value) {
+        this.shareStatusToFacebook = value;
+        return this;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @implNote WAWebStatusPrivacySettingSync.persistShareToIG
+     */
+    @Override
+    public Optional<Boolean> shareStatusToInstagram() {
+        return Optional.ofNullable(shareStatusToInstagram);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @implNote WAWebStatusPrivacySettingSync.persistShareToIG
+     */
+    @Override
+    public WhatsAppStore setShareStatusToInstagram(Boolean value) {
+        this.shareStatusToInstagram = value;
+        return this;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @implNote WAWebRecentStickerCollectionMd.removeAllRecentAvatarStickers
+     */
+    @Override
+    public int removeAllRecentAvatarStickers() {
+        var iterator = recentStickers.entrySet().iterator();
+        var removed = 0;
+        while (iterator.hasNext()) {
+            var entry = iterator.next();
+            if (entry.getValue().isAvatar()) {
+                iterator.remove();
+                removed++;
+            }
+        }
+        return removed;
     }
 
     @Override

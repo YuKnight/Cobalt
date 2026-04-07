@@ -137,6 +137,52 @@ public non-sealed abstract class Chat implements JidProvider {
     @ProtobufProperty(index = 39, type = ProtobufType.STRING)
     private Jid phoneNumberJid;
 
+    /**
+     * Wire-protocol field carrying the {@code shareOwnPn} flag for a LID 1:1 chat
+     * delivered via {@code HistorySync}'s {@code Conversation} message at protobuf
+     * field index {@code 40}.
+     *
+     * <p>WA Web does NOT persist this value on the chat record. The field exists on
+     * the {@code Conversation} protobuf purely as a carrier so that
+     * {@code WAWebHistoryMsgHandlerAction.handleInitialSyncMsgs} can read it from
+     * each LID conversation entry and forward it onto the corresponding LID
+     * contact record via
+     * {@code WAWebUpdateLidMetadataJob.updateLidMetadataJob([{lid, data: {shareOwnPn}}])},
+     * which ultimately writes the {@code shareOwnPn} column on the
+     * {@code WAWebLidAwareContactsDB} contact row. In Cobalt that contact column
+     * is exposed as {@link com.github.auties00.cobalt.model.contact.Contact#phoneNumberShared()}
+     * and is otherwise written by
+     * {@link com.github.auties00.cobalt.sync.handler.ShareOwnPnHandler}.
+     *
+     * <p>The separate {@code WAWebSchemaLidChatState} table referenced by an earlier
+     * audit (which declares its own {@code shareOwnPn} column) is dead schema in WA
+     * Web: only the {@code addTable} schema definition itself and the
+     * {@code WAWebGetAllModelStorageTableNames} enumeration reference it. No WA Web
+     * module ever reads or writes that table, so it cannot be a propagation source.
+     *
+     * <p>The field must remain on this protobuf message to keep wire compatibility
+     * with WA Web's {@code WAWebProtobufsHistorySync.pb} {@code Conversation}
+     * descriptor ({@code shareOwnPn:[40,e.TYPES.BOOL]}); removing it would silently
+     * drop the value during HistorySync deserialization.
+     *
+     * @implNote WAWebProtobufsHistorySync.pb {@code Conversation.shareOwnPn} (field 40);
+     *           WAWebHistoryMsgHandlerAction.handleInitialSyncMsgs reads it and
+     *           forwards it to the LID contact via
+     *           WAWebUpdateLidMetadataJob.updateLidMetadataJob.
+     *
+     * <p>TODO: Cobalt has no equivalent of WAWebHistoryMsgHandlerAction's
+     * conversation-level LID metadata propagation step. The Cobalt history sync
+     * pipeline currently deserializes this value into {@link #shareOwnPhoneNumber}
+     * but never drains it onto the matching LID
+     * {@link com.github.auties00.cobalt.model.contact.Contact}. The propagation
+     * should: for each LID 1:1 chat in the incoming {@code HistorySync}, look up
+     * (or create) the LID contact identified by {@link #jid()} and call
+     * {@code contact.setPhoneNumberShared(shareOwnPhoneNumber)} when the field is
+     * present, mirroring WA Web's
+     * {@code if (b != null) { v.shareOwnPn = b; a.push({lid: m, data: v}) }}
+     * accumulator that feeds {@code updateLidMetadataJob}. Until that propagation
+     * exists, this field is read-only wire scaffolding.
+     */
     @ProtobufProperty(index = 40, type = ProtobufType.BOOL)
     private Boolean shareOwnPhoneNumber;
 

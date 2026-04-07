@@ -9,6 +9,7 @@ import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.stream.SocketStream;
+import com.github.auties00.cobalt.sync.SnapshotRecoveryService;
 import com.github.auties00.cobalt.util.FastRandomUtils;
 
 import java.util.ArrayDeque;
@@ -30,6 +31,7 @@ public final class IqStreamHandler implements SocketStream.Handler {
     private final WhatsAppClient whatsapp;
     private final WhatsAppClientVerificationHandler.Web webVerificationHandler;
     private final DeviceService deviceService;
+    private final SnapshotRecoveryService snapshotRecoveryService;
     private final ScheduledExecutorService rotationExecutor;
     private final Object rotationLock;
     private ScheduledFuture<?> rotationTask;
@@ -37,11 +39,13 @@ public final class IqStreamHandler implements SocketStream.Handler {
     public IqStreamHandler(
             WhatsAppClient whatsapp,
             WhatsAppClientVerificationHandler.Web webVerificationHandler,
-            DeviceService deviceService
+            DeviceService deviceService,
+            SnapshotRecoveryService snapshotRecoveryService
     ) {
         this.whatsapp = whatsapp;
         this.webVerificationHandler = Objects.requireNonNull(webVerificationHandler, "webVerificationHandler cannot be null");
         this.deviceService = Objects.requireNonNull(deviceService, "deviceService cannot be null");
+        this.snapshotRecoveryService = Objects.requireNonNull(snapshotRecoveryService, "snapshotRecoveryService cannot be null");
         this.rotationLock = new Object();
         this.rotationExecutor = Executors.newSingleThreadScheduledExecutor(runnable ->
                 Thread.ofPlatform()
@@ -213,7 +217,7 @@ public final class IqStreamHandler implements SocketStream.Handler {
                 });
 
         extractPairingProps(pairSuccess)
-                .ifPresent(props -> store.setPrimaryDeviceSupportsSyncdRecovery(props.isSyncdSnapshotRecoveryEnabled()));
+                .ifPresent(props -> snapshotRecoveryService.updatePrimaryDeviceSupportsSyncdRecovery(props.isSyncdSnapshotRecoveryEnabled()));
         store.setRegistered(true);
         store.setOnline(true);
         safeSave("pair-success");

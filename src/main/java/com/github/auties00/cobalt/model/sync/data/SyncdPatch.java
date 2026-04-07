@@ -89,6 +89,35 @@ public final class SyncdPatch {
         return Optional.ofNullable(clientDebugData);
     }
 
+    /**
+     * Decodes the {@link #clientDebugData()} raw bytes into a {@link PatchDebugData} message.
+     *
+     * <p>The {@code clientDebugData} field is encoded as a {@link PatchDebugData} protobuf
+     * by the sender (see {@code MutationRequestBuilder} for the outgoing path) and is intended
+     * for diagnostic logging on the receiving side. Decoding is best-effort: a malformed or
+     * absent payload yields {@link Optional#empty()} rather than propagating an exception so
+     * that debug data corruption can never break sync processing.
+     *
+     * @implNote WAWebSyncdValidateServerSyncProtobuf.validatePatchProtobuf — decodes
+     *           {@code clientDebugData} via {@code decodeProtobuf(PatchDebugDataSpec, ...)}
+     *           and includes the decoded object in the validated output for debug logging
+     *           (the {@code _applyPatch} function uses {@code currentLthash} and
+     *           {@code newLthash} for employee-visible logging).
+     * @return an {@link Optional} containing the decoded {@link PatchDebugData}, or
+     *         {@link Optional#empty()} if no debug data is present or decoding failed
+     */
+    public Optional<PatchDebugData> decodedClientDebugData() {
+        if (clientDebugData == null || clientDebugData.length == 0) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(PatchDebugDataSpec.decode(clientDebugData));
+        } catch (Exception e) {
+            // Debug data failure must not break sync — swallow and return empty.
+            return Optional.empty();
+        }
+    }
+
     public void setVersion(SyncdVersion version) {
         this.version = version;
     }

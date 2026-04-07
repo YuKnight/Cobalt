@@ -58,7 +58,8 @@ import java.util.zip.GZIPInputStream;
  * @implNote WAWebRequestSyncdSnapshotRecovery.SyncdSnapshotRecoveryModule,
  *           WAWebSyncdSnapshotRecoveryGatingUtils.shouldPreformSnapshotRecovery,
  *           WAWebSyncdSnapshotRecoveryGatingUtils.syncdSnapshotRecoveryEnabled,
- *           WAWebSyncdSnapshotRecoveryGatingUtils.updatePrimaryDeviceSupportsSyncdRecovery
+ *           WAWebSyncdSnapshotRecoveryGatingUtils.updatePrimaryDeviceSupportsSyncdRecovery,
+ *           WAWebSendNonMessageDataRequest.sendPeerDataOperationRequest (snapshot recovery path)
  */
 public final class SnapshotRecoveryService {
     private static final Logger LOGGER = Logger.getLogger(SnapshotRecoveryService.class.getName());
@@ -66,7 +67,7 @@ public final class SnapshotRecoveryService {
 
     private final WhatsAppClient client; // ADAPTED: WAWebRequestSyncdSnapshotRecovery constructor DI
     private final ABPropsService abPropsService; // ADAPTED: WAWebSyncdSnapshotRecoveryGatingUtils uses WAWebABProps directly
-    private final Map<SyncPatchType, CompletableFuture<PeerDataOperationRequestResponseMessage.PeerDataOperationResult.SyncDSnapshotFatalRecoveryResponse>> pendingRecoveries; // ADAPTED: WAWebRequestSyncdSnapshotRecovery: this.recoveryPromise = new Map
+    private final Map<SyncPatchType, CompletableFuture<SyncdSnapshotRecovery>> pendingRecoveries; // ADAPTED: WAWebRequestSyncdSnapshotRecovery: this.recoveryPromise = new Map — holds the decoded snapshot to avoid double-decoding
     private final Semaphore recoverySemaphore; // ADAPTED: WAWebRequestSyncdSnapshotRecovery: this.recoveryInflight (Resolvable)
 
     /**
@@ -97,6 +98,21 @@ public final class SnapshotRecoveryService {
         }
 
         return abPropsService.getBool(ABProp.ENABLE_PEER_SNAPSHOT_RECOVERY); // WAWebSyncdSnapshotRecoveryGatingUtils.s: getABPropConfigValue("enable_peer_snapshot_recovery")
+    }
+
+    /**
+     * Updates the stored flag indicating whether the primary device supports
+     * syncd snapshot recovery.
+     *
+     * <p>Per WhatsApp Web {@code WAWebSyncdSnapshotRecoveryGatingUtils.updatePrimaryDeviceSupportsSyncdRecovery}:
+     * this persists the {@code WAPrimaryDeviceSupportsSyncdRecovery} user preference,
+     * which is checked by {@link #isRecoveryEnabled()} to gate snapshot recovery.
+     *
+     * @param supported {@code true} if the primary device supports syncd recovery
+     * @implNote WAWebSyncdSnapshotRecoveryGatingUtils.updatePrimaryDeviceSupportsSyncdRecovery
+     */
+    public void updatePrimaryDeviceSupportsSyncdRecovery(boolean supported) {
+        client.store().setPrimaryDeviceSupportsSyncdRecovery(supported); // WAWebSyncdSnapshotRecoveryGatingUtils.c: userPrefsIdb.set("WAPrimaryDeviceSupportsSyncdRecovery", e)
     }
 
     /**
@@ -138,13 +154,17 @@ public final class SnapshotRecoveryService {
      *
      * <p>Per WhatsApp Web behavior, recovery requests are serialized globally
      * to prevent multiple concurrent recoveries across different collections.
+     * The total time for semaphore acquisition plus waiting for the response
+     * is bounded by a single {@link #RECOVERY_TIMEOUT_MS} window, matching
+     * the WA Web {@code promiseTimeout} that wraps the entire recovery call.
      *
      * @param collectionName the collection to recover
-     * @return the recovery response, or {@code null} if recovery failed or timed out
+     * @return the decoded recovery snapshot, or {@code null} if recovery failed or timed out
      * @implNote WAWebRequestSyncdSnapshotRecovery.requestRecoveryWithTimeout,
      *           WAWebRequestSyncdSnapshotRecovery.requestRecoveryFromPrimary
      */
-    public PeerDataOperationRequestResponseMessage.PeerDataOperationResult.SyncDSnapshotFatalRecoveryResponse requestRecovery(SyncPatchType collectionName) {
+    public SyncdSnapshotRecovery requestRecovery(SyncPatchType collectionName) {
+        var startTime = System.currentTimeMillis(); // ADAPTED: WAWebRequestSyncdSnapshotRecovery.requestRecoveryWithTimeout: promiseTimeout wraps entire call
         try {
             // ADAPTED: WAWebRequestSyncdSnapshotRecovery.requestRecoveryFromPrimary: this.recoveryInflight != null && (yield this.recoveryInflight.promise)
             if (!recoverySemaphore.tryAcquire(RECOVERY_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
@@ -163,7 +183,13 @@ public final class SnapshotRecoveryService {
             sendRecoveryRequest(collectionName); // WAWebRequestSyncdSnapshotRecovery.requestRecoveryFromPrimary: sendPeerDataOperationRequest(COMPANION_SYNCD_SNAPSHOT_FATAL_RECOVERY, ...)
 
             // ADAPTED: WAWebRequestSyncdSnapshotRecovery.requestRecoveryWithTimeout: promiseTimeout(this.requestRecoveryFromPrimary(t), p)
-            return responseFuture.get(RECOVERY_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+            var elapsed = System.currentTimeMillis() - startTime; // WAWebRequestSyncdSnapshotRecovery.requestRecoveryWithTimeout: single timeout wraps entire operation
+            var remainingTimeout = RECOVERY_TIMEOUT_MS - elapsed; // WAWebRequestSyncdSnapshotRecovery.requestRecoveryWithTimeout: promiseTimeout(p = 6e4)
+            if (remainingTimeout <= 0) {
+                LOGGER.warning("Snapshot recovery timed out after semaphore acquisition for collection " + collectionName);
+                return null;
+            }
+            return responseFuture.get(remainingTimeout, TimeUnit.MILLISECONDS); // WAWebRequestSyncdSnapshotRecovery.requestRecoveryWithTimeout: promiseTimeout
         } catch (Exception e) {
             LOGGER.warning("Snapshot recovery failed for collection " + collectionName + ": " + e.getMessage()); // WAWebRequestSyncdSnapshotRecovery.requestRecoveryWithTimeout: catch(t) { ERROR(...) }
             return null; // WAWebRequestSyncdSnapshotRecovery.requestRecoveryWithTimeout: return null
@@ -174,23 +200,28 @@ public final class SnapshotRecoveryService {
     }
 
     /**
-     * Resolves a pending recovery request with the response from the primary device.
+     * Resolves a pending recovery request with the decoded snapshot from the primary device.
      *
      * <p>This method should be called by the protocol message handler when a
      * {@code PeerDataOperationRequestResponseMessage} with type
-     * {@code COMPANION_SYNCD_SNAPSHOT_FATAL_RECOVERY} is received.
+     * {@code COMPANION_SYNCD_SNAPSHOT_FATAL_RECOVERY} is received. The handler is
+     * responsible for decoding the {@code SyncDSnapshotFatalRecoveryResponse} bytes
+     * into a {@link SyncdSnapshotRecovery} via {@link #decodeRecoverySnapshot} and
+     * passing the decoded object here, mirroring WA Web's
+     * {@code WAWebNonMessageDataRequestHandler.m} which decodes once before
+     * resolving the recovery promise.
      *
-     * @param collectionName the collection name from the response
-     * @param response       the recovery response data
+     * @param collectionName the collection name extracted from the decoded snapshot
+     * @param recoveredSnapshot the decoded recovery snapshot
      * @implNote WAWebRequestSyncdSnapshotRecovery.resolveRecoveryPromise
      */
     public void resolveRecovery(
             SyncPatchType collectionName,
-            PeerDataOperationRequestResponseMessage.PeerDataOperationResult.SyncDSnapshotFatalRecoveryResponse response
+            SyncdSnapshotRecovery recoveredSnapshot
     ) {
         var future = pendingRecoveries.get(collectionName); // WAWebRequestSyncdSnapshotRecovery.resolveRecoveryPromise: var e = this.recoveryPromise.get(t)
         if (future != null) {
-            future.complete(response); // WAWebRequestSyncdSnapshotRecovery.resolveRecoveryPromise: e.resolve(n)
+            future.complete(recoveredSnapshot); // WAWebRequestSyncdSnapshotRecovery.resolveRecoveryPromise: e.resolve(n)
         } else {
             LOGGER.fine("Received snapshot recovery response for " + collectionName + " but no pending request found");
         }
@@ -214,24 +245,31 @@ public final class SnapshotRecoveryService {
     ) {
         var snapshotBytes = response.collectionSnapshot() // WAWebNonMessageDataRequestHandler.m: e.syncdSnapshotFatalRecoveryResponse.collectionSnapshot
                 .orElseThrow(() -> new NoSuchElementException("Missing snapshot"));
-        if (response.isCompressed()) { // WAWebNonMessageDataRequestHandler.m: i === true && (s = yield inflate(l.readByteArrayView()))
-            try (var protobufStream = ProtobufInputStream.fromStream(new GZIPInputStream(new ByteArrayInputStream(snapshotBytes)))) {
-                return SyncdSnapshotRecoverySpec.decode(protobufStream); // WAWebNonMessageDataRequestHandler.m: decodeProtobuf(SyncdSnapshotRecoverySpec, s)
-            } catch (Exception e) {
-                throw new WhatsAppWebAppStateSyncException.ExternalDecodeFailed(e);
+        try {
+            if (response.isCompressed()) { // WAWebNonMessageDataRequestHandler.m: i === true && (s = yield inflate(l.readByteArrayView()))
+                try (var protobufStream = ProtobufInputStream.fromStream(new GZIPInputStream(new ByteArrayInputStream(snapshotBytes)))) {
+                    return SyncdSnapshotRecoverySpec.decode(protobufStream); // WAWebNonMessageDataRequestHandler.m: decodeProtobuf(SyncdSnapshotRecoverySpec, s)
+                }
+            } else {
+                return SyncdSnapshotRecoverySpec.decode(snapshotBytes); // WAWebNonMessageDataRequestHandler.m: decodeProtobuf(SyncdSnapshotRecoverySpec, s)
             }
-        } else {
-            return SyncdSnapshotRecoverySpec.decode(snapshotBytes); // WAWebNonMessageDataRequestHandler.m: decodeProtobuf(SyncdSnapshotRecoverySpec, s)
+        } catch (Exception e) {
+            throw new WhatsAppWebAppStateSyncException.ExternalDecodeFailed(e);
         }
     }
 
     /**
      * Sends the recovery request to the primary device.
      *
+     * <p>Constructs a {@code COMPANION_SYNCD_SNAPSHOT_FATAL_RECOVERY}
+     * peer data operation request message and sends it to device 0
+     * (the primary device). The request includes the collection name
+     * and current timestamp.
+     *
      * @implNote WAWebRequestSyncdSnapshotRecovery.requestRecoveryFromPrimary (send portion),
-     *           WAWebSendNonMessageDataRequest.sendPeerDataOperationRequest,
-     *           WAWebSendNonMessageDataRequest.P (builds syncdCollectionFatalRecoveryRequest),
-     *           WAWebSendNonMessageDataRequest.D (builds peer message to device 0)
+     *           WAWebSendNonMessageDataRequest.sendPeerDataOperationRequest (orchestration),
+     *           WAWebSendNonMessageDataRequest builds syncdCollectionFatalRecoveryRequest via local helper,
+     *           WAWebSendNonMessageDataRequest builds single peer message to device 0 via non-fanout path
      */
     private void sendRecoveryRequest(SyncPatchType collectionName) {
         var primaryDevice = getPrimaryDevice(); // WAWebSendNonMessageDataRequest.D: createDeviceWidFromUserAndDevice(getMeDevicePnOrThrow().user, getMeDevicePnOrThrow().server, 0)
@@ -273,17 +311,15 @@ public final class SnapshotRecoveryService {
         var messageInfo = new ChatMessageInfoBuilder() // ADAPTED: WAWebSendNonMessageDataRequest.D: {id, to, type: "protocol", subtype: "peer_data_operation_request_message", ...}
                 .key(messageKey)
                 .message(messageContainer)
-                .timestamp(Instant.now())
-                .senderJid(self)
                 .build();
-        client.sendPeerMessage(primaryDevice, messageInfo); // WAWebSendNonMessageDataRequest.L: yield encryptAndSendKeyMsg({msg: t, ...})
+        client.sendPeerMessage(primaryDevice, messageInfo); // WAWebSendNonMessageDataRequest.sendPeerDataOperationRequest -> WAWebSendAppStateSyncMsgJob.encryptAndSendKeyMsg({msg: t, pushPriority: null, privacySensitive: undefined})
     }
 
     /**
      * Gets the primary device JID (device 0).
      *
      * @return the primary device JID, or {@code null} if own JID is not set
-     * @implNote WAWebSendNonMessageDataRequest.D: createDeviceWidFromUserAndDevice(getMeDevicePnOrThrow().user, getMeDevicePnOrThrow().server, 0)
+     * @implNote WAWebSendNonMessageDataRequest non-fanout path: createDeviceWidFromUserAndDevice(getMeDevicePnOrThrow().user, getMeDevicePnOrThrow().server, 0)
      */
     private Jid getPrimaryDevice() {
         var myJid = client.store().jid().orElse(null); // ADAPTED: WAWebSendNonMessageDataRequest.D: getMeDevicePnOrThrow()

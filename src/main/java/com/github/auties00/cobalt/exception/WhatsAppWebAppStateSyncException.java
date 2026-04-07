@@ -92,6 +92,7 @@ public sealed abstract class WhatsAppWebAppStateSyncException extends WhatsAppEx
                 WhatsAppWebAppStateSyncException.IndexMacMismatch,
                 WhatsAppWebAppStateSyncException.MissingKey,
                 WhatsAppWebAppStateSyncException.MissingKeyOnAllDevices,
+                WhatsAppWebAppStateSyncException.TimeoutWhileWaitingForMissingKey,
                 WhatsAppWebAppStateSyncException.MissingPatches,
                 WhatsAppWebAppStateSyncException.TerminalPatch,
                 WhatsAppWebAppStateSyncException.Conflict,
@@ -462,21 +463,130 @@ public sealed abstract class WhatsAppWebAppStateSyncException extends WhatsAppEx
      * @implNote WAWebSyncdError.SyncdFatalError — WA Web reports SyncdFatalErrorType.MISSING_KEY_ON_ALL_CLIENTS
      */
     public static final class MissingKeyOnAllDevices extends WhatsAppWebAppStateSyncException {
+        /**
+         * The identifier of the missing encryption key.
+         */
         private final byte[] keyId;
 
+        /**
+         * Constructs a new missing-key-on-all-devices exception.
+         *
+         * @param keyId the identifier of the missing key; must not be {@code null}
+         * @throws NullPointerException if keyId is {@code null}
+         * @implNote WAWebSyncdError.SyncdFatalError — WA Web reports SyncdFatalErrorType.MISSING_KEY_ON_ALL_CLIENTS
+         */
         public MissingKeyOnAllDevices(byte[] keyId) {
             super("Missing sync key with id " + HexFormat.of().formatHex(
                     Objects.requireNonNull(keyId, "keyId cannot be null")) + " on all companion devices");
             this.keyId = keyId;
         }
 
+        /**
+         * Returns the identifier of the missing key.
+         * <p>
+         * This ID identifies the specific key that no companion device possesses,
+         * indicating the sync state is unrecoverable without re-linking.
+         *
+         * @return the key ID as a byte array; never {@code null}
+         * @implNote WAWebSyncdError.SyncdFatalError — MISSING_KEY_ON_ALL_CLIENTS context
+         */
         public byte[] keyId() {
             return keyId;
         }
 
+        /**
+         * Returns whether this exception represents a fatal error.
+         *
+         * @return {@code true} - missing key on all devices is always fatal
+         * @implNote WAWebSyncdError.SyncdFatalError — fatal because no device can provide the key
+         */
         @Override
         public boolean isFatal() {
             return true;
+        }
+    }
+
+    /**
+     * Exception thrown when the wait for a missing sync key expires before all
+     * companion devices have responded.
+     * <p>
+     * Per WhatsApp Web WAWebSyncdStoreMissingKeys: when a sync key is missing,
+     * the client asks companion devices for the key and waits up to the
+     * configured timeout (see {@code getSyncdWaitForKeyTimeoutDays}). If the
+     * timeout fires before the key arrives and before every asked device has
+     * explicitly responded, this exception is thrown to distinguish the
+     * timeout path from the all-devices-responded path reported by
+     * {@link MissingKeyOnAllDevices}.
+     *
+     * <h2>Detection</h2>
+     * This condition is detected when:
+     * <ul>
+     *   <li>The scheduled wait-for-key timeout has elapsed</li>
+     *   <li>At least one tracked missing key has been outstanding longer than
+     *       the configured timeout duration</li>
+     *   <li>The key has not yet been received from any device</li>
+     * </ul>
+     *
+     * <h2>Recovery</h2>
+     * This is a non-fatal error. The sync state can be recovered by retrying
+     * the key request or waiting for the device to come online. The configurable
+     * error handler may choose to reconnect, re-request, or log out.
+     *
+     * @implNote WAWebSyncdMetricFatalError.SyncdFatalErrorType.TIMEOUT_WHILE_WAITING_FOR_MISSING_KEY
+     *           — WA Web reports this specific metric via
+     *           {@code reportSyncdFatalError(TIMEOUT_WHILE_WAITING_FOR_MISSING_KEY)}
+     *           in {@code WAWebSyncdStoreMissingKeys._timeoutWhileWaitingForMissingKey}
+     *           as a distinct cause separate from {@code MISSING_KEY_ON_ALL_CLIENTS}.
+     */
+    public static final class TimeoutWhileWaitingForMissingKey extends WhatsAppWebAppStateSyncException {
+        /**
+         * The identifier of the missing encryption key whose wait timeout expired.
+         */
+        private final byte[] keyId;
+
+        /**
+         * Constructs a new timeout-while-waiting-for-missing-key exception.
+         *
+         * @param keyId the identifier of the missing key whose wait timeout fired;
+         *              must not be {@code null}
+         * @throws NullPointerException if {@code keyId} is {@code null}
+         * @implNote WAWebSyncdStoreMissingKeys._timeoutWhileWaitingForMissingKey —
+         *           constructed when the scheduled timeout fires with the earliest
+         *           expired missing key's ID.
+         */
+        public TimeoutWhileWaitingForMissingKey(byte[] keyId) {
+            super("Timeout waiting for missing sync key with id " + HexFormat.of().formatHex(
+                    Objects.requireNonNull(keyId, "keyId cannot be null")));
+            this.keyId = keyId;
+        }
+
+        /**
+         * Returns the identifier of the missing key whose wait timeout expired.
+         * <p>
+         * This ID identifies the specific key that was being awaited when the
+         * configured timeout elapsed without the key being received.
+         *
+         * @return the key ID as a byte array; never {@code null}
+         * @implNote WAWebSyncdStoreMissingKeys._timeoutWhileWaitingForMissingKey —
+         *           carries the key ID context for downstream error handling.
+         */
+        public byte[] keyId() {
+            return keyId;
+        }
+
+        /**
+         * Returns whether this exception represents a fatal error.
+         *
+         * @return {@code false} — a wait-timeout is recoverable via retry or
+         *         the configurable error handler policy
+         * @implNote WAWebSyncdMetricFatalError.SyncdFatalErrorType.TIMEOUT_WHILE_WAITING_FOR_MISSING_KEY
+         *           — WA Web reports this as a distinct metric; Cobalt treats it
+         *           as non-fatal and delegates recovery to the pluggable error
+         *           handler per Cobalt's redesigned error model.
+         */
+        @Override
+        public boolean isFatal() {
+            return false;
         }
     }
 
@@ -870,16 +980,29 @@ public sealed abstract class WhatsAppWebAppStateSyncException extends WhatsAppEx
      * @implNote WAWebSyncdError.SyncdFatalError — WA Web throws {@code new SyncdFatalError("syncd: has missing patches")}
      */
     public static final class MissingPatches extends WhatsAppWebAppStateSyncException {
+        /**
+         * The sync collection that has missing patches.
+         */
         private final SyncPatchType collectionName;
+
+        /**
+         * The current local version of the collection.
+         */
         private final long localVersion;
+
+        /**
+         * The minimum version among received patches.
+         */
         private final long minPatchVersion;
 
         /**
          * Constructs a new missing patches exception.
          *
-         * @param collectionName  the affected collection
+         * @param collectionName  the affected collection; must not be {@code null}
          * @param localVersion    the current local version
          * @param minPatchVersion the minimum version among received patches
+         * @throws NullPointerException if collectionName is {@code null}
+         * @implNote WAWebSyncdError.SyncdFatalError — WA Web throws {@code new SyncdFatalError("syncd: has missing patches")}
          */
         public MissingPatches(SyncPatchType collectionName, long localVersion, long minPatchVersion) {
             super("Missing patches for collection " + collectionName
@@ -892,7 +1015,8 @@ public sealed abstract class WhatsAppWebAppStateSyncException extends WhatsAppEx
         /**
          * Returns the affected collection.
          *
-         * @return the patch type; never null
+         * @return the patch type; never {@code null}
+         * @implNote WAWebSyncdError.SyncdFatalError — collection context for missing patches
          */
         public SyncPatchType collectionName() {
             return collectionName;
@@ -902,6 +1026,7 @@ public sealed abstract class WhatsAppWebAppStateSyncException extends WhatsAppEx
          * Returns the current local version.
          *
          * @return the local version
+         * @implNote WAWebSyncdError.SyncdFatalError — ADAPTED: Cobalt provides local version context not present in WA Web error message
          */
         public long localVersion() {
             return localVersion;
@@ -911,11 +1036,18 @@ public sealed abstract class WhatsAppWebAppStateSyncException extends WhatsAppEx
          * Returns the minimum version among received patches.
          *
          * @return the minimum patch version
+         * @implNote WAWebSyncdError.SyncdFatalError — ADAPTED: Cobalt provides min patch version context not present in WA Web error message
          */
         public long minPatchVersion() {
             return minPatchVersion;
         }
 
+        /**
+         * Returns whether this exception represents a fatal error.
+         *
+         * @return {@code true} - missing patches is always fatal
+         * @implNote WAWebSyncdError.SyncdFatalError — fatal because patch sequence gap is unrecoverable
+         */
         @Override
         public boolean isFatal() {
             return true;
@@ -937,14 +1069,23 @@ public sealed abstract class WhatsAppWebAppStateSyncException extends WhatsAppEx
      * @implNote WAWebSyncdError.SyncdFatalError — WA Web throws {@code new SyncdFatalError("received terminal patch with exit code: ...")}
      */
     public static final class TerminalPatch extends WhatsAppWebAppStateSyncException {
+        /**
+         * The sync collection that received the terminal patch.
+         */
         private final SyncPatchType collectionName;
+
+        /**
+         * The exit code signaling why the collection data is unrecoverable.
+         */
         private final DisconnectReason exitCode;
 
         /**
          * Constructs a new terminal patch exception.
          *
-         * @param collectionName the affected collection
-         * @param exitCode       the exit code from the patch
+         * @param collectionName the affected collection; must not be {@code null}
+         * @param exitCode       the exit code from the patch; must not be {@code null}
+         * @throws NullPointerException if collectionName or exitCode is {@code null}
+         * @implNote WAWebSyncdError.SyncdFatalError — WA Web throws {@code new SyncdFatalError("received terminal patch with exit code: ...")}
          */
         public TerminalPatch(SyncPatchType collectionName, DisconnectReason exitCode) {
             super("Terminal patch for collection " + collectionName + " with exit code: " + exitCode);
@@ -955,7 +1096,8 @@ public sealed abstract class WhatsAppWebAppStateSyncException extends WhatsAppEx
         /**
          * Returns the affected collection.
          *
-         * @return the patch type; never null
+         * @return the patch type; never {@code null}
+         * @implNote WAWebSyncdError.SyncdFatalError — collection context for terminal patch
          */
         public SyncPatchType collectionName() {
             return collectionName;
@@ -964,12 +1106,19 @@ public sealed abstract class WhatsAppWebAppStateSyncException extends WhatsAppEx
         /**
          * Returns the exit code from the patch.
          *
-         * @return the exit code; never null
+         * @return the exit code; never {@code null}
+         * @implNote WAWebSyncdError.SyncdFatalError — ADAPTED: WA Web includes exit code in the error message string; Cobalt exposes it as a typed field
          */
         public DisconnectReason exitCode() {
             return exitCode;
         }
 
+        /**
+         * Returns whether this exception represents a fatal error.
+         *
+         * @return {@code true} - terminal patches are always fatal
+         * @implNote WAWebSyncdError.SyncdFatalError — all terminal exit codes are fatal
+         */
         @Override
         public boolean isFatal() {
             return true;
@@ -985,12 +1134,16 @@ public sealed abstract class WhatsAppWebAppStateSyncException extends WhatsAppEx
      * @implNote WAWebSyncdError.SyncdRetryableError — WA Web handles 409 as a retryable conflict
      */
     public static final class Conflict extends WhatsAppWebAppStateSyncException {
+        /**
+         * Whether the server indicated more patches are available after the conflict.
+         */
         private final boolean hasMorePatches;
 
         /**
          * Constructs a new conflict exception.
          *
          * @param hasMorePatches whether the server indicated more patches are available
+         * @implNote WAWebSyncdError.SyncdRetryableError — WA Web handles 409 as a retryable conflict
          */
         public Conflict(boolean hasMorePatches) {
             super("Server returned 409 conflict");
@@ -1001,11 +1154,18 @@ public sealed abstract class WhatsAppWebAppStateSyncException extends WhatsAppEx
          * Returns whether the server indicated more patches are available.
          *
          * @return {@code true} if more patches are available
+         * @implNote WAWebSyncdError.SyncdRetryableError — ADAPTED: Cobalt tracks hasMorePatches as a typed boolean; WA Web determines this from the collection state machine
          */
         public boolean hasMorePatches() {
             return hasMorePatches;
         }
 
+        /**
+         * Returns whether this exception represents a fatal error.
+         *
+         * @return {@code false} - conflicts are retryable
+         * @implNote WAWebSyncdError.SyncdRetryableError — 409 conflicts are always retryable
+         */
         @Override
         public boolean isFatal() {
             return false;
@@ -1020,13 +1180,23 @@ public sealed abstract class WhatsAppWebAppStateSyncException extends WhatsAppEx
      * @implNote WAWebSyncdError.SyncdRetryableError — WA Web creates {@code new SyncdRetryableError(t, n)} with backoff
      */
     public static final class RetryableServerError extends WhatsAppWebAppStateSyncException {
+        /**
+         * The server error code that triggered this retryable error.
+         */
         private final String errorCode;
+
+        /**
+         * The server-suggested backoff duration in milliseconds, or {@code null} if none was provided.
+         *
+         * @implNote WAWebSyncdError.SyncdRetryableError — maps to the {@code backoff} field on the WA Web error class
+         */
         private final Long serverBackoffMs;
 
         /**
          * Constructs a new retryable server error exception.
          *
          * @param errorCode the server error code
+         * @implNote WAWebSyncdError.SyncdRetryableError — convenience overload for errors without server backoff
          */
         public RetryableServerError(String errorCode) {
             this(errorCode, null);
@@ -1037,6 +1207,7 @@ public sealed abstract class WhatsAppWebAppStateSyncException extends WhatsAppEx
          *
          * @param errorCode       the server error code
          * @param serverBackoffMs the server-suggested backoff duration in milliseconds, or {@code null}
+         * @implNote WAWebSyncdError.SyncdRetryableError — WA Web creates {@code new SyncdRetryableError(t, n)} where {@code n} is the backoff
          */
         public RetryableServerError(String errorCode, Long serverBackoffMs) {
             super("Server returned retryable error code: " + errorCode);
@@ -1048,6 +1219,7 @@ public sealed abstract class WhatsAppWebAppStateSyncException extends WhatsAppEx
          * Returns the server error code.
          *
          * @return the error code
+         * @implNote WAWebSyncdError.SyncdRetryableError — ADAPTED: WA Web passes error code as the message string; Cobalt exposes it as a typed field
          */
         public String errorCode() {
             return errorCode;
@@ -1057,11 +1229,18 @@ public sealed abstract class WhatsAppWebAppStateSyncException extends WhatsAppEx
          * Returns the server-suggested backoff duration in milliseconds, if any.
          *
          * @return the backoff duration, or {@code null} if none was provided
+         * @implNote WAWebSyncdError.SyncdRetryableError — maps to the {@code backoff} field on the WA Web error class
          */
         public Long serverBackoffMs() {
             return serverBackoffMs;
         }
 
+        /**
+         * Returns whether this exception represents a fatal error.
+         *
+         * @return {@code false} - retryable server errors are not fatal
+         * @implNote WAWebSyncdError.SyncdRetryableError — retryable errors use exponential backoff
+         */
         @Override
         public boolean isFatal() {
             return false;

@@ -26,12 +26,14 @@ import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
 import com.github.auties00.cobalt.model.payment.OrphanPaymentNotificationBuilder;
 import com.github.auties00.cobalt.model.payment.PaymentInfo;
 import com.github.auties00.cobalt.model.payment.PaymentInfoBuilder;
-import com.github.auties00.cobalt.model.sync.SyncCollectionState;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.model.sync.data.SyncdSnapshotRecovery;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.stream.SocketStream;
 import com.github.auties00.cobalt.sync.SnapshotRecoveryService;
+import com.github.auties00.cobalt.sync.WebAppStateService;
+import com.github.auties00.cobalt.sync.key.SyncKeyRotationService;
 import it.auties.protobuf.stream.ProtobufInputStream;
 
 import java.io.ByteArrayInputStream;
@@ -48,18 +50,24 @@ public final class MessageStreamHandler implements SocketStream.Handler {
     private final MessageService messageService;
     private final MessageReceiptHandler receiptHandler;
     private final SnapshotRecoveryService snapshotRecoveryService;
+    private final SyncKeyRotationService syncKeyRotationService;
     private final LidMigrationService lidMigrationService;
 
     public MessageStreamHandler(
             WhatsAppClient whatsapp,
             MessageService messageService,
             SnapshotRecoveryService snapshotRecoveryService,
+            WebAppStateService webAppStateService,
             LidMigrationService lidMigrationService
     ) {
         this.whatsapp = whatsapp;
         this.messageService = Objects.requireNonNull(messageService, "messageService cannot be null");
         this.receiptHandler = new MessageReceiptHandler(whatsapp);
         this.snapshotRecoveryService = Objects.requireNonNull(snapshotRecoveryService, "snapshotRecoveryService cannot be null");
+        // The handler only depends on the key rotation service exposed by WebAppStateService;
+        // keep the parameter type as WebAppStateService to make the dependency direction explicit
+        // and avoid leaking ownership of SyncKeyRotationService outside of WebAppStateService.
+        this.syncKeyRotationService = Objects.requireNonNull(webAppStateService, "webAppStateService cannot be null").syncKeyRotationService();
         this.lidMigrationService = Objects.requireNonNull(lidMigrationService, "lidMigrationService cannot be null");
     }
 
@@ -550,12 +558,14 @@ public final class MessageStreamHandler implements SocketStream.Handler {
     }
 
     private void processAppStateSyncKeyShare(ChatMessageInfo info, AppStateSyncKeyShare keyShare) {
-        var keys = keyShare.keys();
+        // WAWebKeyManagementHandleKeyShareApi: caller-side validation before delegating
+        // to WAWebSyncdHandleKeyShare.handleKeyShare. Sender device ID is extracted from
+        // the message info; keys with missing or malformed key IDs are filtered out so
+        // they never reach the underlying handler.
         var senderDeviceId = info.senderJid().isPresent() ? info.senderJid().get().device() : -1;
-        var usableKeys = new ArrayList<AppStateSyncKey>(keys.size());
 
-        var resolvedAny = false;
-        var negativeResponseObserved = false;
+        var keys = keyShare.keys();
+        var validatedKeys = new ArrayList<AppStateSyncKey>(keys.size());
         for (var key : keys) {
             var keyId = key.keyId()
                     .flatMap(AppStateSyncKeyId::keyId)
@@ -571,59 +581,17 @@ public final class MessageStreamHandler implements SocketStream.Handler {
                 continue;
             }
 
-            var hasKeyData = key.keyData()
-                    .flatMap(AppStateSyncKeyData::keyData)
-                    .map(data -> data.length > 0)
-                    .orElse(false);
-            if (hasKeyData) {
-                usableKeys.add(key);
-                if (whatsapp.store().findMissingSyncKey(keyId).isPresent()) {
-                    whatsapp.store().removeMissingSyncKey(keyId);
-                    resolvedAny = true;
-                }
-                continue;
-            }
-
-            if (senderDeviceId < 0) {
-                continue;
-            }
-
-            var missingKey = whatsapp.store().findMissingSyncKey(keyId).orElse(null);
-            if (missingKey == null || !missingKey.wasAsked(senderDeviceId)) {
-                continue;
-            }
-
-            if (!missingKey.hasDeviceRespondedWithoutKey(senderDeviceId)) {
-                missingKey.markDeviceRespondedWithoutKey(senderDeviceId);
-                negativeResponseObserved = true;
-            }
-            if (missingKey.isMissingOnAllDevices()) {
-                whatsapp.scheduleAllDevicesRespondedCheck();
-            }
+            validatedKeys.add(key);
         }
 
-        if (!usableKeys.isEmpty()) {
-            whatsapp.store().addWebAppStateKeys(usableKeys);
+        if (validatedKeys.isEmpty()) {
+            return;
         }
 
-        if (resolvedAny) {
-            whatsapp.rescheduleMissingSyncKeyTimeout(); // WAWebSyncdStoreMissingKeys.updateMissingKeys: yield I({MissingKeyStore: t}) — reschedule after +keys removed
-            var blockedCollections = new ArrayList<SyncPatchType>();
-            for (var patchType : SyncPatchType.values()) {
-                var metadata = whatsapp.store().findWebAppState(patchType);
-                if (metadata.state() == SyncCollectionState.BLOCKED) {
-                    whatsapp.store().markWebAppStateDirty(patchType);
-                    blockedCollections.add(patchType);
-                }
-            }
-            if (!blockedCollections.isEmpty()) {
-                whatsapp.pullWebAppState(blockedCollections.toArray(SyncPatchType[]::new));
-            }
-        }
-
-        if (resolvedAny || negativeResponseObserved) {
-            whatsapp.store().setSyncedWebAppState(false);
-        }
+        // WAWebSyncdHandleKeyShare.handleKeyShare: stores keys, updates missing key
+        // tracking, reschedules timeouts, and resumes blocked collections (which
+        // includes the equivalent of WAWebSyncd.syncBlockedCollections).
+        syncKeyRotationService.handleKeyShare(senderDeviceId, validatedKeys);
     }
 
     private void processAppStateSyncKeyRequest(
@@ -702,17 +670,35 @@ public final class MessageStreamHandler implements SocketStream.Handler {
             return;
         }
 
-        for (var result : response.peerDataOperationResult()) {
-            var recovery = result.syncdSnapshotFatalRecoveryResponse().orElse(null);
-            if (recovery == null) {
-                continue;
-            }
-
-            var snapshot = snapshotRecoveryService.decodeRecoverySnapshot(recovery);
-            snapshot.collectionName()
-                    .flatMap(SyncPatchType::of)
-                    .ifPresent(collectionName -> snapshotRecoveryService.resolveRecovery(collectionName, recovery));
+        // WAWebNonMessageDataRequestHandler: only the first peerDataOperationResult is
+        // consumed (`d(n.peerDataOperationResult[0], t)`); for snapshot recovery the
+        // primary device sends back a single result.
+        var results = response.peerDataOperationResult();
+        if (results.isEmpty()) {
+            return;
         }
+
+        var recovery = results.get(0).syncdSnapshotFatalRecoveryResponse().orElse(null);
+        if (recovery == null) {
+            return;
+        }
+
+        // WAWebNonMessageDataRequestHandler.m: decode the SyncDSnapshotFatalRecoveryResponse
+        // exactly once and pass the decoded SyncdSnapshotRecovery through the recovery
+        // promise so the awaiting consumer in WebAppStateService does not decode again.
+        SyncdSnapshotRecovery decoded;
+        try {
+            decoded = snapshotRecoveryService.decodeRecoverySnapshot(recovery);
+        } catch (RuntimeException exception) {
+            LOGGER.log(System.Logger.Level.WARNING,
+                    "Failed to decode snapshot recovery payload: {0}",
+                    exception.getMessage());
+            return;
+        }
+
+        decoded.collectionName()
+                .flatMap(SyncPatchType::of)
+                .ifPresent(collectionName -> snapshotRecoveryService.resolveRecovery(collectionName, decoded));
     }
 
     private Optional<LIDMigrationMappingSyncPayload> decodeLidMappingPayload(byte[] payload) {

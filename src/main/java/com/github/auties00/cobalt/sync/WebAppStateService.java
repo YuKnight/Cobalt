@@ -2,10 +2,12 @@ package com.github.auties00.cobalt.sync;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.exception.WhatsAppMediaException;
 import com.github.auties00.cobalt.exception.WhatsAppWebAppStateSyncException;
 import com.github.auties00.cobalt.message.send.id.MessageIdGenerator;
 import com.github.auties00.cobalt.message.send.id.MessageIdVersion;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfoBuilder;
+import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.media.ExternalBlobReference;
 import com.github.auties00.cobalt.model.message.MessageContainerBuilder;
 import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
@@ -48,6 +50,17 @@ import java.util.logging.Logger;
  *
  * <p>This class manages bidirectional synchronization of application state
  * across multiple devices using end-to-end encryption and LT-Hash verification.
+ *
+ * @implNote WAWebSyncd (state machine orchestration, markCollectionsForSync, scheduleSyncCollections,
+ *     initializeStateMachine, processOnAppResume, syncBlockedCollections, getInFlightCollections,
+ *     getPendingCollections), WAWebSyncdServerSync (serverSync, syncRound, buildAndSendIq),
+ *     WAWebSyncdCollectionHandler (applyAppStateSyncResponse, applyIndividualMutations),
+ *     WAWebSyncdCollectionUtils (isBootstrap — adapted to {@code SyncCollectionMetadata.bootstrapped}
+ *     boolean field with inverted semantics, inlined at call sites; isCriticalCollection — adapted
+ *     to {@code SyncPatchType.isCritical()}),
+ *     WAWebSyncdOrphan (orphan mutation retry), WAWebSyncdResolveConflict (conflict resolution),
+ *     WAWebSyncdFatal (fatal error handling), WAWebSyncdDisabled (isSyncdDisabled — always
+ *     {@code false} in Cobalt since it is never a Web Worker)
  */
 public final class WebAppStateService {
     private static final Logger LOGGER = Logger.getLogger(WebAppStateService.class.getName());
@@ -67,9 +80,10 @@ public final class WebAppStateService {
     private volatile CompletableFuture<?> periodicSyncJob;
 
     /**
-     * Creates a new WebAppStateManager instance.
+     * Creates a new WebAppStateService instance.
      *
-     * @param whatsapp               the Whatsapp instance to use for store access and node sending
+     * @implNote WAWebSyncd (module initialization — constructor DI replaces module-level imports)
+     * @param whatsapp               the WhatsApp client instance for store access and node sending
      * @param abPropsService         the AB props service for configuration values
      * @param snapshotRecoveryService the snapshot recovery service for peer recovery
      */
@@ -84,6 +98,11 @@ public final class WebAppStateService {
         this.retryScheduler = new WebAppStateBackoffScheduler();
         this.missingSyncKeyRequestService = new MissingSyncKeyRequestService(whatsapp);
         this.missingSyncKeyTimeoutScheduler = new MissingSyncKeyTimeoutScheduler(whatsapp, abPropsService, missingSyncKeyRequestService);
+        // Wire the back-edge after both collaborators exist so that
+        // MissingSyncKeyRequestService.trackMissingKeys can call
+        // missingSyncKeyTimeoutScheduler.scheduleTimeoutCheck() inline,
+        // mirroring WAWebSyncdStoreMissingKeys.addMissingKeys.
+        this.missingSyncKeyRequestService.setTimeoutScheduler(missingSyncKeyTimeoutScheduler);
         this.syncKeyRotationService = new SyncKeyRotationService(whatsapp, abPropsService);
         this.snapshotRecoveryService = snapshotRecoveryService;
     }
@@ -119,6 +138,90 @@ public final class WebAppStateService {
         if (!allCollections.isEmpty()) { // WAWebSyncd.V: n.forEach(...)
             syncCollectionsBatched(allCollections); // WAWebSyncd.V: Z() -> ee() -> scheduleSyncCollections
         }
+    }
+
+    /**
+     * Returns the internal {@link SyncKeyRotationService} instance owned by this service.
+     *
+     * <p>Exposed so collaborators that need direct access to key share/rotation primitives
+     * (e.g., the protocol message handler dispatching incoming
+     * {@code AppStateSyncKeyShare} messages) can call into the service without having
+     * a separately injected instance, since the service is currently constructed
+     * internally by {@link WebAppStateService}.
+     *
+     * @return the sync key rotation service
+     * @implNote ADAPTED: WA Web exposes WAWebSyncdHandleKeyShare and WAWebSyncdKeyManagement
+     *                    as standalone modules; Cobalt owns SyncKeyRotationService inside
+     *                    WebAppStateService and exposes it via this getter for collaborators.
+     */
+    public SyncKeyRotationService syncKeyRotationService() {
+        return syncKeyRotationService;
+    }
+
+    /**
+     * Syncs all collections currently in {@code BLOCKED} state.
+     *
+     * <p>Per WhatsApp Web {@code WAWebSyncd.syncBlockedCollections} (J): retrieves all
+     * collections in the {@code Blocked} state from the state machine, transitions them
+     * to {@code Dirty}, and triggers a sync round. This is called after missing sync
+     * keys are received (via {@code WAWebSyncdHandleKeyShare.handleKeyShare}) to resume
+     * syncing collections that were waiting for key material.
+     *
+     * @implNote WAWebSyncd.syncBlockedCollections (J)
+     */
+    public void syncBlockedCollections() {
+        var blockedCollections = new ArrayList<SyncPatchType>(); // WAWebSyncd.J: var t = getCollectionsInStateBlocked()
+        for (var patchType : SyncPatchType.values()) { // WAWebSyncd.J: iterates blocked collections
+            var metadata = store.findWebAppState(patchType);
+            if (metadata.state() == SyncCollectionState.BLOCKED) { // WAWebSyncd.J: getCollectionsInStateBlocked
+                store.markWebAppStateDirty(patchType); // WAWebSyncd.J: moveCollectionsToDirty(t)
+                blockedCollections.add(patchType);
+            }
+        }
+        if (!blockedCollections.isEmpty()) { // WAWebSyncd.J: Z() — schedule sync
+            pullPatches(blockedCollections.toArray(SyncPatchType[]::new)); // WAWebSyncd.J: Z() -> ee() -> serverSync
+        }
+    }
+
+    /**
+     * Returns the set of collections currently being synced (in-flight).
+     *
+     * <p>Per WhatsApp Web {@code WAWebSyncd.getInFlightCollections} (me): returns the
+     * module-level set {@code A} tracking collections with an active server sync request.
+     * In Cobalt, this is derived from the store's {@code IN_FLIGHT} state.
+     *
+     * @implNote WAWebSyncd.getInFlightCollections (me)
+     * @return an unmodifiable set of in-flight collection types
+     */
+    public Set<SyncPatchType> getInFlightCollections() {
+        var result = new LinkedHashSet<SyncPatchType>(); // WAWebSyncd.me: return A
+        for (var patchType : SyncPatchType.values()) { // ADAPTED: WAWebSyncd uses module-level Set A; Cobalt derives from store state
+            if (store.findWebAppState(patchType).state() == SyncCollectionState.IN_FLIGHT) {
+                result.add(patchType);
+            }
+        }
+        return Collections.unmodifiableSet(result); // WAWebSyncd.me: return A (Set)
+    }
+
+    /**
+     * Returns the set of collections pending sync.
+     *
+     * <p>Per WhatsApp Web {@code WAWebSyncd.getPendingCollections} (pe): returns the
+     * module-level set {@code F} tracking collections that were re-marked dirty while
+     * already in-flight, requiring another sync round after the current one completes.
+     * In Cobalt, this is derived from the store's {@code PENDING} state.
+     *
+     * @implNote WAWebSyncd.getPendingCollections (pe)
+     * @return an unmodifiable set of pending collection types
+     */
+    public Set<SyncPatchType> getPendingCollections() {
+        var result = new LinkedHashSet<SyncPatchType>(); // WAWebSyncd.pe: return F
+        for (var patchType : SyncPatchType.values()) { // ADAPTED: WAWebSyncd uses module-level Set F; Cobalt derives from store state
+            if (store.findWebAppState(patchType).state() == SyncCollectionState.PENDING) {
+                result.add(patchType);
+            }
+        }
+        return Collections.unmodifiableSet(result); // WAWebSyncd.pe: return F (Set)
     }
 
     /**
@@ -163,10 +266,32 @@ public final class WebAppStateService {
             // WAWebSyncdServerSync.S: pre-filter ErrorRetry/ErrorFatal/Blocked -> done
             // Per WA Web WAWebSyncdResponseParser.h: collection-level errors are captured
             // on the response object rather than thrown, so each collection is handled independently.
+            // Per WA Web WAWebSyncdServerSync.R: Conflict/ConflictHasMore are NOT in the
+            // ErrorRetry/ErrorFatal/Blocked switch — they go through applyAppStateSyncResponse
+            // (as empty responses) and then through the post-apply routing logic.
             for (var response : responses) {
                 // WAWebSyncdServerSync.S: collections with error states go directly to done
                 if (response.collectionError().isPresent()) {
-                    handleSyncError(response.collectionError().get(), response.collectionName()); // WAWebSyncdServerSync.S
+                    var collectionError = response.collectionError().get();
+                    // WAWebSyncdServerSync.R: Conflict/ConflictHasMore fall through to default
+                    // and are handled in the post-apply routing, not as generic errors
+                    if (collectionError instanceof WhatsAppWebAppStateSyncException.Conflict conflict) {
+                        // WAWebSyncdServerSync.R: post-apply routing for Conflict
+                        if (conflict.hasMorePatches()) {
+                            // WAWebSyncdServerSync.R: ConflictHasMore -> always refetch
+                            store.markWebAppStateDirty(response.collectionName()); // WAWebSyncdServerSync.R: refetchCollections
+                        } else {
+                            // WAWebSyncdServerSync.R: Conflict -> check pending
+                            var hasPending = !whatsapp.store().findPendingMutations(response.collectionName()).isEmpty();
+                            if (hasPending) {
+                                store.markWebAppStateDirty(response.collectionName()); // WAWebSyncdServerSync.R: refetchCollections
+                            } else {
+                                store.markWebAppStateUpToDate(response.collectionName()); // WAWebSyncdServerSync.R: Conflict + !pending -> Success
+                            }
+                        }
+                    } else {
+                        handleSyncError(collectionError, response.collectionName()); // WAWebSyncdServerSync.S
+                    }
                     continue;
                 }
 
@@ -366,7 +491,7 @@ public final class WebAppStateService {
         if (!store.primaryFeatures().contains("favorite_sticker")) { // WAWebSyncdOrphan.checkOrphanFavoriteStickers: isFavoriteStickersEnabled
             return; // WAWebSyncdOrphan.checkOrphanFavoriteStickers: not enabled, early return
         }
-        retryOrphanMutationsByModelType("favoriteSticker", () -> // WAWebSyncdOrphan.checkOrphanFavoriteStickers -> w(FavoriteSticker, conditionFn)
+        retryOrphanMutationsByModelType("FavoriteSticker", () -> // WAWebSyncdOrphan.checkOrphanFavoriteStickers -> w(SyncModelType.FavoriteSticker, conditionFn)
                 abPropsService.getBool(ABProp.FAVORITE_STICKER_SYNC_AFTER_PAIRING_ENABLED_WEB) // WAWebSyncdOrphan.checkOrphanFavoriteStickers: isFavoriteStickerSyncAfterPairingEnabled
         );
     }
@@ -472,8 +597,22 @@ public final class WebAppStateService {
         }
     }
 
+    /**
+     * Maximum number of sync iterations before giving up.
+     *
+     * @implNote WAWebSyncdServerSync.serverSync (C = 500)
+     */
     private static final int MAX_SYNC_ITERATIONS = 500; // WAWebSyncdServerSync.serverSync: C=500
 
+    /**
+     * Result of a single sync round, bundling the parsed response, optional upload
+     * metadata, and whether the pending upload was skipped due to an unbootstrapped collection.
+     *
+     * @implNote WAWebSyncdServerSync.S (syncRound return value)
+     * @param response            the parsed sync response
+     * @param uploadInfo          the upload metadata, or {@code null} if no upload was included
+     * @param skippedPendingUpload whether pending mutations were skipped due to unbootstrapped state
+     */
     private record SyncRoundResult(
             MutationSyncResponse response,
             SyncRequest.UploadedPatchInfo uploadInfo,
@@ -481,6 +620,15 @@ public final class WebAppStateService {
     ) {
     }
 
+    /**
+     * Represents a pending sync action entry update (either put or remove) to be applied
+     * after the version guard passes.
+     *
+     * @implNote WAWebSyncdAntiTampering.computeLtHash (entry accumulation)
+     * @param indexMac the index MAC identifying the entry
+     * @param entry    the entry to store, or {@code null} for remove operations
+     * @param remove   whether this is a remove operation
+     */
     private record SyncActionEntryUpdate(
             byte[] indexMac,
             SyncActionEntry entry,
@@ -488,6 +636,14 @@ public final class WebAppStateService {
     ) {
     }
 
+    /**
+     * Result of an LT-Hash computation, bundling the new hash and the sync action
+     * entry updates that should be persisted if the version guard passes.
+     *
+     * @implNote WAWebSyncdAntiTampering.computeLtHash (Y/J)
+     * @param newHash the computed LT-Hash
+     * @param updates the sync action entry updates
+     */
     private record LtHashComputation(
             byte[] newHash,
             List<SyncActionEntryUpdate> updates
@@ -589,9 +745,33 @@ public final class WebAppStateService {
         return new SyncRoundResult(parsedResponse, syncRequest.uploadInfo(), skippedPendingUpload);
     }
 
+    /**
+     * Processes a sync response for a single collection, applying snapshots,
+     * patches, and state transitions.
+     *
+     * <p>Per WhatsApp Web {@code WAWebSyncdCollectionHandler.applyAppStateSyncResponse}:
+     * first processes any snapshot (download, decrypt, verify MAC, apply mutations),
+     * then processes patches in version order (download externals, decrypt, verify
+     * integrity, compute LT-Hash, apply mutations). Finally transitions the collection
+     * to the appropriate state based on the response's {@code has_more_patches} flag.
+     *
+     * @implNote WAWebSyncdCollectionHandler.applyAppStateSyncResponse (Ie/Te — main entry point),
+     *     WAWebSyncdCollectionHandler._applySnapshotAndPatches (We/qe — snapshot path),
+     *     WAWebSyncdCollectionHandler._applyPatches (He/Ge — patch loop),
+     *     WAWebSyncdCollectionHandler._applyPatch (Ke/Qe — single patch),
+     *     WAWebSyncdCollectionHandler._applySetMutations (Xe/Ye — mutation application),
+     *     WAWebSyncdCollectionHandler.ot/at (version guard),
+     *     WAWebSyncdMMSDownload.downloadSnapshot (snapshot download),
+     *     WAWebSyncdAntiTampering.computeLtHash (LT-Hash computation),
+     *     WAWebSyncdValidateMutations (duplicate index/version validation)
+     * @param syncResponse the parsed sync response for a single collection
+     */
     private void handleSyncResponse(MutationSyncResponse syncResponse) {
         var collectionName = syncResponse.collectionName();
-        var receivedMutations = false;
+        // WAWebSyncdCollectionHandler.applyAppStateSyncResponse: capture pre-sync state
+        // for missing patches check (WA Web's `n` parameter is the local version BEFORE sync)
+        var wasBootstrapped = store.findWebAppState(collectionName).bootstrapped(); // WAWebSyncdCollectionUtils.isBootstrap(n): n != null means bootstrapped
+        var localVersionBeforeSync = getCurrentVersion(collectionName); // WAWebSyncdCollectionHandler.Ie: n (localVersion parameter)
 
         // Phase A: Process snapshot if present
         var recoveredFromSnapshot = false;
@@ -604,6 +784,17 @@ public final class WebAppStateService {
             store.clearSyncActionEntries(collectionName);
 
             var snapshot = downloadAndDecodeSnapshot(syncResponse.snapshotReference().get());
+            // Per WA Web WAWebSyncdCollectionHandler: after decoding the snapshot, the
+            // SyncdSnapshot.version.version field is independently validated with
+            // `new SyncdFatalError("missing snapshot version")`. The XML collection
+            // version checked above is separate from this protobuf-level check.
+            var snapshotVersionEntry = snapshot.version().orElse(null); // WAWebSyncdCollectionHandler: SyncdSnapshot.version
+            var snapshotProtoVersion = snapshotVersionEntry == null
+                    ? 0L
+                    : snapshotVersionEntry.version().orElse(0L); // WAWebSyncdCollectionHandler: SyncdSnapshot.version.version
+            if (snapshotProtoVersion <= 0L) {
+                throw new WhatsAppWebAppStateSyncException.UnexpectedError("missing snapshot version", null); // WAWebSyncdCollectionHandler — SyncdFatalError
+            }
             var snapshotMutations = getMutationsFromSnapshot(snapshot);
             var untrusted = snapshotMutations.isEmpty()
                     ? List.<DecryptedMutation.Untrusted>of()
@@ -628,19 +819,20 @@ public final class WebAppStateService {
                         snapshotTrusted.add(new DecryptedMutation.Trusted(entry.index(), entry.value(), entry.operation(), entry.timestamp(), entry.actionVersion()));
                     }
                     applyMutations(collectionName, snapshotTrusted); // WAWebSyncdCollectionHandler.Xe: handlers run regardless of version guard
-                    receivedMutations = true;
                 }
             } catch (WhatsAppWebAppStateSyncException e) {
                 if (!e.isFatal() || !snapshotRecoveryService.shouldAttemptRecovery(collectionName, snapshotMutations.size())) {
                     throw e;
                 }
 
-                var recoveryResponse = snapshotRecoveryService.requestRecovery(collectionName);
-                if (recoveryResponse == null) {
+                var recoveredSnapshot = snapshotRecoveryService.requestRecovery(collectionName);
+                if (recoveredSnapshot == null) {
                     throw e;
                 }
 
-                var recoveredSnapshot = snapshotRecoveryService.decodeRecoverySnapshot(recoveryResponse);
+                // Per WAWebNonMessageDataRequestHandler.m, the decode is performed once
+                // by the protocol message handler before resolving the recovery promise;
+                // requestRecovery now returns the already-decoded snapshot to match.
                 var recoveredName = recoveredSnapshot.collectionName()
                         .orElseThrow(() -> new WhatsAppWebAppStateSyncException.UnexpectedError(
                                 "Recovery response missing collection name for " + collectionName,
@@ -658,7 +850,6 @@ public final class WebAppStateService {
                     applyMutations(collectionName, recoveredTrusted);
                 }
                 recoveredFromSnapshot = true;
-                receivedMutations = !recoveredTrusted.isEmpty();
             }
         }
 
@@ -667,8 +858,13 @@ public final class WebAppStateService {
             return;
         }
 
-        if (syncResponse.snapshotReference().isEmpty() && !store.findWebAppState(collectionName).bootstrapped()) {
-            updateCollectionState(collectionName, 0L, MutationLTHash.EMPTY_HASH);
+        // WAWebSyncdCollectionHandler.applyAppStateSyncResponse Case 4: no snapshot, no patches, no upload
+        // Only initialize bootstrap (version 0, empty LT-Hash) when there is truly nothing to process.
+        // WA Web: `else { isBootstrap(n) && updateCollectionVersionAndLtHashInTransaction(i, Re, Le) }`
+        if (syncResponse.snapshotReference().isEmpty()
+                && syncResponse.patches().isEmpty()
+                && !wasBootstrapped) { // WAWebSyncdCollectionUtils.isBootstrap(n): n == null
+            updateCollectionState(collectionName, 0L, MutationLTHash.EMPTY_HASH); // WAWebSyncdCollectionHandler.Ie: updateCollectionVersionAndLtHashInTransaction(i, Re=0, Le=new ArrayBuffer(128))
         }
 
         var sortedPatches = new ArrayList<>(syncResponse.patches());
@@ -678,13 +874,15 @@ public final class WebAppStateService {
 
         validateNoDuplicatePatchVersions(collectionName, sortedPatches);
 
+        // WAWebSyncdCollectionHandler.applyAppStateSyncResponse: missing patches detection
+        // WA Web: `var $ = n != null && x > n + 1 && g.length > 0`
+        // `n != null` maps to `wasBootstrapped` (collection has been synced before)
         if (!sortedPatches.isEmpty()) {
-            var localVersion = getCurrentVersion(collectionName);
             long minPatchVersion = sortedPatches.getFirst().version()
                     .map(version -> version.version().orElse(0L))
                     .orElse(0L);
-            if (localVersion > 0 && minPatchVersion > localVersion + 1) {
-                throw new WhatsAppWebAppStateSyncException.MissingPatches(collectionName, localVersion, minPatchVersion);
+            if (wasBootstrapped && minPatchVersion > localVersionBeforeSync + 1) { // WAWebSyncdCollectionHandler.Ie: n != null && x > n + 1
+                throw new WhatsAppWebAppStateSyncException.MissingPatches(collectionName, localVersionBeforeSync, minPatchVersion);
             }
         }
 
@@ -727,13 +925,22 @@ public final class WebAppStateService {
             }
 
             var newHash = computeNewLTHash(collectionName, currentHash, untrusted);
-            var patchValueMacs = untrusted.stream()
-                    .map(DecryptedMutation.Untrusted::valueMac)
-                    .toList();
-            var snapshotMacValid = integrityVerifier.verifyPatchIntegrity(collectionName, patch, newHash.newHash(), patchValueMacs);
-            if (!snapshotMacValid) {
-                store.markWebAppStateMacMismatch(collectionName);
-                LOGGER.warning("Patch snapshot MAC mismatch for " + collectionName + " at version " + patchVersion + ", marking mac-mismatch");
+
+            // @implNote WAWebSyncdAntiTampering.validateSnapshotMac — hoisted guard:
+            // when the collection is already in mac-mismatch state, the snapshot MAC validation
+            // is skipped entirely (matches the `isCollectionInMacMismatchFatal` early-return in
+            // function G). Hoisting the check here avoids the per-patch valueMacs list allocation
+            // and the HMAC setup performed inside verifyPatchIntegrity. The internal guard inside
+            // MutationIntegrityVerifier.verifyPatchIntegrity is retained as defense in depth.
+            if (!store.findWebAppState(collectionName).macMismatch()) {
+                var patchValueMacs = untrusted.stream()
+                        .map(DecryptedMutation.Untrusted::valueMac)
+                        .toList();
+                var snapshotMacValid = integrityVerifier.verifyPatchIntegrity(collectionName, patch, newHash.newHash(), patchValueMacs);
+                if (!snapshotMacValid) {
+                    store.markWebAppStateMacMismatch(collectionName);
+                    LOGGER.warning("Patch snapshot MAC mismatch for " + collectionName + " at version " + patchVersion + ", marking mac-mismatch");
+                }
             }
 
             var patchVersionApplied = updateCollectionState(collectionName, patchVersion, newHash.newHash()); // WAWebSyncdCollectionHandler.ot
@@ -748,18 +955,16 @@ public final class WebAppStateService {
             }
             if (!patchTrusted.isEmpty()) {
                 applyMutations(collectionName, patchTrusted); // WAWebSyncdCollectionHandler.Xe: handlers run regardless of version guard
-                receivedMutations = true;
             }
         }
 
-        if (!receivedMutations) {
-            store.markWebAppStateUpToDate(collectionName);
-            return;
-        }
-
-        if (syncResponse.hasMore()) {
+        // WAWebSyncdCollectionHandler.applyAppStateSyncResponse: state transition
+        // WA Web returns the response to the caller which checks hasMorePatches for routing.
+        // The hasMore flag must always be checked, even when no mutations were received,
+        // because the server may send an empty batch with hasMore=true indicating more data.
+        if (syncResponse.hasMore()) { // WAWebSyncdServerSync.R: hasMorePatches -> Pending
             store.markWebAppStatePending(collectionName);
-        } else {
+        } else { // WAWebSyncdServerSync.R: Success -> UP_TO_DATE
             store.markWebAppStateUpToDate(collectionName);
         }
     }
@@ -773,6 +978,7 @@ public final class WebAppStateService {
      * mutations to sync actions, removes REMOVE mutation entries, and atomically
      * updates the collection state.
      *
+     * @implNote WAWebSyncdCollectionHandler.$e (_uploadSuccessful — post-upload persistence)
      * @param uploadInfo the upload metadata captured during request building
      */
     private void processUploadSuccess(SyncRequest.UploadedPatchInfo uploadInfo) {
@@ -836,6 +1042,7 @@ public final class WebAppStateService {
      *   <li>REMOVE mutations are ordered before SET mutations</li>
      * </ul>
      *
+     * @implNote WAWebSyncdCollectionHandler.applyAppStateSyncResponse (mutation ordering logic)
      * @param mutations the decrypted mutations from a single patch
      * @return the deduplicated and ordered mutations
      */
@@ -924,10 +1131,26 @@ public final class WebAppStateService {
         }
     }
 
+    /**
+     * Returns the current version for the specified collection.
+     *
+     * @implNote WAWebGetCollectionVersion.getCollectionVersionInTransaction
+     * @param patchType the collection to query
+     * @return the current version number
+     */
     private long getCurrentVersion(SyncPatchType patchType) {
         return store.findWebAppState(patchType).version();
     }
 
+    /**
+     * Returns the current LT-Hash for the specified collection.
+     *
+     * <p>Falls back to {@link MutationLTHash#EMPTY_HASH} if no hash state exists.
+     *
+     * @implNote WAWebSyncdAntiTampering (hash state lookup for LT-Hash computation)
+     * @param patchType the collection to query
+     * @return the current LT-Hash bytes
+     */
     private byte[] getCurrentLTHash(SyncPatchType patchType) {
         var currentHashState = whatsapp.store().findWebAppHashStateByName(patchType)
                 .orElseGet(() -> new SyncHashValue(patchType));
@@ -967,10 +1190,28 @@ public final class WebAppStateService {
             if (throwable instanceof WhatsAppWebAppStateSyncException exception) {
                 throw exception;
             }
-            throw new WhatsAppWebAppStateSyncException.ExternalDownloadFailed(throwable); // ADAPTED: WAWebSyncdNetCallbacksApi.downloadSyncBlob — MediaNotFoundError → SyncdFatalError("external patch expired")
+            // Per WA Web WAWebSyncdNetCallbacksApi.downloadSyncBlob: MediaNotFoundError
+            // (HTTP 404 / CDN blob expired) is re-thrown as
+            // `new SyncdFatalError("external patch expired")` — a fatal error that
+            // stops the collection rather than scheduling a retry. Non-404 failures
+            // remain retryable ExternalDownloadFailed.
+            if (isExternalBlobNotFound(throwable)) {
+                throw new WhatsAppWebAppStateSyncException.UnexpectedError("external patch expired", throwable); // WAWebSyncdNetCallbacksApi.downloadSyncBlob — MediaNotFoundError → SyncdFatalError
+            }
+            throw new WhatsAppWebAppStateSyncException.ExternalDownloadFailed(throwable); // WAWebSyncdNetCallbacksApi.downloadSyncBlob — non-404 download failures are retryable
         }
     }
 
+    /**
+     * Extracts mutations from a decoded snapshot, wrapping each record as a SET mutation.
+     *
+     * <p>Per WhatsApp Web snapshot processing: all snapshot records are treated as
+     * SET operations since the snapshot represents the full state at a given version.
+     *
+     * @implNote WAWebSyncdCollectionHandler.applyAppStateSyncResponse (snapshot record iteration)
+     * @param snapshot the decoded snapshot
+     * @return the mutations derived from the snapshot records
+     */
     private SequencedCollection<SyncdMutation> getMutationsFromSnapshot(SyncdSnapshot snapshot) {
         var result = new ArrayList<SyncdMutation>();
         for (var record : snapshot.records()) {
@@ -1136,8 +1377,51 @@ public final class WebAppStateService {
                     .awaitMediaConnection()
                     .download(externalRef); // WAWebSyncdNetCallbacksApi.downloadSyncBlob(blobRef, "patch", collectionName)
         } catch (Throwable throwable) {
-            throw new WhatsAppWebAppStateSyncException.ExternalDownloadFailed(throwable); // ADAPTED: WAWebSyncdNetCallbacksApi.downloadSyncBlob — MediaNotFoundError → SyncdFatalError("external patch expired")
+            // Per WA Web WAWebSyncdNetCallbacksApi.downloadSyncBlob: when the CDN returns
+            // MediaNotFoundError (HTTP 404 / expired blob) for an external patch, WA Web
+            // throws `new SyncdFatalError("external patch expired")` — fatal, not retryable.
+            if (isExternalBlobNotFound(throwable)) {
+                throw new WhatsAppWebAppStateSyncException.UnexpectedError("external patch expired", throwable); // WAWebSyncdNetCallbacksApi.downloadSyncBlob — MediaNotFoundError → SyncdFatalError
+            }
+            throw new WhatsAppWebAppStateSyncException.ExternalDownloadFailed(throwable); // WAWebSyncdNetCallbacksApi.downloadSyncBlob — non-404 download failures are retryable
         }
+    }
+
+    /**
+     * Returns whether the given throwable indicates the external blob could not be found
+     * (typically HTTP 404 / CDN-expired), equivalent to WA Web's {@code MediaNotFoundError}.
+     *
+     * <p>WA Web's {@code downloadSyncBlob} wraps such failures as
+     * {@code new SyncdFatalError("external patch expired")}. In Cobalt, the media download
+     * path surfaces not-found failures as {@link WhatsAppMediaException.Download} with a
+     * message containing the HTTP status code (e.g. {@code "status code 404"}).
+     *
+     * @implNote WAWebSyncdNetCallbacksApi.downloadSyncBlob (MediaNotFoundError detection)
+     * @param throwable the exception thrown by the media download path
+     * @return {@code true} if the throwable indicates a 404 / not-found blob, {@code false} otherwise
+     */
+    private boolean isExternalBlobNotFound(Throwable throwable) {
+        // Walk the cause chain so a wrapped IOException still gets classified correctly.
+        for (var current = throwable; current != null; current = current.getCause()) {
+            if (current instanceof WhatsAppMediaException.Download) {
+                var message = current.getMessage();
+                if (message != null && (message.contains("status code 404") || message.contains("404") && message.toLowerCase().contains("not found"))) {
+                    return true;
+                }
+            }
+            var message = current.getMessage();
+            if (message != null) {
+                var lower = message.toLowerCase();
+                if (lower.contains("404") || lower.contains("not found") || lower.contains("notfound")) {
+                    return true;
+                }
+            }
+            // Avoid infinite loops in case of self-referencing causes.
+            if (current.getCause() == current) {
+                break;
+            }
+        }
+        return false;
     }
 
     /**
@@ -1148,27 +1432,31 @@ public final class WebAppStateService {
      * @throws WhatsAppWebAppStateSyncException.UnexpectedError if any required field is missing
      */
     private void validateExternalBlobReference(ExternalBlobReference ref) {
-        if (ref.mediaDirectPath().isEmpty() || ref.mediaDirectPath().get().isEmpty()) { // WAWebSyncdValidateServerSyncProtobuf.validateExternalBlobReference — e == null → SyncdFatalError("missing external blob reference direct path")
-            throw new WhatsAppWebAppStateSyncException.UnexpectedError(
-                    "External blob reference missing directPath",
-                    null
-            );
-        }
+        // Per WA Web WAWebSyncdValidateServerSyncProtobuf.validateExternalBlobReference,
+        // the validation order is: mediaKey → directPath → fileSha256 → fileEncSha256.
+        // Matching the order keeps the error surfaced by the first missing field
+        // consistent with WA Web, which is important for parity with its error metrics.
         if (ref.mediaKey().isEmpty() || ref.mediaKey().get().length == 0) { // WAWebSyncdValidateServerSyncProtobuf.validateExternalBlobReference — !s → SyncdFatalError("missing external blob reference media key")
             throw new WhatsAppWebAppStateSyncException.UnexpectedError(
                     "External blob reference missing mediaKey",
                     null
             );
         }
-        if (ref.fileEncSha256().isEmpty()) { // WAWebSyncdValidateServerSyncProtobuf.validateExternalBlobReference — !r → SyncdFatalError("missing external blob reference file enc SHA256")
+        if (ref.mediaDirectPath().isEmpty() || ref.mediaDirectPath().get().isEmpty()) { // WAWebSyncdValidateServerSyncProtobuf.validateExternalBlobReference — e == null → SyncdFatalError("missing external blob reference direct path")
             throw new WhatsAppWebAppStateSyncException.UnexpectedError(
-                    "External blob reference missing fileEncSha256",
+                    "External blob reference missing directPath",
                     null
             );
         }
         if (ref.fileSha256().isEmpty()) { // WAWebSyncdValidateServerSyncProtobuf.validateExternalBlobReference — !a → SyncdFatalError("missing external blob reference file SHA256")
             throw new WhatsAppWebAppStateSyncException.UnexpectedError(
                     "External blob reference missing fileSha256",
+                    null
+            );
+        }
+        if (ref.fileEncSha256().isEmpty()) { // WAWebSyncdValidateServerSyncProtobuf.validateExternalBlobReference — !r → SyncdFatalError("missing external blob reference file enc SHA256")
+            throw new WhatsAppWebAppStateSyncException.UnexpectedError(
+                    "External blob reference missing fileEncSha256",
                     null
             );
         }
@@ -1190,13 +1478,34 @@ public final class WebAppStateService {
         }
     }
 
+    /**
+     * Decrypts a sequence of raw mutations, performing missing key detection before decryption.
+     *
+     * <p>Per WhatsApp Web {@code WAWebSyncdDecryptMutationsWrapper}: first scans all mutations
+     * for missing keys, sending key share requests for any that are absent. If a missing key
+     * is found, throws {@link WhatsAppWebAppStateSyncException.MissingKey} to transition the
+     * collection to {@code BLOCKED} state. For REMOVE mutations, the handling depends on the
+     * {@code web_request_missing_keys_for_removes} AB prop.
+     *
+     * @implNote WAWebSyncdDecryptMutationsWrapper (missing key scan + decrypt loop),
+     *     WAWebSyncdDecryptMutation.decryptMutation (per-mutation decryption)
+     * @param mutations the raw mutations to decrypt
+     * @return the decrypted untrusted mutations
+     * @throws WhatsAppWebAppStateSyncException.MissingKey if a required sync key is not available
+     * @throws WhatsAppWebAppStateSyncException.DecryptionFailed if decryption fails
+     */
     private SequencedCollection<DecryptedMutation.Untrusted> decryptMutations(SequencedCollection<SyncdMutation> mutations) {
         // Per WA Web WAWebSyncdDecryptMutationsWrapper: proactively scan all key IDs
         // before decrypting to detect missing keys. For REMOVE mutations, the behavior
         // depends on the web_request_missing_keys_for_removes AB prop:
         // - If true: treat REMOVE missing keys the same as SET (MissingKey -> Blocked)
-        // - If false: REMOVE missing keys are fatal errors
+        // - If false: REMOVE missing keys are fatal (SyncdFatalError)
         var requestMissingKeysForRemoves = abPropsService.getBool(ABProp.WEB_REQUEST_MISSING_KEYS_FOR_REMOVES); // WAWebSyncdDecryptMutationsWrapper.y
+        // Per WA Web handleMissingKeysInSnapshot/handleMissingKeysInPatches: collect ALL
+        // missing key IDs into a Set first, then invoke handleMissingKeys ONCE with the
+        // full batch. The Set deduplicates keys that appear in multiple mutations and
+        // avoids one key-share request per mutation.
+        var missingKeyIds = new LinkedHashMap<String, byte[]>(); // WAWebSyncdHandleMissingKeys.handleMissingKeysInSnapshot/handleMissingKeysInPatches
         byte[] firstMissingKeyId = null;
         for (var mutation : mutations) {
             var keyId = mutation.record()
@@ -1206,14 +1515,25 @@ public final class WebAppStateService {
             if (keyId != null && whatsapp.store().findWebAppStateKeyById(keyId).isEmpty()) {
                 var operation = mutation.operation().orElse(null); // WAWebSyncdDecryptMutationsWrapper.y
                 if (operation == SyncdOperation.REMOVE && !requestMissingKeysForRemoves) { // WAWebSyncdDecryptMutationsWrapper.y
+                    // AB prop web_request_missing_keys_for_removes == false:
+                    // WA Web throws `new SyncdFatalError("no key data for remove mutations")`.
+                    // Cobalt uses UnexpectedError (fatal, isFatal() == true) with the matching
+                    // message to preserve the fatal routing behavior.
                     throw new WhatsAppWebAppStateSyncException.UnexpectedError( // WAWebSyncdDecryptMutationsWrapper.y
-                            "No key data for remove mutation", null);
+                            "no key data for remove mutations", null);
                 }
                 if (firstMissingKeyId == null) {
                     firstMissingKeyId = keyId;
                 }
-                missingSyncKeyRequestService.requestMissingKey(keyId);
+                // Deduplicate using a key derived from the raw bytes so we only queue one
+                // request per distinct key ID across the whole mutation batch.
+                missingKeyIds.putIfAbsent(HexFormat.of().formatHex(keyId), keyId);
             }
+        }
+        if (!missingKeyIds.isEmpty()) {
+            // WAWebSyncdHandleMissingKeys.handleMissingKeysInSnapshot/handleMissingKeysInPatches:
+            // single batched call with the full set of missing key IDs.
+            missingSyncKeyRequestService.requestMissingKeys(missingKeyIds.values());
         }
         if (firstMissingKeyId != null) {
             throw new WhatsAppWebAppStateSyncException.MissingKey(firstMissingKeyId);
@@ -1261,6 +1581,13 @@ public final class WebAppStateService {
                 );
                 decrypted.add(decryptedMutation);
             } catch (Exception e) {
+                // Per WA Web WAWebSyncdDecryptMutation.decryptMutation: the catch block logs
+                // and re-throws the original exception (ValueMacMismatch, IndexMacMismatch, etc.)
+                // so the outer handler can distinguish fatal from retryable sync errors.
+                // Only wrap non-sync exceptions so their original subtype (and isFatal()) is preserved.
+                if (e instanceof WhatsAppWebAppStateSyncException syncEx) {
+                    throw syncEx;
+                }
                 throw new WhatsAppWebAppStateSyncException.DecryptionFailed(e);
             }
         }
@@ -1268,6 +1595,20 @@ public final class WebAppStateService {
         return Collections.unmodifiableSequencedCollection(decrypted);
     }
 
+    /**
+     * Applies a batch of trusted mutations to the store via the handler registry.
+     *
+     * <p>Per WhatsApp Web {@code WAWebSyncdCollectionHandler._applySetMutations} (Xe):
+     * resolves conflicts with pending local mutations, groups by action name, applies
+     * each group through its handler, records mutation state (success/failed/orphan/unsupported),
+     * and retries orphan mutations that may now succeed.
+     *
+     * @implNote WAWebSyncdCollectionHandler._applySetMutations (Xe),
+     *     WAWebSyncdCollectionHandler.nt (action name categorization),
+     *     WAWebSyncdResolveConflict.resolveConflict (conflict resolution step)
+     * @param collectionName  the collection these mutations belong to
+     * @param remoteMutations the trusted mutations to apply
+     */
     private void applyMutations(SyncPatchType collectionName, SequencedCollection<DecryptedMutation.Trusted> remoteMutations) {
         // Step 1: Resolve conflicts with pending local mutations
         var mutationsToApply = resolveConflicts(remoteMutations, collectionName);
@@ -1422,8 +1763,10 @@ public final class WebAppStateService {
      * the model type (action name) and model ID (primary entity JID) from the
      * mutation index for targeted orphan lookups.
      *
-     * @param mutation  the trusted mutation to persist as an orphan
-     * @param modelType the action name extracted from the mutation grouping
+     * @implNote WAWebSyncdCollectionHandler._applySetMutations (Xe — orphan entry construction)
+     * @param mutation        the trusted mutation to persist as an orphan
+     * @param modelType       the action name extracted from the mutation grouping
+     * @param modelIdOverride explicit model ID override, or {@code null} to extract from index
      * @return the constructed orphan entry
      */
     private static OrphanMutationEntry buildOrphanEntry(
@@ -1451,6 +1794,14 @@ public final class WebAppStateService {
                 .build();
     }
 
+    /**
+     * Builds an {@link OrphanMutationEntry} without a model ID override.
+     *
+     * @implNote WAWebSyncdCollectionHandler._applySetMutations (Xe — orphan entry construction)
+     * @param mutation  the trusted mutation to persist as an orphan
+     * @param modelType the action name extracted from the mutation grouping
+     * @return the constructed orphan entry
+     */
     private static OrphanMutationEntry buildOrphanEntry(DecryptedMutation.Trusted mutation, String modelType) {
         return buildOrphanEntry(mutation, modelType, null);
     }
@@ -1523,6 +1874,16 @@ public final class WebAppStateService {
         }
     }
 
+    /**
+     * Extracts the model ID from a mutation index string.
+     *
+     * <p>The mutation index is a JSON array where element 0 is the action name
+     * and element 1 (if present) is the primary entity identifier (e.g. JID).
+     *
+     * @implNote WAWebSyncdActionUtils.parseIndex (index[1] extraction)
+     * @param mutationIndex the raw index string
+     * @return the model ID, or {@code null} if the index is invalid or too short
+     */
     private String extractModelId(String mutationIndex) {
         try {
             var indexArray = JSON.parseArray(mutationIndex);
@@ -1534,6 +1895,20 @@ public final class WebAppStateService {
         return null;
     }
 
+    /**
+     * Records the application result of a mutation in the sync action entry store.
+     *
+     * <p>Per WhatsApp Web {@code WAWebSyncdCollectionHandler._applySetMutations} (Xe):
+     * after each mutation is applied (or fails), its action state, model type, and model
+     * ID are updated on the corresponding sync action entry. Only SET mutations are
+     * recorded; REMOVE mutations have no entry to update.
+     *
+     * @implNote WAWebSyncdCollectionHandler._applySetMutations (Xe — action state recording)
+     * @param collectionName the collection the mutation belongs to
+     * @param mutation       the trusted mutation that was applied
+     * @param actionName     the resolved action name, or {@code null} if unknown
+     * @param result         the application result from the handler
+     */
     private void recordMutationState(
             SyncPatchType collectionName,
             DecryptedMutation.Trusted mutation,
@@ -1720,6 +2095,20 @@ public final class WebAppStateService {
         return Collections.unmodifiableSequencedCollection(filteredResults);
     }
 
+    /**
+     * Computes a new LT-Hash from a base hash and a sequence of mutations.
+     *
+     * <p>Per WhatsApp Web {@code WAWebSyncdAntiTampering.computeLtHash} (Y/J): for SET
+     * mutations, removes the previous value MAC (if any) and adds the new one. For REMOVE
+     * mutations, removes the existing value MAC. Returns both the new hash and the sync
+     * action entry updates to be applied if the version guard passes.
+     *
+     * @implNote WAWebSyncdAntiTampering.computeLtHash (Y/J)
+     * @param patchType the collection being processed
+     * @param baseHash  the starting LT-Hash
+     * @param mutations the mutations to apply to the hash
+     * @return the computed hash and the sync action entry updates
+     */
     private LtHashComputation computeNewLTHash(SyncPatchType patchType, byte[] baseHash, SequencedCollection<DecryptedMutation.Untrusted> mutations) {
         var currentHash = baseHash != null ? baseHash : MutationLTHash.EMPTY_HASH;
         var toAdd = new ArrayList<byte[]>();
@@ -1769,6 +2158,16 @@ public final class WebAppStateService {
         );
     }
 
+    /**
+     * Persists sync action entry updates computed during LT-Hash computation.
+     *
+     * <p>Applies SET and REMOVE updates to the sync action entry store, called only
+     * when the version guard passes ({@link #updateCollectionState} returns {@code true}).
+     *
+     * @implNote WAWebSyncdAntiTampering.computeLtHash (entry store persistence after version guard)
+     * @param patchType the collection whose entries to update
+     * @param updates   the entry updates to apply
+     */
     private void applySyncActionEntryUpdates(SyncPatchType patchType, List<SyncActionEntryUpdate> updates) {
         for (var update : updates) {
             if (update.remove()) {
@@ -1826,8 +2225,10 @@ public final class WebAppStateService {
             store.markWebAppStateBlocked(collectionName); // WAWebSyncdServerSync.S: Blocked state
             var keyId = missingKeyEx.keyId(); // WAWebSyncdServerSync.S
 
+            // WAWebSyncdHandleMissingKeys._handleMissingKeys -> WAWebSyncdStoreMissingKeys.addMissingKeys
+            // schedules the timeout check inline at the end of trackMissingKeys, so no separate
+            // scheduleTimeoutCheck() call is needed here (matches WA Web's call flow).
             missingSyncKeyRequestService.requestMissingKey(keyId); // WAWebSyncdHandleMissingKeys._handleMissingKeys
-            missingSyncKeyTimeoutScheduler.scheduleTimeoutCheck(); // WAWebSyncdStoreMissingKeys._scheduleTimeoutForMissingKey
             missingSyncKeyTimeoutScheduler.startPeriodicReRequestJob(); // WAWebSyncdStoreMissingKeys._startPeriodicReRequestJob
         } else if (error instanceof WhatsAppWebAppStateSyncException syncEx && syncEx.isFatal()) {
             store.markWebAppStateErrorFatal(collectionName); // WAWebSyncdServerSync.S: catch (SyncdFatalError) -> ErrorFatal
@@ -1906,10 +2307,14 @@ public final class WebAppStateService {
                 .protocolMessage(protocolMessage)
                 .build();
 
-        var primaryDeviceJid = myJid.withDevice(0); // WAWebSyncdFatalExceptionNotificationApi: createDeviceWidFromUserAndDevice(..., 0)
+        // WAWebSyncdFatalExceptionNotificationApi: createDeviceWidFromUserAndDevice(..., 0)
+        // builds a device JID with agent == 0 and device == 0; it does NOT preserve the
+        // calling JID's agent. Use the 4-arg Jid.of form to construct `user:0@server`
+        // explicitly so the agent is not carried over from `myJid`.
+        var primaryDeviceJid = Jid.of(myJid.user(), myJid.server(), 0, 0); // WAWebSyncdFatalExceptionNotificationApi: createDeviceWidFromUserAndDevice(..., 0)
         var messageKey = new MessageKeyBuilder() // WAWebSyncdFatalExceptionNotificationApi: new WAWebMsgKey({fromMe: true, remote: getMePnUserOrThrow(), id: ...})
                 .id(MessageIdGenerator.generate(MessageIdVersion.V2, myJid)) // WAWebSyncdFatalExceptionNotificationApi: yield WAWebMsgKey.newId()
-                .parentJid(myJid) // ADAPTED: WAWebSyncdFatalExceptionNotificationApi: remote: getMePnUserOrThrow()
+                .parentJid(myJid.toUserJid()) // WAWebSyncdFatalExceptionNotificationApi: remote: getMePnUserOrThrow() — strip device/agent
                 .fromMe(true) // WAWebSyncdFatalExceptionNotificationApi: fromMe: true
                 .senderJid(myJid) // ADAPTED: Cobalt peer message pattern
                 .build();
@@ -1930,6 +2335,8 @@ public final class WebAppStateService {
      * without providing the requested key, this method should be called to
      * schedule a grace period check. If all devices have responded negatively,
      * the missing key is marked as fatal after the grace period.
+     *
+     * @implNote WAWebSyncdStoreMissingKeys._checkAllDevicesHaveRespondedOrStartGracePeriod
      */
     public void scheduleAllDevicesRespondedCheck() {
         missingSyncKeyTimeoutScheduler.scheduleAllDevicesRespondedCheck();
@@ -1955,6 +2362,8 @@ public final class WebAppStateService {
      * <p>Per WhatsApp Web {@code WAWebSocketModel.sendLogout}: before
      * disconnecting, pending sentinel mutations are flushed to the server
      * so that key expiration is propagated to other devices.
+     *
+     * @implNote WAWebSocketModel.sendLogout (pre-disconnect flush)
      */
     public void flushDirtyCollections() {
         for (var patchType : SyncPatchType.values()) {
@@ -1970,11 +2379,14 @@ public final class WebAppStateService {
     }
 
     /**
-     * Starts the periodic sync job that syncs all collections every 6 hours.
+     * Starts the periodic sync job that syncs all collections periodically.
      *
      * <p>Per WhatsApp Web {@code syncdSyncAllCollectionsJob}: a background job
      * runs periodically to catch missed notifications by syncing all collections.
      * This ensures eventual consistency even if push notifications are lost.
+     *
+     * @implNote WAWebTasksDefinitions.syncdSyncAllCollectionsJob (periodic sync),
+     *     WAWebSyncdKeyRotation (periodic key rotation)
      */
     public void startPeriodicSyncJob() {
         stopPeriodicSyncJob();
@@ -1985,6 +2397,15 @@ public final class WebAppStateService {
         syncKeyRotationService.startPeriodicRotationJob();
     }
 
+    /**
+     * Schedules the next periodic sync after the configured delay.
+     *
+     * <p>Per WhatsApp Web {@code syncdSyncAllCollectionsJob}: the delay is determined
+     * by the {@code syncd_periodic_sync_days} AB prop. Reschedules itself after
+     * each execution to create a recurring job.
+     *
+     * @implNote WAWebTasksDefinitions.syncdSyncAllCollectionsJob (periodic sync scheduling)
+     */
     private void scheduleNextPeriodicSync() {
         var days = abPropsService.getInt(ABProp.SYNCD_PERIODIC_SYNC_DAYS);
         if (days <= 0) {
@@ -2007,6 +2428,8 @@ public final class WebAppStateService {
 
     /**
      * Stops the periodic sync job.
+     *
+     * @implNote WAWebTasksDefinitions.syncdSyncAllCollectionsJob (cancellation)
      */
     public void stopPeriodicSyncJob() {
         var job = periodicSyncJob;
@@ -2016,6 +2439,14 @@ public final class WebAppStateService {
         }
     }
 
+    /**
+     * Resets all background jobs and schedulers.
+     *
+     * <p>Stops the periodic sync job, key rotation job, backoff scheduler, and
+     * missing key timeout scheduler. Called during disconnect or logout.
+     *
+     * @implNote WAWebSyncd (module-level cleanup on disconnect/logout)
+     */
     public void reset() {
         stopPeriodicSyncJob();
         syncKeyRotationService.stopPeriodicRotationJob();
