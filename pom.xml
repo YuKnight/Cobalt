@@ -2,11 +2,17 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.github.auties00</groupId>
-    <artifactId>cobalt</artifactId>
+    <artifactId>cobalt-parent</artifactId>
     <version>0.1.0</version>
+    <packaging>pom</packaging>
     <name>${project.groupId}:${project.artifactId}</name>
     <description>Standalone fully-featured WhatsApp Web API for Java and Kotlin</description>
     <url>https://github.com/Auties00/Cobalt</url>
+
+    <modules>
+        <module>modules/wam</module>
+        <module>modules/lib</module>
+    </modules>
 
     <developers>
         <developer>
@@ -47,6 +53,37 @@
             <url>https://jitpack.io</url>
         </repository>
     </repositories>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <java.version>25</java.version>
+        <maven.surefire.plugin.version>3.0.0-M9</maven.surefire.plugin.version>
+        <maven.gpg.plugin.version>3.0.1</maven.gpg.plugin.version>
+        <maven.compiler.plugin.version>3.15.0</maven.compiler.plugin.version>
+        <maven.source.plugin.version>3.2.1</maven.source.plugin.version>
+        <maven.javadoc.plugin.version>3.5.0</maven.javadoc.plugin.version>
+        <maven.staging.plugin.version>0.8.0</maven.staging.plugin.version>
+        <zxing.version>3.5.1</zxing.version>
+        <json.version>2.0.57</json.version>
+        <protoc.version>3.4.5</protoc.version>
+        <junit.version>5.10.0-M1</junit.version>
+        <libsignal.version>0.0.5</libsignal.version>
+        <curve25519.version>3.0.1</curve25519.version>
+        <lazysodium.version>5.1.4</lazysodium.version>
+        <linkpreview.version>2.3</linkpreview.version>
+        <vcard.version>0.12.1</vcard.version>
+        <qr.terminal.version>2.2</qr.terminal.version>
+        <libphonenumber.version>9.0.4</libphonenumber.version>
+        <maven.versions.version>2.15.0</maven.versions.version>
+        <plist.version>1.27</plist.version>
+        <sl4j.version>2.0.13</sl4j.version>
+        <apk.parser.version>2.6.10</apk.parser.version>
+        <collections.version>1.0.0</collections.version>
+        <lmdbjava.version>0.9.0</lmdbjava.version>
+        <javapoet.version>0.6.0</javapoet.version>
+        <jmh.version>1.37</jmh.version>
+        <selenium.version>4.27.0</selenium.version>
+    </properties>
 
     <profiles>
         <profile>
@@ -135,260 +172,5 @@
                 </plugins>
             </build>
         </profile>
-        <profile>
-            <id>uber-jar</id>
-            <build>
-                <plugins>
-                    <plugin>
-                        <artifactId>maven-assembly-plugin</artifactId>
-                        <configuration>
-                            <descriptorRefs>
-                                <descriptorRef>jar-with-dependencies</descriptorRef>
-                            </descriptorRefs>
-                        </configuration>
-                        <executions>
-                            <execution>
-                                <id>make-assembly</id>
-                                <phase>package</phase>
-                                <goals>
-                                    <goal>single</goal>
-                                </goals>
-                            </execution>
-                        </executions>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
     </profiles>
-
-    <packaging>jar</packaging>
-
-    <properties>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <java.version>25</java.version>
-        <maven.surefire.plugin.version>3.0.0-M9</maven.surefire.plugin.version>
-        <maven.gpg.plugin.version>3.0.1</maven.gpg.plugin.version>
-        <maven.compiler.plugin.version>3.15.0</maven.compiler.plugin.version>
-        <maven.source.plugin.version>3.2.1</maven.source.plugin.version>
-        <maven.javadoc.plugin.version>3.5.0</maven.javadoc.plugin.version>
-        <maven.staging.plugin.version>0.8.0</maven.staging.plugin.version>
-        <zxing.version>3.5.1</zxing.version>
-        <json.version>2.0.57</json.version>
-        <protoc.version>3.4.5</protoc.version>
-        <junit.version>5.10.0-M1</junit.version>
-        <libsignal.version>0.0.5</libsignal.version>
-        <curve25519.version>3.0.1</curve25519.version>
-        <lazysodium.version>5.1.4</lazysodium.version>
-        <linkpreview.version>2.3</linkpreview.version>
-        <vcard.version>0.12.1</vcard.version>
-        <qr.terminal.version>2.2</qr.terminal.version>
-        <libphonenumber.version>9.0.4</libphonenumber.version>
-        <maven.versions.version>2.15.0</maven.versions.version>
-        <plist.version>1.27</plist.version>
-        <sl4j.version>2.0.13</sl4j.version>
-        <apk.parser.version>2.6.10</apk.parser.version>
-        <collections.version>1.0.0</collections.version>
-        <lmdbjava.version>0.9.0</lmdbjava.version>
-        <javapoet.version>0.6.0</javapoet.version>
-        <jmh.version>1.37</jmh.version>
-        <cobalt.build.dir>${project.basedir}/target</cobalt.build.dir>
-    </properties>
-
-    <build>
-        <directory>${cobalt.build.dir}</directory>
-        <plugins>
-            <!-- Compile the project with protobuf annotation processing -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <version>${maven.compiler.plugin.version}</version>
-                <executions>
-                    <execution>
-                        <id>wam-processor-compile</id>
-                        <phase>generate-sources</phase>
-                        <goals>
-                            <goal>compile</goal>
-                        </goals>
-                        <configuration>
-                            <source>${java.version}</source>
-                            <target>${java.version}</target>
-                            <release>${java.version}</release>
-                            <includes>
-                                <include>**/wam/annotation/**</include>
-                                <include>**/wam/processor/**</include>
-                                <include>module-info.java</include>
-                            </includes>
-                            <proc>none</proc>
-                            <compilerArgs>
-                                <compilerArg>--enable-preview</compilerArg>
-                            </compilerArgs>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>default-compile</id>
-                        <configuration>
-                            <source>${java.version}</source>
-                            <target>${java.version}</target>
-                            <release>${java.version}</release>
-                            <annotationProcessorPaths>
-                                <annotationProcessorPath>
-                                    <groupId>com.github.auties00</groupId>
-                                    <artifactId>protobuf-serialization-plugin</artifactId>
-                                    <version>${protoc.version}</version>
-                                </annotationProcessorPath>
-                                <annotationProcessorPath>
-                                    <groupId>${project.groupId}</groupId>
-                                    <artifactId>${project.artifactId}</artifactId>
-                                    <version>${project.version}</version>
-                                </annotationProcessorPath>
-                            </annotationProcessorPaths>
-                            <compilerArgs>
-                                <compilerArg>--enable-preview</compilerArg>
-                            </compilerArgs>
-                        </configuration>
-                    </execution>
-                </executions>
-                <configuration>
-                    <source>${java.version}</source>
-                    <target>${java.version}</target>
-                    <compilerArgs>--enable-preview</compilerArgs>
-                </configuration>
-            </plugin>
-
-            <!-- Test the library to be sure that everything works-->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <version>${maven.surefire.plugin.version}</version>
-                <dependencies>
-                    <dependency>
-                        <groupId>org.junit.jupiter</groupId>
-                        <artifactId>junit-jupiter-engine</artifactId>
-                        <version>${junit.version}</version>
-                    </dependency>
-                </dependencies>
-            </plugin>
-        </plugins>
-    </build>
-
-    <dependencies>
-        <dependency>
-            <groupId>com.github.auties00</groupId>
-            <artifactId>protobuf-serialization-plugin</artifactId>
-            <version>${protoc.version}</version>
-        </dependency>
-
-        <!-- Generate and print QR code (Web API) -->
-        <dependency>
-            <groupId>com.google.zxing</groupId>
-            <artifactId>javase</artifactId>
-            <version>${zxing.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.github.auties00</groupId>
-            <artifactId>qr-terminal</artifactId>
-            <version>${qr.terminal.version}</version>
-        </dependency>
-
-        <!-- Cryptography (used by Whatsapp) -->
-        <dependency>
-            <groupId>com.github.auties00</groupId>
-            <artifactId>libsignal</artifactId>
-            <version>${libsignal.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.github.auties00</groupId>
-            <artifactId>curve25519</artifactId>
-            <version>${curve25519.version}</version>
-        </dependency>
-
-        <!-- Protobuf serialization (used by Whatsapp) -->
-        <dependency>
-            <groupId>com.github.auties00</groupId>
-            <artifactId>protobuf-base</artifactId>
-            <version>${protoc.version}</version>
-        </dependency>
-
-        <!-- JSON serialization (used by Whatsapp) -->
-        <dependency>
-            <groupId>com.alibaba.fastjson2</groupId>
-            <artifactId>fastjson2</artifactId>
-            <version>${json.version}</version>
-        </dependency>
-
-        <!-- Parse phone numbers (Mobile API) -->
-        <dependency>
-            <groupId>com.googlecode.libphonenumber</groupId>
-            <artifactId>libphonenumber</artifactId>
-            <version>${libphonenumber.version}</version>
-        </dependency>
-
-        <!-- Parse Android APK (Mobile API) -->
-        <dependency>
-            <groupId>net.dongliu</groupId>
-            <artifactId>apk-parser</artifactId>
-            <version>${apk.parser.version}</version>
-        </dependency>
-
-        <!-- Generate messageContainer previews -->
-        <dependency>
-            <groupId>com.github.auties00</groupId>
-            <artifactId>link-preview</artifactId>
-            <version>${linkpreview.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.googlecode.ez-vcard</groupId>
-            <artifactId>ez-vcard</artifactId>
-            <version>${vcard.version}</version>
-        </dependency>
-
-        <!-- Store messages in memory -->
-        <dependency>
-            <groupId>com.github.auties00</groupId>
-            <artifactId>collections</artifactId>
-            <version>1.0.0</version>
-        </dependency>
-
-        <!-- LMDB key-value store for lazy message loading -->
-        <dependency>
-            <groupId>org.lmdbjava</groupId>
-            <artifactId>lmdbjava</artifactId>
-            <version>${lmdbjava.version}</version>
-        </dependency>
-
-        <!-- Code generation for WAM annotation processor -->
-        <dependency>
-            <groupId>com.palantir.javapoet</groupId>
-            <artifactId>javapoet</artifactId>
-            <version>${javapoet.version}</version>
-        </dependency>
-
-        <!-- Testing framework -->
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter</artifactId>
-            <version>${junit.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-engine</artifactId>
-            <version>${junit.version}</version>
-            <scope>test</scope>
-        </dependency>
-
-        <!-- Micro-benchmarks -->
-        <dependency>
-            <groupId>org.openjdk.jmh</groupId>
-            <artifactId>jmh-core</artifactId>
-            <version>${jmh.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.openjdk.jmh</groupId>
-            <artifactId>jmh-generator-annprocess</artifactId>
-            <version>${jmh.version}</version>
-            <scope>test</scope>
-        </dependency>
-    </dependencies>
 </project>

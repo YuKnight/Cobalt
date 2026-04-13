@@ -50,7 +50,7 @@ Discovery builds the module list. Do this yourself, do NOT delegate to agents.
    - String constants, `ACTION_NAME`, `QUERY_ID`, enum names, stanza tags.
    - Superclass/interface/import relationships.
 4. Follow transitive references: if a file imports or registers another class, that class is a candidate too.
-5. Search `src/main/java/com/github/auties00/cobalt/node/binary/NodeTokens.java` for protocol identifiers related to the feature.
+5. Search `modules/lib/src/main/java/com/github/auties00/cobalt/node/binary/NodeTokens.java` for protocol identifiers related to the feature.
 
 ### Step 1.2: WA Web Module Search
 
@@ -120,7 +120,7 @@ Write `validation/<feature>/manifest.json`:
   "modules": [
     {
       "waModule": "WAWebModuleName",
-      "cobaltFiles": ["src/main/java/.../File.java"],
+      "cobaltFiles": [".../src/main/java/.../File.java"],
       "exports": [
         {
           "exportName": "functionA",

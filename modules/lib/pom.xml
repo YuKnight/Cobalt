@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.github.auties00</groupId>
+        <artifactId>cobalt-parent</artifactId>
+        <version>0.1.0</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>cobalt</artifactId>
+    <packaging>jar</packaging>
+    <name>${project.groupId}:${project.artifactId}</name>
+    <description>Standalone fully-featured WhatsApp Web API for Java and Kotlin</description>
+
+    <profiles>
+        <profile>
+            <id>uber-jar</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <artifactId>maven-assembly-plugin</artifactId>
+                        <configuration>
+                            <descriptorRefs>
+                                <descriptorRef>jar-with-dependencies</descriptorRef>
+                            </descriptorRefs>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>make-assembly</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>single</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>${maven.compiler.plugin.version}</version>
+                <configuration>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
+                    <release>${java.version}</release>
+                    <annotationProcessorPaths>
+                        <annotationProcessorPath>
+                            <groupId>com.github.auties00</groupId>
+                            <artifactId>protobuf-serialization-plugin</artifactId>
+                            <version>${protoc.version}</version>
+                        </annotationProcessorPath>
+                        <annotationProcessorPath>
+                            <groupId>com.github.auties00</groupId>
+                            <artifactId>cobalt-wam</artifactId>
+                            <version>${project.version}</version>
+                        </annotationProcessorPath>
+                    </annotationProcessorPaths>
+                    <compilerArgs>
+                        <compilerArg>--enable-preview</compilerArg>
+                    </compilerArgs>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>${maven.surefire.plugin.version}</version>
+                <configuration>
+                    <argLine>--enable-preview --add-modules jdk.incubator.vector</argLine>
+                </configuration>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.junit.jupiter</groupId>
+                        <artifactId>junit-jupiter-engine</artifactId>
+                        <version>${junit.version}</version>
+                    </dependency>
+                </dependencies>
+            </plugin>
+        </plugins>
+    </build>
+
+    <dependencies>
+        <!-- WAM annotation processor and types -->
+        <dependency>
+            <groupId>com.github.auties00</groupId>
+            <artifactId>cobalt-wam</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.github.auties00</groupId>
+            <artifactId>protobuf-serialization-plugin</artifactId>
+            <version>${protoc.version}</version>
+        </dependency>
+
+        <!-- Generate and print QR code (Web API) -->
+        <dependency>
+            <groupId>com.google.zxing</groupId>
+            <artifactId>javase</artifactId>
+            <version>${zxing.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.auties00</groupId>
+            <artifactId>qr-terminal</artifactId>
+            <version>${qr.terminal.version}</version>
+        </dependency>
+
+        <!-- Cryptography (used by Whatsapp) -->
+        <dependency>
+            <groupId>com.github.auties00</groupId>
+            <artifactId>libsignal</artifactId>
+            <version>${libsignal.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.auties00</groupId>
+            <artifactId>curve25519</artifactId>
+            <version>${curve25519.version}</version>
+        </dependency>
+
+        <!-- Protobuf serialization (used by Whatsapp) -->
+        <dependency>
+            <groupId>com.github.auties00</groupId>
+            <artifactId>protobuf-base</artifactId>
+            <version>${protoc.version}</version>
+        </dependency>
+
+        <!-- JSON serialization (used by Whatsapp) -->
+        <dependency>
+            <groupId>com.alibaba.fastjson2</groupId>
+            <artifactId>fastjson2</artifactId>
+            <version>${json.version}</version>
+        </dependency>
+
+        <!-- Parse phone numbers (Mobile API) -->
+        <dependency>
+            <groupId>com.googlecode.libphonenumber</groupId>
+            <artifactId>libphonenumber</artifactId>
+            <version>${libphonenumber.version}</version>
+        </dependency>
+
+        <!-- Parse Android APK (Mobile API) -->
+        <dependency>
+            <groupId>net.dongliu</groupId>
+            <artifactId>apk-parser</artifactId>
+            <version>${apk.parser.version}</version>
+        </dependency>
+
+        <!-- Generate messageContainer previews -->
+        <dependency>
+            <groupId>com.github.auties00</groupId>
+            <artifactId>link-preview</artifactId>
+            <version>${linkpreview.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.googlecode.ez-vcard</groupId>
+            <artifactId>ez-vcard</artifactId>
+            <version>${vcard.version}</version>
+        </dependency>
+
+        <!-- Store messages in memory -->
+        <dependency>
+            <groupId>com.github.auties00</groupId>
+            <artifactId>collections</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+
+        <!-- LMDB key-value store for lazy message loading -->
+        <dependency>
+            <groupId>org.lmdbjava</groupId>
+            <artifactId>lmdbjava</artifactId>
+            <version>${lmdbjava.version}</version>
+        </dependency>
+
+        <!-- Testing framework -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Selenium for TLS fingerprint verification -->
+        <dependency>
+            <groupId>org.seleniumhq.selenium</groupId>
+            <artifactId>selenium-java</artifactId>
+            <version>${selenium.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Micro-benchmarks -->
+        <dependency>
+            <groupId>org.openjdk.jmh</groupId>
+            <artifactId>jmh-core</artifactId>
+            <version>${jmh.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.openjdk.jmh</groupId>
+            <artifactId>jmh-generator-annprocess</artifactId>
+            <version>${jmh.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>
