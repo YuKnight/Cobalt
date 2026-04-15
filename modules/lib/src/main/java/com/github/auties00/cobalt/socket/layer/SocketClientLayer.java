@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.socket.layer;
 
-import com.github.auties00.cobalt.socket.threading.SocketClientLayerContext;
+import com.github.auties00.cobalt.socket.layer.threading.SocketClientLayerContext;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -19,7 +19,12 @@ import java.nio.ByteBuffer;
  * handshake logic) to manipulate the connection lifecycle without
  * needing direct access to the NIO channel or selector.
  */
-public interface SocketClientLayer {
+/**
+ * @param <C> the type of layer context associated with this layer,
+ *            used by the selector to return a properly typed
+ *            {@link java.util.Optional}
+ */
+public interface SocketClientLayer<C extends SocketClientLayerContext> {
     /**
      * Connects this layer to the specified address.
      *
@@ -122,5 +127,5 @@ public interface SocketClientLayer {
      * @param context the layer context to register
      * @throws IOException if registration fails
      */
-    void registerLayerContext(Class<? extends SocketClientLayer> key, SocketClientLayerContext context) throws IOException;
+    void registerLayerContext(Class<?> key, SocketClientLayerContext context) throws IOException;
 }

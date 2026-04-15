@@ -4,15 +4,15 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 import com.alibaba.fastjson2.JSONWriter;
-import com.github.auties00.cobalt.node.mex.json.MexJsonOperation;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
+import com.github.auties00.cobalt.node.mex.json.MexJsonOperation;
+
 import java.io.IOException;
 import java.io.StringWriter;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -159,7 +159,7 @@ public sealed interface GetUsernameMex extends MexJsonOperation permits GetUsern
                 }
 
                 var result = new ArrayList<UsernameInfo>(arr.size());
-                for (int i = 0; i < arr.size(); i++) {
+                for (var i = 0; i < arr.size(); i++) {
                     of(arr.getJSONObject(i)).ifPresent(result::add);
                 }
                 return result;

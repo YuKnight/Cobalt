@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.device.stanza;
 
-import com.github.auties00.cobalt.device.DeviceConstants;
+import com.github.auties00.cobalt.model.device.DeviceConstants;
 import com.github.auties00.cobalt.device.DeviceListResult;
 import com.github.auties00.cobalt.device.adv.DeviceADVValidator;
 import com.github.auties00.cobalt.model.device.info.DeviceInfo;

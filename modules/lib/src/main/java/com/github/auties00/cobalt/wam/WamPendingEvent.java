@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.wam;
 
-import com.github.auties00.cobalt.wam.event.WamEventSpec;
+import com.github.auties00.cobalt.wam.model.WamEventSpec;
 
 import java.util.concurrent.CompletableFuture;
 

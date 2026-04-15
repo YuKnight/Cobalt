@@ -154,7 +154,7 @@ public sealed interface FetchNewsletterIsDomainPreviewableMex extends MexJsonOpe
                 }
 
                 var result = new ArrayList<UrlPreviews>(arr.size());
-                for (int i = 0; i < arr.size(); i++) {
+                for (var i = 0; i < arr.size(); i++) {
                     of(arr.getJSONObject(i)).ifPresent(result::add);
                 }
                 return result;

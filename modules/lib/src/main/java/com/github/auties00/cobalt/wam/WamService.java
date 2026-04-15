@@ -6,10 +6,10 @@ import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
-import com.github.auties00.cobalt.util.FastRandomUtils;
+import com.github.auties00.cobalt.util.FastDataUtils;
 import com.github.auties00.cobalt.wam.binary.WamGlobalEncoder;
-import com.github.auties00.cobalt.wam.event.WamEventSpec;
-import com.github.auties00.cobalt.wam.annotation.WamChannel;
+import com.github.auties00.cobalt.wam.model.WamEventSpec;
+import com.github.auties00.cobalt.wam.model.WamChannel;
 import com.google.i18n.phonenumbers.PhoneNumberUtil;
 
 import java.lang.invoke.MethodHandles;
@@ -311,7 +311,7 @@ public final class WamService {
 
         var weight = effectiveWeight(event);
         if (weight > 1) {
-            if (FastRandomUtils.randomInt(weight) != 0) {
+            if (FastDataUtils.randomInt(weight) != 0) {
                 return;
             }
         }
@@ -356,7 +356,7 @@ public final class WamService {
 
         var weight = effectiveWeight(event);
         if (weight > 1) {
-            if (FastRandomUtils.randomInt(weight) != 0) {
+            if (FastDataUtils.randomInt(weight) != 0) {
                 return CompletableFuture.completedFuture(null);
             }
         }
@@ -1016,7 +1016,7 @@ public final class WamService {
         var delay = attempt == 0 ? RETRY_BASE_DELAY_MS : (long) Math.pow(2, attempt);
         if (delay > RETRY_MAX_DELAY_MS) delay = RETRY_MAX_DELAY_MS;
         if (delay < RETRY_BASE_DELAY_MS) delay = RETRY_BASE_DELAY_MS;
-        var jitter = (long) (delay * 0.1 * FastRandomUtils.randomDouble());
+        var jitter = (long) (delay * 0.1 * FastDataUtils.randomDouble());
         return delay + jitter;
     }
 

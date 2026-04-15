@@ -1,6 +1,6 @@
 # Cobalt
 
-Cobalt is a Java reimplementation of WhatsApp Web/Desktop.
+Cobalt is a Java reimplementation of WhatsApp Web/Desktop/Mobile.
 
 ## Build
 
@@ -50,15 +50,32 @@ Cobalt class names mirror WA Web modules but drop the `WA`/`WAWeb` prefix:
 | `*Action` (e.g., `ArchiveChatAction`)     | Sync action protobuf models         |
 | `*Stanza` (e.g., `ChatFanoutStanza`)      | Stanza/node builders                |
 
-### @implNote Tags
-Cobalt classes/methods use `@implNote` javadoc tags to document which WA Web module and function they implement. When these exist, they are the primary mapping source.
+### Source Provenance Annotations (`cobalt-source-meta`)
+Cobalt tracks its relationship to WhatsApp source code via annotations in `com.github.auties00.cobalt.meta`, split into two families:
+
+**WhatsApp Web** (Web + Desktop — same JS codebase):
+- `@WhatsAppWebModule(moduleName = "WAWebFoo")` on types — which JS module(s) the class adapts
+- `@WhatsAppWebExport(moduleName = "WAWebFoo", exports = "bar", adaptation = ...)` on methods/fields/constructors — which export is implemented
+- `WhatsAppWebPlatform` enum: `SHARED` (default), `WINDOWS`, `MAC_OS` — for desktop-specific divergences
+
+**WhatsApp Mobile** (iOS / Android — native codebases):
+- `@WhatsAppMobileClass(className = "WAFoo", platform = ...)` on types — which native class is adapted
+- `@WhatsAppMobileMethod(className = "WAFoo", methods = "-bar:", platform = ..., adaptation = ...)` on methods/fields/constructors
+- `WhatsAppMobilePlatform` enum: `IOS`, `ANDROID` — no default, must be specified
+
+**Shared model:**
+- `WhatsAppAdaptation` enum: `DIRECT` (same logic), `ADAPTED` (same purpose, different structure), `COBALT_SPECIFIC` (no WA counterpart)
+- All annotations are `@Repeatable` and `SOURCE` retention
+- The annotation processor generates `META-INF/wa-source-manifest.json` at compile time
+
+**Statement-level traceability** (inline `// WAWebFoo.bar: ...` comments inside method bodies) remains as comments — Java annotations cannot target arbitrary statements.
 
 ### Nodes/Stanzas
 Built via `NodeBuilder` with `.description()`, `.attribute()`, `.content()`.
 `Node` has convenience methods to get and stream attributes and content: use the best convenience method to improve code readability.
 
 ## Javadoc Requirements
-ALL members (public, protected, package-private, private) MUST have JDK-style multiline javadoc. No `@since` tags. Always include `@implNote` with WA Web provenance.
+ALL members (public, protected, package-private, private) MUST have JDK-style multiline javadoc. No `@since` tags. Use source provenance annotations (`@WhatsAppWebModule`/`@WhatsAppWebExport` for Web, `@WhatsAppMobileClass`/`@WhatsAppMobileMethod` for Mobile) to declare WA source mappings. `@implNote` can be used alongside annotations for free-text adaptation explanations when the annotation alone is insufficient.
 
 ### Style Rules
 - Third person declarative present tense: "Returns the value" not "Return the value"
@@ -74,7 +91,7 @@ ALL members (public, protected, package-private, private) MUST have JDK-style mu
 - `@param` for every parameter
 - `@return` for every non-void method
 - `@throws` for every checked exception and significant unchecked exceptions
-- `@implNote` with `WAModuleName.functionName` on every method/constructor
+- `@WhatsAppWebExport` / `@WhatsAppMobileMethod` on every method/constructor/field that maps to WA source
 
 ## Validation System
 The `/validate` command validates Cobalt's Java against WhatsApp Web's JS source via MCP tools.
@@ -84,4 +101,5 @@ The `/validate` command validates Cobalt's Java against WhatsApp Web's JS source
 - **Phantom sweep agent:** `.claude/agents/validate-phantom.md` — whole-codebase dead-code removal, verified against WA Web before deletion.
 - **MCP server:** `.mcp.json` registers `whatsapp` MCP (HTTP at localhost:8787) from `tooling/web-mcp-server-new`.
 - **Exhaustiveness guarantee:** The orchestrator builds a manifest of ALL WA Web exports via `get_exports`, then validates every entry. The completeness check at the end verifies every export has a verdict.
+- **Source manifest:** The annotation processor generates `META-INF/wa-source-manifest.json` mapping Cobalt types/members to WA Web modules/exports and WA Mobile classes/methods. The validation system consumes this manifest for cross-referencing.
 - **Dependency ordering:** Validation runs in topological order (leaves first, consumers last) so each agent's dependencies are already in place when it runs.

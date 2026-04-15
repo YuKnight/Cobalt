@@ -119,7 +119,7 @@ public final class SyncKeyUtils {
     public static byte[] hexToUint8Array(String hex) {
         var parts = hex.split(" "); // WAWebSyncdCryptoUtils.hexToUint8Array: e.split(" ")
         var result = new byte[parts.length]; // WAWebSyncdCryptoUtils.hexToUint8Array: Uint8Array.from(...)
-        for (int i = 0; i < parts.length; i++) {
+        for (var i = 0; i < parts.length; i++) {
             result[i] = (byte) Integer.parseInt(parts[i], 16); // WAWebSyncdCryptoUtils.hexToUint8Array: parseInt(e, 16)
         }
         return result; // WAWebSyncdCryptoUtils.hexToUint8Array: return result
@@ -143,7 +143,7 @@ public final class SyncKeyUtils {
 
         // WAWebSyncdCryptoUtils.syncKeyIdToHex: Array.from(new Uint8Array(...), e => e.toString(16)).toString().replace(/,/g, " ")
         var sb = new StringBuilder();
-        for (int i = 0; i < keyId.length; i++) {
+        for (var i = 0; i < keyId.length; i++) {
             if (i > 0) {
                 sb.append(' '); // WAWebSyncdCryptoUtils.syncKeyIdToHex: .replace(/,/g, " ")
             }

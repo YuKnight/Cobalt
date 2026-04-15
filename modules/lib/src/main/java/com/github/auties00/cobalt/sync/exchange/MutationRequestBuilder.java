@@ -12,7 +12,7 @@ import com.github.auties00.cobalt.model.signal.KeyIdBuilder;
 import com.github.auties00.cobalt.model.sync.SyncHashValue;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.SyncActionEntry;
-import com.github.auties00.cobalt.model.sync.SyncPendingMutation;
+import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.model.sync.data.*;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.props.ABProp;

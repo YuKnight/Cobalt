@@ -203,7 +203,7 @@ public sealed interface GetPrivacySettingsMex extends MexJsonOperation permits G
                         }
 
                         var result = new ArrayList<Settings>(arr.size());
-                        for (int i = 0; i < arr.size(); i++) {
+                        for (var i = 0; i < arr.size(); i++) {
                             of(arr.getJSONObject(i)).ifPresent(result::add);
                         }
                         return result;
@@ -237,7 +237,7 @@ public sealed interface GetPrivacySettingsMex extends MexJsonOperation permits G
                     }
 
                     var result = new ArrayList<PrivacySettings>(arr.size());
-                    for (int i = 0; i < arr.size(); i++) {
+                    for (var i = 0; i < arr.size(); i++) {
                         of(arr.getJSONObject(i)).ifPresent(result::add);
                     }
                     return result;
@@ -272,7 +272,7 @@ public sealed interface GetPrivacySettingsMex extends MexJsonOperation permits G
                 }
 
                 var result = new ArrayList<Item>(arr.size());
-                for (int i = 0; i < arr.size(); i++) {
+                for (var i = 0; i < arr.size(); i++) {
                     of(arr.getJSONObject(i)).ifPresent(result::add);
                 }
                 return result;

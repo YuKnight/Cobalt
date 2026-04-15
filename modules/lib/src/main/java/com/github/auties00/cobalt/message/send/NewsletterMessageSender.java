@@ -336,7 +336,7 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
 
         // WAWebNewsletterSendMessageQueryJob.c: reactionCode != null && reactionCode !== ""
         // treats empty string as revoke, same as null
-        Node reactionNode = reaction.text()
+        var reactionNode = reaction.text()
                 .filter(t -> !t.isEmpty())
                 .map(this::buildReactionContent)
                 .orElseGet(this::buildReactionRevoke);

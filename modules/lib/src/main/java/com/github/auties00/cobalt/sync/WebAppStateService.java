@@ -1672,7 +1672,7 @@ public final class WebAppStateService {
                 handlerFailed = true; // WAWebSyncdCollectionHandler.Xe
                 LOGGER.warning("Error during _applySetMutations for " + entry.getKey() + " in " + collectionName + ": " + throwable.getMessage());
             }
-            for (int i = 0; i < versionGated.size(); i++) { // WAWebSyncdCollectionHandler.Xe
+            for (var i = 0; i < versionGated.size(); i++) { // WAWebSyncdCollectionHandler.Xe
                 var mutation = versionGated.get(i);
                 var result = handlerFailed // WAWebSyncdCollectionHandler.Xe: k ? Failed : E[T].actionState
                         ? MutationApplicationResult.failed()

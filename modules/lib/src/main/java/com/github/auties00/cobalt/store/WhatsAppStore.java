@@ -17,7 +17,7 @@ import com.github.auties00.cobalt.model.device.pairing.ClientPayload.ClientRelea
 import com.github.auties00.cobalt.model.device.sync.MissingDeviceSyncKey;
 import com.github.auties00.cobalt.model.device.sync.PendingDeviceSync;
 import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.jid.JidDevice;
+import com.github.auties00.cobalt.client.WhatsAppDevice;
 import com.github.auties00.cobalt.model.jid.JidProvider;
 import com.github.auties00.cobalt.model.message.MessageInfo;
 import com.github.auties00.cobalt.model.message.MessageKey;
@@ -33,6 +33,7 @@ import com.github.auties00.cobalt.model.privacy.PrivacySettingType;
 import com.github.auties00.cobalt.model.setting.ChatLockSettings;
 import com.github.auties00.cobalt.model.sync.*;
 import com.github.auties00.cobalt.model.sync.action.bot.MaibaAIFeaturesControlAction;
+import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastCampaignAction;
 import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastInsightsAction;
 import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastListAction;
@@ -212,7 +213,7 @@ public interface WhatsAppStore extends SignalProtocolStore {
      *
      * @return the device info, never {@code null}
      */
-    JidDevice device();
+    WhatsAppDevice device();
 
     /**
      * Sets the device information.
@@ -220,7 +221,7 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * @param device the device info, must not be {@code null}
      * @return this store instance for method chaining
      */
-    WhatsAppStore setDevice(JidDevice device);
+    WhatsAppStore setDevice(WhatsAppDevice device);
 
     /**
      * Returns the release channel for this connection.

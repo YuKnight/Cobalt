@@ -275,7 +275,7 @@ public sealed interface UsyncMex extends MexJsonOperation permits UsyncMex.Reque
                     }
 
                     var result = new ArrayList<UsernameInfo>(arr.size());
-                    for (int i = 0; i < arr.size(); i++) {
+                    for (var i = 0; i < arr.size(); i++) {
                         of(arr.getJSONObject(i)).ifPresent(result::add);
                     }
                     return result;
@@ -352,7 +352,7 @@ public sealed interface UsyncMex extends MexJsonOperation permits UsyncMex.Reque
                     }
 
                     var result = new ArrayList<AboutStatusInfo>(arr.size());
-                    for (int i = 0; i < arr.size(); i++) {
+                    for (var i = 0; i < arr.size(); i++) {
                         of(arr.getJSONObject(i)).ifPresent(result::add);
                     }
                     return result;
@@ -390,7 +390,7 @@ public sealed interface UsyncMex extends MexJsonOperation permits UsyncMex.Reque
                 }
 
                 var result = new ArrayList<Item>(arr.size());
-                for (int i = 0; i < arr.size(); i++) {
+                for (var i = 0; i < arr.size(); i++) {
                     of(arr.getJSONObject(i)).ifPresent(result::add);
                 }
                 return result;

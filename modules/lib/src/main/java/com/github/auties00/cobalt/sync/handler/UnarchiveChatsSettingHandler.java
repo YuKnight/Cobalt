@@ -130,7 +130,7 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
         }
 
         var results = new ArrayList<MutationApplicationResult>(mutations.size());
-        for (int i = 0; i < mutations.size() - 1; i++) { // WAWebArchiveSettingSync.applyMutations: only processes e[e.length - 1]
+        for (var i = 0; i < mutations.size() - 1; i++) { // WAWebArchiveSettingSync.applyMutations: only processes e[e.length - 1]
             results.add(MutationApplicationResult.skipped());
         }
         results.add(applyMutationResult(client, mutations.getLast())); // WAWebArchiveSettingSync.applyMutations: var l = e[e.length - 1]

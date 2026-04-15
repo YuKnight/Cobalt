@@ -228,7 +228,7 @@ public final class RecentEmojiWeightsHandler implements WebAppStateActionHandler
             return MutationApplicationResult.malformed();
         }
 
-        List<RecentEmojiWeight> weights = action.weights(); // NO_WA_BASIS: full snapshot of the recent emoji weight list (already null-safe via the action accessor)
+        var weights = action.weights(); // NO_WA_BASIS: full snapshot of the recent emoji weight list (already null-safe via the action accessor)
         client.store().setRecentEmojiWeights(weights); // NO_WA_BASIS: persist the snapshot on the flattened Cobalt store
         return MutationApplicationResult.success();
     }

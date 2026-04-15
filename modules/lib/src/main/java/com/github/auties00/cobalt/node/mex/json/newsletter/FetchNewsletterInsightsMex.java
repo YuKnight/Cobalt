@@ -187,7 +187,7 @@ public sealed interface FetchNewsletterInsightsMex extends MexJsonOperation perm
                 }
 
                 var result = new ArrayList<State>(arr.size());
-                for (int i = 0; i < arr.size(); i++) {
+                for (var i = 0; i < arr.size(); i++) {
                     of(arr.getJSONObject(i)).ifPresent(result::add);
                 }
                 return result;
@@ -306,7 +306,7 @@ public sealed interface FetchNewsletterInsightsMex extends MexJsonOperation perm
                     }
 
                     var result = new ArrayList<Values>(arr.size());
-                    for (int i = 0; i < arr.size(); i++) {
+                    for (var i = 0; i < arr.size(); i++) {
                         of(arr.getJSONObject(i)).ifPresent(result::add);
                     }
                     return result;
@@ -341,7 +341,7 @@ public sealed interface FetchNewsletterInsightsMex extends MexJsonOperation perm
                 }
 
                 var result = new ArrayList<Result>(arr.size());
-                for (int i = 0; i < arr.size(); i++) {
+                for (var i = 0; i < arr.size(); i++) {
                     of(arr.getJSONObject(i)).ifPresent(result::add);
                 }
                 return result;

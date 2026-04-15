@@ -255,7 +255,7 @@ public sealed interface FetchNewsletterFollowersMex extends MexJsonOperation per
                             }
 
                             var result = new ArrayList<UsernameInfo>(arr.size());
-                            for (int i = 0; i < arr.size(); i++) {
+                            for (var i = 0; i < arr.size(); i++) {
                                 of(arr.getJSONObject(i)).ifPresent(result::add);
                             }
                             return result;
@@ -292,7 +292,7 @@ public sealed interface FetchNewsletterFollowersMex extends MexJsonOperation per
                         }
 
                         var result = new ArrayList<Node>(arr.size());
-                        for (int i = 0; i < arr.size(); i++) {
+                        for (var i = 0; i < arr.size(); i++) {
                             of(arr.getJSONObject(i)).ifPresent(result::add);
                         }
                         return result;
@@ -328,7 +328,7 @@ public sealed interface FetchNewsletterFollowersMex extends MexJsonOperation per
                     }
 
                     var result = new ArrayList<Edges>(arr.size());
-                    for (int i = 0; i < arr.size(); i++) {
+                    for (var i = 0; i < arr.size(); i++) {
                         of(arr.getJSONObject(i)).ifPresent(result::add);
                     }
                     return result;
@@ -362,7 +362,7 @@ public sealed interface FetchNewsletterFollowersMex extends MexJsonOperation per
                 }
 
                 var result = new ArrayList<Followers>(arr.size());
-                for (int i = 0; i < arr.size(); i++) {
+                for (var i = 0; i < arr.size(); i++) {
                     of(arr.getJSONObject(i)).ifPresent(result::add);
                 }
                 return result;

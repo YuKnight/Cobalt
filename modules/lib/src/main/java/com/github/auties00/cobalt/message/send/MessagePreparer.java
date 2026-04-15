@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.message.send;
 
+import com.github.auties00.cobalt.message.addon.EncMessageFactory;
 import com.github.auties00.cobalt.message.send.id.MessageIdGenerator;
 import com.github.auties00.cobalt.message.send.id.MessageIdVersion;
 import com.github.auties00.cobalt.model.chat.ChatMessageContextInfoBuilder;
@@ -17,7 +18,7 @@ import com.github.auties00.cobalt.model.message.text.ReactionMessage;
 import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
 import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfoBuilder;
 import com.github.auties00.cobalt.store.WhatsAppStore;
-import com.github.auties00.cobalt.util.FastRandomUtils;
+import com.github.auties00.cobalt.util.FastDataUtils;
 
 import java.time.Instant;
 import java.util.Objects;
@@ -126,7 +127,7 @@ final class MessagePreparer {
 
         // WAWebSendTextMsgChatAction / WAWebChatForwardMessage:
         // generate 32-byte message secret via crypto.getRandomValues(new Uint8Array(32))
-        var messageSecret = FastRandomUtils.randomByteArray(MESSAGE_SECRET_SIZE);
+        var messageSecret = FastDataUtils.randomByteArray(MESSAGE_SECRET_SIZE);
 
         // WAWebAddonEncryptAddonMsgData: validate or convert addon content
         var preparedContainer = prepareAddonContent(container, chatJid, localJid);
@@ -236,11 +237,7 @@ final class MessagePreparer {
                 if (parentMessage.isEmpty()) {
                     throw new IllegalArgumentException("Cannot encrypt reaction: parent message not found");
                 }
-                var encrypted = new EncReactionMessageSimpleBuilder()
-                        .reaction(reaction)
-                        .parentMessage(parentMessage.get())
-                        .selfJid(selfJid)
-                        .build();
+                var encrypted = EncMessageFactory.encryptReaction(reaction, parentMessage.get(), selfJid);
                 yield MessageContainer.of(encrypted);
             }
 
@@ -277,11 +274,7 @@ final class MessagePreparer {
                 if (parentMessage.isEmpty()) {
                     throw new IllegalArgumentException("Cannot encrypt comment: parent message not found");
                 }
-                var encrypted = new EncCommentMessageSimpleBuilder()
-                        .comment(comment)
-                        .parentMessage(parentMessage.get())
-                        .selfJid(selfJid)
-                        .build();
+                var encrypted = EncMessageFactory.encryptComment(comment, parentMessage.get(), selfJid);
                 yield MessageContainer.of(encrypted);
             }
 

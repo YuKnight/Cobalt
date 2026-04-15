@@ -334,7 +334,7 @@ public sealed interface FetchNewsletterEnforcementsMex extends MexJsonOperation 
                         }
 
                         var result = new ArrayList<IpViolationReportData>(arr.size());
-                        for (int i = 0; i < arr.size(); i++) {
+                        for (var i = 0; i < arr.size(); i++) {
                             of(arr.getJSONObject(i)).ifPresent(result::add);
                         }
                         return result;
@@ -368,7 +368,7 @@ public sealed interface FetchNewsletterEnforcementsMex extends MexJsonOperation 
                     }
 
                     var result = new ArrayList<EnforcementExtraData>(arr.size());
-                    for (int i = 0; i < arr.size(); i++) {
+                    for (var i = 0; i < arr.size(); i++) {
                         of(arr.getJSONObject(i)).ifPresent(result::add);
                     }
                     return result;
@@ -469,7 +469,7 @@ public sealed interface FetchNewsletterEnforcementsMex extends MexJsonOperation 
                     }
 
                     var result = new ArrayList<EnforcementPolicyInformation>(arr.size());
-                    for (int i = 0; i < arr.size(); i++) {
+                    for (var i = 0; i < arr.size(); i++) {
                         of(arr.getJSONObject(i)).ifPresent(result::add);
                     }
                     return result;
@@ -510,7 +510,7 @@ public sealed interface FetchNewsletterEnforcementsMex extends MexJsonOperation 
                 }
 
                 var result = new ArrayList<ProfilePictureDeletions>(arr.size());
-                for (int i = 0; i < arr.size(); i++) {
+                for (var i = 0; i < arr.size(); i++) {
                     of(arr.getJSONObject(i)).ifPresent(result::add);
                 }
                 return result;
@@ -736,7 +736,7 @@ public sealed interface FetchNewsletterEnforcementsMex extends MexJsonOperation 
                         }
 
                         var result = new ArrayList<IpViolationReportData>(arr.size());
-                        for (int i = 0; i < arr.size(); i++) {
+                        for (var i = 0; i < arr.size(); i++) {
                             of(arr.getJSONObject(i)).ifPresent(result::add);
                         }
                         return result;
@@ -789,7 +789,7 @@ public sealed interface FetchNewsletterEnforcementsMex extends MexJsonOperation 
                         }
 
                         var result = new ArrayList<EnforcementTargetData>(arr.size());
-                        for (int i = 0; i < arr.size(); i++) {
+                        for (var i = 0; i < arr.size(); i++) {
                             of(arr.getJSONObject(i)).ifPresent(result::add);
                         }
                         return result;
@@ -842,7 +842,7 @@ public sealed interface FetchNewsletterEnforcementsMex extends MexJsonOperation 
                         }
 
                         var result = new ArrayList<AppealExtraData>(arr.size());
-                        for (int i = 0; i < arr.size(); i++) {
+                        for (var i = 0; i < arr.size(); i++) {
                             of(arr.getJSONObject(i)).ifPresent(result::add);
                         }
                         return result;
@@ -878,7 +878,7 @@ public sealed interface FetchNewsletterEnforcementsMex extends MexJsonOperation 
                     }
 
                     var result = new ArrayList<EnforcementExtraData>(arr.size());
-                    for (int i = 0; i < arr.size(); i++) {
+                    for (var i = 0; i < arr.size(); i++) {
                         of(arr.getJSONObject(i)).ifPresent(result::add);
                     }
                     return result;
@@ -979,7 +979,7 @@ public sealed interface FetchNewsletterEnforcementsMex extends MexJsonOperation 
                     }
 
                     var result = new ArrayList<EnforcementPolicyInformation>(arr.size());
-                    for (int i = 0; i < arr.size(); i++) {
+                    for (var i = 0; i < arr.size(); i++) {
                         of(arr.getJSONObject(i)).ifPresent(result::add);
                     }
                     return result;
@@ -1020,7 +1020,7 @@ public sealed interface FetchNewsletterEnforcementsMex extends MexJsonOperation 
                 }
 
                 var result = new ArrayList<Suspensions>(arr.size());
-                for (int i = 0; i < arr.size(); i++) {
+                for (var i = 0; i < arr.size(); i++) {
                     of(arr.getJSONObject(i)).ifPresent(result::add);
                 }
                 return result;
@@ -1254,7 +1254,7 @@ public sealed interface FetchNewsletterEnforcementsMex extends MexJsonOperation 
                             }
 
                             var result = new ArrayList<IpViolationReportData>(arr.size());
-                            for (int i = 0; i < arr.size(); i++) {
+                            for (var i = 0; i < arr.size(); i++) {
                                 of(arr.getJSONObject(i)).ifPresent(result::add);
                             }
                             return result;
@@ -1288,7 +1288,7 @@ public sealed interface FetchNewsletterEnforcementsMex extends MexJsonOperation 
                         }
 
                         var result = new ArrayList<EnforcementExtraData>(arr.size());
-                        for (int i = 0; i < arr.size(); i++) {
+                        for (var i = 0; i < arr.size(); i++) {
                             of(arr.getJSONObject(i)).ifPresent(result::add);
                         }
                         return result;
@@ -1389,7 +1389,7 @@ public sealed interface FetchNewsletterEnforcementsMex extends MexJsonOperation 
                         }
 
                         var result = new ArrayList<EnforcementPolicyInformation>(arr.size());
-                        for (int i = 0; i < arr.size(); i++) {
+                        for (var i = 0; i < arr.size(); i++) {
                             of(arr.getJSONObject(i)).ifPresent(result::add);
                         }
                         return result;
@@ -1430,7 +1430,7 @@ public sealed interface FetchNewsletterEnforcementsMex extends MexJsonOperation 
                     }
 
                     var result = new ArrayList<BaseEnforcementData>(arr.size());
-                    for (int i = 0; i < arr.size(); i++) {
+                    for (var i = 0; i < arr.size(); i++) {
                         of(arr.getJSONObject(i)).ifPresent(result::add);
                     }
                     return result;
@@ -1465,7 +1465,7 @@ public sealed interface FetchNewsletterEnforcementsMex extends MexJsonOperation 
                 }
 
                 var result = new ArrayList<ViolatingMessages>(arr.size());
-                for (int i = 0; i < arr.size(); i++) {
+                for (var i = 0; i < arr.size(); i++) {
                     of(arr.getJSONObject(i)).ifPresent(result::add);
                 }
                 return result;
@@ -1754,7 +1754,7 @@ public sealed interface FetchNewsletterEnforcementsMex extends MexJsonOperation 
                             }
 
                             var result = new ArrayList<IpViolationReportData>(arr.size());
-                            for (int i = 0; i < arr.size(); i++) {
+                            for (var i = 0; i < arr.size(); i++) {
                                 of(arr.getJSONObject(i)).ifPresent(result::add);
                             }
                             return result;
@@ -1807,7 +1807,7 @@ public sealed interface FetchNewsletterEnforcementsMex extends MexJsonOperation 
                             }
 
                             var result = new ArrayList<EnforcementTargetData>(arr.size());
-                            for (int i = 0; i < arr.size(); i++) {
+                            for (var i = 0; i < arr.size(); i++) {
                                 of(arr.getJSONObject(i)).ifPresent(result::add);
                             }
                             return result;
@@ -1860,7 +1860,7 @@ public sealed interface FetchNewsletterEnforcementsMex extends MexJsonOperation 
                             }
 
                             var result = new ArrayList<AppealExtraData>(arr.size());
-                            for (int i = 0; i < arr.size(); i++) {
+                            for (var i = 0; i < arr.size(); i++) {
                                 of(arr.getJSONObject(i)).ifPresent(result::add);
                             }
                             return result;
@@ -1913,7 +1913,7 @@ public sealed interface FetchNewsletterEnforcementsMex extends MexJsonOperation 
                             }
 
                             var result = new ArrayList<EnforcingEntityData>(arr.size());
-                            for (int i = 0; i < arr.size(); i++) {
+                            for (var i = 0; i < arr.size(); i++) {
                                 of(arr.getJSONObject(i)).ifPresent(result::add);
                             }
                             return result;
@@ -1952,7 +1952,7 @@ public sealed interface FetchNewsletterEnforcementsMex extends MexJsonOperation 
                         }
 
                         var result = new ArrayList<EnforcementExtraData>(arr.size());
-                        for (int i = 0; i < arr.size(); i++) {
+                        for (var i = 0; i < arr.size(); i++) {
                             of(arr.getJSONObject(i)).ifPresent(result::add);
                         }
                         return result;
@@ -2053,7 +2053,7 @@ public sealed interface FetchNewsletterEnforcementsMex extends MexJsonOperation 
                         }
 
                         var result = new ArrayList<EnforcementPolicyInformation>(arr.size());
-                        for (int i = 0; i < arr.size(); i++) {
+                        for (var i = 0; i < arr.size(); i++) {
                             of(arr.getJSONObject(i)).ifPresent(result::add);
                         }
                         return result;
@@ -2094,7 +2094,7 @@ public sealed interface FetchNewsletterEnforcementsMex extends MexJsonOperation 
                     }
 
                     var result = new ArrayList<BaseEnforcementData>(arr.size());
-                    for (int i = 0; i < arr.size(); i++) {
+                    for (var i = 0; i < arr.size(); i++) {
                         of(arr.getJSONObject(i)).ifPresent(result::add);
                     }
                     return result;
@@ -2129,7 +2129,7 @@ public sealed interface FetchNewsletterEnforcementsMex extends MexJsonOperation 
                 }
 
                 var result = new ArrayList<Geosuspensions>(arr.size());
-                for (int i = 0; i < arr.size(); i++) {
+                for (var i = 0; i < arr.size(); i++) {
                     of(arr.getJSONObject(i)).ifPresent(result::add);
                 }
                 return result;

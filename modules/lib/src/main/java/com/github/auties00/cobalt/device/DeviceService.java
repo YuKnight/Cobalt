@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.device;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.model.device.DeviceConstants;
 import com.github.auties00.cobalt.device.adv.DeviceADVChecker;
 import com.github.auties00.cobalt.device.adv.DeviceADVValidator;
 import com.github.auties00.cobalt.device.adv.ValidatedKeyIndexListResult;
@@ -2389,9 +2390,9 @@ public final class DeviceService {
         var lastADVCheckTime = store.lastAdvCheckTime().orElse(null);
 
         // WAWebHandleAdvOmittedResultApi: update timestamp and check expectedTs clearing
-        Instant finalExpectedTs = cachedList.expectedTimestamp();
-        Instant finalUpdateTs = cachedList.expectedTimestampUpdateTimestamp();
-        Instant finalLastJobTs = cachedList.expectedTimestampLastDeviceJobTimestamp();
+        var finalExpectedTs = cachedList.expectedTimestamp();
+        var finalUpdateTs = cachedList.expectedTimestampUpdateTimestamp();
+        var finalLastJobTs = cachedList.expectedTimestampLastDeviceJobTimestamp();
 
         if (DeviceExpectedTsUtils.shouldClearExpectedTimestamp(
                 adjustedTimestamp, null, cachedList, lastADVCheckTime)) {

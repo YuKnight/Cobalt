@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.device.icdc;
 
-import com.github.auties00.cobalt.device.DeviceConstants;
+import com.github.auties00.cobalt.model.device.DeviceConstants;
 import com.github.auties00.cobalt.model.device.identity.ADVEncryptionType;
 import com.github.auties00.cobalt.model.device.info.DeviceInfo;
 import com.github.auties00.cobalt.model.device.info.DeviceList;

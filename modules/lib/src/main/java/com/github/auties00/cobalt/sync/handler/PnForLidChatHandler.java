@@ -160,7 +160,7 @@ public final class PnForLidChatHandler implements WebAppStateActionHandler {
 
         // WAWebPnForLidChatSync: var s = e.indexParts[1]
         var indexArray = JSON.parseArray(mutation.index()); // ADAPTED: Cobalt parses the raw JSON index string; WA Web's WAWebSyncdMutationParser already exposes indexParts
-        String lidJidString = indexArray != null && indexArray.size() > 1 ? indexArray.getString(1) : null; // ADAPTED: out-of-bounds access in WA Web returns undefined, which fails isWidlike
+        var lidJidString = indexArray != null && indexArray.size() > 1 ? indexArray.getString(1) : null; // ADAPTED: out-of-bounds access in WA Web returns undefined, which fails isWidlike
         // WAWebPnForLidChatSync: if (!isWidlike(s)) return i++, n.malformedActionIndex()
         if (lidJidString == null || lidJidString.isEmpty()) {
             return malformedActionIndex(); // WAWebPnForLidChatSync: i++, return n.malformedActionIndex()

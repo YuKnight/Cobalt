@@ -243,7 +243,7 @@ public sealed interface FetchNewsletterDehydratedMex extends MexJsonOperation pe
                         }
 
                         var result = new ArrayList<ReactionCodes>(arr.size());
-                        for (int i = 0; i < arr.size(); i++) {
+                        for (var i = 0; i < arr.size(); i++) {
                             of(arr.getJSONObject(i)).ifPresent(result::add);
                         }
                         return result;
@@ -277,7 +277,7 @@ public sealed interface FetchNewsletterDehydratedMex extends MexJsonOperation pe
                     }
 
                     var result = new ArrayList<Settings>(arr.size());
-                    for (int i = 0; i < arr.size(); i++) {
+                    for (var i = 0; i < arr.size(); i++) {
                         of(arr.getJSONObject(i)).ifPresent(result::add);
                     }
                     return result;
@@ -330,7 +330,7 @@ public sealed interface FetchNewsletterDehydratedMex extends MexJsonOperation pe
                     }
 
                     var result = new ArrayList<WamoSub>(arr.size());
-                    for (int i = 0; i < arr.size(); i++) {
+                    for (var i = 0; i < arr.size(); i++) {
                         of(arr.getJSONObject(i)).ifPresent(result::add);
                     }
                     return result;
@@ -367,7 +367,7 @@ public sealed interface FetchNewsletterDehydratedMex extends MexJsonOperation pe
                 }
 
                 var result = new ArrayList<ThreadMetadata>(arr.size());
-                for (int i = 0; i < arr.size(); i++) {
+                for (var i = 0; i < arr.size(); i++) {
                     of(arr.getJSONObject(i)).ifPresent(result::add);
                 }
                 return result;
@@ -420,7 +420,7 @@ public sealed interface FetchNewsletterDehydratedMex extends MexJsonOperation pe
                 }
 
                 var result = new ArrayList<ViewerMetadata>(arr.size());
-                for (int i = 0; i < arr.size(); i++) {
+                for (var i = 0; i < arr.size(); i++) {
                     of(arr.getJSONObject(i)).ifPresent(result::add);
                 }
                 return result;

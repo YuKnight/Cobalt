@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.socket.layer.application.websocket.frame.enco
 
 import com.github.auties00.cobalt.socket.layer.application.websocket.frame.WebSocketFrameConstants;
 import jdk.incubator.vector.ByteVector;
+import jdk.incubator.vector.IntVector;
 import jdk.incubator.vector.VectorOperators;
 import jdk.incubator.vector.VectorSpecies;
 
@@ -55,8 +56,12 @@ public final class WebSocketFrameEncoder {
     private static final VectorSpecies<Byte> BYTE_SPECIES = ByteVector.SPECIES_PREFERRED;
 
     /**
-     * The number of bytes processed per SIMD iteration, equal to the
-     * lane count of {@link #BYTE_SPECIES}.  Always a multiple of 4.
+     * The preferred hardware vector species used for SIMD bulk masking.
+     */
+    private static final VectorSpecies<Integer> INT_SPECIES = IntVector.SPECIES_PREFERRED;
+
+    /**
+     * The number of bytes processed per SIMD iteration, equal to the lane count of {@link #BYTE_SPECIES}.
      */
     private static final int VECTOR_LENGTH = BYTE_SPECIES.length();
 
@@ -95,13 +100,20 @@ public final class WebSocketFrameEncoder {
      * All payload buffers are masked as one logical message, so the mask
      * offset continues across buffer boundaries.
      *
+     * <p><strong>Ownership:</strong> this method takes ownership of the
+     * payload buffers and masks them <em>in place</em> for zero-copy
+     * performance.  Callers must not reuse or read the buffers after
+     * this call.  Passing a read-only buffer is safe — it will be
+     * copied before masking.
+     *
      * <p>If every buffer in {@code payloads} is {@code null} or empty and
      * at least one non-{@code null} buffer was present, the returned
      * array contains a single header-only frame.  If {@code payloads}
      * itself is {@code null} or zero-length, an empty array is returned.
      *
      * @param payloads the payload buffers in message order; individual
-     *        entries may be {@code null} or empty and will be skipped
+     *        entries may be {@code null} or empty and will be skipped.
+     *        <strong>Buffers are consumed — do not reuse after this call.</strong>
      * @return frame buffers ready to send, or an empty array if there
      *         is nothing to encode
      */
@@ -377,7 +389,7 @@ public final class WebSocketFrameEncoder {
             var leading = Math.min(4 - align, length);
             for (; i < leading; i++) {
                 long idx = position + i;
-                byte b = segment.get(ValueLayout.JAVA_BYTE, idx);
+                var b = segment.get(ValueLayout.JAVA_BYTE, idx);
                 segment.set(ValueLayout.JAVA_BYTE, idx,
                         (byte) (b ^ WebSocketFrameConstants.maskByte(maskKey, maskOffset + i)));
             }
@@ -412,7 +424,7 @@ public final class WebSocketFrameEncoder {
 
         for (; i < length; i++) {
             long idx = position + i;
-            byte b = segment.get(ValueLayout.JAVA_BYTE, idx);
+            var b = segment.get(ValueLayout.JAVA_BYTE, idx);
             segment.set(ValueLayout.JAVA_BYTE, idx,
                     (byte) (b ^ WebSocketFrameConstants.maskByte(maskKey, maskOffset + i)));
         }
@@ -429,10 +441,7 @@ public final class WebSocketFrameEncoder {
      * @return a {@link ByteVector} filled with the repeating mask pattern
      */
     private static ByteVector buildAlignedMaskVector(int maskKey) {
-        var mask = new byte[VECTOR_LENGTH];
-        for (int i = 0; i < VECTOR_LENGTH; i += 4) {
-            INT_HANDLE.set(mask, i, maskKey);
-        }
-        return ByteVector.fromArray(BYTE_SPECIES, mask, 0);
+        return IntVector.broadcast(INT_SPECIES, maskKey)
+                .reinterpretAsBytes();
     }
 }

@@ -26,7 +26,7 @@ import com.github.auties00.cobalt.model.message.MessageContainer;
 import com.github.auties00.cobalt.model.newsletter.Newsletter;
 import com.github.auties00.cobalt.model.newsletter.NewsletterViewerRole;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.SyncPendingMutation;
+import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.node.mex.json.community.FetchAllSubgroupsMex;
@@ -41,7 +41,7 @@ import com.github.auties00.cobalt.stream.SocketStream;
 import com.github.auties00.cobalt.sync.SnapshotRecoveryService;
 import com.github.auties00.cobalt.sync.WebAppStateService;
 import com.github.auties00.cobalt.sync.key.SyncKeyUtils;
-import com.github.auties00.cobalt.util.FastRandomUtils;
+import com.github.auties00.cobalt.util.FastDataUtils;
 import com.github.auties00.cobalt.util.RandomIdUtils;
 import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.curve25519.Curve25519;
@@ -102,8 +102,8 @@ public final class WhatsAppClient {
         if ((store.clientType() == WhatsAppClientType.WEB) == (webVerificationHandler == null)) {
             throw new IllegalArgumentException("webVerificationHandler cannot be null when client type is WEB");
         }
-        SignalSessionCipher sessionCipher = new SignalSessionCipher(store);
-        SignalGroupCipher groupCipher = new SignalGroupCipher(store);
+        var sessionCipher = new SignalSessionCipher(store);
+        var groupCipher = new SignalGroupCipher(store);
         this.abPropsService = new ABPropsService(this);
         var snapshotRecoveryService = new SnapshotRecoveryService(this, abPropsService);
         this.webAppStateService = new WebAppStateService(this, abPropsService, snapshotRecoveryService);
@@ -355,7 +355,7 @@ public final class WhatsAppClient {
 
     public Node sendNode(NodeBuilder node, Function<Node, Boolean> filter) {
         if (!node.hasAttribute("id")) {
-            node.attribute("id", FastRandomUtils.randomHex(10));
+            node.attribute("id", FastDataUtils.randomHex(10));
         }
 
         var outgoing = node.build();
@@ -570,7 +570,7 @@ public final class WhatsAppClient {
             preKeys.add(preKeyPair);
             var id = new NodeBuilder()
                     .description("id")
-                    .content(FastRandomUtils.intToBytes(preKeyPair.id(), 3))
+                    .content(FastDataUtils.intToBytes(preKeyPair.id(), 3))
                     .build();
             var value = new NodeBuilder()
                     .description("value")
@@ -584,7 +584,7 @@ public final class WhatsAppClient {
         }
         var registration = new NodeBuilder()
                 .description("registration")
-                .content(FastRandomUtils.intToBytes(store.registrationId(), 4))
+                .content(FastDataUtils.intToBytes(store.registrationId(), 4))
                 .build();
         var type = new NodeBuilder()
                 .description("type")
@@ -600,7 +600,7 @@ public final class WhatsAppClient {
                 .build();
         var skeyId = new NodeBuilder()
                 .description("id")
-                .content(FastRandomUtils.intToBytes(store.signedKeyPair().id(), 3))
+                .content(FastDataUtils.intToBytes(store.signedKeyPair().id(), 3))
                 .build();
         var skeyValue = new NodeBuilder()
                 .description("value")

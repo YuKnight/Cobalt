@@ -114,7 +114,7 @@ public final class MutationLTHash {
         var hashBuf = ByteBuffer.wrap(hash).order(ByteOrder.LITTLE_ENDIAN); // WACryptoLtHash.performPointwiseWithOverflow: new DataView(t)
         var expandedBuf = ByteBuffer.wrap(expanded).order(ByteOrder.LITTLE_ENDIAN); // WACryptoLtHash.performPointwiseWithOverflow: new DataView(n)
         var result = ByteBuffer.allocate(hashBuf.capacity()).order(ByteOrder.LITTLE_ENDIAN); // WACryptoLtHash.performPointwiseWithOverflow: new DataView(new ArrayBuffer(e.byteLength))
-        for (int i = 0; i < hashBuf.capacity(); i += 2) { // WACryptoLtHash.performPointwiseWithOverflow: l += s (s=2)
+        for (var i = 0; i < hashBuf.capacity(); i += 2) { // WACryptoLtHash.performPointwiseWithOverflow: l += s (s=2)
             var a = Short.toUnsignedInt(hashBuf.getShort()); // WACryptoLtHash.performPointwiseWithOverflow: e.getUint16(l, true)
             var b = Short.toUnsignedInt(expandedBuf.getShort()); // WACryptoLtHash.performPointwiseWithOverflow: o.getUint16(l, true)
             result.putShort((short) ((addition ? a + b : a - b) & 0xFFFF)); // WACryptoLtHash.performPointwiseWithOverflow: i.setUint16(l, r(e, t), true)

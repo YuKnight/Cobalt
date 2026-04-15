@@ -82,7 +82,7 @@ public final class GroupSkmsgFanoutStanza {
         // WAWebSendGroupSkmsgJob: SKMSG <enc> node
         // When skmsgCiphertext is null (bot feedback messages), the enc
         // node is omitted and the message is delivered only via <bot>
-        Node skmsgEncNode = skmsgCiphertext != null
+        var skmsgEncNode = skmsgCiphertext != null
                 ? new NodeBuilder()
                         .description("enc")
                         .attribute("v", String.valueOf(MessageEncryption.CIPHERTEXT_VERSION))

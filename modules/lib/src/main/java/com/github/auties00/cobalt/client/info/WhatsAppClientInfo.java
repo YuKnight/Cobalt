@@ -11,7 +11,7 @@ public sealed interface WhatsAppClientInfo
             case IOS -> WhatsAppIosClientInfo.ofPersonal();
             case ANDROID_BUSINESS -> WhatsAppAndroidClientInfo.ofBusiness();
             case IOS_BUSINESS -> WhatsAppIosClientInfo.ofBusiness();
-            case WINDOWS, MACOS -> WhatsAppWebClientInfo.of();
+            case WINDOWS, MACOS, WEB -> WhatsAppWebClientInfo.of();
             default -> throw new IllegalStateException("Unexpected value: " + platform);
         };
     }

@@ -59,7 +59,12 @@
                         </annotationProcessorPath>
                         <annotationProcessorPath>
                             <groupId>com.github.auties00</groupId>
-                            <artifactId>cobalt-wam</artifactId>
+                            <artifactId>cobalt-wam-core</artifactId>
+                            <version>${project.version}</version>
+                        </annotationProcessorPath>
+                        <annotationProcessorPath>
+                            <groupId>com.github.auties00</groupId>
+                            <artifactId>cobalt-source-meta</artifactId>
                             <version>${project.version}</version>
                         </annotationProcessorPath>
                     </annotationProcessorPaths>
@@ -88,10 +93,24 @@
     </build>
 
     <dependencies>
+        <!-- Source provenance annotations -->
+        <dependency>
+            <groupId>com.github.auties00</groupId>
+            <artifactId>cobalt-source-meta</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- WhatsApp protobuf data model -->
+        <dependency>
+            <groupId>com.github.auties00</groupId>
+            <artifactId>cobalt-model</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- WAM annotation processor and types -->
         <dependency>
             <groupId>com.github.auties00</groupId>
-            <artifactId>cobalt-wam</artifactId>
+            <artifactId>cobalt-wam-core</artifactId>
             <version>${project.version}</version>
         </dependency>
 
@@ -190,6 +209,14 @@
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-engine</artifactId>
             <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Bouncy Castle for test certificate generation -->
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcpkix-jdk18on</artifactId>
+            <version>1.80</version>
             <scope>test</scope>
         </dependency>
 

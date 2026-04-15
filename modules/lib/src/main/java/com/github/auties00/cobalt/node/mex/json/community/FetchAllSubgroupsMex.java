@@ -222,7 +222,7 @@ public sealed interface FetchAllSubgroupsMex extends MexJsonOperation permits Fe
                     }
 
                     var result = new ArrayList<Subject>(arr.size());
-                    for (int i = 0; i < arr.size(); i++) {
+                    for (var i = 0; i < arr.size(); i++) {
                         of(arr.getJSONObject(i)).ifPresent(result::add);
                     }
                     return result;
@@ -257,7 +257,7 @@ public sealed interface FetchAllSubgroupsMex extends MexJsonOperation permits Fe
                 }
 
                 var result = new ArrayList<DefaultSubGroup>(arr.size());
-                for (int i = 0; i < arr.size(); i++) {
+                for (var i = 0; i < arr.size(); i++) {
                     of(arr.getJSONObject(i)).ifPresent(result::add);
                 }
                 return result;
@@ -412,7 +412,7 @@ public sealed interface FetchAllSubgroupsMex extends MexJsonOperation permits Fe
                             }
 
                             var result = new ArrayList<Subject>(arr.size());
-                            for (int i = 0; i < arr.size(); i++) {
+                            for (var i = 0; i < arr.size(); i++) {
                                 of(arr.getJSONObject(i)).ifPresent(result::add);
                             }
                             return result;
@@ -489,7 +489,7 @@ public sealed interface FetchAllSubgroupsMex extends MexJsonOperation permits Fe
                             }
 
                             var result = new ArrayList<Properties>(arr.size());
-                            for (int i = 0; i < arr.size(); i++) {
+                            for (var i = 0; i < arr.size(); i++) {
                                 of(arr.getJSONObject(i)).ifPresent(result::add);
                             }
                             return result;
@@ -542,7 +542,7 @@ public sealed interface FetchAllSubgroupsMex extends MexJsonOperation permits Fe
                             }
 
                             var result = new ArrayList<MembershipApprovalRequests>(arr.size());
-                            for (int i = 0; i < arr.size(); i++) {
+                            for (var i = 0; i < arr.size(); i++) {
                                 of(arr.getJSONObject(i)).ifPresent(result::add);
                             }
                             return result;
@@ -579,7 +579,7 @@ public sealed interface FetchAllSubgroupsMex extends MexJsonOperation permits Fe
                         }
 
                         var result = new ArrayList<Node>(arr.size());
-                        for (int i = 0; i < arr.size(); i++) {
+                        for (var i = 0; i < arr.size(); i++) {
                             of(arr.getJSONObject(i)).ifPresent(result::add);
                         }
                         return result;
@@ -613,7 +613,7 @@ public sealed interface FetchAllSubgroupsMex extends MexJsonOperation permits Fe
                     }
 
                     var result = new ArrayList<Edges>(arr.size());
-                    for (int i = 0; i < arr.size(); i++) {
+                    for (var i = 0; i < arr.size(); i++) {
                         of(arr.getJSONObject(i)).ifPresent(result::add);
                     }
                     return result;
@@ -647,7 +647,7 @@ public sealed interface FetchAllSubgroupsMex extends MexJsonOperation permits Fe
                 }
 
                 var result = new ArrayList<SubGroups>(arr.size());
-                for (int i = 0; i < arr.size(); i++) {
+                for (var i = 0; i < arr.size(); i++) {
                     of(arr.getJSONObject(i)).ifPresent(result::add);
                 }
                 return result;

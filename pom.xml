@@ -10,7 +10,9 @@
     <url>https://github.com/Auties00/Cobalt</url>
 
     <modules>
-        <module>modules/wam</module>
+        <module>modules/wam-core</module>
+        <module>modules/source-meta</module>
+        <module>modules/model</module>
         <module>modules/lib</module>
     </modules>
 

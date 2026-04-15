@@ -328,7 +328,7 @@ public sealed interface FetchGroupInfoIncludBotsMex extends MexJsonOperation per
                     }
 
                     var result = new ArrayList<UsernameInfo>(arr.size());
-                    for (int i = 0; i < arr.size(); i++) {
+                    for (var i = 0; i < arr.size(); i++) {
                         of(arr.getJSONObject(i)).ifPresent(result::add);
                     }
                     return result;
@@ -365,7 +365,7 @@ public sealed interface FetchGroupInfoIncludBotsMex extends MexJsonOperation per
                 }
 
                 var result = new ArrayList<Creator>(arr.size());
-                for (int i = 0; i < arr.size(); i++) {
+                for (var i = 0; i < arr.size(); i++) {
                     of(arr.getJSONObject(i)).ifPresent(result::add);
                 }
                 return result;
@@ -511,7 +511,7 @@ public sealed interface FetchGroupInfoIncludBotsMex extends MexJsonOperation per
                         }
 
                         var result = new ArrayList<UsernameInfo>(arr.size());
-                        for (int i = 0; i < arr.size(); i++) {
+                        for (var i = 0; i < arr.size(); i++) {
                             of(arr.getJSONObject(i)).ifPresent(result::add);
                         }
                         return result;
@@ -548,7 +548,7 @@ public sealed interface FetchGroupInfoIncludBotsMex extends MexJsonOperation per
                     }
 
                     var result = new ArrayList<Creator>(arr.size());
-                    for (int i = 0; i < arr.size(); i++) {
+                    for (var i = 0; i < arr.size(); i++) {
                         of(arr.getJSONObject(i)).ifPresent(result::add);
                     }
                     return result;
@@ -584,7 +584,7 @@ public sealed interface FetchGroupInfoIncludBotsMex extends MexJsonOperation per
                 }
 
                 var result = new ArrayList<Subject>(arr.size());
-                for (int i = 0; i < arr.size(); i++) {
+                for (var i = 0; i < arr.size(); i++) {
                     of(arr.getJSONObject(i)).ifPresent(result::add);
                 }
                 return result;
@@ -741,7 +741,7 @@ public sealed interface FetchGroupInfoIncludBotsMex extends MexJsonOperation per
                         }
 
                         var result = new ArrayList<UsernameInfo>(arr.size());
-                        for (int i = 0; i < arr.size(); i++) {
+                        for (var i = 0; i < arr.size(); i++) {
                             of(arr.getJSONObject(i)).ifPresent(result::add);
                         }
                         return result;
@@ -778,7 +778,7 @@ public sealed interface FetchGroupInfoIncludBotsMex extends MexJsonOperation per
                     }
 
                     var result = new ArrayList<Creator>(arr.size());
-                    for (int i = 0; i < arr.size(); i++) {
+                    for (var i = 0; i < arr.size(); i++) {
                         of(arr.getJSONObject(i)).ifPresent(result::add);
                     }
                     return result;
@@ -815,7 +815,7 @@ public sealed interface FetchGroupInfoIncludBotsMex extends MexJsonOperation per
                 }
 
                 var result = new ArrayList<Description>(arr.size());
-                for (int i = 0; i < arr.size(); i++) {
+                for (var i = 0; i < arr.size(); i++) {
                     of(arr.getJSONObject(i)).ifPresent(result::add);
                 }
                 return result;
@@ -1002,7 +1002,7 @@ public sealed interface FetchGroupInfoIncludBotsMex extends MexJsonOperation per
                             }
 
                             var result = new ArrayList<UsernameInfo>(arr.size());
-                            for (int i = 0; i < arr.size(); i++) {
+                            for (var i = 0; i < arr.size(); i++) {
                                 of(arr.getJSONObject(i)).ifPresent(result::add);
                             }
                             return result;
@@ -1041,7 +1041,7 @@ public sealed interface FetchGroupInfoIncludBotsMex extends MexJsonOperation per
                         }
 
                         var result = new ArrayList<Participant>(arr.size());
-                        for (int i = 0; i < arr.size(); i++) {
+                        for (var i = 0; i < arr.size(); i++) {
                             of(arr.getJSONObject(i)).ifPresent(result::add);
                         }
                         return result;
@@ -1076,7 +1076,7 @@ public sealed interface FetchGroupInfoIncludBotsMex extends MexJsonOperation per
                     }
 
                     var result = new ArrayList<Edges>(arr.size());
-                    for (int i = 0; i < arr.size(); i++) {
+                    for (var i = 0; i < arr.size(); i++) {
                         of(arr.getJSONObject(i)).ifPresent(result::add);
                     }
                     return result;
@@ -1111,7 +1111,7 @@ public sealed interface FetchGroupInfoIncludBotsMex extends MexJsonOperation per
                 }
 
                 var result = new ArrayList<Participants>(arr.size());
-                for (int i = 0; i < arr.size(); i++) {
+                for (var i = 0; i < arr.size(); i++) {
                     of(arr.getJSONObject(i)).ifPresent(result::add);
                 }
                 return result;
@@ -1381,7 +1381,7 @@ public sealed interface FetchGroupInfoIncludBotsMex extends MexJsonOperation per
                     }
 
                     var result = new ArrayList<LimitSharing>(arr.size());
-                    for (int i = 0; i < arr.size(); i++) {
+                    for (var i = 0; i < arr.size(); i++) {
                         of(arr.getJSONObject(i)).ifPresent(result::add);
                     }
                     return result;
@@ -1434,7 +1434,7 @@ public sealed interface FetchGroupInfoIncludBotsMex extends MexJsonOperation per
                     }
 
                     var result = new ArrayList<LidMigrationState>(arr.size());
-                    for (int i = 0; i < arr.size(); i++) {
+                    for (var i = 0; i < arr.size(); i++) {
                         of(arr.getJSONObject(i)).ifPresent(result::add);
                     }
                     return result;
@@ -1487,7 +1487,7 @@ public sealed interface FetchGroupInfoIncludBotsMex extends MexJsonOperation per
                     }
 
                     var result = new ArrayList<Ephemeral>(arr.size());
-                    for (int i = 0; i < arr.size(); i++) {
+                    for (var i = 0; i < arr.size(); i++) {
                         of(arr.getJSONObject(i)).ifPresent(result::add);
                     }
                     return result;
@@ -1540,7 +1540,7 @@ public sealed interface FetchGroupInfoIncludBotsMex extends MexJsonOperation per
                     }
 
                     var result = new ArrayList<GrowthLocked2>(arr.size());
-                    for (int i = 0; i < arr.size(); i++) {
+                    for (var i = 0; i < arr.size(); i++) {
                         of(arr.getJSONObject(i)).ifPresent(result::add);
                     }
                     return result;
@@ -1592,7 +1592,7 @@ public sealed interface FetchGroupInfoIncludBotsMex extends MexJsonOperation per
                 }
 
                 var result = new ArrayList<Properties>(arr.size());
-                for (int i = 0; i < arr.size(); i++) {
+                for (var i = 0; i < arr.size(); i++) {
                     of(arr.getJSONObject(i)).ifPresent(result::add);
                 }
                 return result;

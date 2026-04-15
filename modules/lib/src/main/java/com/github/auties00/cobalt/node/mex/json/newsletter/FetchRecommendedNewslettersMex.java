@@ -191,7 +191,7 @@ public sealed interface FetchRecommendedNewslettersMex extends MexJsonOperation 
                 }
 
                 var result = new ArrayList<PageInfo>(arr.size());
-                for (int i = 0; i < arr.size(); i++) {
+                for (var i = 0; i < arr.size(); i++) {
                     of(arr.getJSONObject(i)).ifPresent(result::add);
                 }
                 return result;
@@ -285,7 +285,7 @@ public sealed interface FetchRecommendedNewslettersMex extends MexJsonOperation 
                     }
 
                     var result = new ArrayList<State>(arr.size());
-                    for (int i = 0; i < arr.size(); i++) {
+                    for (var i = 0; i < arr.size(); i++) {
                         of(arr.getJSONObject(i)).ifPresent(result::add);
                     }
                     return result;
@@ -458,7 +458,7 @@ public sealed interface FetchRecommendedNewslettersMex extends MexJsonOperation 
                         }
 
                         var result = new ArrayList<Name>(arr.size());
-                        for (int i = 0; i < arr.size(); i++) {
+                        for (var i = 0; i < arr.size(); i++) {
                             of(arr.getJSONObject(i)).ifPresent(result::add);
                         }
                         return result;
@@ -535,7 +535,7 @@ public sealed interface FetchRecommendedNewslettersMex extends MexJsonOperation 
                         }
 
                         var result = new ArrayList<Description>(arr.size());
-                        for (int i = 0; i < arr.size(); i++) {
+                        for (var i = 0; i < arr.size(); i++) {
                             of(arr.getJSONObject(i)).ifPresent(result::add);
                         }
                         return result;
@@ -612,7 +612,7 @@ public sealed interface FetchRecommendedNewslettersMex extends MexJsonOperation 
                         }
 
                         var result = new ArrayList<Preview>(arr.size());
-                        for (int i = 0; i < arr.size(); i++) {
+                        for (var i = 0; i < arr.size(); i++) {
                             of(arr.getJSONObject(i)).ifPresent(result::add);
                         }
                         return result;
@@ -653,7 +653,7 @@ public sealed interface FetchRecommendedNewslettersMex extends MexJsonOperation 
                     }
 
                     var result = new ArrayList<ThreadMetadata>(arr.size());
-                    for (int i = 0; i < arr.size(); i++) {
+                    for (var i = 0; i < arr.size(); i++) {
                         of(arr.getJSONObject(i)).ifPresent(result::add);
                     }
                     return result;
@@ -689,7 +689,7 @@ public sealed interface FetchRecommendedNewslettersMex extends MexJsonOperation 
                 }
 
                 var result = new ArrayList<Result>(arr.size());
-                for (int i = 0; i < arr.size(); i++) {
+                for (var i = 0; i < arr.size(); i++) {
                     of(arr.getJSONObject(i)).ifPresent(result::add);
                 }
                 return result;

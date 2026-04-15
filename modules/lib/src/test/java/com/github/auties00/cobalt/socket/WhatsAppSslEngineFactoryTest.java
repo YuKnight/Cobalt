@@ -27,7 +27,7 @@ class WhatsAppSslEngineFactoryTest {
     @BeforeAll
     static void ensureSslFactoryLoaded() {
         //noinspection ResultOfMethodCallIgnored
-        WhatsAppSslEngineFactory.newWebSSLEngineFactory();
+        WhatsAppSslEngineFactory.chrome();
     }
 
     private static final String CHECK_URL = "https://www.howsmyssl.com/a/check";
@@ -116,11 +116,11 @@ class WhatsAppSslEngineFactoryTest {
     /**
      * Gets the TLS fingerprint as seen by howsmyssl.com when connecting
      * through an {@link SSLSocket} configured with the same TLS
-     * parameters that {@link WhatsAppSslEngineFactory#newWebSSLEngineFactory()} produces.
+     * parameters that {@link WhatsAppSslEngineFactory#chrome()} produces.
      */
     private JSONObject getInternalFingerprint() throws Exception {
-        var engineParams = WhatsAppSslEngineFactory.newWebSSLEngineFactory()
-                .apply(CHECK_ADDRESS)
+        var engineParams = WhatsAppSslEngineFactory.chrome()
+                .createSSLEngine(CHECK_ADDRESS)
                 .getSSLParameters();
         var sslContext = SSLContext.getInstance("TLS");
         sslContext.init(null, null, null);

@@ -1,7 +1,6 @@
 package com.github.auties00.cobalt.socket.layer.transport;
 
-import com.github.auties00.cobalt.socket.threading.SocketClientContext;
-import com.github.auties00.cobalt.socket.threading.SocketClientLayerContext;
+import com.github.auties00.cobalt.socket.layer.threading.SocketClientLayerContext;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
@@ -17,9 +16,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * {@link SocketClientLayerContext}
  * because the transport layer is the byte source/sink, not a byte
  * processor.  Processing contexts (TLS, tunnel, WebSocket, application)
- * are stored separately in the
- * {@link SocketClientContext}
- * layer context map.
+ * are stored separately.
  *
  * <p>The {@link PendingRead} inner class is used during the pre-tunnel
  * phase for blocking proxy handshake reads.  The {@link PendingWrites}

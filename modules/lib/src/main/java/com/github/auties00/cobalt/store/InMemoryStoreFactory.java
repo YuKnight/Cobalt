@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.store;
 
 import com.github.auties00.cobalt.client.WhatsAppClientType;
-import com.github.auties00.cobalt.model.jid.JidDevice;
+import com.github.auties00.cobalt.client.WhatsAppDevice;
 import com.github.auties00.cobalt.util.StorePathUtils;
 import it.auties.protobuf.stream.ProtobufInputStream;
 
@@ -77,8 +77,8 @@ final class InMemoryStoreFactory implements WhatsAppStoreFactory {
     @Override
     public WhatsAppStore create(WhatsAppClientType clientType, UUID uuid) throws IOException {
         var device = switch (clientType) {
-            case WEB -> JidDevice.web();
-            case MOBILE -> JidDevice.ios(false);
+            case WEB -> WhatsAppDevice.web();
+            case MOBILE -> WhatsAppDevice.ios(false);
         };
         return new InMemoryStoreBuilder()
                 .uuid(Objects.requireNonNullElseGet(uuid, UUID::randomUUID))
@@ -90,8 +90,8 @@ final class InMemoryStoreFactory implements WhatsAppStoreFactory {
     @Override
     public WhatsAppStore create(WhatsAppClientType clientType, long phoneNumber) throws IOException {
         var device = switch (clientType) {
-            case WEB -> JidDevice.web();
-            case MOBILE -> JidDevice.ios(false);
+            case WEB -> WhatsAppDevice.web();
+            case MOBILE -> WhatsAppDevice.ios(false);
         };
         return new InMemoryStoreBuilder()
                 .uuid(UUID.randomUUID())

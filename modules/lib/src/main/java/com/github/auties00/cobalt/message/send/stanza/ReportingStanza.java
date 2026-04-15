@@ -92,7 +92,7 @@ public final class ReportingStanza {
     public Node build(ChatMessageInfo messageInfo, Jid selfJid, Jid remoteJid) {
         // WAWebMessagingGatingUtils.isReportingTokenSendingEnabled:
         // rt_sender_reporting_token_version > 0
-        int senderVersion = abPropsService.getInt(ABProp.RT_SENDER_REPORTING_TOKEN_VERSION);
+        var senderVersion = abPropsService.getInt(ABProp.RT_SENDER_REPORTING_TOKEN_VERSION);
         if (senderVersion <= 0) {
             return null;
         }

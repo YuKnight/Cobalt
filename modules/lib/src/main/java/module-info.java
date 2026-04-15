@@ -1,4 +1,7 @@
 module com.github.auties00.cobalt {
+    // Source provenance annotations
+    requires static com.github.auties00.cobalt.meta;
+
     // Vector API
     requires jdk.incubator.vector;
 
@@ -31,6 +34,9 @@ module com.github.auties00.cobalt {
 
     // LMDB key-value store
     requires static org.lmdbjava; // Not necessary if the user doesn't want a persistent store
+
+    // Data model
+    requires com.github.auties00.cobalt.model;
 
     // WAM annotation processor and types
     requires com.github.auties00.cobalt.wam;

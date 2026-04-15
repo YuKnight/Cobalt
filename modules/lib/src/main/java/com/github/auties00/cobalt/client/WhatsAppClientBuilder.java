@@ -3,7 +3,7 @@ package com.github.auties00.cobalt.client;
 import com.github.auties00.cobalt.client.registration.WhatsAppMobileClientRegistration;
 import com.github.auties00.cobalt.model.business.profile.BusinessCategory;
 import com.github.auties00.cobalt.model.device.pairing.ClientAppVersion;
-import com.github.auties00.cobalt.model.jid.JidDevice;
+import com.github.auties00.cobalt.client.WhatsAppDevice;
 import com.github.auties00.cobalt.store.WhatsAppStore;
 import com.github.auties00.cobalt.store.WhatsAppStoreFactory;
 
@@ -423,7 +423,7 @@ public sealed class WhatsAppClientBuilder {
          * @param device the companion device, can be null
          * @return the same instance for chaining
          */
-        public Options device(JidDevice device) {
+        public Options device(WhatsAppDevice device) {
             store.setDevice(device);
             return this;
         }
@@ -509,7 +509,7 @@ public sealed class WhatsAppClientBuilder {
              * @return the same instance for chaining
              */
             @Override
-            public Web device(JidDevice device) {
+            public Web device(WhatsAppDevice device) {
                 return (Web) super.device(device);
             }
 
@@ -647,7 +647,7 @@ public sealed class WhatsAppClientBuilder {
              * @return the same instance for chaining
              */
             @Override
-            public Mobile device(JidDevice device) {
+            public Mobile device(WhatsAppDevice device) {
                 store.setDevice(device);
                 return this;
             }

@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.socket.layer.application.websocket.frame.deco
 
 import com.github.auties00.cobalt.socket.layer.application.websocket.frame.WebSocketFrameConstants;
 import jdk.incubator.vector.ByteVector;
+import jdk.incubator.vector.IntVector;
 import jdk.incubator.vector.VectorOperators;
 import jdk.incubator.vector.VectorSpecies;
 
@@ -41,8 +42,27 @@ public final class WebSocketFrameDecoder {
     private static final int READ_MASK = 3;
     private static final int READ_PAYLOAD = 4;
 
+    /**
+     * The preferred hardware vector species used for SIMD bulk masking.
+     */
     private static final VectorSpecies<Byte> BYTE_SPECIES = ByteVector.SPECIES_PREFERRED;
+
+    /**
+     * The preferred hardware vector species used for SIMD bulk masking.
+     */
+    private static final VectorSpecies<Integer> INT_SPECIES = IntVector.SPECIES_PREFERRED;
+
+    /**
+     * The number of bytes processed per SIMD iteration, equal to the lane count of {@link #BYTE_SPECIES}.
+     */
     private static final int VECTOR_LENGTH = BYTE_SPECIES.length();
+
+    /**
+     * Minimum number of mask-aligned bytes required before the SIMD path
+     * is entered.  Below this threshold the int-wise and byte-wise paths
+     * handle the entire payload, avoiding vector-setup overhead on small
+     * frames.
+     */
     private static final int VECTORIZE_THRESHOLD = VECTOR_LENGTH * 2;
 
     /**
@@ -258,7 +278,8 @@ public final class WebSocketFrameDecoder {
     /**
      * Validates the frame header after the full payload length is known.
      *
-     * <p>A frame is invalid if its payload length exceeds
+     * <p>A frame is invalid if any RSV bit is set (no extensions are
+     * negotiated), if its payload length exceeds
      * {@link WebSocketFrameConstants#MAX_FRAME_LENGTH}, or if it is a
      * control frame that is either fragmented or exceeds the control
      * payload limit.
@@ -266,6 +287,10 @@ public final class WebSocketFrameDecoder {
      * @return {@code true} if the frame header is valid
      */
     private boolean validateFrame() {
+        if ((firstByte & 0x70) != 0) {
+            return false;
+        }
+
         if (payloadLength > WebSocketFrameConstants.MAX_FRAME_LENGTH) {
             return false;
         }
@@ -487,10 +512,7 @@ public final class WebSocketFrameDecoder {
      * @return a {@link ByteVector} filled with the repeating mask pattern
      */
     private static ByteVector buildAlignedMaskVector(int maskKey) {
-        var mask = new byte[VECTOR_LENGTH];
-        for (int i = 0; i < VECTOR_LENGTH; i += 4) {
-            INT_HANDLE.set(mask, i, maskKey);
-        }
-        return ByteVector.fromArray(BYTE_SPECIES, mask, 0);
+        return IntVector.broadcast(INT_SPECIES, maskKey)
+                .reinterpretAsBytes();
     }
 }

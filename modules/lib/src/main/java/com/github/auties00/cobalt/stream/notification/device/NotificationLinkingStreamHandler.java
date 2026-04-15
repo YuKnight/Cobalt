@@ -9,7 +9,7 @@ import com.github.auties00.cobalt.model.newsletter.NewsletterViewerRole;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.model.sync.action.device.WaffleAccountLinkStateAction;
 import com.github.auties00.cobalt.stream.SocketStream;
-import com.github.auties00.cobalt.util.FastRandomUtils;
+import com.github.auties00.cobalt.util.FastDataUtils;
 
 import java.util.Set;
 
@@ -169,7 +169,7 @@ final class NotificationLinkingStreamHandler implements SocketStream.Handler {
     private void handleLinkCodeRefresh(Node node) {
         // WAWebHandleCompanionReqRefreshNotification: regenerate ADV secret key
         if (node.hasDescription("notification") && node.hasAttribute("type", "companion_reg_refresh")) {
-            whatsapp.store().setAdvSecretKey(FastRandomUtils.randomByteArray(32)); // ADAPTED: WA Web stores base64, Cobalt stores raw bytes
+            whatsapp.store().setAdvSecretKey(FastDataUtils.randomByteArray(32)); // ADAPTED: WA Web stores base64, Cobalt stores raw bytes
         }
 
         // ADAPTED: WAWebAltDeviceLinkingHandleNotification - Cobalt extracts verification value

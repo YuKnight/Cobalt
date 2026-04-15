@@ -263,8 +263,8 @@ public final class ChatLockSettingsHandler implements WebAppStateActionHandler {
         //   return t.value == null || (t.key === "iterations" ? e.iterations = t.value.asUnsignedInteger
         //                              : t.key === "salt" && (e.salt = t.value.asBlob)), e
         // }, {})
-        boolean hasIterations = false; // WAWebChatLockSettingsSync.applyMutations: _.iterations
-        boolean hasSalt = false; // WAWebChatLockSettingsSync.applyMutations: _.salt
+        var hasIterations = false; // WAWebChatLockSettingsSync.applyMutations: _.iterations
+        var hasSalt = false; // WAWebChatLockSettingsSync.applyMutations: _.salt
         for (var arg : transformerArgs) { // WAWebChatLockSettingsSync.applyMutations: p.reduce
             var value = arg.value().orElse(null); // WAWebChatLockSettingsSync.applyMutations: t.value
             if (value == null) { // WAWebChatLockSettingsSync.applyMutations: if (t.value == null) continue (via return e)

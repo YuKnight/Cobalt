@@ -3,8 +3,8 @@ import com.github.auties00.cobalt.socket.layer.application.websocket.frame.WebSo
 import com.github.auties00.cobalt.socket.layer.application.websocket.frame.decoder.WebSocketDecodedFrame;
 import com.github.auties00.cobalt.socket.layer.application.websocket.frame.decoder.WebSocketFrameDecoder;
 import com.github.auties00.cobalt.socket.layer.application.websocket.frame.encoder.WebSocketFrameEncoder;
-import com.github.auties00.cobalt.socket.threading.SocketClientInboundResult;
-import com.github.auties00.cobalt.socket.threading.SocketClientLayerContext;
+import com.github.auties00.cobalt.socket.layer.threading.SocketClientInboundResult;
+import com.github.auties00.cobalt.socket.layer.threading.SocketClientLayerContext;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -161,6 +161,8 @@ public final class WebSocketLayerContext implements SocketClientLayerContext {
 
     @Override
     public void onDisconnect() {
-        nextLayer.onDisconnect();
+        if(nextLayer != null) {
+            nextLayer.onDisconnect();
+        }
     }
 }

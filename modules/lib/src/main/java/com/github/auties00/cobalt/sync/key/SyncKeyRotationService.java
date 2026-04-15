@@ -415,7 +415,7 @@ public final class SyncKeyRotationService {
         // WAWebSyncdRotateKey.hasADeviceBeenRemoved: new Set(n.deviceIndexes), expand from n.currentIndex+1 to o
         var keyDeviceIndexes = new HashSet<>(fingerprint.deviceIndexes());
         var keyCurrentIndex = fingerprint.currentIndex().orElse(0);
-        for (int i = keyCurrentIndex + 1; i <= currentFingerprint.currentIndex; i++) {
+        for (var i = keyCurrentIndex + 1; i <= currentFingerprint.currentIndex; i++) {
             keyDeviceIndexes.add(i);
         }
 

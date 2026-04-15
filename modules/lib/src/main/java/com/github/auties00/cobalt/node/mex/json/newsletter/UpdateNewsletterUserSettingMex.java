@@ -153,7 +153,7 @@ public sealed interface UpdateNewsletterUserSettingMex extends MexJsonOperation 
                 }
 
                 var result = new ArrayList<State>(arr.size());
-                for (int i = 0; i < arr.size(); i++) {
+                for (var i = 0; i < arr.size(); i++) {
                     of(arr.getJSONObject(i)).ifPresent(result::add);
                 }
                 return result;

@@ -205,7 +205,7 @@ public sealed interface FetchNewsletterMex extends MexJsonOperation permits Fetc
                 }
 
                 var result = new ArrayList<State>(arr.size());
-                for (int i = 0; i < arr.size(); i++) {
+                for (var i = 0; i < arr.size(); i++) {
                     of(arr.getJSONObject(i)).ifPresent(result::add);
                 }
                 return result;
@@ -411,7 +411,7 @@ public sealed interface FetchNewsletterMex extends MexJsonOperation permits Fetc
                     }
 
                     var result = new ArrayList<Name>(arr.size());
-                    for (int i = 0; i < arr.size(); i++) {
+                    for (var i = 0; i < arr.size(); i++) {
                         of(arr.getJSONObject(i)).ifPresent(result::add);
                     }
                     return result;
@@ -488,7 +488,7 @@ public sealed interface FetchNewsletterMex extends MexJsonOperation permits Fetc
                     }
 
                     var result = new ArrayList<Picture>(arr.size());
-                    for (int i = 0; i < arr.size(); i++) {
+                    for (var i = 0; i < arr.size(); i++) {
                         of(arr.getJSONObject(i)).ifPresent(result::add);
                     }
                     return result;
@@ -565,7 +565,7 @@ public sealed interface FetchNewsletterMex extends MexJsonOperation permits Fetc
                     }
 
                     var result = new ArrayList<Preview>(arr.size());
-                    for (int i = 0; i < arr.size(); i++) {
+                    for (var i = 0; i < arr.size(); i++) {
                         of(arr.getJSONObject(i)).ifPresent(result::add);
                     }
                     return result;
@@ -642,7 +642,7 @@ public sealed interface FetchNewsletterMex extends MexJsonOperation permits Fetc
                     }
 
                     var result = new ArrayList<Description>(arr.size());
-                    for (int i = 0; i < arr.size(); i++) {
+                    for (var i = 0; i < arr.size(); i++) {
                         of(arr.getJSONObject(i)).ifPresent(result::add);
                     }
                     return result;
@@ -714,7 +714,7 @@ public sealed interface FetchNewsletterMex extends MexJsonOperation permits Fetc
                         }
 
                         var result = new ArrayList<ReactionCodes>(arr.size());
-                        for (int i = 0; i < arr.size(); i++) {
+                        for (var i = 0; i < arr.size(); i++) {
                             of(arr.getJSONObject(i)).ifPresent(result::add);
                         }
                         return result;
@@ -748,7 +748,7 @@ public sealed interface FetchNewsletterMex extends MexJsonOperation permits Fetc
                     }
 
                     var result = new ArrayList<Settings>(arr.size());
-                    for (int i = 0; i < arr.size(); i++) {
+                    for (var i = 0; i < arr.size(); i++) {
                         of(arr.getJSONObject(i)).ifPresent(result::add);
                     }
                     return result;
@@ -801,7 +801,7 @@ public sealed interface FetchNewsletterMex extends MexJsonOperation permits Fetc
                     }
 
                     var result = new ArrayList<WamoSub>(arr.size());
-                    for (int i = 0; i < arr.size(); i++) {
+                    for (var i = 0; i < arr.size(); i++) {
                         of(arr.getJSONObject(i)).ifPresent(result::add);
                     }
                     return result;
@@ -845,7 +845,7 @@ public sealed interface FetchNewsletterMex extends MexJsonOperation permits Fetc
                 }
 
                 var result = new ArrayList<ThreadMetadata>(arr.size());
-                for (int i = 0; i < arr.size(); i++) {
+                for (var i = 0; i < arr.size(); i++) {
                     of(arr.getJSONObject(i)).ifPresent(result::add);
                 }
                 return result;
@@ -951,7 +951,7 @@ public sealed interface FetchNewsletterMex extends MexJsonOperation permits Fetc
                     }
 
                     var result = new ArrayList<Settings>(arr.size());
-                    for (int i = 0; i < arr.size(); i++) {
+                    for (var i = 0; i < arr.size(); i++) {
                         of(arr.getJSONObject(i)).ifPresent(result::add);
                     }
                     return result;
@@ -987,7 +987,7 @@ public sealed interface FetchNewsletterMex extends MexJsonOperation permits Fetc
                 }
 
                 var result = new ArrayList<ViewerMetadata>(arr.size());
-                for (int i = 0; i < arr.size(); i++) {
+                for (var i = 0; i < arr.size(); i++) {
                     of(arr.getJSONObject(i)).ifPresent(result::add);
                 }
                 return result;

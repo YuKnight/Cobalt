@@ -1,8 +1,8 @@
 package com.github.auties00.cobalt.socket;
 
 import com.github.auties00.cobalt.socket.layer.SocketClientLayerListener;
-import com.github.auties00.cobalt.socket.threading.SocketClientInboundResult;
-import com.github.auties00.cobalt.socket.threading.SocketClientLayerContext;
+import com.github.auties00.cobalt.socket.layer.threading.SocketClientInboundResult;
+import com.github.auties00.cobalt.socket.layer.threading.SocketClientLayerContext;
 import com.github.auties00.cobalt.socket.layer.transport.SocketClientTransportLayerContext;
 
 import java.nio.ByteBuffer;
@@ -32,24 +32,61 @@ import java.util.concurrent.Executors;
  *     whichever buffer {@link #inboundTarget()} returns, avoiding
  *     intermediate copies.
  * </ul>
+ *
+ * @implNote ADAPTED: WAFrameSocket.FrameSocket — WA Web uses a {@code Binary}
+ *     accumulation buffer with a peek/read loop to extract frames, while
+ *     Cobalt uses a two-phase state machine (length buffer then payload
+ *     buffer) integrated into the NIO selector-driven layer context chain.
+ *     The pending-close mechanism ({@code $4} in WA Web) is unnecessary in
+ *     Cobalt because frames are processed one at a time from the selector
+ *     thread rather than buffered in a binary accumulator.
  */
-final class WhatsAppLayerContext implements SocketClientLayerContext {
+public final class WhatsAppLayerContext implements SocketClientLayerContext {
+    /**
+     * The size in bytes of the int24 length prefix (3 bytes).
+     *
+     * @implNote WAFrameSocket.FrameSocket.sendFrame — the int24 prefix
+     *     is written as {@code writeUint8(n >> 16)} followed by
+     *     {@code writeUint16(n & 65535)}, totalling 3 bytes.
+     */
     private static final int INT24_BYTE_SIZE = 3;
-    private static final int MAX_MESSAGE_LENGTH = 1048576;
+
+    /**
+     * The maximum valid frame length, equal to the largest unsigned int24
+     * value ({@code 0xFFFFFF = 16777215}).
+     *
+     * @implNote WAFrameSocket.FrameSocket.$8 — WA Web validates outbound
+     *     frame size with {@code n >= 1 << 24}, meaning values 0 through
+     *     16777215 are valid.  WA Web does not validate inbound frame
+     *     lengths at all; this constant provides a defensive upper bound
+     *     matching the protocol's int24 capacity.
+     */
+    private static final int MAX_MESSAGE_LENGTH = 0xFFFFFF;
 
     /**
      * The listener that receives complete datagrams and close events.
+     *
+     * @implNote ADAPTED: WAFrameSocket.FrameSocket.onFrame — WA Web uses
+     *     separate {@code onFrame} and {@code onClose} callback fields;
+     *     Cobalt combines them into a single {@link SocketClientLayerListener}.
      */
     private final SocketClientLayerListener listener;
 
     /**
      * Buffer for reading the 3-byte length prefix of the current inbound
      * datagram.  Heap-allocated, reused for every datagram.
+     *
+     * @implNote ADAPTED: WAFrameSocket.FrameSocket.$3 — WA Web uses a
+     *     single {@code Binary} accumulation buffer; Cobalt splits the
+     *     read into a dedicated 3-byte length prefix buffer.
      */
     private final ByteBuffer datagramLengthBuffer;
 
     /**
      * Lock for creating and destroying the listener executor.
+     *
+     * @implNote NO_WA_BASIS — Cobalt-specific synchronization for the
+     *     listener executor lifecycle.
      */
     private final Object executorLock;
 
@@ -64,13 +101,38 @@ final class WhatsAppLayerContext implements SocketClientLayerContext {
      *
      * <p>Transitions from {@code true} to {@code false} exactly once
      * after the Noise handshake completes.
+     *
+     * @implNote NO_WA_BASIS — Cobalt-specific dual-mode flag for bridging
+     *     async NIO with blocking handshake reads.
      */
     private volatile boolean handshakeMode;
 
     /**
      * The pending blocking read request during handshake mode.
+     *
+     * @implNote NO_WA_BASIS — Cobalt-specific mechanism for blocking
+     *     handshake reads.
      */
     private volatile SocketClientTransportLayerContext.PendingRead pendingHandshakeRead;
+
+    /**
+     * Buffer for data arriving during handshake mode before a pending
+     * read is set.  This prevents data loss when the selector delivers
+     * the server response before the handshake thread calls
+     * {@link #setPendingRead(SocketClientTransportLayerContext.PendingRead)}.
+     *
+     * <p>Accessed by the selector thread (write) and the handshake
+     * virtual thread (drain in {@code setPendingRead}), so all access
+     * is guarded by {@link #handshakeLock}.
+     */
+    private ByteBuffer handshakeBuffer;
+
+    /**
+     * Lock guarding {@link #handshakeBuffer} and {@link #pendingHandshakeRead}
+     * to prevent data races between the selector thread and the
+     * handshake virtual thread.
+     */
+    private final Object handshakeLock = new Object();
 
     /**
      * Buffer for accumulating the payload of the current inbound datagram,
@@ -79,18 +141,30 @@ final class WhatsAppLayerContext implements SocketClientLayerContext {
      * <p>Allocated once the 3-byte length prefix is complete, sized to the
      * decoded length.  Set back to {@code null} after the completed datagram
      * is handed off to the listener.
+     *
+     * @implNote ADAPTED: WAFrameSocket.FrameSocket.$3 — WA Web's single
+     *     {@code Binary} accumulation buffer is split into a separate
+     *     per-message payload buffer in Cobalt.
      */
     private ByteBuffer datagramBuffer;
 
     /**
      * Single-threaded virtual executor for delivering datagrams to the
      * listener in order.
+     *
+     * @implNote NO_WA_BASIS — Cobalt uses a virtual-thread executor to
+     *     serialize datagram delivery off the selector thread.
      */
     private volatile ExecutorService listenerExecutor;
 
     /**
      * Creates an application layer context for the given listener.
      *
+     * @implNote ADAPTED: WAFrameSocket.FrameSocket constructor — WA Web accepts
+     *     a raw socket and optional initial data; Cobalt receives a
+     *     {@link SocketClientLayerListener} via constructor DI and integrates
+     *     into the NIO layer context chain instead of wiring raw socket
+     *     callbacks.
      * @param listener the non-null listener to receive datagrams
      */
     WhatsAppLayerContext(SocketClientLayerListener listener) {
@@ -108,6 +182,10 @@ final class WhatsAppLayerContext implements SocketClientLayerContext {
      * and a payload is being accumulated, returns the per-message
      * {@link #datagramBuffer}.
      *
+     * @implNote ADAPTED: WAFrameSocket.FrameSocket.$5 — WA Web accumulates
+     *     all inbound bytes into a single {@code Binary} buffer; Cobalt
+     *     instead exposes a two-phase target (length prefix or payload) so
+     *     the NIO selector can read directly into the correct buffer.
      * @return the buffer to read or unwrap into, in write mode
      */
     @Override
@@ -119,6 +197,12 @@ final class WhatsAppLayerContext implements SocketClientLayerContext {
         return datagramBuffer != null ? datagramBuffer : datagramLengthBuffer;
     }
 
+    /**
+     * An empty buffer returned when no handshake read is pending.
+     *
+     * @implNote NO_WA_BASIS — Cobalt-specific sentinel for the handshake
+     *     mode inbound target.
+     */
     private static final ByteBuffer EMPTY_BUFFER = ByteBuffer.allocate(0);
 
     /**
@@ -138,6 +222,11 @@ final class WhatsAppLayerContext implements SocketClientLayerContext {
      *     listener and resets state for the next message.
      * </ol>
      *
+     * @implNote ADAPTED: WAFrameSocket.FrameSocket.convertBufferedToFrames — WA Web
+     *     loops over the accumulation buffer extracting complete frames via
+     *     {@code peek(p)} and {@code _(binary)}; Cobalt processes one frame
+     *     at a time through the NIO selector's read cycle, returning
+     *     {@link SocketClientInboundResult} to control the event loop.
      * @param bytesRead the number of bytes placed into the target, or -1
      *                  for end-of-stream
      * @return the processing result
@@ -169,7 +258,7 @@ final class WhatsAppLayerContext implements SocketClientLayerContext {
                     | (datagramLengthBuffer.get() & 0xFF);
             datagramLengthBuffer.clear();
 
-            if (length <= 0 || length > MAX_MESSAGE_LENGTH) {
+            if (length < 0 || length > MAX_MESSAGE_LENGTH) {
                 return new SocketClientInboundResult.Close();
             }
 
@@ -199,6 +288,12 @@ final class WhatsAppLayerContext implements SocketClientLayerContext {
      * a bounded copy from the source into the current
      * {@link #inboundTarget()} and advances the state machine.
      *
+     * @implNote ADAPTED: WAFrameSocket.FrameSocket.$5 — WA Web's
+     *     {@code onData} handler writes bytes into the {@code Binary}
+     *     accumulation buffer and calls {@code convertBufferedToFrames()};
+     *     Cobalt pushes decoded bytes from upstream layers through the
+     *     state machine directly, avoiding an intermediate accumulation
+     *     buffer.
      * @param source the buffer containing decoded bytes, in read mode
      * @return the result of processing
      */
@@ -225,7 +320,7 @@ final class WhatsAppLayerContext implements SocketClientLayerContext {
                             | (datagramLengthBuffer.get() & 0xFF);
                     datagramLengthBuffer.clear();
 
-                    if (length <= 0 || length > MAX_MESSAGE_LENGTH) {
+                    if (length < 0 || length > MAX_MESSAGE_LENGTH) {
                         return new SocketClientInboundResult.Close();
                     }
 
@@ -245,6 +340,9 @@ final class WhatsAppLayerContext implements SocketClientLayerContext {
     /**
      * Processes an inbound read completion during handshake mode.
      *
+     * @implNote NO_WA_BASIS — Cobalt-specific mechanism for bridging the
+     *     blocking Noise handshake reads with the async NIO selector.
+     *     WA Web's handshake is fully async and does not need this.
      * @param bytesRead the number of bytes read, or -1 for end-of-stream
      * @return the processing result
      */
@@ -285,20 +383,98 @@ final class WhatsAppLayerContext implements SocketClientLayerContext {
      * Feeds decoded bytes from an upstream layer into a pending handshake
      * read.
      *
+     * @implNote NO_WA_BASIS — Cobalt-specific mechanism for bridging the
+     *     blocking Noise handshake reads with decoded bytes from upstream
+     *     layers (e.g. TLS unwrap).  WA Web's handshake is fully async.
      * @param source the buffer containing decoded bytes, in read mode
      * @return the processing result
      */
     private SocketClientInboundResult feedHandshakeRead(ByteBuffer source) {
-        var read = pendingHandshakeRead;
-        if (read == null) {
+        synchronized (handshakeLock) {
+            var read = pendingHandshakeRead;
+            if (read != null) {
+                var count = Math.min(source.remaining(), read.buffer.remaining());
+                var savedLimit = source.limit();
+                source.limit(source.position() + count);
+                read.buffer.put(source);
+                source.limit(savedLimit);
+
+                if (read.length == -1) {
+                    read.length = 0;
+                }
+                read.length += count;
+
+                if (!read.fullRead || !read.buffer.hasRemaining()) {
+                    pendingHandshakeRead = null;
+                    synchronized (read.lock) {
+                        read.lock.notifyAll();
+                    }
+                }
+            }
+
+            // Buffer any unconsumed bytes for the next read
+            if (source.hasRemaining()) {
+                if (handshakeBuffer == null) {
+                    handshakeBuffer = ByteBuffer.allocate(source.remaining());
+                } else if (handshakeBuffer.remaining() < source.remaining()) {
+                    var newBuf = ByteBuffer.allocate(handshakeBuffer.position() + source.remaining());
+                    handshakeBuffer.flip();
+                    newBuf.put(handshakeBuffer);
+                    handshakeBuffer = newBuf;
+                }
+                handshakeBuffer.put(source);
+            }
+
             return new SocketClientInboundResult.Continue();
         }
+    }
 
-        var count = Math.min(source.remaining(), read.buffer.remaining());
-        var savedLimit = source.limit();
-        source.limit(source.position() + count);
-        read.buffer.put(source);
-        source.limit(savedLimit);
+    /**
+     * Sets the pending handshake read request.
+     *
+     * <p>Called by the handshake thread to post a read request that the
+     * selector will fulfill through the layer context chain.
+     *
+     * @implNote NO_WA_BASIS — Cobalt-specific mechanism for blocking
+     *     handshake reads through the async NIO layer context chain.
+     * @param read the pending read request
+     * @return {@code true} if the read was posted, {@code false} if
+     *         another read is already pending
+     */
+    public boolean setPendingRead(SocketClientTransportLayerContext.PendingRead read) {
+        synchronized (handshakeLock) {
+            if (pendingHandshakeRead != null) {
+                return false;
+            }
+            pendingHandshakeRead = read;
+
+            // Drain any data that arrived before this read was posted
+            if (handshakeBuffer != null && handshakeBuffer.position() > 0) {
+                handshakeBuffer.flip();
+                drainHandshakeBuffer();
+                if (handshakeBuffer != null && !handshakeBuffer.hasRemaining()) {
+                    handshakeBuffer = null;
+                }
+            }
+            return true;
+        }
+    }
+
+    /**
+     * Drains the handshake buffer into the current pending read.
+     * Must be called under {@link #handshakeLock}.
+     */
+    private void drainHandshakeBuffer() {
+        var read = pendingHandshakeRead;
+        if (read == null || handshakeBuffer == null || !handshakeBuffer.hasRemaining()) {
+            return;
+        }
+
+        var count = Math.min(handshakeBuffer.remaining(), read.buffer.remaining());
+        var savedLimit = handshakeBuffer.limit();
+        handshakeBuffer.limit(handshakeBuffer.position() + count);
+        read.buffer.put(handshakeBuffer);
+        handshakeBuffer.limit(savedLimit);
 
         if (read.length == -1) {
             read.length = 0;
@@ -312,25 +488,11 @@ final class WhatsAppLayerContext implements SocketClientLayerContext {
             }
         }
 
-        return new SocketClientInboundResult.Continue();
-    }
-
-    /**
-     * Sets the pending handshake read request.
-     *
-     * <p>Called by the handshake thread to post a read request that the
-     * selector will fulfill through the layer context chain.
-     *
-     * @param read the pending read request
-     * @return {@code true} if the read was posted, {@code false} if
-     *         another read is already pending
-     */
-    public boolean setPendingRead(SocketClientTransportLayerContext.PendingRead read) {
-        if (pendingHandshakeRead != null) {
-            return false;
+        if (handshakeBuffer.hasRemaining()) {
+            handshakeBuffer.compact();
+        } else {
+            handshakeBuffer = null;
         }
-        pendingHandshakeRead = read;
-        return true;
     }
 
     /**
@@ -339,6 +501,10 @@ final class WhatsAppLayerContext implements SocketClientLayerContext {
      *
      * <p>After this call, inbound data is processed as int24-framed
      * datagrams and delivered to the listener.
+     *
+     * @implNote NO_WA_BASIS — Cobalt-specific handshake/datagram mode
+     *     transition.  WA Web's FrameSocket does not have a handshake
+     *     mode; the Noise handshake is handled at a different layer.
      */
     public void markHandshakeComplete() {
         this.handshakeMode = false;
@@ -349,6 +515,10 @@ final class WhatsAppLayerContext implements SocketClientLayerContext {
      *
      * <p>Called when the connection transitions to the post-tunnel phase
      * and datagram delivery begins.
+     *
+     * @implNote NO_WA_BASIS — Cobalt uses a single-threaded virtual executor
+     *     to serialize datagram delivery; WA Web delivers frames
+     *     synchronously from the socket's data callback.
      */
     public void startListenerExecutor() {
         if (listenerExecutor == null || listenerExecutor.isShutdown()) {
@@ -360,6 +530,19 @@ final class WhatsAppLayerContext implements SocketClientLayerContext {
         }
     }
 
+    /**
+     * Handles connection teardown by releasing resources and notifying
+     * the listener.
+     *
+     * <p>Completes any pending handshake read with end-of-stream, shuts
+     * down the listener executor, and invokes the listener's
+     * {@link SocketClientLayerListener#onClose()} callback.
+     *
+     * @implNote ADAPTED: WAFrameSocket.FrameSocket.$9 — WA Web's close
+     *     handler sets {@code closed = true} and invokes the
+     *     {@code onClose} callback.  Cobalt additionally releases the
+     *     handshake read and listener executor resources.
+     */
     @Override
     public void onDisconnect() {
         var read = pendingHandshakeRead;

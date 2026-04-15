@@ -303,7 +303,7 @@ public sealed interface FetchSubgroupSuggestionsMex extends MexJsonOperation per
                             }
 
                             var result = new ArrayList<Subject>(arr.size());
-                            for (int i = 0; i < arr.size(); i++) {
+                            for (var i = 0; i < arr.size(); i++) {
                                 of(arr.getJSONObject(i)).ifPresent(result::add);
                             }
                             return result;
@@ -368,7 +368,7 @@ public sealed interface FetchSubgroupSuggestionsMex extends MexJsonOperation per
                             }
 
                             var result = new ArrayList<Description>(arr.size());
-                            for (int i = 0; i < arr.size(); i++) {
+                            for (var i = 0; i < arr.size(); i++) {
                                 of(arr.getJSONObject(i)).ifPresent(result::add);
                             }
                             return result;
@@ -421,7 +421,7 @@ public sealed interface FetchSubgroupSuggestionsMex extends MexJsonOperation per
                             }
 
                             var result = new ArrayList<Creator>(arr.size());
-                            for (int i = 0; i < arr.size(); i++) {
+                            for (var i = 0; i < arr.size(); i++) {
                                 of(arr.getJSONObject(i)).ifPresent(result::add);
                             }
                             return result;
@@ -462,7 +462,7 @@ public sealed interface FetchSubgroupSuggestionsMex extends MexJsonOperation per
                         }
 
                         var result = new ArrayList<Node>(arr.size());
-                        for (int i = 0; i < arr.size(); i++) {
+                        for (var i = 0; i < arr.size(); i++) {
                             of(arr.getJSONObject(i)).ifPresent(result::add);
                         }
                         return result;
@@ -496,7 +496,7 @@ public sealed interface FetchSubgroupSuggestionsMex extends MexJsonOperation per
                     }
 
                     var result = new ArrayList<Edges>(arr.size());
-                    for (int i = 0; i < arr.size(); i++) {
+                    for (var i = 0; i < arr.size(); i++) {
                         of(arr.getJSONObject(i)).ifPresent(result::add);
                     }
                     return result;
@@ -530,7 +530,7 @@ public sealed interface FetchSubgroupSuggestionsMex extends MexJsonOperation per
                 }
 
                 var result = new ArrayList<SubGroupSuggestions>(arr.size());
-                for (int i = 0; i < arr.size(); i++) {
+                for (var i = 0; i < arr.size(); i++) {
                     of(arr.getJSONObject(i)).ifPresent(result::add);
                 }
                 return result;

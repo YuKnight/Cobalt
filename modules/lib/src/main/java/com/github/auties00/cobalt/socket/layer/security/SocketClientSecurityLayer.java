@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.socket.layer.security;
 
 import com.github.auties00.cobalt.socket.layer.SocketClientLayer;
+import com.github.auties00.cobalt.socket.layer.threading.SocketClientLayerContext;
 
 import java.io.IOException;
 
@@ -11,7 +12,7 @@ import java.io.IOException;
  * encryption is handled by the standalone {@code WhatsAppSocketClient}
  * rather than as a layer in the stack.
  */
-public sealed interface SocketClientSecurityLayer extends SocketClientLayer
+public sealed interface SocketClientSecurityLayer<C extends SocketClientLayerContext> extends SocketClientLayer<C>
         permits SocketClientTransportSecurityLayer, SocketClientTunnelSecurityLayer {
     /**
      * Starts the security handshake and blocks until it completes.

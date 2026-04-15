@@ -6,7 +6,7 @@ import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.SyncPendingMutation;
+import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.model.sync.action.bot.BotWelcomeRequestAction;
 import com.github.auties00.cobalt.model.sync.action.bot.BotWelcomeRequestActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;

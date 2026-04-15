@@ -8,7 +8,7 @@ import com.github.auties00.cobalt.model.business.*;
 import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.store.WhatsAppStore;
-import com.github.auties00.cobalt.util.FastRandomUtils;
+import com.github.auties00.cobalt.util.FastDataUtils;
 import com.github.auties00.curve25519.Curve25519;
 import com.github.auties00.libsignal.key.SignalIdentityKeyPair;
 import com.github.auties00.libsignal.key.SignalIdentityPublicKey;
@@ -199,7 +199,7 @@ public abstract sealed class WhatsAppMobileClientRegistration implements AutoClo
                     new GCMParameterSpec(128, new byte[12])
             );
             var result = cipher.doFinal(params.getBytes(StandardCharsets.UTF_8));
-            var cipheredParameters = Base64.getUrlEncoder().encodeToString(FastRandomUtils.concatByteArrays(keypair.publicKey().toEncodedPoint(), result));
+            var cipheredParameters = Base64.getUrlEncoder().encodeToString(FastDataUtils.concatByteArrays(keypair.publicKey().toEncodedPoint(), result));
             var requestBuilder = createRequest(path, cipheredParameters);
             var response = httpClient.send(requestBuilder, HttpResponse.BodyHandlers.ofByteArray());
             if(response.statusCode() != 200) {
@@ -224,10 +224,10 @@ public abstract sealed class WhatsAppMobileClientRegistration implements AutoClo
                 "lc", "US",
                 "authkey", Base64.getUrlEncoder().encodeToString(store.noiseKeyPair().publicKey().toEncodedPoint()),
                 "vname", certificate,
-                "e_regid", Base64.getUrlEncoder().encodeToString(FastRandomUtils.intToBytes(store.registrationId(), 4)),
+                "e_regid", Base64.getUrlEncoder().encodeToString(FastDataUtils.intToBytes(store.registrationId(), 4)),
                 "e_keytype", SIGNAL_PUBLIC_KEY_TYPE,
                 "e_ident", Base64.getUrlEncoder().encodeToString(store.identityKeyPair().publicKey().toEncodedPoint()),
-                "e_skey_id", Base64.getUrlEncoder().encodeToString(FastRandomUtils.intToBytes(store.signedKeyPair().id(), 3)),
+                "e_skey_id", Base64.getUrlEncoder().encodeToString(FastDataUtils.intToBytes(store.signedKeyPair().id(), 3)),
                 "e_skey_val", Base64.getUrlEncoder().encodeToString(store.signedKeyPair().publicKey().toEncodedPoint()),
                 "e_skey_sig", Base64.getUrlEncoder().encodeToString(store.signedKeyPair().signature()),
                 "fdid", fdid,

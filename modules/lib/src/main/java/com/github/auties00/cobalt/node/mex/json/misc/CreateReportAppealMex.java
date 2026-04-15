@@ -297,7 +297,7 @@ public sealed interface CreateReportAppealMex extends MexJsonOperation permits C
                 }
 
                 var result = new ArrayList<Appeal>(arr.size());
-                for (int i = 0; i < arr.size(); i++) {
+                for (var i = 0; i < arr.size(); i++) {
                     of(arr.getJSONObject(i)).ifPresent(result::add);
                 }
                 return result;

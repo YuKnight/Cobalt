@@ -1,9 +1,8 @@
 package com.github.auties00.cobalt.wam.event;
 
 import com.github.auties00.cobalt.wam.annotation.WamEvent;
-import com.github.auties00.cobalt.wam.annotation.WamProperty;
-import com.github.auties00.cobalt.wam.annotation.WamChannel;
-import com.github.auties00.cobalt.wam.annotation.WamType;
+import com.github.auties00.cobalt.wam.model.WamChannel;
+import com.github.auties00.cobalt.wam.model.WamEventSpec;
 
 
 @WamEvent(id = 2960, channel = WamChannel.PRIVATE, betaWeight = 20, releaseWeight = 1000, privateStatsId = 191000728)

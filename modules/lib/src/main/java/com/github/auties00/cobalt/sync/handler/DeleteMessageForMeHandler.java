@@ -6,6 +6,8 @@ import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.MessageKey;
 import com.github.auties00.cobalt.model.sync.*;
 import com.github.auties00.cobalt.model.sync.action.chat.DeleteMessageForMeAction;
+import com.github.auties00.cobalt.sync.ConflictResolution;
+import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.model.sync.action.chat.DeleteMessageForMeActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
@@ -326,7 +328,7 @@ public final class DeleteMessageForMeHandler implements WebAppStateActionHandler
         // WAWebDeleteMessageForMeSync.getDeleteForMeMutations: var a = unixTimeMs()
         var now = Instant.now(); // WAWebDeleteMessageForMeSync.getDeleteForMeMutations: var a = o("WATimeUtils").unixTimeMs()
         var results = new ArrayList<SyncPendingMutation>(keys.size());
-        for (int i = 0; i < keys.size(); i++) { // WAWebDeleteMessageForMeSync.getDeleteForMeMutations: t.map(function(t) { ... })
+        for (var i = 0; i < keys.size(); i++) { // WAWebDeleteMessageForMeSync.getDeleteForMeMutations: t.map(function(t) { ... })
             var key = keys.get(i);
             var messageTimestamp = messageTimestamps.get(i);
             var isGroup = isGroupMessages.get(i);
