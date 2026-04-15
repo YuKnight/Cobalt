@@ -3,7 +3,7 @@ package com.github.auties00.cobalt.client;
 import com.github.auties00.cobalt.model.device.DevicePlatformType;
 import com.github.auties00.cobalt.model.device.pairing.ClientAppVersion;
 import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
-import com.github.auties00.cobalt.util.FastDataUtils;
+import com.github.auties00.cobalt.util.DataUtils;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
@@ -386,7 +386,7 @@ public final class WhatsAppDevice {
      * @return a new iOS-configured device descriptor
      */
     public static WhatsAppDevice ios(boolean business) {
-        var device = IOS_DEVICES.get(FastDataUtils.randomInt(IOS_DEVICES.size()));
+        var device = IOS_DEVICES.get(DataUtils.randomInt(IOS_DEVICES.size()));
         return new WhatsAppDevice(
                 device.model,
                 device.manufacturer,
@@ -411,12 +411,12 @@ public final class WhatsAppDevice {
      * @return a new Android-configured device descriptor
      */
     public static WhatsAppDevice android(boolean business) {
-        var model = "Pixel_" + FastDataUtils.randomInt(2, 9);
+        var model = "Pixel_" + DataUtils.randomInt(2, 9);
         return new WhatsAppDevice(
                 model,
                 "Google",
                 business ? ClientPlatformType.ANDROID_BUSINESS : ClientPlatformType.ANDROID,
-                ClientAppVersion.of(String.valueOf(FastDataUtils.randomInt(11, 16))),
+                ClientAppVersion.of(String.valueOf(DataUtils.randomInt(11, 16))),
                 null,
                 model,
                 WhatsAppClientType.MOBILE

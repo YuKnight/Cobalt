@@ -18,7 +18,7 @@ import com.github.auties00.cobalt.model.message.text.ReactionMessage;
 import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
 import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfoBuilder;
 import com.github.auties00.cobalt.store.WhatsAppStore;
-import com.github.auties00.cobalt.util.FastDataUtils;
+import com.github.auties00.cobalt.util.DataUtils;
 
 import java.time.Instant;
 import java.util.Objects;
@@ -127,7 +127,7 @@ final class MessagePreparer {
 
         // WAWebSendTextMsgChatAction / WAWebChatForwardMessage:
         // generate 32-byte message secret via crypto.getRandomValues(new Uint8Array(32))
-        var messageSecret = FastDataUtils.randomByteArray(MESSAGE_SECRET_SIZE);
+        var messageSecret = DataUtils.randomByteArray(MESSAGE_SECRET_SIZE);
 
         // WAWebAddonEncryptAddonMsgData: validate or convert addon content
         var preparedContainer = prepareAddonContent(container, chatJid, localJid);

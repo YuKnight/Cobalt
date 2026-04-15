@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.wam;
 
-import com.github.auties00.cobalt.util.FastDataUtils;
+import com.github.auties00.cobalt.util.DataUtils;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -68,7 +68,7 @@ final class WamBeaconing {
         var currentDayEpoch = Instant.now().truncatedTo(ChronoUnit.DAYS).getEpochSecond();
         if (currentDayEpoch != state.activationDayEpoch) {
             state.activationDayEpoch = currentDayEpoch;
-            state.active = FastDataUtils.randomDouble() <= ACTIVATION_PROBABILITY;
+            state.active = DataUtils.randomDouble() <= ACTIVATION_PROBABILITY;
             state.sequenceNumber = 0;
         }
 

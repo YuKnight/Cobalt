@@ -3,6 +3,7 @@ package com.github.auties00.cobalt.socket;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
+import com.github.auties00.cobalt.socket.application.whatsapp.WhatsAppSslEngineFactory;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;

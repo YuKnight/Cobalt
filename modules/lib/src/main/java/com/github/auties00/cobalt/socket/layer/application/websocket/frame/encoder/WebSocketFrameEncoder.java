@@ -10,9 +10,9 @@ import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
-import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.ReadOnlyBufferException;
 import java.util.Arrays;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -270,15 +270,7 @@ public final class WebSocketFrameEncoder {
     }
 
     /**
-     * Applies the WebSocket mask to a buffer, choosing the fastest path
-     * based on the buffer type.
-     *
-     * <p>For writable array-backed buffers the mask is applied
-     * <b>in-place</b> and the original buffer is returned.  For writable
-     * direct buffers the mask is applied in-place via
-     * {@link MemorySegment#ofBuffer(Buffer)}.  For read-only buffers a
-     * new heap buffer is allocated, the data is copied, and the copy is
-     * masked.
+     * Applies the WebSocket mask to a buffer, choosing the fastest path based on the buffer type.
      *
      * @param payload    the buffer to mask
      * @param maskKey    the four-byte masking key
@@ -291,22 +283,19 @@ public final class WebSocketFrameEncoder {
             return EMPTY_PAYLOAD;
         }
 
-        if (!payload.isReadOnly() && payload.hasArray()) {
+        if(payload.isReadOnly()) {
+            throw new ReadOnlyBufferException();
+        }
+
+        if (payload.hasArray()) {
             var array = payload.array();
             var start = payload.arrayOffset() + payload.position();
             applyMaskToArray(array, start, length, maskKey, maskOffset);
             return payload;
         }
 
-        if (!payload.isReadOnly()) {
-            applyMaskViaSegment(MemorySegment.ofBuffer(payload), payload.position(), length, maskKey, maskOffset);
-            return payload;
-        }
-
-        var masked = new byte[length];
-        payload.duplicate().get(masked);
-        applyMaskToArray(masked, 0, length, maskKey, maskOffset);
-        return ByteBuffer.wrap(masked);
+        applyMaskViaSegment(MemorySegment.ofBuffer(payload), payload.position(), length, maskKey, maskOffset);
+        return payload;
     }
 
     /**

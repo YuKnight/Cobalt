@@ -58,7 +58,7 @@ import com.github.auties00.cobalt.model.sync.action.payment.PaymentTosAction;
 import com.github.auties00.cobalt.model.sync.action.privacy.PrivateProcessingSettingAction;
 import com.github.auties00.cobalt.model.sync.action.setting.NotificationActivitySettingAction;
 import com.github.auties00.cobalt.sync.crypto.MutationLTHash;
-import com.github.auties00.cobalt.util.FastDataUtils;
+import com.github.auties00.cobalt.util.DataUtils;
 import com.github.auties00.collections.ConcurrentLinkedHashMap;
 import com.github.auties00.libsignal.SignalProtocolAddress;
 import com.github.auties00.libsignal.groups.SignalSenderKeyName;
@@ -548,7 +548,7 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
             contact.lid()
                     .ifPresent(entry -> registerLidMapping(contact.jid(), entry));
         }
-        this.registrationId = requireNonNullElseGet(registrationId, () -> FastDataUtils.randomInt(16380) + 1);
+        this.registrationId = requireNonNullElseGet(registrationId, () -> DataUtils.randomInt(16380) + 1);
         this.noiseKeyPair = requireNonNullElseGet(noiseKeyPair, SignalIdentityKeyPair::random);
         this.identityKeyPair = requireNonNullElseGet(identityKeyPair, SignalIdentityKeyPair::random);
         this.signedKeyPair = requireNonNullElseGet(signedKeyPair, () -> SignalSignedKeyPair.of(this.registrationId, this.identityKeyPair));
@@ -556,8 +556,8 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
         this.fdid = requireNonNullElseGet(fdid, UUID::randomUUID);
         this.deviceId = requireNonNullElseGet(deviceId, () -> HexFormat.of().parseHex(UUID.randomUUID().toString().replace("-", "")));
         this.advertisingId = requireNonNullElseGet(advertisingId, UUID::randomUUID);
-        this.identityId = requireNonNullElseGet(identityId, () -> FastDataUtils.randomByteArray(16));
-        this.backupToken = requireNonNullElseGet(backupToken, () -> FastDataUtils.randomByteArray(20));
+        this.identityId = requireNonNullElseGet(identityId, () -> DataUtils.randomByteArray(16));
+        this.backupToken = requireNonNullElseGet(backupToken, () -> DataUtils.randomByteArray(20));
         this.signedDeviceIdentity = signedDeviceIdentity;
         this.senderKeys = Objects.requireNonNull(senderKeys, "senderKeys cannot be null");
         this.appStateKeys = Objects.requireNonNull(appStateKeys, "appStateKeys cannot be null");

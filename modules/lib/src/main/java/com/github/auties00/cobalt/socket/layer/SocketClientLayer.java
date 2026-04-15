@@ -120,12 +120,13 @@ public interface SocketClientLayer<C extends SocketClientLayerContext> {
      * Registers a layer context in the selector pipeline.
      *
      * <p>Layer contexts are the per-connection processing state for each
-     * protocol layer.  They are registered in bottom-to-top order during
-     * stack construction so the selector can drive the inbound read path.
+     * protocol layer.  They are registered during stack construction so
+     * the selector can drive the inbound read path.  The concrete type
+     * of the context determines its position in the chain.
      *
-     * @param key     the layer class that owns this context
      * @param context the layer context to register
      * @throws IOException if registration fails
      */
-    void registerLayerContext(Class<?> key, SocketClientLayerContext context) throws IOException;
+    void registerLayerContext(SocketClientLayerContext context) throws IOException;
+
 }

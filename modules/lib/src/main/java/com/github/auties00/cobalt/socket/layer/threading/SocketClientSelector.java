@@ -1,10 +1,6 @@
 package com.github.auties00.cobalt.socket.layer.threading;
 
-import com.github.auties00.cobalt.socket.layer.security.SocketClientTransportSecurityLayer;
-import com.github.auties00.cobalt.socket.layer.security.SocketClientTunnelSecurityLayer;
-import com.github.auties00.cobalt.socket.layer.security.TlsSocketClientLayerContext;
 import com.github.auties00.cobalt.socket.layer.transport.SocketClientTransportLayerContext;
-import com.github.auties00.cobalt.socket.layer.tunnel.SocketClientTunnelLayer;
 import com.github.auties00.cobalt.socket.layer.tunnel.SocketClientTunnelLayerContext;
 
 import java.io.IOException;
@@ -78,7 +74,7 @@ public final class SocketClientSelector implements Runnable {
      */
     public synchronized void register(SocketChannel channel, SocketClientTransportLayerContext transportContext) throws IOException {
         selector.wakeup();
-        channel.register(selector, SelectionKey.OP_CONNECT, new SocketClientContext(transportContext));
+        channel.register(selector, SelectionKey.OP_CONNECT, SocketClientContext.newConnectionContext(transportContext));
         if (selectorThread == null || !selectorThread.isAlive()) {
             selectorThread = Thread.startVirtualThread(this);
         }
@@ -88,18 +84,16 @@ public final class SocketClientSelector implements Runnable {
      * Registers a layer context for the given channel.
      *
      * @param channel      the channel
-     * @param key          the layer class key
      * @param layerContext the context to register
      * @return {@code true} if registered, {@code false} if the channel
      *         is not registered with this selector
      */
-    public boolean registerLayerContext(SocketChannel channel, Class<?> key, SocketClientLayerContext layerContext) {
+    public boolean registerLayerContext(SocketChannel channel, SocketClientLayerContext layerContext) {
         var selKey = channel.keyFor(selector);
         if (selKey == null) {
             return false;
         }
-        var ctx = (SocketClientContext) selKey.attachment();
-        ctx.addLayerContext(key, layerContext);
+        ((SocketClientContext) selKey.attachment()).addLayerContext(layerContext);
         return true;
     }
 
@@ -183,7 +177,7 @@ public final class SocketClientSelector implements Runnable {
         }
 
         var ctx = (SocketClientContext) key.attachment();
-        var tunnelCtx = ctx.getLayerContext(SocketClientTunnelLayer.class);
+        var tunnelCtx = ctx.tunnelContext();
         if (tunnelCtx.isEmpty()) {
             return false;
         }
@@ -260,8 +254,7 @@ public final class SocketClientSelector implements Runnable {
         var ctx = (SocketClientContext) key.attachment();
 
         // Mark tunnel as established
-        var tunnelCtx = ctx.getLayerContext(SocketClientTunnelLayer.class);
-        tunnelCtx.ifPresent(SocketClientTunnelLayerContext::markTunnelled);
+        ctx.tunnelContext().ifPresent(SocketClientTunnelLayerContext::markTunnelled);
 
         try {
             key.interestOps(key.interestOps() | SelectionKey.OP_READ);
@@ -287,81 +280,78 @@ public final class SocketClientSelector implements Runnable {
         if (leftover != null && leftover.hasRemaining() && !preSeedDatagram(channel, leftover)) {
             return false;
         }
-        return drainSslAppBuffer(channel);
+        return drainAppBuffer(channel);
     }
 
     /**
-     * Initiates a TLS handshake and blocks the calling virtual thread
+     * Initiates a security handshake and blocks the calling virtual thread
      * until it completes.
      *
-     * @param channel    the channel
-     * @param tlsContext the TLS layer context to register
-     * @param timeout    the handshake timeout in milliseconds
+     * @param channel         the channel
+     * @param securityContext  the security layer context to handshake
+     * @param timeout         the handshake timeout in milliseconds
      * @throws IOException if the handshake fails or times out
      */
-    public void startTlsHandshake(SocketChannel channel, SocketClientLayerContext tlsContext, long timeout) throws IOException {
+    public void startHandshake(SocketChannel channel, SocketClientLayerContext securityContext, long timeout) throws IOException {
         var key = channel.keyFor(selector);
         if (key == null || !key.isValid()) {
             throw new IOException("Channel not registered");
         }
 
         var ctx = (SocketClientContext) key.attachment();
-        if (!(tlsContext instanceof TlsSocketClientLayerContext tls)) {
-            throw new IOException("Expected TlsLayerContext");
-        }
 
-        tls.beginHandshake();
+        securityContext.beginHandshake();
 
         try {
             key.interestOps(SelectionKey.OP_READ | SelectionKey.OP_WRITE);
         } catch (CancelledKeyException e) {
-            throw new IOException("Key cancelled during TLS init");
+            throw new IOException("Key cancelled during handshake init");
         }
         wakeup();
 
-        synchronized (tls.handshakeLock()) {
+        var lock = securityContext.handshakeLock();
+        if (lock == null) {
+            throw new IOException("Security context does not support handshaking");
+        }
+
+        synchronized (lock) {
             var deadline = System.currentTimeMillis() + timeout;
-            while (!tls.isHandshakeComplete() && ctx.transportContext().isConnected()) {
+            while (!securityContext.isHandshakeComplete() && ctx.transportContext().isConnected()) {
                 var remaining = deadline - System.currentTimeMillis();
                 if (remaining <= 0) {
-                    throw new IOException("TLS handshake timed out");
+                    throw new IOException("Handshake timed out");
                 }
                 try {
-                    tls.handshakeLock().wait(remaining);
+                    lock.wait(remaining);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
-                    throw new IOException("TLS handshake interrupted", e);
+                    throw new IOException("Handshake interrupted", e);
                 }
             }
         }
 
-        if (!tls.isHandshakeComplete()) {
-            throw new IOException("TLS handshake failed: connection lost");
+        if (!securityContext.isHandshakeComplete()) {
+            throw new IOException("Handshake failed: connection lost");
         }
     }
 
     /**
-     * Drains any leftover decrypted data from the TLS application input
-     * buffer into the layer pipeline.
+     * Drains any leftover buffered data from all layer contexts into
+     * the layer pipeline.
      *
      * @param channel the channel
-     * @return {@code true} if draining succeeded or no TLS layer is
-     *         present, {@code false} if draining failed
+     * @return {@code true} if draining succeeded or no layers needed
+     *         draining, {@code false} if draining failed
      */
-    public boolean drainSslAppBuffer(SocketChannel channel) {
+    public boolean drainAppBuffer(SocketChannel channel) {
         var key = channel.keyFor(selector);
         if (key == null) {
             return false;
         }
 
         var ctx = (SocketClientContext) key.attachment();
-        var tlsCtx = ctx.getLayerContext(SocketClientTransportSecurityLayer.class);
-        if (tlsCtx.isEmpty()) {
-            return true;
-        }
-
         try {
-            return tlsCtx.get().drainToNextLayer();
+            return ctx.drainAllLayers();
         } catch (IOException _) {
             return false;
         }
@@ -391,7 +381,7 @@ public final class SocketClientSelector implements Runnable {
         // TLS-decrypted.  Feed them into the tunnel context (the first
         // non-TLS context in the chain) rather than the TLS bottom, so
         // they are not erroneously re-decrypted.
-        var tunnelCtx = ctx.getLayerContext(SocketClientTunnelLayer.class);
+        var tunnelCtx = ctx.tunnelContext();
         SocketClientLayerContext target;
         if (tunnelCtx.isPresent()) {
             target = tunnelCtx.get();
@@ -467,16 +457,14 @@ public final class SocketClientSelector implements Runnable {
                 }
             }
 
-            // Check for TLS handshaking (either transport or tunnel TLS)
-            var transportTls = ctx.getLayerContext(SocketClientTransportSecurityLayer.class);
-            var tunnelTls = ctx.getLayerContext(SocketClientTunnelSecurityLayer.class);
-            var handshakingTls = transportTls.filter(TlsSocketClientLayerContext::isHandshaking)
-                    .or(() -> tunnelTls.filter(TlsSocketClientLayerContext::isHandshaking));
-            if (handshakingTls.isPresent()) {
-                if (handshakingTls.get().isTasksPending()) {
+            // Check for any layer currently handshaking
+            var handshakingCtx = ctx.findHandshakingContext();
+            if (handshakingCtx.isPresent()) {
+                var hCtx = handshakingCtx.get();
+                if (hCtx.isTasksPending()) {
                     return;
                 }
-                if (!processHandshake(channel, ctx, key, handshakingTls.get())) {
+                if (!processHandshake(channel, ctx, key, hCtx)) {
                     unregister(channel);
                 }
                 return;
@@ -490,9 +478,7 @@ public final class SocketClientSelector implements Runnable {
             }
             if (key.isWritable()) {
                 processWrite(channel, ctx);
-                var hasPendingWrites = !transportCtx.pendingWrites.isEmpty()
-                        || transportTls.map(TlsSocketClientLayerContext::hasPendingEncryptedOutput).orElse(false)
-                        || tunnelTls.map(TlsSocketClientLayerContext::hasPendingEncryptedOutput).orElse(false);
+                var hasPendingWrites = !transportCtx.pendingWrites.isEmpty() || ctx.hasPendingOutput();
                 key.interestOps(updateWriteInterestOps(key.interestOps(), hasPendingWrites));
             }
         } catch (Exception _) {
@@ -500,9 +486,9 @@ public final class SocketClientSelector implements Runnable {
         }
     }
 
-    private boolean processHandshake(SocketChannel channel, SocketClientContext ctx, SelectionKey key, TlsSocketClientLayerContext tlsCtx) throws IOException {
-        var result = tlsCtx.driveHandshake(channel);
-        return handleInboundResult(channel, ctx, key, result);
+    private boolean processHandshake(SocketChannel channel, SocketClientContext ctx, SelectionKey key, SocketClientLayerContext layerCtx) throws IOException {
+        var result = layerCtx.driveHandshake(channel);
+        return handleInboundResult(ctx, key, result);
     }
 
     private boolean processRead(SocketChannel channel, SocketClientContext ctx) throws IOException {
@@ -516,13 +502,12 @@ public final class SocketClientSelector implements Runnable {
         var result = bottom.processInbound(bytesRead);
 
         var key = channel.keyFor(selector);
-        return key != null && handleInboundResult(channel, ctx, key, result);
+        return key != null && handleInboundResult(ctx, key, result);
     }
 
-    private boolean handleInboundResult(SocketChannel channel, SocketClientContext ctx, SelectionKey key, SocketClientInboundResult result) throws IOException {
+    private boolean handleInboundResult(SocketClientContext ctx, SelectionKey key, SocketClientInboundResult result) {
         return switch (result) {
-            case SocketClientInboundResult.Continue _ -> true;
-            case SocketClientInboundResult.Buffering _ -> true;
+            case SocketClientInboundResult.Continue _, SocketClientInboundResult.Buffering _ -> true;
             case SocketClientInboundResult.Close _ -> false;
             case SocketClientInboundResult.NeedsWrite needsWrite -> {
                 // Enqueue the write data and enable write interest
@@ -541,17 +526,13 @@ public final class SocketClientSelector implements Runnable {
                 yield true;
             }
             case SocketClientInboundResult.Suspended _ -> {
-                // TLS tasks pending — disable interest, run tasks
+                // Delegated tasks pending — disable interest, run tasks
                 try {
                     key.interestOps(0);
                 } catch (CancelledKeyException _) {
                     yield true;
                 }
-                var pendingTls = ctx.getLayerContext(SocketClientTransportSecurityLayer.class)
-                        .filter(TlsSocketClientLayerContext::isTasksPending)
-                        .or(() -> ctx.getLayerContext(SocketClientTunnelSecurityLayer.class)
-                                .filter(TlsSocketClientLayerContext::isTasksPending));
-                pendingTls.ifPresent(tls -> tls.runDelegatedTasks(() -> {
+                ctx.findTasksPendingContext().ifPresent(layer -> layer.runDelegatedTasks(() -> {
                     try {
                         key.interestOps(SelectionKey.OP_READ | SelectionKey.OP_WRITE);
                     } catch (CancelledKeyException _) {
@@ -566,53 +547,25 @@ public final class SocketClientSelector implements Runnable {
 
     private boolean processWrite(SocketChannel channel, SocketClientContext ctx) throws IOException {
         var transportCtx = ctx.transportContext();
-        var transportTls = ctx.getLayerContext(SocketClientTransportSecurityLayer.class);
-        var tunnelTls = ctx.getLayerContext(SocketClientTunnelSecurityLayer.class);
-
-        if (transportTls.isPresent() && tunnelTls.isPresent()) {
-            return processWriteDualSsl(channel, transportCtx, transportTls.get(), tunnelTls.get());
-        } else if (transportTls.isPresent()) {
-            return processWriteSsl(channel, transportCtx, transportTls.get());
-        } else if (tunnelTls.isPresent()) {
-            return processWriteSsl(channel, transportCtx, tunnelTls.get());
-        } else {
-            return processWriteDirect(channel, transportCtx);
-        }
-    }
-
-    /**
-     * Writes pending data with dual TLS wrapping (HTTPS proxy).
-     *
-     * <p>The transport TLS encrypts to the target, then the tunnel TLS
-     * encrypts to the proxy.  The transport TLS wraps into an
-     * intermediate buffer, then the tunnel TLS wraps that intermediate
-     * and writes to the channel.
-     */
-    private boolean processWriteDualSsl(SocketChannel channel, SocketClientTransportLayerContext transportCtx, TlsSocketClientLayerContext transportTls, TlsSocketClientLayerContext tunnelTls) throws IOException {
+        var bottom = ctx.bottomProcessingContext();
         while (transportCtx.isConnected()) {
             var claim = transportCtx.pendingWrites.claim();
             if (claim.isEmpty()) {
                 return true;
             }
 
-            var wrapped = transportTls.wrapToBuffer(claim.array(), claim.offset(), claim.count());
-            if (wrapped == null) {
-                var consumed = countConsumed(claim);
-                transportCtx.pendingWrites.release(consumed);
-                return false;
-            }
-
-            if (!tunnelTls.wrapAndWrite(channel, new ByteBuffer[]{wrapped}, 0, 1)) {
-                var consumed = countConsumed(claim);
-                transportCtx.pendingWrites.release(consumed);
-                return false;
+            boolean success;
+            if (bottom != null) {
+                success = bottom.processOutbound(channel, claim.array(), claim.offset(), claim.count());
+            } else {
+                channel.write(claim.array(), claim.offset(), claim.count());
+                success = true;
             }
 
             var consumed = countConsumed(claim);
             transportCtx.pendingWrites.release(consumed);
-
-            if (consumed < claim.count()) {
-                continue;
+            if (!success) {
+                return false;
             }
         }
         return false;
@@ -627,66 +580,6 @@ public final class SocketClientSelector implements Runnable {
             consumed++;
         }
         return consumed;
-    }
-
-    private boolean processWriteDirect(SocketChannel channel, SocketClientTransportLayerContext transportCtx) throws IOException {
-        while (transportCtx.isConnected()) {
-            var claim = transportCtx.pendingWrites.claim();
-            if (claim.isEmpty()) {
-                return true;
-            }
-
-            channel.write(claim.array(), claim.offset(), claim.count());
-
-            var consumed = 0;
-            for (var i = claim.offset(); i < claim.offset() + claim.count(); i++) {
-                if (claim.array()[i].hasRemaining()) {
-                    break;
-                }
-                consumed++;
-            }
-            transportCtx.pendingWrites.release(consumed);
-
-            if (consumed < claim.count()) {
-                return false;
-            }
-        }
-        return false;
-    }
-
-    private boolean processWriteSsl(SocketChannel channel, SocketClientTransportLayerContext transportCtx, TlsSocketClientLayerContext tlsCtx) throws IOException {
-        while (transportCtx.isConnected()) {
-            var claim = transportCtx.pendingWrites.claim();
-            if (claim.isEmpty()) {
-                return true;
-            }
-
-            if (!tlsCtx.wrapAndWrite(channel, claim.array(), claim.offset(), claim.count())) {
-                var consumed = 0;
-                for (var i = claim.offset(); i < claim.offset() + claim.count(); i++) {
-                    if (claim.array()[i].hasRemaining()) {
-                        break;
-                    }
-                    consumed++;
-                }
-                transportCtx.pendingWrites.release(consumed);
-                return false;
-            }
-
-            var consumed = 0;
-            for (var i = claim.offset(); i < claim.offset() + claim.count(); i++) {
-                if (claim.array()[i].hasRemaining()) {
-                    break;
-                }
-                consumed++;
-            }
-            transportCtx.pendingWrites.release(consumed);
-
-            if (consumed < claim.count()) {
-                continue;
-            }
-        }
-        return false;
     }
 
     static int updateWriteInterestOps(int currentOps, boolean hasPendingWrites) {

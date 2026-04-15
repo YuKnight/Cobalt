@@ -167,11 +167,24 @@ public final class WhatsAppLayerContext implements SocketClientLayerContext {
      *     callbacks.
      * @param listener the non-null listener to receive datagrams
      */
-    WhatsAppLayerContext(SocketClientLayerListener listener) {
+    private WhatsAppLayerContext(SocketClientLayerListener listener) {
         this.listener = Objects.requireNonNull(listener, "listener cannot be null");
         this.datagramLengthBuffer = ByteBuffer.allocate(INT24_BYTE_SIZE);
         this.executorLock = new Object();
         this.handshakeMode = true;
+    }
+
+    /**
+     * Creates a new application layer context for the given listener.
+     *
+     * @implNote ADAPTED: WAFrameSocket.FrameSocket constructor — WA Web accepts
+     *     a raw socket and optional initial data; Cobalt creates via this
+     *     factory method and integrates into the NIO layer context chain.
+     * @param listener the non-null listener to receive datagrams and close events
+     * @return a new {@code WhatsAppLayerContext}
+     */
+    public static WhatsAppLayerContext newAppContext(SocketClientLayerListener listener) {
+        return new WhatsAppLayerContext(listener);
     }
 
     /**

@@ -1,4 +1,4 @@
-package com.github.auties00.cobalt.socket.misc;
+package com.github.auties00.cobalt.util;
 
 import com.github.auties00.cobalt.socket.layer.SocketClientLayer;
 import jdk.incubator.vector.ByteVector;
@@ -8,8 +8,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 /**
- * A buffered byte reader for HTTP-style response parsing on top of a
- * {@link SocketClientLayer}.
+ * A buffered byte reader for HTTP-style response parsing.
  *
  * <p>This utility centralizes status-line parsing, header scanning, and
  * timeout/EOF handling used by CONNECT and WebSocket upgrade handshakes.
@@ -126,9 +125,7 @@ public final class HttpResponseReader {
     private byte[] buf;
 
     /**
-     * A reusable {@link ByteBuffer} wrapper around {@link #buf}, used only
-     * for the {@link SocketClientLayer#readBinary(ByteBuffer, boolean)} call
-     * during buffer refills.
+     * A reusable {@link ByteBuffer} wrapper around {@link #buf}
      */
     private ByteBuffer bufWrapper;
 
@@ -632,7 +629,7 @@ public final class HttpResponseReader {
         var remaining = bufLimit - from;
 
         if (remaining >= VECTOR_SCAN_THRESHOLD) {
-            // Vectorised path ---
+            // Vectorised path
             var i = from;
             var vectorLimit = bufLimit - SPECIES_LENGTH;
 
@@ -651,7 +648,7 @@ public final class HttpResponseReader {
                 }
             }
         } else {
-            // Scalar path (small buffer, vector overhead not worth it) ---
+            // Scalar path (small buffer, vector overhead not worth it)
             for (var i = from; i < bufLimit; i++) {
                 if (buf[i] == LINE_FEED) {
                     return i - from;

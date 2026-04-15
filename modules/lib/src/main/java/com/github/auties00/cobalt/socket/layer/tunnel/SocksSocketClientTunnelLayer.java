@@ -121,7 +121,7 @@ final class SocksSocketClientTunnelLayer implements SocketClientTunnelLayer {
                 new InetSocketAddress(proxy.host(), proxy.port()),
                 listener
         );
-        innerLayer.registerLayerContext(SocketClientTunnelLayer.class, new SocketClientTunnelLayerContext(false));
+        innerLayer.registerLayerContext(SocketClientTunnelLayerContext.newTunnelContext());
 
         switch (proxy) {
             case WhatsAppClientProxy.Socks.V4.Local v4 -> performSocks4Handshake(v4);
@@ -460,7 +460,7 @@ final class SocksSocketClientTunnelLayer implements SocketClientTunnelLayer {
     }
 
     @Override
-    public void registerLayerContext(Class<?> key, SocketClientLayerContext context) throws IOException {
-        innerLayer.registerLayerContext(key, context);
+    public void registerLayerContext(SocketClientLayerContext context) throws IOException {
+        innerLayer.registerLayerContext(context);
     }
 }

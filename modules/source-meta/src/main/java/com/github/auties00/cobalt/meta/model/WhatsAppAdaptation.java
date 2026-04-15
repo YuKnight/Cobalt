@@ -15,11 +15,5 @@ public enum WhatsAppAdaptation {
      * (e.g. constructor DI instead of module imports, executor instead
      * of setTimeout).
      */
-    ADAPTED,
-
-    /**
-     * No WhatsApp counterpart: Cobalt-specific code (e.g. Java logging,
-     * synchronization primitives, convenience predicates).
-     */
-    COBALT_SPECIFIC
+    ADAPTED
 }

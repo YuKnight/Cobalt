@@ -14,7 +14,7 @@ import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.stream.SocketStream;
 import com.github.auties00.cobalt.sync.SnapshotRecoveryService;
-import com.github.auties00.cobalt.util.FastDataUtils;
+import com.github.auties00.cobalt.util.DataUtils;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -212,7 +212,7 @@ public final class IqStreamHandler implements SocketStream.Handler {
             return;
         }
 
-        whatsapp.store().setAdvSecretKey(FastDataUtils.randomByteArray(32)); // WAWebHandlePairDevice.g: yield o("WAWebAdvSignatureApi").generateADVSecretKey()
+        whatsapp.store().setAdvSecretKey(DataUtils.randomByteArray(32)); // WAWebHandlePairDevice.g: yield o("WAWebAdvSignatureApi").generateADVSecretKey()
 
         var refs = extractPairRefs(pairDevice); // WAWebHandlePairDevice._: c.pairDeviceRef.map(function(e) { ... readString(t.size()) })
         if (refs.isEmpty()) {
@@ -359,7 +359,7 @@ public final class IqStreamHandler implements SocketStream.Handler {
     private String buildQrPayload(String ref) {
         var store = whatsapp.store();
         var advSecret = store.advSecretKey().orElseGet(() -> { // WAWebHandlePairDevice.g: yield generateADVSecretKey() -- already generated
-            var generated = FastDataUtils.randomByteArray(32); // NO_WA_BASIS: fallback generation
+            var generated = DataUtils.randomByteArray(32); // NO_WA_BASIS: fallback generation
             store.setAdvSecretKey(generated);
             return generated;
         });

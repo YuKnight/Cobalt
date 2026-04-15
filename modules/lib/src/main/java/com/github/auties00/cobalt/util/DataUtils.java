@@ -3,7 +3,7 @@ package com.github.auties00.cobalt.util;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 
-public final class FastDataUtils {
+public final class DataUtils {
     private static final SecureRandom RANDOM;
     private static final byte[] EMPTY_BYTE_ARRAY = new byte[0];
     private static final char[] HEX_ALPHABET = new char[]{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
@@ -16,7 +16,7 @@ public final class FastDataUtils {
         }
     }
 
-    private FastDataUtils() {
+    private DataUtils() {
         throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
     }
 

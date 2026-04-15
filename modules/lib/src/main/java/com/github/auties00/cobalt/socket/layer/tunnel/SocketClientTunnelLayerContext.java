@@ -50,18 +50,19 @@ public final class SocketClientTunnelLayerContext implements SocketClientLayerCo
      * @param tunnelled {@code true} if the tunnel is immediately
      *                         established (no pre-tunnel handshake phase)
      */
-    public SocketClientTunnelLayerContext(boolean tunnelled) {
+    private SocketClientTunnelLayerContext(boolean tunnelled) {
         this.tunnelled = tunnelled;
     }
 
     /**
-     * Returns the next layer context in the inbound processing chain.
+     * Creates a new tunnel layer context in the pre-tunnel (not yet
+     * tunnelled) state.
      *
-     * @return the next layer context, or {@code null} if not yet linked
+     * @return a new {@code SocketClientTunnelLayerContext} with
+     *         {@code tunnelled} set to {@code false}
      */
-    @Override
-    public SocketClientLayerContext nextLayer() {
-        return nextLayer;
+    public static SocketClientTunnelLayerContext newTunnelContext() {
+        return new SocketClientTunnelLayerContext(false);
     }
 
     /**

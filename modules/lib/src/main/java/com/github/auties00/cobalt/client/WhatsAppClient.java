@@ -41,7 +41,7 @@ import com.github.auties00.cobalt.stream.SocketStream;
 import com.github.auties00.cobalt.sync.SnapshotRecoveryService;
 import com.github.auties00.cobalt.sync.WebAppStateService;
 import com.github.auties00.cobalt.sync.key.SyncKeyUtils;
-import com.github.auties00.cobalt.util.FastDataUtils;
+import com.github.auties00.cobalt.util.DataUtils;
 import com.github.auties00.cobalt.util.RandomIdUtils;
 import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.curve25519.Curve25519;
@@ -355,7 +355,7 @@ public final class WhatsAppClient {
 
     public Node sendNode(NodeBuilder node, Function<Node, Boolean> filter) {
         if (!node.hasAttribute("id")) {
-            node.attribute("id", FastDataUtils.randomHex(10));
+            node.attribute("id", DataUtils.randomHex(10));
         }
 
         var outgoing = node.build();
@@ -570,7 +570,7 @@ public final class WhatsAppClient {
             preKeys.add(preKeyPair);
             var id = new NodeBuilder()
                     .description("id")
-                    .content(FastDataUtils.intToBytes(preKeyPair.id(), 3))
+                    .content(DataUtils.intToBytes(preKeyPair.id(), 3))
                     .build();
             var value = new NodeBuilder()
                     .description("value")
@@ -584,7 +584,7 @@ public final class WhatsAppClient {
         }
         var registration = new NodeBuilder()
                 .description("registration")
-                .content(FastDataUtils.intToBytes(store.registrationId(), 4))
+                .content(DataUtils.intToBytes(store.registrationId(), 4))
                 .build();
         var type = new NodeBuilder()
                 .description("type")
@@ -600,7 +600,7 @@ public final class WhatsAppClient {
                 .build();
         var skeyId = new NodeBuilder()
                 .description("id")
-                .content(FastDataUtils.intToBytes(store.signedKeyPair().id(), 3))
+                .content(DataUtils.intToBytes(store.signedKeyPair().id(), 3))
                 .build();
         var skeyValue = new NodeBuilder()
                 .description("value")

@@ -36,7 +36,8 @@ import java.nio.channels.SocketChannel;
  * {@code NEED_UNWRAP}, and {@code NEED_TASK} transitions, returning
  * appropriate {@link SocketClientInboundResult} variants to the selector.
  */
-public final class TlsSocketClientLayerContext implements SocketClientLayerContext {
+public sealed abstract class TlsSocketClientLayerContext implements SocketClientLayerContext
+        permits TransportTlsLayerContext, TunnelTlsLayerContext {
     private static final ByteBuffer EMPTY_BUFFER = ByteBuffer.allocate(0);
 
     /**
@@ -100,18 +101,8 @@ public final class TlsSocketClientLayerContext implements SocketClientLayerConte
     /**
      * Creates a TLS layer context.
      */
-    public TlsSocketClientLayerContext() {
+    TlsSocketClientLayerContext() {
         this.sslHandshakeLock = new Object();
-    }
-
-    /**
-     * Returns the next layer context in the inbound processing chain.
-     *
-     * @return the next layer context, or {@code null} if not yet linked
-     */
-    @Override
-    public SocketClientLayerContext nextLayer() {
-        return nextLayer;
     }
 
     /**
@@ -237,6 +228,7 @@ public final class TlsSocketClientLayerContext implements SocketClientLayerConte
      * @return the result indicating what the selector should do next
      * @throws IOException if a TLS error occurs
      */
+    @Override
     public SocketClientInboundResult driveHandshake(SocketChannel channel) throws IOException {
         // Flush residual encrypted data from a previous partial write
         if (netOutBuffer.position() > 0) {
@@ -440,6 +432,7 @@ public final class TlsSocketClientLayerContext implements SocketClientLayerConte
      * @param onComplete callback to run after tasks finish (typically
      *                   re-registers interest ops and wakes selector)
      */
+    @Override
     public void runDelegatedTasks(Runnable onComplete) {
         Thread.startVirtualThread(() -> {
             Runnable task;
@@ -544,7 +537,8 @@ public final class TlsSocketClientLayerContext implements SocketClientLayerConte
      *
      * @return {@code true} if pending network output exists
      */
-    public boolean hasPendingEncryptedOutput() {
+    @Override
+    public boolean hasPendingOutput() {
         return netOutBuffer != null && netOutBuffer.position() > 0;
     }
 
@@ -553,6 +547,7 @@ public final class TlsSocketClientLayerContext implements SocketClientLayerConte
      *
      * @return {@code true} if handshaking
      */
+    @Override
     public boolean isHandshaking() {
         return sslHandshaking;
     }
@@ -562,6 +557,7 @@ public final class TlsSocketClientLayerContext implements SocketClientLayerConte
      *
      * @return {@code true} if tasks are running
      */
+    @Override
     public boolean isTasksPending() {
         return sslTasksPending;
     }
@@ -574,6 +570,7 @@ public final class TlsSocketClientLayerContext implements SocketClientLayerConte
      *
      * @return the handshake lock object
      */
+    @Override
     public Object handshakeLock() {
         return sslHandshakeLock;
     }
@@ -583,6 +580,7 @@ public final class TlsSocketClientLayerContext implements SocketClientLayerConte
      *
      * @return {@code true} if the handshake completed
      */
+    @Override
     public boolean isHandshakeComplete() {
         return sslHandshakeComplete;
     }
@@ -592,6 +590,7 @@ public final class TlsSocketClientLayerContext implements SocketClientLayerConte
      *
      * @throws IOException if the handshake cannot be initiated
      */
+    @Override
     public void beginHandshake() throws IOException {
         sslEngine.beginHandshake();
     }
@@ -610,6 +609,7 @@ public final class TlsSocketClientLayerContext implements SocketClientLayerConte
      *         drain, {@code false} if the next layer signalled close
      * @throws IOException if layer processing fails
      */
+    @Override
     public boolean drainToNextLayer() throws IOException {
         if (sslEngine == null || appInBuffer == null) {
             return true;
@@ -624,6 +624,33 @@ public final class TlsSocketClientLayerContext implements SocketClientLayerConte
         var result = feedNextLayer(appInBuffer);
         appInBuffer.compact();
         return !(result instanceof SocketClientInboundResult.Close);
+    }
+
+    /**
+     * Processes outbound data by wrapping it through this TLS layer.
+     *
+     * <p>If a next layer exists, wraps the data to a buffer and delegates
+     * to the next layer's {@code processOutbound}.  Otherwise, wraps and
+     * writes directly to the channel.
+     *
+     * @param channel the socket channel to write to
+     * @param buffers the data buffers to write
+     * @param offset  the offset into the buffers array
+     * @param count   the number of buffers to process
+     * @return {@code true} if all data was written successfully
+     * @throws IOException if a TLS or I/O error occurs
+     */
+    @Override
+    public boolean processOutbound(SocketChannel channel, ByteBuffer[] buffers, int offset, int count) throws IOException {
+        var next = nextLayer;
+        if (next != null) {
+            var wrapped = wrapToBuffer(buffers, offset, count);
+            if (wrapped == null) {
+                return false;
+            }
+            return next.processOutbound(channel, new ByteBuffer[]{wrapped}, 0, 1);
+        }
+        return wrapAndWrite(channel, buffers, offset, count);
     }
 
     @Override
@@ -672,5 +699,23 @@ public final class TlsSocketClientLayerContext implements SocketClientLayerConte
         } catch (IOException _) {
             // Best-effort: connection is being torn down
         }
+    }
+
+    /**
+     * Creates a transport-level TLS layer context.
+     *
+     * @return a new transport TLS context
+     */
+    public static TlsSocketClientLayerContext newTransportTlsContext() {
+        return new TransportTlsLayerContext();
+    }
+
+    /**
+     * Creates a tunnel-level TLS layer context.
+     *
+     * @return a new tunnel TLS context
+     */
+    public static TlsSocketClientLayerContext newTunnelTlsContext() {
+        return new TunnelTlsLayerContext();
     }
 }

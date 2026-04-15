@@ -4,8 +4,8 @@ import com.github.auties00.cobalt.socket.layer.SocketClientLayer;
 import com.github.auties00.cobalt.socket.layer.SocketClientLayerListener;
 import com.github.auties00.cobalt.socket.layer.application.websocket.frame.encoder.WebSocketFrameEncoder;
 import com.github.auties00.cobalt.socket.layer.threading.SocketClientLayerContext;
-import com.github.auties00.cobalt.socket.misc.HttpResponseReader;
-import com.github.auties00.cobalt.util.FastDataUtils;
+import com.github.auties00.cobalt.util.HttpResponseReader;
+import com.github.auties00.cobalt.util.DataUtils;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -118,7 +118,7 @@ public final class WebSocketClient {
      * @param transportLayer the transport layer stack
      * @param userAgent      the User-Agent string for the upgrade request
      */
-    public WebSocketClient(SocketClientLayer<?> transportLayer, String userAgent) {
+    private WebSocketClient(SocketClientLayer<?> transportLayer, String userAgent) {
         this.transportLayer = transportLayer;
         this.userAgent = ("\r\nUser-Agent: " + userAgent).getBytes(StandardCharsets.US_ASCII);
         this.responseReader = new HttpResponseReader(
@@ -129,6 +129,19 @@ public final class WebSocketClient {
                 MAX_RESPONSE_HEADER_SIZE,
                 MAX_STATUS_LINE_SPACES
         );
+    }
+
+    /**
+     * Creates a new WebSocket client wrapping the given transport layer.
+     *
+     * @param transportLayer the transport layer stack (TCP + optional TLS
+     *                       + optional proxy tunnel)
+     * @param userAgent      the User-Agent string sent in the HTTP upgrade
+     *                       request
+     * @return a new {@code WebSocketClient}
+     */
+    public static WebSocketClient newWebSocketClient(SocketClientLayer<?> transportLayer, String userAgent) {
+        return new WebSocketClient(transportLayer, userAgent);
     }
 
     /**
@@ -159,8 +172,8 @@ public final class WebSocketClient {
                 listener
         );
 
-        var wsContext = new WebSocketLayerContext(nextLayer);
-        transportLayer.registerLayerContext(WebSocketClient.class, wsContext);
+        var wsContext = WebSocketLayerContext.newWebSocketContext(nextLayer);
+        transportLayer.registerLayerContext(wsContext);
 
         performUpgrade(address.getHost(), port, address.getRawPath());
     }
@@ -245,7 +258,7 @@ public final class WebSocketClient {
      * @return the Base64-encoded key as ASCII bytes
      */
     private static byte[] createWebSocketKey() {
-        var raw = FastDataUtils.randomByteArray(16);
+        var raw = DataUtils.randomByteArray(16);
         return Base64.getEncoder().encode(raw);
     }
 

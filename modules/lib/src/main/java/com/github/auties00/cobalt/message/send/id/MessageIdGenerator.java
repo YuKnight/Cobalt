@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.message.send.id;
 
 import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.util.FastDataUtils;
+import com.github.auties00.cobalt.util.DataUtils;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
@@ -137,7 +137,7 @@ public final class MessageIdGenerator {
      */
     private static String generateV1() {
         // WARandomHex.randomHex(8): 8 random bytes → 16 hex chars
-        var randomBytes = FastDataUtils.randomByteArray(V1_RANDOM_BYTES);
+        var randomBytes = DataUtils.randomByteArray(V1_RANDOM_BYTES);
         return PREFIX + HEX.formatHex(randomBytes);
     }
 
@@ -153,7 +153,7 @@ public final class MessageIdGenerator {
         // WAWebMsgKeyNewId.genMsgKeyUint: build the pre-image payload
         var timestamp = Instant.now().getEpochSecond();
         var jidBytes = senderJid.toString().getBytes(StandardCharsets.UTF_8);
-        var randomBytes = FastDataUtils.randomByteArray(V2_RANDOM_BYTES);
+        var randomBytes = DataUtils.randomByteArray(V2_RANDOM_BYTES);
         var payload = new byte[Long.BYTES + jidBytes.length + randomBytes.length];
         var offset = 0;
 

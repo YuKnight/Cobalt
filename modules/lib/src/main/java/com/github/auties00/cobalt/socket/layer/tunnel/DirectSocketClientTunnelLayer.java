@@ -45,7 +45,7 @@ final class DirectSocketClientTunnelLayer implements SocketClientTunnelLayer {
     @Override
     public void connect(InetSocketAddress address, SocketClientLayerListener listener) throws IOException {
         innerLayer.connect(address, listener);
-        innerLayer.registerLayerContext(SocketClientTunnelLayer.class, new SocketClientTunnelLayerContext(false));
+        innerLayer.registerLayerContext(SocketClientTunnelLayerContext.newTunnelContext());
     }
 
     @Override
@@ -84,7 +84,7 @@ final class DirectSocketClientTunnelLayer implements SocketClientTunnelLayer {
     }
 
     @Override
-    public void registerLayerContext(Class<?> key, SocketClientLayerContext context) throws IOException {
-        innerLayer.registerLayerContext(key, context);
+    public void registerLayerContext(SocketClientLayerContext context) throws IOException {
+        innerLayer.registerLayerContext(context);
     }
 }

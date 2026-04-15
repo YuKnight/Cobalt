@@ -26,7 +26,7 @@ import com.github.auties00.cobalt.socket.layer.transport.SocketClientTransportLa
 import com.github.auties00.cobalt.socket.layer.tunnel.SocketClientTunnelLayer;
 import com.github.auties00.cobalt.store.WhatsAppStore;
 
-import com.github.auties00.cobalt.util.FastDataUtils;
+import com.github.auties00.cobalt.util.DataUtils;
 import com.github.auties00.cobalt.util.GcmUtils;
 import com.github.auties00.curve25519.Curve25519;
 import com.github.auties00.libsignal.key.SignalIdentityKeyPair;
@@ -125,14 +125,15 @@ public sealed abstract class WhatsAppSocketClient {
         Objects.requireNonNull(sslEngineFactory, "sslEngineFactory cannot be null");
 
         var transport = createTransport();
-        var tunnel = createTunnel(transport, store, sslEngineFactory);
+        var tunnelSecurity = createTunnelSecurity(transport, store, sslEngineFactory);
+        var tunnel = createTunnel(tunnelSecurity, store);
+        var transportSecurity = createTransportSecurity(tunnel, store, sslEngineFactory);
 
         if (store.device().platform() == ClientPlatformType.WEB) {
-            var tlsToTarget = SocketClientTransportSecurityLayer.newTlsTransport(tunnel, sslEngineFactory);
             var userAgent = store.device().toUserAgent(store.clientVersion());
-            return new Web(store, new WebSocketClient(tlsToTarget, userAgent));
+            return new Web(store, WebSocketClient.newWebSocketClient(transportSecurity, userAgent));
         } else {
-            return new Mobile(store, tunnel);
+            return new Mobile(store, transportSecurity);
         }
     }
 
@@ -149,35 +150,26 @@ public sealed abstract class WhatsAppSocketClient {
         return SocketClientTransportLayer.newTcpTransport();
     }
 
-    /**
-     * Creates the tunnel layer for the given store, wrapping the transport
-     * in a proxy tunnel if configured.
-     *
-     * <p>Every connection has a tunnel layer.  For direct connections,
-     * a {@link SocketClientTunnelLayer#newDirectTunnel(SocketClientLayer)
-     * DirectTunnel} provides the {@code TunnelLayerContext} needed for
-     * blocking reads during the handshake phase.
-     *
-     * <p>For HTTPS proxies, the inner layer is wrapped in TLS so the
-     * HTTP CONNECT request is encrypted to the proxy.
-     *
-     * @param transport     the base transport layer
-     * @param store         the WhatsApp store
-     * @param engineFactory the SSL engine factory bound to the device
-     * @return the tunnel layer
-     */
-    private static SocketClientLayer<?> createTunnel(SocketClientLayer<?> transport, WhatsAppStore store, WhatsAppSslEngineFactory engineFactory) {
+    private static SocketClientLayer<?> createTunnelSecurity(SocketClientLayer<?> transport, WhatsAppStore store, WhatsAppSslEngineFactory engineFactory) {
         return switch (store.proxy().orElse(null)) {
-            case WhatsAppClientProxy.Http http -> {
-                var innerForProxy = switch (http) {
-                    case WhatsAppClientProxy.Http.Plain _ -> transport;
-                    case WhatsAppClientProxy.Http.Secure _ -> SocketClientTunnelSecurityLayer.newTlsTunnel(transport, engineFactory);
-                };
-                yield SocketClientTunnelLayer.newHttpTunnel(http, innerForProxy);
-            }
-            case WhatsAppClientProxy.Socks socks -> SocketClientTunnelLayer.newSocksTunnel(socks, transport);
-            case null -> SocketClientTunnelLayer.newDirectTunnel(transport);
+            case WhatsAppClientProxy.Http.Secure _ -> SocketClientTunnelSecurityLayer.newTlsTunnel(transport, engineFactory);
+            case null, default -> SocketClientTunnelSecurityLayer.newPlainTunnel(transport);
         };
+    }
+
+    private static SocketClientLayer<?> createTunnel(SocketClientLayer<?> tunnelSecurity, WhatsAppStore store) {
+        return switch (store.proxy().orElse(null)) {
+            case WhatsAppClientProxy.Http http -> SocketClientTunnelLayer.newHttpTunnel(http, tunnelSecurity);
+            case WhatsAppClientProxy.Socks socks -> SocketClientTunnelLayer.newSocksTunnel(socks, tunnelSecurity);
+            case null -> SocketClientTunnelLayer.newDirectTunnel(tunnelSecurity);
+        };
+    }
+
+    private static SocketClientLayer<?> createTransportSecurity(SocketClientLayer<?> tunnel, WhatsAppStore store, WhatsAppSslEngineFactory engineFactory) {
+        if (store.device().platform() == ClientPlatformType.WEB) {
+            return SocketClientTransportSecurityLayer.newTlsTransport(tunnel, engineFactory);
+        }
+        return SocketClientTransportSecurityLayer.newPlainTransport(tunnel);
     }
 
     /**
@@ -282,7 +274,7 @@ public sealed abstract class WhatsAppSocketClient {
         this.listener = listener;
 
         var decryptingListener = new DecryptingListener();
-        var appContext = new WhatsAppLayerContext(decryptingListener);
+        var appContext = WhatsAppLayerContext.newAppContext(decryptingListener);
         connectImpl(appContext, decryptingListener);
     }
 
@@ -879,10 +871,7 @@ public sealed abstract class WhatsAppSocketClient {
                 }
 
                 if (datagram.isReadOnly()) {
-                    var output = ByteBuffer.allocate(datagram.remaining() - GCM_TAG_BYTE_SIZE);
-                    readCipher.doFinal(datagram.duplicate(), output);
-                    output.flip();
-                    return output;
+                    throw new ReadOnlyBufferException();
                 }
 
                 var start = datagram.position();
@@ -927,7 +916,7 @@ public sealed abstract class WhatsAppSocketClient {
     static final class Web extends WhatsAppSocketClient {
         private static final byte[] WEB_VERSION = new byte[]{6, NodeTokens.DICTIONARY_VERSION};
         private static final ByteBuffer WEB_PROLOGUE = ByteBuffer.wrap(
-                FastDataUtils.concatByteArrays(WHATSAPP_VERSION_HEADER, WEB_VERSION)
+                DataUtils.concatByteArrays(WHATSAPP_VERSION_HEADER, WEB_VERSION)
         ).asReadOnlyBuffer();
 
         /**
@@ -1171,10 +1160,10 @@ public sealed abstract class WhatsAppSocketClient {
         private DevicePairingRegistrationData createRegisterData() {
             return new ClientPayloadDevicePairingRegistrationDataBuilder()
                     .buildHash(store.clientVersion().toHash())
-                    .eRegid(FastDataUtils.intToBytes(store.registrationId(), 4))
-                    .eKeytype(FastDataUtils.intToBytes(SignalIdentityPublicKey.type(), 1))
+                    .eRegid(DataUtils.intToBytes(store.registrationId(), 4))
+                    .eKeytype(DataUtils.intToBytes(SignalIdentityPublicKey.type(), 1))
                     .eIdent(store.identityKeyPair().publicKey().toEncodedPoint())
-                    .eSkeyId(FastDataUtils.intToBytes(store.signedKeyPair().id(), 3))
+                    .eSkeyId(DataUtils.intToBytes(store.signedKeyPair().id(), 3))
                     .eSkeyVal(store.signedKeyPair().publicKey().toEncodedPoint())
                     .eSkeySig(store.signedKeyPair().signature())
                     .deviceProps(createCompanionProps())
@@ -1236,7 +1225,7 @@ public sealed abstract class WhatsAppSocketClient {
     static final class Mobile extends WhatsAppSocketClient {
         private static final byte[] MOBILE_VERSION = new byte[]{5, NodeTokens.DICTIONARY_VERSION};
         private static final ByteBuffer MOBILE_PROLOGUE = ByteBuffer.wrap(
-                FastDataUtils.concatByteArrays(WHATSAPP_VERSION_HEADER, MOBILE_VERSION)
+                DataUtils.concatByteArrays(WHATSAPP_VERSION_HEADER, MOBILE_VERSION)
         ).asReadOnlyBuffer();
 
         /**
@@ -1272,7 +1261,7 @@ public sealed abstract class WhatsAppSocketClient {
         @Override
         void connectImpl(WhatsAppLayerContext appContext, DecryptingListener decryptingListener) throws IOException {
             mobileLayer.connect(SOCKET_ENDPOINT, decryptingListener);
-            mobileLayer.registerLayerContext(WhatsAppSocketClient.class, appContext);
+            mobileLayer.registerLayerContext(appContext);
             performNoiseHandshake(null);
             appContext.startListenerExecutor();
             mobileLayer.finishConnect();

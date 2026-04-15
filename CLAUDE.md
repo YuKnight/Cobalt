@@ -64,7 +64,7 @@ Cobalt tracks its relationship to WhatsApp source code via annotations in `com.g
 - `WhatsAppMobilePlatform` enum: `IOS`, `ANDROID` — no default, must be specified
 
 **Shared model:**
-- `WhatsAppAdaptation` enum: `DIRECT` (same logic), `ADAPTED` (same purpose, different structure), `COBALT_SPECIFIC` (no WA counterpart)
+- `WhatsAppAdaptation` enum: `DIRECT` (same logic), `ADAPTED` (same purpose, different structure)
 - All annotations are `@Repeatable` and `SOURCE` retention
 - The annotation processor generates `META-INF/wa-source-manifest.json` at compile time
 

@@ -35,7 +35,7 @@ final class TcpSocketClientTransportLayer implements SocketClientTransportLayer 
 
     @Override
     public void connect(InetSocketAddress address, SocketClientLayerListener listener) throws IOException {
-        this.transportContext = new SocketClientTransportLayerContext();
+        this.transportContext = SocketClientTransportLayerContext.newTransportContext();
         this.channel = SocketChannel.open();
         channel.configureBlocking(false);
         channel.connect(address);
@@ -108,12 +108,12 @@ final class TcpSocketClientTransportLayer implements SocketClientTransportLayer 
 
     @Override
     public void startHandshake(SocketClientLayerContext tlsContext, long timeout) throws IOException {
-        SocketClientSelector.INSTANCE.startTlsHandshake(channel, tlsContext, timeout);
+        SocketClientSelector.INSTANCE.startHandshake(channel, tlsContext, timeout);
     }
 
     @Override
-    public void registerLayerContext(Class<?> key, SocketClientLayerContext layerContext) throws IOException {
-        if (!SocketClientSelector.INSTANCE.registerLayerContext(channel, key, layerContext)) {
+    public void registerLayerContext(SocketClientLayerContext layerContext) throws IOException {
+        if (!SocketClientSelector.INSTANCE.registerLayerContext(channel, layerContext)) {
             throw new IOException("Failed to register layer context: channel not registered");
         }
     }

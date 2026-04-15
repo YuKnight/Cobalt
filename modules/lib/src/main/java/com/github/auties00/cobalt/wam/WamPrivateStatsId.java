@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.wam;
 
-import com.github.auties00.cobalt.util.FastDataUtils;
+import com.github.auties00.cobalt.util.DataUtils;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -77,7 +77,7 @@ final class WamPrivateStatsId {
         for (var mapEntry : entries.entrySet()) {
             var entry = mapEntry.getValue();
             if (shouldRotate(entry, now)) {
-                var value = FastDataUtils.randomHex(32);
+                var value = DataUtils.randomHex(32);
                 var newEntry = new Entry(entry.key, entry.keyHashInt, entry.rotationDays, value, now);
                 mapEntry.setValue(newEntry);
             }
@@ -119,7 +119,7 @@ final class WamPrivateStatsId {
     }
 
     private void addEntry(String key, int keyHashInt, int rotationDays) {
-        var value = FastDataUtils.randomHex(32);
+        var value = DataUtils.randomHex(32);
         var epoch = Instant.now().getEpochSecond();
         var entry = new Entry(key, keyHashInt, rotationDays, value, epoch);
         entries.put(keyHashInt, entry);

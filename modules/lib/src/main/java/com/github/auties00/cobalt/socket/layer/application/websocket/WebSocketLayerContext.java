@@ -44,10 +44,21 @@ public final class WebSocketLayerContext implements SocketClientLayerContext {
      *
      * @param nextLayer the layer above in the read pipeline
      */
-    public WebSocketLayerContext(SocketClientLayerContext nextLayer) {
+    private WebSocketLayerContext(SocketClientLayerContext nextLayer) {
         this.nextLayer = nextLayer;
         this.readBuffer = ByteBuffer.allocateDirect(READ_BUFFER_SIZE);
         this.frameDecoder = new WebSocketFrameDecoder();
+    }
+
+    /**
+     * Creates a new WebSocket layer context chained to the given next layer.
+     *
+     * @param nextLayer the layer above in the read pipeline, receives
+     *                  decoded WebSocket data frame payloads
+     * @return a new {@code WebSocketLayerContext}
+     */
+    public static WebSocketLayerContext newWebSocketContext(SocketClientLayerContext nextLayer) {
+        return new WebSocketLayerContext(nextLayer);
     }
 
     /**

@@ -1,6 +1,4 @@
-package com.github.auties00.cobalt.socket.misc;
-
-import com.github.auties00.cobalt.socket.WhatsAppSslEngineFactory;
+package com.github.auties00.cobalt.socket;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;

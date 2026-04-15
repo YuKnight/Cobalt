@@ -3,7 +3,7 @@ package com.github.auties00.cobalt.socket.layer.tunnel;
 import com.github.auties00.cobalt.client.WhatsAppClientProxy;
 import com.github.auties00.cobalt.socket.layer.SocketClientLayer;
 import com.github.auties00.cobalt.socket.layer.SocketClientLayerListener;
-import com.github.auties00.cobalt.socket.misc.HttpResponseReader;
+import com.github.auties00.cobalt.util.HttpResponseReader;
 import com.github.auties00.cobalt.socket.layer.threading.SocketClientLayerContext;
 
 import java.io.IOException;
@@ -143,7 +143,7 @@ final class HttpSocketClientTunnelLayer implements SocketClientTunnelLayer {
                     listener
             );
             if (redirects == 0) {
-                innerLayer.registerLayerContext(SocketClientTunnelLayer.class, new SocketClientTunnelLayerContext(false));
+                innerLayer.registerLayerContext(SocketClientTunnelLayerContext.newTunnelContext());
             }
 
             var deadline = System.currentTimeMillis() + OVERALL_HANDSHAKE_TIMEOUT;
@@ -759,7 +759,7 @@ final class HttpSocketClientTunnelLayer implements SocketClientTunnelLayer {
     }
 
     @Override
-    public void registerLayerContext(Class<?> key, SocketClientLayerContext context) throws IOException {
-        innerLayer.registerLayerContext(key, context);
+    public void registerLayerContext(SocketClientLayerContext context) throws IOException {
+        innerLayer.registerLayerContext(context);
     }
 }

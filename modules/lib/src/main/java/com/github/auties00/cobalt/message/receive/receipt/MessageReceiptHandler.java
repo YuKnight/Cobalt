@@ -9,7 +9,7 @@ import com.github.auties00.cobalt.model.message.MessageInfo;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.store.WhatsAppStore;
-import com.github.auties00.cobalt.util.FastDataUtils;
+import com.github.auties00.cobalt.util.DataUtils;
 import com.github.auties00.libsignal.key.SignalIdentityPublicKey;
 import com.github.auties00.libsignal.key.SignalPreKeyPair;
 
@@ -206,7 +206,7 @@ public final class MessageReceiptHandler {
         // WAWebSendRetryReceiptJob: build registration node
         var registrationNode = new NodeBuilder()
                 .description("registration")
-                .content(FastDataUtils.intToBytes(store.registrationId(), 4))
+                .content(DataUtils.intToBytes(store.registrationId(), 4))
                 .build();
 
         // WAWebSendRetryReceiptJob: build keys node when retryCount >= threshold
@@ -438,7 +438,7 @@ public final class MessageReceiptHandler {
             // WAWebSendRetryReceiptJob: xmppPreKey(preKey)
             var preKeyIdNode = new NodeBuilder()
                     .description("id")
-                    .content(FastDataUtils.intToBytes(preKey.id(), 3))
+                    .content(DataUtils.intToBytes(preKey.id(), 3))
                     .build();
             var preKeyValueNode = new NodeBuilder()
                     .description("value")
@@ -453,7 +453,7 @@ public final class MessageReceiptHandler {
             var signedKeyPair = store.signedKeyPair();
             var skeyIdNode = new NodeBuilder()
                     .description("id")
-                    .content(FastDataUtils.intToBytes(signedKeyPair.id(), 3))
+                    .content(DataUtils.intToBytes(signedKeyPair.id(), 3))
                     .build();
             var skeyValueNode = new NodeBuilder()
                     .description("value")

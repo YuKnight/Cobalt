@@ -1,20 +1,28 @@
 package com.github.auties00.cobalt.socket.layer.threading;
 
-import com.github.auties00.cobalt.socket.layer.SocketClientLayer;
+import com.github.auties00.cobalt.socket.WhatsAppLayerContext;
+import com.github.auties00.cobalt.socket.layer.application.websocket.WebSocketLayerContext;
+import com.github.auties00.cobalt.socket.layer.security.PlainSocketClientLayerContext;
 import com.github.auties00.cobalt.socket.layer.security.TlsSocketClientLayerContext;
+import com.github.auties00.cobalt.socket.layer.security.TransportTlsLayerContext;
+import com.github.auties00.cobalt.socket.layer.security.TunnelTlsLayerContext;
 import com.github.auties00.cobalt.socket.layer.transport.SocketClientTransportLayerContext;
+import com.github.auties00.cobalt.socket.layer.tunnel.SocketClientTunnelLayerContext;
 
-import java.util.*;
+import java.io.IOException;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Predicate;
 
 /**
  * Per-connection context attached to a {@link java.nio.channels.SelectionKey}
  * as its attachment.
  *
- * <p>Layer contexts are stored in a {@link SequencedMap} preserving
- * bottom-to-top insertion order.  When a new context is registered and
- * the previous topmost context has no {@code nextLayer} set, the map
- * auto-chains them so the inbound processing pipeline is wired
- * automatically.
+ * <p>Layer contexts are stored as explicit typed fields in a fixed
+ * bottom-to-top order: transport security, tunnel security, tunnel,
+ * websocket, app.  When a new context is registered, the chain is
+ * rebuilt automatically so the inbound processing pipeline is wired
+ * correctly.
  */
 final class SocketClientContext {
     /**
@@ -23,10 +31,29 @@ final class SocketClientContext {
     private final SocketClientTransportLayerContext transportContext;
 
     /**
-     * Layer processing contexts, keyed by layer class, in bottom-to-top
-     * insertion order.
+     * Transport-level security context (TLS or plain passthrough).
      */
-    private final SequencedMap<Class<?>, SocketClientLayerContext> layerContextMap;
+    private SocketClientLayerContext transportSecurity;
+
+    /**
+     * Tunnel-level security context (TLS or plain passthrough).
+     */
+    private SocketClientLayerContext tunnelSecurity;
+
+    /**
+     * Tunnel layer context (proxy handshake and blocking reads).
+     */
+    private SocketClientTunnelLayerContext tunnel;
+
+    /**
+     * WebSocket framing layer context.
+     */
+    private WebSocketLayerContext websocket;
+
+    /**
+     * WhatsApp application layer context (Noise protocol).
+     */
+    private WhatsAppLayerContext app;
 
     /**
      * Creates a context with the given transport context.
@@ -35,7 +62,16 @@ final class SocketClientContext {
      */
     SocketClientContext(SocketClientTransportLayerContext transportContext) {
         this.transportContext = Objects.requireNonNull(transportContext);
-        this.layerContextMap = new LinkedHashMap<>();
+    }
+
+    /**
+     * Creates a new connection context wrapping the given transport context.
+     *
+     * @param transportContext the transport-level state for the connection
+     * @return a new {@code SocketClientContext}
+     */
+    static SocketClientContext newConnectionContext(SocketClientTransportLayerContext transportContext) {
+        return new SocketClientContext(transportContext);
     }
 
     /**
@@ -57,58 +93,124 @@ final class SocketClientContext {
      *         are registered
      */
     SocketClientLayerContext bottomProcessingContext() {
-        return layerContextMap.isEmpty() ? null : layerContextMap.firstEntry().getValue();
+        if (transportSecurity != null) return transportSecurity;
+        if (tunnelSecurity != null) return tunnelSecurity;
+        if (tunnel != null) return tunnel;
+        if (websocket != null) return websocket;
+        return app;
     }
 
     /**
-     * Retrieves a layer context by its layer class.
+     * Registers a layer context and rebuilds the processing chain.
      *
-     * <p>The type parameter {@code C} is inferred from the layer class's
-     * type parameter binding.  For example, passing
-     * {@code SocketClientTransportSecurityLayer.class} (which extends
-     * {@code SocketClientLayer<TlsLayerContext>}) returns
-     * {@code Optional<TlsLayerContext>}.
+     * <p>The concrete type of the context determines which field is set.
+     * Transport and tunnel TLS are distinguished by their sealed
+     * subclass ({@link TransportTlsLayerContext} vs
+     * {@link TunnelTlsLayerContext}).
      *
-     * @param <C>   the context type, inferred from the layer's type parameter
-     * @param clazz the layer class
-     * @return an optional containing the context, or empty if not present
-     */
-    @SuppressWarnings("unchecked")
-    <C extends SocketClientLayerContext> Optional<C> getLayerContext(Class<? extends SocketClientLayer<C>> clazz) {
-        var result = layerContextMap.get(clazz);
-        if (result == null) {
-            return Optional.empty();
-        }
-
-        return Optional.of((C) result);
-    }
-
-    /**
-     * Appends a layer context at the top of the processing chain.
-     *
-     * @param clazz        the layer class key
      * @param layerContext the context to register
-     * @return the previous topmost context (the one that should link
-     *         to the new context), or {@code null} if the map was empty
-     *         or the key was already registered
      */
-    void addLayerContext(Class<?> clazz, SocketClientLayerContext layerContext) {
-        if (layerContextMap.containsKey(clazz)) {
-            return;
+    void addLayerContext(SocketClientLayerContext layerContext) {
+        switch (layerContext) {
+            case TransportTlsLayerContext tls -> this.transportSecurity = tls;
+            case TunnelTlsLayerContext tls -> this.tunnelSecurity = tls;
+            case PlainSocketClientLayerContext.Transport plain -> this.transportSecurity = plain;
+            case PlainSocketClientLayerContext.Tunnel plain -> this.tunnelSecurity = plain;
+            case SocketClientTunnelLayerContext t -> this.tunnel = t;
+            case WebSocketLayerContext ws -> this.websocket = ws;
+            case WhatsAppLayerContext wa -> this.app = wa;
         }
+        rebuildChain();
+    }
 
-        if (layerContext instanceof TlsSocketClientLayerContext) {
-            var previousBottom = layerContextMap.isEmpty() ? null : layerContextMap.firstEntry().getValue();
-            layerContextMap.putFirst(clazz, layerContext);
-            if (previousBottom != null) {
-                layerContext.setNextLayer(previousBottom);
+    /**
+     * Returns the tunnel layer context, if present.
+     *
+     * @return an optional containing the tunnel context, or empty if
+     *         no tunnel layer is registered
+     */
+    Optional<SocketClientTunnelLayerContext> tunnelContext() {
+        return Optional.ofNullable(tunnel);
+    }
+
+    /**
+     * Finds the first layer context that is currently handshaking.
+     *
+     * @return an optional containing the handshaking context, or empty
+     *         if no layer is handshaking
+     */
+    Optional<SocketClientLayerContext> findHandshakingContext() {
+        return findFirst(SocketClientLayerContext::isHandshaking);
+    }
+
+    /**
+     * Returns whether any layer context has pending output data.
+     *
+     * @return {@code true} if any layer has pending output
+     */
+    boolean hasPendingOutput() {
+        return findFirst(SocketClientLayerContext::hasPendingOutput).isPresent();
+    }
+
+    /**
+     * Finds the first layer context that has pending delegated tasks.
+     *
+     * @return an optional containing the context with pending tasks,
+     *         or empty if none
+     */
+    Optional<SocketClientLayerContext> findTasksPendingContext() {
+        return findFirst(SocketClientLayerContext::isTasksPending);
+    }
+
+    /**
+     * Drains buffered data from all layer contexts into their next layers.
+     *
+     * @return {@code true} if all layers drained successfully,
+     *         {@code false} if any layer signalled close
+     * @throws IOException if layer processing fails
+     */
+    boolean drainAllLayers() throws IOException {
+        if (transportSecurity != null && !transportSecurity.drainToNextLayer()) return false;
+        if (tunnelSecurity != null && !tunnelSecurity.drainToNextLayer()) return false;
+        if (tunnel != null && !tunnel.drainToNextLayer()) return false;
+        if (websocket != null && !websocket.drainToNextLayer()) return false;
+        if (app != null && !app.drainToNextLayer()) return false;
+        return true;
+    }
+
+    /**
+     * Rebuilds the {@code nextLayer} chain by walking the fields in
+     * bottom-to-top order and linking each context to the next.
+     */
+    private void rebuildChain() {
+        linkLayers(transportSecurity, tunnelSecurity, tunnel, websocket, app);
+    }
+
+    /**
+     * Links non-null contexts in the given order, setting each one's
+     * {@code nextLayer} to the next non-null context.
+     */
+    private static void linkLayers(SocketClientLayerContext... layers) {
+        SocketClientLayerContext previous = null;
+        for (var ctx : layers) {
+            if (ctx == null) continue;
+            if (previous != null) {
+                previous.setNextLayer(ctx);
             }
-        } else {
-            var previousTop = layerContextMap.isEmpty() ? null : layerContextMap.lastEntry().getValue();
-            layerContextMap.put(clazz, layerContext);
-            if (previousTop != null) {
-                previousTop.setNextLayer(layerContext);
-            }
+            previous = ctx;
         }
+    }
+
+    /**
+     * Returns the first layer context matching the predicate, walking
+     * fields in bottom-to-top order.
+     */
+    private Optional<SocketClientLayerContext> findFirst(Predicate<SocketClientLayerContext> predicate) {
+        if (transportSecurity != null && predicate.test(transportSecurity)) return Optional.of(transportSecurity);
+        if (tunnelSecurity != null && predicate.test(tunnelSecurity)) return Optional.of(tunnelSecurity);
+        if (tunnel != null && predicate.test(tunnel)) return Optional.of(tunnel);
+        if (websocket != null && predicate.test(websocket)) return Optional.of(websocket);
+        if (app != null && predicate.test(app)) return Optional.of(app);
+        return Optional.empty();
     }
 }

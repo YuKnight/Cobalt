@@ -70,9 +70,18 @@ public final class SocketClientTransportLayerContext {
     /**
      * Creates a transport layer context for a new connection.
      */
-    public SocketClientTransportLayerContext() {
+    SocketClientTransportLayerContext() {
         this.connectionLock = new Object();
         this.pendingWrites = new PendingWrites(WRITES_CHUNK_CAPACITY);
+    }
+
+    /**
+     * Creates a new transport layer context for a new connection.
+     *
+     * @return a new {@code SocketClientTransportLayerContext}
+     */
+    static SocketClientTransportLayerContext newTransportContext() {
+        return new SocketClientTransportLayerContext();
     }
 
     /**

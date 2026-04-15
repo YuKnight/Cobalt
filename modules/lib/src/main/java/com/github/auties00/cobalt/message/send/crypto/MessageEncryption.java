@@ -6,7 +6,7 @@ import com.github.auties00.cobalt.message.receive.crypto.MessageDecryption;
 import com.github.auties00.cobalt.message.receive.crypto.SenderKeyNameFactory;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.store.WhatsAppStore;
-import com.github.auties00.cobalt.util.FastDataUtils;
+import com.github.auties00.cobalt.util.DataUtils;
 import com.github.auties00.libsignal.SignalSessionCipher;
 import com.github.auties00.libsignal.groups.SignalGroupCipher;
 import com.github.auties00.libsignal.protocol.SignalSenderKeyDistributionMessage;
@@ -254,7 +254,7 @@ public final class MessageEncryption {
         Objects.requireNonNull(plaintext, "plaintext cannot be null");
 
         // Generate random padding length between 1 and 16
-        var paddingLength = MIN_PADDING + (FastDataUtils.randomByteArray(1)[0] & 0x0F);
+        var paddingLength = MIN_PADDING + (DataUtils.randomByteArray(1)[0] & 0x0F);
 
         var padded = new byte[plaintext.length + paddingLength];
         System.arraycopy(plaintext, 0, padded, 0, plaintext.length);

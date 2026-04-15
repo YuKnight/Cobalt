@@ -54,7 +54,7 @@ For each type in the package:
    - Existing `@implNote` reference
    - Name similarity
    - Behavioral similarity (read the WA Web source via `mcp__whatsapp__get_symbol_source` or `mcp__whatsapp__get_module_source`)
-5. For methods/fields with no WA Web counterpart, classify as `COBALT_SPECIFIC`.
+5. Methods/fields with no WA Web counterpart do not get a `@WhatsAppWebExport` annotation — only members with a confirmed WA Web mapping are annotated.
 
 ### Step 3: Read WA Web Source for Context
 
@@ -100,7 +100,7 @@ public Optional<IcdcResult> compute(Jid userJid) {
 - `adaptation`: MUST be specified (no default). Use:
   - `WhatsAppAdaptation.DIRECT` — same logic, translated to Java
   - `WhatsAppAdaptation.ADAPTED` — same purpose, different structure (e.g., DI instead of module imports, executor instead of setTimeout, `Optional` instead of null checks)
-  - `WhatsAppAdaptation.COBALT_SPECIFIC` — no WA Web counterpart (Java logging, synchronization, convenience methods)
+- Only annotate members that have a confirmed WA Web counterpart. Members with no WA Web mapping (Java loggers, synchronization primitives, convenience methods, defensive null checks, builder helpers, `AutoCloseable` implementations) do NOT get a `@WhatsAppWebExport` annotation.
 - If a member maps to exports from multiple modules, add multiple `@WhatsAppWebExport` annotations.
 - Import: `import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;` and `import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;`
 
@@ -190,7 +190,7 @@ The `@implNote` on a method provides the technical mapping to WA Web source. For
 - Start with `WAModuleName.functionName:` followed by a technical explanation
 - Reference WA Web variable names, function calls, and control flow from the actual source
 - When the implementation is ADAPTED, explain what differs: "WA Web uses X; Cobalt uses Y"
-- When the implementation is COBALT_SPECIFIC, say "NO_WA_BASIS:" followed by the reason
+- When the member has no WA Web counterpart, do not add an `@implNote`
 
 #### 4.5: Javadocs on Fields and Constants
 
@@ -234,8 +234,7 @@ var remoteDevices = new ArrayList<DeviceInfo>();
 2. **Second line**: explains what the code is doing in natural language, starting with a verb: `// Checks whether...`, `// Computes the...`, `// Iterates all...`
 3. **Comments are on separate lines** — never at the end of a code line
 4. **One empty line after the statement/block** that the comment describes, before the next comment block
-5. For statements with no WA Web counterpart: `// COBALT_SPECIFIC` on the first line, explanation on the second
-6. For adapted statements: `// ADAPTED: WAModuleName.exportName` on the first line, explanation of the adaptation on the second
+5. For adapted statements: `// ADAPTED: WAModuleName.exportName` on the first line, explanation of the adaptation on the second
 7. Do NOT comment trivial statements (logger declarations, simple getters, `Objects.requireNonNull`)
 8. DO comment: variable declarations with logic, conditionals, loops, method calls with side effects, return value computation, error handling paths
 
@@ -257,7 +256,7 @@ public Optional<IcdcResult> compute(Jid userJid) {
 After annotating all files in the package:
 
 1. Verify every type has a `@WhatsAppWebModule` annotation (unless it is Cobalt-specific with no WA Web counterpart).
-2. Verify every method, constructor, and field has a `@WhatsAppWebExport` annotation (with `adaptation` specified).
+2. Verify every method, constructor, and field that maps to a WA Web export has a `@WhatsAppWebExport` annotation (with `adaptation` specified). Members with no WA Web counterpart must NOT have a `@WhatsAppWebExport`.
 3. Verify every member has a javadoc with the required tags.
 4. Verify every `@implNote` references a real WA Web module and function (from MCP data, not guessed).
 5. Verify inline comments in method bodies follow the two-line format.
@@ -276,13 +275,7 @@ After annotating all files in the package:
   - WA Web store operations are mapped into `WhatsAppStore` or `AbstractWhatsAppStore`
   - Constructor-based DI replaces module-level imports
   - `ScheduledExecutorService` replaces `setTimeout`/`setInterval`
-- `WhatsAppAdaptation.COBALT_SPECIFIC` — No WA Web counterpart at all. Use this for:
-  - Java loggers (`System.Logger`)
-  - Synchronization primitives (`ReentrantLock`, `Object` locks)
-  - Convenience predicates (`isPreKeyMessage()`)
-  - Defensive null checks that WA Web does not have
-  - Builder helpers
-  - `AutoCloseable` implementations
+Members with no WA Web counterpart (Java loggers, synchronization primitives, convenience predicates, defensive null checks, builder helpers, `AutoCloseable` implementations) do NOT get a `@WhatsAppWebExport` annotation, `@implNote`, or inline WA Web comments. They still get javadocs describing their purpose.
 
 ---
 
@@ -290,12 +283,12 @@ After annotating all files in the package:
 
 - **Annotate EVERY file.** Do not skip any file in the package.
 - **Annotate EVERY member.** Do not skip any class, method, field, or constructor.
-- **Never guess WA Web mappings.** Always verify via MCP tools (`mcp__whatsapp__search_modules`, `mcp__whatsapp__get_exports`, `mcp__whatsapp__get_symbol_source`). If you cannot find a WA Web counterpart, classify as `COBALT_SPECIFIC`.
+- **Never guess WA Web mappings.** Always verify via MCP tools (`mcp__whatsapp__search_modules`, `mcp__whatsapp__get_exports`, `mcp__whatsapp__get_symbol_source`). If you cannot find a WA Web counterpart, do not add a source provenance annotation.
 - **Never fabricate module or export names.** Only use names confirmed by MCP tool results.
 - **Javadocs describe features, not source code.** A developer reading the javadoc should understand what the class/method does in WhatsApp, not which WA Web module it came from.
 - **`@implNote` describes source code, not features.** A developer reading the `@implNote` should be able to find the exact WA Web function and understand the technical mapping.
 - **Inline comments cite and explain.** First line cites, second line explains. Empty line after the statement.
-- **`adaptation` has no default.** You MUST specify `WhatsAppAdaptation.DIRECT`, `WhatsAppAdaptation.ADAPTED`, or `WhatsAppAdaptation.COBALT_SPECIFIC` on every `@WhatsAppWebExport` annotation. Never omit it.
+- **`adaptation` has no default.** You MUST specify `WhatsAppAdaptation.DIRECT` or `WhatsAppAdaptation.ADAPTED` on every `@WhatsAppWebExport` annotation. Never omit it.
 - **Do not remove existing code.** Your job is to add annotations, javadocs, and comments — not to change behavior.
 - **Do not add or remove methods, fields, or classes.** Only add metadata.
 - **Preserve existing inline comments** that reference WA Web modules — update them to the new two-line format if they don't already follow it.

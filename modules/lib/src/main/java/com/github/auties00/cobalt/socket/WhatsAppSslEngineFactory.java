@@ -1,17 +1,11 @@
 package com.github.auties00.cobalt.socket;
 
-import com.github.auties00.cobalt.socket.misc.ChromeSslEngineFactory;
-
 import javax.net.ssl.SSLEngine;
 import java.net.InetSocketAddress;
 
 /**
  * Factory for creating {@link SSLEngine} instances for WhatsApp
  * socket connections.
- *
- * <p>The default implementation ({@link ChromeSslEngineFactory#instance()})
- * configures a TLS fingerprint that matches a real browser so that
- * WhatsApp's JA3 fingerprinting accepts the connection.
  */
 @FunctionalInterface
 public interface WhatsAppSslEngineFactory {

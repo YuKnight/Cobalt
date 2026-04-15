@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.crypto;
 
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
-import com.github.auties00.cobalt.util.FastDataUtils;
+import com.github.auties00.cobalt.util.DataUtils;
 
 import javax.crypto.Cipher;
 import javax.crypto.KDF;
@@ -220,7 +220,7 @@ public final class MutationKeys implements AutoCloseable {
         var paddingLength = Math.max(0, MAX_OF_MIN_DATA_LENGTH - indexLength - valueLength); // WAWebSyncdMutationsCryptoUtils.generatePadding: Math.max(0, MAX_OF_MIN_DATA_LENGTH - e - t)
         var padding = new byte[paddingLength]; // WAWebSyncdMutationsCryptoUtils.generatePadding: new Uint8Array(n)
         if (paddingLength > 0) {
-            FastDataUtils.randomByteArray(padding, 0, paddingLength); // WAWebSyncdMutationsCryptoUtils.generatePadding: getCrypto().getRandomValues(r)
+            DataUtils.randomByteArray(padding, 0, paddingLength); // WAWebSyncdMutationsCryptoUtils.generatePadding: getCrypto().getRandomValues(r)
         }
         return padding; // WAWebSyncdMutationsCryptoUtils.generatePadding: return r.buffer
     }
@@ -241,7 +241,7 @@ public final class MutationKeys implements AutoCloseable {
      */
     public byte[] generateCipherText(byte[] plaintext) throws GeneralSecurityException {
         var iv = new byte[IV_LENGTH]; // WAWebSyncdMutationsCryptoUtils.generateCipherText → WACryptoAesCbc.aesCbcEncrypt: getIv(optionalIv)
-        FastDataUtils.randomByteArray(iv, 0, IV_LENGTH); // WACryptoDependencies.getCrypto().getRandomValues
+        DataUtils.randomByteArray(iv, 0, IV_LENGTH); // WACryptoDependencies.getCrypto().getRandomValues
         return generateCipherText(iv, plaintext);
     }
 
