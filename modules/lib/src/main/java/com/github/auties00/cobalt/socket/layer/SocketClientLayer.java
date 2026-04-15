@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.socket.layer;
 
-import com.github.auties00.cobalt.socket.layer.threading.SocketClientLayerContext;
+import com.github.auties00.cobalt.socket.threading.SocketClientLayerContext;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -18,8 +18,7 @@ import java.nio.ByteBuffer;
  * layer.  These methods allow higher-level code (such as protocol
  * handshake logic) to manipulate the connection lifecycle without
  * needing direct access to the NIO channel or selector.
- */
-/**
+ *
  * @param <C> the type of layer context associated with this layer,
  *            used by the selector to return a properly typed
  *            {@link java.util.Optional}

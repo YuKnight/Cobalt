@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.socket.layer.security;
 
 import com.github.auties00.cobalt.socket.layer.SocketClientLayer;
-import com.github.auties00.cobalt.socket.layer.threading.SocketClientLayerContext;
+import com.github.auties00.cobalt.socket.threading.SocketClientLayerContext;
 
 import java.io.IOException;
 

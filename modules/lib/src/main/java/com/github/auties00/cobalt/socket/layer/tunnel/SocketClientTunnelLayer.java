@@ -1,7 +1,10 @@
 package com.github.auties00.cobalt.socket.layer.tunnel;
 
-import com.github.auties00.cobalt.client.WhatsAppClientProxy;
 import com.github.auties00.cobalt.socket.layer.SocketClientLayer;
+import com.github.auties00.cobalt.client.WhatsAppClientProxy;
+import com.github.auties00.cobalt.socket.layer.tunnel.direct.DirectSocketClientTunnelLayer;
+import com.github.auties00.cobalt.socket.layer.tunnel.http.HttpSocketClientTunnelLayer;
+import com.github.auties00.cobalt.socket.layer.tunnel.socks.SocksSocketClientTunnelLayer;
 
 /**
  * A tunnel layer in the socket client stack.
