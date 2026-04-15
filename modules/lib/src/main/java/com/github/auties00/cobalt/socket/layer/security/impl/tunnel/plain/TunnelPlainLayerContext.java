@@ -14,10 +14,15 @@ import java.nio.channels.SocketChannel;
  * <p>All operations are delegated to the next layer in the chain.
  */
 public final class TunnelPlainLayerContext implements SocketClientTunnelSecurityLayerContext {
-    private final SocketClientLayerContext nextLayer;
+    private volatile SocketClientLayerContext nextLayer;
 
     public TunnelPlainLayerContext(SocketClientLayerContext nextLayer) {
         this.nextLayer = nextLayer;
+    }
+
+    @Override
+    public void setNextLayer(SocketClientLayerContext next) {
+        this.nextLayer = next;
     }
 
     @Override
