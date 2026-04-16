@@ -4,37 +4,41 @@ import it.auties.protobuf.annotation.ProtobufEnum;
 import it.auties.protobuf.annotation.ProtobufEnumIndex;
 
 /**
- * A visibility setting that controls whether media attachments are automatically
- * downloaded and displayed within a conversation or across all conversations.
+ * A setting that controls whether incoming media attachments are automatically
+ * downloaded and made visible in a conversation.
  *
- * <p>This enum is defined in {@code WAWebProtobufsHistorySync.pb} and is
- * referenced in two contexts: at field index 27 in the {@code Conversation}
- * message to control per-chat media visibility, and at field index 2 in
- * {@code GlobalSettings} to control the application-wide default. When a
- * conversation-level setting is {@link #DEFAULT}, the client falls back to the
- * value specified in {@code GlobalSettings}.
+ * <p>This setting is honored at two levels: an application-wide default
+ * configured in global settings, and an optional per-conversation override
+ * applied to individual chats. When a conversation uses {@link #DEFAULT}, the
+ * client falls back to the application-wide value. Setting a conversation to
+ * {@link #OFF} hides media attachments and skips automatic downloads even when
+ * the global default is {@link #ON}.
  */
 @ProtobufEnum(name = "MediaVisibility")
 public enum MediaVisibility {
     /**
-     * The singleton instance for the default media visibility setting.
-     * When used at the conversation level, this indicates that the global
-     * setting should be applied instead.
-     * This has the numeric value of {@code 0}.
+     * Inherits the application-wide setting.
+     *
+     * <p>Applied at the conversation level; when used, the global default
+     * determines the effective behavior.
+     *
+     * <p>Numeric value {@code 0}.
      */
     DEFAULT(0),
 
     /**
-     * The singleton instance for disabling media visibility.
-     * Media attachments are not automatically downloaded or displayed.
-     * This has the numeric value of {@code 1}.
+     * Hides media attachments. Media is not automatically downloaded or
+     * displayed in the conversation.
+     *
+     * <p>Numeric value {@code 1}.
      */
     OFF(1),
 
     /**
-     * The singleton instance for enabling media visibility.
-     * Media attachments are automatically downloaded and displayed.
-     * This has the numeric value of {@code 2}.
+     * Shows media attachments. Media is automatically downloaded and displayed
+     * in the conversation.
+     *
+     * <p>Numeric value {@code 2}.
      */
     ON(2);
 
@@ -48,7 +52,7 @@ public enum MediaVisibility {
     }
 
     /**
-     * The protobuf enum index of this visibility setting.
+     * The protobuf enum index backing this visibility setting.
      */
     final int index;
 

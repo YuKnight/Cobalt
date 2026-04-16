@@ -13,26 +13,45 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * A builder for WhatsApp API client instances with support for both web-based and mobile-based connections.
- * <p>
- * This class implements a fluent builder pattern with specialized inner classes that handle:
- * <ul>
- *   <li>Web client connections (through QR codes or pairing codes)</li>
- *   <li>Mobile client connections (through phone numbers and verification)</li>
- *   <li>Custom client configurations for advanced use cases</li>
- * </ul>
- * <p>
- * The builder provides a clean, type-safe API for creating and configuring WhatsApp client instances
- * with appropriate connection, serialization, and authentication options.
+ * A fluent builder that constructs {@link WhatsAppClient} instances.
+ *
+ * <p>The builder exposes three entry points via
+ * {@link #webClient()}, {@link #mobileClient()}, and
+ * {@link #customClient()}. Each entry point returns a specialised
+ * sub-builder that guides the caller through the steps needed for that
+ * client flavour: selecting a store factory, loading or creating a
+ * connection, providing a verification handler, and finally producing the
+ * {@link WhatsAppClient}. The specialisations use a sealed class
+ * hierarchy so each step exposes only the parameters that apply to it,
+ * keeping the surface type-safe.
+ *
+ * @see WhatsAppClient
  */
 
 public sealed class WhatsAppClientBuilder {
+    /**
+     * The default message preview handler: preview inference is enabled.
+     */
     private static final WhatsAppClientMessagePreviewHandler DEFAULT_MESSAGE_PREVIEW_HANDLER = WhatsAppClientMessagePreviewHandler.enabled(true);
+    /**
+     * The default error handler: prints stack traces to stderr.
+     */
     private static final WhatsAppClientErrorHandler DEFAULT_ERROR_HANDLER = WhatsAppClientErrorHandler.toTerminal();
+    /**
+     * The default web verification handler: renders the QR code in the
+     * terminal.
+     */
     private static final WhatsAppClientVerificationHandler.Web DEFAULT_WEB_VERIFICATION_HANDLER = WhatsAppClientVerificationHandler.Web.QrCode.toTerminal();
 
+    /**
+     * The shared root builder, accessed via {@link WhatsAppClient#builder()}.
+     */
     static final WhatsAppClientBuilder INSTANCE = new WhatsAppClientBuilder();
 
+    /**
+     * Private singleton constructor; obtain instances via
+     * {@link WhatsAppClient#builder()}.
+     */
     private WhatsAppClientBuilder() {
 
     }
@@ -88,9 +107,28 @@ public sealed class WhatsAppClientBuilder {
         return new Custom();
     }
 
+    /**
+     * A builder stage that selects an existing persisted session or
+     * provisions a new one, backed by a {@link WhatsAppStoreFactory}.
+     *
+     * <p>Sub-types {@link Web} and {@link Mobile} specialise the behaviour
+     * to the respective client flavour. Every {@code loadXxx} method
+     * offers a parallel {@code loadOrCreateXxx} variant that falls back
+     * to provisioning a fresh store when the lookup is not satisfied.
+     */
     public static abstract sealed class Client extends WhatsAppClientBuilder {
+        /**
+         * The store factory that loads or creates the session on disk.
+         */
         final WhatsAppStoreFactory factory;
 
+        /**
+         * Constructs a new {@code Client} stage backed by the given
+         * factory.
+         *
+         * @param factory the store factory; must not be {@code null}
+         * @throws NullPointerException if {@code factory} is {@code null}
+         */
         private Client(WhatsAppStoreFactory factory) {
             this.factory = Objects.requireNonNull(factory, "factory must not be null");
         }
@@ -163,7 +201,21 @@ public sealed class WhatsAppClientBuilder {
          */
         public abstract Options loadOrCreateConnection(Long phoneNumber) throws IOException;
 
+        /**
+         * The {@link WhatsAppClientType#WEB} specialisation of the
+         * {@code Client} stage.
+         *
+         * <p>Produces {@link Options.Web} instances whose store is tagged
+         * as a web companion and whose subsequent verification flow
+         * accepts QR codes or pairing codes.
+         */
         public static final class Web extends Client {
+            /**
+             * Package-private constructor used by
+             * {@link WhatsAppClientBuilder#webClient()}.
+             *
+             * @param factory the store factory for the web client
+             */
             private Web(WhatsAppStoreFactory factory) {
                 super(factory);
             }
@@ -273,7 +325,22 @@ public sealed class WhatsAppClientBuilder {
             }
         }
 
+        /**
+         * The {@link WhatsAppClientType#MOBILE} specialisation of the
+         * {@code Client} stage.
+         *
+         * <p>Produces {@link Options.Mobile} instances whose store is
+         * tagged as a primary mobile device; the subsequent step lets the
+         * caller register a phone number via
+         * {@link Options.Mobile#register(long, WhatsAppClientVerificationHandler.Mobile)}.
+         */
         public static final class Mobile extends Client {
+            /**
+             * Package-private constructor used by
+             * {@link WhatsAppClientBuilder#mobileClient()}.
+             *
+             * @param factory the store factory for the mobile client
+             */
             private Mobile(WhatsAppStoreFactory factory) {
                 super(factory);
             }
@@ -384,11 +451,39 @@ public sealed class WhatsAppClientBuilder {
         }
     }
 
+    /**
+     * A builder stage that applies session-wide options to a resolved
+     * {@link WhatsAppStore} before the client is materialised.
+     *
+     * <p>Every fluent setter on this stage writes directly into the
+     * underlying store (for things that must be persisted, such as the
+     * proxy configuration, device profile, and client version) or into
+     * local fields (for handlers, which are not serialised). Concrete
+     * {@link Web} and {@link Mobile} specialisations add verification and
+     * business-profile options that are only meaningful for their
+     * respective flavours.
+     */
     public static sealed class Options extends WhatsAppClientBuilder {
+        /**
+         * The resolved store on which configuration writes are applied.
+         */
         final WhatsAppStore store;
+        /**
+         * The message preview handler installed on the future client.
+         */
         WhatsAppClientMessagePreviewHandler messagePreviewHandler;
+        /**
+         * The error handler installed on the future client.
+         */
         WhatsAppClientErrorHandler errorHandler;
 
+        /**
+         * Package-private constructor used by the {@link Client}
+         * sub-builder once the store has been resolved.
+         *
+         * @param store the store to configure; must not be {@code null}
+         * @throws NullPointerException if {@code store} is {@code null}
+         */
         private Options(WhatsAppStore store) {
             this.store = Objects.requireNonNull(store, "store must not be null");
         }
@@ -475,7 +570,22 @@ public sealed class WhatsAppClientBuilder {
             return this;
         }
 
+        /**
+         * The {@link WhatsAppClientType#WEB} specialisation of the
+         * {@code Options} stage.
+         *
+         * <p>Adds the {@link #historySetting(WhatsAppWebClientHistory)}
+         * option and the terminal step methods
+         * {@link #unregistered(WhatsAppClientVerificationHandler.Web.QrCode)},
+         * {@link #unregistered(long, WhatsAppClientVerificationHandler.Web.PairingCode)},
+         * and {@link #registered()} that materialise the client.
+         */
         public static final class Web extends Options {
+            /**
+             * Package-private constructor used by {@link Client.Web}.
+             *
+             * @param store the store resolved by the previous stage
+             */
             private Web(WhatsAppStore store) {
                 super(store);
             }
@@ -623,7 +733,22 @@ public sealed class WhatsAppClientBuilder {
             }
         }
 
+        /**
+         * The {@link WhatsAppClientType#MOBILE} specialisation of the
+         * {@code Options} stage.
+         *
+         * <p>Adds mobile-only setters for the account "about" text and
+         * business profile (address, geolocation, description, website,
+         * email, category) plus the terminal step methods
+         * {@link #register(long, WhatsAppClientVerificationHandler.Mobile)}
+         * and {@link #registered()}.
+         */
         public static final class Mobile extends Options {
+            /**
+             * Package-private constructor used by {@link Client.Mobile}.
+             *
+             * @param store the store resolved by the previous stage
+             */
             private Mobile(WhatsAppStore store) {
                 super(store);
             }
@@ -840,12 +965,42 @@ public sealed class WhatsAppClientBuilder {
         }
     }
 
+    /**
+     * A low-level builder stage that bypasses the
+     * {@link WhatsAppStoreFactory} flow and lets the caller supply a
+     * pre-built {@link WhatsAppStore}.
+     *
+     * <p>{@code Custom} is useful for test harnesses or for integrators
+     * that already own a store (for example, one loaded from an external
+     * database). The caller is responsible for ensuring the store's
+     * {@link WhatsAppStore#clientType()} matches the intended flavour and
+     * that the keys stored inside it are consistent with any identifiers
+     * passed elsewhere in the build chain.
+     */
     public static final class Custom extends WhatsAppClientBuilder {
+        /**
+         * The externally-supplied store.
+         */
         private WhatsAppStore store;
+        /**
+         * The message preview handler to install on the built client.
+         */
         private WhatsAppClientMessagePreviewHandler messagePreviewHandler;
+        /**
+         * The error handler to install on the built client.
+         */
         private WhatsAppClientErrorHandler errorHandler;
+        /**
+         * The web verification handler to install on the built client,
+         * only honoured when the store's client type is
+         * {@link WhatsAppClientType#WEB}.
+         */
         private WhatsAppClientVerificationHandler.Web webVerificationHandler;
 
+        /**
+         * Package-private constructor used by
+         * {@link WhatsAppClientBuilder#customClient()}.
+         */
         private Custom() {
 
         }

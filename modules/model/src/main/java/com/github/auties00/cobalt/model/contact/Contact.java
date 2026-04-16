@@ -15,25 +15,34 @@ import java.util.Optional;
 /**
  * A model representing a WhatsApp contact.
  *
- * <p>Each contact is uniquely identified by a phone-number-based {@link Jid} and may
- * optionally be associated with a LID (Linked Identifier) as part of the WhatsApp LID
- * migration. A contact carries three independent name fields that originate from different
- * sources: the {@linkplain #chosenName() chosen name} (also known as the "push name") is
- * the display name set by the contact on their own WhatsApp profile, the
- * {@linkplain #fullName() full name} is the name stored in the local device's address
- * book, and the {@linkplain #shortName() short name} is a shortened form of the address
- * book name (typically the first word).
+ * <p>Each contact is uniquely identified by a phone-number-based {@link Jid}
+ * and may optionally carry a LID (Linked Identifier), which is WhatsApp's
+ * privacy-preserving replacement for phone numbers in group chats and
+ * communities. Three independent name fields originate from different sources
+ * and are all exposed separately:
+ * <ul>
+ *   <li>the {@linkplain #chosenName() chosen name}, also known as the "push
+ *       name", is the display name that the contact has set on their own
+ *       WhatsApp profile;</li>
+ *   <li>the {@linkplain #fullName() full name} is the name stored for the
+ *       contact in the local device's address book;</li>
+ *   <li>the {@linkplain #shortName() short name} is a shortened form of the
+ *       address-book name, typically the first word.</li>
+ * </ul>
  *
- * <p>Presence information ({@linkplain #lastKnownPresence() online status},
- * {@linkplain #lastSeen() last seen timestamp}) is maintained at the individual contact
- * level. This presence reflects only the 1:1 conversation state; for a contact's
- * presence within a group chat, use
- * {@link Chat#getPresence(JidProvider)} instead. By default, the server does not send
- * presence updates for every contact. To receive real-time updates, call
+ * <p>Presence information such as the {@linkplain #lastKnownPresence() online
+ * status} and the {@linkplain #lastSeen() last seen timestamp} is maintained
+ * per contact and reflects only the state of the 1:1 conversation with that
+ * contact. Group-chat presence is tracked separately on the group: use
+ * {@link Chat#getPresence(JidProvider)} for that purpose. By default the
+ * WhatsApp server does not push presence updates for every contact; to
+ * receive real-time updates for a specific contact call
  * {@code WhatsAppClient#subscribeToPresence(JidProvider)}.
  *
- * <p>This class is a local model only. Modifying its fields does not send any request
- * to the WhatsApp servers; it simply reflects the locally cached state.
+ * <p>This class is a local model only. Modifying its fields does not send any
+ * request to the WhatsApp servers; it simply reflects the locally cached
+ * state. Two contacts are considered equal when they share the same
+ * {@linkplain #jid() JID}, regardless of the other fields.
  *
  * @see ContactStatus
  * @see ContactCard
@@ -41,123 +50,121 @@ import java.util.Optional;
 @ProtobufMessage
 public final class Contact implements JidProvider {
     /**
-     * The non-{@code null} phone-number-based JID that uniquely identifies this contact.
-     * In the WhatsApp Web contact database, this corresponds to the primary key
-     * ({@code id}) column. The JID encodes the contact's phone number and server
-     * information.
+     * The non-{@code null} phone-number-based JID that uniquely identifies
+     * this contact. The JID encodes the contact's phone number and server
+     * information and is the primary identity key of this record.
      */
     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
     final Jid jid;
 
     /**
-     * The display name that this contact has chosen for their own WhatsApp profile,
-     * commonly referred to as the "push name". This value is set by the contact
-     * themselves during registration or through their profile settings. In the
-     * WhatsApp Web contact database, this corresponds to the {@code pushname} column.
-     * Although a push name is required at registration time, it can be removed later,
-     * making this field nullable.
+     * The display name that this contact has chosen for their own WhatsApp
+     * profile, commonly referred to as the "push name". This value is set by
+     * the contact themselves during registration or through their profile
+     * settings. Although a push name is required at registration time, it can
+     * be cleared later, so this field is nullable.
      */
     @ProtobufProperty(index = 2, type = ProtobufType.STRING)
     String chosenName;
 
     /**
-     * The full name associated with this contact in the local device's address book.
-     * In the WhatsApp Web contact database, this corresponds to the {@code name}
-     * column. This value is {@code null} if the contact is not saved in the address
-     * book.
+     * The full name associated with this contact in the local device's
+     * address book. This value is {@code null} when the contact is not saved
+     * in the address book.
      */
     @ProtobufProperty(index = 3, type = ProtobufType.STRING)
     String fullName;
 
     /**
-     * A shortened form of the address-book name for this contact, typically the first
-     * alphabetic word of the {@linkplain #fullName() full name}. In the WhatsApp Web
-     * contact database, this corresponds to the {@code shortName} column. This value
-     * is {@code null} if no full name is available or if the first word does not start
-     * with an alphabetic character.
+     * A shortened form of the address-book name for this contact, typically
+     * the first alphabetic word of the {@linkplain #fullName() full name}.
+     * This value is {@code null} when no full name is available or when the
+     * first word does not start with an alphabetic character.
      */
     @ProtobufProperty(index = 4, type = ProtobufType.STRING)
     String shortName;
 
     /**
-     * The last known presence state of this contact in the 1:1 conversation. This
-     * field tracks whether the contact is online, offline, typing, or recording audio.
-     * It is not affected by the contact's activity in group chats. Defaults to
-     * {@link ContactStatus#UNAVAILABLE} when no presence data has been received.
+     * The last known presence state of this contact in the 1:1 conversation.
+     * This field tracks whether the contact is online, offline, typing, or
+     * recording an audio message, and it is not affected by the contact's
+     * activity in group chats. Defaults to {@link ContactStatus#UNAVAILABLE}
+     * when no presence data has been received.
      */
     @ProtobufProperty(index = 5, type = ProtobufType.ENUM)
     ContactStatus lastKnownPresence;
 
     /**
-     * The epoch-second timestamp of when this contact was last seen online, or
-     * {@code null} if the information is unavailable. A contact may hide their
-     * last-seen timestamp through their privacy settings, in which case this field
-     * remains {@code null}. In the WhatsApp Web presence model, this corresponds
-     * to the {@code t} field on the chatstate, and it is only shown when the
-     * chatstate's {@code deny} flag is not set.
+     * The epoch-second timestamp of when this contact was last seen online,
+     * or {@code null} if the information is unavailable. A contact may hide
+     * their last-seen timestamp through their privacy settings, in which case
+     * this field remains {@code null} regardless of their actual activity.
      */
     @ProtobufProperty(index = 6, type = ProtobufType.UINT64)
     Long lastSeenSeconds;
 
     /**
-     * Whether this contact has been blocked by the current user. Blocked contacts
-     * cannot send messages to the user and do not receive presence updates.
+     * Whether this contact has been blocked by the current user. Blocked
+     * contacts cannot send messages to the user and do not receive presence
+     * updates from the user.
      */
     @ProtobufProperty(index = 7, type = ProtobufType.BOOL)
     boolean blocked;
 
     /**
-     * Whether the status updates (stories) posted by this contact are muted. When
-     * muted, the contact's status updates are hidden from the status tab but the
-     * contact can still send and receive messages normally.
+     * Whether the story-style status updates posted by this contact are muted.
+     * When muted, the contact's status updates are hidden from the Status tab
+     * but the contact can still send and receive regular messages normally.
      */
     @ProtobufProperty(index = 8, type = ProtobufType.BOOL)
     boolean statusMuted;
 
     /**
-     * The LID (Linked Identifier) associated with this contact, used as part of the
-     * WhatsApp LID migration. The LID provides an alternative, stable identifier that
-     * maps to the contact's phone-number-based JID. Once a LID is assigned, it
-     * becomes the preferred identifier returned by {@link #toJid()}. This value is
-     * {@code null} if the contact has not yet been assigned a LID.
+     * The LID (Linked Identifier) associated with this contact, or
+     * {@code null} if none has been assigned. The LID is an alternative,
+     * phone-number-free identifier that WhatsApp uses to address users in
+     * group chats and communities without exposing their phone number. Once a
+     * LID is known for a contact, it becomes the preferred identifier
+     * returned by {@link #toJid()}.
      */
     @ProtobufProperty(index = 9, type = ProtobufType.STRING)
     Jid lid;
 
     /**
-     * The optional username associated with this contact's WhatsApp account. Usernames
-     * are user-chosen identifiers fetched via the USync protocol
-     * ({@code WAWebUsyncUsername}). When present, the username is displayed in the
-     * format {@code @username}. This value is {@code null} if the contact has not set
-     * a username.
+     * The optional username associated with this contact's WhatsApp account.
+     * Usernames are user-chosen textual handles that can be used to address a
+     * contact without knowing their phone number. When present, the username
+     * is typically displayed in the {@code @username} form. This value is
+     * {@code null} if the contact has not set a username.
      */
     @ProtobufProperty(index = 10, type = ProtobufType.STRING)
     String username;
 
     /**
-     * The ADV (Account Device Verification) encryption type for this contact, indicating
-     * whether the contact uses standard end-to-end encryption ({@code E2EE}) or hosted
-     * business API encryption ({@code HOSTED}). This information is updated during
-     * device list synchronization. This value is {@code null} if the encryption type
-     * has not been determined.
+     * The end-to-end encryption scheme used by this contact, or {@code null}
+     * if it has not yet been determined. The value indicates whether messages
+     * exchanged with the contact travel through the standard Signal protocol
+     * end-to-end encryption or through the hosted business-API variant. This
+     * information is refreshed during device-list synchronisation.
      */
     @ProtobufProperty(index = 11, type = ProtobufType.ENUM)
     ADVEncryptionType encryptionType;
 
     /**
-     * Whether the local user has opted to share their own phone number with this
-     * LID-identified contact. Populated by the {@code shareOwnPn} app state sync
-     * action and used by the LID metadata update job to control phone number
-     * visibility in LID-addressed conversations.
+     * Whether the local user has opted to share their own phone number with
+     * this LID-identified contact. This flag only has meaning for contacts
+     * that have a {@linkplain #lid() LID} and controls whether the phone
+     * number is visible to the other party in LID-addressed conversations.
      */
     @ProtobufProperty(index = 12, type = ProtobufType.BOOL)
     boolean phoneNumberShared;
 
     /**
-     * Whether this contact record was created through the username-based contact
-     * discovery flow rather than through phone number lookup. Used to scope
-     * {@code REMOVE} operations in {@link com.github.auties00.cobalt.sync.handler.LidContactHandler}:
-     * only username-originated contacts have their name fields cleared on removal.
+     * Whether this contact record was created through the username-based
+     * contact discovery flow rather than through phone number lookup. The
+     * flag influences removal semantics: only records added by username have
+     * their name fields cleared when the contact is removed from the sync
+     * layer.
      */
     @ProtobufProperty(index = 13, type = ProtobufType.BOOL)
     boolean addedByUsername;
@@ -165,18 +172,29 @@ public final class Contact implements JidProvider {
     /**
      * Constructs a new contact with the given field values.
      *
-     * @param jid                the non-{@code null} JID uniquely identifying this contact
-     * @param chosenName         the push name set by the contact, or {@code null}
+     * @param jid                the non-{@code null} JID uniquely identifying
+     *                           this contact
+     * @param chosenName         the push name set by the contact, or
+     *                           {@code null}
      * @param fullName           the address-book full name, or {@code null}
      * @param shortName          the address-book short name, or {@code null}
-     * @param lastKnownPresence  the last known presence state, or {@code null} (defaults
-     *                           to {@link ContactStatus#UNAVAILABLE})
-     * @param lastSeenSeconds    the epoch-second timestamp of last seen, or {@code null}
+     * @param lastKnownPresence  the last known presence state, or
+     *                           {@code null} to default to
+     *                           {@link ContactStatus#UNAVAILABLE}
+     * @param lastSeenSeconds    the epoch-second timestamp of last seen, or
+     *                           {@code null}
      * @param blocked            whether this contact is blocked
-     * @param statusMuted        whether this contact's status updates are muted
+     * @param statusMuted        whether this contact's status updates are
+     *                           muted
      * @param lid                the LID for this contact, or {@code null}
-     * @param username           the username for this contact, or {@code null}
-     * @param encryptionType     the ADV encryption type, or {@code null}
+     * @param username           the username for this contact, or
+     *                           {@code null}
+     * @param encryptionType     the end-to-end encryption scheme, or
+     *                           {@code null}
+     * @param phoneNumberShared  whether the local user has shared their phone
+     *                           number with this contact
+     * @param addedByUsername    whether this contact was added through
+     *                           username-based discovery
      */
     Contact(Jid jid, String chosenName, String fullName, String shortName, ContactStatus lastKnownPresence, Long lastSeenSeconds, boolean blocked, boolean statusMuted, Jid lid, String username, ADVEncryptionType encryptionType, boolean phoneNumberShared, boolean addedByUsername) {
         this.jid = Objects.requireNonNull(jid, "value cannot be null");
@@ -195,7 +213,8 @@ public final class Contact implements JidProvider {
     }
 
     /**
-     * Returns the non-{@code null} JID that uniquely identifies this contact.
+     * Returns the non-{@code null} phone-number-based JID that uniquely
+     * identifies this contact.
      *
      * @return the contact's phone-number-based JID
      */
@@ -204,13 +223,14 @@ public final class Contact implements JidProvider {
     }
 
     /**
-     * Returns the best available display name for this contact, resolving through
-     * multiple name sources in order of preference.
+     * Returns the best available display name for this contact.
      *
-     * <p>The resolution order follows the WhatsApp Web name display logic: the short
-     * name from the address book is preferred first, followed by the full address-book
-     * name, then the push name (chosen name). If none of these are available, the user
-     * part of the contact's JID is returned as a fallback.
+     * <p>The resolution order follows the standard WhatsApp name display
+     * logic: the short name from the address book is preferred first,
+     * followed by the full address-book name, then the push name chosen by
+     * the contact. If none of these are available, the user part of the
+     * contact's JID is returned as a last-resort fallback, so the result is
+     * always a non-{@code null} string.
      *
      * @return a non-{@code null} display name for this contact
      */
@@ -231,16 +251,19 @@ public final class Contact implements JidProvider {
     }
 
     /**
-     * Returns the push name that this contact has chosen for their WhatsApp profile.
+     * Returns the push name that this contact has chosen for their WhatsApp
+     * profile.
      *
-     * @return an {@code Optional} containing the chosen name, or empty if not available
+     * @return an {@code Optional} containing the chosen name, or empty if the
+     *         contact has not set one
      */
     public Optional<String> chosenName() {
         return Optional.ofNullable(this.chosenName);
     }
 
     /**
-     * Sets the push name for this contact.
+     * Sets the push name that this contact has chosen for their WhatsApp
+     * profile.
      *
      * @param chosenName the chosen name to set, or {@code null} to clear
      */
@@ -249,10 +272,11 @@ public final class Contact implements JidProvider {
     }
 
     /**
-     * Returns the full name associated with this contact in the local address book.
+     * Returns the full name associated with this contact in the local address
+     * book.
      *
-     * @return an {@code Optional} containing the full name, or empty if the contact
-     *         is not saved in the address book
+     * @return an {@code Optional} containing the full name, or empty if the
+     *         contact is not saved in the address book
      */
     public Optional<String> fullName() {
         return Optional.ofNullable(this.fullName);
@@ -270,7 +294,8 @@ public final class Contact implements JidProvider {
     /**
      * Returns the shortened address-book name for this contact.
      *
-     * @return an {@code Optional} containing the short name, or empty if not available
+     * @return an {@code Optional} containing the short name, or empty if not
+     *         available
      */
     public Optional<String> shortName() {
         return Optional.ofNullable(this.shortName);
@@ -286,7 +311,8 @@ public final class Contact implements JidProvider {
     }
 
     /**
-     * Returns the last known presence state of this contact in the 1:1 conversation.
+     * Returns the last known presence state of this contact in the 1:1
+     * conversation.
      *
      * @return the last known presence, never {@code null} (defaults to
      *         {@link ContactStatus#UNAVAILABLE})
@@ -307,11 +333,12 @@ public final class Contact implements JidProvider {
     /**
      * Returns the timestamp of when this contact was last seen online.
      *
-     * <p>This value is empty if the contact has never been seen online during this
-     * session, or if the contact's privacy settings hide the last-seen information.
+     * <p>This value is empty when the contact has never been observed online
+     * during the current session, or when the contact's privacy settings hide
+     * the last-seen information from the local user.
      *
-     * @return an {@code Optional} containing the last-seen instant, or empty if
-     *         unavailable
+     * @return an {@code Optional} containing the last-seen instant, or empty
+     *         if unavailable
      */
     public Optional<Instant> lastSeen() {
         if (lastSeenSeconds == null || lastSeenSeconds <= 0) {
@@ -341,25 +368,28 @@ public final class Contact implements JidProvider {
     /**
      * Sets whether this contact is blocked.
      *
-     * @param blocked {@code true} to mark as blocked, {@code false} to unblock
+     * @param blocked {@code true} to mark as blocked, {@code false} to
+     *                unblock
      */
     public void setBlocked(boolean blocked) {
         this.blocked = blocked;
     }
 
     /**
-     * Returns whether this contact's status updates (stories) are muted.
+     * Returns whether this contact's story-style status updates are muted.
      *
-     * @return {@code true} if status updates are muted, {@code false} otherwise
+     * @return {@code true} if status updates are muted, {@code false}
+     *         otherwise
      */
     public boolean statusMuted() {
         return statusMuted;
     }
 
     /**
-     * Sets whether this contact's status updates are muted.
+     * Sets whether this contact's story-style status updates are muted.
      *
-     * @param statusMuted {@code true} to mute status updates, {@code false} to unmute
+     * @param statusMuted {@code true} to mute status updates, {@code false}
+     *                    to unmute
      */
     public void setStatusMuted(boolean statusMuted) {
         this.statusMuted = statusMuted;
@@ -368,8 +398,8 @@ public final class Contact implements JidProvider {
     /**
      * Returns the LID (Linked Identifier) associated with this contact.
      *
-     * @return an {@code Optional} containing the LID, or empty if no LID has been
-     *         assigned
+     * @return an {@code Optional} containing the LID, or empty if none has
+     *         been assigned
      */
     public Optional<Jid> lid() {
         return Optional.ofNullable(lid);
@@ -385,7 +415,8 @@ public final class Contact implements JidProvider {
     }
 
     /**
-     * Returns whether this contact has been assigned a LID (Linked Identifier).
+     * Returns whether this contact has been assigned a LID (Linked
+     * Identifier).
      *
      * @return {@code true} if a LID is present, {@code false} otherwise
      */
@@ -396,8 +427,8 @@ public final class Contact implements JidProvider {
     /**
      * Returns the username associated with this contact's WhatsApp account.
      *
-     * @return an {@code Optional} containing the username, or empty if the contact
-     *         has not set a username
+     * @return an {@code Optional} containing the username, or empty if the
+     *         contact has not set one
      */
     public Optional<String> username() {
         return Optional.ofNullable(username);
@@ -413,7 +444,8 @@ public final class Contact implements JidProvider {
     }
 
     /**
-     * Returns whether this contact has a username set on their WhatsApp account.
+     * Returns whether this contact has a username set on their WhatsApp
+     * account.
      *
      * @return {@code true} if a username is present, {@code false} otherwise
      */
@@ -422,26 +454,28 @@ public final class Contact implements JidProvider {
     }
 
     /**
-     * Returns the ADV encryption type for this contact.
+     * Returns the end-to-end encryption scheme used by this contact.
      *
-     * @return an {@code Optional} containing the encryption type, or empty if the
-     *         type has not been determined
+     * @return an {@code Optional} containing the encryption type, or empty
+     *         if the type has not been determined yet
      */
     public Optional<ADVEncryptionType> encryptionType() {
         return Optional.ofNullable(encryptionType);
     }
 
     /**
-     * Sets the ADV encryption type for this contact.
+     * Sets the end-to-end encryption scheme for this contact.
      *
-     * @param encryptionType the encryption type to set, or {@code null} to clear
+     * @param encryptionType the encryption type to set, or {@code null} to
+     *                       clear
      */
     public void setEncryptionType(ADVEncryptionType encryptionType) {
         this.encryptionType = encryptionType;
     }
 
     /**
-     * Returns whether the local user has shared their phone number with this contact.
+     * Returns whether the local user has shared their own phone number with
+     * this contact in LID-addressed conversations.
      *
      * @return {@code true} if the phone number has been shared
      */
@@ -450,7 +484,8 @@ public final class Contact implements JidProvider {
     }
 
     /**
-     * Sets whether the local user has shared their phone number with this contact.
+     * Sets whether the local user has shared their own phone number with this
+     * contact.
      *
      * @param phoneNumberShared {@code true} if the phone number is shared
      */
@@ -459,7 +494,8 @@ public final class Contact implements JidProvider {
     }
 
     /**
-     * Returns whether this contact was added through username-based discovery.
+     * Returns whether this contact was added through username-based contact
+     * discovery.
      *
      * @return {@code true} if the contact was added by username
      */
@@ -468,7 +504,8 @@ public final class Contact implements JidProvider {
     }
 
     /**
-     * Sets whether this contact was added through username-based discovery.
+     * Sets whether this contact was added through username-based contact
+     * discovery.
      *
      * @param addedByUsername {@code true} if added by username
      */
@@ -477,13 +514,16 @@ public final class Contact implements JidProvider {
     }
 
     /**
-     * Returns whether any of the contact's name fields (full name, short name, or
-     * chosen name) exactly matches the given string.
+     * Returns whether any of the contact's name fields exactly matches the
+     * given string.
+     *
+     * <p>The full name, short name and chosen name are all compared using
+     * {@link String#equals(Object)}. The comparison is case-sensitive.
      *
      * @param name the name to check against, or {@code null}
-     * @return {@code true} if the given name matches at least one of the contact's
-     *         name fields, {@code false} if {@code name} is {@code null} or no match
-     *         is found
+     * @return {@code true} if the given name matches at least one of the
+     *         contact's name fields, {@code false} if {@code name} is
+     *         {@code null} or no match is found
      */
     public boolean hasName(String name) {
         return name != null
@@ -491,10 +531,12 @@ public final class Contact implements JidProvider {
     }
 
     /**
-     * Returns the preferred JID for this contact. If a LID has been assigned, the LID
-     * is returned; otherwise, the phone-number-based JID is returned. This behavior
-     * supports the WhatsApp LID migration, where LIDs progressively replace phone
-     * number JIDs as the primary contact identifier.
+     * Returns the preferred JID for addressing this contact.
+     *
+     * <p>If a LID has been assigned to the contact, the LID is returned;
+     * otherwise the phone-number-based JID is returned. This behaviour
+     * supports the progressive migration from phone-number JIDs to LIDs as
+     * the primary contact identifier.
      *
      * @return the LID if present, otherwise the phone-number-based JID
      */
@@ -509,7 +551,7 @@ public final class Contact implements JidProvider {
     }
 
     /**
-     * Returns a hash code based on this contact's {@linkplain #jid() JID}.
+     * Returns a hash code derived from this contact's {@linkplain #jid() JID}.
      *
      * @return the hash code of the JID
      */
@@ -519,11 +561,14 @@ public final class Contact implements JidProvider {
     }
 
     /**
-     * Returns whether this contact is equal to the given object. Two contacts are
-     * considered equal if they have the same {@linkplain #jid() JID}.
+     * Returns whether this contact is equal to the given object.
+     *
+     * <p>Two contacts are considered equal when they share the same
+     * {@linkplain #jid() JID}, regardless of the other fields.
      *
      * @param other the object to compare with
-     * @return {@code true} if the other object is a {@code Contact} with the same JID
+     * @return {@code true} if the other object is a {@code Contact} with the
+     *         same JID
      */
     public boolean equals(Object other) {
         return other instanceof Contact that && Objects.equals(this.jid(), that.jid());

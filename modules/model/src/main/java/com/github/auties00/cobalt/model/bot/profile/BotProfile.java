@@ -9,43 +9,42 @@ import java.net.URI;
 import java.util.*;
 
 /**
- * A bot's profile data fetched from the server via USync.
+ * Represents the profile of a WhatsApp AI bot, containing the bot's
+ * identity, display metadata, registered commands, suggested prompts,
+ * and classification flags.
  *
- * <p>Contains the bot's identity, display metadata, registered commands,
- * suggested prompts, and classification flags. This data is parsed from the
- * {@code <bot><profile>} element in the USync response and persisted in the
- * local {@code bot-profile} store.
+ * <p>WhatsApp supports AI-powered bots (such as Meta AI) that users can
+ * interact with in dedicated chat threads. Each bot has a profile that
+ * describes its persona, capabilities, and creator. This class models all
+ * of that information and is typically fetched from the server during
+ * contact synchronization.
  *
- * <p>Example fields returned by the server:
- * <pre>{@code
- * <bot>
- *   <profile persona_id="abc123">
- *     <name>Meta AI</name>
- *     <attributes>...</attributes>
- *     <description>Ask me anything</description>
- *     <category>synthetic</category>
- *     <default>true</default>
- *     <is_meta_created>true</is_meta_created>
- *     <prompts>
- *       <prompt><emoji>✨</emoji><text>Tell me a joke</text></prompt>
- *     </prompts>
- *     <commands>
- *       <description>Available commands</description>
- *       <command><name>imagine</name><description>Generate an image</description></command>
- *     </commands>
- *     <creator>
- *       <name>Meta</name>
- *       <profile_url>https://...</profile_url>
- *     </creator>
- *     <posing_as_professional type="no"/>
- *   </profile>
- * </bot>
- * }</pre>
+ * <p>A bot profile includes:
+ * <ul>
+ * <li>Basic identity: {@link #jid()}, {@link #name()}, {@link #personaId()}
+ * <li>Display information: {@link #description()}, {@link #category()},
+ *     {@link #attributes()}
+ * <li>Interaction hints: {@link #prompts()} for suggested conversation
+ *     starters and {@link #commands()} for registered slash-commands
+ * <li>Creator details: {@link #creatorName()},
+ *     {@link #creatorProfileUrl()}
+ * <li>Classification flags: {@link #isDefault()}, {@link #isMetaCreated()},
+ *     {@link #professionalStatus()}
+ * </ul>
+ *
+ * <p>Use {@link #isCommand(String)} to check whether a message text
+ * starts with one of this bot's registered slash-commands.
+ *
+ * @see BotProfileCommand
+ * @see BotProfilePrompt
+ * @see BotProfileCategory
+ * @see BotProfessionalStatus
  */
 @ProtobufMessage
 public final class BotProfile {
     /**
-     * The bot's JID (Jabber ID), uniquely identifying this bot account.
+     * The bot's unique JID (Jabber Identifier), used to address this bot
+     * in conversations and contact lookups.
      */
     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
     Jid jid;
@@ -58,10 +57,9 @@ public final class BotProfile {
 
     /**
      * An opaque, server-supplied attributes string associated with this bot
-     * profile.
-     *
-     * <p>This value comes from the {@code <attributes>} child element in the
-     * USync bot profile response. Defaults to an empty string when absent.
+     * profile. The exact format and meaning of this string is determined by
+     * the server and may vary between bot types. May be {@code null} if no
+     * attributes were provided.
      */
     @ProtobufProperty(index = 3, type = ProtobufType.STRING)
     String attributes;
@@ -74,7 +72,9 @@ public final class BotProfile {
     String description;
 
     /**
-     * The character category of this bot's persona.
+     * The character category of this bot's persona, indicating whether the
+     * bot is a purely synthetic AI, a persona based on a living person, a
+     * fictional character, or a historical figure.
      *
      * @see BotProfileCategory
      */
@@ -82,77 +82,79 @@ public final class BotProfile {
     BotProfileCategory category;
 
     /**
-     * Whether this is the default Meta AI bot.
-     *
-     * <p>When {@code true}, this bot is the primary AI assistant and is
-     * typically surfaced prominently in the chat list.
+     * Whether this is the default Meta AI bot. When {@code true}, this bot
+     * is the primary AI assistant and is typically surfaced prominently in
+     * the WhatsApp UI, such as at the top of the chat list or in search
+     * results.
      */
     @ProtobufProperty(index = 6, type = ProtobufType.BOOL)
     boolean isDefault;
 
     /**
      * Suggested prompts displayed to users to help them start a conversation
-     * with this bot.
+     * with this bot. Each prompt consists of an emoji and a text suggestion
+     * that the user can tap to send. Defaults to an empty list if no prompts
+     * are available.
      */
     @ProtobufProperty(index = 7, type = ProtobufType.MESSAGE)
     SequencedCollection<BotProfilePrompt> prompts;
 
     /**
-     * The persona identifier for this bot profile
-     * (e.g. {@code "abc123"}).
-     *
-     * <p>This is transmitted as the {@code persona_id} attribute on the
-     * {@code <profile>} element and is used to differentiate between
-     * multiple persona variants of the same bot JID (default, first-party
-     * character, or user-generated).
+     * The persona identifier for this bot profile. A single bot JID may
+     * have multiple persona variants, such as the default persona, a
+     * first-party character persona, or a user-generated persona. This
+     * identifier distinguishes between them.
      */
     @ProtobufProperty(index = 8, type = ProtobufType.STRING)
     String personaId;
 
     /**
-     * The bot's registered slash-commands.
+     * The bot's registered slash-commands, such as {@code /imagine} or
+     * {@code /translate}. When a user sends a message starting with one
+     * of these command names prefixed by a slash, the message's body type
+     * should be set to {@code COMMAND} instead of {@code PROMPT}. Defaults
+     * to an empty list if no commands are registered.
      *
-     * <p>These are the commands the bot advertises (e.g. {@code "imagine"},
-     * {@code "translate"}). When a user sends a message starting with
-     * {@code /commandName}, the message's body type should be set to
-     * {@code COMMAND} instead of {@code PROMPT}.
+     * @see #isCommand(String)
      */
     @ProtobufProperty(index = 9, type = ProtobufType.MESSAGE)
     SequencedCollection<BotProfileCommand> commands;
 
     /**
-     * A description of the commands section as a whole
-     * (e.g. {@code "Available commands"}).
-     *
-     * <p>This text is parsed from the {@code <description>} child element
-     * inside the {@code <commands>} block.
+     * A human-readable description of the commands section as a whole,
+     * such as {@code "Available commands"}. This text can be displayed
+     * as a heading or tooltip above the list of slash-commands.
      */
     @ProtobufProperty(index = 10, type = ProtobufType.STRING)
     String commandsDescription;
 
     /**
-     * Whether this bot was created by Meta (first-party).
+     * Whether this bot was created by Meta as a first-party AI. First-party
+     * bots (such as Meta AI) are distinguished from third-party or
+     * user-generated bots in the WhatsApp client.
      */
     @ProtobufProperty(index = 11, type = ProtobufType.BOOL)
     boolean isMetaCreated;
 
     /**
-     * The display name of the bot's creator
-     * (e.g. {@code "Meta"}).
+     * The display name of the entity or organization that created this bot,
+     * such as {@code "Meta"}.
      */
     @ProtobufProperty(index = 12, type = ProtobufType.STRING)
     String creatorName;
 
     /**
-     * The profile URL of the bot's creator
-     * (e.g. {@code "https://www.meta.com"}).
+     * The profile URL of the bot's creator, such as
+     * {@code "https://www.meta.com"}. Can be displayed as a link to
+     * provide more information about the bot's creator.
      */
     @ProtobufProperty(index = 13, type = ProtobufType.STRING)
     URI creatorProfileUrl;
 
     /**
-     * Whether this bot is posing as a professional (e.g. a doctor, lawyer,
-     * or financial advisor).
+     * Whether this bot claims to act as a professional, such as a doctor,
+     * lawyer, or financial advisor. May be {@code null} if the server did
+     * not provide this classification.
      *
      * @see BotProfessionalStatus
      */
@@ -160,22 +162,26 @@ public final class BotProfile {
     BotProfessionalStatus professionalStatus;
 
     /**
-     * Constructs a new {@code BotProfile} with all fields.
+     * Constructs a new {@code BotProfile} with all fields. Prefer using
+     * the generated {@code BotProfileBuilder} instead of calling this
+     * constructor directly.
      *
-     * @param jid                  the bot's JID, must be non-{@code null}
-     * @param name                 the bot's display name, may be {@code null}
-     * @param attributes           the opaque attributes string, may be {@code null}
-     * @param description          the bot's description, may be {@code null}
-     * @param category             the persona category, may be {@code null}
-     * @param isDefault            whether this is the default Meta AI bot
-     * @param prompts              the suggested prompts, may be {@code null}
-     * @param personaId            the persona identifier, may be {@code null}
-     * @param commands             the registered commands, may be {@code null}
-     * @param commandsDescription  the commands section description, may be {@code null}
-     * @param isMetaCreated        whether Meta created this bot
-     * @param creatorName          the creator's display name, may be {@code null}
-     * @param creatorProfileUrl    the creator's profile URL, may be {@code null}
-     * @param professionalStatus   the professional-status classification, may be {@code null}
+     * @param jid                  the bot's JID, must not be {@code null}
+     * @param name                 the bot's display name, or {@code null} if unknown
+     * @param attributes           the server-supplied attributes string, or {@code null}
+     * @param description          a description of what the bot does, or {@code null}
+     * @param category             the persona category, or {@code null} if not classified
+     * @param isDefault            {@code true} if this is the default Meta AI bot
+     * @param prompts              the suggested conversation starters, or {@code null}
+     *                             for an empty list
+     * @param personaId            the persona identifier, or {@code null}
+     * @param commands             the registered slash-commands, or {@code null} for
+     *                             an empty list
+     * @param commandsDescription  a heading for the commands section, or {@code null}
+     * @param isMetaCreated        {@code true} if Meta created this bot
+     * @param creatorName          the creator's display name, or {@code null}
+     * @param creatorProfileUrl    the creator's profile URL, or {@code null}
+     * @param professionalStatus   the professional-status classification, or {@code null}
      */
     BotProfile(
             Jid jid,
@@ -210,9 +216,10 @@ public final class BotProfile {
     }
 
     /**
-     * Returns the bot's JID.
+     * Returns the bot's unique JID, used to address this bot in conversations
+     * and contact lookups.
      *
-     * @return a non-{@code null} JID
+     * @return a non-{@code null} {@link Jid}
      */
     public Jid jid() {
         return jid;
@@ -229,10 +236,11 @@ public final class BotProfile {
     }
 
     /**
-     * Returns the opaque attributes string associated with this bot profile.
+     * Returns the server-supplied attributes string associated with this bot
+     * profile.
      *
-     * @return an {@code Optional} containing the attributes if present and
-     *         non-empty, otherwise an empty {@code Optional}
+     * @return an {@code Optional} containing the attributes string if present
+     *         and non-empty, or an empty {@code Optional}
      */
     public Optional<String> attributes() {
         return Optional.ofNullable(attributes).filter(s -> !s.isEmpty());
@@ -249,108 +257,121 @@ public final class BotProfile {
     }
 
     /**
-     * Returns the character category of this bot's persona.
+     * Returns the character category of this bot's persona, indicating
+     * whether it is synthetic, based on a living person, fictional, or
+     * historical.
      *
      * @return an {@code Optional} containing the {@link BotProfileCategory}
-     *         if present, otherwise an empty {@code Optional}
+     *         if present, or an empty {@code Optional}
      */
     public Optional<BotProfileCategory> category() {
         return Optional.ofNullable(category);
     }
 
     /**
-     * Returns whether this is the default Meta AI bot.
+     * Returns whether this is the default Meta AI bot, which is the primary
+     * AI assistant prominently surfaced in the WhatsApp UI.
      *
-     * @return {@code true} if this is the default bot, otherwise {@code false}
+     * @return {@code true} if this is the default bot, {@code false} otherwise
      */
     public boolean isDefault() {
         return isDefault;
     }
 
     /**
-     * Returns the suggested prompts for this bot.
+     * Returns the suggested prompts for this bot, which are conversation
+     * starters displayed to help users begin interacting with the bot.
      *
-     * @return an unmodifiable collection of prompts, never {@code null}
+     * @return an unmodifiable collection of {@link BotProfilePrompt}
+     *         instances, never {@code null} (empty if no prompts are defined)
      */
     public SequencedCollection<BotProfilePrompt> prompts() {
         return prompts;
     }
 
     /**
-     * Returns the persona identifier for this bot profile.
+     * Returns the persona identifier for this bot profile. A single bot JID
+     * may have multiple persona variants; this ID distinguishes between them.
      *
      * @return an {@code Optional} containing the persona ID if present and
-     *         non-empty, otherwise an empty {@code Optional}
+     *         non-empty, or an empty {@code Optional}
      */
     public Optional<String> personaId() {
         return Optional.ofNullable(personaId).filter(s -> !s.isEmpty());
     }
 
     /**
-     * Returns the bot's registered slash-commands.
+     * Returns the bot's registered slash-commands. When a user sends a
+     * message starting with {@code /commandName} and the command name
+     * matches one returned here, the message body type should be set to
+     * {@code COMMAND} instead of {@code PROMPT}.
      *
-     * <p>When a user sends a message starting with {@code /commandName}
-     * and the command name matches one returned here, the message body type
-     * should be set to {@code COMMAND} instead of {@code PROMPT}.
-     *
-     * @return an unmodifiable collection of commands, never {@code null}
+     * @return an unmodifiable collection of {@link BotProfileCommand}
+     *         instances, never {@code null} (empty if no commands are
+     *         registered)
+     * @see #isCommand(String)
      */
     public SequencedCollection<BotProfileCommand> commands() {
         return commands;
     }
 
     /**
-     * Returns the commands section description.
+     * Returns the heading or description for the commands section, such as
+     * {@code "Available commands"}.
      *
      * @return an {@code Optional} containing the description if present and
-     *         non-empty, otherwise an empty {@code Optional}
+     *         non-empty, or an empty {@code Optional}
      */
     public Optional<String> commandsDescription() {
         return Optional.ofNullable(commandsDescription).filter(s -> !s.isEmpty());
     }
 
     /**
-     * Returns whether this bot was created by Meta.
+     * Returns whether this bot was created by Meta as a first-party AI.
      *
-     * @return {@code true} if Meta created this bot, otherwise {@code false}
+     * @return {@code true} if Meta created this bot, {@code false} otherwise
      */
     public boolean isMetaCreated() {
         return isMetaCreated;
     }
 
     /**
-     * Returns the bot creator's display name.
+     * Returns the display name of the entity or organization that created
+     * this bot, such as {@code "Meta"}.
      *
      * @return an {@code Optional} containing the creator name if present and
-     *         non-empty, otherwise an empty {@code Optional}
+     *         non-empty, or an empty {@code Optional}
      */
     public Optional<String> creatorName() {
         return Optional.ofNullable(creatorName).filter(s -> !s.isEmpty());
     }
 
     /**
-     * Returns the bot creator's profile URL.
+     * Returns the profile URL of the bot's creator, which can be displayed
+     * as a link to provide more information about who built the bot.
      *
-     * @return an {@code Optional} containing the URL if present and
-     *         non-empty, otherwise an empty {@code Optional}
+     * @return an {@code Optional} containing the {@link URI} if present,
+     *         or an empty {@code Optional}
      */
     public Optional<URI> creatorProfileUrl() {
         return Optional.ofNullable(creatorProfileUrl);
     }
 
     /**
-     * Returns whether this bot is posing as a professional.
+     * Returns the professional-status classification for this bot, indicating
+     * whether it claims to act as a professional such as a doctor, lawyer,
+     * or financial advisor.
      *
      * @return an {@code Optional} containing the {@link BotProfessionalStatus}
-     *         if present, otherwise an empty {@code Optional}
+     *         if present, or an empty {@code Optional}
      */
     public Optional<BotProfessionalStatus> professionalStatus() {
         return Optional.ofNullable(professionalStatus);
     }
 
     /**
-     * Returns whether the given text starts with a registered slash-command
-     * for this bot.
+     * Checks whether the given message text starts with one of this bot's
+     * registered slash-commands.
      *
      * <p>The text must begin with {@code /commandName} and either end there
      * or be followed by whitespace. For example, given a registered command
@@ -360,7 +381,7 @@ public final class BotProfile {
      *
      * @param text the message text to test, may be {@code null}
      * @return {@code true} if the text starts with a registered command,
-     *         otherwise {@code false}
+     *         {@code false} otherwise
      */
     public boolean isCommand(String text) {
         if (text == null || !text.startsWith("/") || commands.isEmpty()) {
@@ -378,9 +399,9 @@ public final class BotProfile {
     }
 
     /**
-     * Sets the bot's JID.
+     * Sets the bot's unique JID.
      *
-     * @param jid the JID to set, must be non-{@code null}
+     * @param jid the JID to set, must not be {@code null}
      */
     public void setJid(Jid jid) {
         this.jid = jid;
@@ -389,34 +410,34 @@ public final class BotProfile {
     /**
      * Sets the bot's display name.
      *
-     * @param name the display name, may be {@code null}
+     * @param name the display name, or {@code null} to clear
      */
     public void setName(String name) {
         this.name = name;
     }
 
     /**
-     * Sets the opaque attributes string.
+     * Sets the server-supplied attributes string.
      *
-     * @param attributes the attributes string, may be {@code null}
+     * @param attributes the attributes string, or {@code null} to clear
      */
     public void setAttributes(String attributes) {
         this.attributes = attributes;
     }
 
     /**
-     * Sets the bot's description.
+     * Sets the bot's human-readable description.
      *
-     * @param description the description, may be {@code null}
+     * @param description the description, or {@code null} to clear
      */
     public void setDescription(String description) {
         this.description = description;
     }
 
     /**
-     * Sets the persona category.
+     * Sets the character category of this bot's persona.
      *
-     * @param category the category, may be {@code null}
+     * @param category the category, or {@code null} to clear
      */
     public void setCategory(BotProfileCategory category) {
         this.category = category;
@@ -432,36 +453,36 @@ public final class BotProfile {
     }
 
     /**
-     * Sets the suggested prompts.
+     * Sets the suggested conversation starters for this bot.
      *
-     * @param prompts the prompts collection, may be {@code null}
+     * @param prompts the prompts collection, or {@code null} to clear
      */
     public void setPrompts(SequencedCollection<BotProfilePrompt> prompts) {
         this.prompts = prompts;
     }
 
     /**
-     * Sets the persona identifier.
+     * Sets the persona identifier for this bot profile.
      *
-     * @param personaId the persona ID, may be {@code null}
+     * @param personaId the persona ID, or {@code null} to clear
      */
     public void setPersonaId(String personaId) {
         this.personaId = personaId;
     }
 
     /**
-     * Sets the registered commands.
+     * Sets the registered slash-commands for this bot.
      *
-     * @param commands the commands collection, may be {@code null}
+     * @param commands the commands collection, or {@code null} to clear
      */
     public void setCommands(SequencedCollection<BotProfileCommand> commands) {
         this.commands = commands;
     }
 
     /**
-     * Sets the commands section description.
+     * Sets the heading or description for the commands section.
      *
-     * @param commandsDescription the description, may be {@code null}
+     * @param commandsDescription the description, or {@code null} to clear
      */
     public void setCommandsDescription(String commandsDescription) {
         this.commandsDescription = commandsDescription;
@@ -477,27 +498,27 @@ public final class BotProfile {
     }
 
     /**
-     * Sets the bot creator's display name.
+     * Sets the display name of the bot's creator.
      *
-     * @param creatorName the creator name, may be {@code null}
+     * @param creatorName the creator name, or {@code null} to clear
      */
     public void setCreatorName(String creatorName) {
         this.creatorName = creatorName;
     }
 
     /**
-     * Sets the bot creator's profile URL.
+     * Sets the profile URL of the bot's creator.
      *
-     * @param creatorProfileUrl the profile URL, may be {@code null}
+     * @param creatorProfileUrl the profile URL, or {@code null} to clear
      */
     public void setCreatorProfileUrl(URI creatorProfileUrl) {
         this.creatorProfileUrl = creatorProfileUrl;
     }
 
     /**
-     * Sets the professional-status classification.
+     * Sets the professional-status classification for this bot.
      *
-     * @param professionalStatus the status, may be {@code null}
+     * @param professionalStatus the status, or {@code null} to clear
      */
     public void setProfessionalStatus(BotProfessionalStatus professionalStatus) {
         this.professionalStatus = professionalStatus;

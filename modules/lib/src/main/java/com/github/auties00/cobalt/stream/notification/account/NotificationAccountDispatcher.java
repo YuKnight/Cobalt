@@ -2,16 +2,62 @@ package com.github.auties00.cobalt.stream.notification.account;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceService;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.stream.SocketStream;
 
+/**
+ * Routes inbound {@code account} category notification stanzas to specialised
+ * handlers based on the {@code type} attribute of the stanza.
+ *
+ * <p>This dispatcher owns one instance of each concrete account-category
+ * handler and forwards each incoming node to the matching handler. Stanzas
+ * with an unrecognised {@code type} are silently ignored.
+ *
+ * @implNote Adapts the WhatsApp Web notification dispatch that fans out
+ *     account notifications to module-specific consumers such as
+ *     {@code WAWebHandleAccountSyncNotification},
+ *     {@code WAWebHandleContactNotification},
+ *     {@code WAWebHandleDisappearingModeNotification},
+ *     {@code WAWebHandlePrivacyTokenNotification} and
+ *     {@code WAWebHandlePictureNotification}.
+ */
+@WhatsAppWebModule(moduleName = "WAWebHandleNotification")
 public final class NotificationAccountDispatcher implements SocketStream.Handler {
+    /**
+     * Handler for {@code type="account_sync"} notifications.
+     */
     private final NotificationAccountStreamHandler accountHandler;
+
+    /**
+     * Handler for {@code type="contacts"} notifications.
+     */
     private final NotificationContactStreamHandler contactHandler;
+
+    /**
+     * Handler for {@code type="disappearing_mode"} notifications.
+     */
     private final NotificationDisappearingModeStreamHandler disappearingModeHandler;
+
+    /**
+     * Handler for {@code type="privacy_token"} notifications.
+     */
     private final NotificationPrivacyStreamHandler privacyHandler;
+
+    /**
+     * Handler for {@code type="picture"} and {@code type="status"} notifications.
+     */
     private final NotificationProfileStreamHandler profileHandler;
 
+    /**
+     * Constructs a new dispatcher and instantiates every sub-handler with the
+     * shared {@link WhatsAppClient} and {@link DeviceService}.
+     *
+     * @param whatsapp      the non-{@code null} client providing store and network access
+     * @param deviceService the non-{@code null} device service used by the account-sync handler
+     */
     public NotificationAccountDispatcher(WhatsAppClient whatsapp, DeviceService deviceService) {
         this.accountHandler = new NotificationAccountStreamHandler(whatsapp, deviceService);
         this.contactHandler = new NotificationContactStreamHandler(whatsapp);
@@ -20,6 +66,16 @@ public final class NotificationAccountDispatcher implements SocketStream.Handler
         this.profileHandler = new NotificationProfileStreamHandler(whatsapp);
     }
 
+    /**
+     * Dispatches the incoming node to the appropriate account-category
+     * handler based on the stanza's {@code type} attribute.
+     *
+     * @param node the incoming notification stanza
+     * @implNote Mirrors the {@code type}-based switch in
+     *     {@code WAWebHandleNotification.handleNotification} for the
+     *     account category.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebHandleNotification", exports = "handleNotification", adaptation = WhatsAppAdaptation.ADAPTED)
     @Override
     public void handle(Node node) {
         var type = node.getAttributeAsString("type", null);
@@ -38,6 +94,15 @@ public final class NotificationAccountDispatcher implements SocketStream.Handler
         }
     }
 
+    /**
+     * Fans out a reset call to every sub-handler so that any cached state
+     * (pending acks, in-flight refresh jobs, etc.) is discarded on a socket
+     * reconnect.
+     *
+     * @implNote Cobalt-specific lifecycle hook; WhatsApp Web handles this
+     *     via module-level reset calls scattered across the individual
+     *     notification modules.
+     */
     @Override
     public void reset() {
         accountHandler.reset();

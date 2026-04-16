@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.wam;
 
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.util.DataUtils;
 
 import java.time.Instant;
@@ -28,10 +31,11 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>This class is not thread-safe; all calls must be made from the
  * single WAM flush thread.
  *
- * @apiNote WAWebWamBeaconing.maybeGetEventSequenceNumber: determines
- * daily activation at 1 % probability and increments a per-buffer-key
- * sequence counter stored in user preferences.
+ * @implNote Adapts {@code WAWebWamBeaconing.maybeGetEventSequenceNumber}
+ *     which determines daily activation at 1% probability and increments
+ *     a per-buffer-key sequence counter stored in user preferences.
  */
+@WhatsAppWebModule(moduleName = "WAWebWamBeaconing")
 final class WamBeaconing {
     /**
      * Probability that beaconing is activated on any given day.
@@ -63,6 +67,7 @@ final class WamBeaconing {
      * @return an {@code OptionalInt} containing the sequence number if
      *         beaconing is active, or empty otherwise
      */
+    @WhatsAppWebExport(moduleName = "WAWebWamBeaconing", exports = "maybeGetEventSequenceNumber", adaptation = WhatsAppAdaptation.ADAPTED)
     OptionalInt nextSequenceNumber(String bufferKey) {
         var state = states.computeIfAbsent(bufferKey, _ -> new ChannelState());
         var currentDayEpoch = Instant.now().truncatedTo(ChronoUnit.DAYS).getEpochSecond();

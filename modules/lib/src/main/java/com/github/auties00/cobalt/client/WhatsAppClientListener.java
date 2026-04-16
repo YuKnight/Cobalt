@@ -19,13 +19,22 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * An event listener interface for WhatsApp communication events.
- * <p>
- * This interface provides callback methods for various events that occur during
- * a WhatsApp session, such as message reception, connection state changes, and data updates.
- * <p>
- * Register a listener using {@link WhatsAppClient#addListener(WhatsAppClientListener)} to receive these events.
- * All methods have empty default implementations, allowing you to override only the ones you need.
+ * A callback interface that observes events emitted by a
+ * {@link WhatsAppClient} during its lifecycle.
+ *
+ * <p>Cobalt funnels every notable event (socket traffic, login, logout,
+ * message reception, contact updates, sync progress, call offers, identity
+ * changes, and so on) through listener callbacks so that application code
+ * can react without having to poll the store. All callback methods carry
+ * empty default implementations, so integrators only need to override the
+ * events they are interested in.
+ *
+ * <p>Listeners are registered via
+ * {@link WhatsAppClient#addListener(WhatsAppClientListener)} and can be
+ * removed with
+ * {@link WhatsAppClient#removeListener(WhatsAppClientListener)}. Each
+ * invocation runs on a virtual thread, so a long-running listener does not
+ * block the client socket or stanza pipeline.
  *
  * @see WhatsAppClient#addListener(WhatsAppClientListener)
  * @see WhatsAppClient#removeListener(WhatsAppClientListener)

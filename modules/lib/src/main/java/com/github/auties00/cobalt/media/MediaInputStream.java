@@ -1,6 +1,9 @@
 package com.github.auties00.cobalt.media;
 
 import com.github.auties00.cobalt.exception.WhatsAppMediaException;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 
 import javax.crypto.Cipher;
 import javax.crypto.KDF;
@@ -16,80 +19,108 @@ import java.security.MessageDigest;
 import java.util.Objects;
 
 /**
- * Base input stream for WhatsApp media encryption and decryption operations.
+ * Shared base class for the streaming media encryption and decryption
+ * pipelines.
  *
- * <p>Provides shared cryptographic primitives used by both the upload
- * ({@link MediaUploadInputStream}) and download ({@link MediaDownloadInputStream})
- * media processing streams, including HKDF key derivation, AES-CBC cipher
- * creation, HMAC-SHA256 computation, and SHA-256 hashing.
+ * <p>Encapsulates the cryptographic primitives used by both
+ * {@link MediaUploadInputStream} (the encrypt-and-HMAC pipeline) and
+ * {@link MediaDownloadInputStream} (the HMAC-and-decrypt pipeline):
+ * HKDF-SHA256 key derivation, AES-CBC cipher creation with PKCS5 padding,
+ * HMAC-SHA256 initialization, and SHA-256 hashing.
  *
- * <p>The key derivation follows WhatsApp's media crypto protocol: a 32-byte
- * media key is expanded via HKDF-SHA256 (with no salt) into 112 bytes, then
- * sliced into four subkeys: a 16-byte IV, a 32-byte AES cipher key, a 32-byte
- * HMAC key, and a 32-byte reference key.
+ * <p>Key derivation follows WhatsApp's media crypto protocol: a 32-byte
+ * random media key is HKDF-expanded (with no salt and the media-type
+ * specific info string) into {@value #EXPANDED_SIZE} bytes and then
+ * sliced into four sub-keys: a 16-byte IV, a 32-byte AES cipher key, a
+ * 32-byte HMAC key, and a 32-byte reference key used for media previews.
  *
- * @implNote WAMediaCrypto
+ * @implNote WAMediaCrypto: {@code computeMediaKeys},
+ * {@code encryptAndHmac}, {@code hmacAndDecrypt}, {@code IV_LENGTH}, and
+ * {@code HMAC_LENGTH}. The derivation follows the extract-then-expand
+ * pattern of WA Web's {@code WACryptoHkdf.extractAndExpand}.
  */
+@WhatsAppWebModule(moduleName = "WAMediaCrypto")
 abstract class MediaInputStream extends InputStream {
     /**
-     * The default buffer size in bytes used for streaming read operations.
+     * The default buffer size in bytes used for streaming reads and
+     * writes. Chosen to match the typical {@link InputStream} buffer
+     * size and to keep cipher block boundaries aligned.
      *
-     * @implNote WAMediaCrypto (internal buffer sizing)
+     * @implNote WAMediaCrypto: internal buffer sizing for
+     * {@code encryptAndHmac} and {@code hmacAndDecrypt}.
      */
     static final int BUFFER_LENGTH = 8192;
 
     /**
-     * The truncated HMAC length in bytes appended to encrypted media.
+     * The number of trailing HMAC bytes appended to the ciphertext.
      *
-     * <p>WhatsApp computes a full 32-byte HMAC-SHA256 over the IV concatenated
-     * with the ciphertext, but only the first 10 bytes are appended to the
-     * encrypted payload and transmitted.
+     * <p>WhatsApp computes a full 32-byte HMAC-SHA256 over {@code IV ||
+     * ciphertext} but only publishes the first 10 bytes; this truncation
+     * is sufficient for integrity while reducing overhead for media that
+     * is often transferred over constrained links.
      *
-     * @implNote WAMediaCrypto.HMAC_LENGTH (v = 10)
+     * @implNote WAMediaCrypto.HMAC_LENGTH: module constant {@code v = 10}.
      */
+    @WhatsAppWebExport(moduleName = "WAMediaCrypto", exports = "HMAC_LENGTH",
+            adaptation = WhatsAppAdaptation.DIRECT)
     static final int MAC_LENGTH = 10;
 
     /**
-     * The total expanded key material size in bytes produced by HKDF.
+     * The total expanded key material size in bytes produced by HKDF
+     * during media key derivation.
      *
      * <p>The 112 bytes are partitioned as:
      * <ul>
-     *   <li>bytes 0-15: initialization vector (IV)</li>
-     *   <li>bytes 16-47: AES-CBC cipher key</li>
-     *   <li>bytes 48-79: HMAC-SHA256 key</li>
-     *   <li>bytes 80-111: reference key (used for media previews)</li>
+     *   <li>bytes 0 through 15: initialization vector (IV)</li>
+     *   <li>bytes 16 through 47: AES-CBC cipher key</li>
+     *   <li>bytes 48 through 79: HMAC-SHA256 key</li>
+     *   <li>bytes 80 through 111: reference key used for media previews</li>
      * </ul>
      *
-     * @implNote WAMediaCrypto.computeMediaKeys (p function, expand to 112 bytes)
+     * @implNote WAMediaCrypto.computeMediaKeys: {@code p} helper that
+     * expands the media key to 112 bytes.
      */
+    @WhatsAppWebExport(moduleName = "WAMediaCrypto", exports = "computeMediaKeys",
+            adaptation = WhatsAppAdaptation.DIRECT)
     static final int EXPANDED_SIZE = 112;
 
     /**
-     * The symmetric key length in bytes for both the AES cipher key and the
-     * HMAC key, each occupying 32 bytes within the expanded key material.
+     * The symmetric key length in bytes for both the AES cipher key and
+     * the HMAC key, each occupying 32 bytes of the expanded material.
      *
-     * @implNote WAMediaCrypto.computeMediaKeys (cipherKey: 32 bytes, hmacKey: 32 bytes)
+     * @implNote WAMediaCrypto.computeMediaKeys: cipherKey and hmacKey
+     * are both 32 bytes wide in the output partition.
      */
+    @WhatsAppWebExport(moduleName = "WAMediaCrypto", exports = "computeMediaKeys",
+            adaptation = WhatsAppAdaptation.DIRECT)
     static final int KEY_LENGTH = 32;
 
     /**
      * The initialization vector length in bytes for AES-CBC encryption.
      *
-     * @implNote WAMediaCrypto.IV_LENGTH (b = 16)
+     * @implNote WAMediaCrypto.IV_LENGTH: module constant {@code b = 16}.
      */
+    @WhatsAppWebExport(moduleName = "WAMediaCrypto", exports = "IV_LENGTH",
+            adaptation = WhatsAppAdaptation.DIRECT)
     static final int IV_LENGTH = 16;
 
     /**
      * The underlying raw input stream providing the source data.
      *
-     * @implNote WAMediaCrypto (plaintext source for encryption, ciphertext source for decryption)
+     * <p>For the upload pipeline this carries plaintext to be encrypted;
+     * for the download pipeline it carries the ciphertext-plus-HMAC
+     * payload delivered by the CDN.
+     *
+     * @implNote WAMediaCrypto: the plaintext source for
+     * {@code encryptAndHmac} and the ciphertext source for
+     * {@code hmacAndDecrypt}.
      */
     final InputStream rawInputStream;
 
     /**
-     * Constructs a new media input stream wrapping the specified raw input stream.
+     * Constructs a new media input stream wrapping the specified raw
+     * input stream.
      *
-     * @implNote WAMediaCrypto
      * @param rawInputStream the underlying input stream, must not be {@code null}
      * @throws NullPointerException if {@code rawInputStream} is {@code null}
      */
@@ -98,23 +129,31 @@ abstract class MediaInputStream extends InputStream {
     }
 
     /**
-     * Derives the media key material from a raw media key and a key name
-     * using HKDF-SHA256.
+     * Derives the expanded key material for a media payload from the raw
+     * 32-byte media key and the media-type specific info string.
      *
-     * <p>Performs HKDF extract-then-expand with no salt (defaults to 32 zero
-     * bytes per RFC 5869) and the UTF-8 encoding of the key name as the info
-     * parameter. The output is {@value #EXPANDED_SIZE} bytes that must be
-     * sliced into the IV, cipher key, HMAC key, and reference key.
+     * <p>Performs HKDF-SHA256 extract-then-expand with no explicit salt
+     * (which defaults to 32 zero bytes per RFC 5869) and the UTF-8
+     * encoding of the key name as the info parameter. Callers slice the
+     * returned {@value #EXPANDED_SIZE}-byte array into the IV, AES cipher
+     * key, HMAC key, and reference key.
      *
-     * @implNote WAMediaCrypto.computeMediaKeys calls WACryptoHkdf.extractAndExpand(mediaKey, info, 112)
+     * @implNote WAMediaCrypto.computeMediaKeys: invokes
+     * {@code WACryptoHkdf.extractAndExpand(mediaKey, info, 112)}.
      * @param mediaKey     the 32-byte raw media key
      * @param mediaKeyName the HKDF info string identifying the media type,
      *                     for example {@code "WhatsApp Image Keys"}
      * @return the {@value #EXPANDED_SIZE}-byte expanded key material
      * @throws WhatsAppMediaException if the HKDF derivation fails
      */
+    @WhatsAppWebExport(moduleName = "WAMediaCrypto", exports = "computeMediaKeys",
+            adaptation = WhatsAppAdaptation.DIRECT)
     byte[] deriveMediaKeyData(byte[] mediaKey, String mediaKeyName) throws WhatsAppMediaException {
         try {
+            // WAMediaCrypto.computeMediaKeys
+            // Uses JDK's KDF API to perform HKDF-SHA256 extract then expand,
+            // matching WACryptoHkdf.extractAndExpand(mediaKey, info, 112)
+
             var hkdf = KDF.getInstance("HKDF-SHA256");
             var params = HKDFParameterSpec.ofExtract()
                     .addIKM(mediaKey)
@@ -126,12 +165,18 @@ abstract class MediaInputStream extends InputStream {
     }
 
     /**
-     * Creates a new SHA-256 message digest instance.
+     * Creates a fresh SHA-256 {@link MessageDigest} for plaintext or
+     * ciphertext hashing.
      *
-     * @implNote WAMediaCrypto (SHA-256 used for fileSha256 and fileEncSha256)
+     * @implNote WAMediaCrypto: SHA-256 is used to compute the
+     * {@code fileSha256} and {@code fileEncSha256} values recorded on the
+     * media message protobuf.
      * @return a fresh {@link MessageDigest} for SHA-256
      * @throws WhatsAppMediaException if the SHA-256 algorithm is not available
      */
+    @WhatsAppWebExport(moduleName = "WAMediaCrypto",
+            exports = {"encryptAndHmac", "hmacAndDecrypt"},
+            adaptation = WhatsAppAdaptation.DIRECT)
     MessageDigest newHash() throws WhatsAppMediaException {
         try {
             return MessageDigest.getInstance("SHA-256");
@@ -141,10 +186,12 @@ abstract class MediaInputStream extends InputStream {
     }
 
     /**
-     * Creates and initializes a new AES-CBC cipher with PKCS5 padding.
+     * Creates and initialises a new AES-CBC cipher with PKCS5 padding.
      *
-     * @implNote WAMediaCrypto.encryptAndHmac / WAMediaCrypto.hmacAndDecrypt
-     *           (WACryptoAesCbc.AesCbcStream for encrypt, WACryptoAesCbc.aesCbcDecrypt for decrypt)
+     * @implNote WAMediaCrypto.encryptAndHmac uses
+     * {@code WACryptoAesCbc.AesCbcStream} for streaming encryption;
+     * WAMediaCrypto.hmacAndDecrypt uses
+     * {@code WACryptoAesCbc.aesCbcDecrypt} for batch decryption.
      * @param mode the cipher mode, either {@link Cipher#ENCRYPT_MODE} or
      *             {@link Cipher#DECRYPT_MODE}
      * @param key  the AES secret key specification
@@ -152,6 +199,9 @@ abstract class MediaInputStream extends InputStream {
      * @return the initialized {@link Cipher}
      * @throws WhatsAppMediaException if cipher creation or initialization fails
      */
+    @WhatsAppWebExport(moduleName = "WAMediaCrypto",
+            exports = {"encryptAndHmac", "hmacAndDecrypt"},
+            adaptation = WhatsAppAdaptation.DIRECT)
     Cipher newCipher(int mode, SecretKeySpec key, IvParameterSpec iv) throws WhatsAppMediaException {
         try {
             var cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
@@ -163,14 +213,20 @@ abstract class MediaInputStream extends InputStream {
     }
 
     /**
-     * Creates and initializes a new HMAC-SHA256 instance with the given key.
+     * Creates and initialises a new HMAC-SHA256 {@link Mac} bound to the
+     * supplied HMAC key.
      *
-     * @implNote WAMediaCrypto.encryptAndHmac / WAMediaCrypto.hmacAndDecrypt
-     *           (WACryptoHmac.encodeKeySha256 + WACryptoHmac.sign / WACryptoHmac.hmacSha256)
+     * @implNote WAMediaCrypto.encryptAndHmac uses
+     * {@code WACryptoHmac.encodeKeySha256} combined with
+     * {@code WACryptoHmac.sign}; WAMediaCrypto.hmacAndDecrypt uses
+     * {@code WACryptoHmac.hmacSha256}.
      * @param key the HMAC-SHA256 secret key specification
      * @return the initialized {@link Mac}
      * @throws WhatsAppMediaException if MAC creation or initialization fails
      */
+    @WhatsAppWebExport(moduleName = "WAMediaCrypto",
+            exports = {"encryptAndHmac", "hmacAndDecrypt"},
+            adaptation = WhatsAppAdaptation.DIRECT)
     Mac newMac(SecretKeySpec key) throws WhatsAppMediaException {
         try {
             var mac = Mac.getInstance("HmacSHA256");
@@ -184,7 +240,6 @@ abstract class MediaInputStream extends InputStream {
     /**
      * Closes the underlying raw input stream.
      *
-     * @implNote WAMediaCrypto
      * @throws IOException if an I/O error occurs while closing
      */
     @Override

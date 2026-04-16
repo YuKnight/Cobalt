@@ -5,33 +5,40 @@ import it.auties.protobuf.model.*;
 import java.util.Optional;
 
 /**
- * Metadata controlling age-verification collection for bot interactions on
+ * Metadata controlling age-verification collection for AI bot interactions on
  * WhatsApp.
  *
- * <p>Before a user can interact with certain AI features, the client may need
- * to collect and verify the user's age. This metadata signals whether the
- * user is eligible for age collection, whether the client should present the
- * age-collection UI, and which collection method to use.
+ * <p>Before a user can interact with certain AI features (such as Meta AI),
+ * the client may need to collect and verify the user's age. This metadata
+ * signals whether the user is eligible for age collection, whether the
+ * client should present the age-collection UI, and which collection method
+ * to use.
  *
- * <p>This metadata is attached to a bot message via
- * {@link com.github.auties00.cobalt.model.bot.BotMetadata#botAgeCollectionMetadata()}.
+ * <p>This metadata is carried inside
+ * {@link com.github.auties00.cobalt.model.bot.BotMetadata#botAgeCollectionMetadata()}
+ * and is populated by the server when age gating is required for the
+ * conversation.
  */
 @ProtobufMessage(name = "BotAgeCollectionMetadata")
 public final class BotAgeCollectionMetadata {
     /**
-     * Whether the user is eligible for age collection.
+     * Whether the user is eligible for age collection. When {@code null},
+     * the server has not yet determined eligibility.
      */
     @ProtobufProperty(index = 1, type = ProtobufType.BOOL)
     Boolean ageCollectionEligible;
 
     /**
-     * Whether the client should trigger the age-collection UI flow.
+     * Whether the client should trigger the age-collection UI flow when
+     * rendering this message. When {@code null}, the field has not been set
+     * by the server.
      */
     @ProtobufProperty(index = 2, type = ProtobufType.BOOL)
     Boolean shouldTriggerAgeCollectionOnClient;
 
     /**
-     * The type of age-collection mechanism to use.
+     * The type of age-collection mechanism to use, such as a simple binary
+     * over-18 check or a Meta Waffle experimentation-driven flow.
      */
     @ProtobufProperty(index = 3, type = ProtobufType.ENUM)
     AgeCollectionType ageCollectionType;
@@ -41,9 +48,13 @@ public final class BotAgeCollectionMetadata {
      * Constructs a new {@code BotAgeCollectionMetadata} with the specified
      * values.
      *
-     * @param ageCollectionEligible               whether the user is eligible
-     * @param shouldTriggerAgeCollectionOnClient   whether to trigger the UI
-     * @param ageCollectionType                    the collection mechanism
+     * @param ageCollectionEligible             whether the user is eligible for
+     *                                          age collection, or {@code null}
+     * @param shouldTriggerAgeCollectionOnClient whether the client should
+     *                                          present the age-collection UI,
+     *                                          or {@code null}
+     * @param ageCollectionType                 the collection mechanism to use,
+     *                                          or {@code null}
      */
     BotAgeCollectionMetadata(Boolean ageCollectionEligible, Boolean shouldTriggerAgeCollectionOnClient, AgeCollectionType ageCollectionType) {
         this.ageCollectionEligible = ageCollectionEligible;
@@ -54,28 +65,30 @@ public final class BotAgeCollectionMetadata {
     /**
      * Returns whether the user is eligible for age collection.
      *
-     * @return {@code true} if the user is eligible, {@code false} otherwise
-     *         or if not set
+     * @return {@code true} if the user is eligible, {@code false} if not
+     *         eligible or if the field was not set by the server
      */
     public boolean ageCollectionEligible() {
         return ageCollectionEligible != null && ageCollectionEligible;
     }
 
     /**
-     * Returns whether the client should trigger the age-collection UI flow.
+     * Returns whether the client should trigger the age-collection UI flow
+     * when rendering this message.
      *
-     * @return {@code true} if the client should trigger the flow,
-     *         {@code false} otherwise or if not set
+     * @return {@code true} if the client should present the age-collection UI,
+     *         {@code false} if not required or if the field was not set
      */
     public boolean shouldTriggerAgeCollectionOnClient() {
         return shouldTriggerAgeCollectionOnClient != null && shouldTriggerAgeCollectionOnClient;
     }
 
     /**
-     * Returns the type of age-collection mechanism to use.
+     * Returns the type of age-collection mechanism to use for this
+     * interaction.
      *
      * @return an {@code Optional} describing the collection type, or an
-     *         empty {@code Optional} if not set
+     *         empty {@code Optional} if the server did not specify one
      */
     public Optional<AgeCollectionType> ageCollectionType() {
         return Optional.ofNullable(ageCollectionType);
@@ -85,39 +98,42 @@ public final class BotAgeCollectionMetadata {
      * Sets whether the user is eligible for age collection.
      *
      * @param ageCollectionEligible the new eligibility flag, or {@code null}
+     *                              to clear the value
      */
     public void setAgeCollectionEligible(Boolean ageCollectionEligible) {
         this.ageCollectionEligible = ageCollectionEligible;
     }
 
     /**
-     * Sets whether the client should trigger the age-collection UI flow.
+     * Sets whether the client should trigger the age-collection UI flow
+     * when rendering this message.
      *
      * @param shouldTriggerAgeCollectionOnClient the new trigger flag, or
-     *        {@code null}
+     *        {@code null} to clear the value
      */
     public void setShouldTriggerAgeCollectionOnClient(Boolean shouldTriggerAgeCollectionOnClient) {
         this.shouldTriggerAgeCollectionOnClient = shouldTriggerAgeCollectionOnClient;
     }
 
     /**
-     * Sets the type of age-collection mechanism to use.
+     * Sets the type of age-collection mechanism to use for this interaction.
      *
-     * @param ageCollectionType the new collection type, or {@code null}
+     * @param ageCollectionType the new collection type, or {@code null} to
+     *                          clear the value
      */
     public void setAgeCollectionType(AgeCollectionType ageCollectionType) {
         this.ageCollectionType = ageCollectionType;
     }
 
     /**
-     * The mechanism used to collect and verify a user's age before granting
-     * access to AI bot features.
+     * Enumerates the mechanisms available for collecting and verifying a
+     * user's age before granting access to AI bot features.
      */
     @ProtobufEnum(name = "BotAgeCollectionMetadata.AgeCollectionType")
     public static enum AgeCollectionType {
         /**
-         * A simple binary over-18 age check — the user confirms whether they
-         * are at least 18 years old.
+         * A simple binary over-18 age check where the user confirms whether
+         * they are at least 18 years old.
          */
         OVER_18_BINARY(0),
 

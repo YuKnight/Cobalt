@@ -1,12 +1,15 @@
 package com.github.auties00.cobalt.model.jid;
 
 /**
- * A collection of static constants that define the delimiter characters used during JID parsing.
+ * Defines the delimiter characters used to parse and render WhatsApp JIDs.
  *
- * <p>WhatsApp JIDs follow the general format {@code user_agent:device@server}, where each
+ * <p>WhatsApp JIDs follow the canonical format {@code user_agent:device@server}, where each
  * component is separated by a specific delimiter character defined in this class. The phone
- * character handles the optional international dialing prefix that may appear in phone-number-based
- * user identifiers.
+ * character handles the optional international dialing prefix that may appear on
+ * phone-number-based user identifiers.
+ *
+ * <p>This class is package-private and intended solely for use by the JID parser and
+ * serializer. It is not part of the public API.
  */
 final class JidConstants {
     /**

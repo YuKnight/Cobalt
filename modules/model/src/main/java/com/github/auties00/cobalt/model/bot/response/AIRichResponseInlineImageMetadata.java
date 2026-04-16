@@ -10,12 +10,21 @@ import java.net.URI;
 import java.util.Optional;
 
 /**
- * Metadata for an inline image fragment within an AI rich response.
+ * Metadata for an inline image fragment within a WhatsApp AI bot rich
+ * response.
  *
  * <p>An inline image is rendered directly within the message flow,
  * with configurable {@linkplain #alignment() alignment} and an
  * optional {@linkplain #tapLinkUrl() tap link} that opens a URL
- * when the user taps the image.
+ * when the user taps the image. The image itself is referenced via
+ * an {@link AIRichResponseImageURL} that provides both preview and
+ * high-resolution variants.
+ *
+ * <p>This type implements {@link AIRichResponseSubMessageContent} and
+ * appears as the {@link AIRichResponseSubMessageType#INLINE_IMAGE INLINE_IMAGE}
+ * variant within an {@link AIRichResponseSubMessage}.
+ *
+ * @see AIRichResponseSubMessage#content()
  */
 @ProtobufMessage(name = "AIRichResponseInlineImageMetadata")
 public final class AIRichResponseInlineImageMetadata implements AIRichResponseSubMessageContent {
@@ -49,6 +58,14 @@ public final class AIRichResponseInlineImageMetadata implements AIRichResponseSu
     URI tapLinkUrl;
 
 
+    /**
+     * Constructs a new inline image metadata instance.
+     *
+     * @param imageUrl   the image URL set with preview and high-res variants, or {@code null}
+     * @param imageText  the alt text or caption, or {@code null}
+     * @param alignment  the horizontal alignment, or {@code null}
+     * @param tapLinkUrl the URL opened on tap, or {@code null}
+     */
     AIRichResponseInlineImageMetadata(AIRichResponseImageURL imageUrl, String imageText, AIRichResponseImageAlignment alignment, URI tapLinkUrl) {
         this.imageUrl = imageUrl;
         this.imageText = imageText;
@@ -135,8 +152,12 @@ public final class AIRichResponseInlineImageMetadata implements AIRichResponseSu
     }
 
     /**
-     * A horizontal alignment for an inline image within an AI rich
-     * response message bubble.
+     * Horizontal alignment for an inline image within an AI rich response
+     * message bubble.
+     *
+     * <p>The alignment is direction-aware: {@link #LEADING} and
+     * {@link #TRAILING} adapt to the text direction (LTR or RTL) of the
+     * conversation.
      */
     @ProtobufEnum(name = "AIRichResponseInlineImageMetadata.AIRichResponseImageAlignment")
     public static enum AIRichResponseImageAlignment {
@@ -157,10 +178,18 @@ public final class AIRichResponseInlineImageMetadata implements AIRichResponseSu
          */
         CENTER(2);
 
+        /**
+         * Constructs an alignment constant with the given protobuf index.
+         *
+         * @param index the protobuf enum index
+         */
         AIRichResponseImageAlignment(@ProtobufEnumIndex int index) {
             this.index = index;
         }
 
+        /**
+         * The protobuf enum index for this alignment.
+         */
         final int index;
 
         /**

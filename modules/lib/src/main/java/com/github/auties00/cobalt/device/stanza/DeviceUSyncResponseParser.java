@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.device.stanza;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.device.DeviceConstants;
 import com.github.auties00.cobalt.device.DeviceListResult;
 import com.github.auties00.cobalt.device.adv.DeviceADVValidator;
@@ -17,23 +20,30 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * Parses USync IQ responses into device list results.
+ * Parses a USync IQ response and classifies each user entry as a full device list, an
+ * omitted result, or an error.
  *
- * <p>Combines the behavior of several WA Web modules to parse and validate the USync
- * response: {@code WAWebUsync.usyncParser} for response structure, {@code WAWebUsyncDevice.deviceParser}
- * for per-user device data, and {@code WAWebHandleAdvForUsyncApi} for key index validation
- * and omitted result handling.
+ * <p>WhatsApp's USync protocol answers a batch of user queries in a single IQ, and for the
+ * device protocol each user can return either the full device list (with a signed key index
+ * list), an "omitted" marker confirming the cached dhash is still valid, or a per-user
+ * error. This parser walks the response tree, verifies the signed key index list via
+ * {@link DeviceADVValidator}, filters devices whose keyIndex is not in the cryptographically
+ * signed {@code validIndexes} set, and produces a list of typed {@link DeviceListResult}
+ * instances that {@link com.github.auties00.cobalt.device.DeviceService} consumes.
  *
  * @implNote WAWebUsyncDevice.deviceParser: parses device lists, key indices, and hosting
  * status from USync response elements.
  * WAWebUsync.usyncParser: parses the USync IQ response envelope.
  * WAWebHandleAdvForUsyncApi.handleADVSyncResultSync: routes results to full or omitted handlers.
+ * WAWebUsyncUsername.usernameParser: optional username co-query co-read with device data.
  */
+@WhatsAppWebModule(moduleName = "WAWebUsync")
+@WhatsAppWebModule(moduleName = "WAWebUsyncDevice")
+@WhatsAppWebModule(moduleName = "WAWebHandleAdvForUsyncApi")
+@WhatsAppWebModule(moduleName = "WAWebUsyncUsername")
 public final class DeviceUSyncResponseParser {
     /**
      * Logger for diagnostic messages during USync response parsing.
-     *
-     * @implNote NO_WA_BASIS: Java-specific logging infrastructure.
      */
     private static final System.Logger LOGGER = System.getLogger(DeviceUSyncResponseParser.class.getName());
 
@@ -53,6 +63,9 @@ public final class DeviceUSyncResponseParser {
      * @param advValidatorService the ADV validator service for key index validation and
      *                            hosted device gating
      */
+    @WhatsAppWebExport(moduleName = "WAWebHandleAdvForUsyncApi",
+            exports = "handleADVSyncResultSync",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public DeviceUSyncResponseParser(DeviceADVValidator advValidatorService) {
         this.advValidatorService = Objects.requireNonNull(advValidatorService, "advValidatorService cannot be null");
     }
@@ -72,6 +85,9 @@ public final class DeviceUSyncResponseParser {
      * @param responseNode the IQ response node
      * @return list of device list results (full, omitted, or error)
      */
+    @WhatsAppWebExport(moduleName = "WAWebUsync",
+            exports = "usyncParser",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public List<DeviceListResult> parse(Node responseNode) {
         // WAWebUsync.usyncParser: r = t.child("usync")
         var usyncNode = responseNode.getChild("usync");
@@ -130,6 +146,9 @@ public final class DeviceUSyncResponseParser {
      * @param usync the usync node
      * @return map of user JID to username
      */
+    @WhatsAppWebExport(moduleName = "WAWebUsyncUsername",
+            exports = "usernameParser",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private Map<Jid, String> parseUsernameMap(Node usync) {
         return usync.streamChild("list")
                 .flatMap(list -> list.streamChildren("user"))
@@ -151,6 +170,9 @@ public final class DeviceUSyncResponseParser {
      * @param usernameMap the username map for correlating usernames
      * @return stream of device list results for this user
      */
+    @WhatsAppWebExport(moduleName = "WAWebUsyncDevice",
+            exports = "deviceParser",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private Stream<DeviceListResult> parseUserDevices(Node userNode, Map<Jid, String> usernameMap) {
         var jidAttr = userNode.getAttributeAsJid("jid");
         if (jidAttr.isEmpty()) {
@@ -215,6 +237,9 @@ public final class DeviceUSyncResponseParser {
      * @param keyIndexListNode the key-index-list node, or {@code null}
      * @return stream containing the omitted result, or empty if invalid
      */
+    @WhatsAppWebExport(moduleName = "WAWebHandleAdvForUsyncApi",
+            exports = "handleADVSyncResultSync",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private Stream<DeviceListResult> parseOmittedResult(Jid userJid, Node deviceListNode, Node keyIndexListNode) {
         // WAWebHandleAdvOmittedResultApi: reject if device-list has companion devices
         if (deviceListNode != null && hasCompanionDevices(deviceListNode)) {
@@ -244,6 +269,9 @@ public final class DeviceUSyncResponseParser {
      * @param deviceListNode the device-list node
      * @return {@code true} if any device has a non-primary device ID
      */
+    @WhatsAppWebExport(moduleName = "WAWebHandleAdvForUsyncApi",
+            exports = "handleADVSyncResultSync",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private boolean hasCompanionDevices(Node deviceListNode) {
         return deviceListNode.streamChildren("device")
                 .anyMatch(device -> !device.hasAttribute("id", DeviceConstants.PRIMARY_DEVICE_ID));
@@ -265,6 +293,9 @@ public final class DeviceUSyncResponseParser {
      * @param signedKeyIndexBytes the raw signed key index list bytes
      * @return stream containing the full result, or empty if validation fails
      */
+    @WhatsAppWebExport(moduleName = "WAWebHandleAdvKeyIndexResultApi",
+            exports = "handleKeyIndexResultSync",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private Stream<DeviceListResult> parseFullResult(
             Jid userJid,
             String username,
@@ -330,6 +361,9 @@ public final class DeviceUSyncResponseParser {
      * @param deviceNode the device node from key-index-list
      * @return stream containing the key index entry, or empty if required attributes are missing
      */
+    @WhatsAppWebExport(moduleName = "WAWebHandleAdvKeyIndexResultApi",
+            exports = "handleKeyIndexResultSync",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private Stream<KeyIndexEntry> parseKeyIndexEntry(Node deviceNode) {
         var jid = deviceNode.getAttributeAsJid("jid");
         var keyIndex = deviceNode.getAttributeAsInt("key-index");
@@ -356,6 +390,9 @@ public final class DeviceUSyncResponseParser {
      * @param validIndexes the set of valid key indexes, or {@code null} if not available
      * @return stream containing the parsed device info, or empty if invalid
      */
+    @WhatsAppWebExport(moduleName = "WAWebUsyncDevice",
+            exports = "deviceParser",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private Stream<DeviceInfo> parseDeviceEntry(
             Node deviceNode,
             Map<Integer, Integer> keyIndexMap,
@@ -405,6 +442,9 @@ public final class DeviceUSyncResponseParser {
      * @param userNode the user node from {@code usync > list > user}
      * @return stream containing the username entry, or empty if not available
      */
+    @WhatsAppWebExport(moduleName = "WAWebUsyncUsername",
+            exports = "usernameParser",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private Stream<UsernameEntry> parseUsernameEntry(Node userNode) {
         var jid = userNode.getAttributeAsJid("jid");
         if (jid.isEmpty()) {

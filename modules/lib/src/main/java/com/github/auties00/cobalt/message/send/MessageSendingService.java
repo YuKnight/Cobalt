@@ -9,6 +9,9 @@ import com.github.auties00.cobalt.message.send.bot.BotProtobufTransform;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
 import com.github.auties00.cobalt.message.send.senderkey.SenderKeyDistribution;
 import com.github.auties00.cobalt.message.send.stanza.*;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidServer;
@@ -26,14 +29,14 @@ import java.util.Objects;
  * <p>This service is the main entry point for outgoing messages.  It
  * dispatches to the appropriate send path based on the chat JID type:
  * <ul>
- *   <li><b>User chats</b> ({@code user@s.whatsapp.net}, {@code user@lid})
- *       — per-device Signal encryption with chat fanout</li>
- *   <li><b>Group chats</b> ({@code group@g.us})
- *       — sender-key encryption, serialised per group</li>
- *   <li><b>Status updates</b> ({@code status@broadcast})
- *       — sender-key encryption to the status audience list</li>
- *   <li><b>Newsletters</b> ({@code newsletter@newsletter})
- *       — plaintext via SMAX RPC (no E2E encryption)</li>
+ *   <li><b>User chats</b> ({@code user@s.whatsapp.net}, {@code user@lid}):
+ *       per-device Signal encryption with chat fanout</li>
+ *   <li><b>Group chats</b> ({@code group@g.us}):
+ *       sender-key encryption, serialised per group</li>
+ *   <li><b>Status updates</b> ({@code status@broadcast}):
+ *       sender-key encryption to the status audience list</li>
+ *   <li><b>Newsletters</b> ({@code newsletter@newsletter}):
+ *       plaintext via SMAX RPC (no E2E encryption)</li>
  * </ul>
  *
  * <p>Peer protocol messages (app state sync, history sync errors) sent
@@ -48,6 +51,10 @@ import java.util.Objects;
  * WAWebNewsletterSendMessageQueryJob.querySendNewsletterMessage: newsletter sending.
  * WAWebSendAppStateSyncMsgJob.encryptAndSendKeyMsg: peer message sending.
  */
+@WhatsAppWebModule(moduleName = "WAWebSendMsgJob")
+@WhatsAppWebModule(moduleName = "WAWebEncryptAndSendStatusMsg")
+@WhatsAppWebModule(moduleName = "WAWebNewsletterSendMessageQueryJob")
+@WhatsAppWebModule(moduleName = "WAWebSendAppStateSyncMsgJob")
 public final class MessageSendingService {
     /**
      * Prepares raw {@link MessageContainer} instances into fully populated
@@ -117,6 +124,8 @@ public final class MessageSendingService {
      * @implNote ADAPTED: WAWebSendMsgJob uses module-level imports for all
      * dependencies; Cobalt uses constructor-based DI and creates all sub-senders.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgJob", exports = "encryptAndSendMsg",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public MessageSendingService(
             WhatsAppClient client,
             MessageEncryption encryption,
@@ -175,6 +184,8 @@ public final class MessageSendingService {
      * routing; Cobalt separates preparation (via {@link MessagePreparer})
      * from routing (via {@link #send(MessageInfo)}).
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgJob", exports = "encryptAndSendMsg",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public AckResult send(Jid chatJid, MessageContainer container) {
         Objects.requireNonNull(chatJid, "chatJid");
         Objects.requireNonNull(container, "container");
@@ -213,6 +224,8 @@ public final class MessageSendingService {
      * {@code encryptAndSendGroupMsg} (group) based on JID type.
      * Cobalt extends routing to also handle status and newsletter JIDs.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgJob", exports = "encryptAndSendMsg",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public AckResult send(MessageInfo messageInfo) {
         Objects.requireNonNull(messageInfo, "messageInfo");
 
@@ -282,6 +295,10 @@ public final class MessageSendingService {
      * the MsgKey with the sender's JID, generates a new message ID, fetches
      * group metadata, and calls {@code encryptAndSendKeyDistributionMsg}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgJob", exports = "encryptAndSendKeyDistributionMsg",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WAWebSendKeyDistributionMsgAction", exports = "sendKeyDistributionMsg",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public void sendKeyDistribution(Jid groupJid, MessageKey key) {
         Objects.requireNonNull(groupJid, "groupJid");
         Objects.requireNonNull(key, "key");
@@ -318,6 +335,8 @@ public final class MessageSendingService {
      * @implNote WAWebSendAppStateSyncMsgJob.encryptAndSendKeyMsg: sends peer
      * messages via createUserDeviceMsgStanza with category="peer".
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendAppStateSyncMsgJob", exports = "encryptAndSendKeyMsg",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public AckResult sendPeer(Jid targetDevice, ChatMessageInfo messageInfo) {
         Objects.requireNonNull(targetDevice, "targetDevice");
         Objects.requireNonNull(messageInfo, "messageInfo");

@@ -1,6 +1,9 @@
 package com.github.auties00.cobalt.migration;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.chat.ChatMetadata;
 import com.github.auties00.cobalt.model.chat.community.CommunityMetadata;
 import com.github.auties00.cobalt.model.chat.group.GroupMetadata;
@@ -17,27 +20,36 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * A scheduled service that migrates inactive groups to LID addressing mode
- * by re-querying their metadata from the server.
+ * Background service that upgrades inactive group chats to LID addressing
+ * by re-querying their metadata from the WhatsApp server.
  *
- * <p>When enabled via the {@link ABProp#ENABLE_INACTIVE_GROUP_LID_MIGRATION}
- * AB prop, this service identifies groups that still use phone-number
- * addressing mode ({@code isLidAddressingMode == false}), queries their
- * metadata from the server (which triggers an update of the addressing mode
- * flag), and marks the migration as complete once all groups have been
- * migrated.
+ * <p>On WhatsApp Web/Desktop, groups must eventually switch from phone-number
+ * addressing to LID addressing. Active groups pick this up naturally when a
+ * member sends a message, but inactive groups remain on the old addressing
+ * mode indefinitely. This service walks the local chat store, asks the
+ * server for metadata on every non-LID group, and relies on the server's
+ * response to flip each group's {@code isLidAddressingMode} flag. Once no
+ * PN-mode groups remain, the migration is considered complete and does not
+ * run again for the session.
  *
- * <p>The service runs once after a 60-second startup delay. If groups
- * remain in PN mode after the initial pass, a follow-up pass is scheduled
- * after 24 hours.
+ * <p>Execution is gated on the
+ * {@link ABProp#ENABLE_INACTIVE_GROUP_LID_MIGRATION} AB prop. The first pass
+ * runs 60 seconds after startup; if any groups are still on PN after the
+ * pass, a retry is scheduled for 24 hours later.
  *
- * @implNote WAWebInactiveGroupLidMigrationJob.migrateInactiveGroupsToLid:
- * finds all non-LID groups where the user is a member, batch-queries
- * their metadata, and marks the migration complete when none remain.
+ * @implNote WAWebInactiveGroupLidMigrationJob: adapts the
+ * {@code migrateInactiveGroupsToLid} export, its inner {@code findPnGroups}
+ * helper, and the retry-on-remaining behaviour. Depends on
+ * {@code WAWebQueryAndUpdateGroupMetadataJob} and {@code WAWebABProps} in
+ * WA Web; in Cobalt these are replaced by {@link WhatsAppClient} and
+ * {@link ABPropsService} via constructor DI.
  */
+@WhatsAppWebModule(moduleName = "WAWebInactiveGroupLidMigrationJob")
+@WhatsAppWebModule(moduleName = "WAWebInactiveGroupLidMigration")
 public final class InactiveGroupLidMigrationService {
     /**
-     * Logger for migration progress and error messages.
+     * Logger used to trace migration progress and failures in the Cobalt
+     * client.
      *
      * @implNote ADAPTED: WAWebInactiveGroupLidMigrationJob uses
      *           {@code WALogger.LOG}/{@code WALogger.ERROR} with tagged
@@ -46,18 +58,18 @@ public final class InactiveGroupLidMigrationService {
     private static final System.Logger LOGGER = System.getLogger(InactiveGroupLidMigrationService.class.getName());
 
     /**
-     * The initial delay before the first migration attempt, matching the
-     * WhatsApp Web requirement that at least 60 seconds have elapsed
-     * since pairing.
+     * Delay before the first migration attempt, matching the WhatsApp Web
+     * requirement that at least 60 seconds have elapsed since pairing.
      *
      * @implNote ADAPTED: WAWebTasksDefinitions registers the task with
-     *           a 60-second post-pairing delay.
+     *           a 60-second post-pairing delay; Cobalt hard-codes the
+     *           same value and schedules it directly.
      */
     private static final Duration INITIAL_DELAY = Duration.ofSeconds(60);
 
     /**
-     * The delay between retry attempts when groups remain in PN mode
-     * after the first pass.
+     * Delay before a follow-up migration attempt when some groups still
+     * remain on phone-number addressing after the initial pass.
      *
      * @implNote ADAPTED: WAWebTasksDefinitions schedules the task at
      *           {@code DAY_SECONDS} intervals. Cobalt self-schedules
@@ -66,7 +78,7 @@ public final class InactiveGroupLidMigrationService {
     private static final Duration RETRY_DELAY = Duration.ofDays(1);
 
     /**
-     * The WhatsApp client used for querying group metadata from the server.
+     * The WhatsApp client used to query group metadata from the server.
      *
      * @implNote WAWebInactiveGroupLidMigrationJob: corresponds to the
      *           module-level import of {@code WAWebQueryAndUpdateGroupMetadataJob}.
@@ -74,7 +86,7 @@ public final class InactiveGroupLidMigrationService {
     private final WhatsAppClient client;
 
     /**
-     * The AB props service used for checking the
+     * Provides access to server-side AB props; used to read the
      * {@link ABProp#ENABLE_INACTIVE_GROUP_LID_MIGRATION} feature flag.
      *
      * @implNote WAWebInactiveGroupLidMigrationJob: corresponds to the
@@ -83,40 +95,45 @@ public final class InactiveGroupLidMigrationService {
     private final ABPropsService abPropsService;
 
     /**
-     * Tracks whether the inactive group LID migration has been completed.
+     * Tracks whether the inactive-group LID migration has already completed
+     * for this session.
      *
-     * <p>In WA Web, this state is persisted via
+     * <p>WA Web persists this flag via
      * {@code WAWebUserPrefsStore} under the key
-     * {@code UserPrefs.InactiveGroupLidMigrationComplete}. In Cobalt,
-     * an in-memory {@link AtomicBoolean} is used instead since Cobalt
-     * does not replicate the UserPrefs persistence layer.
+     * {@code UserPrefs.InactiveGroupLidMigrationComplete}. Cobalt keeps a
+     * process-local {@link AtomicBoolean} because the UserPrefs persistence
+     * layer is not replicated.
      *
      * @implNote ADAPTED: WAWebInactiveGroupLidMigration.isInactiveGroupLidMigrationComplete
      *           reads this value; WAWebInactiveGroupLidMigration.setInactiveGroupLidMigrationComplete
      *           writes {@code true} to it.
      */
+    @WhatsAppWebExport(moduleName = "WAWebInactiveGroupLidMigration",
+            exports = {"isInactiveGroupLidMigrationComplete", "setInactiveGroupLidMigrationComplete"},
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private final AtomicBoolean complete;
 
     /**
-     * The currently scheduled migration task, or {@code null} if no task
-     * is pending. Used to cancel pending retries on disconnect/reconnect.
+     * Handle on the currently scheduled migration task, or {@code null} if
+     * no task is pending. Used to cancel pending retries on
+     * disconnect/reconnect.
      *
-     * @implNote NO_WA_BASIS: Cobalt lifecycle field for managing scheduled
-     *           task cancellation. WA Web relies on the task scheduler's
-     *           own lifecycle management.
+     * @implNote Cobalt lifecycle field for managing scheduled task
+     *           cancellation. WA Web relies on the task scheduler's own
+     *           lifecycle management.
      */
     private volatile CompletableFuture<Void> scheduledTask;
 
     /**
-     * Constructs a new inactive group LID migration service.
+     * Constructs a new inactive-group LID migration service.
      *
      * @implNote WAWebInactiveGroupLidMigration: module-level initialization.
      *           The WA Web module initializes by reading
      *           {@code UserPrefs.InactiveGroupLidMigrationComplete}
      *           from {@code WAWebUserPrefsStore}. Cobalt uses constructor
      *           DI with an {@link AtomicBoolean} initialized to {@code false}.
-     * @param client        the WhatsApp client for querying group metadata
-     * @param abPropsService the AB props service for checking the feature flag
+     * @param client         the WhatsApp client used for querying group metadata
+     * @param abPropsService the AB props service used for checking the feature flag
      */
     public InactiveGroupLidMigrationService(WhatsAppClient client, ABPropsService abPropsService) {
         this.client = Objects.requireNonNull(client, "client");
@@ -125,11 +142,12 @@ public final class InactiveGroupLidMigrationService {
     }
 
     /**
-     * Starts the migration service by scheduling the first attempt after
-     * the initial delay.
+     * Starts the migration service by scheduling the first pass after the
+     * initial delay.
      *
      * <p>This method should be called once after the client has logged in
-     * and AB props are available.
+     * and AB props are available. Subsequent calls after completion are
+     * no-ops.
      *
      * @implNote ADAPTED: WAWebTasksDefinitions.registerTasks schedules the
      *           migration task via the WA Web task scheduler with a 60-second
@@ -137,22 +155,31 @@ public final class InactiveGroupLidMigrationService {
      *           to achieve the same effect.
      */
     public void start() {
+        // WAWebInactiveGroupLidMigrationJob.migrateInactiveGroupsToLid
+        // Short-circuits scheduling when the migration has already been marked complete in a previous call
+
         if (complete.get()) {
             LOGGER.log(System.Logger.Level.DEBUG,
                     "[lid-inactive-group-migration] already done, skip");
             return;
         }
 
+        // WAWebTasksDefinitions.registerTasks
+        // Schedules the migration pass to run after the 60-second post-pairing grace period
+
         scheduledTask = SchedulerUtils.scheduleDelayed(INITIAL_DELAY, this::run);
     }
 
     /**
-     * Cancels any pending scheduled migration task and resets the service
-     * state. Called on disconnect/reconnect.
+     * Cancels any pending scheduled migration task so no further passes
+     * run until {@link #start()} is called again.
      *
-     * @implNote NO_WA_BASIS: Cobalt lifecycle method for cleaning up
-     *           scheduled tasks on disconnect/reconnect. WA Web relies on
-     *           the task scheduler's own cleanup mechanism.
+     * <p>Intended to be invoked when the client disconnects and needs to
+     * clear scheduled work tied to the session.
+     *
+     * @implNote Cobalt lifecycle method for cleaning up scheduled tasks
+     *           on disconnect/reconnect. WA Web relies on the task
+     *           scheduler's own cleanup mechanism.
      */
     public void reset() {
         var task = scheduledTask;
@@ -166,9 +193,10 @@ public final class InactiveGroupLidMigrationService {
      * Executes a single migration pass.
      *
      * <p>Checks the AB prop, finds PN-mode groups, queries their metadata,
-     * and either marks migration complete or schedules a retry.
+     * and either marks migration complete or schedules a retry 24 hours
+     * later.
      *
-     * @implNote WAWebInactiveGroupLidMigrationJob.migrateInactiveGroupsToLid.
+     * @implNote WAWebInactiveGroupLidMigrationJob.migrateInactiveGroupsToLid:
      *           WA Web uses {@code queryAndUpdateAllGroupMetadata} for batch
      *           queries; Cobalt iterates individually via
      *           {@code queryChatMetadata}. WA Web relies on the external task
@@ -177,13 +205,22 @@ public final class InactiveGroupLidMigrationService {
      *           errors to the task scheduler; Cobalt logs and swallows since
      *           the scheduled task handles completion independently.
      */
+    @WhatsAppWebExport(moduleName = "WAWebInactiveGroupLidMigrationJob",
+            exports = "migrateInactiveGroupsToLid",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private void run() {
         try {
+            // WAWebInactiveGroupLidMigrationJob.migrateInactiveGroupsToLid
+            // Gates execution on the AB prop that enables inactive-group LID migration server-side
+
             if (!abPropsService.getBool(ABProp.ENABLE_INACTIVE_GROUP_LID_MIGRATION)) {
                 LOGGER.log(System.Logger.Level.DEBUG,
                         "[lid-inactive-group-migration] ABProp disabled, skip");
                 return;
             }
+
+            // WAWebInactiveGroupLidMigrationJob.migrateInactiveGroupsToLid
+            // Re-checks the complete flag in case the initial pass ran during a previous session
 
             if (complete.get()) {
                 LOGGER.log(System.Logger.Level.DEBUG,
@@ -193,6 +230,9 @@ public final class InactiveGroupLidMigrationService {
 
             LOGGER.log(System.Logger.Level.INFO,
                     "[lid-inactive-group-migration] starting migration");
+
+            // WAWebInactiveGroupLidMigrationJob.migrateInactiveGroupsToLid
+            // Collects the set of group chats that are still on phone-number addressing
 
             var pnGroups = findPnGroups();
             if (pnGroups.isEmpty()) {
@@ -204,6 +244,9 @@ public final class InactiveGroupLidMigrationService {
 
             LOGGER.log(System.Logger.Level.INFO,
                     "[lid-inactive-group-migration] found {0} PN groups", pnGroups.size());
+
+            // ADAPTED: WAWebInactiveGroupLidMigrationJob.migrateInactiveGroupsToLid
+            // WA Web uses queryAndUpdateAllGroupMetadata for a batch request; Cobalt issues one query per group
 
             for (var groupJid : pnGroups) {
                 try {
@@ -217,6 +260,9 @@ public final class InactiveGroupLidMigrationService {
 
             LOGGER.log(System.Logger.Level.INFO,
                     "[lid-inactive-group-migration] groups queried+updated");
+
+            // WAWebInactiveGroupLidMigrationJob.migrateInactiveGroupsToLid
+            // Re-scans the store after the refresh to decide between completion and retry
 
             var remaining = findPnGroups();
             if (remaining.isEmpty()) {
@@ -237,16 +283,15 @@ public final class InactiveGroupLidMigrationService {
     }
 
     /**
-     * Finds all group chats that are still in phone-number addressing mode.
+     * Finds all group chats that are still using phone-number addressing.
      *
-     * <p>Iterates over all chats on the group-or-community server, looks up
-     * each chat's metadata, and retains only those where
-     * {@code isLidAddressingMode} is {@code false} and the group is neither
-     * suspended nor terminated.
+     * <p>Walks the stored chats on the group-or-community server, loads
+     * their cached metadata, and returns only those that have not yet been
+     * flipped to LID and are not suspended or terminated.
      *
-     * <p>In WA Web the membership check is explicit via
-     * {@code bulkCheckMyMembership}; in Cobalt the store already contains
-     * only chats the user is a member of, so the membership filter is
+     * <p>WA Web makes the membership check explicit via
+     * {@code bulkCheckMyMembership}; Cobalt's store already holds only
+     * chats the user participates in, so the membership filter is
      * implicit.
      *
      * @implNote ADAPTED: WAWebInactiveGroupLidMigrationJob.C (findPnGroups).
@@ -259,39 +304,51 @@ public final class InactiveGroupLidMigrationService {
      *           metadata types.
      * @return the list of group JIDs that have not migrated to LID
      */
+    @WhatsAppWebExport(moduleName = "WAWebInactiveGroupLidMigrationJob",
+            exports = "migrateInactiveGroupsToLid",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private List<Jid> findPnGroups() {
         var store = client.store();
         return store.chats()
                 .stream()
                 .map(chat -> chat.jid())
-                .filter(jid -> jid.hasServer(JidServer.groupOrCommunity())) // WAWebInactiveGroupLidMigrationJob.C
+                // WAWebInactiveGroupLidMigrationJob.migrateInactiveGroupsToLid
+                // Restricts the scan to chats on the groups-or-communities server
+
+                .filter(jid -> jid.hasServer(JidServer.groupOrCommunity()))
                 .filter(jid -> {
+                    // WAWebInactiveGroupLidMigrationJob.migrateInactiveGroupsToLid
+                    // Keeps only groups whose metadata is cached, still on PN addressing, and neither suspended nor terminated
+
                     var metadata = store.findChatMetadata(jid).orElse(null);
                     return metadata != null
-                            && !metadata.isLidAddressingMode() // WAWebInactiveGroupLidMigrationJob.C: isLidAddressingMode !== true
-                            && !isSuspendedOrTerminated(metadata); // WAWebInactiveGroupLidMigrationJob.C: !e.suspended && !e.terminated
+                            && !metadata.isLidAddressingMode()
+                            && !isSuspendedOrTerminated(metadata);
                 })
                 .toList();
     }
 
     /**
-     * Checks whether the given chat metadata represents a suspended or
-     * terminated group/community.
+     * Returns whether the given group or community metadata indicates the
+     * chat is suspended or has been terminated.
      *
-     * <p>Since {@link ChatMetadata} is a sealed interface that permits
-     * {@link GroupMetadata} and {@link CommunityMetadata}, this method
-     * uses pattern matching to delegate to the concrete type's
-     * {@code isSuspended()} and {@code isTerminated()} accessors.
+     * <p>Because {@link ChatMetadata} is a sealed interface permitting
+     * {@link GroupMetadata} and {@link CommunityMetadata}, this method uses
+     * pattern matching to access the concrete accessors for each variant.
      *
-     * @implNote WAWebInactiveGroupLidMigrationJob.C: {@code !e.suspended && !e.terminated}
-     *           filter applied after membership check.
-     * @param metadata the non-{@code null} chat metadata to check
+     * @implNote WAWebInactiveGroupLidMigrationJob.migrateInactiveGroupsToLid:
+     *           the {@code !e.suspended && !e.terminated} filter applied
+     *           after the membership check.
+     * @param metadata the non-{@code null} chat metadata to inspect
      * @return {@code true} if the group or community is suspended or terminated
      */
+    @WhatsAppWebExport(moduleName = "WAWebInactiveGroupLidMigrationJob",
+            exports = "migrateInactiveGroupsToLid",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private static boolean isSuspendedOrTerminated(ChatMetadata metadata) {
         return switch (metadata) {
-            case GroupMetadata gm -> gm.isSuspended() || gm.isTerminated(); // WAWebInactiveGroupLidMigrationJob.C
-            case CommunityMetadata cm -> cm.isSuspended() || cm.isTerminated(); // WAWebInactiveGroupLidMigrationJob.C
+            case GroupMetadata gm -> gm.isSuspended() || gm.isTerminated();
+            case CommunityMetadata cm -> cm.isSuspended() || cm.isTerminated();
         };
     }
 }

@@ -4,14 +4,17 @@ import it.auties.protobuf.annotation.ProtobufDeserializer;
 import it.auties.protobuf.annotation.ProtobufSerializer;
 
 /**
- * The operating mode for a {@link BusinessHoursEntry}, indicating how the business's
- * availability is determined for a given day.
+ * Represents the operating mode for a {@link BusinessHoursEntry}, indicating how the
+ * business's availability is determined for a given day.
  *
- * <p>Three modes are currently defined by the WhatsApp protocol. {@link SpecificHours}
- * indicates that the business operates during specific time ranges defined by the entry's
- * opening and closing times. {@link Open24H} indicates that the business is open for the
- * entire day. {@link AppointmentOnly} indicates that the business is available only by
- * appointment.
+ * <p>Three modes are currently defined by the WhatsApp protocol:
+ * <ul>
+ *   <li>{@link SpecificHours} indicates that the business operates during specific time
+ *       ranges defined by the entry's opening and closing times.
+ *   <li>{@link Open24H} indicates that the business is open for the entire day.
+ *   <li>{@link AppointmentOnly} indicates that the business is available only by
+ *       appointment.
+ * </ul>
  *
  * <p>An {@link Unknown} variant is provided for forward compatibility with values that
  * may be introduced by the server in the future.

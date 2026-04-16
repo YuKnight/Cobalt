@@ -12,76 +12,83 @@ import java.util.Optional;
 import java.util.OptionalInt;
 
 /**
- * Metadata describing a bot plugin that contributed to a bot response, such as
- * a web search or Instagram Reels integration.
+ * Describes a bot plugin that contributed to a Meta AI bot response, such as a
+ * web search plugin or an Instagram Reels integration.
  *
- * <p>This message is attached to {@code BotMetadata} (field 3) and carries
- * information about which search provider was used, the query that was
- * executed, and any media thumbnails or reference links returned by the
- * plugin.
+ * <p>When the Meta AI bot invokes an external plugin to answer a user query,
+ * this metadata accompanies the reply. It identifies which
+ * {@link SearchProvider} fulfilled the request, the {@link PluginType} used,
+ * the search query that was executed, and various URLs for thumbnails,
+ * provider profile photos, favicons, and result pages. Clients use this
+ * information to render attribution UI elements alongside the bot response.
  *
- * <p>A plugin response may have a parent plugin (identified by
- * {@link #parentPluginMessageKey()}) when the response is a follow-up or
- * drill-down from a previous plugin result.
+ * <p>Plugin responses can form chains: a follow-up or drill-down result
+ * references its predecessor via {@link #parentPluginMessageKey()} and
+ * {@link #parentPluginType()}.
+ *
+ * @see BotSourcesMetadata
  */
 @ProtobufMessage(name = "BotPluginMetadata")
 public final class BotPluginMetadata {
     /**
-     * The search provider that fulfilled this plugin request.
+     * The external search provider that fulfilled this plugin request, such as
+     * Bing, Google, or a support/help-center service.
      */
     @ProtobufProperty(index = 1, type = ProtobufType.ENUM)
     SearchProvider provider;
 
     /**
-     * The type of plugin that generated this response.
+     * The type of plugin that generated this response, indicating whether it
+     * was a web search, Reels integration, or another plugin category.
      */
     @ProtobufProperty(index = 2, type = ProtobufType.ENUM)
     PluginType pluginType;
 
     /**
-     * The CDN URL of the thumbnail image for a Reels plugin result, for
-     * example {@code "https://mmg.whatsapp.net/v/t62.1234/image.jpg"}.
+     * The CDN URL of the thumbnail image for this plugin result, typically
+     * used for Reels or image-rich search results.
      */
     @ProtobufProperty(index = 3, type = ProtobufType.STRING)
     URI thumbnailCdnUrl;
 
     /**
-     * The CDN URL of the search provider's profile photo, for example
-     * {@code "https://mmg.whatsapp.net/v/t62.1234/profile.jpg"}.
+     * The CDN URL of the search provider's profile photo, displayed alongside
+     * the attribution to identify the source visually.
      */
     @ProtobufProperty(index = 4, type = ProtobufType.STRING)
     URI profilePhotoCdnUrl;
 
     /**
-     * The URL of the search provider's result page, for example
-     * {@code "https://www.bing.com/search?q=weather+today"}.
+     * The URL of the search provider's result page that the user can visit for
+     * the full search results.
      */
     @ProtobufProperty(index = 5, type = ProtobufType.STRING)
     URI searchProviderUrl;
 
     /**
-     * The zero-based index of this plugin result within the list of results
-     * returned by the search provider.
+     * The zero-based position of this plugin result within the ordered list of
+     * results returned by the search provider.
      */
     @ProtobufProperty(index = 6, type = ProtobufType.UINT32)
     Integer referenceIndex;
 
     /**
-     * The expected number of citation links that this plugin result contains.
+     * The expected number of citation links embedded in this plugin result,
+     * allowing the client to pre-allocate UI space for source attributions.
      */
     @ProtobufProperty(index = 7, type = ProtobufType.UINT32)
     Integer expectedLinksCount;
 
     /**
-     * The search query string that was sent to the search provider, for
-     * example {@code "weather in New York today"}.
+     * The search query string that was sent to the search provider. For
+     * example, {@code "weather in New York today"}.
      */
     @ProtobufProperty(index = 9, type = ProtobufType.STRING)
     String searchQuery;
 
     /**
      * The message key of the parent plugin message that this result is a
-     * follow-up to, if any.
+     * follow-up or drill-down from, enabling plugin response chaining.
      */
     @ProtobufProperty(index = 10, type = ProtobufType.MESSAGE)
     MessageKey parentPluginMessageKey;
@@ -103,8 +110,8 @@ public final class BotPluginMetadata {
     PluginType parentPluginType;
 
     /**
-     * The CDN URL of the search provider's favicon, for example
-     * {@code "https://mmg.whatsapp.net/v/t62.1234/favicon.ico"}.
+     * The CDN URL of the search provider's favicon, displayed alongside the
+     * plugin result for visual source identification.
      */
     @ProtobufProperty(index = 13, type = ProtobufType.STRING)
     URI faviconCdnUrl;
@@ -112,18 +119,27 @@ public final class BotPluginMetadata {
     /**
      * Constructs a new {@code BotPluginMetadata} with the specified values.
      *
-     * @param provider               the search provider, or {@code null}
-     * @param pluginType             the plugin type, or {@code null}
+     * @param provider               the search provider that fulfilled the
+     *                               request, or {@code null}
+     * @param pluginType             the type of plugin used, or {@code null}
      * @param thumbnailCdnUrl        the thumbnail CDN URL, or {@code null}
-     * @param profilePhotoCdnUrl     the profile photo CDN URL, or {@code null}
-     * @param searchProviderUrl      the search provider URL, or {@code null}
-     * @param referenceIndex         the result reference index, or {@code null}
-     * @param expectedLinksCount     the expected links count, or {@code null}
-     * @param searchQuery            the search query, or {@code null}
-     * @param parentPluginMessageKey the parent plugin message key, or {@code null}
-     * @param deprecatedField        the deprecated plugin type, or {@code null}
-     * @param parentPluginType       the parent plugin type, or {@code null}
-     * @param faviconCdnUrl          the favicon CDN URL, or {@code null}
+     * @param profilePhotoCdnUrl     the provider's profile photo CDN URL, or
+     *                               {@code null}
+     * @param searchProviderUrl      the URL of the provider's result page, or
+     *                               {@code null}
+     * @param referenceIndex         the zero-based result index, or
+     *                               {@code null}
+     * @param expectedLinksCount     the expected number of citation links, or
+     *                               {@code null}
+     * @param searchQuery            the search query string, or {@code null}
+     * @param parentPluginMessageKey the key of the parent plugin message, or
+     *                               {@code null}
+     * @param deprecatedField        the deprecated plugin type field, or
+     *                               {@code null}
+     * @param parentPluginType       the plugin type of the parent message, or
+     *                               {@code null}
+     * @param faviconCdnUrl          the provider's favicon CDN URL, or
+     *                               {@code null}
      */
     BotPluginMetadata(SearchProvider provider, PluginType pluginType, URI thumbnailCdnUrl, URI profilePhotoCdnUrl, URI searchProviderUrl, Integer referenceIndex, Integer expectedLinksCount, String searchQuery, MessageKey parentPluginMessageKey, PluginType deprecatedField, PluginType parentPluginType, URI faviconCdnUrl) {
         this.provider = provider;
@@ -141,9 +157,9 @@ public final class BotPluginMetadata {
     }
 
     /**
-     * Returns the search provider that fulfilled this plugin request.
+     * Returns the external search provider that fulfilled this plugin request.
      *
-     * @return an {@code Optional} describing the search provider, or an empty
+     * @return an {@link Optional} describing the search provider, or an empty
      *         {@code Optional} if not set
      */
     public Optional<SearchProvider> provider() {
@@ -153,7 +169,7 @@ public final class BotPluginMetadata {
     /**
      * Returns the type of plugin that generated this response.
      *
-     * @return an {@code Optional} describing the plugin type, or an empty
+     * @return an {@link Optional} describing the plugin type, or an empty
      *         {@code Optional} if not set
      */
     public Optional<PluginType> pluginType() {
@@ -161,9 +177,9 @@ public final class BotPluginMetadata {
     }
 
     /**
-     * Returns the CDN URL of the thumbnail image for a Reels plugin result.
+     * Returns the CDN URL of the thumbnail image for this plugin result.
      *
-     * @return an {@code Optional} describing the thumbnail URL, or an empty
+     * @return an {@link Optional} describing the thumbnail URL, or an empty
      *         {@code Optional} if not set
      */
     public Optional<URI> thumbnailCdnUrl() {
@@ -173,7 +189,7 @@ public final class BotPluginMetadata {
     /**
      * Returns the CDN URL of the search provider's profile photo.
      *
-     * @return an {@code Optional} describing the profile photo URL, or an
+     * @return an {@link Optional} describing the profile photo URL, or an
      *         empty {@code Optional} if not set
      */
     public Optional<URI> profilePhotoCdnUrl() {
@@ -181,9 +197,9 @@ public final class BotPluginMetadata {
     }
 
     /**
-     * Returns the URL of the search provider's result page.
+     * Returns the URL of the search provider's full result page.
      *
-     * @return an {@code Optional} describing the search provider URL, or an
+     * @return an {@link Optional} describing the search provider URL, or an
      *         empty {@code Optional} if not set
      */
     public Optional<URI> searchProviderUrl() {
@@ -191,10 +207,10 @@ public final class BotPluginMetadata {
     }
 
     /**
-     * Returns the zero-based index of this plugin result within the list of
-     * results returned by the search provider.
+     * Returns the zero-based position of this plugin result within the ordered
+     * list of results returned by the search provider.
      *
-     * @return an {@code OptionalInt} describing the reference index, or an
+     * @return an {@link OptionalInt} describing the reference index, or an
      *         empty {@code OptionalInt} if not set
      */
     public OptionalInt referenceIndex() {
@@ -202,9 +218,10 @@ public final class BotPluginMetadata {
     }
 
     /**
-     * Returns the expected number of citation links in this plugin result.
+     * Returns the expected number of citation links embedded in this plugin
+     * result.
      *
-     * @return an {@code OptionalInt} describing the links count, or an empty
+     * @return an {@link OptionalInt} describing the links count, or an empty
      *         {@code OptionalInt} if not set
      */
     public OptionalInt expectedLinksCount() {
@@ -214,7 +231,7 @@ public final class BotPluginMetadata {
     /**
      * Returns the search query string that was sent to the search provider.
      *
-     * @return an {@code Optional} describing the search query, or an empty
+     * @return an {@link Optional} describing the search query, or an empty
      *         {@code Optional} if not set
      */
     public Optional<String> searchQuery() {
@@ -222,10 +239,11 @@ public final class BotPluginMetadata {
     }
 
     /**
-     * Returns the message key of the parent plugin message.
+     * Returns the message key of the parent plugin message that this result is
+     * a follow-up from.
      *
-     * @return an {@code Optional} describing the parent message key, or an
-     *         empty {@code Optional} if not set
+     * @return an {@link Optional} describing the parent message key, or an
+     *         empty {@code Optional} if this is not a follow-up result
      */
     public Optional<MessageKey> parentPluginMessageKey() {
         return Optional.ofNullable(parentPluginMessageKey);
@@ -234,7 +252,7 @@ public final class BotPluginMetadata {
     /**
      * Returns the deprecated plugin type field.
      *
-     * @return an {@code Optional} describing the deprecated plugin type, or an
+     * @return an {@link Optional} describing the deprecated plugin type, or an
      *         empty {@code Optional} if not set
      * @deprecated superseded by {@link #pluginType()}
      */
@@ -243,10 +261,10 @@ public final class BotPluginMetadata {
     }
 
     /**
-     * Returns the plugin type of the parent message.
+     * Returns the plugin type of the parent message in a follow-up chain.
      *
-     * @return an {@code Optional} describing the parent plugin type, or an
-     *         empty {@code Optional} if not set
+     * @return an {@link Optional} describing the parent plugin type, or an
+     *         empty {@code Optional} if this is not a follow-up result
      */
     public Optional<PluginType> parentPluginType() {
         return Optional.ofNullable(parentPluginType);
@@ -255,7 +273,7 @@ public final class BotPluginMetadata {
     /**
      * Returns the CDN URL of the search provider's favicon.
      *
-     * @return an {@code Optional} describing the favicon URL, or an empty
+     * @return an {@link Optional} describing the favicon URL, or an empty
      *         {@code Optional} if not set
      */
     public Optional<URI> faviconCdnUrl() {
@@ -263,9 +281,9 @@ public final class BotPluginMetadata {
     }
 
     /**
-     * Sets the search provider that fulfilled this plugin request.
+     * Sets the external search provider that fulfilled this plugin request.
      *
-     * @param provider the new search provider, or {@code null}
+     * @param provider the new search provider, or {@code null} to clear
      */
     public void setProvider(SearchProvider provider) {
         this.provider = provider;
@@ -274,16 +292,16 @@ public final class BotPluginMetadata {
     /**
      * Sets the type of plugin that generated this response.
      *
-     * @param pluginType the new plugin type, or {@code null}
+     * @param pluginType the new plugin type, or {@code null} to clear
      */
     public void setPluginType(PluginType pluginType) {
         this.pluginType = pluginType;
     }
 
     /**
-     * Sets the CDN URL of the thumbnail image.
+     * Sets the CDN URL of the thumbnail image for this plugin result.
      *
-     * @param thumbnailCdnUrl the new thumbnail URL, or {@code null}
+     * @param thumbnailCdnUrl the new thumbnail URL, or {@code null} to clear
      */
     public void setThumbnailCdnUrl(URI thumbnailCdnUrl) {
         this.thumbnailCdnUrl = thumbnailCdnUrl;
@@ -292,52 +310,55 @@ public final class BotPluginMetadata {
     /**
      * Sets the CDN URL of the search provider's profile photo.
      *
-     * @param profilePhotoCdnUrl the new profile photo URL, or {@code null}
+     * @param profilePhotoCdnUrl the new profile photo URL, or {@code null} to
+     *                           clear
      */
     public void setProfilePhotoCdnUrl(URI profilePhotoCdnUrl) {
         this.profilePhotoCdnUrl = profilePhotoCdnUrl;
     }
 
     /**
-     * Sets the URL of the search provider's result page.
+     * Sets the URL of the search provider's full result page.
      *
-     * @param searchProviderUrl the new search provider URL, or {@code null}
+     * @param searchProviderUrl the new search provider URL, or {@code null} to
+     *                          clear
      */
     public void setSearchProviderUrl(URI searchProviderUrl) {
         this.searchProviderUrl = searchProviderUrl;
     }
 
     /**
-     * Sets the zero-based index of this plugin result.
+     * Sets the zero-based position of this plugin result in the ordered list.
      *
-     * @param referenceIndex the new reference index, or {@code null}
+     * @param referenceIndex the new reference index, or {@code null} to clear
      */
     public void setReferenceIndex(Integer referenceIndex) {
         this.referenceIndex = referenceIndex;
     }
 
     /**
-     * Sets the expected number of citation links.
+     * Sets the expected number of citation links in this plugin result.
      *
-     * @param expectedLinksCount the new links count, or {@code null}
+     * @param expectedLinksCount the new links count, or {@code null} to clear
      */
     public void setExpectedLinksCount(Integer expectedLinksCount) {
         this.expectedLinksCount = expectedLinksCount;
     }
 
     /**
-     * Sets the search query string.
+     * Sets the search query string that was sent to the search provider.
      *
-     * @param searchQuery the new search query, or {@code null}
+     * @param searchQuery the new search query, or {@code null} to clear
      */
     public void setSearchQuery(String searchQuery) {
         this.searchQuery = searchQuery;
     }
 
     /**
-     * Sets the message key of the parent plugin message.
+     * Sets the message key of the parent plugin message in a follow-up chain.
      *
-     * @param parentPluginMessageKey the new parent message key, or {@code null}
+     * @param parentPluginMessageKey the new parent message key, or
+     *                               {@code null} to clear
      */
     public void setParentPluginMessageKey(MessageKey parentPluginMessageKey) {
         this.parentPluginMessageKey = parentPluginMessageKey;
@@ -354,9 +375,10 @@ public final class BotPluginMetadata {
     }
 
     /**
-     * Sets the plugin type of the parent message.
+     * Sets the plugin type of the parent message in a follow-up chain.
      *
-     * @param parentPluginType the new parent plugin type, or {@code null}
+     * @param parentPluginType the new parent plugin type, or {@code null} to
+     *                         clear
      */
     public void setParentPluginType(PluginType parentPluginType) {
         this.parentPluginType = parentPluginType;
@@ -365,14 +387,15 @@ public final class BotPluginMetadata {
     /**
      * Sets the CDN URL of the search provider's favicon.
      *
-     * @param faviconCdnUrl the new favicon URL, or {@code null}
+     * @param faviconCdnUrl the new favicon URL, or {@code null} to clear
      */
     public void setFaviconCdnUrl(URI faviconCdnUrl) {
         this.faviconCdnUrl = faviconCdnUrl;
     }
 
     /**
-     * The type of bot plugin that generated a response.
+     * Enumerates the types of bot plugins that can generate content within a
+     * Meta AI bot response, such as web search or Instagram Reels integration.
      */
     @ProtobufEnum(name = "BotPluginMetadata.PluginType")
     public static enum PluginType {
@@ -394,19 +417,21 @@ public final class BotPluginMetadata {
         SEARCH(2);
 
         /**
-         * Constructs a new plugin type constant with the specified protobuf
-         * index.
+         * Constructs a new plugin type constant.
          *
-         * @param index the protobuf enum index
+         * @param index the protobuf-assigned numeric index for this constant
          */
         PluginType(@ProtobufEnumIndex int index) {
             this.index = index;
         }
 
+        /**
+         * The protobuf-assigned numeric index for this constant.
+         */
         final int index;
 
         /**
-         * Returns the protobuf enum index of this plugin type.
+         * Returns the protobuf-assigned numeric index for this constant.
          *
          * @return the protobuf index
          */
@@ -416,7 +441,8 @@ public final class BotPluginMetadata {
     }
 
     /**
-     * The external search provider used by a bot plugin to fulfill a query.
+     * Enumerates the external search providers that a bot plugin can use to
+     * fulfill a query, such as Bing, Google, or a help-center service.
      */
     @ProtobufEnum(name = "BotPluginMetadata.SearchProvider")
     public static enum SearchProvider {
@@ -441,19 +467,21 @@ public final class BotPluginMetadata {
         SUPPORT(3);
 
         /**
-         * Constructs a new search provider constant with the specified
-         * protobuf index.
+         * Constructs a new search provider constant.
          *
-         * @param index the protobuf enum index
+         * @param index the protobuf-assigned numeric index for this constant
          */
         SearchProvider(@ProtobufEnumIndex int index) {
             this.index = index;
         }
 
+        /**
+         * The protobuf-assigned numeric index for this constant.
+         */
         final int index;
 
         /**
-         * Returns the protobuf enum index of this search provider.
+         * Returns the protobuf-assigned numeric index for this constant.
          *
          * @return the protobuf index
          */

@@ -13,16 +13,13 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * A WhatsApp VoIP call offer, representing the signaling data and lifecycle
- * status of either a one-to-one or a group call.
+ * Represents a WhatsApp VoIP call offer, capturing the signaling data and
+ * lifecycle status of either a one-to-one or a group call.
  *
  * <p>Instances of this class are created when a call offer stanza is received
  * from the WhatsApp server (incoming call) or when the local user initiates
  * an outgoing call. Each call is uniquely identified by its
- * {@linkplain #callId() call identifier}. The fields in this class correspond
- * to properties of the WhatsApp Web call model, including the peer JID, call
- * direction, video flag, and the
- * {@linkplain #offlineOffer() offline offer indicator}.
+ * {@linkplain #callId() call identifier}.
  *
  * <p>The {@linkplain #status() status} tracks where the call is in its
  * lifecycle, from {@link Status#RINGING} when the offer arrives, through
@@ -32,39 +29,36 @@ import java.util.Optional;
  *
  * <p>When the call offer was received while the device was disconnected from
  * the WhatsApp server, the {@link #offlineOffer()} flag is set to
- * {@code true}. In the WhatsApp Web client, when a call offer is received
- * while offline, the ringing UI is not shown and the call cannot be answered
- * in real time.
+ * {@code true}. Offline offers cannot be answered in real time and
+ * typically transition to the {@link Status#MISSED} state.
+ *
+ * <p>For group calls, the {@link #group()} flag is {@code true} and the
+ * {@link #groupJid()} provides the JID of the group. The {@link #chatJid()}
+ * returns the chat where the call log entry appears, which is the peer's
+ * JID for one-to-one calls or the group JID for group calls.
  */
 @ProtobufMessage
 public final class CallOffer {
     /**
-     * The JID of the chat where this call's log entry appears.
-     *
-     * <p>For one-to-one calls this is the peer's JID. For group calls this
-     * is the group JID. In the WhatsApp Web client, the call log target is
-     * resolved by determining the appropriate chat based on the call
-     * creator, group context, and any LID-to-PN migrations.
+     * The {@link Jid} of the chat where this call's log entry appears. For
+     * one-to-one calls this is the peer's JID; for group calls this is
+     * the group JID.
      */
     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
     Jid chatJid;
 
     /**
-     * The JID of the user who initiated (created) this call.
-     *
-     * <p>In the WhatsApp Web call model, this corresponds to the call
-     * creator whose JID is used to determine whether the call is incoming
-     * or outgoing relative to the current account.
+     * The {@link Jid} of the user who initiated this call. This is used
+     * to determine whether the call is incoming or outgoing relative to
+     * the current account.
      */
     @ProtobufProperty(index = 2, type = ProtobufType.STRING)
     Jid callerJid;
 
     /**
-     * The unique identifier for this call.
-     *
-     * <p>In the WhatsApp Web call model, this is the {@code id} property
-     * that uniquely identifies the call within the call collection and is
-     * used as the message key ID for the corresponding call log message.
+     * The unique identifier for this call. This identifier is also used
+     * as the message key ID for the corresponding call log message in
+     * the chat.
      */
     @ProtobufProperty(index = 3, type = ProtobufType.STRING)
     String callId;
@@ -72,20 +66,14 @@ public final class CallOffer {
     /**
      * The instant at which the call offer was sent or received, expressed
      * as epoch seconds.
-     *
-     * <p>In the WhatsApp Web call model, this corresponds to the
-     * {@code offerTime} property.
      */
     @ProtobufProperty(index = 4, type = ProtobufType.INT64, mixins = InstantSecondsMixin.class)
     Instant timestamp;
 
     /**
      * Whether this is a video call ({@code true}) or a voice-only call
-     * ({@code false}).
-     *
-     * <p>In the WhatsApp Web call model, this corresponds to the
-     * {@code isVideo} property and determines whether the video UI is
-     * shown during the call.
+     * ({@code false}). Determines whether the video UI is shown during
+     * the call.
      */
     @ProtobufProperty(index = 5, type = ProtobufType.BOOL)
     boolean video;
@@ -99,34 +87,25 @@ public final class CallOffer {
     Status status;
 
     /**
-     * Whether the call offer was received while this device was offline.
-     *
-     * <p>In the WhatsApp Web call model, this corresponds to the
-     * {@code offerReceivedWhileOffline} property. When {@code true}, the
-     * device was not connected to the WhatsApp server at the time the
-     * offer arrived, so the ringing notification is not shown to the user
-     * and the call cannot be answered in real time.
+     * Whether the call offer was received while this device was offline
+     * (disconnected from the WhatsApp server). When {@code true}, the
+     * ringing notification is not shown and the call cannot be answered
+     * in real time.
      */
     @ProtobufProperty(index = 7, type = ProtobufType.BOOL)
     boolean offlineOffer;
 
     /**
      * Whether this is a group call ({@code true}) or a one-to-one call
-     * ({@code false}).
-     *
-     * <p>In the WhatsApp Web call model, this corresponds to the
-     * {@code isGroup} property. Group calls may also carry a
-     * {@link #groupJid} and have per-participant state tracking.
+     * ({@code false}). Group calls may also carry a {@link #groupJid}
+     * and have per-participant state tracking.
      */
     @ProtobufProperty(index = 8, type = ProtobufType.BOOL)
     boolean group;
 
     /**
-     * The JID of the group, if this is a group call.
-     *
-     * <p>This field is only set when {@link #group()} returns
-     * {@code true}. In the WhatsApp Web call model, this corresponds to
-     * the {@code groupJid} property.
+     * The {@link Jid} of the group, if this is a group call. This field
+     * is only set when {@link #group()} returns {@code true}.
      */
     @ProtobufProperty(index = 9, type = ProtobufType.STRING)
     Jid groupJid;
@@ -134,9 +113,6 @@ public final class CallOffer {
     /**
      * Whether this call was initiated by the local user ({@code true}) or
      * is an incoming call from a remote peer ({@code false}).
-     *
-     * <p>In the WhatsApp Web call model, this corresponds to the
-     * {@code outgoing} property.
      */
     @ProtobufProperty(index = 10, type = ProtobufType.BOOL)
     boolean outgoing;
@@ -173,7 +149,8 @@ public final class CallOffer {
     }
 
     /**
-     * Returns the JID of the chat where this call's log entry appears.
+     * Returns the {@link Jid} of the chat where this call's log entry
+     * appears.
      *
      * <p>For one-to-one calls this is the peer's JID. For group calls
      * this is the group JID.
@@ -185,7 +162,7 @@ public final class CallOffer {
     }
 
     /**
-     * Returns the JID of the user who initiated the call.
+     * Returns the {@link Jid} of the user who initiated the call.
      *
      * @return the caller JID, never {@code null}
      */
@@ -215,7 +192,7 @@ public final class CallOffer {
      * Returns whether this is a video call.
      *
      * @return {@code true} if this is a video call, {@code false} for
-     *         voice-only
+     *         voice-only calls
      */
     public boolean video() {
         return video;
@@ -256,7 +233,7 @@ public final class CallOffer {
     }
 
     /**
-     * Returns the JID of the group, if this is a group call.
+     * Returns the {@link Jid} of the group, if this is a group call.
      *
      * @return an {@code Optional} describing the group JID, or an empty
      *         {@code Optional} for one-to-one calls
@@ -276,7 +253,7 @@ public final class CallOffer {
     }
 
     /**
-     * Sets the JID of the chat where this call's log entry appears.
+     * Sets the {@link Jid} of the chat where this call's log entry appears.
      *
      * @param chatJid the chat JID to set
      */
@@ -285,7 +262,7 @@ public final class CallOffer {
     }
 
     /**
-     * Sets the JID of the user who initiated this call.
+     * Sets the {@link Jid} of the user who initiated this call.
      *
      * @param callerJid the caller JID to set
      */
@@ -349,7 +326,7 @@ public final class CallOffer {
     }
 
     /**
-     * Sets the JID of the group for group calls.
+     * Sets the {@link Jid} of the group for group calls.
      *
      * @param groupJid the group JID to set
      */
@@ -405,64 +382,46 @@ public final class CallOffer {
     }
 
     /**
-     * The lifecycle status of a WhatsApp VoIP call offer.
+     * Represents the lifecycle status of a WhatsApp VoIP call offer.
      *
      * <p>A call transitions through these states as signaling stanzas are
-     * exchanged between participants. The WhatsApp Web call model tracks
-     * call state internally using a richer set of states (such as
-     * {@code Calling}, {@code PreacceptReceived}, {@code AcceptSent},
-     * {@code AcceptReceived}, {@code CallActive}, and
-     * {@code CallActiveElseWhere}), which this enum simplifies into a
-     * reduced lifecycle.
+     * exchanged between participants. The typical progression for an
+     * incoming call that is answered begins with {@link #RINGING} when
+     * the offer stanza arrives and the device alerts the user, then
+     * transitions to {@link #ACCEPTED} once the callee answers and a media
+     * session is established.
      *
-     * <p>The typical progression for an incoming call that is answered
-     * begins with {@link #RINGING} when the offer stanza arrives and the
-     * device alerts the user, then transitions to {@link #ACCEPTED} once
-     * the callee answers and a media session is established. If the call
-     * is not answered, the terminal state depends on the reason: the
-     * callee may have explicitly declined ({@link #REJECTED}), the call
-     * may have rung until the timeout elapsed ({@link #TIMED_OUT}), the
-     * user may not have interacted with the notification
-     * ({@link #MISSED}), or the caller may have hung up before the callee
-     * answered ({@link #CANCELLED}).
+     * <p>If the call is not answered, the terminal state depends on the
+     * reason: the callee may have explicitly declined ({@link #REJECTED}),
+     * the call may have rung until the timeout elapsed
+     * ({@link #TIMED_OUT}), the user may not have interacted with the
+     * notification ({@link #MISSED}), or the caller may have hung up
+     * before the callee answered ({@link #CANCELLED}).
      */
     @ProtobufEnum
     public enum Status {
         /**
          * The call offer has been received and the device is ringing.
-         *
-         * <p>This is the initial state for every incoming call. If the
-         * offer was received while the device was offline
+         * This is the initial state for every incoming call. If the offer
+         * was received while the device was offline
          * ({@link CallOffer#offlineOffer()}), the ringing UI is not shown.
-         * In the WhatsApp Web call model, this corresponds to the
-         * {@code ReceivedCall} state.
          */
         RINGING(0),
 
         /**
          * The call has been accepted and a media session is (or was)
          * active between the participants.
-         *
-         * <p>In the WhatsApp Web call model, this corresponds to the
-         * {@code CallActive} state where the VoIP media connection has
-         * been established.
          */
         ACCEPTED(1),
 
         /**
-         * The callee explicitly rejected the incoming call.
-         *
-         * <p>In the WhatsApp Web native call result, this corresponds to
-         * the {@code Declined} value.
+         * The callee explicitly rejected (declined) the incoming call.
          */
         REJECTED(2),
 
         /**
          * The call was not answered within the server-defined timeout
          * period.
-         *
-         * <p>In the WhatsApp Web call model, this corresponds to the
-         * {@code TimedOut} participant state.
          */
         TIMED_OUT(3),
 
@@ -471,18 +430,11 @@ public final class CallOffer {
          * incoming call notification. This can occur when the device is
          * in Do Not Disturb mode, the caller is silenced by privacy
          * settings, or the device was offline when the offer arrived.
-         *
-         * <p>In the WhatsApp Web native call result, both the
-         * {@code Missed} and {@code MissedNotificationsMuted} values
-         * produce this state.
          */
         MISSED(4),
 
         /**
          * The caller cancelled the call before it was answered.
-         *
-         * <p>In the WhatsApp Web native call result, this corresponds to
-         * the {@code Canceled} value.
          */
         CANCELLED(5);
 

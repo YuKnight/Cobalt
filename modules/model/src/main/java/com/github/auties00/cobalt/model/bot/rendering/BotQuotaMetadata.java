@@ -174,10 +174,18 @@ public final class BotQuotaMetadata {
              */
             REASONING_FEATURE(1);
 
+            /**
+             * Constructs a new {@code BotFeatureType} with the given protobuf index.
+             *
+             * @param index the protobuf enum index
+             */
             BotFeatureType(@ProtobufEnumIndex int index) {
                 this.index = index;
             }
 
+            /**
+             * The protobuf enum index for this feature type.
+             */
             final int index;
 
             /**

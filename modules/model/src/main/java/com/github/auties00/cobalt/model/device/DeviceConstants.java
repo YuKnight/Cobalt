@@ -2,36 +2,49 @@ package com.github.auties00.cobalt.model.device;
 
 
 /**
- * Device identification constants for WhatsApp's multi-device architecture.
+ * Device identifier constants used across WhatsApp's multi-device architecture.
  *
- * @implNote WAJids: defines device ID constants used across the multi-device architecture.
- * @see DeviceInfo
+ * <p>Every WhatsApp account can be linked to a primary phone and up to four companion
+ * devices (Web browsers, desktop apps, additional phones). Each linked device is
+ * addressed by an integer identifier that is part of the device level JID. This class
+ * centralises the well known, reserved device identifiers that Cobalt uses when
+ * building or parsing these JIDs.
+ *
+ * @see DeviceListMetadata
  */
 public final class DeviceConstants {
 
     /**
      * Prevents instantiation of this utility class.
      *
-     * @implNote NO_WA_BASIS: Java-specific utility class pattern.
+     * <p>This class exposes only static constants and must never be constructed.
+     *
+     * @throws UnsupportedOperationException always
      */
     private DeviceConstants() {
         throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
     }
 
     /**
-     * Device ID for the primary (phone) device.
+     * Device identifier reserved for the primary device of an account.
      *
-     * @implNote WAJids.DEFAULT_DEVICE_ID: the primary device (phone) is always device 0.
+     * <p>The primary device is the phone that originally registered the WhatsApp
+     * account. It owns the identity key and is the authority that authorises
+     * companion devices via the ADV signed device identity protocol. Device id
+     * {@code 0} is always interpreted as the primary device when parsing or
+     * constructing device level JIDs.
      */
     public static final int PRIMARY_DEVICE_ID = 0;
 
     /**
-     * Device ID reserved for hosted (business API) devices.
+     * Device identifier reserved for hosted (Business API) devices.
      *
-     * @implNote WAWebUsyncDevice.parseDeviceNode: hosted devices use ID 99 or
-     * {@code is_hosted="true"}.
-     * WAWebBizCoexGatingUtils.bizHostedDevicesEnabled: controls whether hosted devices
-     * are accepted.
+     * <p>Hosted devices are server side companions that belong to a WhatsApp
+     * Business account and are operated by a Business Solution Provider on behalf
+     * of the account owner rather than by an end user device. They use the
+     * reserved id {@code 99} so that other devices can recognise and route
+     * messages to them correctly when the business coexistence feature is
+     * enabled.
      */
     public static final int HOSTED_DEVICE_ID = 99;
 }

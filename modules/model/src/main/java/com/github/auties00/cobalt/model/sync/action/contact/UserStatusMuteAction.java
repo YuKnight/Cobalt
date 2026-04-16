@@ -8,25 +8,42 @@ import it.auties.protobuf.model.ProtobufType;
 
 import java.util.Optional;
 
+/**
+ * A sync action that records whether a contact's status updates are muted
+ * for the current user.
+ *
+ * <p>Status updates are the 24-hour disappearing posts contacts can publish
+ * on their "Status" feed. Muting a contact's status hides their posts from
+ * the feed without affecting chat messages. This action is emitted whenever
+ * a contact is muted or unmuted on the status feed so that every linked
+ * device shows the same visibility preferences.
+ *
+ * <p>Each entry is indexed by the contact's JID through
+ * {@link UserStatusMuteActionArgs} and is replicated via the
+ * {@link SyncPatchType#REGULAR_HIGH} collection.
+ */
 @ProtobufMessage(name = "SyncActionValue.UserStatusMuteAction")
 public final class UserStatusMuteAction implements SyncAction<UserStatusMuteActionArgs> {
     /**
-     * Canonical WhatsApp Web action name for this action type.
+     * The canonical action name {@code "userStatusMute"} used to identify
+     * this action inside a sync patch.
      */
     public static final String ACTION_NAME = "userStatusMute";
 
     /**
-     * Canonical WhatsApp Web action version for this action type.
+     * The canonical action version for this action type.
      */
     public static final int ACTION_VERSION = 7;
 
     /**
-     * Canonical WhatsApp Web collection name for this action type.
+     * The sync collection this action is carried in.
      */
     public static final SyncPatchType COLLECTION_NAME = SyncPatchType.REGULAR_HIGH;
 
     /**
-     * {@inheritDoc}
+     * Returns the canonical action name {@code "userStatusMute"}.
+     *
+     * @return the string {@code "userStatusMute"}
      */
     @Override
     public String actionName() {
@@ -34,7 +51,9 @@ public final class UserStatusMuteAction implements SyncAction<UserStatusMuteActi
     }
 
     /**
-     * {@inheritDoc}
+     * Returns the action version declared by this action type.
+     *
+     * @return the action version
      */
     @Override
     public int actionVersion() {
@@ -42,50 +61,55 @@ public final class UserStatusMuteAction implements SyncAction<UserStatusMuteActi
     }
 
 
+    /**
+     * Whether the contact's status feed is muted for the current user.
+     */
     @ProtobufProperty(index = 1, type = ProtobufType.BOOL)
     Boolean muted;
 
 
+    /**
+     * Constructs a new {@code UserStatusMuteAction}. Intended to be invoked
+     * by the generated builder and by the protobuf deserializer.
+     *
+     * @param muted whether the contact's status is muted, or {@code null} to
+     *              leave the flag unset
+     */
     UserStatusMuteAction(Boolean muted) {
         this.muted = muted;
     }
 
     /**
-     * Returns whether the user status is muted, coalescing an absent value to
-     * {@code false}.
+     * Returns whether the contact's status feed is muted, coalescing an
+     * absent value to {@code false}.
      *
-     * @implNote {@code WAWebUserStatusMuteSyncAction.apply} treats both an
-     *           absent value and an explicit {@code false} as "not muted";
-     *           callers that must distinguish the two cases should use
-     *           {@link #rawMuted()}.
-     * @return {@code true} if the user status is muted, otherwise {@code false}
+     * <p>Callers that must distinguish an explicitly missing field from an
+     * explicit {@code false} should use {@link #rawMuted()} instead.
+     *
+     * @return {@code true} if the contact's status is muted, otherwise
+     *         {@code false}
      */
     public boolean muted() {
         return muted != null && muted;
     }
 
     /**
-     * Returns the raw nullable {@code muted} flag as provided by the remote
-     * sync action, preserving the distinction between an absent field and an
-     * explicitly set value.
+     * Returns the raw nullable flag as provided by the remote sync action,
+     * preserving the distinction between an absent field and an explicitly
+     * set value.
      *
-     * @implNote WA Web treats absent muted as malformed; this accessor exposes
-     *           the raw nullable value for handlers that need to distinguish
-     *           absent from explicit false.
-     * @return an {@link Optional} containing the raw {@link Boolean} value, or
-     *         an empty {@code Optional} if the field was not present on the
-     *         wire
+     * @return an {@link Optional} containing the raw {@link Boolean} value,
+     *         or an empty {@code Optional} if the field was not present on
+     *         the wire
      */
     public Optional<Boolean> rawMuted() {
         return Optional.ofNullable(muted);
     }
 
     /**
-     * Sets the {@code muted} flag, which indicates whether the user status is
-     * muted.
+     * Updates whether the contact's status feed is muted for the current
+     * user.
      *
-     * @implNote {@code WAWebUserStatusMuteSyncAction.apply} mirrors updates to
-     *           this flag from the primary device.
      * @param muted the new flag value, or {@code null} to clear the field
      */
     public void setMuted(Boolean muted) {

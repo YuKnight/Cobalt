@@ -11,144 +11,149 @@ import java.util.Optional;
 import java.util.OptionalInt;
 
 /**
- * A snapshot of a subgroup that is linked to a WhatsApp community.
+ * Represents a subgroup that is linked to a WhatsApp community.
  *
- * <p>Every community (parent group) maintains an ordered set of linked
- * subgroups. Each subgroup is represented by its {@link Jid} and a set of
- * metadata properties that describe its state. This class captures those
- * values as they appear in the protobuf wire format exchanged with the
- * WhatsApp servers.
+ * <p>Every WhatsApp community organizes conversations into subgroups.
+ * Each subgroup has its own JID, display name, description, and participant
+ * count. This class captures the metadata of a single linked subgroup as
+ * reported by the server, including its relationship to the parent community
+ * and special roles such as being the default announcement subgroup or the
+ * general chat subgroup.
  *
- * <p>In the WhatsApp Web client the same data is split across two models.
- * Subgroups the user has already joined are tracked by the
- * {@code WAWebGroupMetadataModel} collection, while subgroups the user has
- * not yet joined are tracked by {@code WAWebUnjoinedSubgroupMetadataModel}.
- * Both models expose a {@code size} property that corresponds to the
- * {@link #participantCount()} field of this class.
+ * <p>Communities always contain at least two special subgroups:
+ * <ul>
+ *   <li>The <b>default announcement subgroup</b>, where only community
+ *       administrators can post messages. Identified by
+ *       {@link #isDefaultSubgroup()} returning {@code true}.</li>
+ *   <li>The <b>general chat subgroup</b>, which acts as the main open
+ *       discussion space. Identified by {@link #isGeneralSubgroup()}
+ *       returning {@code true}.</li>
+ * </ul>
+ * Additional subgroups may be created by administrators (or by non-admin
+ * members if the community permits it).
  *
  * <p>Instances of this class are mutable. All fields can be changed after
- * construction through the fluent setter methods, each of which returns
- * the same instance for method chaining.
+ * construction through the setter methods.
  *
  * @see CommunityMetadata#communityGroups()
  */
 @ProtobufMessage(name = "CommunityLinkedGroup")
 public final class CommunityLinkedGroup {
     /**
-     * The JID that uniquely identifies the linked subgroup.
+     * The JID that uniquely identifies this linked subgroup within WhatsApp.
+     * Every subgroup has its own distinct JID, separate from the parent
+     * community JID.
      */
     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
     Jid jid;
 
     /**
-     * The number of participants currently in the linked subgroup, or
-     * {@code null} if the participant count is not available.
+     * The number of participants currently in this linked subgroup, or
+     * {@code null} if the server did not include participant count
+     * information. This value is a server-reported approximation and may
+     * not reflect real-time membership changes.
      */
     @ProtobufProperty(index = 2, type = ProtobufType.UINT32)
     Integer participantCount;
 
     /**
      * The display name (subject) of this linked subgroup, or {@code null}
-     * if the subject is not available. In the WhatsApp Web client this
-     * corresponds to the {@code subject} property of the
-     * {@code WAWebUnjoinedSubgroupMetadataModel}.
+     * if the subject is not available. The subject is set by the subgroup
+     * or community administrator and is visible to all community members.
      */
     @ProtobufProperty(index = 3, type = ProtobufType.STRING)
     String subject;
 
     /**
      * The instant at which the subject was last changed, or {@code null}
-     * if the timestamp is not available. In the WhatsApp Web client this
-     * corresponds to the {@code subjectTime} property.
+     * if the timestamp is not available.
      */
     @ProtobufProperty(index = 4, type = ProtobufType.INT64, mixins = InstantSecondsMixin.class)
     Instant subjectTimestamp;
 
     /**
      * The JID of the parent community this subgroup belongs to, or
-     * {@code null} if not available. In the WhatsApp Web client this
-     * corresponds to the {@code parentGroupId} property.
+     * {@code null} if not available. This provides a back-reference from
+     * the subgroup to its owning community.
      */
     @ProtobufProperty(index = 5, type = ProtobufType.STRING)
     Jid parentGroupJid;
 
     /**
      * Whether this subgroup is the default announcement subgroup of the
-     * parent community. In the WhatsApp Web client this corresponds to the
-     * {@code defaultSubgroup} property and identifies the subgroup as a
-     * {@code LINKED_ANNOUNCEMENT_GROUP}.
+     * parent community. The default announcement subgroup is a special
+     * subgroup where only community administrators can send messages. Every
+     * community has exactly one default announcement subgroup.
      */
     @ProtobufProperty(index = 6, type = ProtobufType.BOOL)
     boolean defaultSubgroup;
 
     /**
      * Whether this subgroup is the general chat subgroup of the parent
-     * community. In the WhatsApp Web client this corresponds to the
-     * {@code generalSubgroup} property and identifies the subgroup as a
-     * {@code LINKED_GENERAL_GROUP}.
+     * community. The general chat subgroup is the main open discussion
+     * space where all community members can participate. Every community
+     * has exactly one general chat subgroup.
      */
     @ProtobufProperty(index = 7, type = ProtobufType.BOOL)
     boolean generalSubgroup;
 
     /**
      * The description text of this linked subgroup, or {@code null} if no
-     * description has been set. In the WhatsApp Web client this corresponds
-     * to the {@code desc} property.
+     * description has been set. The description is typically a short
+     * paragraph explaining the purpose or topic of the subgroup.
      */
     @ProtobufProperty(index = 8, type = ProtobufType.STRING)
     String description;
 
     /**
      * The instant at which this linked subgroup was created, or
-     * {@code null} if the timestamp is not available. In the WhatsApp Web
-     * client this corresponds to the {@code creation} property.
+     * {@code null} if the creation timestamp is not available.
      */
     @ProtobufProperty(index = 9, type = ProtobufType.INT64, mixins = InstantSecondsMixin.class)
     Instant creationTimestamp;
 
     /**
      * The JID of the user who originally created this subgroup, or
-     * {@code null} if not known. In the WhatsApp Web client this corresponds
-     * to the {@code owner} property.
+     * {@code null} if the creator is not known.
      */
     @ProtobufProperty(index = 10, type = ProtobufType.STRING)
     Jid ownerJid;
 
     /**
      * Whether admin approval is required for new members to join this
-     * subgroup. In the WhatsApp Web client this corresponds to the
-     * {@code membershipApprovalMode} property.
+     * subgroup. When {@code true}, join requests must be approved by a
+     * subgroup administrator before the requesting user becomes a member.
      */
     @ProtobufProperty(index = 11, type = ProtobufType.BOOL)
     boolean membershipApprovalMode;
 
     /**
-     * Whether this subgroup is hidden from the community's subgroup list.
-     * In the WhatsApp Web client this corresponds to the
-     * {@code hiddenSubgroup} property.
+     * Whether this subgroup is hidden from the community's public subgroup
+     * list. Hidden subgroups are not visible to community members browsing
+     * the list of available subgroups.
      */
     @ProtobufProperty(index = 12, type = ProtobufType.BOOL)
     boolean hiddenSubgroup;
 
     /**
-     * Whether this subgroup has been suspended. A suspended subgroup cannot
-     * be interacted with until it is restored. In the WhatsApp Web client
-     * this corresponds to the {@code suspended} property.
+     * Whether this subgroup has been suspended by WhatsApp. A suspended
+     * subgroup cannot receive or send messages until it is restored. This
+     * typically happens as a result of policy enforcement actions.
      */
     @ProtobufProperty(index = 13, type = ProtobufType.BOOL)
     boolean suspended;
 
     /**
-     * Constructs a new {@code CommunityLinkedGroup} with the specified
-     * values.
+     * Constructs a new {@code CommunityLinkedGroup} with the specified values.
      *
      * @param jid                    the JID of the linked subgroup
      * @param participantCount       the number of participants, or
-     *                               {@code null} if unknown
-     * @param subject                the display name, or {@code null}
+     *                               {@code null} if not available
+     * @param subject                the display name (subject), or
+     *                               {@code null} if not available
      * @param subjectTimestamp       the instant at which the subject was
      *                               last changed, or {@code null}
-     * @param parentGroupJid         the parent community JID, or
+     * @param parentGroupJid         the JID of the parent community, or
      *                               {@code null}
      * @param defaultSubgroup        whether this is the default
      *                               announcement subgroup
@@ -157,9 +162,12 @@ public final class CommunityLinkedGroup {
      * @param description            the description text, or {@code null}
      * @param creationTimestamp      the instant at which this subgroup was
      *                               created, or {@code null}
-     * @param ownerJid               the creator JID, or {@code null}
-     * @param membershipApprovalMode whether admin approval is required
-     * @param hiddenSubgroup         whether this subgroup is hidden
+     * @param ownerJid               the JID of the subgroup creator, or
+     *                               {@code null}
+     * @param membershipApprovalMode whether admin approval is required to
+     *                               join
+     * @param hiddenSubgroup         whether this subgroup is hidden from
+     *                               the community subgroup list
      * @param suspended              whether this subgroup is suspended
      */
     CommunityLinkedGroup(
@@ -195,7 +203,7 @@ public final class CommunityLinkedGroup {
     /**
      * Returns the JID that uniquely identifies this linked subgroup.
      *
-     * @return the subgroup JID
+     * @return the subgroup JID, or {@code null} if not set
      */
     public Jid jid() {
         return jid;
@@ -213,10 +221,10 @@ public final class CommunityLinkedGroup {
     /**
      * Returns the number of participants currently in this linked subgroup,
      * if available. The count may be absent when the server did not include
-     * participant information in the response.
+     * participant count information in the metadata response.
      *
      * @return an {@code OptionalInt} containing the participant count, or
-     *         empty if the count is not available
+     *         empty if not available
      */
     public OptionalInt participantCount() {
         return participantCount == null
@@ -275,8 +283,9 @@ public final class CommunityLinkedGroup {
     }
 
     /**
-     * Returns the JID of the parent community this subgroup belongs to, if
-     * available.
+     * Returns the JID of the parent community this subgroup belongs to,
+     * if available. This provides a back-reference from the subgroup to
+     * its owning {@link CommunityMetadata}.
      *
      * @return an {@code Optional} containing the parent community JID, or
      *         empty if not available
@@ -297,9 +306,10 @@ public final class CommunityLinkedGroup {
 
     /**
      * Returns whether this subgroup is the default announcement subgroup
-     * of the parent community.
+     * of the parent community. The default announcement subgroup is a
+     * read-only group where only administrators can post messages.
      *
-     * @return {@code true} if this is the default subgroup
+     * @return {@code true} if this is the default announcement subgroup
      */
     public boolean isDefaultSubgroup() {
         return defaultSubgroup;
@@ -308,7 +318,8 @@ public final class CommunityLinkedGroup {
     /**
      * Sets whether this subgroup is the default announcement subgroup.
      *
-     * @param defaultSubgroup {@code true} to mark as default subgroup
+     * @param defaultSubgroup {@code true} to mark as the default
+     *                        announcement subgroup
      */
     public void setDefaultSubgroup(boolean defaultSubgroup) {
         this.defaultSubgroup = defaultSubgroup;
@@ -316,7 +327,8 @@ public final class CommunityLinkedGroup {
 
     /**
      * Returns whether this subgroup is the general chat subgroup of the
-     * parent community.
+     * parent community. The general chat subgroup is the main open
+     * discussion space where all community members can participate.
      *
      * @return {@code true} if this is the general chat subgroup
      */
@@ -415,8 +427,9 @@ public final class CommunityLinkedGroup {
     }
 
     /**
-     * Returns whether this subgroup is hidden from the community's subgroup
-     * list.
+     * Returns whether this subgroup is hidden from the community's public
+     * subgroup list. Hidden subgroups are not visible to community members
+     * browsing the list of available subgroups.
      *
      * @return {@code true} if this subgroup is hidden
      */
@@ -425,8 +438,8 @@ public final class CommunityLinkedGroup {
     }
 
     /**
-     * Sets whether this subgroup is hidden from the community's subgroup
-     * list.
+     * Sets whether this subgroup is hidden from the community's public
+     * subgroup list.
      *
      * @param hiddenSubgroup {@code true} to mark as hidden
      */
@@ -435,7 +448,8 @@ public final class CommunityLinkedGroup {
     }
 
     /**
-     * Returns whether this subgroup has been suspended.
+     * Returns whether this subgroup has been suspended by WhatsApp. A
+     * suspended subgroup cannot receive or send messages until restored.
      *
      * @return {@code true} if this subgroup is suspended
      */

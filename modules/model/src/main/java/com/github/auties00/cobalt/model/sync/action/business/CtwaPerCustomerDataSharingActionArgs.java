@@ -5,17 +5,18 @@ import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.SyncActionArgs;
 
 /**
- * Index arguments for {@link CtwaPerCustomerDataSharingAction}.
+ * Index arguments identifying a {@link CtwaPerCustomerDataSharingAction} inside a sync patch.
  *
- * <p>The sync index produced is {@code ["ctwaPerCustomerDataSharing", accountLidJid]}.
+ * <p>The resulting sync index is {@code ["ctwaPerCustomerDataSharing", accountLidJid]}, which
+ * binds the opt-in record to the specific customer account being synced.
  *
  * @param accountLidJid the account LID JID identifying the customer whose data-sharing preference is being synced
  */
 public record CtwaPerCustomerDataSharingActionArgs(Jid accountLidJid) implements SyncActionArgs {
     /**
-     * {@inheritDoc}
+     * Returns the index argument array that uniquely keys this preference within the sync patch.
      *
-     * @return a single-element array containing the account LID JID string
+     * @return a single-element array containing the stringified account LID JID
      */
     @Override
     public String[] toIndexArgs() {

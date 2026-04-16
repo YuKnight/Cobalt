@@ -9,69 +9,65 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * The stock availability of a product in a WhatsApp Business catalog.
+ * Represents the stock availability of a product in a WhatsApp Business
+ * catalog.
  *
- * <p>In the WhatsApp Web client, product availability is represented by
- * the {@code ProductAvailability} enum defined in
- * {@code WAWebProductTypes.flow}, which maps each value to a lowercase
- * display string such as {@code "in stock"} or {@code "out of stock"}.
- * The availability value is obtained from the {@code availability}
- * attribute on the product node in the {@code w:biz:catalog} IQ stanza
- * or from the {@code product_availability} field in GraphQL catalog
- * responses.
+ * <p>Each product in a business catalog has an availability status that
+ * determines whether customers can add it to their cart and proceed with
+ * a purchase. Products marked as {@link #OUT_OF_STOCK} are displayed
+ * differently in the catalog UI and cannot be purchased.
  *
- * <p>Products whose availability is {@link #OUT_OF_STOCK} are considered
- * unavailable for purchase. In the WhatsApp Web client, the constant
- * {@code PRODUCT_AVAILABILITY_UNAVAILABLE_VALUES} groups the
- * availability values that indicate a product cannot be purchased.
+ * <p>The availability can be resolved from its display name (such as
+ * {@code "in stock"} or {@code "out of stock"}) using the
+ * {@link #ofName(String)} method, which performs case-insensitive matching
+ * with underscores replaced by spaces.
  */
 @ProtobufEnum
 public enum BusinessItemAvailability {
     /**
-     * The availability of the item is unknown or has not been specified
-     * by the business owner. This is the default value used by the
-     * WhatsApp Web client when the {@code product_availability} field
-     * is absent or does not match any known value.
+     * The availability of the product is unknown or has not been specified
+     * by the business owner.
+     *
+     * <p>This is the default value used when the availability field is
+     * absent or does not match any recognized value.
      */
     UNKNOWN,
 
     /**
-     * The item is currently in stock and available for purchase. This
-     * corresponds to the {@code "in stock"} display string in the
-     * WhatsApp Web client's {@code ProductAvailability} enum.
+     * The product is currently in stock and available for purchase.
+     *
+     * <p>Customers can add this product to their cart and proceed with
+     * ordering.
      */
     IN_STOCK,
 
     /**
-     * The item is currently out of stock and unavailable for purchase.
-     * This corresponds to the {@code "out of stock"} display string in
-     * the WhatsApp Web client's {@code ProductAvailability} enum. The
-     * WhatsApp Web client includes this value in the
-     * {@code PRODUCT_AVAILABILITY_UNAVAILABLE_VALUES} constant.
+     * The product is currently out of stock and unavailable for purchase.
+     *
+     * <p>Products with this status are still visible in the catalog but
+     * cannot be added to a cart. The catalog UI typically displays a
+     * visual indicator that the item is unavailable.
      */
     OUT_OF_STOCK;
 
     /**
-     * A lookup map from lowercase display names (with underscores
-     * replaced by spaces) to their corresponding enum constants. Used
-     * by {@link #ofName(String)} for case-insensitive display name
-     * resolution.
+     * Lookup map from lowercase display names (with underscores replaced
+     * by spaces) to their corresponding enum constants.
      */
     private static final Map<String, BusinessItemAvailability> PRETTY_NAME_TO_AVAILABILITY = Arrays.stream(BusinessItemAvailability.values())
             .collect(Collectors.toMap(entry -> entry.name().toLowerCase().replaceAll("_", " "), Function.identity()));
 
     /**
-     * Returns the availability corresponding to the given display name.
+     * Returns the availability constant matching the given display name.
      *
-     * <p>The display name is matched case-insensitively with underscores
-     * replaced by spaces, following the same format used by the
-     * {@code ProductAvailability} enum in {@code WAWebProductTypes.flow}
-     * (e.g. {@code "in stock"}, {@code "out of stock"},
-     * {@code "unknown"}).
+     * <p>The lookup is case-insensitive and expects spaces instead of
+     * underscores (for example, {@code "in stock"} or
+     * {@code "out of stock"}). This matches the format used in catalog
+     * query responses.
      *
-     * @param name the display name to look up
-     * @return an {@code Optional} describing the matching availability,
-     *         or an empty {@code Optional} if no match is found
+     * @param name the display name to look up, such as {@code "in stock"}
+     * @return an {@code Optional} containing the matching availability
+     *         constant, or an empty {@code Optional} if no match is found
      */
     public static Optional<BusinessItemAvailability> ofName(String name) {
         return Optional.ofNullable(PRETTY_NAME_TO_AVAILABILITY.get(name));

@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.node.binary;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidServer;
 import com.github.auties00.cobalt.node.Node;
@@ -19,40 +22,31 @@ import static com.github.auties00.cobalt.node.binary.NodeTags.*;
 import static com.github.auties00.cobalt.node.binary.NodeTokens.*;
 
 /**
- * A decoder for deserializing WhatsApp protocol nodes from binary ByteBuffer data.
- * <p>
- * This decoder implements the WhatsApp binary protocol specification for deserializing
- * node-based data structures used in WhatsApp communication. It handles various node types,
- * attributes, and children formats including compressed data, JID pairs, binary data,
- * and tokenized strings.
- * <p>
- * The decoder supports:
- * <ul>
- *     <li>Compressed and uncompressed data using DEFLATE algorithm</li>
- *     <li>Multiple binary data formats (8-bit, 20-bit, and 32-bit size prefixes)</li>
- *     <li>Packed hexadecimal and nibble-encoded strings</li>
- *     <li>Dictionary-based token resolution for efficient string encoding</li>
- *     <li>JID parsing for user and device identification</li>
- *     <li>Nested node structures with attributes and child nodes</li>
- * </ul>
- * <p>
- * Instances are obtained via the {@link #of(ByteBuffer)} factory method, which
- * automatically selects the appropriate implementation based on the compression
- * flag in the data header.
- * <p>
- * Usage example:
- * <pre>{@code
- * ByteBuffer buffer = ByteBuffer.wrap(encodedData);
- * NodeDecoder decoder = NodeDecoder.of(buffer);
- * Node node = decoder.decode();
- * }</pre>
+ * Parses WhatsApp stanza trees from the server's binary wire format.
  *
+ * <p>Incoming WebSocket frames from the WhatsApp server are either raw or
+ * DEFLATE-compressed binary blobs encoded with the WAWap protocol. This
+ * class turns those blobs back into {@link Node} trees by reading the
+ * leading size indicator, description, attribute list, and typed content
+ * (list, JID pair, hex/nibble packed string, dictionary token, single-byte
+ * token, or binary blob of various widths).
+ *
+ * <p>Clients create a decoder via {@link #of(ByteBuffer)}, which inspects
+ * the first byte's compression flag and picks the direct or inflating
+ * implementation, and then call {@link #decode()} to obtain the root
+ * {@link Node}. The decoder implements {@link AutoCloseable} so the
+ * underlying {@link Inflater} can be released deterministically.
+ *
+ * @implNote WAWap.decodeStanza: the JS decoder this class mirrors. Uses
+ *           the WAWapDict token tables and the WAWap JID encoding to
+ *           translate bytes back into a {@code WapNode} tree.
  * @see Node
  * @see NodeAttribute
  * @see NodeEncoder
  * @see NodeTokens
  * @see NodeTags
  */
+@WhatsAppWebModule(moduleName = "WAWap")
 public sealed abstract class NodeDecoder implements AutoCloseable {
     /**
      * VarHandle for reading 16-bit values in big-endian byte order from byte arrays.
@@ -96,16 +90,20 @@ public sealed abstract class NodeDecoder implements AutoCloseable {
     }
 
     /**
-     * Creates a new {@code NodeDecoder} for the provided ByteBuffer.
-     * <p>
-     * The factory reads the first byte's compression flag (bit 2) to determine
-     * whether the data is DEFLATE-compressed. If compression is detected, a
-     * decompressing decoder is returned; otherwise, a direct-read decoder is
-     * returned.
+     * Creates a new decoder for the given encoded stanza buffer.
      *
+     * <p>Reads the leading flags byte and returns a
+     * {@link Compressed} decoder when bit 2 is set, or an
+     * {@link Uncompressed} decoder otherwise.
+     *
+     * @implNote WAWap.decodeStanza: WA Web performs the same flag check
+     *           and dispatches to an inflating path when compressed.
      * @param source the ByteBuffer containing the encoded node data
-     * @return a {@code NodeDecoder} appropriate for the data's compression mode
+     * @return a {@code NodeDecoder} appropriate for the data's
+     *         compression mode
      */
+    @WhatsAppWebExport(moduleName = "WAWap", exports = "decodeStanza",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public static NodeDecoder of(ByteBuffer source) {
         var flags = source.get() & 0xFF;
         if ((flags & 2) != 0) {
@@ -116,11 +114,16 @@ public sealed abstract class NodeDecoder implements AutoCloseable {
     }
 
     /**
-     * Decodes a node from the ByteBuffer.
+     * Decodes the root {@link Node} of this stanza.
      *
-     * @return the decoded {@link Node} object representing the node structure
-     * @throws IOException if an I/O error occurs while reading or decompressing data
+     * @implNote WAWap.decodeStanza: reads the node size, description,
+     *           attributes, and typed content.
+     * @return the decoded node
+     * @throws IOException if an I/O error occurs while reading or
+     *         decompressing data
      */
+    @WhatsAppWebExport(moduleName = "WAWap", exports = "decodeStanza",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public final Node decode() throws IOException {
         return readNode();
     }

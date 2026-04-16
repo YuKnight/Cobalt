@@ -4,16 +4,15 @@ import it.auties.protobuf.annotation.ProtobufDeserializer;
 import it.auties.protobuf.annotation.ProtobufSerializer;
 
 /**
- * The day of the week for a {@link BusinessHoursEntry}, indicating which day
+ * Represents the day of the week for a {@link BusinessHoursEntry}, indicating which day
  * the entry's operating schedule applies to.
  *
- * <p>Seven days are defined using three-letter abbreviations that match the
- * wire format used by the WhatsApp protocol: {@code "sun"}, {@code "mon"},
- * {@code "tue"}, {@code "wed"}, {@code "thu"}, {@code "fri"}, and
- * {@code "sat"}.
+ * <p>All seven days of the week are defined using three-letter abbreviations that match
+ * the wire format used by the WhatsApp protocol: {@code "sun"}, {@code "mon"},
+ * {@code "tue"}, {@code "wed"}, {@code "thu"}, {@code "fri"}, and {@code "sat"}.
  *
- * <p>An {@link Unknown} variant is provided for forward compatibility with
- * values that may be introduced by the server in the future.
+ * <p>An {@link Unknown} variant is provided for forward compatibility with values that
+ * may be introduced by the server in the future.
  *
  * <p>The wire format is a plain {@code String} (e.g. {@code "mon"}).
  *

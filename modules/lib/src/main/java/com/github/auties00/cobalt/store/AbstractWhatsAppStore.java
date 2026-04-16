@@ -29,6 +29,7 @@ import com.github.auties00.cobalt.model.message.context.ContextualMessage;
 import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKey;
 import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyData;
 import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyId;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.mixin.InstantMillisMixin;
 import com.github.auties00.cobalt.model.mixin.InstantSecondsMixin;
 import com.github.auties00.cobalt.model.mixin.PathMixin;
@@ -81,6 +82,48 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static java.util.Objects.requireNonNullElseGet;
 
+/**
+ * Base implementation of {@link WhatsAppStore} that aggregates every
+ * session field, setting, collection and Signal-protocol key into a single
+ * flat protobuf message.
+ *
+ * <p>This class intentionally collapses WhatsApp Web's multi-database
+ * architecture into a single in-memory aggregate:
+ * <ul>
+ *   <li>~12 IndexedDB databases carrying chats, contacts, messages, sync
+ *       keys and sync state</li>
+ *   <li>~100 IndexedDB tables that WA Web queries via its reactive
+ *       Collection layer</li>
+ *   <li>~45 in-memory reactive {@code Collection} models (contacts,
+ *       chats, calls, newsletters, etc.)</li>
+ *   <li>the key-value UserPrefs store used for AB props, encrypted rid,
+ *       pairing metadata and so on</li>
+ * </ul>
+ * All of these are exposed as {@code ConcurrentHashMap} fields,
+ * {@link com.github.auties00.collections.ConcurrentLinkedHashMap} caches,
+ * or plain scalar fields on this class, so that a concrete subclass only
+ * needs to decide how to serialise/load the aggregate.
+ *
+ * <p>The Signal protocol state (identity keys, pre-keys, signed pre-keys,
+ * sessions, sender keys, app-state sync keys, noise keys) lives on this
+ * class as well, so that instances can be used directly as a
+ * {@link com.github.auties00.libsignal.SignalProtocolStore}.
+ *
+ * @implNote WAWebModelStorageInitialize: each WA Web IndexedDB schema
+ * module ({@code WAWebSchema*}) maps to a corresponding field or map on
+ * this class. The WA Web collection modules ({@code WAWebChatCollection},
+ * {@code WAWebContactCollection}, {@code WAWebCallsCollection}, ...) are
+ * represented by the {@link java.util.concurrent.ConcurrentHashMap} fields
+ * and accessor methods. The Signal storage module
+ * {@code WAWebSignalStorage} is absorbed through the {@code SignalProtocol}
+ * fields. The UserPrefs module {@code WAWebUserPrefsBase} corresponds to
+ * the scalar fields (registered, showSecurityNotifications,
+ * primaryDeviceSupportsSyncdRecovery, etc.).
+ */
+@WhatsAppWebModule(moduleName = "WAWebModelStorageInitialize")
+@WhatsAppWebModule(moduleName = "WAWebCollections")
+@WhatsAppWebModule(moduleName = "WAWebSignalStorage")
+@WhatsAppWebModule(moduleName = "WAWebUserPrefsBase")
 @SuppressWarnings({"unused", "UnusedReturnValue"})
 @ProtobufMessage
 abstract class AbstractWhatsAppStore implements WhatsAppStore {

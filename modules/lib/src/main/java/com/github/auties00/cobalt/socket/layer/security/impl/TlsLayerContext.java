@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.socket.layer.security.impl;
 
-import com.github.auties00.cobalt.socket.threading.SocketClientInboundResult;
 import com.github.auties00.cobalt.socket.layer.security.SocketClientSecurityLayerContext;
+import com.github.auties00.cobalt.socket.threading.SocketClientInboundResult;
 import com.github.auties00.cobalt.socket.threading.SocketClientLayerContext;
 
 import javax.net.ssl.SSLEngine;
@@ -15,29 +15,27 @@ import java.nio.channels.SocketChannel;
 /**
  * A layer context that provides TLS encryption and decryption.
  *
- * <p>This context is reusable for both tunnel-level TLS (HTTPS proxy)
- * and transport-level TLS (secure WebSocket).  Each instance owns its
- * own {@link SSLEngine} and associated buffers.
+ * <p>This context owns an {@link SSLEngine} and the associated net/app
+ * buffers. It is positionally polymorphic — the same implementation serves
+ * both tunnel-level TLS (client-to-proxy) and transport-level TLS
+ * (client-to-target).  The composition of the stack determines which role
+ * a particular instance fulfils.
  *
- * <p>The inbound read path uses a zero-copy fast path: encrypted data
- * is read into {@link #netInBuffer}, then unwrapped directly into the
- * next layer's {@link SocketClientLayerContext#inboundTarget()}, avoiding
- * an intermediate application buffer copy.  A slow path through
- * {@link #appInBuffer} handles the rare {@code BUFFER_OVERFLOW} case
- * where the next layer's target is too small for a full TLS record.
+ * <p>The inbound read path uses a zero-copy fast path: encrypted data is
+ * read into {@link #netInBuffer}, then unwrapped directly into the next
+ * layer's {@link SocketClientLayerContext#inboundTarget()}, avoiding an
+ * intermediate application buffer copy.  A slow path through
+ * {@link #appInBuffer} handles the rare {@code BUFFER_OVERFLOW} case.
  *
- * <p>The outbound write path coalesces multiple application buffers
- * into a single TLS record via
- * {@link SSLEngine#wrap(ByteBuffer[], int, int, ByteBuffer)}, minimizing
- * TLS record overhead and system calls.
+ * <p>The outbound write path coalesces multiple application buffers into
+ * a single TLS record via
+ * {@link SSLEngine#wrap(ByteBuffer[], int, int, ByteBuffer)}.
  *
  * <p>TLS handshake is driven by the selector calling
- * {@link #processInbound(int)} while {@link #sslHandshaking} is true.
- * The handshake state machine handles {@code NEED_WRAP},
- * {@code NEED_UNWRAP}, and {@code NEED_TASK} transitions, returning
- * appropriate {@link SocketClientInboundResult} variants to the selector.
+ * {@link #driveHandshake(SocketChannel)} while {@link #sslHandshaking} is
+ * true.
  */
-public abstract class TlsSocketClientLayerContext implements SocketClientSecurityLayerContext {
+final class TlsLayerContext implements SocketClientSecurityLayerContext {
     private static final ByteBuffer EMPTY_BUFFER = ByteBuffer.allocate(0);
 
     private volatile SocketClientLayerContext nextLayer;
@@ -54,7 +52,7 @@ public abstract class TlsSocketClientLayerContext implements SocketClientSecurit
     /**
      * Creates a TLS layer context.
      */
-    protected TlsSocketClientLayerContext() {
+    public TlsLayerContext() {
         this.sslHandshakeLock = new Object();
     }
 

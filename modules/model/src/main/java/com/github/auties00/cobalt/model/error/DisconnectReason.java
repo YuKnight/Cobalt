@@ -7,46 +7,47 @@ import it.auties.protobuf.model.ProtobufType;
 import java.util.Optional;
 
 /**
- * An exit code that the WhatsApp server embeds in a synchronization patch to signal a
- * terminal condition during app-state synchronization.
+ * A terminal failure marker that the WhatsApp server embeds in an app-state
+ * synchronization patch.
  *
- * <p>When the server detects an unrecoverable problem while assembling a syncd patch
- * it attaches an {@code ExitCode} message to the patch instead of, or in addition to,
- * the normal mutation payload. The client is expected to treat any patch that carries
- * an exit code as fatal, log the code and the optional explanatory text, and trigger a
- * full re-synchronization of the affected collection.
+ * <p>When the server cannot produce a usable patch for a collection such as
+ * chats, contacts, or starred messages it attaches an instance of this
+ * message instead of, or in addition to, the normal mutation payload. The
+ * client is expected to treat any patch that carries a disconnect reason as
+ * fatal, log the numeric {@link #code()} and the optional {@link #text()},
+ * and trigger a full re-synchronization of the affected collection.
  *
- * <p>The exit code is embedded at field index {@code 7} of the {@code SyncdPatch}
- * protobuf message. The {@link #code()} field classifies the nature of the failure
- * while the {@link #text()} field provides an optional human-readable description
- * that is included in diagnostic logs and error reports.
+ * <p>The {@link #code()} field classifies the nature of the failure using
+ * the {@link DisconnectCode} enumeration. The {@link #text()} field carries
+ * an optional human-readable description that is useful for diagnostic logs
+ * and error reports but is not intended to be shown to end users.
  *
  * @see DisconnectCode
  */
 @ProtobufMessage(name = "ExitCode")
 public final class DisconnectReason {
     /**
-     * The numeric exit code that classifies the terminal condition, or {@code null}
-     * if no code was provided by the server.
+     * The numeric code that classifies the terminal condition, or
+     * {@code null} if the server did not supply one.
      */
     @ProtobufProperty(index = 1, type = ProtobufType.UINT64)
     DisconnectCode code;
 
     /**
-     * An optional human-readable description of the terminal condition, included by
-     * the server for diagnostic purposes.
+     * An optional human-readable description of the terminal condition,
+     * supplied by the server for diagnostic purposes.
      */
     @ProtobufProperty(index = 2, type = ProtobufType.STRING)
     String text;
 
     /**
-     * Constructs a new {@code DisconnectReason} with the given exit code and optional
-     * explanatory text.
+     * Constructs a new {@code DisconnectReason} with the given code and
+     * optional descriptive text.
      *
-     * @param code the exit code that classifies the terminal condition, or
-     *        {@code null} if unknown
-     * @param text an optional human-readable description of the terminal condition,
-     *        or {@code null} if not provided
+     * @param code the numeric code that classifies the terminal condition,
+     *        or {@code null} if unknown
+     * @param text an optional human-readable description of the terminal
+     *        condition, or {@code null} if not provided
      */
     DisconnectReason(DisconnectCode code, String text) {
         this.code = code;
@@ -54,10 +55,10 @@ public final class DisconnectReason {
     }
 
     /**
-     * Returns the exit code that classifies the terminal condition.
+     * Returns the numeric code that classifies the terminal condition.
      *
-     * @return an {@link Optional} containing the {@link DisconnectCode}, or an empty
-     *         {@code Optional} if no code was provided by the server
+     * @return an {@link Optional} containing the {@link DisconnectCode}, or
+     *         an empty {@code Optional} if no code was supplied by the server
      */
     public Optional<DisconnectCode> code() {
         return Optional.ofNullable(code);
@@ -66,26 +67,26 @@ public final class DisconnectReason {
     /**
      * Returns the human-readable description of the terminal condition.
      *
-     * @return an {@link Optional} containing the descriptive text, or an empty
-     *         {@code Optional} if no text was provided by the server
+     * @return an {@link Optional} containing the descriptive text, or an
+     *         empty {@code Optional} if no text was supplied by the server
      */
     public Optional<String> text() {
         return Optional.ofNullable(text);
     }
 
     /**
-     * Sets the exit code that classifies the terminal condition.
+     * Replaces the numeric code that classifies the terminal condition.
      *
-     * @param code the exit code, or {@code null} to clear
+     * @param code the new code, or {@code null} to clear
      */
     public void setCode(DisconnectCode code) {
         this.code = code;
     }
 
     /**
-     * Sets the human-readable description of the terminal condition.
+     * Replaces the human-readable description of the terminal condition.
      *
-     * @param text the descriptive text, or {@code null} to clear
+     * @param text the new descriptive text, or {@code null} to clear
      */
     public void setText(String text) {
         this.text = text;

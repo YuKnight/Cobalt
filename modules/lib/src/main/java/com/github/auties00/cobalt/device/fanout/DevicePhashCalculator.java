@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.device.fanout;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidServer;
 import com.github.auties00.cobalt.props.ABProp;
@@ -11,16 +14,29 @@ import java.security.NoSuchAlgorithmException;
 import java.util.*;
 
 /**
- * Service that calculates participant hash (phash) for group messages.
+ * Computes the participant hash (phash) that WhatsApp servers use to confirm the
+ * sender's view of a group's device membership.
  *
- * <p>The phash verifies that sender and server agree on the list of participants
- * that should receive a group message.
+ * <p>Group messages carry a {@code phash} attribute on the stanza; the server
+ * compares it to its own hash of the participant device JIDs and, on mismatch,
+ * either rejects the stanza or instructs the client to resync. This calculator
+ * reproduces both supported hash formats (SHA-1 V1 and SHA-256 V2) and is also
+ * used by {@link com.github.auties00.cobalt.device.DeviceService} to short-circuit
+ * device list syncs when the server pre-announces an expected phash.
+ *
+ * <p>V2 additionally supports injecting the Meta AI bot JIDs into the hashed set
+ * when the corresponding feature flags are active.
  *
  * @implNote WAWebPhashUtils: provides phashV1 and phashV2 functions that hash
  * sorted legacy JID strings and return a prefixed base64-encoded truncated hash.
+ * Bot injection gating uses WAWebBotGroupGatingUtils.
  */
+@WhatsAppWebModule(moduleName = "WAWebPhashUtils")
 public final class DevicePhashCalculator {
 
+    /**
+     * Logger for phash computation diagnostics.
+     */
     private static final System.Logger LOGGER = System.getLogger(DevicePhashCalculator.class.getName());
 
     /**
@@ -28,6 +44,9 @@ public final class DevicePhashCalculator {
      *
      * @implNote WAWebPhashUtils: truncates the hash to first 6 bytes before base64 encoding.
      */
+    @WhatsAppWebExport(moduleName = "WAWebPhashUtils",
+            exports = {"phashV1", "phashV2"},
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static final int HASH_BYTES_TO_USE = 6;
 
     /**
@@ -36,6 +55,9 @@ public final class DevicePhashCalculator {
      *
      * @implNote WAWebBotUtils.META_BOT_TEE_FBID_WID: createUserWidOrThrow("1273596044787272@bot")
      */
+    @WhatsAppWebExport(moduleName = "WAWebBotUtils",
+            exports = "META_BOT_TEE_FBID_WID",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static final Jid META_AI_TEE_BOT_ACCOUNT = new Jid("1273596044787272", JidServer.bot());
 
     /**
@@ -50,6 +72,9 @@ public final class DevicePhashCalculator {
      * @throws NullPointerException if {@code abPropsService} is {@code null}
      * @implNote WAWebPhashUtils: depends on WAWebBotGroupGatingUtils which reads AB props.
      */
+    @WhatsAppWebExport(moduleName = "WAWebPhashUtils",
+            exports = {"phashV1", "phashV2"},
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public DevicePhashCalculator(ABPropsService abPropsService) {
         this.abPropsService = Objects.requireNonNull(abPropsService, "abPropsService cannot be null");
     }
@@ -71,6 +96,9 @@ public final class DevicePhashCalculator {
      * defaulting both bot flags to {@code false}. This overload exists for backward
      * compatibility and should be migrated to the 4-param variant.
      */
+    @WhatsAppWebExport(moduleName = "WAWebPhashUtils",
+            exports = {"phashV1", "phashV2"},
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public String calculate(
             Set<Jid> deviceJids,
             DevicePhashVersion version,
@@ -100,6 +128,9 @@ public final class DevicePhashCalculator {
      * WAWebPhashUtils.phashV2: sorts JIDs in legacy format, hashes with SHA-256,
      * truncates to 6 bytes, and prepends "2:" prefix. Supports open and TEE bot injection.
      */
+    @WhatsAppWebExport(moduleName = "WAWebPhashUtils",
+            exports = {"phashV1", "phashV2"},
+            adaptation = WhatsAppAdaptation.DIRECT)
     public String calculate(
             Set<Jid> deviceJids,
             DevicePhashVersion version,
@@ -160,6 +191,9 @@ public final class DevicePhashCalculator {
      * @implNote WAWebBotGroupGatingUtils.isOpenGroupBotParticipantAddEnabled: returns
      * {@code true} only if both AB props are enabled.
      */
+    @WhatsAppWebExport(moduleName = "WAWebBotGroupGatingUtils",
+            exports = "isOpenGroupBotParticipantAddEnabled",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private boolean isOpenGroupBotParticipantAddEnabled() {
         var webAiGroupOpenSupport = abPropsService.getBool(ABProp.WEB_AI_GROUP_OPEN_SUPPORT);
         var aiGroupParticipationEnabled = abPropsService.getBool(ABProp.AI_GROUP_PARTICIPATION_ENABLED);
@@ -174,6 +208,9 @@ public final class DevicePhashCalculator {
      * @implNote WAWebBotGroupGatingUtils.isTEEGroupBotParticipantAddEnabled: returns
      * {@code true} only if both AB props are enabled.
      */
+    @WhatsAppWebExport(moduleName = "WAWebBotGroupGatingUtils",
+            exports = "isTEEGroupBotParticipantAddEnabled",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private boolean isTEEGroupBotParticipantAddEnabled() {
         var webAiGroupOpenSupport = abPropsService.getBool(ABProp.WEB_AI_GROUP_OPEN_SUPPORT);
         var aiGroupParticipationAddTeeEnabled = abPropsService.getBool(ABProp.AI_GROUP_PARTICIPATION_ADD_TEE_ENABLED);
@@ -191,6 +228,9 @@ public final class DevicePhashCalculator {
      * V2 uses {@code toString({legacy: true, formatFull: true})} producing
      * "user.0:device@s.whatsapp.net". Legacy format converts c.us server to s.whatsapp.net.
      */
+    @WhatsAppWebExport(moduleName = "WAWebPhashUtils",
+            exports = {"phashV1", "phashV2"},
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private static String toLegacyJidString(Jid jid, DevicePhashVersion version) {
         // WAWebPhashUtils.phashV1: uses asUserWidOrThrow which validates the JID is a user type
         // and strips device information, keeping only user@server
@@ -219,6 +259,9 @@ public final class DevicePhashCalculator {
      * @return the legacy server, with {@code c.us} mapped to {@code s.whatsapp.net}
      * @implNote WAWebWid.toString: when legacy=true, converts "c.us" to "s.whatsapp.net"
      */
+    @WhatsAppWebExport(moduleName = "WAWebWid",
+            exports = "toString",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private static JidServer toLegacyServer(JidServer server) {
         if (server.equals(JidServer.legacyUser())) {
             return JidServer.user();

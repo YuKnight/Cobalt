@@ -9,42 +9,63 @@ import it.auties.protobuf.model.ProtobufType;
 import java.util.Optional;
 
 /**
- * A sync action representing an outgoing contact entry.
+ * A sync action that records an outgoing contact card sent to a peer.
  *
- * <p>Per WhatsApp Web, this action stores a contact's name as seen by
- * the current user in their address book, synced via the
- * {@code REGULAR_LOW} collection.
+ * <p>Outgoing contact actions capture the name under which a contact was
+ * shared with someone else. They keep linked devices in agreement about what
+ * display name was used when a contact card was dispatched, independently of
+ * later edits to the user's address book.
+ *
+ * <p>Entries are indexed by the user JID string through
+ * {@link OutContactActionArgs} and replicated via the
+ * {@link SyncPatchType#REGULAR_LOW} collection.
  */
 @ProtobufMessage(name = "SyncActionValue.OutContactAction")
 public final class OutContactAction implements SyncAction<OutContactActionArgs> {
     /**
-     * Canonical WhatsApp Web action name for this action type.
+     * The canonical action name {@code "out_contact"} used to identify this
+     * action inside a sync patch.
      */
     public static final String ACTION_NAME = "out_contact";
 
     /**
-     * Canonical WhatsApp Web action version for this action type.
+     * The canonical action version for this action type.
      */
     public static final int ACTION_VERSION = 1;
 
     /**
-     * Canonical WhatsApp Web collection name for this action type.
+     * The sync collection this action is carried in.
      */
     public static final SyncPatchType COLLECTION_NAME = SyncPatchType.REGULAR_LOW;
 
+    /**
+     * The full display name under which the contact was shared.
+     */
     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
     String fullName;
 
+    /**
+     * The first name under which the contact was shared.
+     */
     @ProtobufProperty(index = 2, type = ProtobufType.STRING)
     String firstName;
 
+    /**
+     * Constructs a new {@code OutContactAction}. Intended to be invoked by the
+     * generated builder and by the protobuf deserializer.
+     *
+     * @param fullName  the full display name, or {@code null}
+     * @param firstName the first name, or {@code null}
+     */
     OutContactAction(String fullName, String firstName) {
         this.fullName = fullName;
         this.firstName = firstName;
     }
 
     /**
-     * {@inheritDoc}
+     * Returns the canonical action name {@code "out_contact"}.
+     *
+     * @return the string {@code "out_contact"}
      */
     @Override
     public String actionName() {
@@ -52,7 +73,9 @@ public final class OutContactAction implements SyncAction<OutContactActionArgs> 
     }
 
     /**
-     * {@inheritDoc}
+     * Returns the action version declared by this action type.
+     *
+     * @return the action version
      */
     @Override
     public int actionVersion() {
@@ -60,18 +83,19 @@ public final class OutContactAction implements SyncAction<OutContactActionArgs> 
     }
 
     /**
-     * Returns the full name of the contact.
+     * Returns the full display name under which the contact was shared.
      *
-     * @return the full name, or empty if not set
+     * @return the full name, or an empty {@link Optional} if none was provided
      */
     public Optional<String> fullName() {
         return Optional.ofNullable(fullName);
     }
 
     /**
-     * Returns the first name of the contact.
+     * Returns the first name under which the contact was shared.
      *
-     * @return the first name, or empty if not set
+     * @return the first name, or an empty {@link Optional} if none was
+     *         provided
      */
     public Optional<String> firstName() {
         return Optional.ofNullable(firstName);

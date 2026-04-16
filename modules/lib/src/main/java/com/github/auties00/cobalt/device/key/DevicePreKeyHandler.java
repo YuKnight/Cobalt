@@ -1,6 +1,9 @@
 package com.github.auties00.cobalt.device.key;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidServer;
 import com.github.auties00.cobalt.node.Node;
@@ -17,63 +20,136 @@ import java.util.concurrent.StructuredTaskScope;
 import java.util.concurrent.StructuredTaskScope.Subtask;
 
 /**
- * Service for fetching prekey bundles from the server.
- * Prekey bundles are needed to establish Signal sessions with devices
- * that we haven't communicated with before.
+ * Fetches Signal pre-key bundles and identity keys from the server and installs them into
+ * the local Signal store so outgoing messages can be encrypted for newly-learned devices.
  *
- * @apiNote WAWebE2ESessionService: implements deduplication of concurrent session
- * establishment requests to prevent duplicate prekey fetches.
+ * <p>Every WhatsApp companion device that Cobalt has not yet talked to needs a freshly
+ * fetched pre-key bundle (identity key, signed pre-key, optional one-time pre-key) so the
+ * Signal session can be initialized before the first outgoing message. This handler batches
+ * those fetches (up to 100 devices per IQ), deduplicates concurrent requests for the same
+ * device, sorts bundles so primary devices are processed before companion devices, and
+ * finally drives {@link SignalSessionCipher} to materialise the sessions.
+ *
+ * <p>Also provides the identity-key prefetch that runs after a successful device sync so
+ * incoming PKMSG decryption does not need a separate server round-trip to validate peer
+ * identities, and a shortcut that stores a user's identity key directly from the ADV
+ * account signature key when the hosted override flag is enabled.
+ *
+ * <p>Invoked by {@link com.github.auties00.cobalt.device.DeviceService} during message send
+ * (to ensure sessions exist) and after device sync (to prefetch identity keys).
+ *
+ * @implNote WAWebFetchPrekeysJob.fetchPrekeys: performs the IQ exchange against
+ * {@code <iq xmlns="encrypt" type="get">} and parses prekey bundles from the response.
+ * WAWebManageE2ESessionsJob.ensureE2ESessions: deduplicates concurrent session establishment
+ * requests via a module-level map.
+ * WAWebGetIdentityKeysJob.getAndStoreIdentityKeys: prefetches identity keys for users with
+ * validated key index info after USync completes.
  */
+@WhatsAppWebModule(moduleName = "WAWebFetchPrekeysJob")
+@WhatsAppWebModule(moduleName = "WAWebManageE2ESessionsJob")
+@WhatsAppWebModule(moduleName = "WAWebGetIdentityKeysJob")
 public final class DevicePreKeyHandler {
+    /**
+     * Maximum number of devices per pre-key IQ query.
+     *
+     * @implNote WAWebFetchPrekeysJob.length: batches large device lists to avoid oversized
+     * IQ stanzas against the {@code encrypt} server namespace.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebFetchPrekeysJob",
+            exports = "length",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static final int MAX_DEVICES_PER_QUERY = 100;
+
+    /**
+     * XML namespace for pre-key and identity-key IQs.
+     *
+     * @implNote WAWebFetchPrekeysJob.fetchPrekeys: uses {@code xmlns="encrypt"} on the IQ.
+     */
     private static final String ENCRYPT_XMLNS = "encrypt";
 
+    /**
+     * The WhatsApp client providing network access and the Signal store.
+     */
     private final WhatsAppClient client;
+
+    /**
+     * The Signal session cipher used to install freshly fetched pre-key bundles.
+     *
+     * @implNote WAWebProcessKeyBundle: converts raw pre-key bundle bytes into an initialised
+     * Signal session; Cobalt delegates that step to {@link SignalSessionCipher#process}.
+     */
     private final SignalSessionCipher sessionCipher;
 
     /**
-     * Tracks in-flight prekey fetch requests by device JID to prevent duplicate
-     * concurrent session establishment requests.
-     * <p>
-     * When multiple message sends target the same device simultaneously, this ensures
-     * we only fetch prekeys once and other callers wait for the same result.
+     * Tracks in-flight prekey fetch requests by device JID to prevent duplicate concurrent
+     * session establishment requests.
      *
-     * @apiNote WAWebE2ESessionService: deduplicates concurrent getE2ESession calls
+     * <p>When multiple message sends target the same device simultaneously, this ensures
+     * only one IQ is dispatched and other callers wait on the same future.
+     *
+     * @implNote WAWebManageE2ESessionsJob.ensureE2ESessions: deduplicates concurrent
+     * {@code getE2ESession} calls using a module-level WaitableMap; Cobalt uses a
+     * {@link ConcurrentHashMap} keyed by device JID.
      */
     private final ConcurrentHashMap<Jid, CompletableFuture<SignalPreKeyBundle>> inFlightRequests = new ConcurrentHashMap<>();
 
+    /**
+     * Creates a new pre-key handler.
+     *
+     * @param client        the WhatsApp client for network and store access
+     * @param sessionCipher the Signal session cipher for installing pre-key bundles
+     * @throws NullPointerException if any argument is {@code null}
+     * @implNote ADAPTED: WAWebFetchPrekeysJob and WAWebManageE2ESessionsJob access store and
+     * network via module-level imports; Cobalt injects them through the constructor.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebManageE2ESessionsJob",
+            exports = "ensureE2ESessions",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public DevicePreKeyHandler(WhatsAppClient client, SignalSessionCipher sessionCipher) {
         this.client = Objects.requireNonNull(client, "client cannot be null");
         this.sessionCipher = Objects.requireNonNull(sessionCipher, "sessionCipher cannot be null");
     }
 
     /**
-     * Fetches prekey bundles for the specified devices and establishes Signal sessions.
-     * Devices are batched to avoid overwhelming the server.
+     * Fetches pre-key bundles for the specified devices and establishes Signal sessions.
      *
-     * @param deviceJids the device JIDs to fetch prekeys for
-     * @return map of device JIDs to their prekey bundles (empty map if fetch fails)
+     * <p>Convenience overload that passes {@code false} for the identity-reason flag.
+     *
+     * @param deviceJids the device JIDs to fetch pre-keys for
+     * @return map of device JIDs to their pre-key bundles; empty if the fetch fails
+     * @implNote WAWebFetchPrekeysJob.fetchPrekeys: default call does not set {@code reason=identity}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebFetchPrekeysJob",
+            exports = "fetchPrekeys",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public Map<Jid, SignalPreKeyBundle> fetchAndProcessPreKeyBundles(Collection<Jid> deviceJids) {
         return fetchAndProcessPreKeyBundles(deviceJids, false);
     }
 
     /**
-     * Fetches prekey bundles for the specified devices and establishes Signal sessions.
-     * Devices are batched to avoid overwhelming the server.
-     * <p>
-     * Implements deduplication: concurrent requests for the same device will share the
-     * same fetch operation instead of making duplicate requests.
-     * <p>
-     * Per WhatsApp Web: the hasUserReasonIdentity flag can be set to indicate to the server
-     * that the fetch is for identity verification purposes.
+     * Fetches pre-key bundles for the specified devices and establishes Signal sessions.
      *
-     * @param deviceJids            the device JIDs to fetch prekeys for
-     * @param hasUserReasonIdentity whether to include the "reason=identity" hint in the request
-     * @return map of device JIDs to their prekey bundles (empty map if fetch fails)
+     * <p>Devices already covered by an in-flight request reuse the pending future; new
+     * devices are batched (up to {@value #MAX_DEVICES_PER_QUERY} per IQ) and dispatched in
+     * parallel across virtual threads. After bundles are fetched they are sorted so primary
+     * devices are processed before companion devices, then handed to the Signal session
+     * cipher to materialise sessions.
      *
-     * @apiNote WAWebE2ESessionService: deduplicates concurrent session establishment requests
+     * @param deviceJids            the device JIDs to fetch pre-keys for
+     * @param hasUserReasonIdentity whether to set {@code reason="identity"} on each user node
+     * @return map of device JIDs to their pre-key bundles; empty if the fetch fails
+     * @throws RuntimeException if the virtual thread is interrupted while waiting
+     * @implNote WAWebFetchPrekeysJob.fetchPrekeys: builds the IQ, parses the response into
+     * per-user bundles, then hands each bundle to WAWebProcessKeyBundle.
+     * WAWebManageE2ESessionsJob.ensureE2ESessions: deduplicates concurrent fetches and
+     * delegates to fetchPrekeys for missing devices.
      */
+    @WhatsAppWebExport(moduleName = "WAWebFetchPrekeysJob",
+            exports = "fetchPrekeys",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebManageE2ESessionsJob",
+            exports = "ensureE2ESessions",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public Map<Jid, SignalPreKeyBundle> fetchAndProcessPreKeyBundles(Collection<Jid> deviceJids, boolean hasUserReasonIdentity) {
         Objects.requireNonNull(deviceJids, "deviceJids cannot be null");
 
@@ -81,39 +157,43 @@ public final class DevicePreKeyHandler {
             return Map.of();
         }
 
-        // Separate devices into those with in-flight requests and those needing new fetches
+        // WAWebManageE2ESessionsJob.ensureE2ESessions
+        // Separates devices into those with in-flight requests and those needing new fetches
+
         var devicesNeedingFetch = new ArrayList<Jid>();
         var existingFutures = new HashMap<Jid, CompletableFuture<SignalPreKeyBundle>>();
 
         for (var deviceJid : deviceJids) {
             var existingFuture = inFlightRequests.get(deviceJid);
             if (existingFuture != null) {
-                // Wait for existing request instead of making a duplicate
                 existingFutures.put(deviceJid, existingFuture);
             } else {
                 devicesNeedingFetch.add(deviceJid);
             }
         }
 
-        // Register new futures for devices we're about to fetch
+        // WAWebManageE2ESessionsJob.ensureE2ESessions
+        // Registers new futures for devices about to be fetched, handling race conditions
+
         var newFutures = new HashMap<Jid, CompletableFuture<SignalPreKeyBundle>>();
         for (var deviceJid : devicesNeedingFetch) {
             var future = new CompletableFuture<SignalPreKeyBundle>();
             var existing = inFlightRequests.putIfAbsent(deviceJid, future);
             if (existing != null) {
-                // Race condition: another thread registered first, use their future
                 existingFutures.put(deviceJid, existing);
             } else {
                 newFutures.put(deviceJid, future);
             }
         }
 
-        // Fetch prekeys for devices that need them
         var allBundles = new HashMap<Jid, SignalPreKeyBundle>();
 
         if (!newFutures.isEmpty()) {
             var devicesToFetch = new ArrayList<>(newFutures.keySet());
             var batches = batchDevices(devicesToFetch);
+
+            // WAWebFetchPrekeysJob.fetchPrekeys
+            // Fans out one virtual-thread subtask per batch to dispatch IQs in parallel
 
             try (var scope = StructuredTaskScope.open()) {
                 var subtasks = new ArrayList<Subtask<Map<Jid, SignalPreKeyBundle>>>();
@@ -122,13 +202,11 @@ public final class DevicePreKeyHandler {
                 }
                 scope.join();
 
-                // Collect results and complete futures
                 for (var subtask : subtasks) {
                     if (subtask.state() == Subtask.State.SUCCESS) {
                         var fetchedBundles = subtask.get();
                         allBundles.putAll(fetchedBundles);
 
-                        // Complete futures for fetched devices
                         for (var entry : fetchedBundles.entrySet()) {
                             var future = newFutures.get(entry.getKey());
                             if (future != null) {
@@ -138,28 +216,30 @@ public final class DevicePreKeyHandler {
                     }
                 }
 
-                // Complete any remaining futures with null (device not in response)
+                // WAWebFetchPrekeysJob.fetchPrekeys
+                // Completes any remaining futures with null when the server omitted the device
+
                 for (var entry : newFutures.entrySet()) {
                     if (!entry.getValue().isDone()) {
                         entry.getValue().complete(null);
                     }
                 }
             } catch (InterruptedException e) {
-                // Complete futures exceptionally
                 for (var future : newFutures.values()) {
                     future.completeExceptionally(e);
                 }
                 Thread.currentThread().interrupt();
                 throw new RuntimeException("Interrupted while fetching prekey bundles", e);
             } finally {
-                // Remove our futures from in-flight tracking
                 for (var deviceJid : newFutures.keySet()) {
                     inFlightRequests.remove(deviceJid);
                 }
             }
         }
 
-        // Wait for existing in-flight requests to complete
+        // WAWebManageE2ESessionsJob.ensureE2ESessions
+        // Waits for previously in-flight requests to complete so deduplicated callers get the same bundle
+
         for (var entry : existingFutures.entrySet()) {
             try {
                 var bundle = entry.getValue().join();
@@ -167,27 +247,28 @@ public final class DevicePreKeyHandler {
                     allBundles.put(entry.getKey(), bundle);
                 }
             } catch (Exception e) {
-                // Log and continue - the device won't have a bundle
+                // Failed in-flight fetch: the device simply will not have a bundle
             }
         }
 
-        // Per WhatsApp Web: sort prekey bundles - primary devices first, then companions
-        // This ensures primary device sessions are established before companion devices
+        // WAWebProcessKeyBundle.processKeyBundle
+        // Sorts bundles so primary devices are processed before companions to avoid races on shared state
+
         var sortedEntries = allBundles.entrySet().stream()
                 .sorted((a, b) -> {
                     var deviceA = a.getKey().device();
                     var deviceB = b.getKey().device();
-                    // Primary devices (device == 0) come first
                     var isPrimaryA = deviceA == 0;
                     var isPrimaryB = deviceB == 0;
                     if (isPrimaryA && !isPrimaryB) return -1;
                     if (!isPrimaryA && isPrimaryB) return 1;
-                    // Then sort by device ID for consistency
                     return Integer.compare(deviceA, deviceB);
                 })
                 .toList();
 
-        // Process bundles to establish sessions in sorted order
+        // WAWebProcessKeyBundle.processKeyBundle
+        // Installs each bundle into the Signal session store in sorted order
+
         for (var entry : sortedEntries) {
             var deviceJid = entry.getKey();
             var bundle = entry.getValue();
@@ -199,8 +280,17 @@ public final class DevicePreKeyHandler {
     }
 
     /**
-     * Fetches prekey bundles for a single batch of devices.
+     * Dispatches a single pre-key IQ for one batch of devices.
+     *
+     * @param deviceJids            the devices included in this batch
+     * @param hasUserReasonIdentity whether to set {@code reason="identity"} on each user node
+     * @return map of device JID to parsed pre-key bundle for this batch
+     * @implNote WAWebFetchPrekeysJob.fetchPrekeys: sends the IQ and passes the response to
+     * the response parser.
      */
+    @WhatsAppWebExport(moduleName = "WAWebFetchPrekeysJob",
+            exports = "fetchPrekeys",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private Map<Jid, SignalPreKeyBundle> fetchPreKeyBatch(List<Jid> deviceJids, boolean hasUserReasonIdentity) {
         var query = buildPreKeyQuery(deviceJids, hasUserReasonIdentity);
         var response = client.sendNode(query);
@@ -208,8 +298,16 @@ public final class DevicePreKeyHandler {
     }
 
     /**
-     * Batches device JIDs for querying.
+     * Splits a device list into batches of at most {@value #MAX_DEVICES_PER_QUERY} entries.
+     *
+     * @param deviceJids the devices to batch
+     * @return the list of batches in input order
+     * @implNote WAWebRunInBatches: WA Web provides a generic batching helper; Cobalt inlines
+     * a simple linear split because the sizes involved are small.
      */
+    @WhatsAppWebExport(moduleName = "WAWebFetchPrekeysJob",
+            exports = "fetchPrekeys",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private List<List<Jid>> batchDevices(Collection<Jid> deviceJids) {
         var batches = new ArrayList<List<Jid>>();
         var currentBatch = new ArrayList<Jid>();
@@ -231,22 +329,21 @@ public final class DevicePreKeyHandler {
 
     /**
      * Builds the prekey query IQ stanza.
-     * <p>
-     * Per WhatsApp Web: the hasUserReasonIdentity flag adds a "reason=identity" attribute
-     * to each user node, indicating to the server that the fetch is for identity purposes.
      *
-     * <pre>
-     * &lt;iq id="{uuid}" xmlns="encrypt" type="get" to="s.whatsapp.net"&gt;
-     *   &lt;key&gt;
-     *     &lt;user jid="{device_jid}" reason="identity"/&gt;
-     *     ...
-     *   &lt;/key&gt;
-     * &lt;/iq&gt;
-     * </pre>
+     * <p>Produces an IQ of the form
+     * {@code <iq xmlns="encrypt" type="get" to="s.whatsapp.net"><key><user jid="..." [reason="identity"]/>...</key></iq>}.
+     * The {@code reason="identity"} attribute is set when the caller requested identity
+     * verification so the server can distinguish identity prefetches from send-path fetches.
      *
      * @param deviceJids            the device JIDs to query
-     * @param hasUserReasonIdentity whether to include reason=identity attribute
+     * @param hasUserReasonIdentity whether to include {@code reason="identity"}
+     * @return the IQ node builder
+     * @implNote WAWebFetchPrekeysJob.fetchPrekeys: constructs the {@code <key>} node with
+     * {@code <user jid=".." [reason="identity"]/>} children.
      */
+    @WhatsAppWebExport(moduleName = "WAWebFetchPrekeysJob",
+            exports = "fetchPrekeys",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private NodeBuilder buildPreKeyQuery(List<Jid> deviceJids, boolean hasUserReasonIdentity) {
         var userNodes = deviceJids.stream()
                 .map(jid -> {
@@ -274,29 +371,20 @@ public final class DevicePreKeyHandler {
     }
 
     /**
-     * Parses the prekey response into SignalPreKeyBundle objects.
+     * Parses the prekey response into {@link SignalPreKeyBundle} instances keyed by device JID.
      *
-     * <pre>
-     * &lt;iq id="{uuid}" type="result"&gt;
-     *   &lt;list&gt;
-     *     &lt;user jid="{device_jid}"&gt;
-     *       &lt;registration&gt;{registration_id}&lt;/registration&gt;
-     *       &lt;type&gt;{key_type}&lt;/type&gt;
-     *       &lt;identity&gt;{identity_key_32bytes}&lt;/identity&gt;
-     *       &lt;skey&gt;
-     *         &lt;id&gt;{signed_prekey_id}&lt;/id&gt;
-     *         &lt;value&gt;{signed_prekey_public_32bytes}&lt;/value&gt;
-     *         &lt;signature&gt;{signature_64bytes}&lt;/signature&gt;
-     *       &lt;/skey&gt;
-     *       &lt;key&gt;
-     *         &lt;id&gt;{one_time_prekey_id}&lt;/id&gt;
-     *         &lt;value&gt;{one_time_prekey_public_32bytes}&lt;/value&gt;
-     *       &lt;/key&gt;
-     *     &lt;/user&gt;
-     *   &lt;/list&gt;
-     * &lt;/iq&gt;
-     * </pre>
+     * <p>The response carries a {@code <list>} envelope with one {@code <user>} entry per
+     * queried device; entries that fail to parse are logged and skipped so one malformed
+     * device does not fail the batch.
+     *
+     * @param response the IQ response node
+     * @return map of device JID to parsed pre-key bundle
+     * @implNote WAWebFetchPrekeysJob.fetchPrekeys: iterates the response list and delegates
+     * per-user parsing to an internal function matching {@link #parseUserPreKeyBundle}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebFetchPrekeysJob",
+            exports = "fetchPrekeys",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private Map<Jid, SignalPreKeyBundle> parsePreKeyResponse(Node response) {
         var result = new HashMap<Jid, SignalPreKeyBundle>();
 
@@ -313,7 +401,6 @@ public final class DevicePreKeyHandler {
                     result.put(deviceJid, bundle);
                 }
             } catch (Exception e) {
-                // Log and continue with other devices
                 var jid = userNode.getAttribute("jid").map(Object::toString).orElse("unknown");
                 System.err.println("Failed to parse prekey bundle for " + jid + ": " + e.getMessage());
             }
@@ -323,21 +410,30 @@ public final class DevicePreKeyHandler {
     }
 
     /**
-     * Parses a single user's prekey bundle from the response.
+     * Parses a single user's pre-key bundle from a response child node.
+     *
+     * <p>Extracts the registration id, identity key, signed pre-key (id, public, signature)
+     * and optional one-time pre-key (id, public) into a {@link SignalPreKeyBundle}.
+     *
+     * @param userNode the {@code <user>} node for this device
+     * @return the parsed pre-key bundle
+     * @throws IllegalArgumentException if any required field is missing
+     * @implNote WAWebFetchPrekeysJob.fetchPrekeys: decodes registration id, identity, signed
+     * pre-key, and optional one-time pre-key from the user node.
      */
+    @WhatsAppWebExport(moduleName = "WAWebFetchPrekeysJob",
+            exports = "fetchPrekeys",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private SignalPreKeyBundle parseUserPreKeyBundle(Node userNode) {
-        // Extract registration ID
         var registrationId = userNode.getChild("registration")
                 .flatMap(Node::toContentInt)
                 .orElseThrow(() -> new IllegalArgumentException("Missing registration ID"));
 
-        // Extract identity key
         var identityKey = userNode.getChild("identity")
                 .flatMap(Node::toContentBytes)
                 .map(SignalIdentityPublicKey::ofDirect)
                 .orElseThrow(() -> new IllegalArgumentException("Missing identity key"));
 
-        // Extract signed prekey
         var signedPreKeyNode = userNode.getChild("skey")
                 .orElseThrow(() -> new IllegalArgumentException("Missing signed prekey"));
 
@@ -362,7 +458,9 @@ public final class DevicePreKeyHandler {
                 .signedPreKeySignature(signedPreKeySignature)
                 .identityKey(identityKey);
 
-        // Extract one-time prekey (optional)
+        // WAWebFetchPrekeysJob.fetchPrekeys
+        // One-time pre-key is optional: when the server ran out, only skey is returned
+
         var preKeyNode = userNode.getChild("key");
         if (preKeyNode.isPresent()) {
             var preKeyId = preKeyNode.get().getChild("id")
@@ -380,16 +478,20 @@ public final class DevicePreKeyHandler {
             }
         }
 
-        // Build the bundle
         return builder.build();
     }
 
     /**
-     * Checks which devices from the given list don't have Signal sessions.
+     * Returns the subset of the given devices that do not yet have a Signal session.
      *
      * @param deviceJids the device JIDs to check
-     * @return list of device JIDs that need sessions
+     * @return the devices for which a session needs to be established
+     * @implNote WAWebManageE2ESessionsJob.ensureE2ESessions: filters devices via
+     * {@code hasSignalSessions} before calling {@code fetchPrekeys}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebManageE2ESessionsJob",
+            exports = "ensureE2ESessions",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public List<Jid> findDevicesNeedingSessions(Collection<Jid> deviceJids) {
         var store = client.store();
         var result = new ArrayList<Jid>();
@@ -405,12 +507,20 @@ public final class DevicePreKeyHandler {
     }
 
     /**
-     * Ensures Signal sessions exist for all specified devices.
-     * Fetches prekeys and creates sessions for any devices without sessions.
+     * Ensures Signal sessions exist for all specified devices by fetching and installing any
+     * missing pre-key bundles.
      *
      * @param deviceJids the device JIDs to ensure sessions for
+     * @implNote WAWebManageE2ESessionsJob.ensureE2ESessions: combines the
+     * "missing session?" filter and the fetch into a single top-level entry point.
      */
+    @WhatsAppWebExport(moduleName = "WAWebManageE2ESessionsJob",
+            exports = "ensureE2ESessions",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public void ensureSessions(Collection<Jid> deviceJids) {
+        // WAWebManageE2ESessionsJob.ensureE2ESessions
+        // Only fetches pre-keys for devices without an existing Signal session
+
         var devicesNeedingSessions = findDevicesNeedingSessions(deviceJids);
         if (devicesNeedingSessions.isEmpty()) {
             return;
@@ -420,25 +530,23 @@ public final class DevicePreKeyHandler {
     }
 
     /**
-     * Fetches and stores identity keys for users who don't have them cached.
-     * <p>
-     * This is an optimization that prefetches identity keys after device sync,
-     * so they're available when needed for message encryption without an extra
-     * round trip. Per WhatsApp Web: called after device sync for users with
-     * validated key index info.
-     * <p>
-     * Query format:
-     * <pre>
-     * &lt;iq id="{uuid}" xmlns="encrypt" type="get" to="s.whatsapp.net"&gt;
-     *   &lt;identity&gt;
-     *     &lt;user jid="{user_jid}"/&gt;
-     *     ...
-     *   &lt;/identity&gt;
-     * &lt;/iq&gt;
-     * </pre>
+     * Prefetches identity keys for the specified users and stores them as trusted identities.
+     *
+     * <p>Called after a successful device sync for every user whose validated signed key
+     * index list contains at least one key index, so incoming PKMSG decryption can validate
+     * peer identities without needing a separate server round-trip.
+     *
+     * <p>The request is an {@code <iq xmlns="encrypt" type="get">} with an {@code <identity>}
+     * child containing one {@code <user>} per user JID targeting their primary device.
      *
      * @param userJids the user JIDs to fetch identity keys for
+     * @throws RuntimeException if the virtual thread is interrupted while waiting
+     * @implNote WAWebGetIdentityKeysJob.getAndStoreIdentityKeys: sends the identity query and
+     * stores each received identity via {@code WAWebSignalProtocolStore.saveIdentity}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebGetIdentityKeysJob",
+            exports = "getAndStoreIdentityKeys",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public void fetchAndStoreIdentityKeys(Collection<Jid> userJids) {
         Objects.requireNonNull(userJids, "userJids cannot be null");
 
@@ -448,10 +556,11 @@ public final class DevicePreKeyHandler {
 
         var store = client.store();
 
-        // Filter out users that already have identity keys stored
+        // WAWebGetIdentityKeysJob.getAndStoreIdentityKeys
+        // Filters users whose primary device already has a session, skipping redundant fetches
+
         var usersNeedingKeys = new ArrayList<Jid>();
         for (var userJid : userJids) {
-            // Check if we have identity key for the primary device
             var primaryDeviceJid = userJid.toUserJid().withDevice(0);
             var address = primaryDeviceJid.toSignalAddress();
             if (store.findSessionByAddress(address).isEmpty()) {
@@ -463,7 +572,9 @@ public final class DevicePreKeyHandler {
             return;
         }
 
-        // Batch and fetch identity keys
+        // WAWebGetIdentityKeysJob.getAndStoreIdentityKeys
+        // Batches users and fans out one virtual-thread subtask per batch
+
         var batches = batchUsers(usersNeedingKeys, MAX_DEVICES_PER_QUERY);
 
         try (var scope = StructuredTaskScope.open()) {
@@ -483,7 +594,14 @@ public final class DevicePreKeyHandler {
 
     /**
      * Fetches and stores identity keys for a single batch of users.
+     *
+     * @param userJids the users in this batch
+     * @implNote WAWebGetIdentityKeysJob.getAndStoreIdentityKeys: sends the identity IQ and
+     * parses the response into trusted identity store entries.
      */
+    @WhatsAppWebExport(moduleName = "WAWebGetIdentityKeysJob",
+            exports = "getAndStoreIdentityKeys",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private void fetchAndStoreIdentityKeyBatch(List<Jid> userJids) {
         var query = buildIdentityKeyQuery(userJids);
         var response = client.sendNode(query);
@@ -491,13 +609,21 @@ public final class DevicePreKeyHandler {
     }
 
     /**
-     * Builds the identity key query IQ stanza.
+     * Builds the identity-key query IQ stanza.
+     *
+     * @param userJids the users in this batch
+     * @return the IQ node builder with the {@code <identity>} child
+     * @implNote WAWebGetIdentityKeysJob.getAndStoreIdentityKeys: constructs the
+     * {@code <identity>} node with one {@code <user>} per user JID targeting the primary device.
      */
+    @WhatsAppWebExport(moduleName = "WAWebGetIdentityKeysJob",
+            exports = "getAndStoreIdentityKeys",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private NodeBuilder buildIdentityKeyQuery(List<Jid> userJids) {
         var userNodes = userJids.stream()
                 .map(jid -> new NodeBuilder()
                         .description("user")
-                        .attribute("jid", jid.toUserJid().withDevice(0)) // Query primary device
+                        .attribute("jid", jid.toUserJid().withDevice(0))
                         .build())
                 .toList();
 
@@ -515,20 +641,19 @@ public final class DevicePreKeyHandler {
     }
 
     /**
-     * Parses the identity key response and stores the keys.
-     * <p>
-     * Response format:
-     * <pre>
-     * &lt;iq id="{uuid}" type="result"&gt;
-     *   &lt;list&gt;
-     *     &lt;user jid="{device_jid}"&gt;
-     *       &lt;type&gt;{key_type}&lt;/type&gt;
-     *       &lt;identity&gt;{identity_key_32bytes}&lt;/identity&gt;
-     *     &lt;/user&gt;
-     *   &lt;/list&gt;
-     * &lt;/iq&gt;
-     * </pre>
+     * Parses the identity-key response and stores each key as a trusted identity.
+     *
+     * <p>Entries that carry an {@code <error>} child are skipped. Entries with a malformed
+     * or non-32-byte identity value are likewise skipped and logged.
+     *
+     * @param response the IQ response node
+     * @implNote WAWebGetIdentityKeysJob.getAndStoreIdentityKeys: iterates response
+     * {@code <list>/<user>} children and calls {@code WAWebSignalProtocolStore.saveIdentity}
+     * for each valid entry.
      */
+    @WhatsAppWebExport(moduleName = "WAWebGetIdentityKeysJob",
+            exports = "getAndStoreIdentityKeys",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private void parseAndStoreIdentityKeyResponse(Node response) {
         var listNode = response.getChild("list");
         if (listNode.isEmpty()) {
@@ -539,7 +664,6 @@ public final class DevicePreKeyHandler {
 
         for (var userNode : listNode.get().getChildren("user")) {
             try {
-                // Check for error
                 var errorNode = userNode.getChild("error");
                 if (errorNode.isPresent()) {
                     continue;
@@ -547,7 +671,6 @@ public final class DevicePreKeyHandler {
 
                 var deviceJid = userNode.getRequiredAttributeAsJid("jid");
 
-                // Extract identity key
                 var identityKeyBytes = userNode.getChild("identity")
                         .flatMap(Node::toContentBytes)
                         .orElse(null);
@@ -556,13 +679,11 @@ public final class DevicePreKeyHandler {
                     continue;
                 }
 
-                // Store the identity key
                 var address = deviceJid.toSignalAddress();
                 var identityKey = SignalIdentityPublicKey.ofDirect(identityKeyBytes);
                 store.addTrustedIdentity(address, identityKey);
 
             } catch (Exception e) {
-                // Log and continue with other users
                 var jid = userNode.getAttribute("jid").map(Object::toString).orElse("unknown");
                 System.err.println("Failed to store identity key for " + jid + ": " + e.getMessage());
             }
@@ -570,8 +691,17 @@ public final class DevicePreKeyHandler {
     }
 
     /**
-     * Batches user JIDs for querying.
+     * Splits a user list into batches of at most {@code batchSize} entries.
+     *
+     * @param userJids  the users to batch
+     * @param batchSize the maximum batch size
+     * @return the list of batches in input order
+     * @implNote WAWebRunInBatches: WA Web uses a generic batching helper; Cobalt inlines a
+     * linear split.
      */
+    @WhatsAppWebExport(moduleName = "WAWebGetIdentityKeysJob",
+            exports = "getAndStoreIdentityKeys",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private List<List<Jid>> batchUsers(Collection<Jid> userJids, int batchSize) {
         var batches = new ArrayList<List<Jid>>();
         var currentBatch = new ArrayList<Jid>();
@@ -592,15 +722,24 @@ public final class DevicePreKeyHandler {
     }
 
     /**
-     * Stores an identity key directly from an account signature key.
-     * <p>
-     * Per WhatsApp Web: when hostedOverrideAdvAccountSignatureKeyEnabled is true
-     * and the device list contains hosted devices, the accountSignatureKey from
-     * the signed key index list is saved as the identity key for the user.
+     * Stores an identity key directly from an ADV account signature key.
+     *
+     * <p>Used on the hosted-devices fast path: when the hosted-override AB prop is enabled
+     * and a device list contains hosted devices, the {@code accountSignatureKey} from the
+     * signed key index list is saved as the user's primary-device identity key, avoiding a
+     * separate identity fetch.
      *
      * @param userJid             the user JID to store the identity for
      * @param accountSignatureKey the 32-byte account signature key
+     * @throws NullPointerException     if any argument is {@code null}
+     * @throws IllegalArgumentException if {@code accountSignatureKey} is not exactly 32 bytes
+     * @implNote WAWebBizCoexGatingUtils.hostedOverrideAdvAccountSignatureKeyEnabled path:
+     * WA Web calls {@code WAWebSignalProtocolStore.saveIdentity(address, accountSignatureKey)}
+     * directly when the override flag is active.
      */
+    @WhatsAppWebExport(moduleName = "WAWebBizCoexGatingUtils",
+            exports = "hostedOverrideAdvAccountSignatureKeyEnabled",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public void storeIdentityFromAccountSignatureKey(Jid userJid, byte[] accountSignatureKey) {
         Objects.requireNonNull(userJid, "userJid cannot be null");
         Objects.requireNonNull(accountSignatureKey, "accountSignatureKey cannot be null");

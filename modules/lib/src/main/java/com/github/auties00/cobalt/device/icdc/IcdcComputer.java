@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.device.icdc;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.device.DeviceConstants;
 import com.github.auties00.cobalt.model.device.identity.ADVEncryptionType;
 import com.github.auties00.cobalt.model.device.info.DeviceInfo;
@@ -16,18 +19,28 @@ import java.time.Instant;
 import java.util.*;
 
 /**
- * Computes Identity Change Detection Consistency (ICDC) metadata for
- * a given user's device list.
+ * Computes Identity Change Detection Consistency (ICDC) metadata for a user's device list.
  *
- * <p>ICDC metadata is attached to every outgoing message so that
- * recipients can detect changes in the sender's or recipient's device
- * list since the last key exchange.  The metadata includes a truncated
- * SHA-256 hash of all known identity keys, the device list timestamp,
- * and the key indexes of devices whose identity keys were available.
+ * <p>Every outgoing WhatsApp message embeds a small chunk of ICDC metadata describing the
+ * sender's (and, for 1:1 chats, the recipient's) known companion devices and the identity
+ * keys used to encrypt to them. Recipients compare this metadata against their own view
+ * and, when it disagrees, invalidate cached sessions and trigger a device list refresh,
+ * defending against stale device lists that could lead to undelivered or mis-encrypted
+ * messages.
+ *
+ * <p>The resulting {@link IcdcResult} carries a truncated SHA-256 hash of the relevant
+ * identity keys, the device list timestamp, the key indexes of devices whose identity
+ * keys were available locally, and the hosted business account type when applicable.
+ *
+ * <p>Used primarily by {@link com.github.auties00.cobalt.device.DeviceService#computeIcdc}
+ * which exposes ICDC computation to the message send pipeline.
  *
  * @implNote WAWebIdentityIcdcApi: getICDCMeta, getICDCMetaFromDeviceRecord,
- * computeIdentityHash.
+ * computeIdentityHash. Identity key serialization and sorting are borrowed from
+ * WAWebIdentityApiUtils.identityKeysToBinary.
  */
+@WhatsAppWebModule(moduleName = "WAWebIdentityIcdcApi")
+@WhatsAppWebModule(moduleName = "WAWebIdentityApiUtils")
 public final class IcdcComputer {
 
     /**
@@ -36,6 +49,9 @@ public final class IcdcComputer {
      * @implNote WAWebIdentityIcdcApi: {@code var e = 8} used as lower bound
      * for {@code Math.max(configValue, e)}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebIdentityIcdcApi",
+            exports = "getICDCMetaFromDeviceRecord",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static final int MIN_HASH_LENGTH = 8;
 
     /**
@@ -44,6 +60,9 @@ public final class IcdcComputer {
      *
      * @implNote WAWebIdentityIcdcApi: {@code var s = 720 * 60 * 60} seconds.
      */
+    @WhatsAppWebExport(moduleName = "WAWebIdentityIcdcApi",
+            exports = "getICDCMetaFromDeviceRecord",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static final Duration RECENT_THRESHOLD = Duration.ofHours(720);
 
     /**
@@ -71,6 +90,9 @@ public final class IcdcComputer {
      * @implNote WAWebIdentityIcdcApi: module-level imports of WAWebApiDeviceList,
      * WAWebSignalProtocolStore, WAWebUserPrefsMeUser, WAWebABProps, WAWebBizCoexGatingUtils.
      */
+    @WhatsAppWebExport(moduleName = "WAWebIdentityIcdcApi",
+            exports = {"getICDCMeta", "getICDCMetaFromDeviceRecord"},
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public IcdcComputer(WhatsAppStore store, ABPropsService abPropsService) {
         this.store = Objects.requireNonNull(store, "store");
         this.abPropsService = Objects.requireNonNull(abPropsService, "abPropsService");
@@ -89,8 +111,13 @@ public final class IcdcComputer {
      * via {@code WAWebApiDeviceList.getDeviceRecord(e)} and delegates to
      * {@code getICDCMetaFromDeviceRecord}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebIdentityIcdcApi",
+            exports = "getICDCMeta",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public Optional<IcdcResult> compute(Jid userJid) {
         // WAWebIdentityIcdcApi.getICDCMeta
+        // Looks up the cached device list for the user and delegates to the record-level computation
+
         return store.findDeviceList(userJid.toUserJid())
                 .filter(deviceList -> !deviceList.deleted())
                 .map(deviceList -> computeFromDeviceList(userJid, deviceList));
@@ -109,6 +136,9 @@ public final class IcdcComputer {
      *         is unavailable for the self user
      * @implNote WAWebIdentityIcdcApi.getICDCMetaFromDeviceRecord.
      */
+    @WhatsAppWebExport(moduleName = "WAWebIdentityIcdcApi",
+            exports = "getICDCMetaFromDeviceRecord",
+            adaptation = WhatsAppAdaptation.DIRECT)
     IcdcResult computeFromDeviceList(Jid userJid, DeviceList deviceList) {
         // WAWebIdentityIcdcApi.getICDCMetaFromDeviceRecord
         var devices = deviceList.devices();
@@ -213,6 +243,12 @@ public final class IcdcComputer {
      * calls {@code identityKeysToBinary(curveKeys)} which sorts keys and concatenates,
      * then {@code sha256(binary).slice(0, hashLength)}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebIdentityIcdcApi",
+            exports = "computeIdentityHash",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WAWebIdentityApiUtils",
+            exports = "identityKeysToBinary",
+            adaptation = WhatsAppAdaptation.DIRECT)
     static byte[] computeIdentityHash(List<byte[]> identityKeys, int hashLength) {
         // WAWebIdentityIcdcApi.computeIdentityHash / WAWebIdentityApiUtils.identityKeysToBinary
         try {
@@ -249,6 +285,9 @@ public final class IcdcComputer {
      * @implNote WAWebIdentityApiUtils: {@code function e(e, t)} byte-by-byte
      * comparator with length tie-breaking.
      */
+    @WhatsAppWebExport(moduleName = "WAWebIdentityApiUtils",
+            exports = "identityKeysToBinary",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static int compareKeyBytes(byte[] a, byte[] b) {
         // WAWebIdentityApiUtils: function e(e, t) { for (n=0; n<e.length && n<t.length; ++n) if (e[n] !== t[n]) return e[n]-t[n]; return e.length-t.length }
         // JS byte values are unsigned (0-255), so use Byte.toUnsignedInt for comparison
@@ -270,6 +309,9 @@ public final class IcdcComputer {
      * {@code getABPropConfigValue("md_icdc_hash_length")} and returns
      * {@code Math.max(configValue, 8)}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebIdentityIcdcApi",
+            exports = "getICDCMetaFromDeviceRecord",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private int getHashLength() {
         // WAWebIdentityIcdcApi.f
         return Math.max(
@@ -286,6 +328,9 @@ public final class IcdcComputer {
      * @implNote WAWebIdentityIcdcApi: {@code function g(e)} checks
      * {@code unixTime() - timestamp < 720 * 60 * 60}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebIdentityIcdcApi",
+            exports = "getICDCMetaFromDeviceRecord",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static boolean isRecent(Instant timestamp) {
         // WAWebIdentityIcdcApi.g
         return timestamp != null
@@ -298,6 +343,9 @@ public final class IcdcComputer {
      * @return {@code true} if the hosted devices feature gate is active
      * @implNote WAWebBizCoexGatingUtils.bizHostedDevicesEnabled.
      */
+    @WhatsAppWebExport(moduleName = "WAWebBizCoexGatingUtils",
+            exports = "bizHostedDevicesEnabled",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private boolean isBizHostedDevicesEnabled() {
         // WAWebBizCoexGatingUtils.bizHostedDevicesEnabled
         return abPropsService.getBool(ABProp.ADV_ACCEPT_HOSTED_DEVICES);

@@ -17,42 +17,60 @@ import static java.lang.System.Logger.Level.ERROR;
 import static java.lang.System.Logger.Level.WARNING;
 
 /**
- * A handler interface for managing error scenarios that occur within the WhatsApp API.
- * <p>
- * This interface enables customizable error handling strategies for different types of failures
- * that can occur during API operations, such as network issues, authentication errors,
- * cryptographic failures, and stream processing problems.
- * <p>
- * The handler determines how the application should respond to these errors through the
- * {@link Result} enum, which supports actions like discarding errors, disconnecting,
- * reconnecting, or logging out completely.
- * <p>
- * Several predefined error handlers are provided through static factory methods that implement
- * common error handling patterns, including logging to the terminal or saving to files.
+ * A pluggable strategy for reacting to failures raised by a
+ * {@link WhatsAppClient}.
+ *
+ * <p>Cobalt deliberately avoids hardcoding recovery behaviour: whenever the
+ * socket, stream, Signal pipeline, media pipeline, or synchronisation
+ * subsystem throws a subtype of {@link WhatsAppException}, the client
+ * delegates to an error handler which decides whether to swallow the error,
+ * tear the session down, force a reconnect, or treat the account as banned
+ * or logged out. This is a core divergence from WhatsApp Web, which inlines
+ * recovery logic at every throw site.
+ *
+ * <p>The interface is a functional interface so a single
+ * {@link java.util.function.BiFunction}-style lambda can be provided as the
+ * handler. Static factory methods
+ * ({@link #toTerminal()}, {@link #toFile()}, {@link #toFile(Path)}) return
+ * sensible default implementations that log the exception and return a
+ * {@link Result} derived from {@link WhatsAppException#isFatal()} plus
+ * recognised session-control exception subtypes.
+ *
+ * @see WhatsAppException
+ * @see WhatsAppClient#handleFailure(WhatsAppException)
  */
 @SuppressWarnings("unused")
 @FunctionalInterface
 public interface WhatsAppClientErrorHandler {
     /**
-     * Processes an error that occurred within the WhatsApp API.
-     * <p>
-     * When an error occurs in any component of the API, this method is called with details
-     * about the exception that was thrown. The implementation should
-     * evaluate the error context and determine the appropriate response action.
+     * Processes an error raised by the WhatsApp client pipeline and returns
+     * the recovery action that should follow.
      *
-     * @param whatsapp  the WhatsApp API instance where the error occurred
-     * @param exception the exception that occurred
-     * @return a {@link Result} value indicating how the API should respond to the error
+     * <p>Implementations are expected to be non-blocking: they are invoked
+     * from the thread that caught the failure and their return value drives
+     * immediate session-control decisions (disconnect, reconnect, ban, log
+     * out). If a handler needs to perform I/O (for example, writing the
+     * stack trace to disk) it should dispatch that work to another thread
+     * as the provided defaults do.
+     *
+     * @param whatsapp  the client where the error originated; its
+     *                  {@link WhatsAppClient#store()} can be consulted for
+     *                  context such as the session JID
+     * @param exception the exception that was raised
+     * @return the recovery action to apply
      */
     Result handleError(WhatsAppClient whatsapp, WhatsAppException exception);
 
     /**
-     * Creates an error handler that logs errors to the terminal's standard error.
-     * <p>
-     * This handler prints full stack traces to the console, making it suitable for
-     * debugging and development environments.
+     * Returns an error handler that writes full stack traces to the
+     * terminal's standard error stream.
      *
-     * @return a new error handler that prints exceptions to the terminal
+     * <p>This is the default handler used by the builder when no custom
+     * handler is supplied. It is well suited to development and debugging
+     * sessions where seeing the exception inline is helpful; production
+     * deployments should prefer {@link #toFile()}.
+     *
+     * @return a handler that prints exceptions to {@code System.err}
      */
     @SuppressWarnings("CallToPrintStackTrace")
     static WhatsAppClientErrorHandler toTerminal() {
@@ -60,25 +78,31 @@ public interface WhatsAppClientErrorHandler {
     }
 
     /**
-     * Creates an error handler that saves error information to files in the default location.
-     * <p>
-     * This handler saves detailed error information to files in the $HOME/.cobalt/errors directory,
-     * making it useful for production environments where logs need to be preserved.
+     * Returns an error handler that persists stack traces to
+     * {@code $HOME/.cobalt/errors}.
      *
-     * @return a new error handler that persists exceptions to files
+     * <p>Each exception is written to a new file named with the current
+     * timestamp in milliseconds, on a dedicated virtual thread so the
+     * session-control decision is not delayed by the write.
+     *
+     * @return a handler that persists exceptions under the user home
+     *         directory
      */
     static WhatsAppClientErrorHandler toFile() {
         return toFile(Path.of(System.getProperty("user.home"), ".cobalt", "errors"));
     }
 
     /**
-     * Creates an error handler that saves error information to files in a specified directory.
-     * <p>
-     * This handler works like {@link #toFile()} but allows specifying a custom directory
-     * where error logs will be saved.
+     * Returns an error handler that persists stack traces to the supplied
+     * directory.
      *
-     * @param directory the directory where error files should be saved
-     * @return a new error handler that persists exceptions to the specified directory
+     * <p>Behaviour matches {@link #toFile()} except that files are written
+     * under {@code directory}. The directory must exist or be creatable by
+     * the running process; failure to write raises an
+     * {@link UncheckedIOException} on the background thread.
+     *
+     * @param directory the directory where stack traces are written
+     * @return a handler that persists exceptions under the given directory
      */
     static WhatsAppClientErrorHandler toFile(Path directory) {
         return defaultErrorHandler((api, throwable) -> Thread.startVirtualThread(() -> {
@@ -93,6 +117,25 @@ public interface WhatsAppClientErrorHandler {
         }));
     }
 
+    /**
+     * Builds the shared error-handling policy used by the
+     * {@link #toTerminal()} and {@link #toFile(Path)} factories, delegating
+     * the stack-trace rendering to the supplied {@code printer}.
+     *
+     * <p>The returned handler recognises session-control exception subtypes
+     * and maps them to the matching {@link Result}: reconnection errors are
+     * discarded pending the next timeout, {@code Reconnect} triggers a
+     * reconnect, {@code LoggedOut} logs out, {@code Banned} bans the
+     * session, and every other exception is either discarded (non-fatal) or
+     * disconnected (fatal), as determined by
+     * {@link WhatsAppException#isFatal()}.
+     *
+     * @param printer consumer that renders the exception (for example to
+     *                stderr or to a file); may be {@code null} to skip
+     *                rendering entirely
+     * @return a handler that logs, renders, and maps exceptions to a
+     *         {@link Result}
+     */
     private static WhatsAppClientErrorHandler defaultErrorHandler(BiConsumer<WhatsAppClient, WhatsAppException> printer) {
         return (whatsapp, exception) -> {
             var logger = System.getLogger("ErrorHandler");
@@ -139,34 +182,60 @@ public interface WhatsAppClientErrorHandler {
     }
 
     /**
-     * Defines the possible response actions when handling errors.
-     * <p>
-     * These values determine how the API should proceed after encountering an error,
-     * ranging from ignoring the error to terminating the session completely.
+     * Enumerates the recovery actions that an error handler can request.
+     *
+     * <p>The value returned from
+     * {@link WhatsAppClientErrorHandler#handleError(WhatsAppClient, WhatsAppException)}
+     * is translated by the client into a concrete
+     * {@link WhatsAppClientDisconnectReason}: {@code DISCARD} leaves the
+     * session running, whereas the other values disconnect with the
+     * corresponding reason.
      */
     enum Result {
         /**
-         * Indicates that the error should be ignored, allowing the session to continue
+         * Swallows the error and leaves the session running.
+         *
+         * <p>Appropriate for transient faults that do not compromise the
+         * session state.
          */
         DISCARD,
 
         /**
-         * Indicates that the current session should be disconnected but preserved for future use
+         * Tears the session down while preserving the credentials on disk.
+         *
+         * <p>The client emits
+         * {@link WhatsAppClientDisconnectReason#DISCONNECTED} and does not
+         * attempt to reconnect.
          */
         DISCONNECT,
 
         /**
-         * Indicates that the session should be disconnected and immediately reconnected
+         * Tears the session down and immediately re-establishes the
+         * connection.
+         *
+         * <p>The client emits
+         * {@link WhatsAppClientDisconnectReason#RECONNECTING} and, after
+         * notifying listeners, calls {@link WhatsAppClient#connect()}
+         * internally.
          */
         RECONNECT,
 
         /**
-         * Indicates that the current session should be terminated as banned.
+         * Terminates the session and treats the account as banned.
+         *
+         * <p>The client emits
+         * {@link WhatsAppClientDisconnectReason#BANNED} and deletes the
+         * session store; reconnection is not attempted.
          */
         BAN,
 
         /**
-         * Indicates that the current session should be completely terminated and deleted
+         * Terminates the session and logs the account out.
+         *
+         * <p>The client emits
+         * {@link WhatsAppClientDisconnectReason#LOGGED_OUT} and deletes the
+         * session store so that fresh credentials must be obtained before
+         * the next connection.
          */
         LOG_OUT
     }

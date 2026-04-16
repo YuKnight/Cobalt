@@ -1,5 +1,9 @@
 package com.github.auties00.cobalt.message.send.bot;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
+
 import javax.crypto.KDF;
 import javax.crypto.spec.HKDFParameterSpec;
 import java.nio.charset.StandardCharsets;
@@ -21,6 +25,7 @@ import java.util.Objects;
  * with a 32-byte zero salt) and then {@code expand(prk, "Bot Message", 32)}
  * (HKDF-Expand).
  */
+@WhatsAppWebModule(moduleName = "WAWebBotMessageSecret")
 public final class BotMessageSecret {
     /**
      * The HKDF algorithm identifier used for key derivation.
@@ -72,11 +77,13 @@ public final class BotMessageSecret {
      * {@code extractSha256(null, ikm)} which uses a 32-byte zero salt,
      * then {@code expand(prk, info, length)}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebBotMessageSecret", exports = "genBotMsgSecretFromMsgSecret",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static byte[] derive(byte[] messageSecret) throws GeneralSecurityException {
         Objects.requireNonNull(messageSecret, "messageSecret");
         var kdf = KDF.getInstance(HKDF_ALGORITHM);
         // WAWebBotMessageSecret.genBotMsgSecretFromMsgSecret
-        var params = HKDFParameterSpec.ofExtract() // WACryptoHkdf.extractSha256(null, messageSecret) — extract with null salt
+        var params = HKDFParameterSpec.ofExtract() // WACryptoHkdf.extractSha256(null, messageSecret): extract with null salt
                 .addIKM(messageSecret)
                 .thenExpand(INFO.getBytes(StandardCharsets.UTF_8), SECRET_LENGTH); // WACryptoHkdf.expand(prk, "Bot Message", 32)
         return kdf.deriveData(params);

@@ -12,10 +12,10 @@ import java.util.OptionalInt;
  * Metadata about how a bot message was shared or forwarded on WhatsApp.
  *
  * <p>When a user forwards a bot-generated message, this metadata is attached
- * to the message's context info (field 72 in the {@code ContextInfo}
- * protobuf). It records the UI entry point from which the original bot
- * interaction was initiated and a forward score indicating how many times
- * the message has been forwarded.
+ * to the message's context info. It records the UI entry point from which
+ * the original bot interaction was initiated and a forward score that
+ * tracks how many times the message has been forwarded, which allows the
+ * server to apply anti-virality measures if needed.
  */
 @ProtobufMessage(name = "BotMessageSharingInfo")
 public final class BotMessageSharingInfo {
@@ -27,8 +27,9 @@ public final class BotMessageSharingInfo {
     BotMetricsEntryPoint botEntryPointOrigin;
 
     /**
-     * The number of times this bot message has been forwarded, where
-     * higher values indicate viral spread.
+     * The cumulative number of times this bot message has been forwarded.
+     * Higher values indicate viral spread and may trigger server-side
+     * restrictions.
      */
     @ProtobufProperty(index = 2, type = ProtobufType.UINT32)
     Integer forwardScore;

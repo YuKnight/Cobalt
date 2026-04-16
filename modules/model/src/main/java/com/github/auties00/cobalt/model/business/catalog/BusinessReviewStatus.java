@@ -9,97 +9,94 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * The compliance review status of a product or collection in a WhatsApp
- * Business catalog.
+ * Represents the compliance review status of a product or collection in a
+ * WhatsApp Business catalog.
  *
- * <p>Products and collections submitted to the catalog undergo a
- * compliance review process before they become visible to customers. In
- * the WhatsApp Web client, product review statuses are validated by the
- * {@code asProductReviewType} function in {@code WAWebProductTypes.flow},
- * which accepts the canonical values {@code "APPROVED"},
- * {@code "PENDING"}, and {@code "REJECTED"}. For collections, the
- * {@code mapCollectionReviewStatusToWASchema} function maps prefixed
- * forms such as {@code "STATUS_APPROVED"} to their canonical
- * counterparts. Review statuses are parsed from the
- * {@code status_info.status} field in catalog query responses.
+ * <p>Products and collections submitted to a WhatsApp Business catalog
+ * undergo a compliance review process before they become visible to
+ * customers. The review ensures that listed items conform to WhatsApp's
+ * commerce policies. This enum captures the possible outcomes of that
+ * review process.
  *
- * <p>When a product is rejected, the business owner may be able to
- * appeal the decision. The WhatsApp Web client determines whether an
- * appeal is available through the {@code can_appeal} field in the
- * {@code status_info} object of catalog query responses, exposed as the
- * {@code whatsapp_product_can_appeal} property in the parsed product
- * model.
+ * <p>A product must have an {@link #APPROVED} review status (and not be
+ * {@linkplain BusinessCatalogEntry#hidden() hidden}) to be visible in the
+ * storefront. Products with a {@link #REJECTED} status may be eligible for
+ * appeal, depending on the rejection reason. The {@link #OUTDATED} status
+ * indicates that a previous review determination is no longer current and
+ * a new review cycle may be required.
+ *
+ * <p>The review status can be resolved from its string name using the
+ * {@link #ofName(String)} method, which performs case-insensitive matching.
  */
 @ProtobufEnum
 public enum BusinessReviewStatus {
     /**
-     * No compliance review has been performed on this item. This value
-     * is used when the review process has not yet been initiated for the
-     * product or collection.
+     * No compliance review has been performed on this item.
+     *
+     * <p>This value indicates that the review process has not yet been
+     * initiated for the product or collection.
      */
     NO_REVIEW,
 
     /**
-     * The item has been submitted and is awaiting compliance review by
-     * WhatsApp. This corresponds to the {@code "PENDING"} canonical
-     * value recognized by the {@code asProductReviewType} function in
-     * {@code WAWebProductTypes.flow} and to the
-     * {@code "STATUS_PENDING"} prefixed form used for collections.
+     * The item has been submitted and is awaiting compliance review.
+     *
+     * <p>Products in this state are typically not yet visible to customers
+     * until the review is completed.
      */
     PENDING,
 
     /**
      * The item did not pass compliance review and is not visible to
-     * customers. This corresponds to the {@code "REJECTED"} canonical
-     * value recognized by the {@code asProductReviewType} function in
-     * {@code WAWebProductTypes.flow} and to the
-     * {@code "STATUS_REJECTED"} prefixed form used for collections.
-     * Depending on the rejection reason, the business owner may be able
-     * to appeal the decision, as indicated by the {@code can_appeal}
-     * field in the {@code status_info} object of catalog query
-     * responses.
+     * customers.
+     *
+     * <p>Depending on the rejection reason, the business owner may be able
+     * to appeal the decision or edit the product to address the compliance
+     * issue and resubmit it.
      */
     REJECTED,
 
     /**
-     * The item passed compliance review and is visible to customers.
-     * This corresponds to the {@code "APPROVED"} canonical value
-     * recognized by the {@code asProductReviewType} function in
-     * {@code WAWebProductTypes.flow} and to the
-     * {@code "STATUS_APPROVED"} prefixed form used for collections.
-     * In the WhatsApp Web client, the most recently approved and
-     * non-hidden product is selected by the
-     * {@code getMostRecentlyApprovedProduct} method on the catalog
-     * model.
+     * The item passed compliance review and is eligible to be visible to
+     * customers.
+     *
+     * <p>An approved product is displayed in the storefront unless it has
+     * been explicitly {@linkplain BusinessCatalogEntry#hidden() hidden} by
+     * the business owner or flagged for sanctions.
      */
     APPROVED,
 
     /**
-     * The item's review status is outdated and a new review cycle may
-     * be required. This value indicates that the previous review
-     * determination is no longer current.
+     * The previous review determination is no longer current.
+     *
+     * <p>This status indicates that a new review cycle may be required,
+     * typically because the product was modified after its last review or
+     * because review policies have changed.
      */
     OUTDATED;
 
     /**
-     * A lookup map from lowercase status names to their corresponding
-     * enum constants. Used by {@link #ofName(String)} for
-     * case-insensitive name resolution.
+     * Lookup map from lowercase status names to their corresponding enum
+     * constants.
      */
     private static final Map<String, BusinessReviewStatus> PRETTY_NAME_TO_REVIEW_STATUS = Arrays.stream(BusinessReviewStatus.values())
             .collect(Collectors.toMap(entry -> entry.name().toLowerCase(), Function.identity()));
 
     /**
-     * Returns the review status corresponding to the given name.
+     * Returns the review status constant matching the given name.
      *
-     * <p>The name is matched case-insensitively against the lowercase
-     * form of each constant's name (e.g. {@code "approved"},
-     * {@code "pending"}, {@code "rejected"}).
+     * <p>The lookup is case-insensitive (for example, {@code "approved"},
+     * {@code "APPROVED"}, and {@code "Approved"} all match
+     * {@link #APPROVED}). This matches the format used in catalog query
+     * responses. For collection-specific prefixed forms such as
+     * {@code "STATUS_APPROVED"}, callers should strip the {@code "STATUS_"}
+     * prefix before calling this method.
      *
-     * @param reviewStatus the review status name to look up
-     * @return an {@code Optional} describing the matching status, or an
-     *         empty {@code Optional} if {@code reviewStatus} is
-     *         {@code null} or no match is found
+     * @param reviewStatus the review status name to look up, or
+     *                     {@code null}
+     * @return an {@code Optional} containing the matching review status
+     *         constant, or an empty {@code Optional} if
+     *         {@code reviewStatus} is {@code null} or no match is found
      */
     public static Optional<BusinessReviewStatus> ofName(String reviewStatus) {
         return reviewStatus == null

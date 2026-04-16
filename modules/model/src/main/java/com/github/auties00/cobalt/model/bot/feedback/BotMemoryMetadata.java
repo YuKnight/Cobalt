@@ -9,14 +9,19 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Metadata describing changes to the AI bot's memory about the user.
+ * Carries metadata describing changes to the AI bot's memory about the user.
  *
- * <p>When the AI bot learns new facts or forgets previously memorized
- * information, this metadata captures the delta: the list of
- * {@linkplain #addedFacts() newly added facts} and
- * {@linkplain #removedFacts() removed facts}. A
- * {@linkplain #disclaimer() disclaimer} may accompany the memory update
- * to inform the user about how their data is handled.
+ * <p>When Meta AI learns new facts or forgets previously memorized information,
+ * this metadata captures the delta: the list of {@linkplain #addedFacts() newly
+ * added facts} and {@linkplain #removedFacts() removed facts}. A
+ * {@linkplain #disclaimer() disclaimer} may accompany the memory update to
+ * inform the user about how their data is being stored and used.
+ *
+ * <p>This metadata is attached to bot messages as part of the
+ * {@code BotMetadata.memoryMetadata} field, allowing the client to render
+ * memory change notifications inline within the conversation.
+ *
+ * @see BotMemoryFact
  */
 @ProtobufMessage(name = "BotMemoryMetadata")
 public final class BotMemoryMetadata {

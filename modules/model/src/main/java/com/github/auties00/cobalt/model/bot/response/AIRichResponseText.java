@@ -4,8 +4,9 @@ import it.auties.protobuf.annotation.ProtobufDeserializer;
 import it.auties.protobuf.annotation.ProtobufSerializer;
 
 /**
- * A wrapper for plain-text or markdown content carried by an
- * {@link AIRichResponseSubMessage} fragment.
+ * Wrapper for plain-text or markdown content carried by an
+ * {@link AIRichResponseSubMessage} fragment within a WhatsApp AI bot
+ * rich response.
  *
  * <p>This type exists so that text content can participate in the
  * {@link AIRichResponseSubMessageContent} sealed hierarchy alongside
@@ -14,6 +15,10 @@ import it.auties.protobuf.annotation.ProtobufSerializer;
  * {@code AIRichResponseSubMessage}); the {@link #of(String)} deserializer
  * and {@link #value()} serializer handle the conversion transparently.
  *
+ * <p>This type implements {@link AIRichResponseSubMessageContent} and
+ * appears as the {@link AIRichResponseSubMessageType#TEXT TEXT} variant
+ * within an {@code AIRichResponseSubMessage}.
+ *
  * <p>Example:
  * <pre>{@code
  *     var text = AIRichResponseText.of("Here is the information you requested:");
@@ -21,6 +26,8 @@ import it.auties.protobuf.annotation.ProtobufSerializer;
  *         .content(text)
  *         .build();
  * }</pre>
+ *
+ * @see AIRichResponseSubMessage#content()
  */
 public final class AIRichResponseText implements AIRichResponseSubMessageContent {
     /**

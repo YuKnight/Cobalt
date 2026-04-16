@@ -8,17 +8,18 @@ import java.util.Optional;
  * Metadata identifying a single bot participant in a WhatsApp group chat.
  *
  * <p>Each entry contains the Facebook ID (FBID) of the bot, which uniquely
- * identifies the bot account on Meta's platform. This is used when sending
- * messages to a group that includes one or more bot participants, so the
- * server can route the message to the correct bot backend.
+ * identifies the bot account on Meta's platform. The client uses this FBID
+ * to construct the bot's JID (by appending {@code @bot}) when routing
+ * messages in a group that includes one or more bot participants.
  *
  * @see BotGroupMetadata
  */
 @ProtobufMessage(name = "BotGroupParticipantMetadata")
 public final class BotGroupParticipantMetadata {
     /**
-     * The Facebook ID (FBID) of the bot participant, for example
-     * {@code "1234567890123456"}.
+     * The Facebook ID (FBID) of the bot participant, a numeric string such
+     * as {@code "1234567890123456"} that uniquely identifies the bot on
+     * Meta's platform.
      */
     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
     String botFacebookId;

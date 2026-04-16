@@ -8,32 +8,83 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 
 /**
- * The constants of this enumerated type describe the various roles that a {@link ChatParticipant}
- * can have in a group. Said roles can be changed using various methods in {@code WhatsAppClient}.
+ * Represents the administrative role a participant can hold in a WhatsApp
+ * group or community.
+ *
+ * <p>Each participant in a group has one of three roles that determine their
+ * permissions:
+ * <ul>
+ *   <li>{@link #USER} - a regular member with no administrative privileges</li>
+ *   <li>{@link #ADMIN} - an administrator who can manage group settings and
+ *       participants</li>
+ *   <li>{@link #FOUNDER} - the original creator of the group (also called
+ *       super-admin), who has all admin privileges and cannot be demoted by
+ *       other admins</li>
+ * </ul>
+ *
+ * <p>Roles can be changed through the participant management methods in
+ * {@code WhatsAppClient}. The {@link #data()} method returns the
+ * protocol-level string identifier used in XMPP stanzas.
+ *
+ * @see GroupParticipant
+ * @see GroupAction
  */
 @ProtobufEnum(name = "GroupParticipant.Rank")
 public enum GroupPartipantRole {
     /**
-     * A participant of the group with no special powers
+     * A regular group participant with no administrative privileges.
+     * This is the default role for newly added members.
      */
     USER(0, null),
+
     /**
-     * A participant of the group with administration powers
+     * A group administrator who can modify group settings, add and remove
+     * participants, and promote or demote other members.
      */
     ADMIN(1, "admin"),
+
     /**
-     * The founder of the group, also known as super admin
+     * The original creator of the group, also known as the super-admin.
+     * The founder has all administrator privileges and cannot be demoted
+     * or removed by other administrators.
      */
     FOUNDER(2, "superadmin");
 
+    /**
+     * The protobuf-assigned numeric index for this role.
+     */
     final int index;
+
+    /**
+     * The protocol-level string identifier for this role, or {@code null}
+     * for regular users.
+     */
     private final String data;
 
+    /**
+     * Constructs a {@code GroupPartipantRole} with the specified protobuf
+     * index and protocol identifier.
+     *
+     * @param index the protobuf enum index
+     * @param data  the protocol-level string identifier, or {@code null}
+     */
     GroupPartipantRole(@ProtobufEnumIndex int index, String data) {
         this.index = index;
         this.data = data;
     }
 
+    /**
+     * Returns the {@code GroupPartipantRole} matching the given protocol-level
+     * string identifier.
+     *
+     * <p>Valid inputs are {@code "admin"}, {@code "superadmin"}, and
+     * {@code null} (for regular users). The match is performed by comparing
+     * each constant's {@link #data()} value.
+     *
+     * @param input the protocol-level role identifier
+     * @return the matching role constant
+     * @throws NoSuchElementException if no constant matches the input
+     */
     public static GroupPartipantRole of(String input) {
         return Arrays.stream(values())
                 .filter(entry -> Objects.equals(entry.data(), input))
@@ -41,10 +92,23 @@ public enum GroupPartipantRole {
                 .orElseThrow(() -> new NoSuchElementException("Cannot find GroupRole for %s".formatted(input)));
     }
 
+    /**
+     * Returns the protobuf-assigned numeric index for this role.
+     *
+     * @return the protobuf enum index
+     */
     public int index() {
         return index;
     }
 
+    /**
+     * Returns the protocol-level string identifier for this role.
+     *
+     * <p>Returns {@code "admin"} for {@link #ADMIN}, {@code "superadmin"} for
+     * {@link #FOUNDER}, and {@code null} for {@link #USER}.
+     *
+     * @return the protocol identifier, or {@code null} for regular users
+     */
     public String data() {
         return data;
     }

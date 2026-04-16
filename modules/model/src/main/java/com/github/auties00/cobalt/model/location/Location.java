@@ -9,30 +9,27 @@ import java.util.Optional;
 import java.util.OptionalDouble;
 
 /**
- * A geographic location that can be associated with an
- * {@link com.github.auties00.cobalt.model.message.interactive.InteractiveAnnotation InteractiveAnnotation}
- * on image and video messages.
+ * A geographic location pinned to a region of an image or video message.
  *
- * <p>When a user annotates a media message with a location pin, the WhatsApp
- * client creates an {@code InteractiveAnnotation} whose action is set to an
- * instance of this class. The annotation also carries a polygon of
- * {@link Point} vertices that defines the tappable region on top of the
- * media; tapping inside that region opens this location in the device's map
- * application.
+ * <p>Interactive annotations allow a media message to expose tappable
+ * regions that perform a contextual action when the recipient taps them.
+ * When the action is an instance of {@code Location}, tapping the region
+ * opens the given latitude and longitude in the recipient's map
+ * application. The tappable region itself is defined by a polygon of
+ * {@link Point} vertices stored on the enclosing
+ * {@link com.github.auties00.cobalt.model.message.interactive.InteractiveAnnotation InteractiveAnnotation}.
  *
- * <p>In the WhatsApp Web client, the location name that appears in the
- * annotation overlay is derived from this class. When a
- * {@code LocationMessage} is parsed by the {@code WAWebParseLocationMessageProto}
- * module, the {@link #name()} and the address of the location (carried by
- * the enclosing {@code LocationMessage}, not by this class) are combined
- * into a single display string separated by a newline character, which is
- * then shown as the annotation label.
+ * <p>The {@link #name()} field provides an optional human-readable label
+ * (for example, a venue or landmark name) that clients display alongside
+ * the annotation. When the enclosing annotation also carries a postal
+ * address, clients typically render the label as the name followed by a
+ * newline and the address.
  *
- * <p>This class should not be confused with the top-level
- * {@code LocationMessage} or {@code LiveLocationMessage} protobuf types,
- * which represent standalone location-sharing messages. This class is a
- * lightweight protobuf type that appears only as a nested action inside
- * {@code InteractiveAnnotation}.
+ * <p>This class is distinct from the top-level location-sharing message
+ * types ({@code LocationMessage} and {@code LiveLocationMessage}), which
+ * represent standalone messages whose entire purpose is to share a
+ * location. {@code Location} is a lightweight payload that appears only
+ * as a nested action inside an {@code InteractiveAnnotation}.
  *
  * @see com.github.auties00.cobalt.model.message.interactive.InteractiveAnnotation
  * @see Point

@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.device.timestamp;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.device.info.DeviceList;
 
 import java.time.Duration;
@@ -7,15 +10,28 @@ import java.time.Instant;
 import java.util.Objects;
 
 /**
- * Utilities for managing expected timestamp logic in device lists.
+ * Utility methods that implement WhatsApp's "expected timestamp" staleness logic for
+ * device lists.
  *
- * <p>The expected timestamp system detects stale device lists that have not been
- * refreshed recently, even when the device hash (dhash) matches.
+ * <p>A device list that the server rejects with a matching dhash is not necessarily
+ * up-to-date: the server may know that a newer list exists but choose not to send it,
+ * instead indicating the "expected" next timestamp. Cobalt (like WA Web) tracks three
+ * timestamps per device record to reason about this: the expected timestamp, when it
+ * was last updated, and which ADV job run observed it. These helpers produce new
+ * values of those fields and decide when a record should be refreshed, cleared, or
+ * treated as expired.
+ *
+ * <p>Consumed by {@link com.github.auties00.cobalt.device.DeviceService} during every
+ * USync response handling path and by
+ * {@link com.github.auties00.cobalt.device.adv.DeviceADVChecker} during periodic
+ * device list expiration checks.
  *
  * @implNote WAWebAdvExpectedTsApi: provides the original implementation for
  * expectedTs, expectedTsLastDeviceJobTs, and expectedTsUpdateTs tracking.
  * WAWebAdvDeviceInfoCheckJob: provides staleness and expiration check logic.
  */
+@WhatsAppWebModule(moduleName = "WAWebAdvExpectedTsApi")
+@WhatsAppWebModule(moduleName = "WAWebAdvDeviceInfoCheckJob")
 public final class DeviceExpectedTsUtils {
 
     /**
@@ -26,12 +42,15 @@ public final class DeviceExpectedTsUtils {
      * threshold constant {@code m} for determining whether expectedTsUpdateTs
      * indicates a stale device list.
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvDeviceInfoCheckJob",
+            exports = "runAdvDeviceInfoCheck",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static final Duration EXPECTED_TIMESTAMP_UPDATE_THRESHOLD = Duration.ofHours(25);
 
     /**
      * Prevents instantiation of this utility class.
      *
-     * @implNote NO_WA_BASIS: Java utility class pattern.
+     * @throws UnsupportedOperationException always, to enforce the utility-class idiom
      */
     private DeviceExpectedTsUtils() {
         throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
@@ -51,6 +70,9 @@ public final class DeviceExpectedTsUtils {
      * @param lastADVCheckTime          the last ADV device check time, or {@code null}
      * @return {@code true} if expected timestamp should be cleared
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvExpectedTsApi",
+            exports = "shouldClearExpectedTs",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static boolean shouldClearExpectedTimestamp(
             Instant incomingTimestamp,
             Instant incomingExpectedTimestamp,
@@ -93,6 +115,9 @@ public final class DeviceExpectedTsUtils {
      * @param newExpectedTimestamp the new expected timestamp, or {@code null}
      * @return {@code true} if the timestamps differ
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvExpectedTsApi",
+            exports = "computeNewExpectedTs",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public static boolean hasExpectedTimestampChanged(Instant oldExpectedTimestamp, Instant newExpectedTimestamp) {
         if (oldExpectedTimestamp == null && newExpectedTimestamp == null) {
             return false;
@@ -116,6 +141,9 @@ public final class DeviceExpectedTsUtils {
      * @param lastADVCheckTime  the last ADV device check time, or {@code null}
      * @return the computed expected timestamp fields
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvExpectedTsApi",
+            exports = "computeExpectedTsForDeviceRecord",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static ExpectedTimestampResult computeExpectedTimestampForDeviceRecord(
             Instant incomingTimestamp,
             DeviceList cachedList,
@@ -171,6 +199,9 @@ public final class DeviceExpectedTsUtils {
      * @param currentExpectedTimestampUpdateTimestamp        the current update timestamp, or {@code null}
      * @return the computed expected timestamp fields
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvExpectedTsApi",
+            exports = "computeNewExpectedTs",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static ExpectedTimestampResult computeNewExpectedTimestamp(
             Instant incomingTimestamp,
             Instant currentTimestamp,
@@ -223,6 +254,9 @@ public final class DeviceExpectedTsUtils {
      * @param lastADVCheckTime the last ADV device check time, or {@code null}
      * @return {@code true} if the device list is stale
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvDeviceInfoCheckJob",
+            exports = "runAdvDeviceInfoCheck",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static boolean isDeviceListStale(
             DeviceList deviceList,
             Instant currentTime,
@@ -268,6 +302,9 @@ public final class DeviceExpectedTsUtils {
      * @param warningThreshold threshold for warning
      * @return {@code true} if the device list is close to expiration
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvDeviceInfoCheckJob",
+            exports = "runAdvDeviceInfoCheck",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static boolean isDeviceListCloseToExpiration(
             DeviceList deviceList,
             Instant currentTime,

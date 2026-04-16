@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.message.send.token;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 
 import javax.crypto.KDF;
@@ -26,6 +29,7 @@ import java.util.Optional;
  * {@code genReportingTokenKeyFromMessageSecret}, and
  * {@code genReportingTokenBody}.
  */
+@WhatsAppWebModule(moduleName = "WAWebReportingTokenUtils")
 public final class ReportingToken {
     /**
      * Output length for the HKDF-derived reporting token key.
@@ -94,6 +98,8 @@ public final class ReportingToken {
      * via {@code genReportingTokenKeyFromMessageSecret}, then
      * {@code hmacSha256(key, content, 16)}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebReportingTokenUtils", exports = "genReportingToken",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static Optional<ReportingTokenResult> generate(
             byte[] messageSecret,
             String stanzaId,
@@ -145,6 +151,8 @@ public final class ReportingToken {
      * {@code extractSha256(null, messageSecret)} followed by
      * {@code expand(prk, info, 32)}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebReportingTokenUtils", exports = "genReportingTokenKeyFromMessageSecret",
+            adaptation = WhatsAppAdaptation.DIRECT)
     static byte[] deriveKey(
             byte[] messageSecret,
             String stanzaId,

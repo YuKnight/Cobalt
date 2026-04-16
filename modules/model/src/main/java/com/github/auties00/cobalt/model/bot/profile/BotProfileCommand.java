@@ -8,22 +8,17 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * A slash-command registered on a bot's profile.
+ * Represents a slash-command registered on a WhatsApp AI bot's profile.
  *
- * <p>Each command is parsed from a {@code <command>} element inside the
- * {@code <commands>} block of the USync bot profile response:
- * <pre>{@code
- * <commands>
- *   <command>
- *     <name>imagine</name>
- *     <description>Generate an image from a text prompt</description>
- *   </command>
- * </commands>
- * }</pre>
+ * <p>Bots advertise a set of slash-commands that users can invoke by
+ * typing a forward slash followed by the command name (e.g.
+ * {@code /imagine}, {@code /translate}). Each command has a name and an
+ * optional description explaining what it does.
  *
  * <p>When a user sends a message starting with {@code /commandName}, the
  * message's body type should be set to {@code COMMAND} instead of
- * {@code PROMPT}.
+ * {@code PROMPT} to indicate that the message is a command invocation
+ * rather than a free-text prompt.
  *
  * @see BotProfile#commands()
  * @see BotProfile#isCommand(String)
@@ -45,12 +40,14 @@ public final class BotProfileCommand {
     String description;
 
     /**
-     * Constructs a new {@code BotProfileCommand}.
+     * Constructs a new {@code BotProfileCommand}. Prefer using the generated
+     * {@code BotProfileCommandBuilder} instead of calling this constructor
+     * directly.
      *
      * @param name        the command name without the leading slash,
-     *                    must be non-{@code null}
+     *                    must not be {@code null}
      * @param description a human-readable description of the command,
-     *                    may be {@code null}
+     *                    or {@code null} if none is available
      */
     BotProfileCommand(String name, String description) {
         this.name = Objects.requireNonNull(name, "name");
@@ -77,18 +74,18 @@ public final class BotProfileCommand {
     }
 
     /**
-     * Sets the command name.
+     * Sets the command name (without the leading slash).
      *
-     * @param name the command name, must be non-{@code null}
+     * @param name the command name, must not be {@code null}
      */
     public void setName(String name) {
         this.name = name;
     }
 
     /**
-     * Sets the command description.
+     * Sets the human-readable description of this command.
      *
-     * @param description the description, may be {@code null}
+     * @param description the description, or {@code null} to clear
      */
     public void setDescription(String description) {
         this.description = description;

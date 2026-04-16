@@ -2,11 +2,17 @@ package com.github.auties00.cobalt.exception;
 
 /**
  * Base exception for all WhatsApp-related errors in the Cobalt library.
- * <p>
- * This is a sealed abstract class that serves as the root of the exception hierarchy
+ *
+ * <p>This is a sealed abstract class that serves as the root of the exception hierarchy
  * for all WhatsApp protocol and client errors. The sealed hierarchy enables exhaustive
  * pattern matching on exception types and ensures all exception categories are explicitly
  * defined.
+
+ * <p>Unlike WhatsApp Web, which handles errors inline via try/catch with hard-coded
+ * recovery actions, Cobalt throws a typed exception subtype and delegates recovery
+ * to a pluggable {@code WhatsAppClientErrorHandler}. This allows applications to
+ * decide whether a given failure should cause a disconnect, reconnect, log out,
+ * or be silently discarded.
  *
  * <h2>Exception Hierarchy</h2>
  * The exception hierarchy is organized by error domain:

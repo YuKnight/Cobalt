@@ -12,73 +12,117 @@ import java.util.Optional;
 import java.util.OptionalInt;
 
 /**
- * A sync action representing customer data (CRM) associated with a chat.
+ * A sync action carrying customer relationship management (CRM) data associated with a chat.
  *
- * <p>Per WhatsApp Web {@code WAWebCustomerDataSync}, this action stores
- * business customer relationship data such as contact type, email,
- * phone numbers, birthday, address, acquisition source, lead stage,
- * last order timestamp, and creation/modification timestamps.
+ * <p>Business accounts can annotate each chat with structured customer information such as
+ * contact classification, email and alternative phone numbers, birthday, postal address,
+ * how the customer was acquired, the current lead stage in the sales funnel, and the time of
+ * their most recent order. These fields are replicated to linked devices through this action
+ * so that the business sees consistent customer records regardless of which device they are
+ * working from.
  *
- * <p>It is synced via the {@code REGULAR_LOW} collection.
- *
- * @implNote WAWebCustomerDataSync, WAWebProtobufSyncAction.pb — SyncActionValue$CustomerDataAction
+ * <p>This action is transported in the {@code REGULAR_LOW} sync collection because the data
+ * is operator-curated and not latency-sensitive, and keyed by chat JID through
+ * {@link CustomerDataActionArgs}.
  */
 @ProtobufMessage(name = "SyncActionValue.CustomerDataAction")
 public final class CustomerDataAction implements SyncAction<CustomerDataActionArgs> {
     /**
-     * Canonical WhatsApp Web action name for this action type.
-     *
-     * @implNote WASyncdConst.Actions.CustomerData
+     * The canonical action name used when encoding this action inside a sync patch index.
      */
     public static final String ACTION_NAME = "customer_data";
 
     /**
-     * Canonical WhatsApp Web action version for this action type.
-     *
-     * @implNote WAWebCustomerDataSync.getVersion
+     * The action version negotiated with the server for this action type.
      */
     public static final int ACTION_VERSION = 1;
 
     /**
-     * Canonical WhatsApp Web collection name for this action type.
-     *
-     * @implNote WAWebCustomerDataSync.collectionName — CollectionName.RegularLow
+     * The sync patch collection that carries this action between devices.
      */
     public static final SyncPatchType COLLECTION_NAME = SyncPatchType.REGULAR_LOW;
 
+    /**
+     * The JID of the chat this customer record is attached to.
+     */
     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
     final String chatJid;
 
+    /**
+     * The integer code classifying the type of contact (for example lead versus customer).
+     */
     @ProtobufProperty(index = 2, type = ProtobufType.INT32)
     final Integer contactType;
 
+    /**
+     * The customer's email address.
+     */
     @ProtobufProperty(index = 3, type = ProtobufType.STRING)
     final String email;
 
+    /**
+     * The customer's alternative phone numbers, encoded as a single string.
+     */
     @ProtobufProperty(index = 4, type = ProtobufType.STRING)
     final String altPhoneNumbers;
 
+    /**
+     * The customer's birthday.
+     */
     @ProtobufProperty(index = 5, type = ProtobufType.INT64, mixins = InstantSecondsMixin.class)
     final Instant birthday;
 
+    /**
+     * The customer's postal address.
+     */
     @ProtobufProperty(index = 6, type = ProtobufType.STRING)
     final String address;
 
+    /**
+     * The integer code identifying how this customer was acquired.
+     */
     @ProtobufProperty(index = 7, type = ProtobufType.INT32)
     final Integer acquisitionSource;
 
+    /**
+     * The integer code describing the customer's current position in the sales funnel.
+     */
     @ProtobufProperty(index = 8, type = ProtobufType.INT32)
     final Integer leadStage;
 
+    /**
+     * The timestamp of the customer's most recent order.
+     */
     @ProtobufProperty(index = 9, type = ProtobufType.INT64, mixins = InstantSecondsMixin.class)
     final Instant lastOrder;
 
+    /**
+     * The timestamp at which this customer record was originally created.
+     */
     @ProtobufProperty(index = 10, type = ProtobufType.INT64, mixins = InstantSecondsMixin.class)
     final Instant createdAt;
 
+    /**
+     * The timestamp at which this customer record was last modified.
+     */
     @ProtobufProperty(index = 11, type = ProtobufType.INT64, mixins = InstantSecondsMixin.class)
     final Instant modifiedAt;
 
+    /**
+     * Creates a customer data action with all CRM fields populated.
+     *
+     * @param chatJid           the associated chat JID, or {@code null}
+     * @param contactType       the contact type code, or {@code null}
+     * @param email             the email address, or {@code null}
+     * @param altPhoneNumbers   the alternative phone numbers string, or {@code null}
+     * @param birthday          the birthday, or {@code null}
+     * @param address           the postal address, or {@code null}
+     * @param acquisitionSource the acquisition source code, or {@code null}
+     * @param leadStage         the lead stage code, or {@code null}
+     * @param lastOrder         the time of the most recent order, or {@code null}
+     * @param createdAt         the creation time of the record, or {@code null}
+     * @param modifiedAt        the last modification time of the record, or {@code null}
+     */
     CustomerDataAction(String chatJid, Integer contactType, String email, String altPhoneNumbers,
                        Instant birthday, String address, Integer acquisitionSource, Integer leadStage,
                        Instant lastOrder, Instant createdAt, Instant modifiedAt) {
@@ -96,7 +140,9 @@ public final class CustomerDataAction implements SyncAction<CustomerDataActionAr
     }
 
     /**
-     * {@inheritDoc}
+     * Returns the canonical action name for this action type.
+     *
+     * @return the action name
      */
     @Override
     public String actionName() {
@@ -104,7 +150,9 @@ public final class CustomerDataAction implements SyncAction<CustomerDataActionAr
     }
 
     /**
-     * {@inheritDoc}
+     * Returns the action version for this action type.
+     *
+     * @return the action version
      */
     @Override
     public int actionVersion() {
@@ -112,36 +160,36 @@ public final class CustomerDataAction implements SyncAction<CustomerDataActionAr
     }
 
     /**
-     * Returns the chat JID this customer data is associated with.
+     * Returns the JID of the chat associated with this customer data.
      *
-     * @return the chat JID, or empty if not set
+     * @return the chat JID, or {@link Optional#empty()} if not set
      */
     public Optional<String> chatJid() {
         return Optional.ofNullable(chatJid);
     }
 
     /**
-     * Returns the contact type.
+     * Returns the contact type code for this customer.
      *
-     * @return the contact type, or empty if not set
+     * @return the contact type code, or {@link OptionalInt#empty()} if not set
      */
     public OptionalInt contactType() {
         return contactType == null ? OptionalInt.empty() : OptionalInt.of(contactType);
     }
 
     /**
-     * Returns the customer email.
+     * Returns the customer's email address.
      *
-     * @return the email, or empty if not set
+     * @return the email, or {@link Optional#empty()} if not set
      */
     public Optional<String> email() {
         return Optional.ofNullable(email);
     }
 
     /**
-     * Returns the customer's alternative phone numbers.
+     * Returns the customer's alternative phone numbers, as stored by the business.
      *
-     * @return the alternative phone numbers, or empty if not set
+     * @return the alternative phone numbers, or {@link Optional#empty()} if not set
      */
     public Optional<String> altPhoneNumbers() {
         return Optional.ofNullable(altPhoneNumbers);
@@ -150,61 +198,61 @@ public final class CustomerDataAction implements SyncAction<CustomerDataActionAr
     /**
      * Returns the customer's birthday.
      *
-     * @return the birthday, or empty if not set
+     * @return the birthday, or {@link Optional#empty()} if not set
      */
     public Optional<Instant> birthday() {
         return Optional.ofNullable(birthday);
     }
 
     /**
-     * Returns the customer's address.
+     * Returns the customer's postal address.
      *
-     * @return the address, or empty if not set
+     * @return the address, or {@link Optional#empty()} if not set
      */
     public Optional<String> address() {
         return Optional.ofNullable(address);
     }
 
     /**
-     * Returns the acquisition source.
+     * Returns the acquisition source code for this customer.
      *
-     * @return the acquisition source, or empty if not set
+     * @return the acquisition source code, or {@link OptionalInt#empty()} if not set
      */
     public OptionalInt acquisitionSource() {
         return acquisitionSource == null ? OptionalInt.empty() : OptionalInt.of(acquisitionSource);
     }
 
     /**
-     * Returns the lead stage.
+     * Returns the lead stage code describing the customer's position in the sales funnel.
      *
-     * @return the lead stage, or empty if not set
+     * @return the lead stage code, or {@link OptionalInt#empty()} if not set
      */
     public OptionalInt leadStage() {
         return leadStage == null ? OptionalInt.empty() : OptionalInt.of(leadStage);
     }
 
     /**
-     * Returns the last order timestamp.
+     * Returns the timestamp of the customer's most recent order.
      *
-     * @return the last order time, or empty if not set
+     * @return the last order time, or {@link Optional#empty()} if not set
      */
     public Optional<Instant> lastOrder() {
         return Optional.ofNullable(lastOrder);
     }
 
     /**
-     * Returns the creation timestamp.
+     * Returns the timestamp at which this customer record was originally created.
      *
-     * @return the creation time, or empty if not set
+     * @return the creation time, or {@link Optional#empty()} if not set
      */
     public Optional<Instant> createdAt() {
         return Optional.ofNullable(createdAt);
     }
 
     /**
-     * Returns the last modification timestamp.
+     * Returns the timestamp at which this customer record was last modified.
      *
-     * @return the modification time, or empty if not set
+     * @return the modification time, or {@link Optional#empty()} if not set
      */
     public Optional<Instant> modifiedAt() {
         return Optional.ofNullable(modifiedAt);

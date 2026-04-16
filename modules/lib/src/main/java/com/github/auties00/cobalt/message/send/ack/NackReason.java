@@ -1,5 +1,9 @@
 package com.github.auties00.cobalt.message.send.ack;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
+
 /**
  * Well-known server nack (negative acknowledgement) error codes.
  *
@@ -12,12 +16,15 @@ package com.github.auties00.cobalt.message.send.ack;
  * error codes the server may include in the ack's {@code error} attribute.
  * @see AckResult#error()
  */
+@WhatsAppWebModule(moduleName = "WAWebCreateNackFromStanza")
 public final class NackReason {
     /**
      * The group's addressing mode has changed since the client's last sync.
      *
      * @implNote WAWebCreateNackFromStanza.NackReason.StaleGroupAddressingMode
      */
+    @WhatsAppWebExport(moduleName = "WAWebCreateNackFromStanza", exports = "NackReason",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static final int STALE_GROUP_ADDRESSING_MODE = 421;
 
     /**
@@ -25,6 +32,8 @@ public final class NackReason {
      *
      * @implNote WAWebCreateNackFromStanza.NackReason.NewChatMessagesCapped
      */
+    @WhatsAppWebExport(moduleName = "WAWebCreateNackFromStanza", exports = "NackReason",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static final int NEW_CHAT_MESSAGES_CAPPED = 475;
 
     /**
@@ -32,6 +41,8 @@ public final class NackReason {
      *
      * @implNote WAWebCreateNackFromStanza.NackReason.ParsingError
      */
+    @WhatsAppWebExport(moduleName = "WAWebCreateNackFromStanza", exports = "NackReason",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static final int PARSING_ERROR = 487;
 
     /**
@@ -39,6 +50,8 @@ public final class NackReason {
      *
      * @implNote WAWebCreateNackFromStanza.NackReason.UnrecognizedStanza
      */
+    @WhatsAppWebExport(moduleName = "WAWebCreateNackFromStanza", exports = "NackReason",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static final int UNRECOGNIZED_STANZA = 488;
 
     /**
@@ -46,6 +59,8 @@ public final class NackReason {
      *
      * @implNote WAWebCreateNackFromStanza.NackReason.UnrecognizedStanzaClass
      */
+    @WhatsAppWebExport(moduleName = "WAWebCreateNackFromStanza", exports = "NackReason",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static final int UNRECOGNIZED_STANZA_CLASS = 489;
 
     /**
@@ -53,6 +68,8 @@ public final class NackReason {
      *
      * @implNote WAWebCreateNackFromStanza.NackReason.UnrecognizedStanzaType
      */
+    @WhatsAppWebExport(moduleName = "WAWebCreateNackFromStanza", exports = "NackReason",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static final int UNRECOGNIZED_STANZA_TYPE = 490;
 
     /**
@@ -60,6 +77,8 @@ public final class NackReason {
      *
      * @implNote WAWebCreateNackFromStanza.NackReason.InvalidProtobuf
      */
+    @WhatsAppWebExport(moduleName = "WAWebCreateNackFromStanza", exports = "NackReason",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static final int INVALID_PROTOBUF = 491;
 
     /**
@@ -67,6 +86,8 @@ public final class NackReason {
      *
      * @implNote WAWebCreateNackFromStanza.NackReason.InvalidHostedCompanionStanza
      */
+    @WhatsAppWebExport(moduleName = "WAWebCreateNackFromStanza", exports = "NackReason",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static final int INVALID_HOSTED_COMPANION_STANZA = 493;
 
     /**
@@ -74,6 +95,8 @@ public final class NackReason {
      *
      * @implNote WAWebCreateNackFromStanza.NackReason.MissingMessageSecret
      */
+    @WhatsAppWebExport(moduleName = "WAWebCreateNackFromStanza", exports = "NackReason",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static final int MISSING_MESSAGE_SECRET = 495;
 
     /**
@@ -81,6 +104,8 @@ public final class NackReason {
      *
      * @implNote WAWebCreateNackFromStanza.NackReason.SignalErrorOldCounter
      */
+    @WhatsAppWebExport(moduleName = "WAWebCreateNackFromStanza", exports = "NackReason",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static final int SIGNAL_ERROR_OLD_COUNTER = 496;
 
     /**
@@ -88,6 +113,8 @@ public final class NackReason {
      *
      * @implNote WAWebCreateNackFromStanza.NackReason.MessageDeletedOnPeer
      */
+    @WhatsAppWebExport(moduleName = "WAWebCreateNackFromStanza", exports = "NackReason",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static final int MESSAGE_DELETED_ON_PEER = 499;
 
     /**
@@ -95,6 +122,8 @@ public final class NackReason {
      *
      * @implNote WAWebCreateNackFromStanza.NackReason.UnhandledError
      */
+    @WhatsAppWebExport(moduleName = "WAWebCreateNackFromStanza", exports = "NackReason",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static final int UNHANDLED_ERROR = 500;
 
     /**
@@ -102,6 +131,8 @@ public final class NackReason {
      *
      * @implNote WAWebCreateNackFromStanza.NackReason.UnsupportedAdminRevoke
      */
+    @WhatsAppWebExport(moduleName = "WAWebCreateNackFromStanza", exports = "NackReason",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static final int UNSUPPORTED_ADMIN_REVOKE = 550;
 
     /**
@@ -109,6 +140,8 @@ public final class NackReason {
      *
      * @implNote WAWebCreateNackFromStanza.NackReason.UnsupportedLIDGroup
      */
+    @WhatsAppWebExport(moduleName = "WAWebCreateNackFromStanza", exports = "NackReason",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static final int UNSUPPORTED_LID_GROUP = 551;
 
     /**
@@ -116,6 +149,8 @@ public final class NackReason {
      *
      * @implNote WAWebCreateNackFromStanza.NackReason.DBOperationFailed
      */
+    @WhatsAppWebExport(moduleName = "WAWebCreateNackFromStanza", exports = "NackReason",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static final int DB_OPERATION_FAILED = 552;
 
     /**

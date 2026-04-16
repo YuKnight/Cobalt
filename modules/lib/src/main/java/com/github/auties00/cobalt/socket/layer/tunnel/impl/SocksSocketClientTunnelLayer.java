@@ -1,9 +1,8 @@
-package com.github.auties00.cobalt.socket.layer.tunnel.impl.socks;
+package com.github.auties00.cobalt.socket.layer.tunnel.impl;
 
 import com.github.auties00.cobalt.socket.layer.SocketClientLayer;
 import com.github.auties00.cobalt.socket.layer.SocketClientLayerListener;
 import com.github.auties00.cobalt.socket.layer.tunnel.SocketClientTunnelLayer;
-import com.github.auties00.cobalt.socket.layer.tunnel.impl.SocketTunnelLayerContextImpl;
 import com.github.auties00.cobalt.socket.threading.SocketClientLayerContext;
 import com.github.auties00.cobalt.client.WhatsAppClientProxy;
 import com.github.auties00.cobalt.client.WhatsAppClientProxyAuthenticator;
@@ -123,7 +122,7 @@ public final class SocksSocketClientTunnelLayer implements SocketClientTunnelLay
                 new InetSocketAddress(proxy.host(), proxy.port()),
                 listener
         );
-        innerLayer.registerLayerContext(new SocketTunnelLayerContextImpl());
+        innerLayer.registerLayerContext(new CommonSocketTunnelLayerContext());
 
         switch (proxy) {
             case WhatsAppClientProxy.Socks.V4.Local v4 -> performSocks4Handshake(v4);

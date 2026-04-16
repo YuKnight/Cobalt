@@ -1,6 +1,9 @@
 package com.github.auties00.cobalt.message.send.icdc;
 
 import com.github.auties00.cobalt.device.icdc.IcdcResult;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.chat.ChatMessageContextInfoBuilder;
 import com.github.auties00.cobalt.model.device.DeviceListMetadataBuilder;
 import com.github.auties00.cobalt.model.message.MessageContainer;
@@ -21,6 +24,8 @@ import com.github.auties00.cobalt.model.message.MessageContainer;
  * Called by WAWebICDCMetaApi.populateICDCMeta after computing sender
  * and recipient ICDC results.
  */
+@WhatsAppWebModule(moduleName = "WAWebE2EProtoGenerator")
+@WhatsAppWebModule(moduleName = "WAWebICDCMetaApi")
 public final class IcdcEnricher {
     /**
      * Prevents instantiation of this utility class.
@@ -51,6 +56,10 @@ public final class IcdcEnricher {
      * shallow-merge the existing messageContextInfo with the new ICDC
      * fields, preserving all pre-existing properties.
      */
+    @WhatsAppWebExport(moduleName = "WAWebE2EProtoGenerator", exports = "populateMessageContextInfo",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WAWebICDCMetaApi", exports = "populateICDCMeta",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static MessageContainer enrich(
             MessageContainer container,
             IcdcResult senderIcdc,

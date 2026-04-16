@@ -11,31 +11,41 @@ import java.time.Instant;
 import java.util.Optional;
 
 /**
- * A record of an AI query being fanned out (distributed) to one or more
- * recipients in a conversation.
+ * Represents an AI query message that has been fanned out (distributed) to
+ * participants in a conversation.
  *
- * <p>When a user sends a prompt to Meta AI inside a group or multi-device
- * session, the server fans the query out so that all relevant participants
- * receive the AI-generated response. This message captures the original
- * {@linkplain #messageKey() message key}, the {@linkplain #message() message content},
- * and the {@linkplain #timestamp() timestamp} of the fanout event.
+ * <p>When a user sends a prompt to Meta AI within a group chat or across a
+ * multi-device session, the server distributes the query to all relevant
+ * participants so they can see both the original question and the AI-generated
+ * response. This protobuf message captures the original
+ * {@linkplain #messageKey() message key} that uniquely identifies the query,
+ * the full {@linkplain #message() message content} of the query, and the
+ * {@linkplain #timestamp() timestamp} at which the fanout occurred.
+ *
+ * <p>This type is embedded within the end-to-end encrypted message structure
+ * as part of the {@code ContextInfo} associated with AI bot messages.
  */
 @ProtobufMessage(name = "AIQueryFanout")
 public final class AIQueryFanout {
     /**
-     * The key that uniquely identifies the original AI query message.
+     * The key that uniquely identifies the original AI query message within the
+     * conversation. This allows recipients to correlate the fanout with the
+     * original user prompt.
      */
     @ProtobufProperty(index = 1, type = ProtobufType.MESSAGE)
     MessageKey messageKey;
 
     /**
-     * The content of the AI query message that was fanned out.
+     * The full content of the AI query message that was fanned out. This contains
+     * the complete end-to-end encrypted message payload, including the user's
+     * prompt text and any associated media or context.
      */
     @ProtobufProperty(index = 2, type = ProtobufType.MESSAGE)
     MessageContainer messageContainer;
 
     /**
-     * The timestamp at which the fanout occurred.
+     * The timestamp, in seconds since the Unix epoch, at which the fanout event
+     * occurred on the server.
      */
     @ProtobufProperty(index = 3, type = ProtobufType.INT64, mixins = InstantSecondsMixin.class)
     Instant timestamp;
@@ -44,9 +54,9 @@ public final class AIQueryFanout {
     /**
      * Constructs a new {@code AIQueryFanout} with the specified values.
      *
-     * @param messageKey the key of the original query message, or {@code null}
-     * @param messageContainer    the message content, or {@code null}
-     * @param timestamp  the fanout timestamp, or {@code null}
+     * @param messageKey       the key of the original query message, or {@code null}
+     * @param messageContainer the full message content of the query, or {@code null}
+     * @param timestamp        the server-side fanout timestamp, or {@code null}
      */
     AIQueryFanout(MessageKey messageKey, MessageContainer messageContainer, Instant timestamp) {
         this.messageKey = messageKey;
@@ -57,7 +67,7 @@ public final class AIQueryFanout {
     /**
      * Returns the key that uniquely identifies the original AI query message.
      *
-     * @return an {@code Optional} describing the message key, or an empty
+     * @return an {@code Optional} containing the message key, or an empty
      *         {@code Optional} if not set
      */
     public Optional<MessageKey> messageKey() {
@@ -65,9 +75,9 @@ public final class AIQueryFanout {
     }
 
     /**
-     * Returns the content of the AI query message that was fanned out.
+     * Returns the full content of the AI query message that was fanned out.
      *
-     * @return an {@code Optional} describing the message, or an empty
+     * @return an {@code Optional} containing the message content, or an empty
      *         {@code Optional} if not set
      */
     public Optional<MessageContainer> message() {
@@ -75,9 +85,9 @@ public final class AIQueryFanout {
     }
 
     /**
-     * Returns the timestamp at which the fanout occurred.
+     * Returns the timestamp at which the fanout event occurred on the server.
      *
-     * @return an {@code Optional} describing the timestamp, or an empty
+     * @return an {@code Optional} containing the fanout timestamp, or an empty
      *         {@code Optional} if not set
      */
     public Optional<Instant> timestamp() {
@@ -87,25 +97,25 @@ public final class AIQueryFanout {
     /**
      * Sets the key that uniquely identifies the original AI query message.
      *
-     * @param messageKey the new message key, or {@code null}
+     * @param messageKey the new message key, or {@code null} to clear
      */
     public void setMessageKey(MessageKey messageKey) {
         this.messageKey = messageKey;
     }
 
     /**
-     * Sets the content of the AI query message that was fanned out.
+     * Sets the full content of the AI query message that was fanned out.
      *
-     * @param messageContainer the new message content, or {@code null}
+     * @param messageContainer the new message content, or {@code null} to clear
      */
     public void setMessage(MessageContainer messageContainer) {
         this.messageContainer = messageContainer;
     }
 
     /**
-     * Sets the timestamp at which the fanout occurred.
+     * Sets the timestamp at which the fanout event occurred.
      *
-     * @param timestamp the new fanout timestamp, or {@code null}
+     * @param timestamp the new fanout timestamp, or {@code null} to clear
      */
     public void setTimestamp(Instant timestamp) {
         this.timestamp = timestamp;

@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.message.send.stanza;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
@@ -26,6 +29,8 @@ import java.util.Objects;
  * @see CsTokenStanza
  * @see ChatFanoutStanza
  */
+@WhatsAppWebModule(moduleName = "WAWebSendMsgCreateFanoutStanza")
+@WhatsAppWebModule(moduleName = "WAWebTrustedContactsUtils")
 public final class TcTokenStanza {
     /**
      * The WhatsApp store, used for chat lookup.
@@ -58,6 +63,8 @@ public final class TcTokenStanza {
      * module-level function uses module-scope imports; Cobalt injects
      * dependencies via constructor.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCreateFanoutStanza", exports = "createFanoutMsgStanza",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public TcTokenStanza(WhatsAppStore store, ABPropsService abPropsService) {
         this.store = Objects.requireNonNull(store, "store");
         this.abPropsService = Objects.requireNonNull(abPropsService, "abPropsService");
@@ -78,6 +85,8 @@ public final class TcTokenStanza {
      * verifies not expired via
      * {@code WAWebTrustedContactsUtils.isTokenExpired(n, TcTokenMode.Receiver)}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCreateFanoutStanza", exports = "createFanoutMsgStanza",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public Node build(Jid chatJid) {
         // WAWebSendMsgCreateFanoutStanza function S/R:
         // if (!getABPropConfigValue("privacy_token_sending_on_all_1_on_1_messages") || e == null)
@@ -130,6 +139,8 @@ public final class TcTokenStanza {
      * to {@code tokenExpirationCutoff} which computes the cutoff
      * from {@code tctoken_duration} and {@code tctoken_num_buckets}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebTrustedContactsUtils", exports = "isTokenExpired",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private boolean isTokenExpired(Instant tokenTimestamp) {
         // WAWebTrustedContactsUtils.getTcTokenDuration for Receiver mode:
         // Math.min(getABPropConfigValue("tctoken_duration"), 15552000)

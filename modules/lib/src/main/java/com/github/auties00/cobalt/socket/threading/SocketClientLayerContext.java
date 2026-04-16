@@ -1,10 +1,5 @@
 package com.github.auties00.cobalt.socket.threading;
 
-import com.github.auties00.cobalt.socket.layer.application.SocketClientApplicationLayerContext;
-import com.github.auties00.cobalt.socket.layer.security.SocketClientSecurityLayerContext;
-import com.github.auties00.cobalt.socket.layer.transport.SocketClientTransportLayerContext;
-import com.github.auties00.cobalt.socket.layer.tunnel.SocketClientTunnelLayerContext;
-
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
@@ -25,8 +20,7 @@ import java.nio.channels.SocketChannel;
  * virtual thread, not on the selector thread.  Only TLS wrapping occurs
  * on the selector thread during write processing.
  */
-public sealed interface SocketClientLayerContext
-        permits SocketClientApplicationLayerContext, SocketClientSecurityLayerContext, SocketClientTransportLayerContext, SocketClientTunnelLayerContext {
+public interface SocketClientLayerContext {
     /**
      * Returns the buffer into which inbound bytes should be placed.
      *

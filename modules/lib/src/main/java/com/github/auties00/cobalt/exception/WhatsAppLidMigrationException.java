@@ -1,5 +1,7 @@
 package com.github.auties00.cobalt.exception;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+
 /**
  * Exception thrown when LID (Lid Identity) migration encounters a critical error.
  * <p>
@@ -34,6 +36,7 @@ package com.github.auties00.cobalt.exception;
  * @see NoLidAvailable
  * @see IncompatibleClient
  */
+@WhatsAppWebModule(moduleName = "WAWebLogoutReasonConstants")
 public sealed abstract class WhatsAppLidMigrationException
         extends WhatsAppException
         permits WhatsAppLidMigrationException.SplitThreadMismatch,

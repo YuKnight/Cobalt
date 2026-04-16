@@ -11,51 +11,66 @@ import java.util.Optional;
 import java.util.OptionalInt;
 
 /**
- * A protobuf message representing metadata for an in-thread survey displayed inline within a
- * WhatsApp AI bot chat thread.
+ * Represents metadata for an in-thread survey displayed inline within a WhatsApp
+ * AI bot conversation.
  *
- * <p>When Meta wants to gather user feedback about AI bot responses, it displays a survey
- * directly within the conversation thread rather than redirecting the user to an external form.
- * This metadata defines the complete structure of such a survey, including the invitation
- * text shown before the user engages, the questions and selectable options presented during
- * the survey, the submit and continue button labels, a privacy statement, and analytics
- * tracking identifiers used for telemetry.
+ * <p>When Meta wants to gather user feedback about AI bot responses, it displays
+ * a survey directly within the conversation thread rather than redirecting the
+ * user to an external form. This metadata defines the complete structure of such
+ * a survey, including the invitation text shown before the user engages, the
+ * questions and selectable options presented during the survey, the submit and
+ * continue button labels, a privacy statement, and analytics tracking identifiers
+ * used for telemetry.
  *
  * <p>The survey flow typically proceeds as follows:
- * <ul>
- * <li>An invitation is shown with a header, body, and a call-to-action button.
- * <li>Upon engagement, the survey title and questions are presented starting from
- *     {@code startQuestionIndex}.
- * <li>The user selects options for each question and submits using the submit button.
- * <li>A toast message confirms that feedback has been received.
- * </ul>
+ * <ol>
+ * <li>An invitation is shown with a {@linkplain #invitationHeaderText() header},
+ *     {@linkplain #invitationBodyText() body}, and a
+ *     {@linkplain #invitationCallToActionText() call-to-action button}.
+ * <li>Upon engagement, the {@linkplain #surveyTitle() survey title} and
+ *     {@linkplain #questions() questions} are presented starting from
+ *     {@linkplain #startQuestionIndex() startQuestionIndex}.
+ * <li>The user selects options for each question and submits using the
+ *     {@linkplain #surveySubmitButtonText() submit button}.
+ * <li>A {@linkplain #feedbackToastText() toast message} confirms that feedback
+ *     has been received.
+ * </ol>
+ *
+ * <p>Several field names in this class differ from the WA Web protobuf names
+ * for readability: {@code analyticsSessionId} maps to {@code tessaSessionId},
+ * {@code surveySessionId} maps to {@code simonSessionId}, {@code surveyId} maps
+ * to {@code simonSurveyId}, {@code analyticsRootId} maps to {@code tessaRootId},
+ * and {@code analyticsEvent} maps to {@code tessaEvent}.
  */
 @ProtobufMessage(name = "InThreadSurveyMetadata")
 public final class InThreadSurveyMetadata {
     /**
-     * The analytics session identifier used for telemetry tracking of this survey interaction,
-     * for example {@code "abc123def456"}.
+     * The analytics session identifier used for telemetry tracking of this survey
+     * interaction. In WA Web this field is named {@code tessaSessionId} after
+     * Meta's Tessa analytics platform.
      */
     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
     String analyticsSessionId;
 
     /**
-     * The survey session identifier used to correlate survey responses with a specific session,
-     * for example {@code "survey_session_789"}.
+     * The survey session identifier used to correlate survey responses with a
+     * specific session. In WA Web this field is named {@code simonSessionId}
+     * after Meta's Simon survey platform.
      */
     @ProtobufProperty(index = 2, type = ProtobufType.STRING)
     String surveySessionId;
 
     /**
-     * The unique identifier for this survey definition,
-     * for example {@code "feedback_survey_001"}.
+     * The unique identifier for this survey definition. In WA Web this field is
+     * named {@code simonSurveyId} after Meta's Simon survey platform.
      */
     @ProtobufProperty(index = 3, type = ProtobufType.STRING)
     String surveyId;
 
     /**
-     * The analytics root identifier used to trace this survey event back to a root analytics context,
-     * for example {@code "root_trace_456"}.
+     * The analytics root identifier used to trace this survey event back to
+     * a root analytics context. In WA Web this field is named
+     * {@code tessaRootId} after Meta's Tessa analytics platform.
      */
     @ProtobufProperty(index = 4, type = ProtobufType.STRING)
     String analyticsRootId;
@@ -68,8 +83,9 @@ public final class InThreadSurveyMetadata {
     String requestId;
 
     /**
-     * The analytics event name used for logging this survey interaction,
-     * for example {@code "in_thread_survey_shown"}.
+     * The analytics event name used for logging this survey interaction. In
+     * WA Web this field is named {@code tessaEvent} after Meta's Tessa
+     * analytics platform.
      */
     @ProtobufProperty(index = 6, type = ProtobufType.STRING)
     String analyticsEvent;
@@ -90,14 +106,15 @@ public final class InThreadSurveyMetadata {
 
     /**
      * The call-to-action button text displayed in the survey invitation,
-     * for example {@code "Take Survey"}.
+     * for example {@code "Take Survey"}. In WA Web this field is named
+     * {@code invitationCtaText}.
      */
     @ProtobufProperty(index = 9, type = ProtobufType.STRING)
     String invitationCallToActionText;
 
     /**
-     * The URL that the call-to-action button links to in the survey invitation,
-     * for example {@code "https://survey.whatsapp.com/feedback/12345"}.
+     * The URL that the call-to-action button links to in the survey invitation.
+     * In WA Web this field is named {@code invitationCtaUrl}.
      */
     @ProtobufProperty(index = 10, type = ProtobufType.STRING)
     URI invitationCallToActionUrl;
@@ -524,10 +541,12 @@ public final class InThreadSurveyMetadata {
     }
 
     /**
-     * A protobuf message representing a selectable option within an {@link InThreadSurveyQuestion}.
+     * Represents a selectable option within an {@link InThreadSurveyQuestion}.
      *
-     * <p>Each option can be represented as a string value, a numeric value, or both, along with
-     * a translated text label displayed to the user.
+     * <p>Each option can carry a {@linkplain #stringValue() string value} (used as
+     * an identifier), a {@linkplain #numericValue() numeric value} (used for scoring
+     * or ordering), or both, along with a localized {@linkplain #textTranslated()
+     * display label} shown to the user.
      */
     @ProtobufMessage(name = "InThreadSurveyMetadata.InThreadSurveyOption")
     public static final class InThreadSurveyOption {
@@ -620,12 +639,13 @@ public final class InThreadSurveyMetadata {
     }
 
     /**
-     * A protobuf message representing a segment of the privacy statement displayed during
-     * an in-thread survey.
+     * Represents a segment of the privacy statement displayed during an in-thread
+     * survey.
      *
-     * <p>Each part consists of a text fragment and an optional URL. Parts without a URL are
-     * rendered as plain text, while parts with a URL are rendered as hyperlinks. Together,
-     * the ordered list of parts composes the full privacy statement with inline links.
+     * <p>Each part consists of a {@linkplain #text() text fragment} and an optional
+     * {@linkplain #url() URL}. Parts without a URL are rendered as plain text, while
+     * parts with a URL are rendered as hyperlinks. Together, the ordered list of parts
+     * composes the full privacy statement with inline links.
      */
     @ProtobufMessage(name = "InThreadSurveyMetadata.InThreadSurveyPrivacyStatementPart")
     public static final class InThreadSurveyPrivacyStatementPart {
@@ -692,10 +712,12 @@ public final class InThreadSurveyMetadata {
     }
 
     /**
-     * A protobuf message representing a single question within an in-thread survey.
+     * Represents a single question within an in-thread survey.
      *
-     * <p>Each question has a display text, a unique identifier, and a list of selectable
-     * {@link InThreadSurveyOption} instances from which the user may choose a response.
+     * <p>Each question has a {@linkplain #questionText() display text}, a unique
+     * {@linkplain #questionId() identifier}, and a list of selectable
+     * {@linkplain #questionOptions() options} from which the user may choose a
+     * response.
      */
     @ProtobufMessage(name = "InThreadSurveyMetadata.InThreadSurveyQuestion")
     public static final class InThreadSurveyQuestion {

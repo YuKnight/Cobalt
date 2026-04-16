@@ -7,8 +7,16 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 
 /**
- * A mute state for a chat, representing whether notifications for the chat
- * are suppressed and, if so, for how long.
+ * Represents the mute state of a WhatsApp chat, controlling whether
+ * notifications for the chat are suppressed and for how long.
+ *
+ * <p>WhatsApp allows users to mute individual chats to silence notifications.
+ * A chat can be muted for a fixed duration (8 hours, 1 week, or until a
+ * specific timestamp), muted indefinitely, or not muted at all. This sealed
+ * interface models all three states via its permitted implementations:
+ * {@link Disabled} (notifications enabled), {@link Enabled.Timeframe}
+ * (muted until a specific instant), and {@link Enabled.Indefinitely}
+ * (muted with no expiration).
  *
  * <p>Instances are obtained through the static factory methods
  * {@link #notMuted()}, {@link #muted()}, {@link #mutedForEightHours()},

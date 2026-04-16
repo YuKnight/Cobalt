@@ -7,6 +7,7 @@ import com.github.auties00.cobalt.socket.threading.SocketClientLayerContext;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.SocketChannel;
 
 /**
  * Default implementation of {@link SocketClientTunnelLayerContext} that handles
@@ -18,7 +19,7 @@ import java.nio.ByteBuffer;
  * to asynchronous mode ({@code tunnelled = true}), it becomes a pure
  * passthrough to the next layer above.
  */
-public final class SocketTunnelLayerContextImpl implements SocketClientTunnelLayerContext {
+final class CommonSocketTunnelLayerContext implements SocketClientTunnelLayerContext {
     private static final ByteBuffer EMPTY_BUFFER = ByteBuffer.allocate(0);
 
     /**
@@ -49,7 +50,7 @@ public final class SocketTunnelLayerContextImpl implements SocketClientTunnelLay
      * Creates a tunnel layer context in the pre-tunnel (not yet
      * tunnelled) state.
      */
-    public SocketTunnelLayerContextImpl() {
+    public CommonSocketTunnelLayerContext() {
         this.tunnelled = false;
     }
 
@@ -202,5 +203,32 @@ public final class SocketTunnelLayerContextImpl implements SocketClientTunnelLay
         if (next != null) {
             next.onDisconnect();
         }
+    }
+
+    /**
+     * Delegates outbound bytes up the chain so that any security layer
+     * above this tunnel gets to wrap them before they reach the channel.
+     *
+     * <p>Without this override, the default {@link SocketClientLayerContext#processOutbound}
+     * would write directly to the channel and short-circuit any TLS layer
+     * that sits above the tunnel in the new linked-list ordering (where
+     * end-to-end TLS is above the tunnel because the factory composes it
+     * as an outer wrapper around the proxy tunnel).
+     *
+     * @param channel the socket channel to write to
+     * @param buffers the data buffers
+     * @param offset  the offset into the buffers array
+     * @param count   the number of buffers to process
+     * @return {@code true} if all data was written successfully
+     * @throws IOException if an I/O error occurs during writing
+     */
+    @Override
+    public boolean processOutbound(SocketChannel channel, ByteBuffer[] buffers, int offset, int count) throws IOException {
+        var next = nextLayer;
+        if (next != null) {
+            return next.processOutbound(channel, buffers, offset, count);
+        }
+        channel.write(buffers, offset, count);
+        return true;
     }
 }

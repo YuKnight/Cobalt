@@ -8,52 +8,46 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Represents a business quick reply template stored locally for the linked
- * device.
+ * Represents a business quick reply template that lets the user expand a short
+ * shortcut into a full canned message.
  *
- * <p>A quick reply consists of a stable {@code id} (the primary key in the
- * WhatsApp Web {@code WAWebSchemaQuickReply} IndexedDB table), a user-visible
- * {@code shortcut} that the user types to expand the template, the
- * {@code message} body that gets sent in the shortcut's place, an optional
- * list of search {@code keywords}, and a usage {@code count} maintained by
- * the WhatsApp Web client.
+ * <p>Quick replies are a WhatsApp Business feature: the user defines a
+ * shortcut (for example {@code "/hello"}) together with the message body that
+ * should be sent in its place (for example {@code "Hello, thanks for
+ * contacting us. How can we help you today?"}). When the user types the
+ * shortcut in the compose box, the client offers the template as a suggestion
+ * and substitutes the full message on selection.
  *
- * <p>Instances are immutable and built via the generated
- * {@code QuickReplyBuilder}.
+ * <p>Each quick reply carries a stable identifier that acts as a primary key
+ * in Cobalt's store, the shortcut text the user types, the message body that
+ * is sent in its place, a list of search keywords that help surface the
+ * template in autocomplete, and a usage counter that the client maintains so
+ * that frequently used replies can be prioritised.
  *
- * @implNote WAWebSchemaQuickReply — IndexedDB schema definition for the
- *           {@code quick-reply} table
+ * <p>Instances are immutable. Use the generated {@code QuickReplyBuilder} to
+ * create new quick replies.
  */
 @ProtobufMessage
 public final class QuickReply {
     /**
-     * The stable identifier for this quick reply, taken from the second
-     * element of the sync index ({@code indexParts[1]}).
+     * The stable identifier of this quick reply.
      *
-     * <p>This is the primary key in WhatsApp Web's {@code WAWebSchemaQuickReply}
-     * IndexedDB table and the value used by Cobalt's {@code WhatsAppStore} to
-     * key the quick reply map. It is required and must be non-{@code null};
-     * mutations that change the {@code shortcut} while preserving the
-     * {@code id} are routed to the same store entry, mirroring WA Web's
-     * primary-key-based upsert semantics.
-     *
-     * @implNote WAWebSchemaQuickReply.id (primary key)
+     * <p>The identifier is used by Cobalt's store to key quick replies. Edits
+     * that change the shortcut or message body while preserving the identifier
+     * are treated as updates to the same entry.
      */
     @ProtobufProperty(index = 5, type = ProtobufType.STRING)
     final String id;
 
     /**
-     * The user-typed shortcut text that triggers the quick reply expansion.
-     *
-     * @implNote WAWebSchemaQuickReply.shortcut
+     * The shortcut text the user types in the compose box to trigger this
+     * quick reply.
      */
     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
     final String shortcut;
 
     /**
-     * The message body that is sent in place of the {@code shortcut}.
-     *
-     * @implNote WAWebSchemaQuickReply.message
+     * The full message body that is sent in place of the shortcut.
      */
     @ProtobufProperty(index = 2, type = ProtobufType.STRING)
     final String message;
@@ -61,15 +55,17 @@ public final class QuickReply {
     /**
      * The list of search keywords associated with this quick reply.
      *
-     * @implNote WAWebSchemaQuickReply.keywords
+     * <p>Keywords help the autocomplete surface the template even when the
+     * user does not type the shortcut verbatim.
      */
     @ProtobufProperty(index = 3, type = ProtobufType.STRING)
     final List<String> keywords;
 
     /**
-     * The usage counter maintained by the WhatsApp Web client.
+     * The usage counter maintained by the client.
      *
-     * @implNote WAWebSchemaQuickReply.count
+     * <p>Clients increment this value each time the quick reply is expanded so
+     * that frequently used templates can be prioritised in suggestions.
      */
     @ProtobufProperty(index = 4, type = ProtobufType.INT32)
     final int count;
@@ -77,12 +73,15 @@ public final class QuickReply {
     /**
      * Constructs a new quick reply with the given field values.
      *
-     * @param id       the non-{@code null} stable identifier
-     * @param shortcut the user-typed shortcut text
-     * @param message  the message body
+     * <p>This constructor is package-private. Application code should obtain
+     * instances through the generated {@code QuickReplyBuilder}.
+     *
+     * @param id       the stable identifier, must not be {@code null}
+     * @param shortcut the shortcut text the user types
+     * @param message  the message body to send in place of the shortcut
      * @param keywords the search keywords
      * @param count    the usage counter
-     * @implNote WAWebSchemaQuickReply — table row constructor
+     * @throws NullPointerException if {@code id} is {@code null}
      */
     QuickReply(String id, String shortcut, String message, List<String> keywords, int count) {
         this.id = Objects.requireNonNull(id, "id cannot be null");
@@ -95,32 +94,25 @@ public final class QuickReply {
     /**
      * Returns the stable identifier of this quick reply.
      *
-     * <p>This value is the primary key used by Cobalt's {@code WhatsAppStore}
-     * and corresponds to the {@code id} column of WhatsApp Web's
-     * {@code WAWebSchemaQuickReply} IndexedDB table.
-     *
-     * @return the non-{@code null} stable identifier
-     * @implNote WAWebSchemaQuickReply.id (primary key)
+     * @return the identifier, never {@code null}
      */
     public String id() {
         return id;
     }
 
     /**
-     * Returns the user-typed shortcut text that triggers this quick reply.
+     * Returns the shortcut text the user types to trigger this quick reply.
      *
      * @return the shortcut text
-     * @implNote WAWebSchemaQuickReply.shortcut
      */
     public String shortcut() {
         return shortcut;
     }
 
     /**
-     * Returns the message body that is sent in place of the shortcut.
+     * Returns the full message body that is sent in place of the shortcut.
      *
      * @return the message body
-     * @implNote WAWebSchemaQuickReply.message
      */
     public String message() {
         return message;
@@ -130,17 +122,15 @@ public final class QuickReply {
      * Returns the search keywords associated with this quick reply.
      *
      * @return the keyword list
-     * @implNote WAWebSchemaQuickReply.keywords
      */
     public List<String> keywords() {
         return keywords;
     }
 
     /**
-     * Returns the usage counter maintained by the WhatsApp Web client.
+     * Returns the number of times this quick reply has been used.
      *
      * @return the usage counter
-     * @implNote WAWebSchemaQuickReply.count
      */
     public int count() {
         return count;

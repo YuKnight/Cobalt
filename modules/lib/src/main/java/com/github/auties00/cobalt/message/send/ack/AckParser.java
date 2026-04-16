@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.message.send.ack;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.node.Node;
 
 import java.time.Instant;
@@ -20,6 +23,7 @@ import java.util.Objects;
  * @see AckResult
  * @see NackReason
  */
+@WhatsAppWebModule(moduleName = "WAWebSendMsgCommonApi")
 public final class AckParser {
     /**
      * Prevents instantiation of this utility class.
@@ -41,6 +45,8 @@ public final class AckParser {
      * @throws NullPointerException     if {@code ack} is {@code null}
      * @throws IllegalArgumentException if the node tag is not {@code "ack"}
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "sendMsgAckSyncParser",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static AckResult parse(Node ack) {
         Objects.requireNonNull(ack, "ack");
         if (!ack.hasDescription("ack")) {

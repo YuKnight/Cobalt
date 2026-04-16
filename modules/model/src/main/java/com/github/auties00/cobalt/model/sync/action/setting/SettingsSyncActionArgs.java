@@ -6,22 +6,35 @@ import com.github.auties00.cobalt.model.sync.SyncActionArgs;
 /**
  * Index arguments for {@link SettingsSyncAction}.
  *
- * <p>The sync index produced is
- * {@code ["settings_sync", platform, settingKey, scope]}.
+ * <p>Each mutation targeting a single field of the settings bundle is
+ * keyed by the triple {@code (platform, settingKey, scope)}:
+ * <ul>
+ *   <li>{@code platform} identifies the publishing client and is the
+ *       string form of a {@link SettingsSyncAction.SettingPlatform}
+ *       enum index (for example {@code "1"} for {@code WEB}).</li>
+ *   <li>{@code settingKey} identifies which setting changed and is the
+ *       string form of a {@link SettingsSyncAction.SettingKey} enum
+ *       index.</li>
+ *   <li>{@code scope} narrows the mutation to a given context, most often
+ *       the value {@code "app"}, allowing future scopes (per-chat,
+ *       per-theme, ...) without changing the wire format.</li>
+ * </ul>
  *
- * <p>The platform identifies the client type (e.g. Web, Hybrid/Windows),
- * the setting key identifies which setting is being synced, and the scope
- * provides additional context (e.g. {@code "app"}).
- *
- * @param platform   the numeric platform identifier string (e.g. WEB, HYBRID from {@code SettingPlatform} enum)
- * @param settingKey the numeric setting key string (from {@code SettingKey} enum)
- * @param scope      the scope or context for the setting (e.g. {@code "app"})
+ * @param platform   the publishing client platform, encoded as the
+ *                   decimal string of a {@code SettingPlatform} index
+ * @param settingKey the setting key being mutated, encoded as the
+ *                   decimal string of a {@code SettingKey} index
+ * @param scope      the scope of the mutation, typically {@code "app"}
  */
 public record SettingsSyncActionArgs(String platform, String settingKey, String scope) implements SyncActionArgs {
     /**
-     * {@inheritDoc}
+     * Returns the three-component index for this mutation.
      *
-     * @return a three-element array encoding the platform, setting key, and scope
+     * <p>The returned array contains {@code platform}, {@code settingKey}
+     * and {@code scope} in that order.
+     *
+     * @return a three-element array encoding the platform, setting key,
+     *         and scope
      */
     @Override
     public String[] toIndexArgs() {

@@ -7,6 +7,9 @@ import com.github.auties00.cobalt.message.send.ack.AckResult;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryptedPayload;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
 import com.github.auties00.cobalt.message.send.icdc.IcdcEnricher;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.chat.ChatKeepType;
 import com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentitySpec;
 import com.github.auties00.cobalt.model.jid.Jid;
@@ -53,12 +56,43 @@ import java.util.*;
  * WAWebAdvSignatureApi: ADV identity node encoding.
  * WAWebBackendJobsCommon: ciphertext version and media type extraction.
  */
+@WhatsAppWebModule(moduleName = "WAWebSendMsgCommonApi")
+@WhatsAppWebModule(moduleName = "WAWebE2EProtoUtils")
+@WhatsAppWebModule(moduleName = "WAWebAdvSignatureApi")
+@WhatsAppWebModule(moduleName = "WAWebBackendJobsCommon")
 abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSender, GroupMessageSender, StatusMessageSender, NewsletterMessageSender, PeerMessageSender {
+    /**
+     * Logger for diagnostic output during per-device encryption.
+     */
     private static final System.Logger LOGGER = System.getLogger(MessageSender.class.getName());
 
+    /**
+     * The WhatsApp client used to send wire stanzas and report failures.
+     *
+     * @implNote ADAPTED: WAWebSendMsgJob uses module-level imports for
+     * the socket and error handling infrastructure; Cobalt injects the
+     * client reference via constructor.
+     */
     final WhatsAppClient client;
+
+    /**
+     * The WhatsApp store holding Signal sessions, device lists,
+     * identity records, and other shared state.
+     *
+     * @implNote ADAPTED: WAWebSignalProtocolStore, WAWebChatCollection,
+     * WAWebContactCollection are module-level imports; Cobalt uses the
+     * unified {@code WhatsAppStore} facade.
+     */
     final WhatsAppStore store;
 
+    /**
+     * Creates a new message sender with the specified client.
+     *
+     * @param client the WhatsApp client for stanza dispatch
+     *
+     * @implNote ADAPTED: WA Web senders use module-level imports;
+     * Cobalt uses constructor-based DI.
+     */
     MessageSender(WhatsAppClient client) {
         this.client = Objects.requireNonNull(client, "client");
         this.store = client.store();
@@ -80,6 +114,8 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      * @apiNote WAWebEventsWaitForOfflineDeliveryEnd: waits for the
      * {@code offline_delivery_end} event before sending.
      */
+    @WhatsAppWebExport(moduleName = "WAWebEventsWaitForOfflineDeliveryEnd", exports = "waitForOfflineDeliveryEnd",
+            adaptation = WhatsAppAdaptation.DIRECT)
     void waitForOfflineDelivery() {
         store.waitForOfflineDeliveryEnd();
     }
@@ -93,6 +129,8 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      * {@code getSignalProtocolStore().flushBufferToDiskIfNotMemOnlyMode()}
      * before the stanza is sent on the wire.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSignalProtocolStore", exports = "flushBufferToDiskIfNotMemOnlyMode",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     void flushStore() {
         try {
             store.save();
@@ -146,6 +184,10 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      * WAWebICDCMetaApi.populateICDCMeta: sets deviceListMetadata and
      * deviceListMetadataVersion on the message's messageContextInfo.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCreateFanoutStanza", exports = "createFanoutMsgStanza",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WAWebICDCMetaApi", exports = "populateICDCMeta",
+            adaptation = WhatsAppAdaptation.DIRECT)
     List<MessageEncryptedPayload> encryptForDevices(
             MessageEncryption encryption,
             Collection<Jid> devices,
@@ -213,6 +255,8 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      * then pattern-matches on the inner message type.
      * WAWebHandleMsgCommon.STANZA_MSG_TYPES: the possible values.
      */
+    @WhatsAppWebExport(moduleName = "WAWebE2EProtoUtils", exports = "typeAttributeFromProtobuf",
+            adaptation = WhatsAppAdaptation.DIRECT)
     String resolveStanzaType(MessageContainer container) {
         var message = container.content();
         return switch (message) {
@@ -267,6 +311,8 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      * edit (1), or pin (2).
      * WAWebAck.EDIT_ATTR: the constant values.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "editAttribute",
+            adaptation = WhatsAppAdaptation.DIRECT)
     String resolveEditAttribute(MessageContainer container) {
         return resolveEditAttribute(container, false);
     }
@@ -285,6 +331,8 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      * Also handles secretEncryptedMessage with EVENT_EDIT or MESSAGE_EDIT
      * secretEncType, mapping both to "1" (MESSAGE_EDIT).
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "editAttribute",
+            adaptation = WhatsAppAdaptation.DIRECT)
     String resolveEditAttribute(MessageContainer container, boolean isAdminRevoke) {
         var message = container.content();
         return switch (message) {
@@ -326,6 +374,8 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      * Hide for reactions, poll votes, event responses, edits, revokes,
      * keepInChat, pinInChat, ephemeral sync, welcome messages.
      */
+    @WhatsAppWebExport(moduleName = "WAWebE2EProtoUtils", exports = "decryptFailAttributeFromProtobuf",
+            adaptation = WhatsAppAdaptation.DIRECT)
     String resolveDecryptFail(MessageContainer container) {
         var message = container.content();
         return switch (message) {
@@ -355,6 +405,9 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      * media type from the protobuf, unwrapping deviceSent/ephemeral/viewOnce.
      * WAWebBackendJobsCommon.encodeMaybeMediaType: encodes to stanza string.
      */
+    @WhatsAppWebExport(moduleName = "WAWebBackendJobsCommon",
+            exports = {"mediaTypeFromProtobuf", "encodeMaybeMediaType"},
+            adaptation = WhatsAppAdaptation.DIRECT)
     String resolveMediaType(MessageContainer container) {
         var message = container.content();
         return switch (message) {
@@ -385,6 +438,8 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      * @apiNote WAWebBackendJobsCommon.nativeFlowNameTypeFromProtobuf: extracts
      * the native flow name from interactiveResponseMessage.
      */
+    @WhatsAppWebExport(moduleName = "WAWebBackendJobsCommon", exports = "nativeFlowNameTypeFromProtobuf",
+            adaptation = WhatsAppAdaptation.DIRECT)
     String resolveNativeFlowName(MessageContainer container) {
         var message = container.content();
         if (!(message instanceof InteractiveResponseMessage irm)) {
@@ -409,6 +464,8 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      * @apiNote WAWebAdvSignatureApi.getADVEncodedIdentity: serialises
      * the ADV signed device identity to protobuf bytes.
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvSignatureApi", exports = "getADVEncodedIdentity",
+            adaptation = WhatsAppAdaptation.DIRECT)
     Node buildIdentityNode() {
         return store.signedDeviceIdentity()
                 .map(identity -> new NodeBuilder()
@@ -426,6 +483,8 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      * {@code key != null}, {@code key.fromMe === true}, and
      * {@code keepType === UNDO_KEEP_FOR_ALL} maps to SENDER_REVOKE (7).
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "editAttribute",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private boolean isUndoKeepForAll(KeepInChatMessage keep) {
         // WAWebSendMsgCommonApi: keepInChatMessage.key != null
         // && keepInChatMessage.key.fromMe === true

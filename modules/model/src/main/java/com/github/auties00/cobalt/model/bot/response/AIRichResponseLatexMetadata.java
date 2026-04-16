@@ -8,14 +8,20 @@ import java.util.Optional;
 import java.util.OptionalDouble;
 
 /**
- * Metadata for a LaTeX mathematical expression fragment within an
- * AI rich response.
+ * Metadata for a LaTeX mathematical expression fragment within a WhatsApp
+ * AI bot rich response.
  *
- * <p>The fragment includes the original {@linkplain #text() text}
- * that surrounds or includes the expressions, together with a list
- * of {@link AIRichResponseLatexExpression} entries. Each expression
- * is pre-rendered as an image on the server; the client downloads
- * and displays the image at the specified dimensions and padding.
+ * <p>The fragment includes the original {@linkplain #text() text} that
+ * surrounds or includes the expressions, together with a list of
+ * {@link AIRichResponseLatexExpression} entries. Each expression is
+ * pre-rendered as an image on the server; the client downloads and
+ * displays the image at the specified dimensions and padding.
+ *
+ * <p>This type implements {@link AIRichResponseSubMessageContent} and
+ * appears as the {@link AIRichResponseSubMessageType#LATEX LATEX}
+ * variant within an {@link AIRichResponseSubMessage}.
+ *
+ * @see AIRichResponseSubMessage#content()
  */
 @ProtobufMessage(name = "AIRichResponseLatexMetadata")
 public final class AIRichResponseLatexMetadata implements AIRichResponseSubMessageContent {
@@ -38,6 +44,12 @@ public final class AIRichResponseLatexMetadata implements AIRichResponseSubMessa
     List<AIRichResponseLatexExpression> expressions;
 
 
+    /**
+     * Constructs a new LaTeX metadata instance.
+     *
+     * @param text        the surrounding text content, or {@code null}
+     * @param expressions the list of LaTeX expressions, or {@code null}
+     */
     AIRichResponseLatexMetadata(String text, List<AIRichResponseLatexExpression> expressions) {
         this.text = text;
         this.expressions = expressions;
@@ -156,6 +168,19 @@ public final class AIRichResponseLatexMetadata implements AIRichResponseSubMessa
         Double imageTrailingPadding;
 
 
+        /**
+         * Constructs a new LaTeX expression instance.
+         *
+         * @param latexExpression     the raw LaTeX source, or {@code null}
+         * @param url                 the pre-rendered image URL, or {@code null}
+         * @param width               the image width in logical pixels, or {@code null}
+         * @param height              the image height in logical pixels, or {@code null}
+         * @param fontHeight          the font height for baseline alignment, or {@code null}
+         * @param imageTopPadding     the top padding in logical pixels, or {@code null}
+         * @param imageLeadingPadding the leading padding in logical pixels, or {@code null}
+         * @param imageBottomPadding  the bottom padding in logical pixels, or {@code null}
+         * @param imageTrailingPadding the trailing padding in logical pixels, or {@code null}
+         */
         AIRichResponseLatexExpression(String latexExpression, String url, Double width, Double height, Double fontHeight, Double imageTopPadding, Double imageLeadingPadding, Double imageBottomPadding, Double imageTrailingPadding) {
             this.latexExpression = latexExpression;
             this.url = url;

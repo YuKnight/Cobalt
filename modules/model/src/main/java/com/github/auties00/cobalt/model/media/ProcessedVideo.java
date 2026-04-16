@@ -9,85 +9,83 @@ import it.auties.protobuf.model.ProtobufType;
 import java.util.*;
 
 /**
- * An alternative transcoded version of a video message, representing the
- * same video content at a different quality level or resolution.
+ * A single transcoded rendition of a video message produced by the server.
  *
- * <p>This message is defined in {@code WAWebProtobufsE2E.pb} and appears as
- * a repeated field (index 27) inside {@code Message.VideoMessage}. When a
- * video is uploaded, the server may produce multiple transcoded versions at
- * different quality levels. Each {@code ProcessedVideo} describes one such
- * version, including its CDN location, file metadata, and encoding
- * parameters.
+ * <p>When a video is uploaded to WhatsApp, the server may transcode it into
+ * several versions targeting different resolutions, bitrates, and codec
+ * profiles so that recipients can pick the rendition best suited to their
+ * network conditions and device capabilities. Each of those renditions is
+ * described by an instance of this class, carrying the CDN location of the
+ * transcoded file, its size and dimensions, the encoding bitrate, a
+ * {@link VideoQuality} tier, and a list of capability tokens that describe
+ * playback prerequisites such as codec support.
  *
- * <p>The client uses the {@code quality} field to select the most
- * appropriate version for the current network conditions and device
- * capabilities, and the {@code capabilities} list to determine whether a
- * given version is compatible with the playback environment.
+ * <p>The client typically inspects the full list of renditions attached to a
+ * video message and chooses the best match based on the current network and
+ * the capabilities the playback environment supports.
  */
 @ProtobufMessage(name = "ProcessedVideo")
 public final class ProcessedVideo {
     /**
-     * The CDN direct path from which this transcoded video version can be
-     * fetched.
+     * The CDN direct path at which this rendition can be retrieved.
      */
     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
     String directPath;
 
     /**
-     * The SHA-256 digest of the transcoded video file, used for integrity
-     * verification.
+     * The SHA-256 digest of the rendition file, used for integrity verification.
      */
     @ProtobufProperty(index = 2, type = ProtobufType.BYTES)
     byte[] fileSha256;
 
     /**
-     * The height of the transcoded video in pixels.
+     * The height of the rendition frame in pixels.
      */
     @ProtobufProperty(index = 3, type = ProtobufType.UINT32)
     Integer height;
 
     /**
-     * The width of the transcoded video in pixels.
+     * The width of the rendition frame in pixels.
      */
     @ProtobufProperty(index = 4, type = ProtobufType.UINT32)
     Integer width;
 
     /**
-     * The total length of the transcoded video file in bytes.
+     * The size of the rendition file in bytes.
      */
     @ProtobufProperty(index = 5, type = ProtobufType.UINT64)
     Long fileLength;
 
     /**
-     * The video bitrate in bits per second.
+     * The encoding bitrate of the rendition in bits per second.
      */
     @ProtobufProperty(index = 6, type = ProtobufType.UINT32)
     Integer bitrate;
 
     /**
-     * The quality tier of this transcoded video version.
+     * The quality tier of this rendition.
      */
     @ProtobufProperty(index = 7, type = ProtobufType.ENUM)
     VideoQuality quality;
 
     /**
-     * The list of capability identifiers that describe the codec or
-     * feature requirements for playing this video version.
+     * The list of capability tokens describing playback prerequisites such
+     * as required codecs or features.
      */
     @ProtobufProperty(index = 8, type = ProtobufType.STRING)
     List<String> capabilities;
 
     /**
-     * Constructs a new {@code ProcessedVideo} with the given field values.
+     * Constructs a new {@code ProcessedVideo} with the given rendition metadata.
      *
-     * @param directPath   the CDN direct path to the transcoded video
-     * @param fileSha256   the SHA-256 digest of the file
-     * @param height       the video height in pixels
-     * @param width        the video width in pixels
-     * @param fileLength   the file length in bytes
-     * @param bitrate      the video bitrate in bits per second
+     * @param directPath   the CDN direct path
+     * @param fileSha256   the SHA-256 digest of the rendition file
+     * @param height       the frame height in pixels
+     * @param width        the frame width in pixels
+     * @param fileLength   the file size in bytes
+     * @param bitrate      the encoding bitrate in bits per second
      * @param quality      the quality tier
-     * @param capabilities the list of playback capability identifiers
+     * @param capabilities the playback capability tokens
      */
     ProcessedVideo(String directPath, byte[] fileSha256, Integer height, Integer width, Long fileLength, Integer bitrate, VideoQuality quality, List<String> capabilities) {
         this.directPath = directPath;
@@ -101,8 +99,7 @@ public final class ProcessedVideo {
     }
 
     /**
-     * Returns the CDN direct path from which this transcoded video version
-     * can be fetched.
+     * Returns the CDN direct path at which this rendition can be retrieved.
      *
      * @return an {@link Optional} containing the direct path, or empty if not set
      */
@@ -111,16 +108,16 @@ public final class ProcessedVideo {
     }
 
     /**
-     * Returns the SHA-256 digest of the transcoded video file.
+     * Returns the SHA-256 digest of the rendition file.
      *
-     * @return an {@link Optional} containing the SHA-256 hash, or empty if not set
+     * @return an {@link Optional} containing the hash bytes, or empty if not set
      */
     public Optional<byte[]> fileSha256() {
         return Optional.ofNullable(fileSha256);
     }
 
     /**
-     * Returns the height of the transcoded video in pixels.
+     * Returns the height of the rendition frame in pixels.
      *
      * @return an {@link OptionalInt} containing the height, or empty if not set
      */
@@ -129,7 +126,7 @@ public final class ProcessedVideo {
     }
 
     /**
-     * Returns the width of the transcoded video in pixels.
+     * Returns the width of the rendition frame in pixels.
      *
      * @return an {@link OptionalInt} containing the width, or empty if not set
      */
@@ -138,7 +135,7 @@ public final class ProcessedVideo {
     }
 
     /**
-     * Returns the total length of the transcoded video file in bytes.
+     * Returns the size of the rendition file in bytes.
      *
      * @return an {@link OptionalLong} containing the file length, or empty if not set
      */
@@ -147,7 +144,7 @@ public final class ProcessedVideo {
     }
 
     /**
-     * Returns the video bitrate in bits per second.
+     * Returns the encoding bitrate of the rendition in bits per second.
      *
      * @return an {@link OptionalInt} containing the bitrate, or empty if not set
      */
@@ -156,27 +153,25 @@ public final class ProcessedVideo {
     }
 
     /**
-     * Returns the quality tier of this transcoded video version.
+     * Returns the quality tier of this rendition.
      *
-     * @return an {@link Optional} containing the video quality, or empty if not set
+     * @return an {@link Optional} containing the quality tier, or empty if not set
      */
     public Optional<VideoQuality> quality() {
         return Optional.ofNullable(quality);
     }
 
     /**
-     * Returns the list of capability identifiers that describe the playback
-     * requirements for this video version.
+     * Returns the playback capability tokens required for this rendition.
      *
-     * @return an unmodifiable list of capability strings, or an empty list
-     *         if none are set
+     * @return an unmodifiable list of capability tokens, or an empty list if none are set
      */
     public List<String> capabilities() {
         return capabilities == null ? List.of() : Collections.unmodifiableList(capabilities);
     }
 
     /**
-     * Sets the CDN direct path to the transcoded video.
+     * Sets the CDN direct path for this rendition.
      *
      * @param directPath the direct path
      */
@@ -185,34 +180,34 @@ public final class ProcessedVideo {
     }
 
     /**
-     * Sets the SHA-256 digest of the transcoded video file.
+     * Sets the SHA-256 digest of the rendition file.
      *
-     * @param fileSha256 the SHA-256 hash
+     * @param fileSha256 the hash bytes
      */
     public void setFileSha256(byte[] fileSha256) {
         this.fileSha256 = fileSha256;
     }
 
     /**
-     * Sets the height of the transcoded video in pixels.
+     * Sets the frame height in pixels.
      *
-     * @param height the video height
+     * @param height the height
      */
     public void setHeight(Integer height) {
         this.height = height;
     }
 
     /**
-     * Sets the width of the transcoded video in pixels.
+     * Sets the frame width in pixels.
      *
-     * @param width the video width
+     * @param width the width
      */
     public void setWidth(Integer width) {
         this.width = width;
     }
 
     /**
-     * Sets the total file length of the transcoded video in bytes.
+     * Sets the file size in bytes.
      *
      * @param fileLength the file length
      */
@@ -221,7 +216,7 @@ public final class ProcessedVideo {
     }
 
     /**
-     * Sets the video bitrate in bits per second.
+     * Sets the encoding bitrate in bits per second.
      *
      * @param bitrate the bitrate
      */
@@ -230,58 +225,58 @@ public final class ProcessedVideo {
     }
 
     /**
-     * Sets the quality tier of this transcoded video version.
+     * Sets the quality tier of this rendition.
      *
-     * @param quality the video quality
+     * @param quality the quality tier
      */
     public void setQuality(VideoQuality quality) {
         this.quality = quality;
     }
 
     /**
-     * Sets the list of playback capability identifiers.
+     * Sets the playback capability tokens.
      *
-     * @param capabilities the capability strings
+     * @param capabilities the capability tokens
      */
     public void setCapabilities(List<String> capabilities) {
         this.capabilities = capabilities;
     }
 
     /**
-     * The quality tier of a processed (transcoded) video version, indicating
-     * the target resolution and bitrate range.
+     * The quality tier of a processed video rendition.
      *
-     * <p>The client uses this value to select the most appropriate video
-     * version based on current network conditions, available bandwidth, and
-     * device display capabilities.
+     * <p>Quality tiers are coarse-grained buckets that the client uses to
+     * rank renditions without inspecting exact resolution or bitrate figures.
+     * The client typically picks the highest tier supported by the current
+     * network and device.
      */
     @ProtobufEnum(name = "ProcessedVideo.VideoQuality")
     public enum VideoQuality {
         /**
-         * The singleton instance for an undefined quality tier, indicating
-         * that the quality level was not specified by the server.
-         * This has the numeric value of {@code 0}.
+         * The quality tier is not specified.
+         *
+         * <p>Numeric value {@code 0}.
          */
         UNDEFINED(0),
 
         /**
-         * The singleton instance for low quality video, targeting reduced
-         * resolution and bitrate for bandwidth-constrained environments.
-         * This has the numeric value of {@code 1}.
+         * Low quality targeting bandwidth-constrained connections.
+         *
+         * <p>Numeric value {@code 1}.
          */
         LOW(1),
 
         /**
-         * The singleton instance for medium quality video, providing a
-         * balance between visual quality and file size.
-         * This has the numeric value of {@code 2}.
+         * Medium quality balancing visual fidelity and file size.
+         *
+         * <p>Numeric value {@code 2}.
          */
         MID(2),
 
         /**
-         * The singleton instance for high quality video, targeting the
-         * highest available resolution and bitrate.
-         * This has the numeric value of {@code 3}.
+         * High quality prioritizing resolution and bitrate over file size.
+         *
+         * <p>Numeric value {@code 3}.
          */
         HIGH(3);
 
@@ -295,7 +290,7 @@ public final class ProcessedVideo {
         }
 
         /**
-         * The protobuf enum index of this quality tier.
+         * The protobuf enum index backing this quality tier.
          */
         final int index;
 

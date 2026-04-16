@@ -5,25 +5,30 @@ import it.auties.protobuf.model.*;
 import java.util.Optional;
 
 /**
- * A container that holds local storage metadata for a media attachment
- * associated with a message.
+ * Local storage metadata attached to a message that references a media
+ * attachment downloaded or cached on the current device.
  *
- * <p>This message is defined in {@code WAWebProtobufsWeb.pb} as part of the
- * {@code WebMessageInfo} structure. It appears at field index 38 in
- * {@code WebMessageInfo} to reference the on-device file path where a media
- * attachment has been downloaded or cached. It is also used at field index 42
- * for quoted sticker data.
+ * <p>Messages carrying media content can be accompanied by an instance of this
+ * type to record where the decrypted file resides on the local filesystem.
+ * This allows the client to display or replay the media without re-downloading
+ * it from the CDN. The field is populated by the media pipeline after a
+ * successful download and is typically empty on messages that have not yet
+ * been downloaded or whose payload has been evicted from local storage.
+ *
+ * <p>This metadata is local to the device; it is not serialized for transport
+ * to other devices or to the server.
  */
 @ProtobufMessage(name = "MediaData")
 public final class MediaData {
     /**
-     * The path on the local filesystem where the media file is stored.
+     * The absolute or relative path on the local filesystem where the
+     * decrypted media file is stored.
      */
     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
     String localPath;
 
     /**
-     * Constructs a new {@code MediaData} with the given local path.
+     * Constructs a new {@code MediaData} pointing at the given local path.
      *
      * @param localPath the local filesystem path to the media file
      */
@@ -32,7 +37,7 @@ public final class MediaData {
     }
 
     /**
-     * Returns the path on the local filesystem where the media file is stored.
+     * Returns the local filesystem path where the media file is stored.
      *
      * @return an {@link Optional} containing the local path, or empty if not set
      */
@@ -41,7 +46,7 @@ public final class MediaData {
     }
 
     /**
-     * Sets the local filesystem path to the media file.
+     * Sets the local filesystem path where the media file is stored.
      *
      * @param localPath the local path
      */

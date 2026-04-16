@@ -4,15 +4,18 @@ package com.github.auties00.cobalt.model.sync.action.media;
 import com.github.auties00.cobalt.model.sync.SyncActionArgs;
 
 /**
- * Index arguments for {@link NoteEditAction}.
+ * Sync index arguments that identify the target note of a {@link NoteEditAction}.
  *
- * <p>The sync index produced is {@code ["note_edit", noteId]}.
+ * <p>Note actions are keyed by a single note identifier so that create, update and
+ * delete operations on the same note collapse into a single entry in the app-state
+ * sync collection.
  *
  * @param noteId the unique identifier of the note being created, edited, or deleted
  */
 public record NoteEditActionArgs(String noteId) implements SyncActionArgs {
     /**
-     * {@inheritDoc}
+     * Returns the index arguments used to address this note inside the app-state
+     * sync collection.
      *
      * @return a single-element array containing the note identifier
      */

@@ -4,19 +4,23 @@ package com.github.auties00.cobalt.model.sync.action.device;
 import com.github.auties00.cobalt.model.sync.SyncActionArgs;
 
 /**
- * Index arguments for {@link NuxAction}.
+ * Index arguments that uniquely identify a single {@link NuxAction} mutation in
+ * the app state sync log.
  *
- * <p>The sync index produced is {@code ["nux", nuxKey]}.
- * The NUX (New User Experience) key identifies which onboarding step or
- * feature-discovery prompt this action refers to.
+ * <p>The sync index is composed by concatenating {@link NuxAction#ACTION_NAME}
+ * with the trailing arguments produced by {@link #toIndexArgs()}, so that
+ * acknowledgements of the same NUX prompt collapse onto a single logical key
+ * during conflict resolution. The NUX key identifies which onboarding step,
+ * tooltip, or feature discovery prompt the action refers to.
  *
- * @param nuxKey the NUX identifier key (e.g. a feature or onboarding step name)
+ * @param nuxKey the stable identifier of the NUX prompt this mutation refers to
  */
 public record NuxActionArgs(String nuxKey) implements SyncActionArgs {
     /**
-     * {@inheritDoc}
+     * Returns the trailing index arguments that follow the action name when
+     * computing the mutation index for this {@link NuxAction}.
      *
-     * @return a single-element array containing the NUX key
+     * @return a single element array containing the NUX key
      */
     @Override
     public String[] toIndexArgs() {

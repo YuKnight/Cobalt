@@ -3,16 +3,18 @@ package com.github.auties00.cobalt.model.sync.action.business;
 import com.github.auties00.cobalt.model.sync.SyncActionArgs;
 
 /**
- * Index arguments for {@link CustomerDataAction}.
+ * Index arguments identifying a {@link CustomerDataAction} inside a sync patch.
  *
- * <p>The sync index produced is {@code ["customer_data", chatJid]}.
+ * <p>The resulting sync index is {@code ["customer_data", chatJid]}, which binds the CRM
+ * record to the specific chat it describes.
  *
- * @implNote WAWebCustomerDataSync — indexArgs: [chatJid]
- * @param chatJid the JID of the chat associated with this customer data
+ * @param chatJid the JID of the chat associated with the customer data being synced
  */
 public record CustomerDataActionArgs(String chatJid) implements SyncActionArgs {
     /**
-     * {@inheritDoc}
+     * Returns the index argument array that uniquely keys this customer record within the sync patch.
+     *
+     * @return a single-element array containing the chat JID
      */
     @Override
     public String[] toIndexArgs() {

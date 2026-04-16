@@ -12,14 +12,17 @@ import java.util.Optional;
 import java.util.OptionalInt;
 
 /**
- * A cryptographic proof for a specific use case, used to verify the
- * authenticity of an AI bot message.
+ * Represents a cryptographic proof for a specific use case, used to verify
+ * the authenticity of an AI bot message.
  *
- * <p>Each proof includes a {@linkplain #version() version} number, the
- * {@linkplain #useCase() use case} it applies to, the raw
- * {@linkplain #signature() signature} bytes, and the
- * {@linkplain #certificateChain() certificate chain} needed to validate
- * the signature.
+ * <p>Each proof includes a {@linkplain #version() protocol version} number,
+ * the {@linkplain #useCase() use case} it applies to (for example,
+ * {@link BotSignatureUseCase#WA_BOT_MSG WA_BOT_MSG} for standard bot messages),
+ * the raw {@linkplain #signature() cryptographic signature} bytes, and the
+ * {@linkplain #certificateChain() certificate chain} ordered from leaf to root
+ * that the client uses to validate the signature against a trusted root.
+ *
+ * @see BotSignatureVerificationMetadata
  */
 @ProtobufMessage(name = "BotSignatureVerificationUseCaseProof")
 public final class BotSignatureVerificationUseCaseProof {
@@ -141,7 +144,8 @@ public final class BotSignatureVerificationUseCaseProof {
     }
 
     /**
-     * The use case that a bot signature verification proof applies to.
+     * Enumerates the use cases that a bot signature verification proof can
+     * apply to.
      */
     @ProtobufEnum(name = "BotSignatureVerificationUseCaseProof.BotSignatureUseCase")
     public static enum BotSignatureUseCase {
@@ -155,6 +159,11 @@ public final class BotSignatureVerificationUseCaseProof {
          */
         WA_BOT_MSG(1);
 
+        /**
+         * Constructs a new {@code BotSignatureUseCase} with the specified protobuf index.
+         *
+         * @param index the protobuf index value
+         */
         BotSignatureUseCase(@ProtobufEnumIndex int index) {
             this.index = index;
         }

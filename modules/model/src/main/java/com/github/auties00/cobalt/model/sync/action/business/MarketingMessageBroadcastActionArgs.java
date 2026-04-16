@@ -4,19 +4,20 @@ package com.github.auties00.cobalt.model.sync.action.business;
 import com.github.auties00.cobalt.model.sync.SyncActionArgs;
 
 /**
- * Index arguments for {@link MarketingMessageBroadcastAction}.
+ * Index arguments identifying a {@link MarketingMessageBroadcastAction} inside a sync patch.
  *
- * <p>The sync index produced is
- * {@code ["marketingMessageBroadcast", marketingMessageId, broadcastMessageId]}.
+ * <p>The resulting sync index is
+ * {@code ["marketingMessageBroadcast", marketingMessageId, broadcastMessageId]}, pairing the
+ * source template with the specific broadcast send whose metrics are being synced.
  *
  * @param marketingMessageId the unique identifier of the marketing (premium) message template
  * @param broadcastMessageId the identifier of the individual broadcast message sent from the template
  */
 public record MarketingMessageBroadcastActionArgs(String marketingMessageId, String broadcastMessageId) implements SyncActionArgs {
     /**
-     * {@inheritDoc}
+     * Returns the index argument array that uniquely keys this broadcast record within the sync patch.
      *
-     * @return a two-element array containing the marketing message and broadcast message identifiers
+     * @return a two-element array containing the marketing message identifier and the broadcast message identifier
      */
     @Override
     public String[] toIndexArgs() {

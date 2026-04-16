@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.stream.control;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceService;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.migration.InactiveGroupLidMigrationService;
 import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.node.Node;
@@ -28,6 +29,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *
  * @implNote WAWebHandleSuccess.default
  */
+@WhatsAppWebModule(moduleName = "WAWebHandleSuccess")
 public final class SuccessStreamHandler implements SocketStream.Handler {
     /**
      * The WhatsApp client instance used for store access and listener notification.

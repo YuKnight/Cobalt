@@ -7,7 +7,7 @@ import it.auties.protobuf.model.ProtobufType;
 import java.util.*;
 
 /**
- * Metadata for a map fragment within an AI rich response.
+ * Metadata for a map fragment within a WhatsApp AI bot rich response.
  *
  * <p>The map is centred at the specified latitude and longitude, with
  * the visible region determined by the latitude and longitude deltas.
@@ -17,6 +17,12 @@ import java.util.*;
  * <p>When {@linkplain #showInfoList() showInfoList} is {@code true},
  * the client renders an additional information panel listing the
  * annotation details alongside the map.
+ *
+ * <p>This type implements {@link AIRichResponseSubMessageContent} and
+ * appears as the {@link AIRichResponseSubMessageType#MAP MAP} variant
+ * within an {@link AIRichResponseSubMessage}.
+ *
+ * @see AIRichResponseSubMessage#content()
  */
 @ProtobufMessage(name = "AIRichResponseMapMetadata")
 public final class AIRichResponseMapMetadata implements AIRichResponseSubMessageContent {
@@ -68,6 +74,16 @@ public final class AIRichResponseMapMetadata implements AIRichResponseSubMessage
     Boolean showInfoList;
 
 
+    /**
+     * Constructs a new map metadata instance.
+     *
+     * @param centerLatitude  the latitude of the map centre, or {@code null}
+     * @param centerLongitude the longitude of the map centre, or {@code null}
+     * @param latitudeDelta   the latitude span of the visible region, or {@code null}
+     * @param longitudeDelta  the longitude span of the visible region, or {@code null}
+     * @param annotations     the list of pin annotations, or {@code null}
+     * @param showInfoList    whether to display the info panel, or {@code null}
+     */
     AIRichResponseMapMetadata(Double centerLatitude, Double centerLongitude, Double latitudeDelta, Double longitudeDelta, List<AIRichResponseMapAnnotation> annotations, Boolean showInfoList) {
         this.centerLatitude = centerLatitude;
         this.centerLongitude = centerLongitude;
@@ -244,6 +260,15 @@ public final class AIRichResponseMapMetadata implements AIRichResponseSubMessage
         String body;
 
 
+        /**
+         * Constructs a new map annotation.
+         *
+         * @param annotationNumber the ordinal number for the pin marker, or {@code null}
+         * @param latitude         the latitude in degrees, or {@code null}
+         * @param longitude        the longitude in degrees, or {@code null}
+         * @param title            the annotation title, or {@code null}
+         * @param body             the annotation description, or {@code null}
+         */
         AIRichResponseMapAnnotation(Integer annotationNumber, Double latitude, Double longitude, String title, String body) {
             this.annotationNumber = annotationNumber;
             this.latitude = latitude;

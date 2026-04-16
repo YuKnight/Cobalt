@@ -14,61 +14,54 @@ import java.time.Instant;
 import java.util.*;
 
 /**
- * The metadata of a WhatsApp group.
+ * Represents the metadata of a WhatsApp group chat.
  *
  * <p>A group is a multi-participant chat entity on WhatsApp that carries
  * administrative metadata such as a subject (display name), a founder, an
  * optional description, a participant list, per-group permission settings,
  * ephemeral-message configuration, addressing-mode flags, and an optional link
- * to a parent community. In the WhatsApp Web client the same database table
- * ({@code WAWebDBGroupsGroupMetadata}) stores both regular group metadata and
- * community metadata, differentiated by the {@code isParentGroup} flag. When
- * {@code isParentGroup} is {@code false} the record describes a regular group
- * and its metadata is represented by this class.
+ * to a parent community.
  *
  * <p>Group metadata captures the identity of the group (its JID and subject),
  * its origin (the founder and foundation timestamp), an optional free-form
  * description with a server-assigned revision identifier, the current list of
- * participants, the group-level administrative settings as direct boolean
- * properties, the ephemeral message expiration timer, addressing-mode flags,
- * and the open-bot-group toggle.
+ * participants, the group-level administrative settings, the ephemeral message
+ * expiration timer, addressing-mode flags, and the open-bot-group toggle.
  *
- * <p>Group settings such as {@code restrict}, {@code announce},
- * {@code memberAddMode}, {@code membershipApprovalMode}, and
- * {@code memberLinkMode} are stored as boolean fields whose public accessors
- * return {@link ChatPolicy} values for clarity. A value of
- * {@link ChatPolicy#ADMINS} indicates the action is restricted to
- * administrators, while {@link ChatPolicy#ANYONE} indicates all members are
- * allowed.
+ * <p>Several group permission settings such as {@code restrict},
+ * {@code announce}, {@code memberAddMode}, {@code membershipApprovalMode},
+ * and {@code memberLinkMode} are stored internally as boolean fields but
+ * exposed through public accessors that return {@link ChatPolicy} values for
+ * clarity. A value of {@link ChatPolicy#ADMINS} indicates the action is
+ * restricted to administrators, while {@link ChatPolicy#ANYONE} indicates all
+ * members are allowed.
+ *
+ * <p>Groups linked to a community can be identified through the subgroup
+ * flags: {@link #isDefaultSubgroup()} returns {@code true} for the Community
+ * Announcement Group, {@link #isGeneralSubgroup()} returns {@code true} for
+ * the general chat, and {@link #parentCommunityJid()} is present for any
+ * linked subgroup.
  *
  * <p>Instances of this class are mutable. All fields can be changed after
- * construction through the fluent setter methods, each of which returns the
- * same instance for method chaining. The participant collection additionally
- * exposes dedicated add, remove, and clear operations.
- *
- * @apiNote In the WhatsApp Web client the {@code WAWebGroupMetadataModel}
- * derives the group's {@code groupType} from the metadata fields. A
- * {@code LINKED_ANNOUNCEMENT_GROUP} has {@code defaultSubgroup === true}, a
- * {@code LINKED_GENERAL_GROUP} has {@code generalSubgroup === true}, and a
- * {@code LINKED_SUBGROUP} has a non-{@code null} {@code parentGroup}
- * reference.
+ * construction through the setter methods. The participant collection
+ * additionally exposes dedicated add, remove, and clear operations.
  *
  * @see ChatMetadata
+ * @see ChatPolicy
  */
 @ProtobufMessage
 public final class GroupMetadata implements ChatMetadata {
     /**
-     * The JID that uniquely identifies this group. In the WhatsApp Web client
-     * this corresponds to the {@code id} property of the
-     * {@code WAWebGroupMetadataModel}.
+     * The JID that uniquely identifies this group. Required, never
+     * {@code null} after construction.
      */
     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
     Jid jid;
 
     /**
-     * The subject (display name) of this group. In the WhatsApp Web client
-     * this is the {@code subject} property of the group metadata record, set
-     * by a group administrator and visible to all participants.
+     * The subject (display name) of this group. Set by a group administrator
+     * and visible to all participants. Required, never {@code null} after
+     * construction.
      */
     @ProtobufProperty(index = 2, type = ProtobufType.STRING)
     String subject;
@@ -82,74 +75,68 @@ public final class GroupMetadata implements ChatMetadata {
 
     /**
      * The instant at which the subject was last changed, or {@code null} if
-     * the timestamp is not available. In the WhatsApp Web client this
-     * corresponds to the {@code subjectTime} property.
+     * the timestamp is not available.
      */
     @ProtobufProperty(index = 4, type = ProtobufType.INT64, mixins = InstantSecondsMixin.class)
     Instant subjectTimestamp;
 
     /**
      * The instant at which this group was created, or {@code null} if the
-     * timestamp is not available. In the WhatsApp Web client this corresponds
-     * to the {@code creation} property.
+     * timestamp is not available.
      */
     @ProtobufProperty(index = 5, type = ProtobufType.INT64, mixins = InstantSecondsMixin.class)
     Instant foundationTimestamp;
 
     /**
-     * The JID of the user who originally created this group, or {@code null}
-     * if the founder is not known. In the WhatsApp Web client this
-     * corresponds to the {@code owner} property.
+     * The JID of the user who originally created this group (the founder or
+     * super-admin), or {@code null} if the founder is not known.
      */
     @ProtobufProperty(index = 6, type = ProtobufType.STRING)
     Jid founderJid;
 
     /**
      * The free-form description text of this group, or {@code null} if no
-     * description has been set. In the WhatsApp Web client this corresponds
-     * to the {@code desc} property.
+     * description has been set.
      */
     @ProtobufProperty(index = 7, type = ProtobufType.STRING)
     String description;
 
     /**
      * The server-assigned identifier for the current description revision,
-     * or {@code null} if no description identifier is available. In the
-     * WhatsApp Web client this corresponds to the {@code descId} property
-     * and is used to detect conflicting concurrent edits.
+     * or {@code null} if no description identifier is available. Used by
+     * the server to detect conflicting concurrent edits to the description.
      */
     @ProtobufProperty(index = 8, type = ProtobufType.STRING)
     String descriptionId;
 
     /**
      * The instant at which the description was last changed, or {@code null}
-     * if the timestamp is not available. In the WhatsApp Web client this
-     * corresponds to the {@code descTime} property.
+     * if the timestamp is not available.
      */
     @ProtobufProperty(index = 9, type = ProtobufType.INT64, mixins = InstantSecondsMixin.class)
     Instant descriptionTimestamp;
 
     /**
-     * The ordered set of participants currently in this group. In the
-     * WhatsApp Web client this corresponds to the {@code participants}
-     * collection on the {@code WAWebGroupMetadataModel}.
+     * The ordered set of participants currently in this group. Insertion
+     * order is preserved. If no participants have been added, an empty
+     * mutable set is used.
      */
     @ProtobufProperty(index = 10, type = ProtobufType.MESSAGE)
     SequencedSet<GroupParticipant> participants;
 
     /**
      * The JID of the participant who last changed the description, or
-     * {@code null} if not known. In the WhatsApp Web client this corresponds
-     * to the {@code descOwner} property.
+     * {@code null} if not known.
      */
     @ProtobufProperty(index = 11, type = ProtobufType.STRING)
     Jid descriptionAuthorJid;
 
     /**
-     * The number of seconds after which messages in this group automatically
-     * disappear, or {@code 0} if ephemeral messaging is disabled. In the
-     * WhatsApp Web client this corresponds to the
-     * {@code ephemeralDuration} property.
+     * The timer for automatic message disappearance in this group. When set
+     * to a non-{@link ChatEphemeralTimer#OFF} value, messages sent to this
+     * group are automatically deleted after the specified duration. A
+     * {@code null} or {@link ChatEphemeralTimer#OFF} value disables
+     * ephemeral messaging.
      */
     @ProtobufProperty(index = 12, type = ProtobufType.UINT32)
     ChatEphemeralTimer ephemeralExpiration;
@@ -157,255 +144,242 @@ public final class GroupMetadata implements ChatMetadata {
     /**
      * Whether metadata editing is restricted to administrators only. When
      * {@code true}, only administrators can change the group's subject,
-     * description, and profile picture. In the WhatsApp Web client this
-     * corresponds to the {@code restrict} property (locked/unlocked).
+     * description, and profile picture. Exposed through {@link #restrict()}
+     * as a {@link ChatPolicy}.
      */
     @ProtobufProperty(index = 13, type = ProtobufType.BOOL)
     boolean restrict;
 
     /**
      * Whether the group is in announcement mode. When {@code true}, only
-     * administrators can send messages. In the WhatsApp Web client this
-     * corresponds to the {@code announce} property.
+     * administrators can send messages. Exposed through {@link #announce()}
+     * as a {@link ChatPolicy}.
      */
     @ProtobufProperty(index = 14, type = ProtobufType.BOOL)
     boolean announce;
 
     /**
      * The JID of the parent community this group is linked to, or
-     * {@code null} if the group is standalone. In the WhatsApp Web client
-     * this corresponds to the {@code parentGroup} property, populated from
-     * the {@code <linked_parent>} element.
+     * {@code null} if the group is standalone.
      */
     @ProtobufProperty(index = 15, type = ProtobufType.STRING)
     Jid parentCommunityJid;
 
     /**
      * Whether this group uses LID (Linked Identity) addressing mode instead
-     * of traditional phone-number-based addressing. In the WhatsApp Web
-     * client this corresponds to the {@code isLidAddressingMode} property.
+     * of traditional phone-number-based addressing. LID addressing hides
+     * phone numbers between participants who do not share them as contacts.
      */
     @ProtobufProperty(index = 16, type = ProtobufType.BOOL)
     boolean isLidAddressingMode;
 
     /**
-     * Whether this group operates in incognito mode. In the WhatsApp Web
-     * client this corresponds to the {@code incognito} column.
+     * Whether this group operates in incognito mode.
      */
     @ProtobufProperty(index = 17, type = ProtobufType.BOOL)
     boolean isIncognito;
 
     /**
-     * Whether frequently forwarded messages are blocked in this group. In
-     * the WhatsApp Web client this corresponds to the
-     * {@code noFrequentlyForwarded} property.
+     * Whether frequently forwarded messages (messages forwarded many times)
+     * are blocked from being sent to this group.
      */
     @ProtobufProperty(index = 18, type = ProtobufType.BOOL)
     boolean noFrequentlyForwarded;
 
     /**
-     * Whether admin approval is required for new members to join this group.
-     * In the WhatsApp Web client this corresponds to the
-     * {@code membershipApprovalMode} property, parsed from the
-     * {@code <membership_approval_mode><group_join state="on">} stanza.
+     * Whether administrator approval is required for new members to join
+     * this group. When {@code true}, prospective members must have their
+     * join request approved by an administrator before joining. Exposed
+     * through {@link #membershipApprovalMode()} as a {@link ChatPolicy}.
      */
     @ProtobufProperty(index = 19, type = ProtobufType.BOOL)
     boolean membershipApprovalMode;
 
     /**
      * Whether invite link usage is restricted to administrators. When
-     * {@code true}, only administrators can use invite links. In the
-     * WhatsApp Web client this corresponds to the {@code memberLinkMode}
-     * property with values {@code "admin_link"} or
-     * {@code "all_member_link"}.
+     * {@code true}, only administrators can share and use invite links to
+     * the group. Exposed through {@link #memberLinkMode()} as a
+     * {@link ChatPolicy}.
      */
     @ProtobufProperty(index = 20, type = ProtobufType.BOOL)
     boolean memberLinkModeAdminOnly;
 
     /**
-     * Whether only administrators can add members to this group. When
-     * {@code true}, adding members is restricted to administrators. In the
-     * WhatsApp Web client this corresponds to the {@code memberAddMode}
-     * field with the value {@code "admin_add"}.
+     * Whether only administrators can add new members to this group. When
+     * {@code true}, adding members is restricted to administrators. Exposed
+     * through {@link #memberAddMode()} as a {@link ChatPolicy}.
      */
     @ProtobufProperty(index = 21, type = ProtobufType.BOOL)
     boolean memberAddModeAdminOnly;
 
     /**
-     * The instant at which the growth lock expires, or {@code null} if no
-     * growth lock is active. In the WhatsApp Web client this corresponds to
-     * the {@code growthLockExpiration} property.
+     * The instant at which an active growth lock expires, or {@code null}
+     * if no growth lock is active. Growth locks temporarily prevent rapid
+     * growth of a group (for example, after anti-spam measures trigger).
      */
     @ProtobufProperty(index = 22, type = ProtobufType.INT64, mixins = InstantSecondsMixin.class)
     Instant growthLockExpiration;
 
     /**
-     * The type of growth lock applied to this group (e.g. {@code "invite"}),
-     * or {@code null} if no growth lock is active. In the WhatsApp Web
-     * client this corresponds to the {@code growthLockType} property.
+     * The type of growth lock applied to this group (for example
+     * {@code "invite"}), or {@code null} if no growth lock is active.
      */
     @ProtobufProperty(index = 23, type = ProtobufType.STRING)
     String growthLockType;
 
     /**
-     * Whether the "report to admin" feature is enabled for this group. In
-     * the WhatsApp Web client this corresponds to the
-     * {@code reportToAdminMode} property.
+     * Whether the "report to admin" feature is enabled for this group.
+     * When enabled, members can report specific messages to the group's
+     * administrators.
      */
     @ProtobufProperty(index = 24, type = ProtobufType.BOOL)
     boolean reportToAdminMode;
 
     /**
-     * The instant of the last report-to-admin event, or {@code null} if no
-     * such event has occurred. In the WhatsApp Web client this corresponds
-     * to the {@code lastReportToAdminTimestamp} property.
+     * The instant at which the most recent report-to-admin event occurred,
+     * or {@code null} if no such event has occurred.
      */
     @ProtobufProperty(index = 25, type = ProtobufType.INT64, mixins = InstantSecondsMixin.class)
     Instant lastReportToAdminTimestamp;
 
     /**
      * The server-reported participant count, or {@code null} if not
-     * available. In the WhatsApp Web client this corresponds to the
-     * {@code size} property.
+     * available. Note that this may differ from the size of
+     * {@link #participants()} when the local participant list is not fully
+     * synchronized with the server.
      */
     @ProtobufProperty(index = 26, type = ProtobufType.UINT32)
     Integer size;
 
     /**
-     * Whether this is a support group. In the WhatsApp Web client this
-     * corresponds to the {@code support} property.
+     * Whether this is a WhatsApp support group used for customer support
+     * interactions.
      */
     @ProtobufProperty(index = 27, type = ProtobufType.BOOL)
     boolean support;
 
     /**
-     * Whether this group has been suspended. A suspended group cannot be
-     * interacted with until it is restored. In the WhatsApp Web client this
-     * corresponds to the {@code suspended} property.
+     * Whether this group has been suspended by WhatsApp. A suspended group
+     * cannot be interacted with until it is restored.
      */
     @ProtobufProperty(index = 28, type = ProtobufType.BOOL)
     boolean suspended;
 
     /**
-     * Whether this group has been terminated. In the WhatsApp Web client
-     * this corresponds to the {@code terminated} property.
+     * Whether this group has been terminated. A terminated group is
+     * permanently closed and cannot be restored.
      */
     @ProtobufProperty(index = 29, type = ProtobufType.BOOL)
     boolean terminated;
 
     /**
      * Whether this group is the default subgroup (Community Announcement
-     * Group) of a community. In the WhatsApp Web client this corresponds to
-     * the {@code defaultSubgroup} property.
+     * Group) of a community. The announcement group is the main group in a
+     * community where administrators can broadcast messages to all
+     * community members.
      */
     @ProtobufProperty(index = 30, type = ProtobufType.BOOL)
     boolean defaultSubgroup;
 
     /**
-     * Whether this group is the general chat subgroup of a community. In
-     * the WhatsApp Web client this corresponds to the
-     * {@code generalSubgroup} property.
+     * Whether this group is the general chat subgroup of a community. The
+     * general chat is an open discussion group that community members can
+     * join automatically.
      */
     @ProtobufProperty(index = 31, type = ProtobufType.BOOL)
     boolean generalSubgroup;
 
     /**
-     * Whether this group is a hidden subgroup within a community. In the
-     * WhatsApp Web client this corresponds to the {@code hiddenSubgroup}
-     * property.
+     * Whether this group is a hidden subgroup within a community. Hidden
+     * subgroups are not visible in the community's list of subgroups.
      */
     @ProtobufProperty(index = 32, type = ProtobufType.BOOL)
     boolean hiddenSubgroup;
 
     /**
-     * Whether the group safety check flag is set. In the WhatsApp Web client
-     * this corresponds to the {@code groupSafetyCheck} property.
+     * Whether the group safety check flag is set. Safety checks flag groups
+     * that may require additional moderation attention.
      */
     @ProtobufProperty(index = 33, type = ProtobufType.BOOL)
     boolean groupSafetyCheck;
 
     /**
      * The JID of the user who added the current user to this group, or
-     * {@code null} if not known. In the WhatsApp Web client this corresponds
-     * to the {@code groupAdder} property.
+     * {@code null} if not known. Used to display the "added by" information
+     * in the group info screen.
      */
     @ProtobufProperty(index = 34, type = ProtobufType.STRING)
     Jid groupAdder;
 
     /**
-     * Whether automatic addition to the general chat is disabled. In the
-     * WhatsApp Web client this corresponds to the
-     * {@code generalChatAutoAddDisabled} property.
+     * Whether automatic addition to the general chat of the parent community
+     * is disabled for this group.
      */
     @ProtobufProperty(index = 35, type = ProtobufType.BOOL)
     boolean generalChatAutoAddDisabled;
 
     /**
-     * The instant of the last activity in this group, or {@code null} if not
-     * available. In the WhatsApp Web client this corresponds to the
-     * {@code lastActivityTimestamp} property.
+     * The instant of the last activity (any message or event) in this
+     * group, or {@code null} if not available.
      */
     @ProtobufProperty(index = 36, type = ProtobufType.INT64, mixins = InstantSecondsMixin.class)
     Instant lastActivityTimestamp;
 
     /**
-     * The instant of the last seen activity in this group, or {@code null}
-     * if not available. In the WhatsApp Web client this corresponds to the
-     * {@code lastSeenActivityTimestamp} property.
+     * The instant at which the current user last viewed activity in this
+     * group, or {@code null} if not available.
      */
     @ProtobufProperty(index = 37, type = ProtobufType.INT64, mixins = InstantSecondsMixin.class)
     Instant lastSeenActivityTimestamp;
 
     /**
-     * Whether this group has CAPI (Community API) capabilities. In the
-     * WhatsApp Web client this corresponds to the {@code hasCapi} property.
+     * Whether this group has CAPI (Community API) capabilities enabled.
      */
     @ProtobufProperty(index = 38, type = ProtobufType.BOOL)
     boolean hasCapi;
 
     /**
-     * Whether this group is a TEE bot group. In the WhatsApp Web client this
-     * corresponds to the {@code isTeeBotGroup} property.
+     * Whether this group is a TEE (Trusted Execution Environment) bot
+     * group. TEE bot groups use a secure execution environment for bot
+     * interactions.
      */
     @ProtobufProperty(index = 39, type = ProtobufType.BOOL)
     boolean isTeeBotGroup;
 
     /**
-     * The trigger that caused the disappearing message mode to be set, or
-     * {@code null} if not set. In the WhatsApp Web client this corresponds
-     * to the {@code disappearingModeTrigger} property.
+     * The trigger that caused the disappearing message mode to be set for
+     * this group, or {@code null} if not set. The trigger indicates whether
+     * the timer was set manually, by account default, or by some other
+     * means.
      */
     @ProtobufProperty(index = 40, type = ProtobufType.ENUM)
     ChatDisappearingMode.Trigger disappearingModeTrigger;
 
     /**
-     * Whether the current user initiated the disappearing message mode. In
-     * the WhatsApp Web client this corresponds to the
-     * {@code disappearingModeInitiatedByMe} property.
+     * Whether the current user initiated the disappearing message mode
+     * change for this group.
      */
     @ProtobufProperty(index = 41, type = ProtobufType.BOOL)
     boolean disappearingModeInitiatedByMe;
 
     /**
-     * Whether the limit sharing feature is enabled for this group. In the
-     * WhatsApp Web client this corresponds to the
-     * {@code limitSharingEnabled} property.
+     * Whether the limit sharing feature is enabled for this group. Limit
+     * sharing restricts certain message sharing behaviors to reduce spam.
      */
     @ProtobufProperty(index = 42, type = ProtobufType.BOOL)
     boolean limitSharingEnabled;
 
     /**
-     * The group evolution version, or {@code null} if not available. In the
-     * WhatsApp Web client this corresponds to the
-     * {@code evolutionVersion} property.
+     * The group evolution version, or {@code null} if not available. Used
+     * to track structural migrations of the group.
      */
     @ProtobufProperty(index = 43, type = ProtobufType.UINT32)
     Integer evolutionVersion;
 
     /**
-     * Whether participant labels are enabled for this group. In the WhatsApp
-     * Web client this corresponds to the {@code participantLabelEnabled}
-     * property.
+     * Whether participant labels (member tags) are enabled for this group.
+     * When enabled, administrators can assign {@link GroupParticipantLabel}
+     * tags to individual participants.
      */
     @ProtobufProperty(index = 44, type = ProtobufType.BOOL)
     boolean participantLabelEnabled;
@@ -413,23 +387,16 @@ public final class GroupMetadata implements ChatMetadata {
     /**
      * Whether the status updates posted by this group are muted for the
      * current user. When muted, the group's status updates are hidden from
-     * the status tab but messages in the group itself remain unaffected.
-     *
-     * <p>In the WhatsApp Web client this corresponds to the
-     * {@code statusMute} column on {@code WAWebDBGroupsGroupMetadata}, set
-     * by the {@code userStatusMute} sync action handler via a bulk merge
-     * onto the group metadata table.
-     *
-     * @implNote WAWebGroupMetadata.statusMute
+     * the status tab, but messages in the group itself remain unaffected.
      */
     @ProtobufProperty(index = 45, type = ProtobufType.BOOL)
     boolean statusMuted;
 
     /**
      * Whether this group has the open Meta AI bot feature enabled. This
-     * field is not serialized as a protobuf property and is instead populated
-     * programmatically from the group query response when bot participants
-     * are detected.
+     * field is not serialized as a protobuf property and is instead
+     * populated at runtime from the group query response when AI bot
+     * participants are detected.
      */
     boolean isOpenBotGroup;
 
@@ -865,8 +832,6 @@ public final class GroupMetadata implements ChatMetadata {
      * <p>A return value of {@link ChatPolicy#ADMINS} indicates that only
      * administrators can edit group information. A return value of
      * {@link ChatPolicy#ANYONE} indicates that all participants can edit it.
-     * In the WhatsApp Web client this corresponds to the {@code restrict}
-     * property (locked/unlocked).
      *
      * @return the non-{@code null} policy for metadata editing
      */
@@ -890,8 +855,7 @@ public final class GroupMetadata implements ChatMetadata {
      * <p>A return value of {@link ChatPolicy#ADMINS} indicates that the
      * group is in announcement mode and only administrators can send
      * messages. A return value of {@link ChatPolicy#ANYONE} indicates that
-     * all participants can send messages. In the WhatsApp Web client this
-     * corresponds to the {@code announce} property.
+     * all participants can send messages.
      *
      * @return the non-{@code null} policy for sending messages
      */
@@ -988,8 +952,7 @@ public final class GroupMetadata implements ChatMetadata {
      * <p>A return value of {@link ChatPolicy#ADMINS} indicates that new
      * members must be approved by an administrator before joining. A return
      * value of {@link ChatPolicy#ANYONE} indicates that members can join
-     * freely. In the WhatsApp Web client this corresponds to the
-     * {@code membershipApprovalMode} property.
+     * freely.
      *
      * @return the non-{@code null} membership approval policy
      */
@@ -1014,8 +977,7 @@ public final class GroupMetadata implements ChatMetadata {
      * <p>A return value of {@link ChatPolicy#ADMINS} indicates that only
      * administrators can use invite links. A return value of
      * {@link ChatPolicy#ANYONE} indicates that all members can share the
-     * link. In the WhatsApp Web client this corresponds to the
-     * {@code memberLinkMode} property.
+     * link.
      *
      * @return the non-{@code null} invite link policy
      */
@@ -1040,8 +1002,7 @@ public final class GroupMetadata implements ChatMetadata {
      * <p>A return value of {@link ChatPolicy#ADMINS} indicates that only
      * administrators can add members. A return value of
      * {@link ChatPolicy#ANYONE} indicates that all participants can add new
-     * members. In the WhatsApp Web client this corresponds to the
-     * {@code memberAddMode} field.
+     * members.
      *
      * @return the non-{@code null} member addition policy
      */
@@ -1494,12 +1455,11 @@ public final class GroupMetadata implements ChatMetadata {
      * Returns whether the status updates posted by this group are muted for
      * the current user.
      *
-     * <p>The state is updated by the {@code userStatusMute} sync action
-     * handler when a user mutes or unmutes a group's status.
+     * <p>When muted, the group's status updates are hidden from the status
+     * tab, but messages in the group itself remain unaffected.
      *
      * @return {@code true} if status updates from this group are muted,
      *         {@code false} otherwise
-     * @implNote WAWebGroupMetadata.statusMute
      */
     public boolean statusMuted() {
         return statusMuted;
@@ -1511,9 +1471,7 @@ public final class GroupMetadata implements ChatMetadata {
      *
      * @param statusMuted {@code true} to mute status updates,
      *                    {@code false} to unmute
-     * @return this {@code GroupMetadata} instance
-     * @implNote WAWebGroupMetadata.statusMute setter — mirrors the
-     *           {@code Contact.setStatusMuted} pattern for typed access
+     * @return this {@code GroupMetadata} instance for method chaining
      */
     public GroupMetadata setStatusMuted(boolean statusMuted) {
         this.statusMuted = statusMuted;
@@ -1536,17 +1494,40 @@ public final class GroupMetadata implements ChatMetadata {
         this.isOpenBotGroup = openBotGroup;
     }
 
+    /**
+     * Returns whether this group metadata is equal to the given object.
+     *
+     * <p>Two {@code GroupMetadata} instances are considered equal if they
+     * have the same {@link #jid()}. Other fields are not considered in the
+     * comparison.
+     *
+     * @param o the object to compare against
+     * @return {@code true} if the given object is a {@code GroupMetadata}
+     *         with the same JID, {@code false} otherwise
+     */
     @Override
     public boolean equals(Object o) {
         return o instanceof GroupMetadata that
                 && Objects.equals(jid, that.jid);
     }
 
+    /**
+     * Returns a hash code consistent with {@link #equals(Object)}, derived
+     * from the group's JID.
+     *
+     * @return the hash code
+     */
     @Override
     public int hashCode() {
         return Objects.hashCode(jid);
     }
 
+    /**
+     * Returns a string representation of this group metadata containing the
+     * JID and subject.
+     *
+     * @return a human-readable string representation
+     */
     @Override
     public String toString() {
         return "GroupMetadata[jid=" + jid + ", subject=" + subject + ']';

@@ -23,8 +23,7 @@ import com.github.auties00.cobalt.socket.layer.SocketClientLayer;
 import com.github.auties00.cobalt.socket.layer.SocketClientLayerListener;
 import com.github.auties00.cobalt.socket.layer.application.websocket.WebSocketClientLayer;
 import com.github.auties00.cobalt.socket.layer.application.whatsapp.WhatsAppSocketClientLayerContext;
-import com.github.auties00.cobalt.socket.layer.security.SocketClientTransportSecurityLayer;
-import com.github.auties00.cobalt.socket.layer.security.SocketClientTunnelSecurityLayer;
+import com.github.auties00.cobalt.socket.layer.security.SocketClientSecurityLayer;
 import com.github.auties00.cobalt.socket.layer.transport.SocketClientTransportLayer;
 import com.github.auties00.cobalt.socket.layer.tunnel.SocketClientTunnelLayer;
 import com.github.auties00.cobalt.socket.threading.SocketClientPendingRead;
@@ -145,8 +144,8 @@ public sealed abstract class WhatsAppSocketClient {
 
     private static SocketClientLayer<?> createTunnelSecurity(SocketClientLayer<?> transport, WhatsAppStore store, WhatsAppSslEngineFactory engineFactory) {
         return switch (store.proxy().orElse(null)) {
-            case WhatsAppClientProxy.Http.Secure _ -> SocketClientTunnelSecurityLayer.newTlsTunnel(transport, engineFactory);
-            case null, default -> SocketClientTunnelSecurityLayer.newPlainTunnel(transport);
+            case WhatsAppClientProxy.Http.Secure _ -> SocketClientSecurityLayer.newTls(transport, engineFactory);
+            case null, default -> SocketClientSecurityLayer.newPlain(transport);
         };
     }
 
@@ -160,9 +159,9 @@ public sealed abstract class WhatsAppSocketClient {
 
     private static SocketClientLayer<?> createTransportSecurity(SocketClientLayer<?> tunnel, WhatsAppStore store, WhatsAppSslEngineFactory engineFactory) {
         if (store.device().platform() == ClientPlatformType.WEB) {
-            return SocketClientTransportSecurityLayer.newTlsTransport(tunnel, engineFactory);
+            return SocketClientSecurityLayer.newTls(tunnel, engineFactory);
         }
-        return SocketClientTransportSecurityLayer.newPlainTransport(tunnel);
+        return SocketClientSecurityLayer.newPlain(tunnel);
     }
 
     /**

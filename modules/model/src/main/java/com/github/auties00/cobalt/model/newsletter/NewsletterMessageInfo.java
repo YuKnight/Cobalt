@@ -12,90 +12,172 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * A message within a newsletter, containing the message content, metadata
- * such as view counts, reactions, poll votes, forwards, and administrative
- * information about the sender.
+ * Represents a single message published inside a newsletter.
  *
- * <p>Newsletter messages are not end-to-end encrypted. The message content
- * is received as plaintext protobuf bytes using the standard
- * {@code Message} protobuf specification.
+ * <p>Unlike chat messages, newsletter messages are not end-to-end
+ * encrypted: the server broadcasts them as plaintext protobuf payloads
+ * decoded against the standard message specification. To compensate for
+ * the lack of privacy, the server never reveals individual reactor or
+ * voter identities; subscribers only see aggregated tallies.
+ *
+ * <p>Each instance bundles the shared message envelope inherited from
+ * {@link MessageInfo} (key, timestamp, content, delivery status, starred
+ * flag, receipts) with newsletter-specific state:
+ * <ul>
+ *   <li>the server-assigned monotonic identifier used to order messages</li>
+ *   <li>the view count, forwards count, and question-response count</li>
+ *   <li>the aggregated reactions keyed by emoji</li>
+ *   <li>the aggregated poll vote tallies</li>
+ *   <li>timestamps tracking the last server update, the original send
+ *       time, and the most recent edit</li>
+ *   <li>the admin profile that published the message</li>
+ *   <li>a WAMO subscription flag marking paid-content messages</li>
+ *   <li>an optional media handle used when the message carries an upload</li>
+ * </ul>
  */
 @ProtobufMessage
 public final class NewsletterMessageInfo implements MessageInfo {
+    /**
+     * The immutable key identifying this message (remote JID, client id,
+     * sender).
+     */
     @ProtobufProperty(index = 1, type = ProtobufType.MESSAGE)
     MessageKey key;
 
+    /**
+     * The monotonic identifier assigned by the newsletter server, used to
+     * order messages within the newsletter.
+     */
     @ProtobufProperty(index = 2, type = ProtobufType.INT32)
     int serverId;
 
+    /**
+     * The moment at which the message was originally delivered.
+     */
     @ProtobufProperty(index = 3, type = ProtobufType.UINT64, mixins = InstantSecondsMixin.class)
     Instant timestamp;
 
+    /**
+     * The number of subscribers that have viewed this message. {@code null}
+     * when not reported yet.
+     */
     @ProtobufProperty(index = 4, type = ProtobufType.UINT64)
     Long views;
 
+    /**
+     * The aggregated reaction tallies, keyed by their emoji content.
+     */
     @ProtobufProperty(index = 5, type = ProtobufType.MAP, mapKeyType = ProtobufType.STRING, mapValueType = ProtobufType.MESSAGE)
     Map<String, NewsletterReaction> reactions;
 
+    /**
+     * The container holding the message content. May be {@code null} for
+     * placeholder or deleted messages.
+     */
     @ProtobufProperty(index = 6, type = ProtobufType.MESSAGE)
     MessageContainer message;
 
+    /**
+     * The delivery status of this message. {@code null} when the server
+     * has not yet reported one.
+     */
     @ProtobufProperty(index = 7, type = ProtobufType.ENUM)
     MessageStatus status;
 
+    /**
+     * Whether the current viewer has starred this message.
+     */
     @ProtobufProperty(index = 8, type = ProtobufType.BOOL)
     boolean starred;
 
+    /**
+     * Delivery receipts associated with this message.
+     */
     @ProtobufProperty(index = 9, type = ProtobufType.MESSAGE)
     List<MessageReceipt> receipts;
 
+    /**
+     * The number of times this message has been forwarded. {@code null}
+     * when not reported yet.
+     */
     @ProtobufProperty(index = 10, type = ProtobufType.UINT64)
     Long forwardsCount;
 
+    /**
+     * The number of responses received when the message is a question
+     * post. {@code null} when the message is not a question or no
+     * responses exist.
+     */
     @ProtobufProperty(index = 11, type = ProtobufType.UINT64)
     Long questionResponsesCount;
 
+    /**
+     * The most recent moment at which the server reported updated
+     * aggregates for this message.
+     */
     @ProtobufProperty(index = 12, type = ProtobufType.UINT64, mixins = InstantSecondsMixin.class)
     Instant lastUpdateFromServerTimestamp;
 
+    /**
+     * The sender-side timestamp, in milliseconds, of the most recent edit.
+     * {@code null} when the message has never been edited.
+     */
     @ProtobufProperty(index = 13, type = ProtobufType.UINT64)
     Long latestEditSenderTimestampMs;
 
+    /**
+     * The original send timestamp before any edits were applied.
+     */
     @ProtobufProperty(index = 14, type = ProtobufType.UINT64, mixins = InstantSecondsMixin.class)
     Instant originalTimestamp;
 
+    /**
+     * Whether this message is gated behind a WAMO subscription.
+     */
     @ProtobufProperty(index = 15, type = ProtobufType.BOOL)
     boolean wamoSub;
 
+    /**
+     * The admin profile that published this message, when admin-profile
+     * attribution is used.
+     */
     @ProtobufProperty(index = 16, type = ProtobufType.MESSAGE)
     NewsletterAdminProfile adminProfile;
 
+    /**
+     * The aggregated poll vote tallies for poll messages.
+     */
     @ProtobufProperty(index = 17, type = ProtobufType.MESSAGE)
     List<NewsletterPollVote> pollVotes;
 
+    /**
+     * A transient handle produced by the media upload pipeline for
+     * messages that carry attachments. Not persisted via protobuf.
+     */
     String mediaHandle;
 
     /**
-     * Constructs a new {@code NewsletterMessageInfo} with the specified fields.
+     * Constructs a new {@code NewsletterMessageInfo}. Invoked by the
+     * generated protobuf deserializer.
      *
      * @param key                            the message key, must not be {@code null}
-     * @param serverId                       the server-assigned message identifier
-     * @param timestamp                      the message timestamp, may be {@code null}
+     * @param serverId                       the server-assigned monotonic identifier
+     * @param timestamp                      the original send timestamp, may be {@code null}
      * @param views                          the view count, may be {@code null}
-     * @param reactions                      the reaction map keyed by emoji content, may be {@code null}
+     * @param reactions                      the aggregated reactions keyed by emoji, may be {@code null}
      * @param message                        the message content container, may be {@code null}
-     * @param status                         the message delivery status, may be {@code null}
+     * @param status                         the delivery status, may be {@code null}
      * @param starred                        whether the message is starred
-     * @param receipts                       the message receipts, may be {@code null}
-     * @param forwardsCount                  the number of times the message was forwarded, may be {@code null}
+     * @param receipts                       the delivery receipts, may be {@code null}
+     * @param forwardsCount                  the forwards count, may be {@code null}
      * @param questionResponsesCount         the number of question responses, may be {@code null}
-     * @param lastUpdateFromServerTimestamp  the timestamp of the last server update, may be {@code null}
-     * @param latestEditSenderTimestampMs    the timestamp in milliseconds of the latest edit, may be {@code null}
-     * @param originalTimestamp              the original timestamp before edits, may be {@code null}
-     * @param wamoSub                        whether this is a WAMO subscription message
-     * @param adminProfile                   the admin profile who sent the message, may be {@code null}
-     * @param pollVotes                      the poll vote data, may be {@code null}
-     * @throws NullPointerException if {@code key} is {@code null}
+     * @param lastUpdateFromServerTimestamp  the timestamp of the last aggregate update, may be {@code null}
+     * @param latestEditSenderTimestampMs    the latest edit timestamp in milliseconds, may be {@code null}
+     * @param originalTimestamp              the original send timestamp before edits, may be {@code null}
+     * @param wamoSub                        whether the message is WAMO-gated
+     * @param adminProfile                   the publishing admin profile, may be {@code null}
+     * @param pollVotes                      the poll vote tallies, defaulted to an empty mutable list when {@code null}
+     * @throws NullPointerException          if {@code key} is {@code null}
      */
     NewsletterMessageInfo(MessageKey key, int serverId, Instant timestamp, Long views, Map<String, NewsletterReaction> reactions, MessageContainer message, MessageStatus status, boolean starred, List<MessageReceipt> receipts, Long forwardsCount, Long questionResponsesCount, Instant lastUpdateFromServerTimestamp, Long latestEditSenderTimestampMs, Instant originalTimestamp, boolean wamoSub, NewsletterAdminProfile adminProfile, List<NewsletterPollVote> pollVotes) {
         this.key = Objects.requireNonNull(key, "key cannot be null");
@@ -118,7 +200,9 @@ public final class NewsletterMessageInfo implements MessageInfo {
     }
 
     /**
-     * {@inheritDoc}
+     * Returns the message key that identifies this message.
+     *
+     * @return the message key, never {@code null}
      */
     @Override
     public MessageKey key() {
@@ -126,9 +210,9 @@ public final class NewsletterMessageInfo implements MessageInfo {
     }
 
     /**
-     * Sets the message key.
+     * Sets the message key that identifies this message.
      *
-     * @param key the message key, must not be {@code null}
+     * @param key the new message key, must not be {@code null}
      * @throws NullPointerException if {@code key} is {@code null}
      */
     public void setKey(MessageKey key) {
@@ -136,7 +220,7 @@ public final class NewsletterMessageInfo implements MessageInfo {
     }
 
     /**
-     * Returns the server-assigned message identifier.
+     * Returns the server-assigned monotonic identifier.
      *
      * @return the server id
      */
@@ -145,16 +229,19 @@ public final class NewsletterMessageInfo implements MessageInfo {
     }
 
     /**
-     * Sets the server-assigned message identifier.
+     * Sets the server-assigned monotonic identifier.
      *
-     * @param serverId the server id
+     * @param serverId the new server id
      */
     public void setServerId(int serverId) {
         this.serverId = serverId;
     }
 
     /**
-     * {@inheritDoc}
+     * Returns the original send timestamp.
+     *
+     * @return an {@link Optional} holding the send timestamp, or empty if
+     *         the server has not reported one
      */
     @Override
     public Optional<Instant> timestamp() {
@@ -162,37 +249,44 @@ public final class NewsletterMessageInfo implements MessageInfo {
     }
 
     /**
-     * Sets the message timestamp.
+     * Sets the original send timestamp.
      *
-     * @param timestamp the timestamp
+     * @param timestamp the new send timestamp, or {@code null}
      */
     public void setTimestamp(Instant timestamp) {
         this.timestamp = timestamp;
     }
 
     /**
-     * Returns the view count, if available.
+     * Returns the number of subscribers that have viewed this message.
      *
-     * @return an {@link OptionalLong} containing the view count,
-     *         or empty if not set
+     * @return an {@link OptionalLong} holding the view count, or empty
+     *         when no count has been reported yet
      */
     public OptionalLong views() {
         return views == null ? OptionalLong.empty() : OptionalLong.of(views);
     }
 
     /**
-     * Sets the view count.
+     * Sets the number of subscribers that have viewed this message.
      *
-     * @param views the view count
+     * @param views the new view count, or {@code null}
      */
     public void setViews(Long views) {
         this.views = views;
     }
 
     /**
-     * Sets the reactions from a collection, merging duplicates.
+     * Replaces the aggregated reactions from a flat collection, collapsing
+     * duplicate entries for the same emoji.
      *
-     * @param reactions the collection of reactions, may be {@code null}
+     * <p>When two entries for the same emoji disagree on the count, the
+     * merged entry takes the larger count; when they agree, the count is
+     * incremented by one to reflect the combined tally. The local
+     * {@code fromMe} flag is preserved from the first entry.
+     *
+     * @param reactions the reactions to aggregate, or {@code null} to
+     *                  reset to an empty map
      */
     public void setReactions(Collection<NewsletterReaction> reactions) {
         if (reactions == null) {
@@ -220,7 +314,12 @@ public final class NewsletterMessageInfo implements MessageInfo {
     }
 
     /**
-     * {@inheritDoc}
+     * Returns the container holding the message content.
+     *
+     * <p>If no content was delivered, an empty container is returned so
+     * that callers can always chain getters without null checks.
+     *
+     * @return the message content container, never {@code null}
      */
     @Override
     public MessageContainer message() {
@@ -228,16 +327,19 @@ public final class NewsletterMessageInfo implements MessageInfo {
     }
 
     /**
-     * Sets the message content container.
+     * Sets the container holding the message content.
      *
-     * @param message the message container
+     * @param message the new content container, or {@code null}
      */
     public void setMessage(MessageContainer message) {
         this.message = message;
     }
 
     /**
-     * {@inheritDoc}
+     * Returns the delivery status of this message.
+     *
+     * @return an {@link Optional} holding the status, or empty when no
+     *         status has been reported yet
      */
     @Override
     public Optional<MessageStatus> status() {
@@ -245,88 +347,95 @@ public final class NewsletterMessageInfo implements MessageInfo {
     }
 
     /**
-     * Sets the message delivery status.
+     * Sets the delivery status of this message.
      *
-     * @param status the delivery status
+     * @param status the new status, or {@code null}
      */
     public void setStatus(MessageStatus status) {
         this.status = status;
     }
 
     /**
-     * Sets the message receipts.
+     * Replaces the delivery receipts associated with this message.
      *
-     * @param receipts the receipt
+     * @param receipts the new receipts, or {@code null}
      */
     public void setReceipts(List<MessageReceipt> receipts) {
         this.receipts = receipts;
     }
 
     /**
-     * Returns the media handle, if available.
+     * Returns the transient media handle produced by the upload pipeline.
      *
-     * @return the media handle, may be {@code null}
+     * @return an {@link Optional} holding the handle, or empty when no
+     *         upload has taken place
      */
     public Optional<String> mediaHandle() {
         return Optional.ofNullable(mediaHandle);
     }
 
     /**
-     * Sets the media handle.
+     * Sets the transient media handle produced by the upload pipeline.
      *
-     * @param mediaHandle the media handle
+     * @param mediaHandle the new handle, or {@code null}
      */
     public void setMediaHandle(String mediaHandle) {
         this.mediaHandle = mediaHandle;
     }
 
     /**
-     * Returns an unmodifiable view of the reactions.
+     * Returns an unmodifiable snapshot of the aggregated reactions.
      *
-     * @return the reactions collection, never {@code null}
+     * @return the reactions as an unmodifiable collection, never
+     *         {@code null}
      */
     public Collection<NewsletterReaction> reactions() {
         return Collections.unmodifiableCollection(reactions.values());
     }
 
     /**
-     * Finds a reaction by its emoji content.
+     * Looks up an aggregated reaction entry by its emoji content.
      *
-     * @param value the emoji content to search for
-     * @return an {@link Optional} containing the matching reaction,
-     *         or empty if not found
+     * @param value the emoji content to look up
+     * @return an {@link Optional} holding the matching reaction, or empty
+     *         when the emoji has no recorded tally
      */
     public Optional<NewsletterReaction> findReaction(String value) {
         return Optional.ofNullable(reactions.get(value));
     }
 
     /**
-     * Adds or replaces a reaction.
+     * Inserts or replaces the tally entry for the supplied reaction.
      *
-     * @param reaction the reaction to add
-     * @return an {@link Optional} containing the previously associated reaction,
-     *         or empty if there was none
+     * @param reaction the reaction whose tally to store
+     * @return an {@link Optional} holding the previous tally for the same
+     *         emoji, or empty when none existed
      */
     public Optional<NewsletterReaction> addReaction(NewsletterReaction reaction) {
         return Optional.ofNullable(reactions.put(reaction.content(), reaction));
     }
 
     /**
-     * Removes a reaction by its emoji code.
+     * Removes the tally entry for the supplied emoji.
      *
-     * @param code the emoji code to remove
-     * @return an {@link Optional} containing the removed reaction,
-     *         or empty if not found
+     * @param code the emoji content whose tally to remove
+     * @return an {@link Optional} holding the removed tally, or empty
+     *         when no tally existed
      */
     public Optional<NewsletterReaction> removeReaction(String code) {
         return Optional.ofNullable(reactions.remove(code));
     }
 
     /**
-     * Increments the count for a reaction, creating it if it does not exist.
+     * Increments the tally for the supplied emoji, creating a new entry
+     * with count {@code 1} when none exists.
      *
-     * @param code   the emoji code
-     * @param fromMe whether the reaction is from the current user
+     * <p>This method also refreshes the local-participation flag so that
+     * the latest action is attributed correctly.
+     *
+     * @param code   the emoji content whose tally to increment
+     * @param fromMe {@code true} when the increment is caused by the
+     *               local user
      */
     public void incrementReaction(String code, boolean fromMe) {
         findReaction(code).ifPresentOrElse(reaction -> {
@@ -339,10 +448,14 @@ public final class NewsletterMessageInfo implements MessageInfo {
     }
 
     /**
-     * Decrements the count for a reaction, removing it if the count
-     * reaches zero.
+     * Decrements the tally for the supplied emoji, removing the entry
+     * entirely when the count would drop to zero.
      *
-     * @param code the emoji code
+     * <p>When the entry survives, its local-participation flag is reset
+     * to {@code false} on the assumption that the local user just retracted
+     * their reaction.
+     *
+     * @param code the emoji content whose tally to decrement
      */
     public void decrementReaction(String code) {
         findReaction(code).ifPresent(reaction -> {
@@ -357,7 +470,9 @@ public final class NewsletterMessageInfo implements MessageInfo {
     }
 
     /**
-     * {@inheritDoc}
+     * Returns whether the current viewer has starred this message.
+     *
+     * @return {@code true} when the message is starred
      */
     @Override
     public boolean starred() {
@@ -365,16 +480,19 @@ public final class NewsletterMessageInfo implements MessageInfo {
     }
 
     /**
-     * Sets whether the message is starred.
+     * Sets whether the current viewer has starred this message.
      *
-     * @param starred {@code true} to star the message
+     * @param starred the new starred flag
      */
     public void setStarred(boolean starred) {
         this.starred = starred;
     }
 
     /**
-     * {@inheritDoc}
+     * Returns an unmodifiable view of the delivery receipts associated
+     * with this message.
+     *
+     * @return the delivery receipts, never {@code null}
      */
     @Override
     public List<MessageReceipt> receipts() {
@@ -382,157 +500,174 @@ public final class NewsletterMessageInfo implements MessageInfo {
     }
 
     /**
-     * Returns the number of times the message was forwarded, if available.
+     * Returns the total number of times this message has been forwarded.
      *
-     * @return an {@link OptionalLong} containing the forwards count,
-     *         or empty if not set
+     * @return an {@link OptionalLong} holding the forwards count, or
+     *         empty when no count has been reported yet
      */
     public OptionalLong forwardsCount() {
         return forwardsCount == null ? OptionalLong.empty() : OptionalLong.of(forwardsCount);
     }
 
     /**
-     * Sets the forwards count.
+     * Sets the total number of times this message has been forwarded.
      *
-     * @param forwardsCount the forwards count
+     * @param forwardsCount the new forwards count, or {@code null}
      */
     public void setForwardsCount(Long forwardsCount) {
         this.forwardsCount = forwardsCount;
     }
 
     /**
-     * Returns the number of question responses, if available.
+     * Returns the number of responses received when this message is a
+     * question post.
      *
-     * @return an {@link OptionalLong} containing the question responses count,
-     *         or empty if not set
+     * @return an {@link OptionalLong} holding the response count, or
+     *         empty when the message is not a question or no responses
+     *         exist yet
      */
     public OptionalLong questionResponsesCount() {
         return questionResponsesCount == null ? OptionalLong.empty() : OptionalLong.of(questionResponsesCount);
     }
 
     /**
-     * Sets the question responses count.
+     * Sets the number of responses received when this message is a
+     * question post.
      *
-     * @param questionResponsesCount the question responses count
+     * @param questionResponsesCount the new response count, or {@code null}
      */
     public void setQuestionResponsesCount(Long questionResponsesCount) {
         this.questionResponsesCount = questionResponsesCount;
     }
 
     /**
-     * Returns the timestamp of the last server update, if available.
+     * Returns the most recent moment at which the server reported
+     * updated aggregates for this message.
      *
-     * @return an {@link Optional} containing the last update timestamp,
-     *         or empty if not set
+     * @return an {@link Optional} holding the last update timestamp, or
+     *         empty when none has been reported
      */
     public Optional<Instant> lastUpdateFromServerTimestamp() {
         return Optional.ofNullable(lastUpdateFromServerTimestamp);
     }
 
     /**
-     * Sets the timestamp of the last server update.
+     * Sets the last server-aggregate update timestamp.
      *
-     * @param lastUpdateFromServerTimestamp the last update timestamp
+     * @param lastUpdateFromServerTimestamp the new timestamp, or
+     *                                      {@code null}
      */
     public void setLastUpdateFromServerTimestamp(Instant lastUpdateFromServerTimestamp) {
         this.lastUpdateFromServerTimestamp = lastUpdateFromServerTimestamp;
     }
 
     /**
-     * Returns the timestamp in milliseconds of the latest edit by the
-     * sender, if available.
+     * Returns the sender-side timestamp, in milliseconds, of the most
+     * recent edit.
      *
-     * @return an {@link OptionalLong} containing the edit timestamp in
-     *         milliseconds, or empty if not set
+     * @return an {@link OptionalLong} holding the edit timestamp, or
+     *         empty when the message has never been edited
      */
     public OptionalLong latestEditSenderTimestampMs() {
         return latestEditSenderTimestampMs == null ? OptionalLong.empty() : OptionalLong.of(latestEditSenderTimestampMs);
     }
 
     /**
-     * Sets the latest edit sender timestamp in milliseconds.
+     * Sets the sender-side timestamp, in milliseconds, of the most recent
+     * edit.
      *
-     * @param latestEditSenderTimestampMs the edit timestamp in milliseconds
+     * @param latestEditSenderTimestampMs the new edit timestamp, or
+     *                                    {@code null}
      */
     public void setLatestEditSenderTimestampMs(Long latestEditSenderTimestampMs) {
         this.latestEditSenderTimestampMs = latestEditSenderTimestampMs;
     }
 
     /**
-     * Returns the original timestamp of the message before any edits,
-     * if available.
+     * Returns the original send timestamp before any edits were applied.
      *
-     * @return an {@link Optional} containing the original timestamp,
-     *         or empty if not set or the message was not edited
+     * @return an {@link Optional} holding the original timestamp, or
+     *         empty when the message has never been edited or the server
+     *         has not reported one
      */
     public Optional<Instant> originalTimestamp() {
         return Optional.ofNullable(originalTimestamp);
     }
 
     /**
-     * Sets the original timestamp before edits.
+     * Sets the original send timestamp before any edits were applied.
      *
-     * @param originalTimestamp the original timestamp
+     * @param originalTimestamp the new original timestamp, or {@code null}
      */
     public void setOriginalTimestamp(Instant originalTimestamp) {
         this.originalTimestamp = originalTimestamp;
     }
 
     /**
-     * Returns whether this is a WAMO subscription message.
+     * Returns whether this message is gated behind a WAMO subscription.
      *
-     * @return {@code true} if this is a WAMO sub message
+     * @return {@code true} when the message is WAMO-gated
      */
     public boolean wamoSub() {
         return wamoSub;
     }
 
     /**
-     * Sets whether this is a WAMO subscription message.
+     * Sets whether this message is gated behind a WAMO subscription.
      *
-     * @param wamoSub {@code true} if this is a WAMO sub message
+     * @param wamoSub the new WAMO-gated flag
      */
     public void setWamoSub(boolean wamoSub) {
         this.wamoSub = wamoSub;
     }
 
     /**
-     * Returns the admin profile of the message sender, if available.
+     * Returns the admin profile that published this message, when
+     * admin-profile attribution is in use.
      *
-     * @return an {@link Optional} containing the admin profile,
-     *         or empty if not set
+     * @return an {@link Optional} holding the admin profile, or empty
+     *         when the message is published under the newsletter itself
      */
     public Optional<NewsletterAdminProfile> adminProfile() {
         return Optional.ofNullable(adminProfile);
     }
 
     /**
-     * Sets the admin profile of the message sender.
+     * Sets the admin profile that published this message.
      *
-     * @param adminProfile the admin profile
+     * @param adminProfile the new admin profile, or {@code null}
      */
     public void setAdminProfile(NewsletterAdminProfile adminProfile) {
         this.adminProfile = adminProfile;
     }
 
     /**
-     * Returns the poll vote data for this message, if it is a poll.
+     * Returns an unmodifiable view of the aggregated poll vote tallies
+     * for this message.
      *
-     * @return an unmodifiable list of poll votes, never {@code null}
+     * @return the poll vote tallies, never {@code null}
      */
     public List<NewsletterPollVote> pollVotes() {
         return Collections.unmodifiableList(pollVotes);
     }
 
     /**
-     * Sets the poll vote data.
+     * Replaces the aggregated poll vote tallies for this message.
      *
-     * @param pollVotes the list of poll votes
+     * @param pollVotes the new tallies, defaulted to an empty mutable
+     *                  list when {@code null}
      */
     public void setPollVotes(List<NewsletterPollVote> pollVotes) {
         this.pollVotes = Objects.requireNonNullElseGet(pollVotes, ArrayList::new);
     }
 
+    /**
+     * Returns whether this message equals the supplied object.
+     *
+     * @param o the object to compare against
+     * @return {@code true} if {@code o} is a {@code NewsletterMessageInfo}
+     *         whose fields are all equal to this one's
+     */
     @Override
     public boolean equals(Object o) {
         return o instanceof NewsletterMessageInfo that
@@ -554,6 +689,11 @@ public final class NewsletterMessageInfo implements MessageInfo {
                && Objects.equals(pollVotes, that.pollVotes);
     }
 
+    /**
+     * Returns a hash code consistent with {@link #equals(Object)}.
+     *
+     * @return the hash code for this message
+     */
     @Override
     public int hashCode() {
         return Objects.hash(key, serverId, timestamp, views, reactions, message, status, starred, forwardsCount, questionResponsesCount, lastUpdateFromServerTimestamp, latestEditSenderTimestampMs, originalTimestamp, wamoSub, adminProfile, pollVotes);

@@ -5,33 +5,50 @@ import com.github.auties00.cobalt.model.contact.Contact;
 import it.auties.protobuf.annotation.ProtobufEnum;
 
 /**
- * The constants of this enumerated type describe the various actions that can be executed on a
- * {@link Contact} in a {@link Chat}. Said chat should be a group: {@link Chat#isGroupOrCommunity()}. Said
- * actions can be executed using various methods in {@code WhatsAppClient}.
+ * Represents the administrative actions that can be performed on a participant
+ * within a WhatsApp group chat.
+ *
+ * <p>These actions correspond to the group management operations available to
+ * administrators through the WhatsApp client. Each action modifies a
+ * {@link Contact}'s relationship with a group {@link Chat} (one where
+ * {@link Chat#isGroupOrCommunity()} returns {@code true}). The actions can be
+ * executed using the participant management methods in {@code WhatsAppClient}.
+ *
+ * <p>The {@link #data()} method returns the lowercase protocol-level identifier
+ * for the action, which is used in the XMPP stanza sent to the server.
  */
 @ProtobufEnum
 public enum GroupAction {
     /**
-     * Adds a contact to a group
+     * Adds a contact as a new participant to the group.
      */
     ADD,
+
     /**
-     * Removes a contact from a group
+     * Removes an existing participant from the group.
      */
     REMOVE,
+
     /**
-     * Promotes a contact to admin in a group
+     * Promotes a regular participant to group administrator, granting them
+     * elevated permissions such as editing group settings and managing members.
      */
     PROMOTE,
+
     /**
-     * Demotes a contact to user in a group
+     * Demotes a group administrator back to a regular participant, revoking
+     * their administrative permissions.
      */
     DEMOTE;
 
     /**
-     * Returns the name of this enumerated constant
+     * Returns the protocol-level identifier for this action.
      *
-     * @return a lowercase non-null String
+     * <p>The returned string is the lowercase form of the enum constant name
+     * and is used as the action type in XMPP stanzas sent to the WhatsApp
+     * server when performing group participant operations.
+     *
+     * @return the lowercase action identifier, never {@code null}
      */
     public String data() {
         return name().toLowerCase();

@@ -3,6 +3,7 @@ package com.github.auties00.cobalt.store;
 
 import com.github.auties00.cobalt.client.*;
 import com.github.auties00.cobalt.media.MediaConnection;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.business.BusinessVerifiedName;
 import com.github.auties00.cobalt.model.business.profile.BusinessCategory;
 import com.github.auties00.cobalt.model.call.CallOffer;
@@ -74,7 +75,19 @@ import java.util.*;
  * on this interface. All implementations are transparent to callers.
  *
  * @see SignalProtocolStore
+ *
+ * @implNote This interface is the public counterpart of
+ * {@code AbstractWhatsAppStore} and re-exposes most of the WA Web
+ * store surface: {@code WAWebModelStorageInitialize},
+ * {@code WAWebCollections}, {@code WAWebSignalStorage},
+ * {@code WAWebUserPrefsBase}. Each field/accessor pair on this interface
+ * carries its own {@code @implNote} pointing at the originating WA Web
+ * schema, collection or prefs module.
  */
+@WhatsAppWebModule(moduleName = "WAWebModelStorageInitialize")
+@WhatsAppWebModule(moduleName = "WAWebCollections")
+@WhatsAppWebModule(moduleName = "WAWebSignalStorage")
+@WhatsAppWebModule(moduleName = "WAWebUserPrefsBase")
 @SuppressWarnings({"unused", "UnusedReturnValue"})
 public interface WhatsAppStore extends SignalProtocolStore {
     /**

@@ -1,11 +1,14 @@
 package com.github.auties00.cobalt.message.send.id;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+
 /**
  * The version of the message-ID generation algorithm.
  *
  * @apiNote WAWebMsgKey.newId: tries V2 first, falls back to V1 on error.
  * @see MessageIdGenerator
  */
+@WhatsAppWebModule(moduleName = "WAWebMsgKey")
 public enum MessageIdVersion {
     /**
      * The deprecated random-only algorithm.

@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.message.send.stanza;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.chat.Chat;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
@@ -41,6 +44,7 @@ import java.util.Objects;
  * @see TcTokenStanza
  * @see ChatFanoutStanza
  */
+@WhatsAppWebModule(moduleName = "WAWebSendMsgCreateFanoutStanza")
 public final class CsTokenStanza {
     /**
      * Logger for HMAC computation failures and missing data.
@@ -111,6 +115,8 @@ public final class CsTokenStanza {
      * module-level function uses module-scope imports; Cobalt injects
      * dependencies via constructor.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCreateFanoutStanza", exports = "genCsTokenBody",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public CsTokenStanza(WhatsAppStore store, ABPropsService abPropsService) {
         this.store = Objects.requireNonNull(store, "store");
         this.abPropsService = Objects.requireNonNull(abPropsService, "abPropsService");
@@ -133,6 +139,8 @@ public final class CsTokenStanza {
      * {@code hmacSha256(salt, accountLid.toString())}, and returns
      * {@code wap("cstoken", null, hmacResult)}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCreateFanoutStanza", exports = "genCsTokenBody",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public Node build(Jid chatJid) {
         // WAWebSendMsgCreateFanoutStanza.genCsTokenBody: wa_nct_token_send_enabled !== true
         if (!abPropsService.getBool(ABProp.WA_NCT_TOKEN_SEND_ENABLED)) {
@@ -226,6 +234,8 @@ public final class CsTokenStanza {
      * ADAPTED: Cobalt does not have a PSA check; the PSA account
      * is extremely rare and irrelevant for NCT tokens.
      */
+    @WhatsAppWebExport(moduleName = "WAWebWid", exports = "isRegularUser",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private static boolean isRegularUser(Jid jid) {
         // WAWebWid.isRegularUser: isUser() && !isPSA() && !isBot()
         // isUser() includes c.us, lid, bot, hosted, hosted.lid

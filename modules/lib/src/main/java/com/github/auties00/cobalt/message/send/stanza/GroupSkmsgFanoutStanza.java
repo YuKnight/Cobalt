@@ -2,6 +2,9 @@ package com.github.auties00.cobalt.message.send.stanza;
 
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
 import com.github.auties00.cobalt.message.MessageEncryptionType;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
@@ -24,7 +27,11 @@ import java.util.Objects;
  * @see ChatFanoutStanza
  * @see ParticipantsStanza
  */
+@WhatsAppWebModule(moduleName = "WAWebSendGroupSkmsgJob")
 public final class GroupSkmsgFanoutStanza {
+    /**
+     * Prevents instantiation of this utility class.
+     */
     private GroupSkmsgFanoutStanza() {
         throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
     }
@@ -56,6 +63,8 @@ public final class GroupSkmsgFanoutStanza {
      *
      * @apiNote WAWebSendGroupSkmsgJob.encryptAndSendSenderKeyMsg
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendGroupSkmsgJob", exports = "encryptAndSendSenderKeyMsg",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static NodeBuilder build(
             String messageId,
             Jid groupJid,

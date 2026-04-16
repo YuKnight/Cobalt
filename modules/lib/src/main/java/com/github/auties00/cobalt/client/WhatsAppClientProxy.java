@@ -5,31 +5,46 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * A proxy configuration for network connections.
+ * A proxy configuration used by {@link WhatsAppClient} when opening the
+ * socket to the WhatsApp servers.
  *
- * <p>Two protocol families are supported: {@linkplain Http HTTP CONNECT}
- * and {@linkplain Socks SOCKS}. Instances are obtained from static factory
- * methods such as {@link #ofHttp(String, int)} and
- * {@link #ofSocks5(String, int)}, or parsed from a URI via {@link #of(URI)}.
+ * <p>The library supports two protocol families: HTTP {@code CONNECT} and
+ * SOCKS (versions 4, 4a, 5, and 5h). Instances are typically constructed
+ * via the static factory methods such as {@link #ofHttp(String, int)},
+ * {@link #ofSocks5(String, int)}, {@link #ofSocks5h(String, int)}, or
+ * parsed from a URI via {@link #of(URI)} for configurations supplied as
+ * environment variables.
+ *
+ * <p>The proxy is applied before the Noise handshake runs: the tunnel
+ * client negotiates with the proxy first, then hands the opened socket to
+ * the WhatsApp protocol layer.
  *
  * @see WhatsAppClientProxyAuthenticator
+ * @see WhatsAppClientBuilder.Options#proxy(WhatsAppClientProxy)
  */
 public sealed interface WhatsAppClientProxy {
 
     /**
      * Returns the proxy server hostname.
+     *
+     * @return the hostname or IP address used to reach the proxy
      */
     String host();
 
     /**
-     * Returns the proxy server port (1-65535).
+     * Returns the proxy server port.
+     *
+     * @return the TCP port (between {@code 1} and {@code 65535}) used to
+     *         reach the proxy
      */
     int port();
 
     /**
-     * Returns the authenticator for this proxy, if any.
+     * Returns the authentication strategy configured for this proxy, if
+     * any.
      *
-     * @return an optional authenticator
+     * @return an {@link Optional} wrapping the authenticator, or empty if
+     *         no authentication is required
      */
     Optional<? extends WhatsAppClientProxyAuthenticator> authenticator();
 
@@ -241,21 +256,61 @@ public sealed interface WhatsAppClientProxy {
     }
 
     /**
-     * An HTTP CONNECT proxy. The connection to the proxy itself may be
-     * plaintext ({@link Plain}) or TLS-encrypted ({@link Secure}).
+     * An HTTP {@code CONNECT} proxy variant.
+     *
+     * <p>HTTP tunnels can either be plaintext ({@link Plain}) or
+     * TLS-encrypted ({@link Secure}); in the latter case a TLS session is
+     * established with the proxy before the {@code CONNECT} request is
+     * issued.
      */
     sealed interface Http extends WhatsAppClientProxy {
 
+        /**
+         * Returns the HTTP-specific authenticator for this proxy.
+         *
+         * @return an {@link Optional} wrapping the HTTP authenticator, or
+         *         empty if no authentication is required
+         */
         @Override
         Optional<WhatsAppClientProxyAuthenticator.Http> authenticator();
 
-        /** A plain (unencrypted) HTTP CONNECT proxy. */
+        /**
+         * A plain HTTP {@code CONNECT} proxy where the tunnel to the proxy
+         * itself is unencrypted.
+         *
+         * <p>The target WhatsApp socket remains end-to-end secure because
+         * TLS/Noise is layered on top of the tunnel; only the
+         * {@code CONNECT} request and its authorization header are sent in
+         * the clear.
+         */
         final class Plain implements Http {
 
+            /**
+             * The proxy hostname.
+             */
             private final String host;
+            /**
+             * The proxy TCP port.
+             */
             private final int port;
+            /**
+             * The authentication strategy, or {@code null} if the proxy
+             * accepts anonymous connections.
+             */
             private final WhatsAppClientProxyAuthenticator.Http authenticator;
 
+            /**
+             * Constructs a new plain HTTP proxy configuration.
+             *
+             * @param host          the proxy hostname; must not be
+             *                      {@code null}
+             * @param port          the proxy port; must be between
+             *                      {@code 1} and {@code 65535}
+             * @param authenticator the authentication strategy, or
+             *                      {@code null}
+             * @throws NullPointerException     if {@code host} is {@code null}
+             * @throws IllegalArgumentException if {@code port} is out of range
+             */
             private Plain(String host, int port, WhatsAppClientProxyAuthenticator.Http authenticator) {
                 Objects.requireNonNull(host, "host");
                 if (port < 1 || port > 65535) {
@@ -267,21 +322,45 @@ public sealed interface WhatsAppClientProxy {
                 this.authenticator = authenticator;
             }
 
+            /**
+             * Returns the proxy hostname.
+             *
+             * @return the hostname
+             */
             @Override
             public String host() {
                 return host;
             }
 
+            /**
+             * Returns the proxy TCP port.
+             *
+             * @return the port
+             */
             @Override
             public int port() {
                 return port;
             }
 
+            /**
+             * Returns the HTTP authenticator associated with this proxy.
+             *
+             * @return an {@link Optional} wrapping the authenticator, or
+             *         empty if none is configured
+             */
             @Override
             public Optional<WhatsAppClientProxyAuthenticator.Http> authenticator() {
                 return Optional.ofNullable(authenticator);
             }
 
+            /**
+             * Compares this proxy to the given object for structural
+             * equality.
+             *
+             * @param obj the object to compare with
+             * @return {@code true} if {@code obj} is another {@code Plain}
+             *         with the same host, port, and authenticator
+             */
             @Override
             public boolean equals(Object obj) {
                 return obj == this
@@ -291,11 +370,23 @@ public sealed interface WhatsAppClientProxy {
                            && authenticator.equals(other.authenticator));
             }
 
+            /**
+             * Returns a hash code derived from the host, port, and
+             * authenticator.
+             *
+             * @return the hash code
+             */
             @Override
             public int hashCode() {
                 return Objects.hash(host, port, authenticator);
             }
 
+            /**
+             * Returns a human-readable description of this proxy
+             * configuration suitable for logs.
+             *
+             * @return the string representation
+             */
             @Override
             public String toString() {
                 return "Http.Plain[host=" + host
@@ -305,15 +396,42 @@ public sealed interface WhatsAppClientProxy {
         }
 
         /**
-         * A TLS-encrypted HTTP CONNECT proxy. The hostname is used for
-         * both SNI and certificate verification.
+         * A TLS-encrypted HTTP {@code CONNECT} proxy.
+         *
+         * <p>The tunnel to the proxy itself is established over TLS, using
+         * the hostname for both Server Name Indication and certificate
+         * verification. Once the tunnel is open, the WhatsApp TLS/Noise
+         * session runs inside it, resulting in a double-encrypted
+         * transport.
          */
         final class Secure implements Http {
 
+            /**
+             * The proxy hostname, also used as the TLS SNI value.
+             */
             private final String host;
+            /**
+             * The proxy TCP port.
+             */
             private final int port;
+            /**
+             * The authentication strategy, or {@code null} if the proxy
+             * accepts anonymous connections.
+             */
             private final WhatsAppClientProxyAuthenticator.Http authenticator;
 
+            /**
+             * Constructs a new TLS-encrypted HTTP proxy configuration.
+             *
+             * @param host          the proxy hostname; must not be
+             *                      {@code null}
+             * @param port          the proxy port; must be between
+             *                      {@code 1} and {@code 65535}
+             * @param authenticator the authentication strategy, or
+             *                      {@code null}
+             * @throws NullPointerException     if {@code host} is {@code null}
+             * @throws IllegalArgumentException if {@code port} is out of range
+             */
             private Secure(String host, int port, WhatsAppClientProxyAuthenticator.Http authenticator) {
                 Objects.requireNonNull(host, "host");
                 if (port < 1 || port > 65535) {
@@ -325,21 +443,45 @@ public sealed interface WhatsAppClientProxy {
                 this.authenticator = authenticator;
             }
 
+            /**
+             * Returns the proxy hostname.
+             *
+             * @return the hostname
+             */
             @Override
             public String host() {
                 return host;
             }
 
+            /**
+             * Returns the proxy TCP port.
+             *
+             * @return the port
+             */
             @Override
             public int port() {
                 return port;
             }
 
+            /**
+             * Returns the HTTP authenticator associated with this proxy.
+             *
+             * @return an {@link Optional} wrapping the authenticator, or
+             *         empty if none is configured
+             */
             @Override
             public Optional<WhatsAppClientProxyAuthenticator.Http> authenticator() {
                 return Optional.ofNullable(authenticator);
             }
 
+            /**
+             * Compares this proxy to the given object for structural
+             * equality.
+             *
+             * @param obj the object to compare with
+             * @return {@code true} if {@code obj} is another {@code Secure}
+             *         with the same host and port
+             */
             @Override
             public boolean equals(Object obj) {
                 return obj == this || (obj instanceof Secure other
@@ -347,11 +489,23 @@ public sealed interface WhatsAppClientProxy {
                                        && port == other.port);
             }
 
+            /**
+             * Returns a hash code derived from the host, port, and
+             * authenticator.
+             *
+             * @return the hash code
+             */
             @Override
             public int hashCode() {
                 return Objects.hash(host, port, authenticator);
             }
 
+            /**
+             * Returns a human-readable description of this proxy
+             * configuration suitable for logs.
+             *
+             * @return the string representation
+             */
             @Override
             public String toString() {
                 return "Http.Secure[host=" + host
@@ -362,31 +516,74 @@ public sealed interface WhatsAppClientProxy {
     }
 
     /**
-     * A SOCKS proxy. Covers both SOCKS4/4a and SOCKS5 (RFC 1928).
+     * A SOCKS proxy configuration, covering both SOCKS4/4a (RFC 1928 and
+     * its 4a extension) and SOCKS5 (RFC 1928 with RFC 1929 sub-negotiation).
      *
-     * <p>SOCKS4 variants ({@link V4.Local}, {@link V4.Remote}) support an optional
-     * user ID. SOCKS5 variants ({@link V5.Local}, {@link V5.Remote}) support RFC 1929
-     * username/password authentication.
+     * <p>SOCKS4 variants ({@link V4.Local}, {@link V4.Remote}) carry an
+     * optional user ID. SOCKS5 variants ({@link V5.Local}, {@link V5.Remote})
+     * support RFC 1929 username/password authentication and optional remote
+     * DNS resolution (the {@code socks5h} scheme).
      */
     sealed interface Socks extends WhatsAppClientProxy {
+        /**
+         * Returns the SOCKS-specific authenticator for this proxy.
+         *
+         * @return an {@link Optional} wrapping the SOCKS authenticator, or
+         *         empty if anonymous connections are used
+         */
         @Override
         Optional<? extends WhatsAppClientProxyAuthenticator.Socks> authenticator();
 
         /**
-         * A SOCKS4 proxy. The connection resolves hostnames
-         * locally ({@link Local}) or remotely ({@link Remote}, SOCKS4a).
+         * A SOCKS4 proxy variant.
+         *
+         * <p>Hostnames may be resolved by the client ({@link Local}) or by
+         * the proxy ({@link Remote}, commonly referred to as SOCKS4a).
          */
         sealed interface V4 extends Socks {
+            /**
+             * Returns the SOCKS4 user ID authenticator for this proxy.
+             *
+             * @return an {@link Optional} wrapping the user ID
+             *         authenticator, or empty if none is configured
+             */
             @Override
             Optional<WhatsAppClientProxyAuthenticator.Socks.V4> authenticator();
 
-            /** A SOCKS4 proxy. Resolves hostnames locally; IPv4 only. */
+            /**
+             * A SOCKS4 proxy that resolves hostnames on the client side.
+             *
+             * <p>IPv4 addresses only: the target must resolve to an IPv4
+             * address before the connect request is sent.
+             */
             final class Local implements V4 {
 
+                /**
+                 * The proxy hostname.
+                 */
                 private final String host;
+                /**
+                 * The proxy TCP port.
+                 */
                 private final int port;
+                /**
+                 * The SOCKS4 user ID authenticator, or {@code null} if no
+                 * user ID is supplied.
+                 */
                 private final WhatsAppClientProxyAuthenticator.Socks.V4 authenticator;
 
+                /**
+                 * Constructs a new SOCKS4 local-DNS proxy configuration.
+                 *
+                 * @param host          the proxy hostname; must not be
+                 *                      {@code null}
+                 * @param port          the proxy port; must be between
+                 *                      {@code 1} and {@code 65535}
+                 * @param authenticator the user ID authenticator, or
+                 *                      {@code null}
+                 * @throws NullPointerException     if {@code host} is {@code null}
+                 * @throws IllegalArgumentException if {@code port} is out of range
+                 */
                 private Local(String host, int port, WhatsAppClientProxyAuthenticator.Socks.V4 authenticator) {
                     Objects.requireNonNull(host, "host");
                     if (port < 1 || port > 65535) {
@@ -398,21 +595,45 @@ public sealed interface WhatsAppClientProxy {
                     this.authenticator = authenticator;
                 }
 
+                /**
+                 * Returns the proxy hostname.
+                 *
+                 * @return the hostname
+                 */
                 @Override
                 public String host() {
                     return host;
                 }
 
+                /**
+                 * Returns the proxy TCP port.
+                 *
+                 * @return the port
+                 */
                 @Override
                 public int port() {
                     return port;
                 }
 
+                /**
+                 * Returns the SOCKS4 user ID authenticator.
+                 *
+                 * @return an {@link Optional} wrapping the authenticator,
+                 *         or empty if none is configured
+                 */
                 @Override
                 public Optional<WhatsAppClientProxyAuthenticator.Socks.V4> authenticator() {
                     return Optional.ofNullable(authenticator);
                 }
 
+                /**
+                 * Compares this proxy to the given object for structural
+                 * equality.
+                 *
+                 * @param obj the object to compare with
+                 * @return {@code true} if {@code obj} is another
+                 *         {@code Local} with the same host and port
+                 */
                 @Override
                 public boolean equals(Object obj) {
                     return obj == this || (obj instanceof Local other
@@ -420,11 +641,22 @@ public sealed interface WhatsAppClientProxy {
                                            && port == other.port);
                 }
 
+                /**
+                 * Returns a hash code derived from the host and port.
+                 *
+                 * @return the hash code
+                 */
                 @Override
                 public int hashCode() {
                     return Objects.hash(host, port);
                 }
 
+                /**
+                 * Returns a human-readable description of this proxy
+                 * configuration suitable for logs.
+                 *
+                 * @return the string representation
+                 */
                 @Override
                 public String toString() {
                     return "Socks.V4.Local[host=" + host
@@ -434,16 +666,42 @@ public sealed interface WhatsAppClientProxy {
             }
 
             /**
-             * A SOCKS4a proxy. The proxy resolves hostnames on the client's
-             * behalf by encoding a deliberate invalid IP ({@code 0.0.0.x})
-             * and appending the domain name.
+             * A SOCKS4a proxy where hostname resolution happens on the
+             * proxy side.
+             *
+             * <p>The client signals remote resolution by sending the
+             * deliberate invalid IP {@code 0.0.0.x} in the request and
+             * appending the hostname after the user ID, as specified by
+             * the SOCKS4a extension.
              */
             final class Remote implements V4 {
 
+                /**
+                 * The proxy hostname.
+                 */
                 private final String host;
+                /**
+                 * The proxy TCP port.
+                 */
                 private final int port;
+                /**
+                 * The SOCKS4 user ID authenticator, or {@code null} if no
+                 * user ID is supplied.
+                 */
                 private final WhatsAppClientProxyAuthenticator.Socks.V4 authenticator;
 
+                /**
+                 * Constructs a new SOCKS4a remote-DNS proxy configuration.
+                 *
+                 * @param host          the proxy hostname; must not be
+                 *                      {@code null}
+                 * @param port          the proxy port; must be between
+                 *                      {@code 1} and {@code 65535}
+                 * @param authenticator the user ID authenticator, or
+                 *                      {@code null}
+                 * @throws NullPointerException     if {@code host} is {@code null}
+                 * @throws IllegalArgumentException if {@code port} is out of range
+                 */
                 private Remote(String host, int port, WhatsAppClientProxyAuthenticator.Socks.V4 authenticator) {
                     Objects.requireNonNull(host, "host");
                     if (port < 1 || port > 65535) {
@@ -455,21 +713,45 @@ public sealed interface WhatsAppClientProxy {
                     this.authenticator = authenticator;
                 }
 
+                /**
+                 * Returns the proxy hostname.
+                 *
+                 * @return the hostname
+                 */
                 @Override
                 public String host() {
                     return host;
                 }
 
+                /**
+                 * Returns the proxy TCP port.
+                 *
+                 * @return the port
+                 */
                 @Override
                 public int port() {
                     return port;
                 }
 
+                /**
+                 * Returns the SOCKS4 user ID authenticator.
+                 *
+                 * @return an {@link Optional} wrapping the authenticator,
+                 *         or empty if none is configured
+                 */
                 @Override
                 public Optional<WhatsAppClientProxyAuthenticator.Socks.V4> authenticator() {
                     return Optional.ofNullable(authenticator);
                 }
 
+                /**
+                 * Compares this proxy to the given object for structural
+                 * equality.
+                 *
+                 * @param obj the object to compare with
+                 * @return {@code true} if {@code obj} is another
+                 *         {@code Remote} with the same host and port
+                 */
                 @Override
                 public boolean equals(Object obj) {
                     return obj == this || (obj instanceof Remote other
@@ -477,11 +759,22 @@ public sealed interface WhatsAppClientProxy {
                                            && port == other.port);
                 }
 
+                /**
+                 * Returns a hash code derived from the host and port.
+                 *
+                 * @return the hash code
+                 */
                 @Override
                 public int hashCode() {
                     return Objects.hash(host, port);
                 }
 
+                /**
+                 * Returns a human-readable description of this proxy
+                 * configuration suitable for logs.
+                 *
+                 * @return the string representation
+                 */
                 @Override
                 public String toString() {
                     return "Socks.V4.Remote[host=" + host
@@ -492,20 +785,55 @@ public sealed interface WhatsAppClientProxy {
         }
 
         /**
-         * A SOCKS5 proxy (RFC 1928). The connection resolves hostnames
-         * locally ({@link Local}) or remotely ({@link Remote}, socks5h).
+         * A SOCKS5 proxy variant (RFC 1928).
+         *
+         * <p>Hostnames may be resolved by the client ({@link Local}) or by
+         * the proxy ({@link Remote}, commonly referred to as
+         * {@code socks5h}).
          */
         sealed interface V5 extends Socks {
+            /**
+             * Returns the SOCKS5 authenticator for this proxy.
+             *
+             * @return an {@link Optional} wrapping the SOCKS5
+             *         authenticator, or empty if anonymous connections are
+             *         used
+             */
             @Override
             Optional<WhatsAppClientProxyAuthenticator.Socks.V5> authenticator();
 
-            /** A SOCKS5 proxy with local DNS resolution (RFC 1928). */
+            /**
+             * A SOCKS5 proxy that resolves hostnames on the client side
+             * (RFC 1928).
+             */
             final class Local implements V5 {
 
+                /**
+                 * The proxy hostname.
+                 */
                 private final String host;
+                /**
+                 * The proxy TCP port.
+                 */
                 private final int port;
+                /**
+                 * The SOCKS5 authenticator, or {@code null} if anonymous
+                 * connections are used.
+                 */
                 private final WhatsAppClientProxyAuthenticator.Socks.V5 authenticator;
 
+                /**
+                 * Constructs a new SOCKS5 local-DNS proxy configuration.
+                 *
+                 * @param host          the proxy hostname; must not be
+                 *                      {@code null}
+                 * @param port          the proxy port; must be between
+                 *                      {@code 1} and {@code 65535}
+                 * @param authenticator the SOCKS5 authenticator, or
+                 *                      {@code null}
+                 * @throws NullPointerException     if {@code host} is {@code null}
+                 * @throws IllegalArgumentException if {@code port} is out of range
+                 */
                 private Local(String host, int port, WhatsAppClientProxyAuthenticator.Socks.V5 authenticator) {
                     Objects.requireNonNull(host, "host");
                     if (port < 1 || port > 65535) {
@@ -517,21 +845,46 @@ public sealed interface WhatsAppClientProxy {
                     this.authenticator = authenticator;
                 }
 
+                /**
+                 * Returns the proxy hostname.
+                 *
+                 * @return the hostname
+                 */
                 @Override
                 public String host() {
                     return host;
                 }
 
+                /**
+                 * Returns the proxy TCP port.
+                 *
+                 * @return the port
+                 */
                 @Override
                 public int port() {
                     return port;
                 }
 
+                /**
+                 * Returns the SOCKS5 authenticator associated with this
+                 * proxy.
+                 *
+                 * @return an {@link Optional} wrapping the authenticator,
+                 *         or empty if none is configured
+                 */
                 @Override
                 public Optional<WhatsAppClientProxyAuthenticator.Socks.V5> authenticator() {
                     return Optional.ofNullable(authenticator);
                 }
 
+                /**
+                 * Compares this proxy to the given object for structural
+                 * equality.
+                 *
+                 * @param obj the object to compare with
+                 * @return {@code true} if {@code obj} is another
+                 *         {@code Local} with the same host and port
+                 */
                 @Override
                 public boolean equals(Object obj) {
                     return obj == this || (obj instanceof Local other
@@ -539,11 +892,23 @@ public sealed interface WhatsAppClientProxy {
                                            && port == other.port);
                 }
 
+                /**
+                 * Returns a hash code derived from the host, port, and
+                 * authenticator.
+                 *
+                 * @return the hash code
+                 */
                 @Override
                 public int hashCode() {
                     return Objects.hash(host, port, authenticator);
                 }
 
+                /**
+                 * Returns a human-readable description of this proxy
+                 * configuration suitable for logs.
+                 *
+                 * @return the string representation
+                 */
                 @Override
                 public String toString() {
                     return "Socks.V5.Local[host=" + host
@@ -553,16 +918,40 @@ public sealed interface WhatsAppClientProxy {
             }
 
             /**
-             * A SOCKS5 proxy with remote DNS resolution ({@code socks5h}).
-             * The proxy resolves hostnames on the client's behalf, preventing
-             * DNS leaks.
+             * A SOCKS5 proxy with remote DNS resolution, commonly referred
+             * to as {@code socks5h}.
+             *
+             * <p>The proxy resolves hostnames on the client's behalf,
+             * preventing DNS leaks to the local resolver.
              */
             final class Remote implements V5 {
 
+                /**
+                 * The proxy hostname.
+                 */
                 private final String host;
+                /**
+                 * The proxy TCP port.
+                 */
                 private final int port;
+                /**
+                 * The SOCKS5 authenticator, or {@code null} if anonymous
+                 * connections are used.
+                 */
                 private final WhatsAppClientProxyAuthenticator.Socks.V5 authenticator;
 
+                /**
+                 * Constructs a new SOCKS5 remote-DNS proxy configuration.
+                 *
+                 * @param host          the proxy hostname; must not be
+                 *                      {@code null}
+                 * @param port          the proxy port; must be between
+                 *                      {@code 1} and {@code 65535}
+                 * @param authenticator the SOCKS5 authenticator, or
+                 *                      {@code null}
+                 * @throws NullPointerException     if {@code host} is {@code null}
+                 * @throws IllegalArgumentException if {@code port} is out of range
+                 */
                 private Remote(String host, int port, WhatsAppClientProxyAuthenticator.Socks.V5 authenticator) {
                     Objects.requireNonNull(host, "host");
                     if (port < 1 || port > 65535) {
@@ -574,21 +963,46 @@ public sealed interface WhatsAppClientProxy {
                     this.authenticator = authenticator;
                 }
 
+                /**
+                 * Returns the proxy hostname.
+                 *
+                 * @return the hostname
+                 */
                 @Override
                 public String host() {
                     return host;
                 }
 
+                /**
+                 * Returns the proxy TCP port.
+                 *
+                 * @return the port
+                 */
                 @Override
                 public int port() {
                     return port;
                 }
 
+                /**
+                 * Returns the SOCKS5 authenticator associated with this
+                 * proxy.
+                 *
+                 * @return an {@link Optional} wrapping the authenticator,
+                 *         or empty if none is configured
+                 */
                 @Override
                 public Optional<WhatsAppClientProxyAuthenticator.Socks.V5> authenticator() {
                     return Optional.ofNullable(authenticator);
                 }
 
+                /**
+                 * Compares this proxy to the given object for structural
+                 * equality.
+                 *
+                 * @param obj the object to compare with
+                 * @return {@code true} if {@code obj} is another
+                 *         {@code Remote} with the same host and port
+                 */
                 @Override
                 public boolean equals(Object obj) {
                     return obj == this || (obj instanceof Remote other
@@ -596,11 +1010,23 @@ public sealed interface WhatsAppClientProxy {
                                            && port == other.port);
                 }
 
+                /**
+                 * Returns a hash code derived from the host, port, and
+                 * authenticator.
+                 *
+                 * @return the hash code
+                 */
                 @Override
                 public int hashCode() {
                     return Objects.hash(host, port, authenticator);
                 }
 
+                /**
+                 * Returns a human-readable description of this proxy
+                 * configuration suitable for logs.
+                 *
+                 * @return the string representation
+                 */
                 @Override
                 public String toString() {
                     return "Socks.V5.Remote[host=" + host

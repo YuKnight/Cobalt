@@ -1,8 +1,23 @@
 package com.github.auties00.cobalt.model.message;
 
 /**
- * A list of all emojis supported by Whatsapp
- * <a href="https://unicode.org/emoji/charts/full-emoji-list.html">Source</a>
+ * Catalogue of the Unicode emojis that WhatsApp recognises as valid
+ * reactions to a message.
+ *
+ * <p>Message reactions are a lightweight way of responding to another
+ * user's message without sending a full reply: the recipient picks a
+ * single emoji that is then displayed next to the original message for
+ * every participant in the conversation. WhatsApp accepts any Unicode
+ * character in principle, but the emoji picker it exposes in its
+ * clients is built from the curated list reproduced by this enum.
+ *
+ * <p>Each constant wraps the exact Unicode sequence to send on the wire.
+ * Call {@link #toString()} to retrieve the emoji as a {@link String}
+ * suitable for placing into a reaction message payload.
+ *
+ * <p>The order of the constants reflects the ordering used by
+ * <a href="https://unicode.org/emoji/charts/full-emoji-list.html">the
+ * official Unicode emoji chart</a>.
  */
 @SuppressWarnings("SpellCheckingInspection")
 public enum MessageReactionEmoji {
@@ -1881,12 +1896,30 @@ public enum MessageReactionEmoji {
     FLAG_SCOTLAND("🏴󠁧󠁢󠁳󠁣󠁴󠁿"),
     FLAG_WALES("🏴󠁧󠁢󠁷󠁬󠁳󠁿");
 
+    /**
+     * The exact Unicode sequence representing this reaction on the wire.
+     */
     private final String value;
 
+    /**
+     * Constructs a new enum constant wrapping the given Unicode emoji
+     * sequence.
+     *
+     * @param value the Unicode sequence to send when this reaction is
+     *              chosen
+     */
     MessageReactionEmoji(String value) {
         this.value = value;
     }
 
+    /**
+     * Returns the Unicode emoji sequence associated with this reaction.
+     *
+     * <p>This is the value that should be written into the reaction
+     * payload sent to WhatsApp.
+     *
+     * @return the non-{@code null} Unicode emoji sequence
+     */
     @Override
     public String toString() {
         return value;

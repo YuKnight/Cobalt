@@ -11,21 +11,22 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * A sealed interface representing the metadata of a group or community chat.
+ * Represents the shared metadata of a WhatsApp group or community chat.
  *
  * <p>Every group and community on WhatsApp has associated metadata such as
- * a subject, founder, description, participants and ephemeral message settings.
- * This interface captures the properties that are common to both
- * {@link GroupMetadata} and {@link CommunityMetadata}, allowing callers to
- * work with either type through a single abstraction.
+ * a subject (display name), founder, description, participant list, and
+ * ephemeral message settings. This sealed interface captures the properties
+ * that are common to both {@link GroupMetadata} and {@link CommunityMetadata},
+ * allowing callers to work with either type through a single abstraction.
  *
  * <p>Concrete implementations carry additional type-specific state:
- * {@code GroupMetadata} holds group settings and an optional parent community
- * link, while {@code CommunityMetadata} holds community settings and the set
- * of linked sub-groups.
+ * {@code GroupMetadata} holds group-level settings and an optional parent
+ * community link, while {@code CommunityMetadata} holds community-level
+ * settings and the set of linked sub-groups.
  *
- * @apiNote WAWebDBGroupsGroupMetadata: the canonical metadata object stored
- * per group or community in the WhatsApp Web database.
+ * <p>Metadata is typically fetched from the server when joining or opening a
+ * group, and is kept in sync via group notification stanzas and history sync
+ * payloads.
  */
 public sealed interface ChatMetadata permits GroupMetadata, CommunityMetadata {
 
@@ -196,9 +197,10 @@ public sealed interface ChatMetadata permits GroupMetadata, CommunityMetadata {
      * Returns whether the open Meta AI bot is enabled in this group or
      * community.
      *
+     * <p>When enabled, the Meta AI bot can participate in the group
+     * conversation and respond to messages from group members.
+     *
      * @return {@code true} if the open bot group feature is active
-     * @apiNote WAWebDBGroupsGroupMetadata: {@code isOpenBotGroup} field.
-     * WAWebBotGroupGatingUtils.isOpenGroupBotSendEnabled: AB prop gate.
      */
     boolean isOpenBotGroup();
 
@@ -207,8 +209,6 @@ public sealed interface ChatMetadata permits GroupMetadata, CommunityMetadata {
      * community.
      *
      * @param openBotGroup {@code true} to enable, {@code false} to disable
-     * @apiNote WAWebMexFetchGroupInfoIncludBotsJob: populated from group
-     * query response when bot participants are present.
      */
     void setOpenBotGroup(boolean openBotGroup);
 }

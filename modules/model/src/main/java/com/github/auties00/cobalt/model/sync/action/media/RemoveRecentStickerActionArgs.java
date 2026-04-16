@@ -4,16 +4,18 @@ package com.github.auties00.cobalt.model.sync.action.media;
 import com.github.auties00.cobalt.model.sync.SyncActionArgs;
 
 /**
- * Index arguments for {@link RemoveRecentStickerAction}.
+ * Sync index arguments that identify which sticker is being removed from the
+ * recent-stickers collection by a {@link RemoveRecentStickerAction}.
  *
- * <p>The sync index produced is {@code ["removeRecentSticker", stickerFileHash]}.
- * The file hash uniquely identifies the sticker in the recent-stickers collection.
+ * <p>The sticker is addressed by its file hash so that the removal applies to
+ * the exact sticker binary regardless of where it was originally received.
  *
  * @param stickerFileHash the file hash of the sticker to remove from the recent list
  */
 public record RemoveRecentStickerActionArgs(String stickerFileHash) implements SyncActionArgs {
     /**
-     * {@inheritDoc}
+     * Returns the index arguments used to address this sticker inside the
+     * app-state sync collection.
      *
      * @return a single-element array containing the sticker file hash
      */

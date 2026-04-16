@@ -5,15 +5,23 @@ import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.SyncActionArgs;
 
 /**
- * Index arguments for {@link BotWelcomeRequestAction}.
+ * Index arguments that identify the bot chat targeted by a
+ * {@link BotWelcomeRequestAction}.
  *
- * <p>The sync index produced is {@code ["bot_welcome_request", chatJid]}.
+ * <p>Every sync action is stored under a composite index that uniquely
+ * describes the entity it mutates. For bot welcome bookkeeping the index is
+ * the pair {@code ["bot_welcome_request", chatJid]}, where {@code chatJid}
+ * selects the specific bot conversation whose welcome delivery status is
+ * being tracked. This ensures that marking one bot chat's welcome as sent
+ * does not interfere with the welcome tracking of any other bot chat.
  *
- * @param chatJid the JID of the bot chat for which a welcome message was requested
+ * @param chatJid the {@link Jid} of the bot chat whose welcome status this
+ *                action records
  */
 public record BotWelcomeRequestActionArgs(Jid chatJid) implements SyncActionArgs {
     /**
-     * {@inheritDoc}
+     * Returns the positional index arguments used to key this action in the
+     * sync patch storage.
      *
      * @return a single-element array containing the chat JID string
      */

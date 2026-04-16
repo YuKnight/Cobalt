@@ -3,6 +3,7 @@ package com.github.auties00.cobalt.stream.iq;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.client.WhatsAppClientVerificationHandler;
 import com.github.auties00.cobalt.device.DeviceService;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.device.identity.ADVDeviceIdentitySpec;
 import com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentity;
 import com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentityBuilder;
@@ -38,6 +39,9 @@ import java.util.concurrent.TimeUnit;
  *
  * @implNote WAWebHandleStanzaCommon.handleIq, WAWebHandlePairDevice.default, WAWebHandlePairSuccess.default
  */
+@WhatsAppWebModule(moduleName = "WAWebHandleStanzaCommon")
+@WhatsAppWebModule(moduleName = "WAWebHandlePairDevice")
+@WhatsAppWebModule(moduleName = "WAWebHandlePairSuccess")
 public final class IqStreamHandler implements SocketStream.Handler {
 
     /**

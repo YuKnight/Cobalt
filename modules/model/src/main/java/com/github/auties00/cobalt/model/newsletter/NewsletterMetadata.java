@@ -9,81 +9,144 @@ import java.time.Instant;
 import java.util.*;
 
 /**
- * The metadata of a newsletter, containing its name, description, pictures,
- * handle, settings, invite code, verification status, creation time,
- * subscriber count, privacy level, and other administrative information.
+ * Aggregates the administrative metadata of a newsletter.
+ *
+ * <p>This class brings together every directory-level field that describes
+ * a newsletter to subscribers and admins: its display name and
+ * description, its full and preview profile pictures, its handle and
+ * invite code, its privacy and verification state, its creation time and
+ * subscriber count, linkage information, admin count, geo-suspension
+ * status, opted-in feature capabilities, and any associated WAMO
+ * subscription plan.
+ *
+ * <p>Every field is optional: the server populates only the fields that
+ * are applicable to the newsletter and visible to the current viewer.
  */
 @ProtobufMessage
 public final class NewsletterMetadata {
+    /**
+     * The display name of the newsletter.
+     */
     @ProtobufProperty(index = 1, type = ProtobufType.MESSAGE)
     NewsletterName name;
 
+    /**
+     * The textual description shown on the newsletter profile screen.
+     */
     @ProtobufProperty(index = 2, type = ProtobufType.MESSAGE)
     NewsletterDescription description;
 
+    /**
+     * The full-resolution profile picture.
+     */
     @ProtobufProperty(index = 3, type = ProtobufType.MESSAGE)
     NewsletterPicture picture;
 
+    /**
+     * The unique handle used to deep-link or share the newsletter.
+     */
     @ProtobufProperty(index = 4, type = ProtobufType.STRING)
     String handle;
 
+    /**
+     * The server-configurable settings (reaction policy and related).
+     */
     @ProtobufProperty(index = 5, type = ProtobufType.MESSAGE)
     NewsletterSettings settings;
 
+    /**
+     * The opaque invite code that can be used to join this newsletter.
+     */
     @ProtobufProperty(index = 6, type = ProtobufType.STRING)
     String invite;
 
+    /**
+     * The verification state of this newsletter.
+     */
     @ProtobufProperty(index = 7, type = ProtobufType.STRING)
     NewsletterVerification verification;
 
+    /**
+     * The moment at which this newsletter was created.
+     */
     @ProtobufProperty(index = 8, type = ProtobufType.UINT64, mixins = InstantSecondsMixin.class)
     Instant creationTimestamp;
 
+    /**
+     * The number of subscribers. {@code null} when not reported yet.
+     */
     @ProtobufProperty(index = 9, type = ProtobufType.UINT64)
     Long subscribersCount;
 
+    /**
+     * The discoverability policy of this newsletter.
+     */
     @ProtobufProperty(index = 10, type = ProtobufType.ENUM)
     NewsletterPrivacy privacy;
 
+    /**
+     * Whether this newsletter is linked to other accounts, for example
+     * business or WAMO accounts.
+     */
     @ProtobufProperty(index = 11, type = ProtobufType.BOOL)
     boolean hasLinkedAccounts;
 
+    /**
+     * The number of admins. {@code null} when not reported yet.
+     */
     @ProtobufProperty(index = 12, type = ProtobufType.UINT64)
     Long adminCount;
 
+    /**
+     * Whether this newsletter has been administratively terminated.
+     */
     @ProtobufProperty(index = 13, type = ProtobufType.BOOL)
     boolean terminated;
 
+    /**
+     * The ISO country codes in which this newsletter is currently
+     * geo-suspended.
+     */
     @ProtobufProperty(index = 14, type = ProtobufType.STRING)
     List<String> geosuspendedCountries;
 
+    /**
+     * The optional features that this newsletter has opted into.
+     */
     @ProtobufProperty(index = 15, type = ProtobufType.ENUM)
     List<NewsletterCapability> capabilities;
 
+    /**
+     * The WAMO subscription plan identifier tied to this newsletter.
+     */
     @ProtobufProperty(index = 16, type = ProtobufType.STRING)
     String wamoSubPlanId;
 
+    /**
+     * The preview-resolution profile picture used for thumbnails.
+     */
     @ProtobufProperty(index = 17, type = ProtobufType.MESSAGE)
     NewsletterPicture previewPicture;
 
     /**
-     * Constructs a new {@code NewsletterMetadata} with the specified fields.
+     * Constructs a new {@code NewsletterMetadata}. Invoked by the
+     * generated protobuf deserializer.
      *
-     * @param name                  the newsletter name, may be {@code null}
-     * @param description           the newsletter description, may be {@code null}
+     * @param name                  the display name, may be {@code null}
+     * @param description           the description, may be {@code null}
      * @param picture               the full-resolution picture, may be {@code null}
-     * @param handle                the newsletter handle, may be {@code null}
-     * @param settings              the newsletter settings, may be {@code null}
+     * @param handle                the unique handle, may be {@code null}
+     * @param settings              the server-configurable settings, may be {@code null}
      * @param invite                the invite code, may be {@code null}
-     * @param verification          the verification status, may be {@code null}
+     * @param verification          the verification state, may be {@code null}
      * @param creationTimestamp     the creation timestamp, may be {@code null}
-     * @param subscribersCount      the number of subscribers, may be {@code null}
-     * @param privacy               the privacy setting, may be {@code null}
+     * @param subscribersCount      the subscriber count, may be {@code null}
+     * @param privacy               the discoverability policy, may be {@code null}
      * @param hasLinkedAccounts     whether the newsletter has linked accounts
-     * @param adminCount            the number of admins, may be {@code null}
-     * @param terminated            whether the newsletter is terminated
-     * @param geosuspendedCountries the list of countries where the newsletter is geo-suspended, may be {@code null}
-     * @param capabilities          the list of enabled capabilities, may be {@code null}
+     * @param adminCount            the admin count, may be {@code null}
+     * @param terminated            whether the newsletter has been terminated
+     * @param geosuspendedCountries the geo-suspended countries, defaulted to an empty mutable list when {@code null}
+     * @param capabilities          the opted-in capabilities, defaulted to an empty mutable list when {@code null}
      * @param wamoSubPlanId         the WAMO subscription plan identifier, may be {@code null}
      * @param previewPicture        the preview-resolution picture, may be {@code null}
      */
@@ -108,140 +171,149 @@ public final class NewsletterMetadata {
     }
 
     /**
-     * Returns the creation timestamp, if available.
+     * Returns the moment at which this newsletter was created.
      *
-     * @return an {@link Optional} containing the creation timestamp,
-     *         or empty if not set
+     * @return an {@link Optional} holding the creation timestamp, or
+     *         empty when not reported
      */
     public Optional<Instant> creationTimestamp() {
         return Optional.ofNullable(creationTimestamp);
     }
 
     /**
-     * Returns the newsletter name, if available.
+     * Returns the display name of this newsletter.
      *
-     * @return an {@link Optional} containing the name, or empty if not set
+     * @return an {@link Optional} holding the display name, or empty
+     *         when not reported
      */
     public Optional<NewsletterName> name() {
         return Optional.ofNullable(name);
     }
 
     /**
-     * Returns the newsletter description, if available.
+     * Returns the textual description of this newsletter.
      *
-     * @return an {@link Optional} containing the description,
-     *         or empty if not set
+     * @return an {@link Optional} holding the description, or empty when
+     *         not reported
      */
     public Optional<NewsletterDescription> description() {
         return Optional.ofNullable(description);
     }
 
     /**
-     * Returns the full-resolution newsletter picture, if available.
+     * Returns the full-resolution profile picture.
      *
-     * @return an {@link Optional} containing the picture, or empty if not set
+     * @return an {@link Optional} holding the picture, or empty when not
+     *         reported
      */
     public Optional<NewsletterPicture> picture() {
         return Optional.ofNullable(picture);
     }
 
     /**
-     * Returns the preview-resolution newsletter picture, if available.
+     * Returns the preview-resolution profile picture.
      *
-     * @return an {@link Optional} containing the preview picture,
-     *         or empty if not set
+     * @return an {@link Optional} holding the preview picture, or empty
+     *         when not reported
      */
     public Optional<NewsletterPicture> previewPicture() {
         return Optional.ofNullable(previewPicture);
     }
 
     /**
-     * Returns the newsletter handle, if available.
+     * Returns the unique handle used to deep-link to this newsletter.
      *
-     * @return an {@link Optional} containing the handle, or empty if not set
+     * @return an {@link Optional} holding the handle, or empty when not
+     *         reported
      */
     public Optional<String> handle() {
         return Optional.ofNullable(handle);
     }
 
     /**
-     * Returns the newsletter settings, if available.
+     * Returns the server-configurable settings such as the reaction
+     * policy.
      *
-     * @return an {@link Optional} containing the settings, or empty if not set
+     * @return an {@link Optional} holding the settings, or empty when
+     *         not reported
      */
     public Optional<NewsletterSettings> settings() {
         return Optional.ofNullable(settings);
     }
 
     /**
-     * Returns the invite code, if available.
+     * Returns the opaque invite code that can be used to join this
+     * newsletter.
      *
-     * @return an {@link Optional} containing the invite code, or empty if not set
+     * @return an {@link Optional} holding the invite code, or empty when
+     *         the viewer is not entitled to see it
      */
     public Optional<String> invite() {
         return Optional.ofNullable(invite);
     }
 
     /**
-     * Returns the verification status, if available.
+     * Returns the verification state of this newsletter.
      *
-     * @return an {@link Optional} containing the verification status,
-     *         or empty if not set
+     * @return an {@link Optional} holding the verification state, or
+     *         empty when not reported
      */
     public Optional<NewsletterVerification> verification() {
         return Optional.ofNullable(verification);
     }
 
     /**
-     * Returns the subscriber count, if available.
+     * Returns the number of subscribers to this newsletter.
      *
-     * @return an {@link OptionalLong} containing the subscriber count,
-     *         or empty if not set
+     * @return an {@link OptionalLong} holding the subscriber count, or
+     *         empty when not reported
      */
     public OptionalLong subscribersCount() {
         return subscribersCount == null ? OptionalLong.empty() : OptionalLong.of(subscribersCount);
     }
 
     /**
-     * Returns the privacy setting, if available.
+     * Returns the discoverability policy of this newsletter.
      *
-     * @return an {@link Optional} containing the privacy setting,
-     *         or empty if not set
+     * @return an {@link Optional} holding the privacy setting, or empty
+     *         when not reported
      */
     public Optional<NewsletterPrivacy> privacy() {
         return Optional.ofNullable(privacy);
     }
 
     /**
-     * Returns whether the newsletter has linked accounts.
+     * Returns whether this newsletter is linked to other accounts.
      *
-     * @return {@code true} if the newsletter has linked accounts
+     * @return {@code true} when any external account is linked
      */
     public boolean hasLinkedAccounts() {
         return hasLinkedAccounts;
     }
 
     /**
-     * Returns the admin count, if available.
+     * Returns the number of admins for this newsletter.
      *
-     * @return an {@link OptionalLong} containing the admin count,
-     *         or empty if not set
+     * @return an {@link OptionalLong} holding the admin count, or empty
+     *         when not reported
      */
     public OptionalLong adminCount() {
         return adminCount == null ? OptionalLong.empty() : OptionalLong.of(adminCount);
     }
 
     /**
-     * Returns whether the newsletter has been terminated.
+     * Returns whether this newsletter has been administratively
+     * terminated.
      *
-     * @return {@code true} if the newsletter is terminated
+     * @return {@code true} when the newsletter is terminated
      */
     public boolean terminated() {
         return terminated;
     }
 
     /**
-     * Returns the list of countries where the newsletter is geo-suspended.
+     * Returns the ISO country codes in which this newsletter is currently
+     * geo-suspended.
      *
      * @return an unmodifiable list of country codes, never {@code null}
      */
@@ -250,7 +322,7 @@ public final class NewsletterMetadata {
     }
 
     /**
-     * Returns the list of enabled capabilities.
+     * Returns the optional features this newsletter has opted into.
      *
      * @return an unmodifiable list of capabilities, never {@code null}
      */
@@ -259,63 +331,65 @@ public final class NewsletterMetadata {
     }
 
     /**
-     * Returns the WAMO subscription plan identifier, if available.
+     * Returns the WAMO subscription plan identifier tied to this
+     * newsletter.
      *
-     * @return an {@link Optional} containing the plan id, or empty if not set
+     * @return an {@link Optional} holding the plan identifier, or empty
+     *         when no WAMO plan is associated
      */
     public Optional<String> wamoSubPlanId() {
         return Optional.ofNullable(wamoSubPlanId);
     }
 
     /**
-     * Sets the newsletter name.
+     * Sets the display name.
      *
-     * @param name the newsletter name
+     * @param name the new display name, or {@code null}
      */
     public void setName(NewsletterName name) {
         this.name = name;
     }
 
     /**
-     * Sets the newsletter description.
+     * Sets the textual description.
      *
-     * @param description the newsletter description
+     * @param description the new description, or {@code null}
      */
     public void setDescription(NewsletterDescription description) {
         this.description = description;
     }
 
     /**
-     * Sets the full-resolution newsletter picture.
+     * Sets the full-resolution profile picture.
      *
-     * @param picture the newsletter picture
+     * @param picture the new picture, or {@code null}
      */
     public void setPicture(NewsletterPicture picture) {
         this.picture = picture;
     }
 
     /**
-     * Sets the preview-resolution newsletter picture.
+     * Sets the preview-resolution profile picture.
      *
-     * @param previewPicture the preview picture
+     * @param previewPicture the new preview picture, or {@code null}
      */
     public void setPreviewPicture(NewsletterPicture previewPicture) {
         this.previewPicture = previewPicture;
     }
 
     /**
-     * Sets the newsletter handle.
+     * Sets the unique handle.
      *
-     * @param handle the handle
+     * @param handle the new handle, or {@code null}
      */
     public void setHandle(String handle) {
         this.handle = handle;
     }
 
     /**
-     * Sets the newsletter settings.
+     * Sets the server-configurable settings.
      *
-     * @param settings the settings
+     * @param settings the new settings, or {@code null}
      */
     public void setSettings(NewsletterSettings settings) {
         this.settings = settings;
@@ -324,16 +398,16 @@ public final class NewsletterMetadata {
     /**
      * Sets the invite code.
      *
-     * @param invite the invite code
+     * @param invite the new invite code, or {@code null}
      */
     public void setInvite(String invite) {
         this.invite = invite;
     }
 
     /**
-     * Sets the verification status.
+     * Sets the verification state.
      *
-     * @param verification the verification status
+     * @param verification the new verification state, or {@code null}
      */
     public void setVerification(NewsletterVerification verification) {
         this.verification = verification;
@@ -342,7 +416,8 @@ public final class NewsletterMetadata {
     /**
      * Sets the creation timestamp.
      *
-     * @param creationTimestamp the creation timestamp
+     * @param creationTimestamp the new creation timestamp, or
+     *                          {@code null}
      */
     public void setCreationTimestamp(Instant creationTimestamp) {
         this.creationTimestamp = creationTimestamp;
@@ -351,25 +426,25 @@ public final class NewsletterMetadata {
     /**
      * Sets the subscriber count.
      *
-     * @param subscribersCount the subscriber count
+     * @param subscribersCount the new subscriber count, or {@code null}
      */
     public void setSubscribersCount(Long subscribersCount) {
         this.subscribersCount = subscribersCount;
     }
 
     /**
-     * Sets the privacy setting.
+     * Sets the discoverability policy.
      *
-     * @param privacy the privacy setting
+     * @param privacy the new privacy setting, or {@code null}
      */
     public void setPrivacy(NewsletterPrivacy privacy) {
         this.privacy = privacy;
     }
 
     /**
-     * Sets whether the newsletter has linked accounts.
+     * Sets whether this newsletter is linked to other accounts.
      *
-     * @param hasLinkedAccounts {@code true} if the newsletter has linked accounts
+     * @param hasLinkedAccounts the new linked-accounts flag
      */
     public void setHasLinkedAccounts(boolean hasLinkedAccounts) {
         this.hasLinkedAccounts = hasLinkedAccounts;
@@ -378,34 +453,37 @@ public final class NewsletterMetadata {
     /**
      * Sets the admin count.
      *
-     * @param adminCount the admin count
+     * @param adminCount the new admin count, or {@code null}
      */
     public void setAdminCount(Long adminCount) {
         this.adminCount = adminCount;
     }
 
     /**
-     * Sets whether the newsletter is terminated.
+     * Sets whether this newsletter has been administratively terminated.
      *
-     * @param terminated {@code true} if the newsletter is terminated
+     * @param terminated the new terminated flag
      */
     public void setTerminated(boolean terminated) {
         this.terminated = terminated;
     }
 
     /**
-     * Sets the list of countries where the newsletter is geo-suspended.
+     * Sets the list of ISO country codes in which this newsletter is
+     * geo-suspended.
      *
-     * @param geosuspendedCountries the list of country codes
+     * @param geosuspendedCountries the new country codes, defaulted to an
+     *                              empty mutable list when {@code null}
      */
     public void setGeosuspendedCountries(List<String> geosuspendedCountries) {
         this.geosuspendedCountries = Objects.requireNonNullElseGet(geosuspendedCountries, ArrayList::new);
     }
 
     /**
-     * Sets the list of enabled capabilities.
+     * Sets the list of optional features this newsletter has opted into.
      *
-     * @param capabilities the list of capabilities
+     * @param capabilities the new capabilities, defaulted to an empty
+     *                     mutable list when {@code null}
      */
     public void setCapabilities(List<NewsletterCapability> capabilities) {
         this.capabilities = Objects.requireNonNullElseGet(capabilities, ArrayList::new);
@@ -414,12 +492,19 @@ public final class NewsletterMetadata {
     /**
      * Sets the WAMO subscription plan identifier.
      *
-     * @param wamoSubPlanId the plan id
+     * @param wamoSubPlanId the new plan identifier, or {@code null}
      */
     public void setWamoSubPlanId(String wamoSubPlanId) {
         this.wamoSubPlanId = wamoSubPlanId;
     }
 
+    /**
+     * Returns whether this metadata equals the supplied object.
+     *
+     * @param o the object to compare against
+     * @return {@code true} if {@code o} is a {@code NewsletterMetadata}
+     *         whose fields are all equal to this one's
+     */
     @Override
     public boolean equals(Object o) {
         return o == this || o instanceof NewsletterMetadata that
@@ -442,6 +527,11 @@ public final class NewsletterMetadata {
                && Objects.equals(wamoSubPlanId, that.wamoSubPlanId);
     }
 
+    /**
+     * Returns a hash code consistent with {@link #equals(Object)}.
+     *
+     * @return the hash code for this metadata
+     */
     @Override
     public int hashCode() {
         return Objects.hash(name, description, picture, previewPicture, handle, settings, invite, verification, creationTimestamp, subscribersCount, privacy, hasLinkedAccounts, adminCount, terminated, geosuspendedCountries, capabilities, wamoSubPlanId);

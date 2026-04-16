@@ -14,59 +14,73 @@ import java.util.stream.Stream;
 
 
 /**
- * A representation of a contact's vCard (Virtual Contact File) as used in WhatsApp
- * contact messages.
+ * A contact vCard (Virtual Contact File) attached to a WhatsApp contact
+ * message.
  *
- * <p>When a user shares a contact through WhatsApp, the contact information is encoded
- * as a vCard string in the {@code contactMessage.vcard} protobuf field. This sealed
- * interface provides two representations of that data: {@link Parsed}, which breaks the
- * vCard into structured fields (name, phone numbers, business name), and {@link Raw},
- * which preserves the original vCard string verbatim when parsing fails or the vCard
- * library is unavailable.
+ * <p>When a user shares a contact through WhatsApp, the contact information
+ * is encoded as a vCard string on the wire. This sealed interface exposes
+ * two representations of that data:
+ * <ul>
+ *   <li>{@link Parsed}, which decomposes the vCard into structured fields
+ *       (version, name, phone numbers grouped by type, business name); and</li>
+ *   <li>{@link Raw}, which preserves the original vCard string verbatim and
+ *       is used when parsing fails, when the vCard uses unsupported
+ *       constructs, or when the vCard library is unavailable at runtime.</li>
+ * </ul>
  *
- * <p>The vCard format follows the standard RFC 6350 specification. WhatsApp extends
- * the standard with custom properties: {@code X-WA-BIZ-NAME} stores the business
- * display name, and the {@code WAID} parameter on telephone entries stores the
- * WhatsApp user identifier (phone number without the leading {@code +}).
+ * <p>The vCard payload follows the standard RFC 6350 format with two
+ * WhatsApp-specific extensions that the parser understands:
+ * <ul>
+ *   <li>the {@code X-WA-BIZ-NAME} extended property stores the business
+ *       display name for contacts belonging to a WhatsApp Business account;
+ *       and</li>
+ *   <li>the {@code WAID} parameter on each {@code TEL} entry stores the
+ *       phone number in the WhatsApp JID form (the phone number without the
+ *       leading {@code +}), allowing the consumer to address the contact
+ *       directly on WhatsApp without having to re-parse the display form.</li>
+ * </ul>
  *
- * <p>Instances are serialized to and deserialized from the protobuf wire format as
- * plain {@code String} values using the {@link ProtobufSerializer} and
- * {@link ProtobufDeserializer} annotations.
+ * <p>Instances are serialised to and deserialised from the protobuf wire
+ * format as plain {@code String} values through the {@link ProtobufSerializer}
+ * and {@link ProtobufDeserializer} annotations.
  *
  * @see com.github.auties00.cobalt.model.message.contact.ContactMessage
  * @see com.github.auties00.cobalt.model.message.contact.ContactsArrayMessage
  */
 public sealed interface ContactCard {
     /**
-     * The vCard extended property name used by WhatsApp to store a business's
-     * display name.
+     * The name of the vCard extended property used by WhatsApp to carry the
+     * display name of a business contact.
      */
     String BUSINESS_NAME_VCARD_PROPERTY = "X-WA-BIZ-NAME";
 
     /**
-     * The vCard parameter name used by WhatsApp to store the phone number's
-     * WhatsApp user identifier on {@code TEL} entries.
+     * The name of the vCard parameter used by WhatsApp on {@code TEL} entries
+     * to carry the phone number's WhatsApp user identifier (the JID).
      */
     String PHONE_NUMBER_VCARD_PROPERTY = "WAID";
 
     /**
-     * The default telephone type assigned to phone numbers when no explicit type
-     * is specified. Corresponds to the vCard {@code CELL} type.
+     * The default vCard telephone type assigned to phone numbers when no
+     * explicit type is specified. Corresponds to the standard {@code CELL}
+     * type.
      */
     String DEFAULT_NUMBER_VCARD_TYPE = "CELL";
 
     /**
      * Parses a vCard string into a structured {@link Parsed} representation.
      *
-     * <p>The parsing extracts the formatted name, telephone numbers (filtered to
-     * entries that have both a recognized type and a {@code WAID} parameter), and
-     * the optional {@code X-WA-BIZ-NAME} extended property. If parsing fails for
-     * any reason (e.g. malformed vCard, missing dependency), a {@link Raw}
-     * representation preserving the original string is returned instead.
+     * <p>The parser extracts the formatted name, the telephone entries that
+     * carry both a recognised type and a {@code WAID} parameter, and the
+     * optional {@code X-WA-BIZ-NAME} extended property. If parsing fails for
+     * any reason (malformed vCard, missing dependency, unexpected exception),
+     * a {@link Raw} representation preserving the original string is returned
+     * instead so that the original payload can still be forwarded.
      *
      * @param vcard the vCard string to parse, or {@code null}
-     * @return a {@code Parsed} instance if parsing succeeds, a {@code Raw} instance
-     *         if parsing fails, or {@code null} if {@code vcard} is {@code null}
+     * @return a {@code Parsed} instance if parsing succeeds, a {@code Raw}
+     *         instance if parsing fails, or {@code null} when {@code vcard}
+     *         is {@code null}
      */
     @ProtobufDeserializer
     static ContactCard of(String vcard) {
@@ -90,9 +104,9 @@ public sealed interface ContactCard {
     }
 
     /**
-     * Creates a new {@link Parsed} contact card with the given name and phone number,
-     * using the default vCard version ({@code 3.0}) and the default phone type
-     * ({@code CELL}).
+     * Creates a new {@link Parsed} contact card with the given name and phone
+     * number, using the default vCard version ({@code 3.0}) and the default
+     * phone type ({@code CELL}).
      *
      * @param name        the display name of the contact, or {@code null}
      * @param phoneNumber the non-{@code null} phone number JID of the contact
@@ -103,13 +117,16 @@ public sealed interface ContactCard {
     }
 
     /**
-     * Creates a new {@link Parsed} contact card with the given name, phone number,
-     * and optional business name, using the default vCard version ({@code 3.0}) and
-     * the default phone type ({@code CELL}).
+     * Creates a new {@link Parsed} contact card with the given name, phone
+     * number and optional business name, using the default vCard version
+     * ({@code 3.0}) and the default phone type ({@code CELL}).
      *
      * @param name         the display name of the contact, or {@code null}
-     * @param phoneNumber  the non-{@code null} phone number JID of the contact
-     * @param businessName the business display name, or {@code null}
+     * @param phoneNumber  the non-{@code null} phone number JID of the
+     *                     contact
+     * @param businessName the business display name to attach as
+     *                     {@code X-WA-BIZ-NAME}, or {@code null} for regular
+     *                     contacts
      * @return a new {@code Parsed} contact card
      */
     static ContactCard of(String name, Jid phoneNumber, String businessName) {
@@ -122,11 +139,12 @@ public sealed interface ContactCard {
     }
 
     /**
-     * Returns whether the given telephone entry has both a recognized type and a
-     * {@code WAID} parameter identifying the WhatsApp user.
+     * Returns whether the given telephone entry has both a recognised type
+     * and a {@code WAID} parameter identifying the WhatsApp user.
      *
      * @param entry the telephone property to validate
-     * @return {@code true} if the entry has a type and a WAID parameter
+     * @return {@code true} if the entry has a type and a {@code WAID}
+     *         parameter
      */
     private static boolean isValidPhoneNumber(Telephone entry) {
         return getPhoneType(entry) != null && entry.getParameter(PHONE_NUMBER_VCARD_PROPERTY) != null;
@@ -136,7 +154,8 @@ public sealed interface ContactCard {
      * Extracts the telephone type from a vCard telephone entry.
      *
      * @param entry the telephone property
-     * @return the type string (e.g. {@code "CELL"}, {@code "HOME"}), or {@code null}
+     * @return the type string (for example {@code "CELL"} or {@code "HOME"}),
+     *         or {@code null} if no type is set
      */
     private static String getPhoneType(Telephone entry) {
         return entry.getParameters().getType();
@@ -147,25 +166,28 @@ public sealed interface ContactCard {
      * parameter.
      *
      * @param entry the telephone property
-     * @return a singleton list containing the JID derived from the WAID value
+     * @return a singleton list containing the JID derived from the
+     *         {@code WAID} value
      */
     private static List<Jid> getPhoneValue(Telephone entry) {
         return List.of(Jid.of(entry.getParameter(PHONE_NUMBER_VCARD_PROPERTY)));
     }
 
     /**
-     * Merges two phone number lists into a single unmodifiable list.
+     * Merges two phone number lists into a single unmodifiable list, used as
+     * a merge function when multiple telephone entries share the same type.
      *
      * @param first  the first list of JIDs
      * @param second the second list of JIDs
-     * @return a combined unmodifiable list containing all JIDs from both lists
+     * @return a combined unmodifiable list containing all JIDs from both
+     *         input lists in order
      */
     private static List<Jid> joinPhoneNumbers(List<Jid> first, List<Jid> second) {
         return Stream.of(first, second).flatMap(Collection::stream).toList();
     }
 
     /**
-     * Serializes this contact card to its vCard string representation.
+     * Serialises this contact card back into its vCard string representation.
      *
      * @return the vCard string
      */
@@ -173,38 +195,39 @@ public sealed interface ContactCard {
     String toVcard();
 
     /**
-     * A structured representation of a parsed vCard, providing typed access to the
-     * contact's name, phone numbers, version, and optional business name.
+     * A structured representation of a parsed vCard, providing typed access
+     * to the contact's name, phone numbers, version and optional business
+     * name.
      *
-     * <p>Phone numbers are organized by their vCard type (e.g. {@code "CELL"},
-     * {@code "HOME"}, {@code "WORK"}) and mapped to their corresponding WhatsApp
-     * {@link Jid} values extracted from the {@code WAID} parameter.
-     *
-     * <p>This class can be serialized back to a valid vCard string via
-     * {@link #toVcard()}.
+     * <p>Phone numbers are organised by their vCard type (for example
+     * {@code "CELL"}, {@code "HOME"} or {@code "WORK"}) and mapped to their
+     * corresponding WhatsApp {@link Jid} values extracted from the
+     * {@code WAID} parameter of each {@code TEL} entry. The class can be
+     * serialised back to a valid vCard string via {@link #toVcard()}.
      */
     final class Parsed implements ContactCard {
         /**
-         * The vCard version string (e.g. {@code "3.0"}, {@code "4.0"}).
+         * The vCard version string (for example {@code "3.0"} or
+         * {@code "4.0"}).
          */
         String version;
 
         /**
-         * The formatted display name from the vCard's {@code FN} property,
-         * or {@code null} if not present.
+         * The formatted display name from the vCard's {@code FN} property, or
+         * {@code null} if the vCard does not carry a formatted name.
          */
         String name;
 
         /**
-         * The phone numbers associated with this contact, grouped by their vCard
-         * telephone type (e.g. {@code "CELL"}, {@code "HOME"}). Each type maps to
-         * an unmodifiable list of {@link Jid} values derived from the {@code WAID}
-         * parameter on the corresponding {@code TEL} entries.
+         * The phone numbers associated with this contact, grouped by their
+         * vCard telephone type. Each type maps to an unmodifiable list of
+         * {@link Jid} values derived from the {@code WAID} parameter on the
+         * corresponding {@code TEL} entries.
          */
         Map<String, List<Jid>> phoneNumbers;
 
         /**
-         * The business display name from the {@code X-WA-BIZ-NAME} extended vCard
+         * The business display name from the {@code X-WA-BIZ-NAME} extended
          * property, or {@code null} if the contact is not a business account.
          */
         String businessName;
@@ -212,10 +235,10 @@ public sealed interface ContactCard {
         /**
          * Constructs a new parsed contact card with the given values.
          *
-         * @param version       the vCard version string
-         * @param name          the formatted display name, or {@code null}
-         * @param phoneNumbers  the phone numbers grouped by type
-         * @param businessName  the business display name, or {@code null}
+         * @param version      the vCard version string
+         * @param name         the formatted display name, or {@code null}
+         * @param phoneNumbers the phone numbers grouped by vCard type
+         * @param businessName the business display name, or {@code null}
          */
         Parsed(String version, String name, Map<String, List<Jid>> phoneNumbers, String businessName) {
             this.version = version;
@@ -227,7 +250,7 @@ public sealed interface ContactCard {
         /**
          * Returns the vCard version string.
          *
-         * @return the version (e.g. {@code "3.0"})
+         * @return the version (for example {@code "3.0"})
          */
         public String version() {
             return version;
@@ -237,7 +260,6 @@ public sealed interface ContactCard {
          * Sets the vCard version string.
          *
          * @param version the version to set
-         * @return this parsed contact card instance
          */
         public void setVersion(String version) {
             this.version = version;
@@ -246,7 +268,8 @@ public sealed interface ContactCard {
         /**
          * Returns the formatted display name from the vCard.
          *
-         * @return an {@code Optional} containing the name, or empty if not present
+         * @return an {@code Optional} containing the name, or empty if no
+         *         formatted name is present
          */
         public Optional<String> name() {
             return Optional.ofNullable(name);
@@ -256,17 +279,17 @@ public sealed interface ContactCard {
          * Sets the formatted display name for this contact card.
          *
          * @param name the name to set, or {@code null} to clear
-         * @return this parsed contact card instance
          */
         public void setName(String name) {
             this.name = name;
     }
 
         /**
-         * Returns the business display name from the {@code X-WA-BIZ-NAME} property.
+         * Returns the business display name from the {@code X-WA-BIZ-NAME}
+         * property.
          *
-         * @return an {@code Optional} containing the business name, or empty if the
-         *         contact is not a business account
+         * @return an {@code Optional} containing the business name, or empty
+         *         if the contact is not a business account
          */
         public Optional<String> businessName() {
             return Optional.ofNullable(businessName);
@@ -275,37 +298,40 @@ public sealed interface ContactCard {
         /**
          * Sets the business display name for this contact card.
          *
-         * @param businessName the business name to set, or {@code null} to clear
-         * @return this parsed contact card instance
+         * @param businessName the business name to set, or {@code null} to
+         *                     clear
          */
         public void setBusinessName(String businessName) {
             this.businessName = businessName;
     }
 
         /**
-         * Returns the phone numbers associated with the given vCard telephone type.
+         * Returns the phone numbers associated with the given vCard telephone
+         * type.
          *
-         * @param type the telephone type (e.g. {@code "CELL"}, {@code "HOME"})
-         * @return an unmodifiable list of JIDs for the given type, or an empty list
-         *         if no numbers are registered under that type
+         * @param type the telephone type (for example {@code "CELL"} or
+         *             {@code "HOME"})
+         * @return an unmodifiable list of JIDs for the given type, or an
+         *         empty list if no numbers are registered under it
          */
         public List<Jid> phoneNumbers(String type) {
             return phoneNumbers.getOrDefault(type, List.of());
         }
 
         /**
-         * Returns the phone numbers associated with the default telephone type
-         * ({@code CELL}).
+         * Returns the phone numbers associated with the default telephone
+         * type ({@code CELL}).
          *
-         * @return an unmodifiable list of JIDs, or an empty list if no cell numbers
-         *         are present
+         * @return an unmodifiable list of JIDs, or an empty list if no
+         *         {@code CELL} numbers are present
          */
         public List<Jid> phoneNumbers() {
             return Objects.requireNonNullElseGet(phoneNumbers.get(DEFAULT_NUMBER_VCARD_TYPE), List::of);
         }
 
         /**
-         * Adds a phone number under the default telephone type ({@code CELL}).
+         * Adds a phone number under the default telephone type
+         * ({@code CELL}).
          *
          * @param contact the non-{@code null} JID to add
          */
@@ -316,7 +342,8 @@ public sealed interface ContactCard {
         /**
          * Adds a phone number under the specified telephone type.
          *
-         * @param category the telephone type (e.g. {@code "CELL"}, {@code "HOME"})
+         * @param category the telephone type (for example {@code "CELL"} or
+         *                 {@code "HOME"})
          * @param contact  the non-{@code null} JID to add
          */
         public void addPhoneNumber(String category, Jid contact) {
@@ -332,10 +359,11 @@ public sealed interface ContactCard {
         }
 
         /**
-         * Serializes this parsed contact card to a valid vCard string. The output
-         * includes the version, formatted name, telephone entries with their
-         * {@code WAID} parameters, and the {@code X-WA-BIZ-NAME} property if a
-         * business name is present.
+         * Serialises this parsed contact card to a valid vCard string.
+         *
+         * <p>The output includes the version, formatted name, the telephone
+         * entries with their {@code WAID} parameters, and the
+         * {@code X-WA-BIZ-NAME} property when a business name is present.
          *
          * @return a non-{@code null} vCard string
          */
@@ -363,13 +391,15 @@ public sealed interface ContactCard {
         }
 
         /**
-         * Returns whether this parsed contact card is equal to the given object.
-         * Two parsed contact cards are considered equal if they have the same
-         * version, name, phone numbers, and business name.
+         * Returns whether this parsed contact card is equal to the given
+         * object.
+         *
+         * <p>Two parsed contact cards are considered equal when their
+         * version, name, phone numbers and business name are all equal.
          *
          * @param o the object to compare with
-         * @return {@code true} if the other object is a {@code Parsed} instance
-         *         with identical field values
+         * @return {@code true} if the other object is a {@code Parsed}
+         *         instance with identical field values
          */
         @Override
         public boolean equals(Object o) {
@@ -381,8 +411,8 @@ public sealed interface ContactCard {
         }
 
         /**
-         * Returns a hash code based on the version, name, phone numbers, and
-         * business name fields.
+         * Returns a hash code derived from the version, name, phone numbers
+         * and business name fields.
          *
          * @return the hash code
          */
@@ -392,8 +422,8 @@ public sealed interface ContactCard {
         }
 
         /**
-         * Returns a string representation of this parsed contact card, including
-         * all field values.
+         * Returns a string representation of this parsed contact card
+         * including all field values.
          *
          * @return a descriptive string
          */
@@ -408,13 +438,13 @@ public sealed interface ContactCard {
     }
 
     /**
-     * A raw, unparsed representation of a vCard string. This variant is used as a
-     * fallback when the vCard string cannot be parsed into a {@link Parsed} instance,
-     * either because the vCard format is malformed or because the parsing library is
-     * unavailable.
+     * A raw, unparsed representation of a vCard string.
      *
-     * <p>The original vCard string is preserved verbatim and returned by
-     * {@link #toVcard()}.
+     * <p>This variant is used as a fallback when the vCard string cannot be
+     * decomposed into a {@link Parsed} instance, either because the content
+     * is malformed or because the parsing library is unavailable. The
+     * original vCard string is preserved verbatim so that it can still be
+     * forwarded unchanged when the card is re-serialised.
      */
     final class Raw implements ContactCard {
         /**
@@ -443,12 +473,14 @@ public sealed interface ContactCard {
         }
 
         /**
-         * Returns whether this raw contact card is equal to the given object. Two
-         * raw contact cards are considered equal if they wrap the same vCard string.
+         * Returns whether this raw contact card is equal to the given object.
+         *
+         * <p>Two raw contact cards are considered equal when they wrap the
+         * same vCard string.
          *
          * @param o the object to compare with
-         * @return {@code true} if the other object is a {@code Raw} instance with
-         *         the same vCard string
+         * @return {@code true} if the other object is a {@code Raw} instance
+         *         with the same vCard string
          */
         @Override
         public boolean equals(Object o) {
@@ -457,7 +489,7 @@ public sealed interface ContactCard {
         }
 
         /**
-         * Returns a hash code based on the raw vCard string.
+         * Returns a hash code derived from the raw vCard string.
          *
          * @return the hash code
          */
@@ -467,9 +499,10 @@ public sealed interface ContactCard {
         }
 
         /**
-         * Returns a string representation of this raw contact card.
+         * Returns a string representation of this raw contact card including
+         * the wrapped vCard content.
          *
-         * @return a descriptive string including the raw vCard content
+         * @return a descriptive string
          */
         @Override
         public String toString() {

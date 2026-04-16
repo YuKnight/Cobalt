@@ -10,130 +10,126 @@ import java.util.Optional;
 import java.util.OptionalLong;
 
 /**
- * A unified interface for accessing media metadata across different
- * message and data types that carry downloadable media content.
+ * A unified view over every Cobalt type that references a downloadable
+ * attachment on WhatsApp's media CDN.
  *
- * <p>This sealed interface provides a common set of accessors and mutators
- * for the fields that all media-bearing types share: a download URL, a CDN
- * direct path, an encryption key, SHA-256 hashes for both plaintext and
- * ciphertext, a file size, and a {@link MediaPath} that describes the CDN
- * route and encryption key label.
+ * <p>Media attachments in WhatsApp come in many shapes: end-to-end encrypted
+ * image, video, audio, document, and sticker messages; application state
+ * synchronization blobs; history sync payloads; and sticker metadata attached
+ * to account preferences. All of them share a common set of fields that
+ * describe where the encrypted bytes live on the CDN and how to decrypt and
+ * validate them. This sealed interface abstracts those common fields so that
+ * the upload and download pipelines can operate on any media-bearing type
+ * without special casing.
  *
- * <p>Implementations of this interface include end-to-end encrypted media
- * messages ({@link MediaMessage}), application state synchronization blobs
- * ({@link ExternalBlobReference}), history sync notification payloads
- * ({@link HistorySyncNotification}), and sticker-related structures
- * ({@link StickerAction}, {@link Sticker}).
+ * <p>Implementations may choose to leave some accessors empty when the
+ * underlying type does not carry that particular field. For example,
+ * {@link ExternalBlobReference} has no media URL because external blobs are
+ * always retrieved through the direct path.
  */
 public sealed interface MediaProvider
         permits StickerAction, MediaMessage, Sticker, ExternalBlobReference, HistorySyncNotification {
     /**
-     * Returns the CDN URL from which the encrypted media file can be
-     * downloaded.
+     * Returns the CDN URL at which the encrypted media can be downloaded.
      *
-     * @return an {@link Optional} containing the media URL, or empty if
-     *         not set
+     * @return an {@link Optional} containing the URL, or empty if not set
      */
     Optional<String> mediaUrl();
 
     /**
-     * Sets the CDN URL for the media file.
+     * Sets the CDN URL for the media.
      *
      * @param mediaUrl the media URL
      */
     void setMediaUrl(String mediaUrl);
 
     /**
-     * Returns the CDN direct path from which the encrypted media file can
-     * be fetched.
+     * Returns the CDN direct path at which the encrypted media can be fetched.
      *
-     * @return an {@link Optional} containing the direct path, or empty if
-     *         not set
+     * @return an {@link Optional} containing the direct path, or empty if not set
      */
     Optional<String> mediaDirectPath();
 
     /**
-     * Sets the CDN direct path for the media file.
+     * Sets the CDN direct path for the media.
      *
      * @param mediaDirectPath the direct path
      */
     void setMediaDirectPath(String mediaDirectPath);
 
     /**
-     * Returns the symmetric encryption key used to decrypt the media file.
+     * Returns the symmetric key used to decrypt the downloaded media bytes.
      *
-     * @return an {@link Optional} containing the media key, or empty if
-     *         not set
+     * @return an {@link Optional} containing the media key, or empty if not set
      */
     Optional<byte[]> mediaKey();
 
     /**
-     * Sets the symmetric encryption key for the media file.
+     * Sets the symmetric key used to decrypt the media.
      *
-     * @param bytes the media key bytes
+     * @param bytes the media key
      */
     void setMediaKey(byte[] bytes);
 
     /**
-     * Sets the epoch-second timestamp at which the media key was generated.
+     * Sets the timestamp at which the media key was generated.
      *
-     * @param timestamp the media key timestamp, or
-     *        {@code null} to clear
+     * <p>Implementations that do not track a key timestamp may ignore this
+     * call.
+     *
+     * @param timestamp the media key timestamp, or {@code null} to clear
      */
     void setMediaKeyTimestamp(Instant timestamp);
 
     /**
-     * Returns the SHA-256 digest of the plaintext (decrypted) media file,
-     * used for integrity verification after decryption.
+     * Returns the SHA-256 digest of the plaintext media, used for integrity
+     * verification after decryption.
      *
-     * @return an {@link Optional} containing the SHA-256 hash, or empty if
-     *         not set
+     * @return an {@link Optional} containing the hash bytes, or empty if not set
      */
     Optional<byte[]> mediaSha256();
 
     /**
-     * Sets the SHA-256 digest of the plaintext media file.
+     * Sets the SHA-256 digest of the plaintext media.
      *
-     * @param bytes the plaintext SHA-256 hash
+     * @param bytes the plaintext hash bytes
      */
     void setMediaSha256(byte[] bytes);
 
     /**
-     * Returns the SHA-256 digest of the encrypted media file, used for
-     * integrity verification before decryption.
+     * Returns the SHA-256 digest of the encrypted media, used for integrity
+     * verification before decryption.
      *
-     * @return an {@link Optional} containing the encrypted SHA-256 hash,
-     *         or empty if not set
+     * @return an {@link Optional} containing the hash bytes, or empty if not set
      */
     Optional<byte[]> mediaEncryptedSha256();
 
     /**
-     * Sets the SHA-256 digest of the encrypted media file.
+     * Sets the SHA-256 digest of the encrypted media.
      *
-     * @param bytes the encrypted SHA-256 hash
+     * @param bytes the encrypted hash bytes
      */
     void setMediaEncryptedSha256(byte[] bytes);
 
     /**
      * Returns the size of the media file in bytes.
      *
-     * @return an {@link OptionalLong} containing the file size, or empty
-     *         if not set
+     * @return an {@link OptionalLong} containing the file size, or empty if not set
      */
     OptionalLong mediaSize();
 
     /**
      * Sets the size of the media file in bytes.
      *
-     * @param mediaSize the file size in bytes
+     * @param mediaSize the file size
      */
     void setMediaSize(long mediaSize);
 
     /**
-     * Returns the {@link MediaPath} that describes the CDN route and
-     * encryption key derivation label for this media type.
+     * Returns the media path classification describing the CDN route and
+     * encryption key label for this provider's content.
      *
-     * @return the media path for this provider, never {@code null}
+     * @return the media path, never {@code null}
      */
     MediaPath mediaPath();
 }

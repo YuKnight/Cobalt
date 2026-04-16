@@ -16,21 +16,24 @@ import java.util.regex.Pattern;
 import static com.github.auties00.cobalt.model.jid.JidConstants.*;
 
 /**
- * A record that represents a WhatsApp JID (Jabber ID), the primary addressing mechanism used
- * by the WhatsApp protocol to identify users, groups, devices, and other entities.
+ * Represents a WhatsApp JID (Jabber ID), the primary addressing mechanism used by the
+ * WhatsApp protocol to identify users, groups, devices, newsletters, bots, and other
+ * entities.
  *
- * <p>A JID is composed of four parts serialized as {@code user_agent:device@server}. The
- * {@code user} identifies the entity (such as a phone number for personal accounts, a numeric
- * identifier for groups or bots, or an opaque LID for privacy-preserving addressing). The
+ * <p>A JID is composed of four parts serialized in the canonical form
+ * {@code user_agent:device@server}. The {@code user} identifies the entity, which may be
+ * a phone number for personal accounts, a numeric identifier for groups or bots, or an
+ * opaque numeric identifier for privacy-preserving Linked Identity addressing. The
  * {@code server} is a {@link JidServer} that classifies the domain the entity belongs to.
- * The {@code agent} and {@code device} are unsigned byte values (0 to 255) that further
- * distinguish client agent configurations and companion devices, respectively. A value of
- * {@code 0} for either indicates the default (primary) agent or device.
+ * The {@code agent} is an unsigned byte value (0 to 255) that distinguishes client agent
+ * configurations, and {@code device} is an unsigned short value (0 to 65535) that
+ * identifies a companion device within an account. A value of {@code 0} for either
+ * component indicates the default (primary) agent or device.
  *
  * <p>This class provides a rich set of factory methods for parsing JIDs from string
  * representations, protobuf encodings, and numeric identifiers. Pre-allocated singleton
- * instances are available for commonly referenced server-only JIDs and well-known accounts
- * such as the Status broadcast, the announcements account, and the Meta AI bot.
+ * instances are available for commonly referenced server-only JIDs and well-known
+ * accounts such as the Status broadcast, the announcements account, and the Meta AI bot.
  *
  * <p>Instances of this record are immutable. Transformation methods such as
  * {@link #withServer(JidServer)}, {@link #withAgent(int)}, and {@link #withDevice(int)}
@@ -38,8 +41,8 @@ import static com.github.auties00.cobalt.model.jid.JidConstants.*;
  *
  * @param user   the user identifier component, or {@code null} for server-only JIDs
  * @param server the non-null server domain component
- * @param device the device identifier, an unsigned byte (0 to 255) where {@code 0} is the
- *               primary device
+ * @param device the device identifier, an unsigned short (0 to 65535) where {@code 0}
+ *               is the primary device
  * @param agent  the agent identifier, an unsigned byte (0 to 255) where {@code 0} is the
  *               default agent
  * @see JidServer
@@ -54,14 +57,13 @@ public record Jid(String user, JidServer server, int device, int agent) implemen
 
     /**
      * A compiled regular expression matching the phone number ranges reserved by
-     * WhatsApp for PN-based (phone-number) bot accounts on the standard user server.
-     * The pattern matches either {@code 1313555XXXX} (ten-digit bots in the
-     * {@code 1313555} range) or {@code 131655500XX} (eleven-digit bots in the
-     * {@code 131655500} range), mirroring WA Web's {@code Wid.isPnBot} literal
-     * regular expression.
+     * WhatsApp for phone-number-based bot accounts on the standard user server.
      *
-     * @implNote WAWebWid.isPnBot — WA Web uses the literal regex
-     *           {@code /^1313555\d{4}$|^131655500\d{2}$/} to test the user number.
+     * <p>The pattern matches either {@code 1313555XXXX} (ten-digit bots in the
+     * {@code 1313555} range) or {@code 131655500XX} (eleven-digit bots in the
+     * {@code 131655500} range). Entities whose user number matches this pattern are
+     * treated as bots even though they live on the standard user domain rather than
+     * on the dedicated {@code bot} domain.
      */
     private static final Pattern PN_BOT_PATTERN = Pattern.compile("^(1313555\\d{4}|131655500\\d{2})$");
 
@@ -158,11 +160,12 @@ public record Jid(String user, JidServer server, int device, int agent) implemen
     private static final Jid LOCATION_BROADCAST = new Jid("location", JidServer.broadcast());
 
     /**
-     * Validates record components.
+     * Validates the record components during construction.
      *
-     * @throws NullPointerException           if {@code server} is {@code null}
-     * @throws IllegalArgumentException if {@code device} or {@code agent} is not
-     *                                        in the unsigned byte range (0 to 255)
+     * @throws NullPointerException     if {@code server} is {@code null}
+     * @throws IllegalArgumentException if {@code device} is not in the unsigned short
+     *                                  range (0 to 65535), or if {@code agent} is not in
+     *                                  the unsigned byte range (0 to 255)
      */
     public Jid {
         Objects.requireNonNull(server, "server cannot be null");
@@ -397,7 +400,7 @@ public record Jid(String user, JidServer server, int device, int agent) implemen
      *
      * @param user   the user identifier, or {@code null} for a server-only JID
      * @param server the non-null server domain
-     * @param device the device identifier (0 to 255)
+     * @param device the device identifier (0 to 65535)
      * @param agent  the agent identifier (0 to 255)
      * @return the corresponding {@code Jid} instance
      */
@@ -569,12 +572,6 @@ public record Jid(String user, JidServer server, int device, int agent) implemen
         return new Jid(user, server, device, agent);
     }
 
-    /**
-     * Validates that the given integer falls within the unsigned byte range.
-     *
-     * @param i the value to check
-     * @throws IllegalArgumentException if the value is not in the range 0 to 255
-     */
     /**
      * Validates that the given integer falls within the unsigned short range.
      *
@@ -862,33 +859,20 @@ public record Jid(String user, JidServer server, int device, int agent) implemen
 
     /**
      * Returns whether this JID identifies a WhatsApp bot account, covering both
-     * the FBID-based bot server and the phone-number bot ranges hosted on the
-     * standard user server.
-     * <p>
-     * A JID is considered a bot if either of the following holds:
+     * dedicated bot server JIDs and phone-number bots that live on the standard
+     * user server.
+     *
+     * <p>A JID is considered a bot if either of the following holds:
      * <ul>
-     *   <li>It has the {@code bot} server domain (FBID-based bots), as reported
-     *       by {@link #hasBotServer()}.</li>
+     *   <li>It has the {@code bot} server domain, which is reported by
+     *       {@link #hasBotServer()}.</li>
      *   <li>It has the standard user server ({@code s.whatsapp.net}) and its
-     *       user number matches one of the reserved PN bot ranges
+     *       user number matches one of the reserved phone-number bot ranges
      *       ({@code 1313555XXXX} or {@code 131655500XX}).</li>
      * </ul>
-     * <p>
-     * This method preserves {@link #hasBotServer()} for backward compatibility
-     * while adding detection of phone-number bots that live on the user server,
-     * matching WA Web's {@code Wid.isBot} check which combines the {@code isPnBot}
-     * and {@code isFbidBot} predicates.
      *
-     * @return {@code true} if this JID identifies either a PN bot or an FBID bot,
-     *         {@code false} otherwise
-     * @implNote WAWebWid.isBot (combines isPnBot and isFbidBot checks) — WA Web's
-     *           {@code Wid.isBot} returns {@code this.isPnBot() || this.isFbidBot()},
-     *           where {@code isPnBot} tests the PN regex
-     *           {@code /^1313555\d{4}$|^131655500\d{2}$/} against the user number on
-     *           the {@code c.us} server and {@code isFbidBot} tests for the
-     *           {@code bot} server. Cobalt uses {@link JidServer#user()} for the PN
-     *           side because Cobalt normalizes {@code c.us} to the standard user
-     *           server representation.
+     * @return {@code true} if this JID identifies either a phone-number bot or a
+     *         dedicated bot-server bot, {@code false} otherwise
      * @see #hasBotServer()
      */
     public boolean isBot() {
@@ -987,7 +971,7 @@ public record Jid(String user, JidServer server, int device, int agent) implemen
      * unchanged. If the device is already equal to this JID's device, {@code this} is
      * returned.
      *
-     * @param device the new device identifier (0 to 255)
+     * @param device the new device identifier (0 to 65535)
      * @return this JID if the device is unchanged, otherwise a new JID with the given
      *         device
      */
@@ -1038,25 +1022,23 @@ public record Jid(String user, JidServer server, int device, int agent) implemen
 
     /**
      * Returns whether this JID and the specified JID refer to the same account,
-     * even if they use different addressing-mode domains.
+     * even when they use different addressing-mode domains.
      *
-     * <p>This matches hosted-domain and non-hosted-domain pairs that represent
-     * the same underlying account:
+     * <p>This recognizes the following hosted-domain and non-hosted-domain pairs
+     * as the same underlying account:
      * <ul>
-     * <li>{@code hosted} ↔ {@code s.whatsapp.net} (or {@code c.us})
-     * <li>{@code hosted.lid} ↔ {@code lid}
+     *   <li>{@code hosted} and {@code s.whatsapp.net} (or the legacy {@code c.us})</li>
+     *   <li>{@code hosted.lid} and {@code lid}</li>
      * </ul>
      *
      * <p>The comparison is performed by normalizing both JIDs via
-     * {@link #toUserJid()} (which strips device/agent data and remaps hosted
-     * domains) and then checking equality.
+     * {@link #toUserJid()}, which strips device and agent data and remaps hosted
+     * domains to their underlying user domains, and then checking equality.
      *
-     * @param other the other JID to compare against
+     * @param other the other JID to compare against, or {@code null}
      * @return {@code true} if both JIDs resolve to the same user JID after
-     *         hosted-domain normalization
-     *
-     * @apiNote WAWebWidFactory.isSameAccountAndAddressingMode: recognizes
-     * {@code hosted↔c.us} and {@code hosted.lid↔lid} as same-account pairs.
+     *         hosted-domain normalization, {@code false} if {@code other} is
+     *         {@code null} or refers to a different account
      */
     public boolean isSameAccount(Jid other) {
         if (other == null) {
@@ -1102,7 +1084,7 @@ public record Jid(String user, JidServer server, int device, int agent) implemen
     }
 
     /**
-     * Returns this JID instance.
+     * Returns this JID instance unchanged, satisfying the {@link JidProvider} contract.
      *
      * @return {@code this}
      */

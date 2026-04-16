@@ -9,70 +9,67 @@ import java.util.Arrays;
 import java.util.Optional;
 
 /**
- * A presence state for a {@link Contact}, describing whether the contact is currently
- * online, offline, typing a message, or recording an audio message.
+ * A presence state for a {@link Contact}, describing whether the contact is
+ * currently online, offline, typing a message, or recording an audio message
+ * in the 1:1 conversation with the local user.
  *
- * <p>In the WhatsApp protocol, presence information is exchanged through XMPP-style
- * {@code <chatstate>} stanzas. The server sends a {@code <composing>} element when a
- * contact begins typing, a {@code <composing media="audio">} element when a contact
- * begins recording an audio message, and a {@code <paused>} element when the contact
- * stops composing. Presence availability is communicated via the {@code type} attribute
- * on the {@code <presence>} stanza, using the values {@code "available"} and
- * {@code "unavailable"}.
- *
- * <p>By default, the WhatsApp server does not push presence updates for every contact.
- * Updates are sent automatically only when a contact sends a message or appears in the
- * recent contacts list. To receive real-time presence updates for a specific contact,
- * subscribe using
+ * <p>The WhatsApp server does not push presence updates for every contact by
+ * default: updates arrive automatically only when a contact sends a message
+ * or appears in the recent contacts list. To receive real-time presence
+ * updates for a specific contact, explicitly subscribe to that contact using
  * {@link com.github.auties00.cobalt.client.WhatsAppClient#subscribeToPresence(com.github.auties00.cobalt.model.jid.JidProvider)}.
  *
- * <p>This enum represents presence at the individual contact level. For group-level
- * presence (e.g. a participant typing in a group), use
+ * <p>This enum represents presence at the individual-contact level, reflecting
+ * only the 1:1 conversation state. For the presence of a participant within a
+ * group chat, use
  * {@link Chat#getPresence(com.github.auties00.cobalt.model.jid.JidProvider)}
  * instead.
+ *
+ * <p>Composing and recording states reported by the server are transient and
+ * are automatically cleared after a short inactivity window if no further
+ * updates arrive; callers that present these states in a user interface
+ * should apply a comparable timeout of their own.
  *
  * @see Contact#lastKnownPresence()
  */
 @ProtobufEnum
 public enum ContactStatus {
     /**
-     * The contact is currently online and connected to WhatsApp. This state corresponds
-     * to the {@code "available"} value in the XMPP presence stanza. When a contact comes
-     * online, the server sends a presence update with this type, and the contact's last
-     * seen timestamp is updated to the current time.
+     * The contact is currently online and connected to WhatsApp. When a
+     * contact transitions to this state, the server delivers a presence
+     * update and the contact's last-seen timestamp is advanced to the
+     * current time.
      */
     AVAILABLE(0),
 
     /**
-     * The contact is currently offline or has disconnected from WhatsApp. This state
-     * corresponds to the {@code "unavailable"} value in the XMPP presence stanza. This
-     * is the default state assigned to a contact when no presence information has been
-     * received yet. When the contact is unavailable, the last seen timestamp (if not
-     * hidden by privacy settings) indicates when the contact was last online.
+     * The contact is currently offline, has disconnected from WhatsApp, or no
+     * presence information has yet been received. This is the default state
+     * assigned to a contact when the client has no fresher data. When the
+     * contact is unavailable, the {@linkplain Contact#lastSeen() last-seen
+     * timestamp} indicates when they were last online, unless hidden by the
+     * contact's privacy settings.
      */
     UNAVAILABLE(1),
 
     /**
-     * The contact is currently typing a text message in the conversation. This state
-     * corresponds to the {@code <composing>} element in the XMPP chatstate stanza
-     * (without the {@code media} attribute). In the WhatsApp Web model this is
-     * represented as the {@code "typing"} chatstate type. The composing state
-     * automatically expires after 25 seconds if no further composing updates are
-     * received from the server.
+     * The contact is currently typing a text message in the conversation.
+     * This state is reported by the server while the contact is actively
+     * composing and expires automatically after a short inactivity window
+     * if no further updates arrive.
      */
     COMPOSING(2),
 
     /**
-     * The contact is currently recording an audio message in the conversation. This
-     * state corresponds to the {@code <composing media="audio">} element in the XMPP
-     * chatstate stanza. In the WhatsApp Web model this is represented as the
-     * {@code "recording_audio"} chatstate type. Like the composing state, this state
-     * automatically expires after 25 seconds if no further updates are received.
+     * The contact is currently recording an audio message in the conversation.
+     * This state is reported by the server while the contact is actively
+     * recording and expires automatically after a short inactivity window
+     * if no further updates arrive.
      */
     RECORDING(3);
 
     /**
-     * The protobuf index associated with this presence state.
+     * The protobuf wire-format index associated with this presence state.
      */
     final int index;
 
@@ -86,7 +83,8 @@ public enum ContactStatus {
     }
 
     /**
-     * Returns the protobuf index associated with this presence state.
+     * Returns the protobuf wire-format index associated with this presence
+     * state.
      *
      * @return the protobuf wire-format index
      */
@@ -95,16 +93,15 @@ public enum ContactStatus {
     }
 
     /**
-     * Returns the {@code ContactStatus} whose {@link #name()} matches the given string,
-     * ignoring case.
+     * Returns the {@code ContactStatus} whose {@link #name()} matches the
+     * given string, ignoring case.
      *
-     * <p>This method is used internally when parsing presence stanza attributes from
-     * the server. The attribute value (e.g. {@code "available"}, {@code "composing"})
-     * is matched case-insensitively against the enum constant names.
+     * <p>This helper is intended for parsing textual presence values such as
+     * {@code "available"} or {@code "composing"} delivered by the server.
      *
      * @param name the presence state name to look up
-     * @return an {@code Optional} containing the matching state, or an empty
-     *         {@code Optional} if no constant matches
+     * @return an {@code Optional} containing the matching state, or empty if
+     *         no constant matches
      */
     public static Optional<ContactStatus> of(String name) {
         return Arrays.stream(values())
@@ -113,9 +110,11 @@ public enum ContactStatus {
     }
 
     /**
-     * Returns the lowercase name of this presence state.
+     * Returns the lowercase form of this state's {@linkplain #name() name},
+     * as used in presence stanza attributes.
      *
-     * @return the state name in lowercase (e.g. {@code "available"}, {@code "composing"})
+     * @return the state name in lowercase (for example {@code "available"}
+     *         or {@code "composing"})
      */
     @Override
     public String toString() {

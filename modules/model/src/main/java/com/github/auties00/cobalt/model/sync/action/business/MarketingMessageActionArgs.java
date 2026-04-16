@@ -4,15 +4,16 @@ package com.github.auties00.cobalt.model.sync.action.business;
 import com.github.auties00.cobalt.model.sync.SyncActionArgs;
 
 /**
- * Index arguments for {@link MarketingMessageAction}.
+ * Index arguments identifying a {@link MarketingMessageAction} inside a sync patch.
  *
- * <p>The sync index produced is {@code ["marketingMessage", marketingMessageId]}.
+ * <p>The resulting sync index is {@code ["marketingMessage", marketingMessageId]}, so the
+ * template identifier alone uniquely keys the record across linked devices.
  *
  * @param marketingMessageId the unique identifier of the marketing (premium) message template
  */
 public record MarketingMessageActionArgs(String marketingMessageId) implements SyncActionArgs {
     /**
-     * {@inheritDoc}
+     * Returns the index argument array that uniquely keys this marketing template within the sync patch.
      *
      * @return a single-element array containing the marketing message identifier
      */

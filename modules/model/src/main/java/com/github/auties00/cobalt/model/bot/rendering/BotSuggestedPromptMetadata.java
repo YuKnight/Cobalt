@@ -60,6 +60,18 @@ public final class BotSuggestedPromptMetadata {
     String selectedPromptId;
 
 
+    /**
+     * Constructs a new {@code BotSuggestedPromptMetadata} with all fields specified directly.
+     *
+     * <p>Callers should prefer the named builder factories
+     * {@link #ofLegacy(List, Integer)} and {@link #ofStructured(BotPromptSuggestions, String)}
+     * to ensure only one format is populated at a time.
+     *
+     * @param suggestedPrompts    the plain-text suggested prompts, or {@code null}
+     * @param selectedPromptIndex the zero-based index of the selected prompt, or {@code null}
+     * @param promptSuggestions   the structured prompt suggestions, or {@code null}
+     * @param selectedPromptId    the identifier of the selected prompt, or {@code null}
+     */
     BotSuggestedPromptMetadata(List<String> suggestedPrompts, Integer selectedPromptIndex, BotPromptSuggestions promptSuggestions, String selectedPromptId) {
         this.suggestedPrompts = suggestedPrompts;
         this.selectedPromptIndex = selectedPromptIndex;

@@ -9,5 +9,5 @@ import com.github.auties00.cobalt.socket.threading.SocketClientLayerContext;
  * transport-level security and one for tunnel-level security.
  * Each may be TLS or plain (no-op passthrough).
  */
-public non-sealed interface SocketClientSecurityLayerContext extends SocketClientLayerContext {
+public interface SocketClientSecurityLayerContext extends SocketClientLayerContext {
 }

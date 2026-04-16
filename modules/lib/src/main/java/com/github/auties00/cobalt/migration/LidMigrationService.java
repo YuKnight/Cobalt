@@ -2,6 +2,9 @@ package com.github.auties00.cobalt.migration;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.exception.WhatsAppLidMigrationException;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.chat.Chat;
 import com.github.auties00.cobalt.model.chat.ChatDisappearingMode;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
@@ -30,55 +33,93 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 /**
- * Service responsible for orchestrating LID (Long ID) migration.
+ * Orchestrates the 1:1 LID (Long ID) migration flow for a WhatsApp account.
  *
- * <p>LID migration is a process where WhatsApp transitions from phone number-based
- * addressing to LID-based addressing for improved privacy. This service replaces WA Web's
- * {@code Lid1X1MigrationUtils} singleton with a state-machine approach using
- * {@link LidMigrationState}, where WA Web uses UserPrefs keys
+ * <p>WhatsApp introduced LID addressing to replace phone-number identifiers
+ * in 1:1 conversations with privacy-preserving long identifiers. Migration
+ * runs once per account: a paired client waits for an AB prop, receives a
+ * mapping sync message from the primary device describing how every known
+ * phone number maps to its assigned LID, rewrites every eligible local chat
+ * to use the new address, deletes chats that can no longer be resolved, and
+ * persists the mapping table so that outgoing and incoming stanzas can be
+ * translated between addressing modes.
+ *
+ * <p>Beyond the migration itself, this service also exposes the utility
+ * conversions ({@link #toLid(Jid)}, {@link #toPn(Jid)},
+ * {@link #getAlternateMsgKey(MessageKey)}, etc.) that the rest of the
+ * client uses to freely move between PN and LID representations for
+ * messages, chats, and the current user's identity.
+ *
+ * <p>WA Web implements this same functionality across a handful of
+ * single-purpose modules backed by UserPrefs keys
  * ({@code WAIsAccountLidFieldMigrated}, {@code WALidOneOnOneMigrationSource},
- * {@code WAIsPureLidSyncDSession}).
+ * {@code WAIsPureLidSyncDSession}). Cobalt collapses them into a single
+ * service with an explicit {@link LidMigrationState} state machine injected
+ * via {@link WhatsAppClient}.
  *
- * @implNote WAWebLid1X1MigrationGating.Lid1X1MigrationUtils,
- *           WAWebLid1x1MigrationPrimaryCache.lidPnMigrationPrimaryCache,
- *           WAWebLid1x1MigrationManager.ThreadMigrationManager
+ * @implNote WAWebLid1X1MigrationGating: exposes the {@code Lid1X1MigrationUtils}
+ *           gating object. WAWebLid1X1ThreadAccountMigrations: drives the
+ *           migration pass over chats. WAWebLid1x1MigrationPrimaryCache:
+ *           holds the assigned/latest LID maps from the primary device.
+ *           WAWebLid1x1MigrationManager: top-level trigger for
+ *           {@code executeMigrationIfNeeded}. WAWebLidMigrationUtils:
+ *           LID/PN conversion helpers.
  */
+@WhatsAppWebModule(moduleName = "WAWebLid1X1MigrationGating")
+@WhatsAppWebModule(moduleName = "WAWebLid1X1ThreadAccountMigrations")
+@WhatsAppWebModule(moduleName = "WAWebLid1x1MigrationPrimaryCache")
+@WhatsAppWebModule(moduleName = "WAWebLid1x1MigrationManager")
+@WhatsAppWebModule(moduleName = "WAWebLid1x1MigrationTimeout")
+@WhatsAppWebModule(moduleName = "WAWebLid1x1MigrationTimeoutUtils")
+@WhatsAppWebModule(moduleName = "WAWebLid1x1MigrationMsgParser")
+@WhatsAppWebModule(moduleName = "WAWebLidMigrationUtils")
+@WhatsAppWebModule(moduleName = "WAWebApiContact")
 public final class LidMigrationService {
     /**
-     * Logger instance for migration lifecycle events.
+     * Logger used to trace the lifecycle of the LID migration.
      *
-     * @implNote ADAPTED: WAWebLid1X1MigrationGating — WA Web uses WALogger.LOG tagged templates
+     * @implNote ADAPTED: WA Web uses {@code WALogger.LOG} tagged templates;
+     *           Cobalt uses {@link System.Logger}.
      */
     private static final System.Logger LOGGER = System.getLogger(LidMigrationService.class.getName());
 
     /**
-     * LID origin type value for phone-number-hiding click-to-WhatsApp chats.
-     * Matches WA Web's {@code LidOriginType.PNH_CTWA} ({@code "ctwa"}).
+     * Marker string for click-to-WhatsApp chats whose LID was created with
+     * phone-number hiding (PNH).
      *
-     * @implNote WAWebUsernameTypes.LidOriginType.PNH_CTWA
+     * @implNote WAWebUsernameTypes.LidOriginType.PNH_CTWA: module-level
+     *           constant value {@code "ctwa"}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebUsernameTypes", exports = "LidOriginType",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static final String LID_ORIGIN_TYPE_PNH_CTWA = "ctwa";
 
     /**
-     * LID origin type value for general (non-PNH) chats.
-     * Matches WA Web's {@code LidOriginType.GENERAL} ({@code "general"}).
+     * Marker string for regular LID chats that have no PNH ancestry.
      *
-     * @implNote WAWebUsernameTypes.LidOriginType.GENERAL
+     * @implNote WAWebUsernameTypes.LidOriginType.GENERAL: module-level
+     *           constant value {@code "general"}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebUsernameTypes", exports = "LidOriginType",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static final String LID_ORIGIN_TYPE_GENERAL = "general";
 
     /**
-     * Stub types that are considered safe to ignore during LID migration deletability
-     * checks, matching WA Web's {@code X()} function.
+     * Stub message types that the LID migration considers "safe" and can
+     * be ignored when deciding whether a chat may be deleted.
      *
-     * <p>WA Web's {@code X()} matches exactly two conditions:
+     * <p>The WA Web {@code X} predicate matches exactly two conditions:
      * <ul>
-     * <li>{@code getIsInitialE2ENotification}: type === "e2e_notification" AND subtype === "encrypt"
-     * <li>{@code getIsDisappearingModeSystemMessage}: type === "notification_template" AND subtype === "disappearing_mode"
+     *     <li>{@code getIsInitialE2ENotification}:
+     *         {@code type === "e2e_notification" && subtype === "encrypt"},</li>
+     *     <li>{@code getIsDisappearingModeSystemMessage}:
+     *         {@code type === "notification_template" && subtype === "disappearing_mode"}.</li>
      * </ul>
      *
      * @implNote WAWebLid1X1ThreadAccountMigrations.flow.X
      */
+    @WhatsAppWebExport(moduleName = "WAWebLid1X1ThreadAccountMigrations", exports = "X",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private static final Set<ChatMessageInfo.StubType> MIGRATION_SAFE_STUB_TYPES = EnumSet.of(
             // Maps to getIsInitialE2ENotification (e2e_notification + encrypt)
             ChatMessageInfo.StubType.E2E_ENCRYPTED,
@@ -88,11 +129,15 @@ public final class LidMigrationService {
     );
 
     /**
-     * Stub types that represent call log entries, matching WA Web's
-     * {@code type === MSG_TYPE.CALL_LOG} check in the {@code ee()} function.
+     * Stub message types representing call log entries, used by the
+     * deletability heuristic.
      *
-     * @implNote WAWebLid1X1ThreadAccountMigrations.flow.ee
+     * @implNote WAWebLid1X1ThreadAccountMigrations.flow.ee: the
+     *           {@code type === MSG_TYPE.CALL_LOG} check inside the
+     *           {@code ee} predicate.
      */
+    @WhatsAppWebExport(moduleName = "WAWebLid1X1ThreadAccountMigrations", exports = "ee",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private static final Set<ChatMessageInfo.StubType> CALL_LOG_STUB_TYPES = EnumSet.of(
             ChatMessageInfo.StubType.CALL_MISSED_VOICE,
             ChatMessageInfo.StubType.CALL_MISSED_VIDEO,
@@ -103,98 +148,118 @@ public final class LidMigrationService {
     );
 
     /**
-     * The WhatsApp client instance for error handling delegation.
-     *
-     * @implNote NO_WA_BASIS — Cobalt DI pattern
+     * The WhatsApp client used to surface migration failures through the
+     * configurable error handler.
      */
     private final WhatsAppClient whatsapp;
 
     /**
-     * The store for chat, contact, and LID mapping persistence.
+     * The flat store that persists chats, contacts, and LID/PN mappings.
      *
-     * @implNote ADAPTED: WAWebLid1X1MigrationGating — WA Web uses UserPrefsIdb, Cobalt uses WhatsAppStore
+     * @implNote ADAPTED: WA Web shards this data across UserPrefsIdb and
+     *           several IndexedDB tables; Cobalt reads and writes through
+     *           the single {@link WhatsAppStore} facade.
      */
     private final WhatsAppStore store;
 
     /**
-     * The AB props service for reading feature flags.
-     *
-     * @implNote NO_WA_BASIS — Cobalt DI pattern
+     * Provides access to the server-sent AB props that gate the migration
+     * ({@code ENABLE_INACTIVE_GROUP_LID_MIGRATION},
+     * {@code LID_ONE_ON_ONE_MIGRATION_*}).
      */
     private final ABPropsService abPropsService;
 
     /**
-     * Current migration state, replacing WA Web's {@code WAIsAccountLidFieldMigrated}
-     * UserPrefs key with a richer state machine.
+     * Current position in the migration pipeline.
      *
-     * @implNote ADAPTED: WAWebLid1X1MigrationGating.isLidMigrated — maps {@code COMPLETE} to {@code true}
+     * <p>WA Web encodes the same information across several UserPrefs keys
+     * ({@code WAIsAccountLidFieldMigrated}, {@code WAIsPureLidSyncDSession},
+     * etc.); Cobalt consolidates them into a single {@link LidMigrationState}
+     * state machine.
+     *
+     * @implNote ADAPTED: WAWebLid1X1MigrationGating.isLidMigrated maps to
+     *           {@link LidMigrationState#COMPLETE}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebLid1X1ThreadAccountMigrations", exports = "getLidThreadMigrationStatus",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private final AtomicReference<LidMigrationState> state;
 
     /**
-     * Primary device's PN to assigned LID mappings cache.
-     * Maps phone number (as numeric string) to the LID assigned by the primary
-     * device at migration time.
+     * Maps each phone-number user part to the LID the primary device
+     * assigned to that contact at migration time.
      *
-     * @implNote WAWebLid1x1MigrationPrimaryCache.$2 — populated from LIDMigrationMappingSyncPayload
+     * @implNote WAWebLid1x1MigrationPrimaryCache.lidPnMigrationPrimaryCache:
+     *           corresponds to the internal {@code $2} table populated from
+     *           {@code LIDMigrationMappingSyncPayload}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebLid1x1MigrationPrimaryCache", exports = "lidPnMigrationPrimaryCache",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private final ConcurrentHashMap<String, Jid> primaryPnToAssignedLidCache;
 
     /**
-     * Primary device's PN to latest LID mappings cache.
-     * Maps phone number (as numeric string) to the most recent LID known to
-     * the primary device, which may differ from the assigned LID.
+     * Maps each phone-number user part to the most recent LID known to the
+     * primary device, which may be newer than the originally assigned LID
+     * if the contact has rotated their LID.
      *
-     * @implNote WAWebLid1x1MigrationPrimaryCache.$3 — populated from LIDMigrationMappingSyncPayload
+     * @implNote WAWebLid1x1MigrationPrimaryCache.lidPnMigrationPrimaryCache:
+     *           corresponds to the internal {@code $3} table populated from
+     *           {@code LIDMigrationMappingSyncPayload}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebLid1x1MigrationPrimaryCache", exports = "lidPnMigrationPrimaryCache",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private final ConcurrentHashMap<String, Jid> primaryPnToLatestLidCache;
 
     /**
-     * Cache of original LIDs for locally-created chats, keyed by the chat's
-     * phone number JID user part.
+     * Caches the original LID set on a chat at creation time, keyed by the
+     * chat's phone-number user part.
      *
-     * <p>Matches WA Web's {@code chat.originalLid} field, which is set in
-     * {@code WAWebCreateChat} when a LID mapping is known at chat creation
-     * time. Used as a last-resort fallback in {@code resolveThread()}
-     * when no other LID mapping is available.
+     * <p>Used as a last-resort LID source in {@link #resolveThread(Chat, Set)}
+     * when neither the local chat nor the primary caches contain a mapping.
      *
-     * @implNote WAWebCreateChat — chat.originalLid field
+     * @implNote WAWebCreateChat: corresponds to the {@code chat.originalLid}
+     *           field that WA Web stores directly on the chat object. Cobalt
+     *           does not have this per-chat field, so a service-scoped map
+     *           holds the same information.
      */
     private final ConcurrentHashMap<String, Jid> originalLidCache;
 
     /**
-     * Chat DB migration timestamp from primary device.
+     * Last known chat DB migration timestamp reported by the primary device.
      *
-     * @implNote WAWebLid1x1MigrationPrimaryCache.$4 — set from parsed payload's primaryMigrationTsSec
+     * @implNote WAWebLid1x1MigrationPrimaryCache.lidPnMigrationPrimaryCache:
+     *           corresponds to the {@code $4} field populated from
+     *           {@code primaryMigrationTsSec} of the parsed payload.
      */
     private volatile Instant chatDbMigrationTimestamp;
 
     /**
-     * Timestamp when the protocol message was received, used as a fallback
-     * when {@link #chatDbMigrationTimestamp} is {@code null}.
-     *
-     * @implNote NO_WA_BASIS — Cobalt-specific fallback for timestamp comparison
+     * Time at which the mapping sync protocol message arrived, used as a
+     * fallback when the primary device did not report a migration
+     * timestamp.
      */
     private volatile Instant receiveTimestamp;
 
     /**
-     * Future for the mapping timeout task, cancelled when mappings are received.
-     * Corresponds to the {@code _} module-level variable in WA Web's
-     * {@code WAWebLid1x1MigrationTimeout}, which holds the {@code setTimeout} handle.
+     * Pending scheduled task that logs the client out when peer mappings do
+     * not arrive within the AB-prop-defined window.
      *
-     * @implNote ADAPTED: WAWebLid1x1MigrationTimeout._ — WA Web uses a raw setTimeout
-     *           handle; Cobalt uses a {@link CompletableFuture} from
-     *           {@link SchedulerUtils#scheduleDelayed(Duration, Runnable)}
+     * @implNote ADAPTED: WAWebLid1x1MigrationTimeout.scheduleLogoutIfNeeded:
+     *           WA Web stores the raw {@code setTimeout} handle in the
+     *           module-level variable {@code _}; Cobalt uses a
+     *           {@link CompletableFuture} produced by
+     *           {@link SchedulerUtils#scheduleDelayed(Duration, Runnable)}.
      */
     private volatile CompletableFuture<Void> mappingTimeoutFuture;
 
     /**
-     * Creates a new LID migration service.
+     * Creates a new LID migration service bound to the given client and AB
+     * props service.
      *
-     * @implNote ADAPTED: WAWebLid1X1MigrationGating — WA Web uses a singleton class {@code new c()},
-     *           Cobalt uses constructor DI
-     * @param whatsapp       the WhatsApp client instance
-     * @param abPropsService the AB props service for reading feature flags
+     * @implNote ADAPTED: WA Web constructs {@code Lid1X1MigrationUtils}
+     *           as a module-level singleton; Cobalt builds the service via
+     *           constructor DI so tests can swap the collaborators.
+     * @param whatsapp       the WhatsApp client that owns this service
+     * @param abPropsService the AB props service used for reading feature flags
      */
     public LidMigrationService(WhatsAppClient whatsapp, ABPropsService abPropsService) {
         this.whatsapp = whatsapp;
@@ -207,68 +272,86 @@ public final class LidMigrationService {
     }
 
     /**
-     * Returns whether the LID migration has completed.
+     * Returns whether the 1:1 LID migration has completed for this account.
      *
-     * <p>This is the Cobalt equivalent of WA Web's
-     * {@code Lid1X1MigrationUtils.isLidMigrated()}, which reads
-     * {@code WAIsAccountLidFieldMigrated === true} from UserPrefsIdb.
-     * In Cobalt, migration completion is tracked by the state machine
-     * reaching {@link LidMigrationState#COMPLETE}.
+     * <p>Consumers use this flag to decide whether outgoing messages
+     * should be addressed by LID or by phone number.
      *
-     * @implNote ADAPTED: WAWebLid1X1MigrationGating.Lid1X1MigrationUtils.isLidMigrated
-     * @return {@code true} if the migration state is {@link LidMigrationState#COMPLETE}
+     * @implNote ADAPTED: WAWebLid1X1MigrationGating.Lid1X1MigrationUtils.isLidMigrated:
+     *           WA Web reads {@code WAIsAccountLidFieldMigrated === true}
+     *           from UserPrefsIdb. Cobalt reads the in-memory state machine
+     *           and returns {@code true} only when it has reached
+     *           {@link LidMigrationState#COMPLETE}.
+     * @return {@code true} if the migration state is
+     *         {@link LidMigrationState#COMPLETE}
      */
+    @WhatsAppWebExport(moduleName = "WAWebLid1X1MigrationGating", exports = "Lid1X1MigrationUtils",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean isLidMigrated() {
-        return state.get() == LidMigrationState.COMPLETE; // WAWebLid1X1MigrationGating.isLidMigrated
+        return state.get() == LidMigrationState.COMPLETE;
     }
 
     /**
-     * Returns whether the syncd session has been migrated.
+     * Returns whether the Syncd session has been migrated to LID.
      *
-     * <p>This is a stub that always returns {@code false}, matching WA Web's
-     * {@code Lid1X1MigrationUtils.isSyncdSessionMigrated()} which also
-     * unconditionally returns {@code false}.
+     * <p>Matches WA Web's stub that unconditionally returns {@code false};
+     * the syncd-session migration is not implemented in either codebase.
      *
-     * @implNote WAWebLid1X1MigrationGating.Lid1X1MigrationUtils.isSyncdSessionMigrated
-     * @return {@code false} always
+     * @implNote WAWebLid1X1MigrationGating.Lid1X1MigrationUtils.isSyncdSessionMigrated:
+     *           unconditional return {@code false}.
+     * @return {@code false}
      */
+    @WhatsAppWebExport(moduleName = "WAWebLid1X1MigrationGating", exports = "Lid1X1MigrationUtils",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public boolean isSyncdSessionMigrated() {
-        return false; // WAWebLid1X1MigrationGating.isSyncdSessionMigrated
+        return false;
     }
 
     /**
-     * Returns whether a PN (phone number) chat should be created.
+     * Returns whether a new PN-addressed chat should still be created.
      *
-     * <p>This is a stub that always returns {@code false}, matching WA Web's
-     * {@code Lid1X1MigrationUtils.shouldCreatePnChat()} which also
-     * unconditionally returns {@code false}.
+     * <p>Matches WA Web's stub that unconditionally returns {@code false};
+     * after the LID migration is enabled server-side, new chats are always
+     * created with LID addressing.
      *
-     * @implNote WAWebLid1X1MigrationGating.Lid1X1MigrationUtils.shouldCreatePnChat
-     * @return {@code false} always
+     * @implNote WAWebLid1X1MigrationGating.Lid1X1MigrationUtils.shouldCreatePnChat:
+     *           unconditional return {@code false}.
+     * @return {@code false}
      */
+    @WhatsAppWebExport(moduleName = "WAWebLid1X1MigrationGating", exports = "Lid1X1MigrationUtils",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public boolean shouldCreatePnChat() {
-        return false; // WAWebLid1X1MigrationGating.shouldCreatePnChat
+        return false;
     }
 
     /**
-     * Returns whether there is a state discrepancy in the LID migration status.
+     * Returns whether the runtime state disagrees with the persisted LID
+     * migration flag.
      *
-     * <p>In WA Web, this checks {@code !isLidMigrated() && rawValue === true},
-     * which is effectively always {@code false} since both read the same UserPrefs key.
-     * Cobalt preserves this behavior by always returning {@code false}.
+     * <p>In WA Web the check is {@code !isLidMigrated() && rawValue === true},
+     * which is unreachable because both sides read the same UserPrefs key.
+     * Cobalt preserves this observable behaviour by returning {@code false}.
      *
-     * @implNote WAWebLid1X1MigrationGating.Lid1X1MigrationUtils.hasStateDiscrepancy
-     * @return {@code false} always (dead code in WA Web)
+     * @implNote WAWebLid1X1MigrationGating.Lid1X1MigrationUtils.hasStateDiscrepancy:
+     *           dead code in WA Web.
+     * @return {@code false}
      */
+    @WhatsAppWebExport(moduleName = "WAWebLid1X1MigrationGating", exports = "Lid1X1MigrationUtils",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public boolean hasStateDiscrepancy() {
-        return false; // WAWebLid1X1MigrationGating.hasStateDiscrepancy
+        return false;
     }
 
     /**
-     * Initializes the migration service.
-     * Should be called after connection is established.
+     * Moves the state machine from {@link LidMigrationState#NOT_STARTED} to
+     * {@link LidMigrationState#WAITING_PROP} so the service is ready to
+     * react to the AB prop.
      *
-     * @implNote NO_WA_BASIS — Cobalt-specific state machine initialization
+     * <p>Should be called once after the connection has been established
+     * and before any protocol traffic is processed.
+     *
+     * @implNote Cobalt lifecycle hook with no WA Web counterpart: the JS
+     *           code starts in the "waiting for prop" state implicitly.
      */
     public void initialize() {
         if (state.compareAndSet(LidMigrationState.NOT_STARTED, LidMigrationState.WAITING_PROP)) {
@@ -277,42 +360,50 @@ public final class LidMigrationService {
     }
 
     /**
-     * Called when the AB prop indicates LID migration is enabled.
-     * Transitions from WAITING_PROP to WAITING_MAPPINGS state and schedules
-     * a timeout for receiving peer mappings.
+     * Enables the migration once the AB prop reports it is active, moving
+     * the state machine to {@link LidMigrationState#WAITING_MAPPINGS} and
+     * arming a timeout that will log the client out if the primary device
+     * never sends its mapping sync.
      *
-     * <p>The timeout duration is read from the
-     * {@link ABProp#LID_ONE_ON_ONE_MIGRATION_PEER_SYNC_TIMEOUT_IN_SECONDS} AB prop.
-     * If the AB prop value is {@code 0}, no timeout is scheduled, matching WA Web's
-     * early return when {@code getABPropConfigValue("lid_one_on_one_migration_peer_sync_timeout_in_seconds") === 0}.
+     * <p>The timeout duration is read from
+     * {@link ABProp#LID_ONE_ON_ONE_MIGRATION_PEER_SYNC_TIMEOUT_IN_SECONDS};
+     * a value of {@code 0} means "no timeout", matching WA Web's early
+     * return in {@code shouldScheduleTimeoutForMissingPeerMessage}.
      *
-     * <p>The double-scheduling guard uses a state machine CAS instead of WA Web's
-     * nullable timeout handle ({@code _ != null} check in
-     * {@code WAWebLid1x1MigrationTimeout.scheduleLogoutIfNeeded}).
-     *
-     * @implNote WAWebLid1X1ThreadAccountMigrations.checkIfMigrationEnabled (function w),
-     *           ADAPTED: WAWebLid1x1MigrationTimeout.scheduleLogoutIfNeeded,
-     *           WAWebLid1x1MigrationTimeoutUtils.shouldScheduleTimeoutForMissingPeerMessage —
-     *           WA Web computes timeout relative to primary migration timestamp via
-     *           {@code timeoutForAt(now, primaryMigrationTime, timeoutSeconds)}; Cobalt schedules a flat
-     *           timeout from the moment migration is enabled because the primary migration timestamp
-     *           is not yet available (it arrives with the mapping sync message).
-     *           The timeout callback re-check uses {@code state == WAITING_MAPPINGS} instead of
-     *           re-calling {@code shouldScheduleTimeoutForMissingPeerMessage()}.
-     *           The {@code hasStateDiscrepancy()} branch is dead code (always false) and is omitted.
-     *           WAM events and the 5-second flush delay are telemetry and are skipped.
+     * @implNote WAWebLid1X1ThreadAccountMigrations.checkIfMigrationEnabled:
+     *           corresponds to the internal function {@code w}.
+     *           ADAPTED: WAWebLid1x1MigrationTimeout.scheduleLogoutIfNeeded
+     *           and WAWebLid1x1MigrationTimeoutUtils.shouldScheduleTimeoutForMissingPeerMessage.
+     *           WA Web computes the timeout relative to the primary migration
+     *           timestamp via {@code timeoutForAt(now, primaryMigrationTime, timeoutSeconds)};
+     *           Cobalt schedules a flat timeout from the moment migration
+     *           is enabled because the primary migration timestamp is not
+     *           yet available when the AB prop flips. The callback checks
+     *           {@code state == WAITING_MAPPINGS} instead of re-calling
+     *           {@code shouldScheduleTimeoutForMissingPeerMessage}.
+     *           The {@code hasStateDiscrepancy} branch and WAM telemetry
+     *           are omitted.
      */
+    @WhatsAppWebExport(moduleName = "WAWebLid1X1ThreadAccountMigrations", exports = "checkIfMigrationEnabled",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebLid1x1MigrationTimeout", exports = "scheduleLogoutIfNeeded",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public void enableMigration() {
         if (state.compareAndSet(LidMigrationState.WAITING_PROP, LidMigrationState.WAITING_MAPPINGS)) {
             LOGGER.log(System.Logger.Level.INFO, "LID migration enabled, waiting for mappings from primary");
-            // WAWebLid1x1MigrationTimeoutUtils.shouldScheduleTimeoutForMissingPeerMessage:
-            //   var t = getABPropConfigValue("lid_one_on_one_migration_peer_sync_timeout_in_seconds");
-            //   if (t === 0) return {shouldScheduleTimeout: false};
-            var timeoutSeconds = abPropsService.getInt(ABProp.LID_ONE_ON_ONE_MIGRATION_PEER_SYNC_TIMEOUT_IN_SECONDS); // WAWebLid1x1MigrationTimeoutUtils.shouldScheduleTimeoutForMissingPeerMessage
+
+            // WAWebLid1x1MigrationTimeoutUtils.shouldScheduleTimeoutForMissingPeerMessage
+            // Reads the peer-sync timeout from AB props; a value of 0 disables the logout scheduling
+
+            var timeoutSeconds = abPropsService.getInt(ABProp.LID_ONE_ON_ONE_MIGRATION_PEER_SYNC_TIMEOUT_IN_SECONDS);
             if (timeoutSeconds == 0) {
                 LOGGER.log(System.Logger.Level.INFO, "LID migration peer sync timeout disabled by AB prop");
-                return; // WAWebLid1x1MigrationTimeoutUtils.shouldScheduleTimeoutForMissingPeerMessage
+                return;
             }
+
+            // WAWebLid1x1MigrationTimeout.scheduleLogoutIfNeeded
+            // Arms a delayed task that fails the migration if mappings have not arrived when it fires
+
             mappingTimeoutFuture = SchedulerUtils.scheduleDelayed(
                     Duration.ofSeconds(timeoutSeconds),
                     () -> {
@@ -327,10 +418,13 @@ public final class LidMigrationService {
     }
 
     /**
-     * Called when the AB prop indicates LID migration is disabled.
-     * Transitions from WAITING_PROP to DISABLED.
+     * Moves the state machine to {@link LidMigrationState#DISABLED} when
+     * the server-sent AB prop indicates the migration is not enabled for
+     * this account.
      *
-     * @implNote NO_WA_BASIS — Cobalt-specific state machine transition
+     * @implNote Cobalt-specific transition with no direct WA Web
+     *           counterpart. WA Web simply never leaves the implicit
+     *           "waiting" state when the prop stays off.
      */
     public void disableMigration() {
         if (state.compareAndSet(LidMigrationState.WAITING_PROP, LidMigrationState.DISABLED)) {
@@ -339,33 +433,47 @@ public final class LidMigrationService {
     }
 
     /**
-     * Processes LID migration mappings received from the primary device.
+     * Processes a mapping sync protocol message received from the primary
+     * device and advances the state machine to
+     * {@link LidMigrationState#READY}.
      *
-     * <p>This method handles the decoded {@link LIDMigrationMappingSyncPayload}
-     * by populating the primary mapping caches ({@link #primaryPnToAssignedLidCache}
-     * and {@link #primaryPnToLatestLidCache}), storing the
-     * {@linkplain LIDMigrationMappingSyncPayload#chatDbMigrationTimestamp() migration timestamp},
-     * and transitioning the state machine to {@link LidMigrationState#READY}.
+     * <p>The payload carries the authoritative table of PN to assigned-LID
+     * pairs plus an optional {@code chatDbMigrationTimestamp}. On arrival,
+     * this method populates {@link #primaryPnToAssignedLidCache} and
+     * {@link #primaryPnToLatestLidCache}, cancels the pending timeout,
+     * marks the service ready, and auto-starts the migration.
      *
-     * <p>If the payload is {@code null}, the method treats it as a malformed
-     * peer message and delegates to {@link #handleError(WhatsAppLidMigrationException)}.
-     * If the payload's mapping list is empty, the method proceeds normally
-     * with an empty cache, matching WA Web's behavior where the parser returns
-     * {@code {mappings: [], primaryMigrationTsSec: null}} and the caller
-     * stores the result without error. Per-chat errors ({@code NoLidAvailable},
-     * etc.) will arise naturally during the subsequent migration execution.
+     * <p>A {@code null} payload is treated as a malformed peer message and
+     * escalated through the client's error handler. An empty mapping list
+     * is accepted: WA Web's parser returns
+     * {@code {mappings: [], primaryMigrationTsSec: null}} in that case and
+     * any per-chat failures surface later when the executor runs.
      *
-     * @implNote WAWebLid1X1ThreadAccountMigrations.setLidMigrationMappings (function A/F),
-     *           WAWebLid1x1MigrationPrimaryCache.$5,
-     *           WAWebLid1x1MigrationMsgParser.parseLidMigrationMappingSyncMsg
-     * @param payload the decoded mapping payload from primary device
+     * @implNote WAWebLid1X1ThreadAccountMigrations.setLidMigrationMappings:
+     *           writes the primary caches and transitions to READY.
+     *           WAWebLid1x1MigrationPrimaryCache.lidPnMigrationPrimaryCache:
+     *           the {@code forEach} loop that populates the inner tables.
+     *           WAWebLid1x1MigrationMsgParser.parseLidMigrationMappingSyncMsg:
+     *           the decoder whose failure mode maps to
+     *           {@link WhatsAppLidMigrationException.FailedToParseMappings}.
+     * @param payload the decoded mapping payload from the primary device,
+     *                or {@code null} if the message failed to parse
      */
+    @WhatsAppWebExport(moduleName = "WAWebLid1X1ThreadAccountMigrations", exports = "setLidMigrationMappings",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebLid1x1MigrationMsgParser", exports = "parseLidMigrationMappingSyncMsg",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public void processProtocolMessage(LIDMigrationMappingSyncPayload payload) {
-        // WAWebLid1X1ThreadAccountMigrations.setLidMigrationMappings: if(e==null) -> logout(LidMigrationPeerMappingsMalformed)
+        // WAWebLid1X1ThreadAccountMigrations.setLidMigrationMappings
+        // A null payload means the peer message could not be decoded, which forces a logout in WA Web
+
         if (payload == null) {
             handleError(new WhatsAppLidMigrationException.FailedToParseMappings("null payload"));
             return;
         }
+
+        // WAWebLid1X1ThreadAccountMigrations.setLidMigrationMappings
+        // Ignores mappings that arrive outside the WAITING_PROP/WAITING_MAPPINGS window
 
         var currentState = state.get();
         if (currentState != LidMigrationState.WAITING_MAPPINGS && currentState != LidMigrationState.WAITING_PROP) {
@@ -374,63 +482,78 @@ public final class LidMigrationService {
         }
 
         try {
-            // Cancel mapping timeout since we received mappings
+            // WAWebLid1x1MigrationTimeout.scheduleLogoutIfNeeded
+            // Cancels the peer-sync timeout now that mappings have arrived
+
             var timeout = mappingTimeoutFuture;
             if (timeout != null) {
                 timeout.cancel(false);
                 mappingTimeoutFuture = null;
             }
 
-            // WAWebLid1X1ThreadAccountMigrations.setLidMigrationMappings: ts = unixTime()
-            this.receiveTimestamp = Instant.now(); // ADAPTED: WAWebLid1X1ThreadAccountMigrations.setLidMigrationMappings
+            // ADAPTED: WAWebLid1X1ThreadAccountMigrations.setLidMigrationMappings
+            // Records the receive timestamp to serve as a fallback when no primary migration timestamp is reported
 
-            // Process mappings — WA Web's parseLidMigrationMappingSyncMsg returns
-            // {mappings: [], primaryMigrationTsSec: null} for empty payloads (not an error).
-            // The caller (WAWebLid1x1MigrationPrimaryCache.$5) stores the result normally.
+            this.receiveTimestamp = Instant.now();
+
+            // WAWebLid1x1MigrationMsgParser.parseLidMigrationMappingSyncMsg
+            // Extracts the mapping list; the parser tolerates an empty list and returns {mappings: [], primaryMigrationTsSec: null}
+
             var mappings = payload.pnToLidMappings();
 
-            // WAWebLid1x1MigrationPrimaryCache.$5: t.$4 = e.primaryMigrationTsSec
-            // For non-empty mappings this is a.chatDbMigrationTimestamp; for empty it is null
+            // WAWebLid1x1MigrationPrimaryCache.lidPnMigrationPrimaryCache
+            // Mirrors the primaryMigrationTsSec assignment: null for empty mappings, payload value otherwise
+
             if (mappings.isEmpty()) {
-                // WAWebLid1x1MigrationMsgParser.parseLidMigrationMappingSyncMsg: returns primaryMigrationTsSec: null
                 this.chatDbMigrationTimestamp = null;
             } else {
-                // WAWebLid1x1MigrationMsgParser.parseLidMigrationMappingSyncMsg: returns primaryMigrationTsSec: a.chatDbMigrationTimestamp
                 this.chatDbMigrationTimestamp = payload.chatDbMigrationTimestamp()
                         .orElse(null);
             }
 
             LOGGER.log(System.Logger.Level.INFO, "Processing {0} LID mappings from primary", mappings.size());
 
-            // WAWebLid1x1MigrationPrimaryCache.$5: e.mappings.forEach(...)
-            // Populate primary caches and update contacts
+            // WAWebLid1x1MigrationPrimaryCache.lidPnMigrationPrimaryCache
+            // Walks every mapping entry and populates the assigned/latest LID caches plus known contacts
+
             for (var mapping : mappings) {
                 processSingleMapping(mapping);
             }
 
-            // Transition to READY state
-            // WAWebLid1X1ThreadAccountMigrations.setLidMigrationMappings: state = READY
+            // WAWebLid1X1ThreadAccountMigrations.setLidMigrationMappings
+            // Transitions the machine to READY once the caches have been loaded
+
             state.set(LidMigrationState.READY);
             LOGGER.log(System.Logger.Level.INFO, "LID migration ready with {0} assigned mappings, {1} latest mappings",
                     primaryPnToAssignedLidCache.size(), primaryPnToLatestLidCache.size());
 
-            // WAWebLid1x1MigrationManager.executeMigrationIfNeeded -> shouldMigrateNow -> migrate1x1Chats
+            // WAWebLid1x1MigrationManager.executeMigrationIfNeeded
+            // Triggers the chat sweep immediately so the UI observes a consistent addressing mode
+
             if (shouldAutoStartMigration()) {
                 executeMigration();
             }
 
         } catch (Throwable throwable) {
-            // WAWebLid1x1MigrationMsgParser.parseLidMigrationMappingSyncMsg: catch -> socketLogout(LidMigrationFailedToParseMapping)
+            // WAWebLid1x1MigrationMsgParser.parseLidMigrationMappingSyncMsg
+            // Any unexpected parse failure becomes a logout-worthy error in WA Web and a fatal exception in Cobalt
+
             handleError(new WhatsAppLidMigrationException.FailedToParseMappings("error processing mappings", throwable));
         }
     }
 
     /**
-     * Observes a chat DB migration timestamp and updates the internal timestamp
-     * if the provided value is more recent.
+     * Records the primary device's chat-DB migration timestamp, keeping
+     * the newest value seen so far.
      *
-     * @implNote WAWebLid1X1ThreadAccountMigrations.flow — chatDbMigrationTimestamp tracking
-     * @param timestamp the timestamp to observe, may be {@code null}
+     * <p>Used by the migration decision logic to tell whether the primary
+     * device's mapping table is fresher than the local chats.
+     *
+     * @implNote WAWebLid1X1ThreadAccountMigrations: the
+     *           {@code chatDbMigrationTimestamp} bookkeeping scattered
+     *           across the flow module.
+     * @param timestamp the observed timestamp, or {@code null} to keep
+     *                  the current value unchanged
      */
     public void observeChatDbMigrationTimestamp(Instant timestamp) {
         if (timestamp == null) {
@@ -443,24 +566,26 @@ public final class LidMigrationService {
     }
 
     /**
-     * Processes LID mappings from a HistorySync message.
+     * Learns LID mappings from a history sync payload.
      *
-     * <p>This method extracts LID mappings from two sources:
-     * <ol>
-     *     <li>The top-level {@code phoneNumberToLidMappings} field</li>
-     *     <li>Individual conversation entries containing {@code pnJid} or {@code lidJid} fields</li>
-     * </ol>
+     * <p>Two sources are inspected: the top-level
+     * {@code phoneNumberToLidMappings} field and each individual
+     * conversation's {@code pnJid}/{@code lidJid} fields. Mappings found
+     * here feed only the general store (contact records and the bidirectional
+     * LID/PN table); they do not populate {@link #primaryPnToAssignedLidCache}
+     * or {@link #primaryPnToLatestLidCache} because WA Web also restricts
+     * those caches to the primary-device protocol message.
      *
-     * <p>History sync data is only stored in the general store (via
-     * {@code store.registerLidMapping()} and contact updates), not in the
-     * primary mapping caches. This matches WhatsApp Web's behavior where
-     * history sync mappings do not feed into the migration decision caches.
+     * <p>If the history sync's {@code GlobalSettings} contains a
+     * {@code chatDbLidMigrationTimestamp}, that value is recorded via
+     * {@link #observeChatDbMigrationTimestamp(Instant)} so the migration
+     * decision logic has a fresher timestamp to work with.
      *
-     * <p>Additionally, if GlobalSettings contains a {@code chatDbLidMigrationTimestamp},
-     * that timestamp is recorded for use during migration timing decisions.
-     *
-     * @implNote WAWebLid1X1ThreadAccountMigrations.flow
-     * @param historySync the decoded HistorySync protobuf
+     * @implNote WAWebLid1X1ThreadAccountMigrations: equivalent to the
+     *           history-sync paths that add bidirectional mappings to
+     *           the store without feeding the primary cache.
+     * @param historySync the decoded HistorySync protobuf, may be
+     *                    {@code null}
      */
     public void processHistorySync(HistorySync historySync) {
         if (historySync == null) {
@@ -508,14 +633,18 @@ public final class LidMigrationService {
     }
 
     /**
-     * Processes a single PhoneNumberToLidMapping from the top-level history sync field.
+     * Registers one {@link PhoneNumberToLIDMapping} entry coming from the
+     * history sync payload.
      *
-     * <p>History sync mappings are stored only in the general store, not in the
-     * primary migration caches.
+     * <p>The mapping is stored bidirectionally in the store and mirrored
+     * onto any existing contact. The primary-device caches are intentionally
+     * not touched: WA Web reserves them for the mapping sync protocol
+     * message.
      *
-     * @implNote WAWebLid1X1ThreadAccountMigrations.flow
-     * @param mapping the mapping to process
-     * @return {@code true} if a valid mapping was processed
+     * @implNote WAWebLid1X1ThreadAccountMigrations: history-sync branch of
+     *           the mapping learner.
+     * @param mapping the mapping entry to process, may be {@code null}
+     * @return {@code true} if a valid mapping was registered
      */
     private boolean processPhoneNumberToLidMapping(PhoneNumberToLIDMapping mapping) {
         if (mapping == null) {
@@ -529,26 +658,27 @@ public final class LidMigrationService {
             return false;
         }
 
-        // Register bidirectional mapping in store (not in primary cache)
-        store.registerLidMapping(pnJid, lidJid);
+        // WAWebLid1X1ThreadAccountMigrations
+        // Registers the bidirectional mapping in the store and mirrors it onto an existing contact when present
 
-        // Update contact if exists
+        store.registerLidMapping(pnJid, lidJid);
         store.findContactByJid(pnJid).ifPresent(contact -> contact.setLid(lidJid));
 
         return true;
     }
 
     /**
-     * Extracts LID mapping from a conversation entry.
+     * Extracts the LID/PN pair from a conversation entry carried by a
+     * history sync payload and mirrors the pairing onto the chat, the
+     * store, and any known contact.
      *
-     * <p>For LID chats (jid has lid server): extracts phone number from pnJid field.
-     * For PN chats (jid has user server): extracts LID from lidJid field.
+     * <p>For LID-keyed chats the phone number is taken from the
+     * {@code pnJid} protobuf field; for PN-keyed chats the LID is taken
+     * from the {@code lidJid} field. Only 1:1 chats are considered.
      *
-     * <p>History sync conversation data is stored only in the general store, not
-     * in the primary migration caches.
-     *
-     * @implNote WAWebLid1X1ThreadAccountMigrations.flow
-     * @param conversation the conversation to process
+     * @implNote WAWebLid1X1ThreadAccountMigrations: history-sync branch
+     *           that handles per-conversation LID fields.
+     * @param conversation the conversation to process, may be {@code null}
      * @return {@code true} if a valid mapping was extracted
      */
     private boolean processConversationLidData(Chat conversation) {
@@ -558,7 +688,9 @@ public final class LidMigrationService {
 
         var chatJid = conversation.jid();
 
-        // Only process 1:1 chats (user or lid server)
+        // WAWebLid1X1ThreadAccountMigrations
+        // Restricts processing to 1:1 chats; groups and broadcast JIDs are not part of LID migration
+
         if (!chatJid.hasUserServer() && !chatJid.hasLidServer()) {
             return false;
         }
@@ -566,12 +698,13 @@ public final class LidMigrationService {
         final Jid phoneJid;
         final Jid lidJid;
 
+        // WAWebLid1X1ThreadAccountMigrations
+        // Picks the paired JID from either phoneNumberJid (LID chat) or lid (PN chat)
+
         if (chatJid.hasLidServer()) {
-            // LID chat: extract phone number from pnJid field
             phoneJid = conversation.phoneNumberJid().orElse(null);
             lidJid = chatJid;
         } else if (chatJid.hasUserServer()) {
-            // PN chat: extract LID from lidJid field (the 'lid' field in Chat)
             phoneJid = chatJid;
             lidJid = conversation.lid().orElse(null);
         } else {
@@ -583,13 +716,11 @@ public final class LidMigrationService {
             return false;
         }
 
-        // Register bidirectional mapping in store (not in primary cache)
+        // WAWebLid1X1ThreadAccountMigrations
+        // Persists the mapping in the store and propagates it to the contact and chat objects
+
         store.registerLidMapping(phoneJid, lidJid);
-
-        // Update contact if exists
         store.findContactByJid(phoneJid).ifPresent(contact -> contact.setLid(lidJid));
-
-        // Update the chat itself to ensure it has the mapping
         conversation.setLid(lidJid);
         if (!phoneJid.equals(chatJid)) {
             conversation.setPhoneNumberJid(phoneJid);
@@ -599,48 +730,50 @@ public final class LidMigrationService {
     }
 
     /**
-     * Processes a single LID mapping entry from the primary device's protocol message.
+     * Records a single mapping entry from the primary device's protocol
+     * message into the primary caches.
      *
-     * <p>Stores {@code assignedLid} into {@link #primaryPnToAssignedLidCache} (keyed
-     * by the phone number's user part) and {@code latestLid} into
-     * {@link #primaryPnToLatestLidCache} if present.  This matches WA Web's
-     * {@code WAWebLid1x1MigrationPrimaryCache.$5} forEach callback:
-     * <pre>{@code
-     * t.$2.set(e.pnUser, e.assignedLid);
-     * e.latestLid != null && t.$3.set(e.pnUser, e.latestLid);
-     * }</pre>
+     * <p>Stores the {@code assignedLid} in
+     * {@link #primaryPnToAssignedLidCache} and the {@code latestLid} in
+     * {@link #primaryPnToLatestLidCache} when present. WA Web defers contact
+     * and store updates to {@code learnMappingsInBulk}; Cobalt eagerly
+     * mirrors the pairing onto any existing contact as a proactive
+     * optimisation.
      *
-     * <p>Additionally performs an early contact update and store mapping
-     * registration if the contact already exists.  WA Web defers this to
-     * {@code learnMappingsInBulk()} after migration completes, but Cobalt
-     * eagerly registers the mapping for any known contact as a proactive
-     * optimization.
-     *
-     * @implNote WAWebLid1x1MigrationPrimaryCache.$5 (forEach callback),
-     *           WAWebLid1x1MigrationMsgParser.parseLidMigrationMappingSyncMsg (mapping transform)
+     * @implNote WAWebLid1x1MigrationPrimaryCache.lidPnMigrationPrimaryCache:
+     *           the forEach callback that writes the {@code $2} and
+     *           {@code $3} caches.
      * @param mapping the mapping entry to process
      */
+    @WhatsAppWebExport(moduleName = "WAWebLid1x1MigrationPrimaryCache", exports = "lidPnMigrationPrimaryCache",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private void processSingleMapping(LIDMigrationMapping mapping) {
         if (mapping == null) {
             return;
         }
 
-        // WAWebLid1x1MigrationMsgParser.parseLidMigrationMappingSyncMsg:
-        //   n = asUserWidOrThrow(createUserWidOrThrow(e.pn.toString()))
+        // WAWebLid1x1MigrationMsgParser.parseLidMigrationMappingSyncMsg
+        // Normalises the PN entry to a user-level JID via asUserWidOrThrow
+
         var jid = mapping.pn();
         var user = jid.user();
 
-        // WAWebLid1x1MigrationPrimaryCache.$5: t.$2.set(e.pnUser, e.assignedLid)
+        // WAWebLid1x1MigrationPrimaryCache.lidPnMigrationPrimaryCache
+        // Writes the assigned LID into the $2 table keyed by the PN user part
+
         var assignedLid = mapping.assignedLid();
         primaryPnToAssignedLidCache.put(user, assignedLid);
 
-        // WAWebLid1x1MigrationPrimaryCache.$5: e.latestLid != null && t.$3.set(e.pnUser, e.latestLid)
+        // WAWebLid1x1MigrationPrimaryCache.lidPnMigrationPrimaryCache
+        // Optionally writes the latest LID into the $3 table when the mapping reports one
+
         mapping.latestLid().ifPresent(latest ->
                 primaryPnToLatestLidCache.put(user, latest)
         );
 
-        // ADAPTED: WAWebLid1x1MigrationPrimaryCache.$5 — WA Web defers contact/store
-        // updates to learnMappingsInBulk; Cobalt eagerly updates for known contacts
+        // ADAPTED: WAWebLid1x1MigrationPrimaryCache.lidPnMigrationPrimaryCache
+        // WA Web defers contact and store updates to learnMappingsInBulk; Cobalt updates eagerly for known contacts
+
         store.findContactByJid(jid).ifPresent(contact -> {
             contact.setLid(assignedLid);
             store.registerLidMapping(jid, assignedLid);
@@ -648,14 +781,26 @@ public final class LidMigrationService {
     }
 
     /**
-     * Executes the LID migration for all eligible chat threads.
+     * Runs the LID migration over every chat in the store.
      *
-     * <p>After successful execution, sets state to {@link LidMigrationState#COMPLETE},
-     * which is the equivalent of WA Web's {@code setIsLidMigrated(true, PEER, false)}.
+     * <p>The method blocks until the Signal offline-delivery window has
+     * finished, snapshots all chats, classifies each one through
+     * {@link #resolveThread(Chat, Set)}, executes the resulting
+     * {@link LidMigrationResolution} actions, marks the state machine as
+     * {@link LidMigrationState#COMPLETE}, and finally flushes the primary
+     * caches into the store's bidirectional mapping tables.
      *
-     * @implNote WAWebLid1X1ThreadAccountMigrations.migrate1x1Chats (function B/W),
-     *           ADAPTED: WAWebLid1X1MigrationGating.setIsLidMigrated — state transition replaces UserPrefs write
+     * <p>If the compatibility AB prop
+     * ({@link ABProp#LID_ONE_ON_ONE_MIGRATION_COMPATIBLE}) is off, the
+     * migration is aborted via the configurable error handler.
+     *
+     * @implNote WAWebLid1X1ThreadAccountMigrations.migrate1x1Chats:
+     *           the executor for the migration flow.
+     *           ADAPTED: WAWebLid1X1MigrationGating.setIsLidMigrated:
+     *           the state transition to COMPLETE replaces the UserPrefs write.
      */
+    @WhatsAppWebExport(moduleName = "WAWebLid1X1ThreadAccountMigrations", exports = "migrate1x1Chats",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public void executeMigration() {
         if (!state.compareAndSet(LidMigrationState.READY, LidMigrationState.IN_PROGRESS)) {
             var currentState = state.get();
@@ -712,21 +857,35 @@ public final class LidMigrationService {
     }
 
     /**
-     * Resolves a single chat thread to determine its migration action.
+     * Classifies a single chat thread into a {@link LidMigrationResolution}.
      *
+     * <p>Walks a cascade of rules to decide whether the chat is already on
+     * LID, whether it is a type that does not participate in 1:1 migration
+     * (group, newsletter, broadcast, bot), whether the primary device has
+     * an assigned LID for the contact, whether a locally-known LID can be
+     * used as a fallback, and finally whether the chat can be deleted if
+     * no LID is known.
+     *
+     * @implNote WAWebLid1X1ThreadAccountMigrations.getResolvedThreadAccountLid:
+     *           the core resolution function.
+     *           WAWebLid1X1ThreadAccountMigrations.migrate1x1Chats:
+     *           the surrounding executor contains the split-thread collision
+     *           check that is inlined here.
      * @param chat               the chat to resolve
-     * @param existingLidThreads the set of JIDs of existing LID threads, used for
-     *                           inline split thread detection
-     * @return the resolution for this thread
-     * @throws WhatsAppLidMigrationException.PrimaryMappingsObsolete if a LID mismatch
-     *         indicates stale primary mappings
-     * @throws WhatsAppLidMigrationException.NoLidAvailable if a non-deletable chat
-     *         has no LID mapping
-     * @throws WhatsAppLidMigrationException.SplitThreadMismatch if a local LID would
-     *         collide with an existing LID thread
-     * @implNote WAWebLid1X1ThreadAccountMigrations.getResolvedThreadAccountLid (function q/U),
-     *           WAWebLid1X1ThreadAccountMigrations.migrate1x1Chats (LID chat handling in W)
+     * @param existingLidThreads the set of JIDs of existing LID threads,
+     *                           used for the inline split-thread collision
+     *                           check
+     * @return the resolution to apply to this chat
+     * @throws WhatsAppLidMigrationException.PrimaryMappingsObsolete if the
+     *         local chat is fresher than the primary mapping table and the
+     *         mismatch AB prop is on
+     * @throws WhatsAppLidMigrationException.NoLidAvailable if a non-deletable
+     *         chat has no LID mapping anywhere
+     * @throws WhatsAppLidMigrationException.SplitThreadMismatch if the local
+     *         LID would collide with an existing LID thread
      */
+    @WhatsAppWebExport(moduleName = "WAWebLid1X1ThreadAccountMigrations", exports = "getResolvedThreadAccountLid",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private LidMigrationResolution resolveThread(Chat chat, Set<Jid> existingLidThreads) {
         var jid = chat.jid();
 
@@ -835,16 +994,21 @@ public final class LidMigrationService {
     }
 
     /**
-     * Returns the effective sync timestamp for migration timing comparisons.
+     * Returns the timestamp used for freshness comparisons against local
+     * chats during migration.
      *
-     * <p>Returns {@link #chatDbMigrationTimestamp} if non-{@code null}, otherwise
-     * falls back to {@link #receiveTimestamp}, and finally to {@link Instant#EPOCH}.
+     * <p>Prefers {@link #chatDbMigrationTimestamp} set by the primary
+     * device; falls back to {@link #receiveTimestamp} captured on
+     * mapping-sync arrival, and finally to {@link Instant#EPOCH}.
      *
-     * @implNote ADAPTED: WAWebLid1x1MigrationPrimaryCache.getPrimaryMigrationTsSec — WA Web returns
-     *           raw {@code $4} (primaryMigrationTsSec); Cobalt wraps as {@link Instant} and adds
-     *           fallback to {@link #receiveTimestamp} and {@link Instant#EPOCH}
+     * @implNote ADAPTED: WAWebLid1x1MigrationPrimaryCache.getPrimaryMigrationTsSec:
+     *           WA Web returns the raw {@code $4} integer (Unix seconds);
+     *           Cobalt returns an {@link Instant} and adds the
+     *           {@link #receiveTimestamp} and epoch fallbacks.
      * @return the effective sync timestamp, never {@code null}
      */
+    @WhatsAppWebExport(moduleName = "WAWebLid1x1MigrationPrimaryCache", exports = "lidPnMigrationPrimaryCache",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private Instant getEffectiveSyncTimestamp() {
         if (chatDbMigrationTimestamp != null) {
             return chatDbMigrationTimestamp;
@@ -856,37 +1020,36 @@ public final class LidMigrationService {
     }
 
     /**
-     * Determines if a chat can be deleted during LID migration when no LID
-     * mapping is available.
+     * Decides whether a chat is safe to delete when the migration cannot
+     * find a LID for it.
      *
-     * <p>This matches WhatsApp Web's deletion logic (function {@code j/K}):
+     * <p>The rule cascade follows WA Web exactly:
      * <ol>
-     *     <li>Compute broadcast exemption: if all messages are safe stubs +
-     *         broadcast messages ({@code te()}), AND the pairing timestamp
-     *         is at or before the oldest message timestamp, then the chat
-     *         is pre-exempted for deletion. (WA Web also checks {@code ne()}
-     *         for ContactInfoCard messages, but Cobalt's protobuf model does
-     *         not expose the message subtype field needed for that check.)</li>
-     *     <li>If NOT pre-exempted AND {@code createdLocally !== true}, the chat
-     *         is NOT deletable. Since Cobalt's {@code Chat} model does not
-     *         track {@code createdLocally}, this step is skipped and the
-     *         remaining checks are applied unconditionally.</li>
-     *     <li>Chats with ephemeral settings are NOT deletable, unless the
-     *         disappearing mode trigger is {@code ACCOUNT_SETTING} and the
-     *         chat contains a disappearing mode system message</li>
-     *     <li>Locked chats are NOT deletable</li>
-     *     <li>Archived chats are NOT deletable</li>
-     *     <li>Muted chats are NOT deletable</li>
-     *     <li>Chats where all messages are safe system stubs, or all messages
-     *         are safe stubs + call log entries (with at least one call log),
-     *         or pre-exempted, are deletable</li>
-     *     <li>Otherwise the chat is NOT deletable</li>
+     *     <li>Broadcast exemption: all messages are safe stubs or broadcast
+     *         messages, and the pairing timestamp is at or before the
+     *         oldest message timestamp (the {@code ne} ContactInfoCard
+     *         check cannot be replicated because Cobalt's protobuf model
+     *         does not expose the subtype field).</li>
+     *     <li>The {@code createdLocally !== true} gate is skipped because
+     *         Cobalt's {@link Chat} model does not track that field; the
+     *         message-content check at the end keeps the heuristic safe.</li>
+     *     <li>Chats with ephemeral settings are not deletable unless the
+     *         disappearing-mode trigger is {@code ACCOUNT_SETTING} and at
+     *         least one disappearing-mode system message exists.</li>
+     *     <li>Locked, archived, or muted chats are not deletable.</li>
+     *     <li>Otherwise the chat is deletable when every message is a safe
+     *         stub, or when every message is a safe stub or a call-log
+     *         entry with at least one call-log entry, or when the
+     *         broadcast exemption applies.</li>
      * </ol>
      *
-     * @implNote WAWebLid1X1ThreadAccountMigrations.K
+     * @implNote WAWebLid1X1ThreadAccountMigrations: the {@code K}
+     *           deletability predicate.
      * @param chat the chat to evaluate
      * @return {@code true} if the chat can be safely deleted
      */
+    @WhatsAppWebExport(moduleName = "WAWebLid1X1ThreadAccountMigrations", exports = "K",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private boolean canDeleteChat(Chat chat) {
         var messages = chat.messages();
 
@@ -949,30 +1112,36 @@ public final class LidMigrationService {
     }
 
     /**
-     * Returns whether the chat has ephemeral settings configured.
+     * Returns whether the chat has ephemeral (disappearing message)
+     * settings configured.
      *
-     * <p>Matches WA Web's check: {@code e.ephemeralDuration != null || e.ephemeralSettingTimestamp != null}.
-     *
-     * @implNote WAWebLid1X1ThreadAccountMigrations.flow
+     * @implNote WAWebLid1X1ThreadAccountMigrations: the
+     *           {@code e.ephemeralDuration != null || e.ephemeralSettingTimestamp != null}
+     *           predicate inside {@code K}.
      * @param chat the chat to check
-     * @return {@code true} if the chat has ephemeral duration or setting timestamp
+     * @return {@code true} if the chat has an ephemeral duration or an
+     *         ephemeral setting timestamp
      */
     private boolean hasEphemeralSettings(Chat chat) {
         return chat.ephemeralExpiration().isPresent() || chat.ephemeralSettingTimestamp().isPresent();
     }
 
     /**
-     * Returns whether the chat is exempt from the ephemeral deletability block.
+     * Returns whether the chat is exempt from the "no-delete-if-ephemeral"
+     * rule.
      *
-     * <p>Matches WA Web's {@code re()} function: returns {@code true} if the chat's
-     * disappearing mode trigger is {@code ACCOUNT_SETTING} and the message list contains
-     * at least one disappearing mode system message.
+     * <p>Returns {@code true} when the chat's disappearing-mode trigger is
+     * {@code ACCOUNT_SETTING} and at least one disappearing-mode system
+     * message is present.
      *
-     * @implNote WAWebLid1X1ThreadAccountMigrations.flow.re
+     * @implNote WAWebLid1X1ThreadAccountMigrations: the {@code re}
+     *           predicate used inside the {@code K} cascade.
      * @param chat     the chat to check
      * @param messages the chat's messages
      * @return {@code true} if the chat is exempt from the ephemeral block
      */
+    @WhatsAppWebExport(moduleName = "WAWebLid1X1ThreadAccountMigrations", exports = "re",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private boolean isEphemeralExempt(Chat chat, Collection<ChatMessageInfo> messages) {
         var trigger = chat.disappearingMode()
                 .flatMap(ChatDisappearingMode::trigger)
@@ -988,98 +1157,113 @@ public final class LidMigrationService {
     }
 
     /**
-     * Returns whether all messages are either migration-safe stubs or broadcast messages,
-     * with at least one broadcast message present.
+     * Returns whether every message is either a migration-safe stub or a
+     * broadcast message, with at least one broadcast present.
      *
-     * <p>Matches WA Web's {@code te(r)} function which checks
-     * {@code r.every(e => X(e) || e.broadcast) && r.some(e => e.broadcast)}.
-     *
-     * @implNote WAWebLid1X1ThreadAccountMigrations.te
-     * @param messages the messages to check
-     * @return {@code true} if every message is a safe stub or broadcast, with at least one broadcast
+     * @implNote WAWebLid1X1ThreadAccountMigrations: the {@code te}
+     *           predicate used inside the {@code K} cascade.
+     * @param messages the messages to inspect
+     * @return {@code true} if the all-stubs-or-broadcast rule applies
      */
+    @WhatsAppWebExport(moduleName = "WAWebLid1X1ThreadAccountMigrations", exports = "te",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private boolean allMessagesAreSafeStubsOrBroadcast(Collection<ChatMessageInfo> messages) {
-        var hasBroadcast = false; // WAWebLid1X1ThreadAccountMigrations.te
+        // WAWebLid1X1ThreadAccountMigrations.te
+        // Tracks whether at least one broadcast message was observed because the predicate requires both conditions
+
+        var hasBroadcast = false;
         for (var msg : messages) {
             if (isMigrationSafeStub(msg)) {
                 continue;
             }
-            if (msg.broadcast()) { // WAWebLid1X1ThreadAccountMigrations.te: e.broadcast
+            if (msg.broadcast()) {
                 hasBroadcast = true;
                 continue;
             }
             return false;
         }
-        return hasBroadcast; // WAWebLid1X1ThreadAccountMigrations.te: r.some(e => e.broadcast)
+        return hasBroadcast;
     }
 
     /**
-     * Returns the oldest message timestamp from the collection.
+     * Returns the oldest timestamp among the given messages.
      *
-     * <p>Matches WA Web's {@code J(r).oldestMessageTs} which computes
-     * {@code Math.min(...r.map(e => e.t))}.
-     *
-     * @implNote WAWebLid1X1ThreadAccountMigrations.J
-     * @param messages the messages to compute from
+     * @implNote WAWebLid1X1ThreadAccountMigrations: the {@code J}
+     *           helper that computes {@code oldestMessageTs} as
+     *           {@code Math.min(...r.map(e => e.t))}.
+     * @param messages the messages to scan
      * @return the oldest timestamp, or {@code null} if the collection is empty
      */
+    @WhatsAppWebExport(moduleName = "WAWebLid1X1ThreadAccountMigrations", exports = "J",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private Instant getOldestMessageTimestamp(Collection<ChatMessageInfo> messages) {
-        Instant oldest = null; // WAWebLid1X1ThreadAccountMigrations.J
+        Instant oldest = null;
         for (var msg : messages) {
             var ts = msg.timestamp().orElse(null);
             if (ts != null && (oldest == null || ts.isBefore(oldest))) {
                 oldest = ts;
             }
         }
-        return oldest; // WAWebLid1X1ThreadAccountMigrations.J: oldestMessageTs
+        return oldest;
     }
 
     /**
-     * Returns whether the pairing timestamp is at or before the given timestamp.
+     * Returns whether the pairing timestamp is known and at or before the
+     * supplied timestamp.
      *
-     * <p>Matches WA Web's {@code H(pairingTimestamp, oldestMessageTs) === "false"}
-     * where {@code H(e, t)} returns {@code "false"} when {@code e != null && !(t < e)},
-     * meaning {@code pairingTimestamp != null && oldestMessageTs >= pairingTimestamp}.
+     * <p>Matches the truthy branch of WA Web's {@code H} helper:
+     * {@code pairingTimestamp != null && !(messageTimestamp < pairingTimestamp)}.
      *
-     * @implNote WAWebLid1X1ThreadAccountMigrations.H
+     * @implNote WAWebLid1X1ThreadAccountMigrations: the {@code H}
+     *           helper used to compare timestamps.
      * @param messageTimestamp the message timestamp to compare against
-     * @return {@code true} if pairing timestamp is non-null and at or before the message timestamp
+     * @return {@code true} if pairing timestamp is non-null and at or
+     *         before the message timestamp
      */
+    @WhatsAppWebExport(moduleName = "WAWebLid1X1ThreadAccountMigrations", exports = "H",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private boolean isPairingTimestampAtOrBefore(Instant messageTimestamp) {
-        var pairingTs = store.pairingTimestamp().orElse(null); // WAWebUserPrefsMultiDevice.getPairingTimestamp
+        // WAWebUserPrefsMultiDevice.getPairingTimestamp
+        // Reads the pairing timestamp stored when the client linked to the primary device
+
+        var pairingTs = store.pairingTimestamp().orElse(null);
         if (pairingTs == null) {
-            return false; // WAWebLid1X1ThreadAccountMigrations.H: e == null -> "unknown"
+            return false;
         }
-        // WAWebLid1X1ThreadAccountMigrations.H: t < e ? "true" : "false"
-        // We want H(...) === "false", which means !(messageTimestamp < pairingTimestamp),
-        // i.e., messageTimestamp >= pairingTimestamp, i.e., !messageTimestamp.isBefore(pairingTimestamp)
-        return !messageTimestamp.isBefore(pairingTs); // WAWebLid1X1ThreadAccountMigrations.H
+
+        // WAWebLid1X1ThreadAccountMigrations.H
+        // Equivalent to H(...) === "false": pairingTimestamp != null and messageTimestamp >= pairingTimestamp
+
+        return !messageTimestamp.isBefore(pairingTs);
     }
 
     /**
-     * Returns whether all messages in the collection are migration-safe system stubs.
+     * Returns whether every message in the collection is a migration-safe
+     * system stub.
      *
-     * <p>Matches WA Web's {@code r.every(X)} check, where {@code X()} returns {@code true}
-     * for initial e2e notifications and disappearing mode system messages.
-     *
-     * @implNote WAWebLid1X1ThreadAccountMigrations.X
-     * @param messages the messages to check
+     * @implNote WAWebLid1X1ThreadAccountMigrations: the
+     *           {@code r.every(X)} expression used inside the {@code K}
+     *           cascade.
+     * @param messages the messages to inspect
      * @return {@code true} if every message is a safe system stub
      */
+    @WhatsAppWebExport(moduleName = "WAWebLid1X1ThreadAccountMigrations", exports = "X",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private boolean allMessagesAreSafeStubs(Collection<ChatMessageInfo> messages) {
         return messages.stream().allMatch(this::isMigrationSafeStub);
     }
 
     /**
-     * Returns whether all messages are either migration-safe stubs or call log entries,
-     * with at least one call log entry present.
+     * Returns whether every message is either a migration-safe stub or a
+     * call-log entry, with at least one call-log entry present.
      *
-     * <p>Matches WA Web's {@code ee(r)} function.
-     *
-     * @implNote WAWebLid1X1ThreadAccountMigrations.flow.ee
-     * @param messages the messages to check
-     * @return {@code true} if every message is a safe stub or call log, with at least one call log
+     * @implNote WAWebLid1X1ThreadAccountMigrations: the {@code ee}
+     *           predicate used inside the {@code K} cascade.
+     * @param messages the messages to inspect
+     * @return {@code true} if the stubs-or-call-log rule applies
      */
+    @WhatsAppWebExport(moduleName = "WAWebLid1X1ThreadAccountMigrations", exports = "ee",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private boolean allMessagesAreSafeStubsOrCallLog(Collection<ChatMessageInfo> messages) {
         var hasCallLog = false;
         for (var msg : messages) {
@@ -1096,12 +1280,17 @@ public final class LidMigrationService {
     }
 
     /**
-     * Returns whether a message is a migration-safe system stub that can be ignored.
+     * Returns whether the given message is an initial E2E notification or
+     * a disappearing-mode system message, either of which the migration
+     * considers safe to ignore.
      *
-     * @implNote WAWebLid1X1ThreadAccountMigrations.flow.X
+     * @implNote WAWebLid1X1ThreadAccountMigrations: the {@code X}
+     *           predicate.
      * @param msg the message to check
-     * @return {@code true} if the message is a safe stub
+     * @return {@code true} if the message is a migration-safe stub
      */
+    @WhatsAppWebExport(moduleName = "WAWebLid1X1ThreadAccountMigrations", exports = "X",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private boolean isMigrationSafeStub(ChatMessageInfo msg) {
         if (!msg.message().isEmpty()) {
             return false;
@@ -1112,12 +1301,15 @@ public final class LidMigrationService {
     }
 
     /**
-     * Returns whether a message is a call log entry.
+     * Returns whether the given message is a call-log entry.
      *
-     * @implNote WAWebLid1X1ThreadAccountMigrations.flow.ee
+     * @implNote WAWebLid1X1ThreadAccountMigrations: the call-log branch
+     *           of the {@code ee} predicate.
      * @param msg the message to check
-     * @return {@code true} if the message is a call log entry
+     * @return {@code true} if the message is a call-log entry
      */
+    @WhatsAppWebExport(moduleName = "WAWebLid1X1ThreadAccountMigrations", exports = "ee",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private boolean isCallLogMessage(ChatMessageInfo msg) {
         var stubType = msg.messageStubType().orElse(null);
         return stubType != null && CALL_LOG_STUB_TYPES.contains(stubType);
@@ -1125,13 +1317,16 @@ public final class LidMigrationService {
 
 
     /**
-     * Executes the resolved migrations.
+     * Applies the pre-computed resolutions to the store.
      *
-     * @implNote ADAPTED: WAWebLid1X1ThreadAccountMigrations.migrate1x1Chats — WA Web collects
-     *           updates into arrays and calls bulkCreateOrMerge/bulkRemove; Cobalt executes
-     *           per-resolution for simplicity
-     * @param resolutions the resolutions to execute
+     * @implNote ADAPTED: WAWebLid1X1ThreadAccountMigrations.migrate1x1Chats:
+     *           WA Web batches updates into arrays and issues a single
+     *           {@code bulkCreateOrMerge}/{@code bulkRemove}; Cobalt
+     *           executes each resolution individually for simplicity.
+     * @param resolutions the resolutions to execute, in order
      */
+    @WhatsAppWebExport(moduleName = "WAWebLid1X1ThreadAccountMigrations", exports = "migrate1x1Chats",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private void executeResolutions(List<LidMigrationResolution> resolutions) {
         for (var resolution : resolutions) {
             try {
@@ -1148,87 +1343,97 @@ public final class LidMigrationService {
     }
 
     /**
-     * Executes a migration resolution by updating the chat to use LID addressing.
+     * Re-keys a chat to use LID addressing and mirrors the new mapping onto
+     * the store and contact records.
      *
-     * @implNote ADAPTED: WAWebLid1X1ThreadAccountMigrations.migrate1x1Chats — maps to
-     *           WA Web's {@code bulkCreateOrMerge(i)} where each entry has
-     *           {@code {id, accountLid, lidOriginType}}
-     * @param migrate the migration resolution to execute
+     * @implNote ADAPTED: WAWebLid1X1ThreadAccountMigrations.migrate1x1Chats:
+     *           this corresponds to WA Web's
+     *           {@code bulkCreateOrMerge(i)} where every entry has
+     *           {@code {id, accountLid, lidOriginType}}.
+     * @param migrate the migration action to apply
      */
+    @WhatsAppWebExport(moduleName = "WAWebLid1X1ThreadAccountMigrations", exports = "migrate1x1Chats",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private void executeMigrate(LidMigrationResolution.Migrate migrate) {
         var originalJid = migrate.originalJid();
         var targetLid = migrate.targetLid();
 
-        // Find the chat
+        // WAWebLid1X1ThreadAccountMigrations.migrate1x1Chats
+        // Looks up the chat object; missing chats simply skip this resolution with a warning
+
         var chat = store.findChatByJid(originalJid).orElse(null);
         if (chat == null) {
             LOGGER.log(System.Logger.Level.WARNING, "Chat not found for migration: {0}", originalJid);
             return;
         }
 
-        // Update the chat's LID
-        chat.setLid(targetLid);
+        // WAWebLid1X1ThreadAccountMigrations.migrate1x1Chats
+        // Rewrites the chat key to the target LID while preserving the original PN as metadata
 
-        // Store the phoneJid for backward compatibility
+        chat.setLid(targetLid);
         chat.setPhoneNumberJid(originalJid);
 
-        // Register the mapping in the store
-        store.registerLidMapping(originalJid, targetLid);
+        // WAWebLid1X1ThreadAccountMigrations.migrate1x1Chats
+        // Registers the mapping bidirectionally and mirrors it onto the associated contact
 
-        // Update associated contact if exists
-        store.findContactByJid(originalJid).ifPresent(contact -> {
-            contact.setLid(targetLid);
-        });
+        store.registerLidMapping(originalJid, targetLid);
+        store.findContactByJid(originalJid).ifPresent(contact -> contact.setLid(targetLid));
 
         LOGGER.log(System.Logger.Level.DEBUG, "Migrated chat {0} -> {1}", originalJid, targetLid);
     }
 
     /**
-     * Executes a delete resolution by removing the chat from the store.
+     * Removes a chat that was classified as safe to delete.
      *
-     * @implNote ADAPTED: WAWebLid1X1ThreadAccountMigrations.migrate1x1Chats — maps to
-     *           WA Web's {@code bulkRemove(m)} for chats and {@code bulkRemove(p)} for messages
-     * @param delete the delete resolution to execute
+     * @implNote ADAPTED: WAWebLid1X1ThreadAccountMigrations.migrate1x1Chats:
+     *           this corresponds to WA Web's
+     *           {@code bulkRemove(m)} for chats and
+     *           {@code bulkRemove(p)} for their messages.
+     * @param delete the delete action to apply
      */
+    @WhatsAppWebExport(moduleName = "WAWebLid1X1ThreadAccountMigrations", exports = "migrate1x1Chats",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private void executeDelete(LidMigrationResolution.Delete delete) {
         var originalJid = delete.originalJid();
 
-        // Remove the chat from store
-        var removed = store.removeChat(originalJid);
+        // WAWebLid1X1ThreadAccountMigrations.migrate1x1Chats
+        // Removes the chat from the store; downstream consumers receive the removal as a normal store event
 
+        var removed = store.removeChat(originalJid);
         if (removed.isPresent()) {
             LOGGER.log(System.Logger.Level.DEBUG, "Deleted chat {0}: {1}", originalJid, delete.reason());
         }
     }
 
     /**
-     * Handles a LID change notification for a contact.
+     * Applies a LID-change notification received for an existing contact,
+     * updating the primary caches, the bidirectional store mapping, the
+     * contact, and any chat keyed by the phone number.
      *
-     * @implNote WAWebLid1X1ThreadAccountMigrations.flow
-     * @param phoneJid the phone number JID
-     * @param newLid   the new LID
-     * @param oldLid   the old LID (may be {@code null})
+     * @implNote WAWebLid1X1ThreadAccountMigrations: the change-notification
+     *           branch that reacts to server-pushed LID rotations.
+     * @param phoneJid the phone-number JID whose LID is changing
+     * @param newLid   the LID it is changing to
+     * @param oldLid   the previous LID, may be {@code null}
      */
     public void changeLid(Jid phoneJid, Jid newLid, Jid oldLid) {
         if (phoneJid == null || newLid == null) {
             return;
         }
 
-        // Update primary caches
+        // WAWebLid1x1MigrationPrimaryCache.lidPnMigrationPrimaryCache
+        // Overwrites both the assigned and latest LID caches with the new value
+
         if (phoneJid.user() != null) {
             primaryPnToAssignedLidCache.put(phoneJid.user(), newLid);
             primaryPnToLatestLidCache.put(phoneJid.user(), newLid);
         }
 
-        // Update store mappings
+        // WAWebLid1X1ThreadAccountMigrations
+        // Propagates the change through the store, the contact record, and the chat if one exists
+
         store.registerLidMapping(phoneJid, newLid);
-
-        // Update contact
-        store.findContactByJid(phoneJid).ifPresent(contact -> {
-            contact.setLid(newLid);
-        });
-
-        // Update chat
+        store.findContactByJid(phoneJid).ifPresent(contact -> contact.setLid(newLid));
         store.findChatByJid(phoneJid).ifPresent(chat -> {
             chat.setLid(newLid);
             chat.setPhoneNumberJid(phoneJid);
@@ -1238,16 +1443,17 @@ public final class LidMigrationService {
     }
 
     /**
-     * Registers the original LID for a locally-created chat.
+     * Remembers the LID that was known at chat-creation time so it can be
+     * used as a fallback during migration when no better source is
+     * available.
      *
-     * <p>This should be called from the chat creation logic when a LID mapping
-     * is already known at chat creation time and LID migration has not yet
-     * completed. Matches WA Web's {@code WAWebCreateChat} behavior where
-     * {@code originalLid} is set on the chat object.
+     * <p>Called by the chat-creation path when a local client already knows
+     * the LID for a phone-number chat before the migration has started.
      *
-     * @implNote WAWebCreateChat — chat.originalLid
-     * @param phoneJid the phone number JID of the chat
-     * @param lid      the LID known at chat creation time
+     * @implNote WAWebCreateChat: corresponds to the {@code chat.originalLid}
+     *           field on the WA Web chat object.
+     * @param phoneJid the phone-number JID of the chat
+     * @param lid      the LID known at chat-creation time
      */
     public void registerOriginalLid(Jid phoneJid, Jid lid) {
         if (phoneJid == null || lid == null || phoneJid.user() == null) {
@@ -1258,23 +1464,29 @@ public final class LidMigrationService {
     }
 
     /**
-     * Persists primary mappings to the store's bidirectional mapping tables.
+     * Flushes the primary caches into the store's bidirectional LID/PN
+     * mapping tables.
      *
-     * <p>Matches WA Web's {@code learnMappingsInBulk()} which uses two learning
-     * sources with skip logic:
+     * <p>Follows WA Web's two-phase learning:
      * <ol>
-     *     <li>Skips entries where the assigned LID already matches the store's
-     *         current LID for that phone number</li>
-     *     <li>Processes "migration-sync-old" mappings first (assigned LID only,
-     *         when the latest LID already matches local)</li>
-     *     <li>Processes "migration-sync-latest" mappings second (both assigned
-     *         and latest LIDs, when the latest LID differs from local)</li>
+     *     <li>Entries whose assigned LID already matches the store's
+     *         current LID for the phone number are skipped.</li>
+     *     <li>Entries whose latest LID matches the local LID are treated
+     *         as "migration-sync-old" and only the assigned LID is
+     *         registered.</li>
+     *     <li>Entries whose latest LID differs are treated as
+     *         "migration-sync-latest" and both the assigned and latest
+     *         LIDs are registered.</li>
      * </ol>
      *
-     * @implNote WAWebLid1x1MigrationPrimaryCache.learnMappingsInBulk,
-     *           WAWebLid1x1MigrationPrimaryCache.$6 (categorization),
-     *           WAWebDBCreateLidPnMappings.createLidPnMappings (store registration)
+     * @implNote WAWebLid1x1MigrationPrimaryCache.lidPnMigrationPrimaryCache:
+     *           the {@code learnMappingsInBulk} method and the
+     *           categorisation helper {@code $6}.
+     *           WAWebDBCreateLidPnMappings.createLidPnMappings:
+     *           the store-side registration call.
      */
+    @WhatsAppWebExport(moduleName = "WAWebLid1x1MigrationPrimaryCache", exports = "lidPnMigrationPrimaryCache",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private void learnMappingsInBulk() {
         var oldMappings = new ArrayList<Map.Entry<Jid, Jid>>();
         var latestMappings = new ArrayList<Map.Entry<Jid, Jid>>();
@@ -1317,34 +1529,42 @@ public final class LidMigrationService {
     }
 
     /**
-     * Determines if migration should auto-start after mappings are received.
+     * Returns whether the migration sweep should run immediately after the
+     * primary-device mapping has been stored.
      *
-     * <p>WhatsApp Web's {@code WAWebLid1x1MigrationManager.executeMigrationIfNeeded()}
-     * unconditionally calls {@code shouldMigrateNow()} (which checks state == READY ||
-     * IN_PROGRESS) and then {@code migrate1x1Chats()}. Since Cobalt's state machine is
-     * already in READY at the point this method is called from
-     * {@link #processProtocolMessage(LIDMigrationMappingSyncPayload)}, this always
-     * returns {@code true}.
+     * <p>WA Web's {@code executeMigrationIfNeeded} unconditionally calls
+     * {@code shouldMigrateNow} (which accepts READY or IN_PROGRESS) and
+     * then {@code migrate1x1Chats}. Because Cobalt only reaches this method
+     * from {@link #processProtocolMessage(LIDMigrationMappingSyncPayload)}
+     * with the state already on READY, the return value is always
+     * {@code true}.
      *
-     * <p>The dependent task registry ({@code addDependentMigrationTask} / {@code $1})
-     * from the WA Web {@code ThreadMigrationManager} singleton is intentionally omitted
-     * because those tasks are WA Web-specific IndexedDB migrations (favorites, labels,
-     * carts, blocklist, PNH threads) that do not apply to Cobalt's flat store model.
+     * <p>The {@code ThreadMigrationManager} dependent-task registry is
+     * deliberately omitted: those tasks are WA Web-specific IndexedDB
+     * migrations (favourites, labels, carts, blocklist, PNH threads)
+     * that do not apply to Cobalt's flat store.
      *
-     * @implNote ADAPTED: WAWebLid1x1MigrationManager.executeMigrationIfNeeded,
-     *           WAWebLid1X1ThreadAccountMigrations.shouldMigrateNow (function O)
+     * @implNote ADAPTED: WAWebLid1x1MigrationManager.executeMigrationIfNeeded
+     *           and WAWebLid1X1ThreadAccountMigrations.shouldMigrateNow.
      * @return {@code true}
      */
+    @WhatsAppWebExport(moduleName = "WAWebLid1x1MigrationManager", exports = "ThreadMigrationManager",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebLid1X1ThreadAccountMigrations", exports = "shouldMigrateNow",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private boolean shouldAutoStartMigration() {
-        return true; // WAWebLid1x1MigrationManager.executeMigrationIfNeeded
+        return true;
     }
 
     /**
-     * Handles a migration error by setting the state to {@link LidMigrationState#FAILED}
-     * and delegating to the client's error handler.
+     * Reports a migration error by flipping the state to
+     * {@link LidMigrationState#FAILED} and delegating to the client's
+     * configurable error handler.
      *
-     * @implNote ADAPTED: WAWebLid1X1MigrationGating — WA Web uses inline recovery, Cobalt throws
-     * @param error the migration exception
+     * @implNote ADAPTED: WAWebLid1X1MigrationGating: WA Web performs
+     *           inline recovery via {@code socketLogout}; Cobalt raises
+     *           the exception through the pluggable error handler.
+     * @param error the migration exception to surface
      */
     private void handleError(WhatsAppLidMigrationException error) {
         state.set(LidMigrationState.FAILED);
@@ -1353,58 +1573,86 @@ public final class LidMigrationService {
     }
 
     /**
-     * Resets the migration service state for a new session.
-     * Called when the client disconnects and reconnects.
+     * Resets the migration service for a new session without discarding
+     * the primary caches.
      *
-     * @implNote ADAPTED: WAWebLid1x1MigrationPrimaryCache.clear — WA Web's {@code clear()} resets
-     *           {@code $1} and clears both maps; Cobalt preserves caches across reconnects since
-     *           {@code clear()} is only called from {@code updateCacheIfEmpty()} (re-population
-     *           guard) and {@code WAWebTestUtilRollbackLidThreadMigration} (debug utility)
+     * <p>Cancels any pending mapping-sync timeout and returns the state
+     * machine to {@link LidMigrationState#NOT_STARTED} unless it is
+     * already in a terminal state.
+     *
+     * @implNote ADAPTED: WAWebLid1x1MigrationPrimaryCache.clear:
+     *           WA Web's {@code clear()} empties the {@code $1} flag and
+     *           the two tables. Cobalt preserves the caches across
+     *           reconnects because {@code clear()} in WA Web is only
+     *           invoked from {@code updateCacheIfEmpty} (a re-population
+     *           guard) and the debug utility
+     *           {@code WAWebTestUtilRollbackLidThreadMigration}.
      */
     public void reset() {
+        // WAWebLid1x1MigrationTimeout.scheduleLogoutIfNeeded
+        // Cancels any armed logout timer so the reconnect path can re-arm it from a clean slate
+
         var timeout = mappingTimeoutFuture;
         if (timeout != null) {
             timeout.cancel(false);
             mappingTimeoutFuture = null;
         }
+
+        // Cobalt state machine reset
+        // Leaves terminal states (COMPLETE, FAILED, DISABLED) intact so a session bounce does not reopen the migration
+
         var currentState = state.get();
-        // Only reset if not in a terminal state
         if (!currentState.isTerminal()) {
             state.set(LidMigrationState.NOT_STARTED);
         }
-        // Don't clear primary caches on reconnect - they persist across sessions
     }
 
     /**
-     * Looks up a LID for a phone number JID.
-     * Checks primary assigned cache first, then store mappings.
+     * Looks up the LID associated with the given phone-number JID.
      *
-     * @implNote ADAPTED: WAWebLid1x1MigrationPrimaryCache.getLidForPn — WA Web returns only from
-     *           {@code $2} (assigned cache); Cobalt additionally falls back to {@code store.findLidByPhone}
-     *           for mappings learned outside the primary cache
-     * @param phoneJid the phone number JID
-     * @return the LID if found
+     * <p>Checks the primary assigned cache first, then falls back to the
+     * store's bidirectional mapping table so mappings learned outside the
+     * primary-device flow are still found.
+     *
+     * @implNote ADAPTED: WAWebLid1x1MigrationPrimaryCache.getLidForPn:
+     *           WA Web returns only the assigned-cache value; Cobalt
+     *           additionally consults {@code store.findLidByPhone}.
+     * @param phoneJid the phone-number JID to look up, may be {@code null}
+     * @return the LID if one is known, otherwise an empty {@link Optional}
      */
+    @WhatsAppWebExport(moduleName = "WAWebLid1x1MigrationPrimaryCache", exports = "lidPnMigrationPrimaryCache",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<Jid> lookupLid(Jid phoneJid) {
         if (phoneJid == null || phoneJid.user() == null) {
             return Optional.empty();
         }
 
-        // Check primary assigned cache
+        // WAWebLid1x1MigrationPrimaryCache.lidPnMigrationPrimaryCache
+        // Checks the primary assigned-LID cache populated from the mapping sync message
+
         var cached = primaryPnToAssignedLidCache.get(phoneJid.user());
         if (cached != null) {
             return Optional.of(cached);
         }
 
-        // Check store mappings (these don't expire)
+        // Cobalt extension to WAWebLid1x1MigrationPrimaryCache.getLidForPn
+        // Falls back to the persistent store mapping for LIDs learned through history sync and other channels
+
         return store.findLidByPhone(phoneJid);
     }
 
     /**
-     * Determines whether to use LID addressing mode for a recipient.
+     * Returns whether outgoing messages to the given recipient should use
+     * LID addressing.
      *
-     * @implNote ADAPTED: WAWebLid1X1MigrationGating.isLidMigrated — checks state machine instead of UserPrefs
-     * @param recipientJid the recipient's JID
+     * <p>LID addressing is used when the recipient already has a LID JID,
+     * or when the recipient is a 1:1 user, the migration is complete or
+     * in progress, and a LID mapping exists for them.
+     *
+     * @implNote ADAPTED: WAWebLid1X1MigrationGating.isLidMigrated:
+     *           the check is expressed through the Cobalt state machine
+     *           and the local mapping lookup.
+     * @param recipientJid the recipient JID, may be {@code null}
      * @return {@code true} if LID addressing should be used
      */
     public boolean shouldUseLidAddressing(Jid recipientJid) {
@@ -1412,82 +1660,87 @@ public final class LidMigrationService {
             return false;
         }
 
-        // Already using LID
         if (recipientJid.hasLidServer()) {
             return true;
         }
 
-        // Groups, newsletters, broadcasts don't use LID addressing
         if (recipientJid.hasGroupOrCommunityServer() ||
             recipientJid.hasNewsletterServer() ||
             recipientJid.hasBroadcastServer()) {
             return false;
         }
 
-        // Check migration state
         var currentState = state.get();
         if (currentState != LidMigrationState.COMPLETE && currentState != LidMigrationState.IN_PROGRESS) {
             return false;
         }
 
-        // Check if we have a LID for this recipient
         return lookupLid(recipientJid).isPresent();
     }
 
     /**
-     * Returns whether a JID should have an account LID.
+     * Returns whether the given JID is eligible to carry an
+     * {@code account_lid} attribute.
      *
-     * <p>A JID should have an account LID when the LID migration has completed
-     * and the JID belongs to a regular user (not a bot, not the PSA/announcements
-     * account). This matches WA Web's {@code shouldHaveAccountLid(wid)} which
-     * checks {@code isLidMigrated() && wid.isRegularUser()}, where
-     * {@code isRegularUser()} means {@code isUser() && !isPSA() && !isBot()}.
+     * <p>Eligibility requires that the 1:1 migration has completed and the
+     * JID represents a regular user (not the PSA/announcements account,
+     * not a bot).
      *
-     * @implNote WAWebLidMigrationUtils.shouldHaveAccountLid
-     * @param jid the JID to check
-     * @return {@code true} if the JID should have an account LID
+     * @implNote WAWebLidMigrationUtils.shouldHaveAccountLid:
+     *           the check is {@code isLidMigrated() && wid.isRegularUser()}.
+     * @param jid the JID to evaluate, may be {@code null}
+     * @return {@code true} if the JID should carry an account LID
      */
+    @WhatsAppWebExport(moduleName = "WAWebLidMigrationUtils", exports = "shouldHaveAccountLid",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public boolean shouldHaveAccountLid(Jid jid) {
         if (jid == null) {
             return false;
         }
 
-        // WAWebLidMigrationUtils.shouldHaveAccountLid: isLidMigrated() && e.isRegularUser()
-        // isRegularUser() = isUser() && !isPSA() && !isBot()
-        // isUser() = c.us || lid || bot || hosted || hosted.lid
-        return isLidMigrated() && isRegularUser(jid); // WAWebLidMigrationUtils.shouldHaveAccountLid
+        // WAWebLidMigrationUtils.shouldHaveAccountLid
+        // Combines the migration-complete flag with the regular-user predicate
+
+        return isLidMigrated() && isRegularUser(jid);
     }
 
     /**
-     * Returns whether a JID represents a regular user.
+     * Returns whether the given JID represents a regular user (not a PSA,
+     * not a bot, and on a user-like server).
      *
-     * <p>Matches WA Web's {@code Wid.isRegularUser()} which returns
-     * {@code this.isUser() && !this.isPSA() && !this.isBot()}, where
-     * {@code isUser()} includes servers {@code c.us}, {@code lid}, {@code bot},
-     * {@code hosted}, and {@code hosted.lid}.
-     *
-     * @implNote WAWebWid.isRegularUser
+     * @implNote WAWebWid.isRegularUser: the JS predicate is
+     *           {@code this.isUser() && !this.isPSA() && !this.isBot()}
+     *           with {@code isUser()} matching {@code c.us}, {@code lid},
+     *           {@code bot}, {@code hosted}, and {@code hosted.lid}.
      * @param jid the JID to check
      * @return {@code true} if the JID is a regular user
      */
+    @WhatsAppWebExport(moduleName = "WAWebWid", exports = "isRegularUser",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static boolean isRegularUser(Jid jid) {
-        // WAWebWid.isUser: c.us || lid || bot || hosted || hosted.lid
+        // WAWebWid.isUser
+        // Fails fast for any JID whose server is not one of the user-like servers
+
         if (!jid.hasUserServer() && !jid.hasLidServer() && !jid.hasBotServer()
                 && !jid.hasHostedServer() && !jid.hasHostedLidServer()) {
-            return false; // WAWebWid.isRegularUser
+            return false;
         }
 
-        // WAWebWid.isPSA: user === "0" && server === "c.us"
+        // WAWebWid.isPSA
+        // Excludes the special announcements account 0@s.whatsapp.net
+
         if (jid.equals(Jid.announcementsAccount())) {
-            return false; // WAWebWid.isRegularUser
+            return false;
         }
 
-        // WAWebWid.isBot: isPnBot() || isFbidBot()
+        // WAWebWid.isBot
+        // Excludes PN bots and FBID bots
+
         if (jid.isBot()) {
-            return false; // WAWebWid.isRegularUser
+            return false;
         }
 
-        return true; // WAWebWid.isRegularUser
+        return true;
     }
 
     /**
@@ -1501,23 +1754,31 @@ public final class LidMigrationService {
      * unchanged if not a LID, or looks up the phone number via
      * {@code getPhoneNumber(wid)}.
      *
-     * @implNote WAWebLidMigrationUtils.toPn
-     * @param jid the JID to convert
+     * @implNote WAWebLidMigrationUtils.toPn: returns the JID unchanged when
+     *           not a LID; otherwise looks up the PN via
+     *           {@code getPhoneNumber(wid)}.
+     * @param jid the JID to convert, may be {@code null}
      * @return the phone number JID, the original JID if not a LID,
      *         or {@code null} if no mapping is found
      */
+    @WhatsAppWebExport(moduleName = "WAWebLidMigrationUtils", exports = "toPn",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public Jid toPn(Jid jid) {
         if (jid == null) {
             return null;
         }
 
-        // WAWebLidMigrationUtils.toPn: if(!t.isLid()) return t
+        // WAWebLidMigrationUtils.toPn
+        // Returns the JID unchanged when it is not a LID; there is nothing to translate
+
         if (!jid.hasLidServer()) {
-            return jid; // WAWebLidMigrationUtils.toPn
+            return jid;
         }
 
-        // WAWebLidMigrationUtils.toPn: var n = getPhoneNumber(t); return n
-        return store.findPhoneByLid(jid).orElse(null); // WAWebLidMigrationUtils.toPn
+        // WAWebLidMigrationUtils.toPn
+        // Delegates to the store's LID to phone-number lookup
+
+        return store.findPhoneByLid(jid).orElse(null);
     }
 
     /**
@@ -1532,25 +1793,33 @@ public final class LidMigrationService {
      * unchanged if already a LID, or calls {@code getCurrentLid(asUserWidOrThrow(wid))}
      * to look up the LID.
      *
-     * @implNote WAWebLidMigrationUtils.toLid
-     * @param jid the JID to convert
+     * @implNote WAWebLidMigrationUtils.toLid: returns the JID unchanged
+     *           when already a LID; otherwise strips the device/agent via
+     *           {@code asUserWidOrThrow} and looks up the LID via
+     *           {@code getCurrentLid}.
+     * @param jid the JID to convert, may be {@code null}
      * @return the LID JID, the original JID if already a LID,
      *         or {@code null} if no mapping is found
      */
+    @WhatsAppWebExport(moduleName = "WAWebLidMigrationUtils", exports = "toLid",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public Jid toLid(Jid jid) {
         if (jid == null) {
             return null;
         }
 
-        // WAWebLidMigrationUtils.toLid: if(e.isLid()) return e
+        // WAWebLidMigrationUtils.toLid
+        // Returns the JID unchanged when it is already on the LID server
+
         if (jid.hasLidServer()) {
-            return jid; // WAWebLidMigrationUtils.toLid
+            return jid;
         }
 
-        // WAWebLidMigrationUtils.toLid: var t = getCurrentLid(asUserWidOrThrow(e))
-        // asUserWidOrThrow strips device/agent, getCurrentLid looks up store
-        var userJid = jid.toUserJid(); // WAWebWidFactory.asUserWidOrThrow
-        return store.findLidByPhone(userJid).orElse(null); // WAWebLidMigrationUtils.toLid
+        // WAWebLidMigrationUtils.toLid
+        // Normalises the JID via asUserWidOrThrow and looks up the LID via the store
+
+        var userJid = jid.toUserJid();
+        return store.findLidByPhone(userJid).orElse(null);
     }
 
     /**
@@ -1564,24 +1833,32 @@ public final class LidMigrationService {
      * {@code asUserWidOrThrow(wid)} first, then returns the wid if it is a LID,
      * or calls {@code getCurrentLid(t)} otherwise.
      *
-     * @implNote WAWebLidMigrationUtils.toUserLid
-     * @param jid the JID to convert
+     * @implNote WAWebLidMigrationUtils.toUserLid: normalises the JID via
+     *           {@code asUserWidOrThrow}, returns it when already on the
+     *           LID server, otherwise looks up the LID.
+     * @param jid the JID to convert, may be {@code null}
      * @return the user LID JID, or {@code null} if no mapping is found
      */
+    @WhatsAppWebExport(moduleName = "WAWebLidMigrationUtils", exports = "toUserLid",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public Jid toUserLid(Jid jid) {
         if (jid == null) {
             return null;
         }
 
-        // WAWebLidMigrationUtils.toUserLid: var t = asUserWidOrThrow(e)
-        var userJid = jid.toUserJid(); // WAWebWidFactory.asUserWidOrThrow
+        // WAWebWidFactory.asUserWidOrThrow
+        // Strips device and agent information to obtain a user-level JID
 
-        // WAWebLidMigrationUtils.toUserLid: return t.isLid() ? t : getCurrentLid(t)
+        var userJid = jid.toUserJid();
+
+        // WAWebLidMigrationUtils.toUserLid
+        // Returns the user JID when it is already on the LID server; otherwise looks up the mapping
+
         if (userJid.hasLidServer()) {
-            return userJid; // WAWebLidMigrationUtils.toUserLid
+            return userJid;
         }
 
-        return store.findLidByPhone(userJid).orElse(null); // WAWebLidMigrationUtils.toUserLid
+        return store.findLidByPhone(userJid).orElse(null);
     }
 
     /**
@@ -1591,18 +1868,24 @@ public final class LidMigrationService {
      * {@code toUserLidOrThrow(wid)} which calls {@code toUserLid(wid)} and throws
      * {@code Error("No LID for user")} if the result is {@code null}.
      *
-     * @implNote WAWebLidMigrationUtils.toUserLidOrThrow
+     * @implNote WAWebLidMigrationUtils.toUserLidOrThrow: delegates to
+     *           {@code toUserLid} and throws
+     *           {@code Error("No LID for user")} when the result is null.
      * @param jid the JID to convert
      * @return the user LID JID, never {@code null}
      * @throws IllegalStateException if no LID mapping is found for the JID
      */
+    @WhatsAppWebExport(moduleName = "WAWebLidMigrationUtils", exports = "toUserLidOrThrow",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public Jid toUserLidOrThrow(Jid jid) {
-        var result = toUserLid(jid); // WAWebLidMigrationUtils.toUserLidOrThrow
+        // WAWebLidMigrationUtils.toUserLidOrThrow
+        // Wraps toUserLid with an error when no LID can be resolved for the given user
+
+        var result = toUserLid(jid);
         if (result == null) {
-            // WAWebLidMigrationUtils.toUserLidOrThrow: throw err("No LID for user")
-            throw new IllegalStateException("No LID for user"); // WAWebLidMigrationUtils.toUserLidOrThrow
+            throw new IllegalStateException("No LID for user");
         }
-        return result; // WAWebLidMigrationUtils.toUserLidOrThrow
+        return result;
     }
 
     /**
@@ -1612,18 +1895,24 @@ public final class LidMigrationService {
      * {@code toPnOrThrow(wid)} which calls {@code toPn(wid)} and throws
      * {@code Error("No PN for user")} if the result is {@code null}.
      *
-     * @implNote WAWebLidMigrationUtils.toPnOrThrow
+     * @implNote WAWebLidMigrationUtils.toPnOrThrow: delegates to
+     *           {@code toPn} and throws
+     *           {@code Error("No PN for user")} when the result is null.
      * @param jid the JID to convert
      * @return the phone number JID, never {@code null}
      * @throws IllegalStateException if no phone number mapping is found for the JID
      */
+    @WhatsAppWebExport(moduleName = "WAWebLidMigrationUtils", exports = "toPnOrThrow",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public Jid toPnOrThrow(Jid jid) {
-        var result = toPn(jid); // WAWebLidMigrationUtils.toPnOrThrow
+        // WAWebLidMigrationUtils.toPnOrThrow
+        // Wraps toPn with an error when no phone number can be resolved
+
+        var result = toPn(jid);
         if (result == null) {
-            // WAWebLidMigrationUtils.toPnOrThrow: throw err("No PN for user")
-            throw new IllegalStateException("No PN for user"); // WAWebLidMigrationUtils.toPnOrThrow
+            throw new IllegalStateException("No PN for user");
         }
-        return result; // WAWebLidMigrationUtils.toPnOrThrow
+        return result;
     }
 
     /**
@@ -1637,14 +1926,20 @@ public final class LidMigrationService {
      * the {@code toLid} function reference when {@code isLid === true}, or the
      * {@code toPn} function reference otherwise.
      *
-     * @implNote WAWebLidMigrationUtils.toAddressingModeFactory
+     * @implNote WAWebLidMigrationUtils.toAddressingModeFactory: returns
+     *           the {@code toLid} reference when the argument is
+     *           {@code true} and {@code toPn} otherwise.
      * @param isLid {@code true} to return the LID conversion function,
      *              {@code false} to return the PN conversion function
      * @return the addressing mode conversion function
      */
+    @WhatsAppWebExport(moduleName = "WAWebLidMigrationUtils", exports = "toAddressingModeFactory",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public Function<Jid, Jid> toAddressingModeFactory(boolean isLid) {
-        // WAWebLidMigrationUtils.toAddressingModeFactory: return e ? f : _
-        return isLid ? this::toLid : this::toPn; // WAWebLidMigrationUtils.toAddressingModeFactory
+        // WAWebLidMigrationUtils.toAddressingModeFactory
+        // Picks the method reference matching the requested addressing mode
+
+        return isLid ? this::toLid : this::toPn;
     }
 
     /**
@@ -1660,30 +1955,40 @@ public final class LidMigrationService {
      * calls {@code getAlternateUserWid()} on each side in order to resolve addressing
      * mode mismatches.
      *
-     * @implNote WAWebLidMigrationUtils.toCommonAddressingMode
+     * @implNote WAWebLidMigrationUtils.toCommonAddressingMode: calls
+     *           {@code getAlternateUserWid} on each side to resolve the
+     *           mismatch.
      * @param first  the first JID, or {@code null}
      * @param second the second JID, or {@code null}
      * @return a two-element array with the (possibly converted) JIDs
      */
+    @WhatsAppWebExport(moduleName = "WAWebLidMigrationUtils", exports = "toCommonAddressingMode",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public Jid[] toCommonAddressingMode(Jid first, Jid second) {
         // WAWebLidMigrationUtils.toCommonAddressingMode
-        if (first != null && second != null
-                && isUserWid(first) && isUserWid(second) // WAWebLidMigrationUtils.toCommonAddressingMode: e.isUser() && t.isUser()
-                && first.hasLidServer() != second.hasLidServer()) { // WAWebLidMigrationUtils.toCommonAddressingMode: e.isLid() !== t.isLid()
+        // Only acts when both sides are user JIDs on different addressing modes
 
-            // WAWebLidMigrationUtils.toCommonAddressingMode: var n = getAlternateUserWid(asUserWidOrThrow(e))
+        if (first != null && second != null
+                && isUserWid(first) && isUserWid(second)
+                && first.hasLidServer() != second.hasLidServer()) {
+
+            // WAWebLidMigrationUtils.toCommonAddressingMode
+            // Tries to resolve the first JID to match the second; returns on success
+
             var alternateFirst = getAlternateUserWid(first.toUserJid());
             if (alternateFirst != null) {
-                return new Jid[]{alternateFirst, second}; // WAWebLidMigrationUtils.toCommonAddressingMode
+                return new Jid[]{alternateFirst, second};
             }
 
-            // WAWebLidMigrationUtils.toCommonAddressingMode: var r = getAlternateUserWid(asUserWidOrThrow(t))
+            // WAWebLidMigrationUtils.toCommonAddressingMode
+            // Falls back to resolving the second JID to match the first
+
             var alternateSecond = getAlternateUserWid(second.toUserJid());
             if (alternateSecond != null) {
-                return new Jid[]{first, alternateSecond}; // WAWebLidMigrationUtils.toCommonAddressingMode
+                return new Jid[]{first, alternateSecond};
             }
         }
-        return new Jid[]{first, second}; // WAWebLidMigrationUtils.toCommonAddressingMode
+        return new Jid[]{first, second};
     }
 
     /**
@@ -1698,61 +2003,81 @@ public final class LidMigrationService {
      * delegates to internal helpers for group/status/broadcast keys (alternating
      * participant) and user keys (alternating remote).
      *
-     * @implNote WAWebLidMigrationUtils.getAlternateMsgKey
-     * @param msgKey the message key to create an alternate for
-     * @return the alternate message key, or {@code null} if no alternate is available
+     * @implNote WAWebLidMigrationUtils.getAlternateMsgKey: dispatches to
+     *           internal helpers {@code S} (group/status/broadcast, where
+     *           the participant JID is alternated) and {@code R}
+     *           (1:1 user, where the remote JID is alternated).
+     * @param msgKey the message key to create an alternate for, may be
+     *               {@code null}
+     * @return the alternate message key, or {@code null} if no alternate
+     *         is available
      */
+    @WhatsAppWebExport(moduleName = "WAWebLidMigrationUtils", exports = "getAlternateMsgKey",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public MessageKey getAlternateMsgKey(MessageKey msgKey) {
         if (msgKey == null) {
             return null;
         }
 
-        var remote = msgKey.parentJid().orElse(null); // WAWebLidMigrationUtils.getAlternateMsgKey
+        var remote = msgKey.parentJid().orElse(null);
         if (remote == null) {
             return null;
         }
 
-        // WAWebLidMigrationUtils.getAlternateMsgKey: if(e.remote.isGroup()||e.remote.isStatus()||e.remote.isBroadcastList())
-        // isStatus() || isBroadcastList() covers all broadcast-server JIDs
+        // WAWebLidMigrationUtils.getAlternateMsgKey
+        // Dispatches to the group/status/broadcast path when the remote is a group or broadcast JID
+
         if (remote.hasGroupOrCommunityServer() || remote.hasBroadcastServer()) {
-            // WAWebLidMigrationUtils.getAlternateMsgKey -> S(e) (group/status/broadcast path)
-            return getAlternateMsgKeyForGroup(msgKey); // WAWebLidMigrationUtils.getAlternateMsgKey
+            return getAlternateMsgKeyForGroup(msgKey);
         }
 
-        // WAWebLidMigrationUtils.getAlternateMsgKey: if(e.remote.isUser())
+        // WAWebLidMigrationUtils.getAlternateMsgKey
+        // Dispatches to the 1:1 path when the remote is a user JID
+
         if (isUserWid(remote)) {
-            // WAWebLidMigrationUtils.getAlternateMsgKey -> R(e) (1:1 user path)
-            return getAlternateMsgKeyForUser(msgKey); // WAWebLidMigrationUtils.getAlternateMsgKey
+            return getAlternateMsgKeyForUser(msgKey);
         }
 
-        return null; // WAWebLidMigrationUtils.getAlternateMsgKey
+        return null;
     }
 
     /**
-     * Creates an alternate message key for a group/status/broadcast message by
-     * alternating the participant JID.
+     * Builds the alternate message key for a group, status, or broadcast
+     * message by swapping the participant JID.
      *
-     * @implNote WAWebLidMigrationUtils.S
-     * @param msgKey the message key with a group, status, or broadcast remote
-     * @return the alternate message key, or {@code null} if no alternate participant is found
+     * @implNote WAWebLidMigrationUtils.S: looks up an alternate participant
+     *           through {@code getAlternateUserWid} and reconstructs the
+     *           key around it.
+     * @param msgKey the message key whose remote is a group, status, or
+     *               broadcast JID
+     * @return the alternate message key, or {@code null} if no alternate
+     *         participant is found
      */
+    @WhatsAppWebExport(moduleName = "WAWebLidMigrationUtils", exports = "S",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private MessageKey getAlternateMsgKeyForGroup(MessageKey msgKey) {
-        // WAWebLidMigrationUtils.S: e.participant != null ? getAlternateUserWid(...) : null
-        var participant = getRawParticipant(msgKey); // WAWebLidMigrationUtils.S
+        // WAWebLidMigrationUtils.S
+        // Requires a raw participant; a null participant short-circuits the lookup
+
+        var participant = getRawParticipant(msgKey);
         if (participant == null) {
-            return null; // WAWebLidMigrationUtils.S: e.participant != null ? ... : null
+            return null;
         }
 
-        // WAWebLidMigrationUtils.S: getAlternateUserWid(asUserWidOrThrow(e.participant))
+        // WAWebLidMigrationUtils.S
+        // Looks up the alternate participant JID via getAlternateUserWid
+
         var alternateParticipant = getAlternateUserWid(participant.toUserJid());
         if (alternateParticipant == null) {
-            return null; // WAWebLidMigrationUtils.S
+            return null;
         }
 
-        // WAWebLidMigrationUtils.S: new WAWebMsgKey({fromMe, remote, id, participant: t})
+        // WAWebLidMigrationUtils.S
+        // Reconstructs the message key around the alternate participant
+
         var remote = msgKey.parentJid().orElse(null);
         var id = msgKey.id().orElse(null);
-        return new MessageKeyBuilder() // WAWebLidMigrationUtils.S
+        return new MessageKeyBuilder()
                 .fromMe(msgKey.fromMe())
                 .parentJid(remote)
                 .id(id)
@@ -1761,29 +2086,38 @@ public final class LidMigrationService {
     }
 
     /**
-     * Creates an alternate message key for a 1:1 user message by alternating
-     * the remote JID.
+     * Builds the alternate message key for a 1:1 message by swapping the
+     * remote JID.
      *
-     * @implNote WAWebLidMigrationUtils.R
-     * @param msgKey the message key with a user remote
-     * @return the alternate message key, or {@code null} if no alternate remote is found
+     * @implNote WAWebLidMigrationUtils.R: looks up an alternate remote
+     *           through {@code getAlternateUserWid} and reconstructs the
+     *           key around it.
+     * @param msgKey the message key whose remote is a user JID
+     * @return the alternate message key, or {@code null} if no alternate
+     *         remote is found
      */
+    @WhatsAppWebExport(moduleName = "WAWebLidMigrationUtils", exports = "R",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private MessageKey getAlternateMsgKeyForUser(MessageKey msgKey) {
-        var remote = msgKey.parentJid().orElse(null); // WAWebLidMigrationUtils.R
+        var remote = msgKey.parentJid().orElse(null);
         if (remote == null) {
             return null;
         }
 
-        // WAWebLidMigrationUtils.R: getAlternateUserWid(asUserWidOrThrow(e.remote))
+        // WAWebLidMigrationUtils.R
+        // Looks up the alternate remote JID via getAlternateUserWid
+
         var alternateRemote = getAlternateUserWid(remote.toUserJid());
         if (alternateRemote == null) {
-            return null; // WAWebLidMigrationUtils.R
+            return null;
         }
 
-        // WAWebLidMigrationUtils.R: new WAWebMsgKey({fromMe, remote: t, id, participant})
+        // WAWebLidMigrationUtils.R
+        // Reconstructs the message key around the alternate remote while keeping the raw participant
+
         var id = msgKey.id().orElse(null);
-        var participant = getRawParticipant(msgKey); // WAWebLidMigrationUtils.R: e.participant (raw field, not fallback)
-        return new MessageKeyBuilder() // WAWebLidMigrationUtils.R
+        var participant = getRawParticipant(msgKey);
+        return new MessageKeyBuilder()
                 .fromMe(msgKey.fromMe())
                 .parentJid(alternateRemote)
                 .id(id)
@@ -1792,54 +2126,63 @@ public final class LidMigrationService {
     }
 
     /**
-     * Extracts the raw participant JID from a message key, without the fallback to
-     * parentJid that {@link MessageKey#senderJid()} provides.
+     * Returns the raw participant JID of a message key, returning
+     * {@code null} when no participant is set.
      *
-     * <p>This corresponds to WA Web's raw {@code e.participant} field access, which
-     * returns {@code null} when no participant is set (unlike Cobalt's
-     * {@code senderJid()} accessor which falls back to {@code parentJid}).
+     * <p>Cobalt's {@link MessageKey#senderJid()} falls back to the parent
+     * JID when the sender is unset; this helper recreates WA Web's raw
+     * field access by detecting that fallback.
      *
-     * @implNote ADAPTED: WAWebMsgKey.participant — raw field access without fallback
+     * @implNote ADAPTED: WAWebMsgKey.participant: WA Web exposes the
+     *           raw participant field; Cobalt infers whether the fallback
+     *           kicked in by comparing the sender to the parent.
      * @param msgKey the message key
      * @return the raw participant JID, or {@code null} if not set
      */
     private static Jid getRawParticipant(MessageKey msgKey) {
-        // senderJid() falls back to parentJid when senderJid is null.
-        // If senderJid() returns the same as parentJid(), then the raw senderJid was null.
-        var sender = msgKey.senderJid().orElse(null); // ADAPTED: WAWebMsgKey.participant
+        // ADAPTED: WAWebMsgKey.participant
+        // Reads the sender; senderJid() returns the parent when the raw participant was null
+
+        var sender = msgKey.senderJid().orElse(null);
         var parent = msgKey.parentJid().orElse(null);
         if (sender != null && sender.equals(parent)) {
-            return null; // Raw participant was null, senderJid() fell back to parentJid
+            return null;
         }
         return sender;
     }
 
     /**
-     * Translate type for the {@link #getMeUserLidOrJidForChat(Chat, TranslateMsgKeyType)}
-     * method, controlling which addressing mode is used for the current user's identity.
+     * Selects which addressing mode the current user should use when
+     * composing a message key for a given chat.
      *
-     * <p>Matches WA Web's {@code WAWebMsgKeyUtils.TranslateMsgKeyType} enum with values
-     * {@code Addon}, {@code Message}, and {@code EditMessage}.
+     * <p>Used by {@link #getMeUserLidOrJidForChat(Chat, TranslateMsgKeyType)}
+     * to distinguish message addons (reactions, receipts) from regular
+     * and edited messages; the three values follow slightly different
+     * LID vs PN rules for Community Announcement Groups.
      *
-     * @implNote WAWebMsgKeyUtils.TranslateMsgKeyType
+     * @implNote WAWebMsgKeyUtils.TranslateMsgKeyType: the JS enum with
+     *           values {@code Addon}, {@code Message}, and
+     *           {@code EditMessage}.
      */
+    @WhatsAppWebModule(moduleName = "WAWebMsgKeyUtils")
     public enum TranslateMsgKeyType {
         /**
-         * Used for addon messages (reactions, receipts, etc.).
+         * Applied when the outgoing message is an addon (reaction,
+         * receipt, etc.).
          *
          * @implNote WAWebMsgKeyUtils.TranslateMsgKeyType.Addon
          */
         ADDON,
 
         /**
-         * Used for regular messages.
+         * Applied when the outgoing message is a regular message.
          *
          * @implNote WAWebMsgKeyUtils.TranslateMsgKeyType.Message
          */
         MESSAGE,
 
         /**
-         * Used for edit messages.
+         * Applied when the outgoing message is an edit.
          *
          * @implNote WAWebMsgKeyUtils.TranslateMsgKeyType.EditMessage
          */
@@ -1863,51 +2206,61 @@ public final class LidMigrationService {
      * if CAG, returns LID only when group has LID addressing mode; otherwise uses the
      * same LID/PN decision as Addon.
      *
-     * @implNote WAWebLidMigrationUtils.getMeUserLidOrJidForChat
+     * @implNote WAWebLidMigrationUtils.getMeUserLidOrJidForChat: selects
+     *           LID or PN based on the chat JID, CAG detection, LID
+     *           addressing mode, and the translate type.
      * @param chat          the chat for which to determine the user identity
      * @param translateType the type of message key translation
      * @return the current user's JID in the appropriate addressing mode
      * @throws IllegalStateException if the store has no JID or LID configured
      */
+    @WhatsAppWebExport(moduleName = "WAWebLidMigrationUtils", exports = "getMeUserLidOrJidForChat",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public Jid getMeUserLidOrJidForChat(Chat chat, TranslateMsgKeyType translateType) {
-        var chatJid = chat.jid(); // WAWebLidMigrationUtils.getMeUserLidOrJidForChat
-        var isLid = chatJid.hasLidServer(); // WAWebLidMigrationUtils.getMeUserLidOrJidForChat: e.id.isLid()
+        // WAWebLidMigrationUtils.getMeUserLidOrJidForChat
+        // Captures the chat JID and whether it is itself on the LID server
 
-        // WAWebLidMigrationUtils.getMeUserLidOrJidForChat: e.isCAG()
-        // isCAG = isGroup && groupType === LINKED_ANNOUNCEMENT_GROUP
+        var chatJid = chat.jid();
+        var isLid = chatJid.hasLidServer();
+
+        // WAWebChatGetters.getIsGroup
+        // Identifies Community Announcement Groups by group server and default-subgroup metadata
+
         var chatMetadata = store.findChatMetadata(chatJid).orElse(null);
-        var isGroup = chatJid.hasGroupOrCommunityServer(); // WAWebChatGetters.getIsGroup
+        var isGroup = chatJid.hasGroupOrCommunityServer();
         var isCAG = isGroup && chatMetadata instanceof com.github.auties00.cobalt.model.chat.group.GroupMetadata gm
-                && gm.isDefaultSubgroup(); // WAWebLidMigrationUtils.getMeUserLidOrJidForChat
+                && gm.isDefaultSubgroup();
 
-        // WAWebLidMigrationUtils.getMeUserLidOrJidForChat: getIsGroup(e) && groupMetadata?.isLidAddressingMode
+        // WAWebLidMigrationUtils.getMeUserLidOrJidForChat
+        // Detects whether the group has flipped to LID addressing mode server-side
+
         var isLidAddressingMode = isGroup
                 && chatMetadata != null
-                && chatMetadata.isLidAddressingMode(); // WAWebLidMigrationUtils.getMeUserLidOrJidForChat
+                && chatMetadata.isLidAddressingMode();
 
-        // WAWebLidMigrationUtils.getMeUserLidOrJidForChat: switch(t)
+        // WAWebLidMigrationUtils.getMeUserLidOrJidForChat
+        // Applies the LID/PN selection table: addon and message/edit follow slightly different CAG rules
+
         return switch (translateType) {
             case ADDON -> {
-                // WAWebLidMigrationUtils.getMeUserLidOrJidForChat: r || a || i ? getMeLidUserOrThrow() : getMePnUserOrThrow()
                 if (isLid || isCAG || isLidAddressingMode) {
-                    yield getMeLidUserOrThrow(); // WAWebLidMigrationUtils.getMeUserLidOrJidForChat
+                    yield getMeLidUserOrThrow();
                 } else {
-                    yield getMePnUserOrThrow(); // WAWebLidMigrationUtils.getMeUserLidOrJidForChat
+                    yield getMePnUserOrThrow();
                 }
             }
             case MESSAGE, EDIT_MESSAGE -> {
-                // WAWebLidMigrationUtils.getMeUserLidOrJidForChat: a ? (i ? getMeLidUserOrThrow() : getMePnUserOrThrow()) : (r || i ? getMeLidUserOrThrow() : getMePnUserOrThrow())
                 if (isCAG) {
                     if (isLidAddressingMode) {
-                        yield getMeLidUserOrThrow(); // WAWebLidMigrationUtils.getMeUserLidOrJidForChat
+                        yield getMeLidUserOrThrow();
                     } else {
-                        yield getMePnUserOrThrow(); // WAWebLidMigrationUtils.getMeUserLidOrJidForChat
+                        yield getMePnUserOrThrow();
                     }
                 } else {
                     if (isLid || isLidAddressingMode) {
-                        yield getMeLidUserOrThrow(); // WAWebLidMigrationUtils.getMeUserLidOrJidForChat
+                        yield getMeLidUserOrThrow();
                     } else {
-                        yield getMePnUserOrThrow(); // WAWebLidMigrationUtils.getMeUserLidOrJidForChat
+                        yield getMePnUserOrThrow();
                     }
                 }
             }
@@ -1925,31 +2278,39 @@ public final class LidMigrationService {
      * a two-element array {@code [lid, pn]} when both are known, or a single-element
      * array when the alternate cannot be found.
      *
-     * @implNote WAWebLidMigrationUtils.getPnAndLidToUpdate
-     * @param jid the JID to find the PN/LID pair for
-     * @return a list containing both addressing mode JIDs, or just the original if no
-     *         alternate is found
+     * @implNote WAWebLidMigrationUtils.getPnAndLidToUpdate: returns a
+     *           two-element array when both addressing modes are known,
+     *           otherwise a single-element array.
+     * @param jid the JID to find the PN/LID pair for, may be {@code null}
+     * @return a list containing both addressing-mode JIDs, or just the
+     *         original if no alternate is found
      */
+    @WhatsAppWebExport(moduleName = "WAWebLidMigrationUtils", exports = "getPnAndLidToUpdate",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public List<Jid> getPnAndLidToUpdate(Jid jid) {
         if (jid == null) {
-            return List.of(); // NO_WA_BASIS — defensive null check
+            return List.of();
         }
 
-        // WAWebLidMigrationUtils.getPnAndLidToUpdate: if(e.isLid()) { var n = toPn(e); if(n != null) return [e, n] }
+        // WAWebLidMigrationUtils.getPnAndLidToUpdate
+        // LID path: pairs the LID with its resolved PN
+
         if (jid.hasLidServer()) {
-            var pn = toPn(jid); // WAWebLidMigrationUtils.getPnAndLidToUpdate
+            var pn = toPn(jid);
             if (pn != null) {
-                return List.of(jid, pn); // WAWebLidMigrationUtils.getPnAndLidToUpdate
+                return List.of(jid, pn);
             }
         } else {
-            // WAWebLidMigrationUtils.getPnAndLidToUpdate: var t = toLid(e); if(t != null) return [e, t]
-            var lid = toLid(jid); // WAWebLidMigrationUtils.getPnAndLidToUpdate
+            // WAWebLidMigrationUtils.getPnAndLidToUpdate
+            // PN path: pairs the PN with its resolved LID
+
+            var lid = toLid(jid);
             if (lid != null) {
-                return List.of(jid, lid); // WAWebLidMigrationUtils.getPnAndLidToUpdate
+                return List.of(jid, lid);
             }
         }
 
-        return List.of(jid); // WAWebLidMigrationUtils.getPnAndLidToUpdate
+        return List.of(jid);
     }
 
     /**
@@ -1960,29 +2321,36 @@ public final class LidMigrationService {
      * WA Web's {@code chatIsLid(chat)} function which checks
      * {@code chat.id.isLid() || (isGroup && groupMetadata?.isLidAddressingMode)}.
      *
-     * @implNote WAWebLidMigrationUtils.chatIsLid
-     * @param chat the chat to check
+     * @implNote WAWebLidMigrationUtils.chatIsLid: returns
+     *           {@code chat.id.isLid() || (isGroup && groupMetadata?.isLidAddressingMode)}.
+     * @param chat the chat to check, may be {@code null}
      * @return {@code true} if the chat uses LID addressing mode
      */
+    @WhatsAppWebExport(moduleName = "WAWebLidMigrationUtils", exports = "chatIsLid",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public boolean chatIsLid(Chat chat) {
         if (chat == null) {
-            return false; // NO_WA_BASIS — defensive null check
+            return false;
         }
 
-        var chatJid = chat.jid(); // WAWebLidMigrationUtils.chatIsLid
+        var chatJid = chat.jid();
 
-        // WAWebLidMigrationUtils.chatIsLid: n.isLid()
+        // WAWebLidMigrationUtils.chatIsLid
+        // Short-circuits for chats already on the LID server
+
         if (chatJid.hasLidServer()) {
-            return true; // WAWebLidMigrationUtils.chatIsLid
+            return true;
         }
 
-        // WAWebLidMigrationUtils.chatIsLid: n.isGroup() && groupMetadata?.isLidAddressingMode
+        // WAWebLidMigrationUtils.chatIsLid
+        // For group chats, checks the groupMetadata.isLidAddressingMode flag
+
         if (chatJid.hasGroupOrCommunityServer()) {
             var chatMetadata = store.findChatMetadata(chatJid).orElse(null);
-            return chatMetadata != null && chatMetadata.isLidAddressingMode(); // WAWebLidMigrationUtils.chatIsLid
+            return chatMetadata != null && chatMetadata.isLidAddressingMode();
         }
 
-        return false; // WAWebLidMigrationUtils.chatIsLid
+        return false;
     }
 
     /**
@@ -1997,83 +2365,115 @@ public final class LidMigrationService {
      * dispatches to {@code getPhoneNumber()} for LIDs and {@code getCurrentLid()} for
      * PNs, with special handling for the "me" user.
      *
-     * @implNote ADAPTED: WAWebApiContact.getAlternateUserWid — WA Web uses separate
-     *           {@code getCurrentLid} and {@code getPhoneNumber} functions with
-     *           me-user special casing; Cobalt consolidates into a single method
-     *           using {@code store.jid()} and {@code store.lid()} for me-user checks
-     * @param userJid the user JID (must already be stripped of device/agent data)
+     * @implNote ADAPTED: WAWebApiContact.getAlternateUserWid: WA Web uses
+     *           separate {@code getCurrentLid} and {@code getPhoneNumber}
+     *           helpers with me-user special casing. Cobalt consolidates
+     *           them into this method, reading {@code store.jid()} and
+     *           {@code store.lid()} for the me-user fast path.
+     * @param userJid the user JID (must already be stripped of
+     *                device/agent data)
      * @return the alternate JID, or {@code null} if not found
      */
+    @WhatsAppWebExport(moduleName = "WAWebApiContact", exports = "getAlternateUserWid",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private Jid getAlternateUserWid(Jid userJid) {
         if (userJid == null) {
             return null;
         }
 
-        // WAWebApiContact.getAlternateUserWid: e.isLid() ? getPhoneNumber(e) : getCurrentLid(e)
+        // WAWebApiContact.getAlternateUserWid
+        // Dispatches to the LID path when the input is already a LID
+
         if (userJid.hasLidServer()) {
-            // WAWebApiContact.A (getPhoneNumber): check me-user first
+            // WAWebApiContact.getPhoneNumber
+            // Me-user fast path: map the current user's LID back to their PN without a store lookup
+
             var meLid = store.lid().map(Jid::toUserJid).orElse(null);
             var mePn = store.jid().map(Jid::toUserJid).orElse(null);
             if (mePn != null && meLid != null && userJid.equals(meLid)) {
-                return mePn; // WAWebApiContact.getAlternateUserWid
+                return mePn;
             }
-            return store.findPhoneByLid(userJid).orElse(null); // WAWebApiContact.getAlternateUserWid
+            return store.findPhoneByLid(userJid).orElse(null);
         } else {
-            // WAWebApiContact.w (getCurrentLid): check me-user first
+            // WAWebApiContact.getCurrentLid
+            // Me-user fast path: map the current user's PN back to their LID without a store lookup
+
             var mePn = store.jid().map(Jid::toUserJid).orElse(null);
             var meLid = store.lid().map(Jid::toUserJid).orElse(null);
             if (meLid != null && mePn != null && userJid.equals(mePn)) {
-                return meLid; // WAWebApiContact.getAlternateUserWid
+                return meLid;
             }
-            return store.findLidByPhone(userJid).orElse(null); // WAWebApiContact.getAlternateUserWid
+            return store.findLidByPhone(userJid).orElse(null);
         }
     }
 
     /**
-     * Returns the current user's LID user JID, throwing if not available.
+     * Returns the current user's LID at user-level, throwing if no LID is
+     * configured yet.
      *
-     * @implNote ADAPTED: WAWebUserPrefsMeUser.getMeLidUserOrThrow — Cobalt uses
-     *           {@code store.lid()} instead of UserPrefs
-     * @return the current user's LID
-     * @throws IllegalStateException if no LID is configured for the current user
+     * @implNote ADAPTED: WAWebUserPrefsMeUser.getMeLidUserOrThrow:
+     *           Cobalt reads {@code store.lid()} instead of the UserPrefs
+     *           key.
+     * @return the current user's LID, never {@code null}
+     * @throws IllegalStateException if no LID is configured for the
+     *         current user
      */
+    @WhatsAppWebExport(moduleName = "WAWebUserPrefsMeUser", exports = "getMeLidUserOrThrow",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private Jid getMeLidUserOrThrow() {
-        return store.lid() // WAWebUserPrefsMeUser.getMeLidUserOrThrow
+        // WAWebUserPrefsMeUser.getMeLidUserOrThrow
+        // Reads the current user's LID from the store and strips it down to user level
+
+        return store.lid()
                 .map(Jid::toUserJid)
-                .orElseThrow(() -> new IllegalStateException("No LID for current user")); // WAWebUserPrefsMeUser.getMeLidUserOrThrow
+                .orElseThrow(() -> new IllegalStateException("No LID for current user"));
     }
 
     /**
-     * Returns the current user's phone number (PN) user JID, throwing if not available.
+     * Returns the current user's phone-number JID at user-level, throwing
+     * if no JID is configured yet.
      *
-     * @implNote ADAPTED: WAWebUserPrefsMeUser.getMePnUserOrThrow_DO_NOT_USE — Cobalt uses
-     *           {@code store.jid()} instead of UserPrefs
-     * @return the current user's PN JID
-     * @throws IllegalStateException if no JID is configured for the current user
+     * @implNote ADAPTED: WAWebUserPrefsMeUser.getMePnUserOrThrow_DO_NOT_USE:
+     *           Cobalt reads {@code store.jid()} instead of the UserPrefs
+     *           key.
+     * @return the current user's PN JID, never {@code null}
+     * @throws IllegalStateException if no JID is configured for the
+     *         current user
      */
+    @WhatsAppWebExport(moduleName = "WAWebUserPrefsMeUser", exports = "getMePnUserOrThrow_DO_NOT_USE",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private Jid getMePnUserOrThrow() {
-        return store.jid() // WAWebUserPrefsMeUser.getMePnUserOrThrow_DO_NOT_USE
+        // WAWebUserPrefsMeUser.getMePnUserOrThrow_DO_NOT_USE
+        // Reads the current user's PN JID from the store and strips it down to user level
+
+        return store.jid()
                 .map(Jid::toUserJid)
-                .orElseThrow(() -> new IllegalStateException("No PN for current user")); // WAWebUserPrefsMeUser.getMePnUserOrThrow_DO_NOT_USE
+                .orElseThrow(() -> new IllegalStateException("No PN for current user"));
     }
 
     /**
-     * Returns whether a JID is a "user" wid in the WA Web sense.
+     * Returns whether the given JID is a user wid (on one of the user-like
+     * servers) in the WhatsApp Web sense.
      *
      * <p>WA Web's {@code Wid.isUser()} returns {@code true} for servers
-     * {@code c.us}, {@code lid}, {@code bot}, {@code hosted}, and {@code hosted.lid}.
-     * In Cobalt, {@code c.us} is normalized to {@code s.whatsapp.net}.
+     * {@code c.us}, {@code lid}, {@code bot}, {@code hosted}, and
+     * {@code hosted.lid}. Cobalt normalises {@code c.us} to
+     * {@code s.whatsapp.net}.
      *
      * @implNote WAWebWid.isUser
      * @param jid the JID to check
      * @return {@code true} if the JID is a user wid
      */
+    @WhatsAppWebExport(moduleName = "WAWebWid", exports = "isUser",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static boolean isUserWid(Jid jid) {
-        // WAWebWid.isUser: c.us || lid || bot || hosted || hosted.lid
+        // WAWebWid.isUser
+        // Matches the union of user-like servers: c.us, lid, bot, hosted, hosted.lid
+
         return jid.hasUserServer()
                 || jid.hasLidServer()
                 || jid.hasBotServer()
                 || jid.hasHostedServer()
-                || jid.hasHostedLidServer(); // WAWebWid.isUser
+                || jid.hasHostedLidServer();
     }
 }

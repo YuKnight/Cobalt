@@ -3,15 +3,18 @@ package com.github.auties00.cobalt.model.sync.action.business;
 import com.github.auties00.cobalt.model.sync.SyncActionArgs;
 
 /**
- * Index arguments for {@link BusinessBroadcastInsightsAction}.
+ * Index arguments identifying a {@link BusinessBroadcastInsightsAction} inside a sync patch.
  *
- * <p>The sync index produced is {@code ["business_broadcast_insights_sync", campaignId]}.
+ * <p>The resulting sync index is {@code ["business_broadcast_insights_sync", campaignId]},
+ * which binds the insights record to the campaign it reports statistics for.
  *
- * @param campaignId the unique identifier of the business broadcast campaign
+ * @param campaignId the unique identifier of the business broadcast campaign whose insights are being synced
  */
 public record BusinessBroadcastInsightsActionArgs(String campaignId) implements SyncActionArgs {
     /**
-     * {@inheritDoc}
+     * Returns the index argument array that uniquely keys this insights record within the sync patch.
+     *
+     * @return a single-element array containing the campaign identifier
      */
     @Override
     public String[] toIndexArgs() {

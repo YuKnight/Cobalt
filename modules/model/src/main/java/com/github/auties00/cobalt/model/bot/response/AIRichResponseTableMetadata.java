@@ -7,13 +7,20 @@ import it.auties.protobuf.model.*;
 import java.util.Optional;
 
 /**
- * Metadata for a table fragment within an AI rich response.
+ * Metadata for a table fragment within a WhatsApp AI bot rich response.
  *
  * <p>The table is represented as an ordered list of
  * {@link AIRichResponseTableRow} entries. Rows flagged as
  * {@linkplain AIRichResponseTableRow#isHeading() headings} are
- * rendered with distinct styling (e.g. bold text, background colour)
- * and typically appear at the top of the table.
+ * rendered with distinct styling (for example, bold text or background
+ * colour) and typically appear at the top of the table. An optional
+ * {@linkplain #title() title} may appear above the table.
+ *
+ * <p>This type implements {@link AIRichResponseSubMessageContent} and
+ * appears as the {@link AIRichResponseSubMessageType#TABLE TABLE}
+ * variant within an {@link AIRichResponseSubMessage}.
+ *
+ * @see AIRichResponseSubMessage#content()
  */
 @ProtobufMessage(name = "AIRichResponseTableMetadata")
 public final class AIRichResponseTableMetadata implements AIRichResponseSubMessageContent {
@@ -32,6 +39,12 @@ public final class AIRichResponseTableMetadata implements AIRichResponseSubMessa
     String title;
 
 
+    /**
+     * Constructs a new table metadata instance.
+     *
+     * @param rows  the ordered list of table rows, or {@code null}
+     * @param title the table title, or {@code null}
+     */
     AIRichResponseTableMetadata(List<AIRichResponseTableRow> rows, String title) {
         this.rows = rows;
         this.title = title;
@@ -100,6 +113,12 @@ public final class AIRichResponseTableMetadata implements AIRichResponseSubMessa
         Boolean isHeading;
 
 
+        /**
+         * Constructs a new table row.
+         *
+         * @param items     the cell values for this row, or {@code null}
+         * @param isHeading whether this row is a heading row, or {@code null}
+         */
         AIRichResponseTableRow(List<String> items, Boolean isHeading) {
             this.items = items;
             this.isHeading = isHeading;

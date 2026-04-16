@@ -4,7 +4,14 @@ import it.auties.protobuf.annotation.ProtobufEnum;
 import it.auties.protobuf.annotation.ProtobufEnumIndex;
 
 /**
- * The type of transparency notice displayed to the user during an AI bot session.
+ * Enumerates the types of transparency notices that can be displayed to a user
+ * during an AI bot session.
+ *
+ * <p>Each constant represents a specific regulatory or policy-driven disclosure
+ * requirement. The client uses this value to determine which disclaimer UI to
+ * render alongside the AI conversation.
+ *
+ * @see SessionTransparencyMetadata
  */
 @ProtobufEnum(name = "SessionTransparencyType")
 public enum SessionTransparencyType {
@@ -18,6 +25,11 @@ public enum SessionTransparencyType {
      */
     NEW_YORK_AI_SAFETY_DISCLAIMER(1);
 
+    /**
+     * Constructs a new {@code SessionTransparencyType} with the specified protobuf index.
+     *
+     * @param index the protobuf index value
+     */
     SessionTransparencyType(@ProtobufEnumIndex int index) {
         this.index = index;
     }

@@ -8,94 +8,93 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * A common abstraction over all message info types, providing
- * access to the core metadata that every message carries regardless
- * of whether it originates from an E2E-encrypted chat or a plaintext
- * newsletter.
+ * Common abstraction over every kind of message envelope surfaced by
+ * WhatsApp, whether it originates from an end-to-end encrypted chat or
+ * a plaintext newsletter.
  *
- * <p>This sealed interface permits {@link ChatMessageInfo} for
- * Signal-encrypted chat messages and {@link NewsletterMessageInfo}
- * for plaintext newsletter messages.
+ * <p>A {@code MessageInfo} wraps the actual {@link MessageContainer}
+ * payload alongside the metadata needed to display, track, and act on
+ * a message: its identifying key, its timestamp, its delivery status,
+ * whether the user has starred it, and the per-recipient receipts it
+ * has accumulated.
  *
- * <p>The common properties exposed here mirror the base message info
- * fields extracted by WhatsApp Web in
- * {@code WAWebProcessBaseMsgInfo.msgToBaseMsgInfo}:
+ * <p>The hierarchy is sealed to the two valid variants:
  * <ul>
- * <li>{@link #key()} — the message key containing id, chat JID, sender,
- *     and direction
- * <li>{@link #message()} — the decoded protobuf message container
- * <li>{@link #timestamp()} — the message timestamp ({@code t})
- * <li>{@link #status()} — the acknowledgment / delivery status ({@code ack})
- * <li>{@link #starred()} — whether the message is starred
- * <li>{@link #receipts()} — the per-recipient delivery and read receipts
+ *   <li>{@link ChatMessageInfo} for Signal-encrypted one-to-one and
+ *       group chat messages</li>
+ *   <li>{@link NewsletterMessageInfo} for plaintext messages broadcast
+ *       through newsletters (channels)</li>
  * </ul>
  *
- * @apiNote WAWebProcessBaseMsgInfo: extracts core metadata from
- * message-related objects to create a standardised base info
- * structure containing id, from, to, type, t, ack, author,
- * notifyName, invis, subtype, and viewMode.
- *
- * @since 0.1.0
+ * <p>Callers can use pattern matching to branch on the concrete type
+ * when they need access to variant-specific metadata; when only the
+ * shared fields matter, programming against this interface is enough.
  */
 public sealed interface MessageInfo permits ChatMessageInfo, NewsletterMessageInfo {
 
     /**
-     * Returns the message key that uniquely identifies this message
-     * within its conversation.
+     * Returns the key that uniquely identifies this message within its
+     * conversation.
      *
-     * <p>The key contains the stanza-level message id, the
-     * conversation (chat or newsletter) JID, the sender, and the
-     * {@code fromMe} direction flag.
+     * <p>The key combines the stanza-level message identifier, the JID
+     * of the chat or newsletter, the sender JID, and the
+     * {@code fromMe} flag indicating the direction of the message.
      *
-     * @return the message key, never {@code null}
+     * @return the non-{@code null} message key
      */
     MessageKey key();
 
     /**
-     * Returns the decoded protobuf message container.
+     * Returns the decoded payload container of this message.
      *
-     * <p>If no message content is available (e.g. stub messages,
-     * system notifications, or protobuf decoding failures), returns
-     * {@link MessageContainer#empty()}.
+     * <p>If the payload is missing (for example a stub system
+     * notification or a message that could not be decoded), the
+     * returned container is {@link MessageContainer#empty()} rather
+     * than {@code null}.
      *
-     * @return the message container, never {@code null}
+     * @return the non-{@code null} message container
      */
     MessageContainer message();
 
     /**
-     * Returns the message timestamp, if available.
+     * Returns the instant at which the message was sent or received,
+     * if known.
      *
-     * <p>This is the epoch-second timestamp from the {@code t}
-     * stanza attribute or the protobuf {@code messageTimestamp} field.
+     * <p>The timestamp is derived from the {@code t} stanza attribute
+     * or the {@code messageTimestamp} protobuf field.
      *
-     * @return an {@link Optional} containing the timestamp,
-     *         or empty if not set
+     * @return an {@link Optional} holding the timestamp, or empty if
+     *         no timestamp is recorded
      */
     Optional<Instant> timestamp();
 
     /**
-     * Returns the delivery / acknowledgment status of this message,
-     * if available.
+     * Returns the current delivery or acknowledgment state of this
+     * message, if known.
      *
-     * <p>The status progresses through the standard lifecycle:
-     * {@code PENDING -> SERVER_ACK -> DELIVERED -> READ -> PLAYED}.
+     * <p>Messages progress through the standard lifecycle
+     * {@code PENDING -> SERVER_ACK -> DELIVERED -> READ -> PLAYED}
+     * as acknowledgments arrive from the server and recipients.
      *
-     * @return an {@link Optional} containing the status,
-     *         or empty if not set
+     * @return an {@link Optional} holding the current status, or empty
+     *         if no status is recorded
      */
     Optional<MessageStatus> status();
 
     /**
-     * Returns whether this message has been starred (bookmarked)
-     * by the user.
+     * Returns whether the user has starred (bookmarked) this message.
      *
-     * @return {@code true} if the message is starred
+     * @return {@code true} if starred, {@code false} otherwise
      */
     boolean starred();
 
     /**
-     * Returns the per-recipient delivery and read receipts for this
-     * message.
+     * Returns the per-recipient delivery and read receipts accumulated
+     * for this message so far.
+     *
+     * <p>In one-to-one chats this list typically contains at most one
+     * receipt; in group chats it can contain one entry per participant
+     * device that has acknowledged the message.
      *
      * @return an unmodifiable list of receipts, never {@code null}
      */

@@ -4,13 +4,18 @@ import it.auties.protobuf.annotation.ProtobufEnum;
 import it.auties.protobuf.annotation.ProtobufEnumIndex;
 
 /**
- * A content type that identifies which metadata payload is carried
- * by an {@link AIRichResponseSubMessage} fragment.
+ * Discriminator that identifies which metadata payload is carried by an
+ * {@link AIRichResponseSubMessage} fragment.
  *
- * <p>Each constant maps to exactly one of the optional metadata
- * fields on {@code AIRichResponseSubMessage}; the client uses this
- * discriminator to decide which field to read and how to render the
- * fragment.
+ * <p>Each constant corresponds to one of the content variant types in the
+ * {@link AIRichResponseSubMessageContent} sealed hierarchy. The client
+ * uses this discriminator to determine how to render the fragment.
+ * Callers typically do not inspect this enum directly; instead, call
+ * {@link AIRichResponseSubMessage#content()} to obtain the active
+ * variant as a type-safe {@code AIRichResponseSubMessageContent}.
+ *
+ * @see AIRichResponseSubMessage#content()
+ * @see AIRichResponseSubMessageContent
  */
 @ProtobufEnum(name = "AIRichResponseSubMessageType")
 public enum AIRichResponseSubMessageType {
@@ -18,88 +23,96 @@ public enum AIRichResponseSubMessageType {
      * An unrecognised or unsupported fragment type.
      *
      * <p>Clients should skip or display a fallback placeholder for
-     * fragments of this type.
+     * fragments carrying this type.
      */
     UNKNOWN(0),
 
     /**
-     * A grid of images rendered as a collage.
+     * A grid of images rendered as a composite collage.
      *
-     * <p>The corresponding metadata is
-     * {@link AIRichResponseSubMessage#gridImageMetadata()}.
+     * <p>The corresponding content variant is
+     * {@link AIRichResponseGridImageMetadata}.
      */
     GRID_IMAGE(1),
 
     /**
      * A plain-text or markdown-formatted text fragment.
      *
-     * <p>The corresponding payload is
-     * {@link AIRichResponseSubMessage#messageText()}.
+     * <p>The corresponding content variant is
+     * {@link AIRichResponseText}.
      */
     TEXT(2),
 
     /**
      * A single inline image with optional alignment and tap link.
      *
-     * <p>The corresponding metadata is
-     * {@link AIRichResponseSubMessage#imageMetadata()}.
+     * <p>The corresponding content variant is
+     * {@link AIRichResponseInlineImageMetadata}.
      */
     INLINE_IMAGE(3),
 
     /**
      * A tabular data fragment rendered as rows and columns.
      *
-     * <p>The corresponding metadata is
-     * {@link AIRichResponseSubMessage#tableMetadata()}.
+     * <p>The corresponding content variant is
+     * {@link AIRichResponseTableMetadata}.
      */
     TABLE(4),
 
     /**
      * A syntax-highlighted code block.
      *
-     * <p>The corresponding metadata is
-     * {@link AIRichResponseSubMessage#codeMetadata()}.
+     * <p>The corresponding content variant is
+     * {@link AIRichResponseCodeMetadata}.
      */
     CODE(5),
 
     /**
-     * A dynamic media element such as an animated GIF or a
-     * static image delivered via a URL.
+     * A dynamic media element such as an animated GIF or a statically
+     * loaded image delivered via a URL.
      *
-     * <p>The corresponding metadata is
-     * {@link AIRichResponseSubMessage#dynamicMetadata()}.
+     * <p>The corresponding content variant is
+     * {@link AIRichResponseDynamicMetadata}.
      */
     DYNAMIC(6),
 
     /**
      * An interactive map view with pin annotations.
      *
-     * <p>The corresponding metadata is
-     * {@link AIRichResponseSubMessage#mapMetadata()}.
+     * <p>The corresponding content variant is
+     * {@link AIRichResponseMapMetadata}.
      */
     MAP(7),
 
     /**
-     * A LaTeX mathematical expression rendered as an image.
+     * A LaTeX mathematical expression rendered as a server-side image.
      *
-     * <p>The corresponding metadata is
-     * {@link AIRichResponseSubMessage#latexMetadata()}.
+     * <p>The corresponding content variant is
+     * {@link AIRichResponseLatexMetadata}.
      */
     LATEX(8),
 
     /**
-     * A collection of content items such as reels displayed
-     * as a carousel.
+     * A collection of content items such as video reels, typically
+     * displayed as a horizontally scrollable carousel.
      *
-     * <p>The corresponding metadata is
-     * {@link AIRichResponseSubMessage#contentItemsMetadata()}.
+     * <p>The corresponding content variant is
+     * {@link AIRichResponseContentItemsMetadata}.
      */
     CONTENT_ITEMS(9);
 
+    /**
+     * Constructs a sub-message type constant with the given protobuf index.
+     *
+     * @param index the protobuf enum index
+     */
     AIRichResponseSubMessageType(@ProtobufEnumIndex int index) {
         this.index = index;
     }
 
+    /**
+     * The protobuf enum index for this sub-message type.
+     */
     final int index;
 
     /**

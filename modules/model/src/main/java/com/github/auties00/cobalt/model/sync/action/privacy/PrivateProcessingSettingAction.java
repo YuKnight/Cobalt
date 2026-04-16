@@ -8,31 +8,38 @@ import it.auties.protobuf.model.*;
 import java.util.Optional;
 
 /**
- * A sync action that records the user's preference for the "private
- * processing" feature, which controls whether sensitive on-device computation
- * may run for the linked account.
+ * Records the user's preference for the "private processing" feature, which
+ * controls whether sensitive on-device computation may run for the linked
+ * account.
  *
- * <p>The action carries a single enum value capturing whether private
- * processing is undefined, enabled, or disabled. WhatsApp Web propagates this
- * preference across linked devices via the {@code private_processing_setting}
- * sync action.
+ * <p>Private processing refers to a set of WhatsApp features that perform
+ * computations locally on the device (for example, message classification or
+ * on-device AI assistance) rather than delegating them to WhatsApp servers.
+ * Because these computations may involve sensitive data, the user can
+ * explicitly opt in or out of the feature, and that choice must be mirrored
+ * on every linked device.
  *
- * @implNote WAWebProtobufSyncAction.pb PrivateProcessingSettingAction
+ * <p>The action carries a single enum value, {@link PrivateProcessingStatus},
+ * capturing whether private processing is undefined, enabled, or disabled.
  */
 @ProtobufMessage(name = "SyncActionValue.PrivateProcessingSettingAction")
 public final class PrivateProcessingSettingAction implements SyncAction<SyncActionEmptyArgs> {
     /**
-     * Canonical WhatsApp Web action name for this action type.
+     * The canonical action name used to identify this sync action on the
+     * wire.
      */
     public static final String ACTION_NAME = "private_processing_setting";
 
     /**
-     * Canonical WhatsApp Web action version for this action type.
+     * The canonical protocol version of this sync action.
      */
     public static final int ACTION_VERSION = 1;
 
     /**
-     * {@inheritDoc}
+     * Returns the canonical action name used to identify this sync action on
+     * the wire.
+     *
+     * @return the action name {@link #ACTION_NAME}
      */
     @Override
     public String actionName() {
@@ -40,7 +47,9 @@ public final class PrivateProcessingSettingAction implements SyncAction<SyncActi
     }
 
     /**
-     * {@inheritDoc}
+     * Returns the canonical protocol version of this sync action.
+     *
+     * @return the action version {@link #ACTION_VERSION}
      */
     @Override
     public int actionVersion() {
@@ -51,18 +60,20 @@ public final class PrivateProcessingSettingAction implements SyncAction<SyncActi
     /**
      * The current private processing status persisted by this action.
      *
-     * @implNote WAWebProtobufSyncAction.pb PrivateProcessingSettingAction.privateProcessingStatus
+     * <p>A {@code null} value means the field was absent on the wire and the
+     * user has not yet expressed a preference on this device.
      */
     @ProtobufProperty(index = 1, type = ProtobufType.ENUM)
     PrivateProcessingStatus privateProcessingStatus;
 
 
     /**
-     * Constructs a new {@code PrivateProcessingSettingAction} carrying the
-     * supplied private processing status.
+     * Constructs a new action carrying the supplied private processing
+     * status.
      *
-     * @implNote WAWebProtobufSyncAction.pb PrivateProcessingSettingAction
-     * @param privateProcessingStatus the private processing status to persist, or {@code null} if unset
+     * @param privateProcessingStatus the private processing status to
+     *                                persist, or {@code null} if the field
+     *                                is absent
      */
     PrivateProcessingSettingAction(PrivateProcessingStatus privateProcessingStatus) {
         this.privateProcessingStatus = privateProcessingStatus;
@@ -71,8 +82,8 @@ public final class PrivateProcessingSettingAction implements SyncAction<SyncActi
     /**
      * Returns the current private processing status carried by this action.
      *
-     * @implNote WAWebProtobufSyncAction.pb PrivateProcessingSettingAction.privateProcessingStatus
-     * @return the private processing status, or {@link Optional#empty()} if unset
+     * @return an {@link Optional} containing the status, or
+     *         {@link Optional#empty()} if the field is unset
      */
     public Optional<PrivateProcessingStatus> privateProcessingStatus() {
         return Optional.ofNullable(privateProcessingStatus);
@@ -81,46 +92,56 @@ public final class PrivateProcessingSettingAction implements SyncAction<SyncActi
     /**
      * Sets the private processing status carried by this action.
      *
-     * @implNote WAWebProtobufSyncAction.pb PrivateProcessingSettingAction.privateProcessingStatus
-     * @param privateProcessingStatus the new private processing status, or {@code null} to clear it
+     * @param privateProcessingStatus the new private processing status, or
+     *                                {@code null} to clear the field
      */
     public void setPrivateProcessingStatus(PrivateProcessingStatus privateProcessingStatus) {
         this.privateProcessingStatus = privateProcessingStatus;
     }
 
     /**
-     * The user's private processing preference.
+     * Enumerates the possible states of the user's private processing
+     * preference.
      *
-     * @implNote WAWebProtobufSyncAction.pb PrivateProcessingSettingAction.PrivateProcessingStatus
+     * <p>The enum distinguishes the case where the user has not yet made a
+     * choice ({@link #UNDEFINED}) from an explicit opt-in
+     * ({@link #ENABLED}) or opt-out ({@link #DISABLED}).
      */
     @ProtobufEnum(name = "SyncActionValue.PrivateProcessingSettingAction.PrivateProcessingStatus")
     public enum PrivateProcessingStatus {
         /**
          * The user has not yet expressed a preference for the private
          * processing feature.
-         *
-         * @implNote WAWebProtobufSyncAction.pb PrivateProcessingSettingAction.PrivateProcessingStatus.UNDEFINED
          */
         UNDEFINED(0),
         /**
          * The user has enabled the private processing feature.
-         *
-         * @implNote WAWebProtobufSyncAction.pb PrivateProcessingSettingAction.PrivateProcessingStatus.ENABLED
          */
         ENABLED(1),
         /**
          * The user has disabled the private processing feature.
-         *
-         * @implNote WAWebProtobufSyncAction.pb PrivateProcessingSettingAction.PrivateProcessingStatus.DISABLED
          */
         DISABLED(2);
 
+        /**
+         * Constructs a new enum constant with the given protobuf wire index.
+         *
+         * @param index the protobuf wire index for this enum constant
+         */
         PrivateProcessingStatus(@ProtobufEnumIndex int index) {
             this.index = index;
         }
 
+        /**
+         * The protobuf wire index for this enum constant.
+         */
         final int index;
 
+        /**
+         * Returns the protobuf wire index for this enum constant.
+         *
+         * @return the protobuf wire index
+         */
         public int index() {
             return this.index;
         }

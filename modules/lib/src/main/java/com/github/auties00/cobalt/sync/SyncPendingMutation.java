@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.sync;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 import java.util.Objects;
@@ -8,10 +9,16 @@ import java.util.UUID;
 /**
  * Represents a pending mutation that hasn't been synced to the server yet.
  *
- * <p>Pending mutations are queued locally and sent to the server during the next sync cycle.
- * Each mutation has a unique {@code mutationId} that persists through the sync cycle for
- * correlating upload requests with server acknowledgements.
+ * <p>Pending mutations are queued locally and sent to the server during the
+ * next sync cycle. Each mutation has a unique {@code mutationId} that persists
+ * through the sync cycle for correlating upload requests with server
+ * acknowledgements.
+ *
+ * @implNote Cobalt-local holder for the entries stored in WhatsApp Web's
+ *     pending-mutation IndexedDB table managed by
+ *     {@code WAWebSyncdPendingMutations}.
  */
+@WhatsAppWebModule(moduleName = "WAWebSyncdPendingMutations")
 public final class SyncPendingMutation {
     private final String mutationId;
     private final DecryptedMutation.Trusted mutation;

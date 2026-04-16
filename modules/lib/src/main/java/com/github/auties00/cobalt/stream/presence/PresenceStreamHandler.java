@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.stream.presence;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.contact.Contact;
 import com.github.auties00.cobalt.model.contact.ContactStatus;
 import com.github.auties00.cobalt.model.jid.Jid;
@@ -24,6 +25,8 @@ import java.util.Set;
  *
  * @implNote WAWebHandlePresence.default and WAWebChangePresenceHandlerAction.default
  */
+@WhatsAppWebModule(moduleName = "WAWebHandlePresence")
+@WhatsAppWebModule(moduleName = "WAWebChangePresenceHandlerAction")
 public final class PresenceStreamHandler implements SocketStream.Handler {
     /**
      * The logger for diagnostic messages related to presence handling.

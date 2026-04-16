@@ -12,7 +12,7 @@ import com.github.auties00.cobalt.socket.threading.SocketClientPendingWrites;
  * selector reads raw channel bytes into its inbound buffer and
  * propagates data up through the layer chain.
  */
-public non-sealed interface SocketClientTransportLayerContext extends SocketClientLayerContext {
+public interface SocketClientTransportLayerContext extends SocketClientLayerContext {
 
     /**
      * Returns whether the connection is currently active.

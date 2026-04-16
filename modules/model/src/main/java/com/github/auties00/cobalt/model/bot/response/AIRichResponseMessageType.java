@@ -4,12 +4,13 @@ import it.auties.protobuf.annotation.ProtobufEnum;
 import it.auties.protobuf.annotation.ProtobufEnumIndex;
 
 /**
- * A message type that classifies the overall format of an
- * {@link AIRichResponseMessage} sent by the WhatsApp AI bot.
+ * Classifies the overall format of an AI rich response message sent by the
+ * WhatsApp AI bot.
  *
- * <p>The type determines how the client should interpret and render
- * the list of {@link AIRichResponseSubMessage} fragments contained
- * in the response.
+ * <p>The type determines how the client should interpret and render the
+ * list of {@link AIRichResponseSubMessage} fragments contained in the
+ * response. Currently two values exist: {@link #UNKNOWN} for unrecognised
+ * formats and {@link #STANDARD} for the normal multi-fragment layout.
  */
 @ProtobufEnum(name = "AIRichResponseMessageType")
 public enum AIRichResponseMessageType {
@@ -28,10 +29,18 @@ public enum AIRichResponseMessageType {
      */
     STANDARD(1);
 
+    /**
+     * Constructs a message type constant with the given protobuf index.
+     *
+     * @param index the protobuf enum index
+     */
     AIRichResponseMessageType(@ProtobufEnumIndex int index) {
         this.index = index;
     }
 
+    /**
+     * The protobuf enum index for this message type.
+     */
     final int index;
 
     /**

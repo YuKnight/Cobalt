@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.message.send.stanza;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.bot.metrics.BotMetricsEntryPoint;
 import com.github.auties00.cobalt.model.bot.metrics.BotMetricsMetadata;
 import com.github.auties00.cobalt.model.chat.Chat;
@@ -27,17 +30,17 @@ import java.util.Objects;
  * <p>The node may include any of the following attributes, depending on
  * message type and recipient:
  * <ul>
- * <li>{@code origin} — LID origin type or bot entry-point origin
- * <li>{@code destination_id} — bot metrics destination identifier
- * <li>{@code sender_intent} — {@code "hosted"} for hosted business accounts
- * <li>{@code polltype} — poll message type ({@code "creation"}, {@code "vote"}, {@code "result_snapshot"})
- * <li>{@code event_type} — event message type ({@code "creation"}, {@code "response"}, {@code "edit"})
- * <li>{@code view_once} — {@code "true"} for view-once media
- * <li>{@code appdata} — app data type ({@code "member_tag"}, {@code "default"}, {@code "group_history"})
- * <li>{@code tag_reason} — member label operation ({@code "user_delete"}, {@code "user_update"})
- * <li>{@code thread_msg_id}, {@code thread_msg_sender_jid} — comment thread identifiers
- * <li>{@code conversation_thread_id} — hashed AI conversation thread identifier
- * <li>{@code status_setting} — status privacy setting for status messages
+ * <li>{@code origin}: LID origin type or bot entry-point origin
+ * <li>{@code destination_id}: bot metrics destination identifier
+ * <li>{@code sender_intent}: {@code "hosted"} for hosted business accounts
+ * <li>{@code polltype}: poll message type ({@code "creation"}, {@code "vote"}, {@code "result_snapshot"})
+ * <li>{@code event_type}: event message type ({@code "creation"}, {@code "response"}, {@code "edit"})
+ * <li>{@code view_once}: {@code "true"} for view-once media
+ * <li>{@code appdata}: app data type ({@code "member_tag"}, {@code "default"}, {@code "group_history"})
+ * <li>{@code tag_reason}: member label operation ({@code "user_delete"}, {@code "user_update"})
+ * <li>{@code thread_msg_id}, {@code thread_msg_sender_jid}: comment thread identifiers
+ * <li>{@code conversation_thread_id}: hashed AI conversation thread identifier
+ * <li>{@code status_setting}: status privacy setting for status messages
  * </ul>
  *
  * @implNote WAWebSendMsgMetaNode.genMetaNode: resolves polltype,
@@ -45,6 +48,7 @@ import java.util.Objects;
  * appdata, tag_reason, thread_msg_id, thread_msg_sender_jid, and
  * conversation_thread_id from the message protobuf and chat data.
  */
+@WhatsAppWebModule(moduleName = "WAWebSendMsgMetaNode")
 public final class MetaStanza {
     /**
      * The store used for resolving chat metadata such as LID origin type
@@ -62,6 +66,8 @@ public final class MetaStanza {
      * @implNote WAWebSendMsgMetaNode: receives store dependencies via
      * module-level imports.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgMetaNode", exports = "genMetaNode",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public MetaStanza(WhatsAppStore store) {
         this.store = Objects.requireNonNull(store, "store");
     }
@@ -88,6 +94,8 @@ public final class MetaStanza {
      * WAWebEncryptAndSendStatusMsg: includes
      * {@code status_setting} in meta node for status stanzas.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgMetaNode", exports = "genMetaNode",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public Node buildChat(Jid chatJid, MessageContainer container, String statusSetting, String hashedAiThreadId) {
         var message = container.content();
 
@@ -200,6 +208,8 @@ public final class MetaStanza {
      * @implNote WAWebSendMsgMetaNode.genMetaNode: delegates to the
      * four-parameter variant with {@code null} hashedAiThreadId.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgMetaNode", exports = "genMetaNode",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public Node buildChat(Jid chatJid, MessageContainer container, String statusSetting) {
         return buildChat(chatJid, container, statusSetting, null);
     }
@@ -215,6 +225,8 @@ public final class MetaStanza {
      * pollResultSnapshotMessage/V3 returns "result_snapshot".
      * WAWebHandleMsgCommon.POLL_TYPES: the possible string values.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgMetaNode", exports = "genMetaNode",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static String resolvePollType(Message message) {
         return switch (message) {
             // WAWebSendMsgMetaNode.u: pollCreationMessage != null → "creation"
@@ -238,6 +250,8 @@ public final class MetaStanza {
      * secretEncryptedMessage with EVENT_EDIT returns "edit".
      * WAWebHandleMsgCommon.EVENT_TYPES: the possible string values.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgMetaNode", exports = "genMetaNode",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static String resolveEventType(Message message) {
         return switch (message) {
             // WAWebSendMsgMetaNode.c: eventMessage != null → "creation"
@@ -270,6 +284,8 @@ public final class MetaStanza {
      * The {@code isCategoryPeerMessage} branch is ADAPTED into
      * {@code PeerMessageSender} which builds its own meta node.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgMetaNode", exports = "genMetaNode",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static String resolveAppdata(Message message) {
         // WAWebSendMsgMetaNode.d: type === PROTOCOL && subtype === "member_label"
         if (message instanceof ProtocolMessage pm
@@ -302,6 +318,8 @@ public final class MetaStanza {
      * "member_label", then inspects memberLabelData.label to determine
      * "user_delete" vs "user_update".
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgMetaNode", exports = "genMetaNode",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static String resolveTagReason(Message message) {
         // WAWebSendMsgMetaNode.p: type === PROTOCOL && subtype === "member_label"
         if (!(message instanceof ProtocolMessage pm)
@@ -328,6 +346,8 @@ public final class MetaStanza {
      * @implNote WAWebSendMsgMetaNode.getOriginAttribute: returns
      * the lidOriginType when to.isLid() and origin === LidOriginType.PNH_CTWA.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgMetaNode", exports = "getOriginAttribute",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private String resolveOrigin(Jid chatJid) {
         // WAWebSendMsgMetaNode.getOriginAttribute: e.isLid() && n === PNH_CTWA
         if (!chatJid.hasLidServer()) {
@@ -354,6 +374,8 @@ public final class MetaStanza {
      * @implNote WAWebBotUtils.isMetaAiBot: checks equality against
      * META_AI_BOT_FBID_WID and META_AI_BOT_WID.
      */
+    @WhatsAppWebExport(moduleName = "WAWebBotUtils", exports = "isMetaAiBot",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static boolean isMetaAiBot(Jid jid) {
         // WAWebBotUtils.isMetaAiBot: e.equals(META_AI_BOT_WID) || e.equals(META_AI_BOT_FBID_WID)
         return jid.equals(Jid.metaAiBotAccount())
@@ -371,6 +393,8 @@ public final class MetaStanza {
      * @implNote WAWebBotLoggingUtils.getBotOriginFromBotMetricsEntryPoint:
      * maps each BotMetricsEntryPoint enum value to a string literal.
      */
+    @WhatsAppWebExport(moduleName = "WAWebBotLoggingUtils", exports = "getBotOriginFromBotMetricsEntryPoint",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static String resolveBotOrigin(BotMetricsEntryPoint entryPoint) {
         // WAWebBotLoggingUtils.getBotOriginFromBotMetricsEntryPoint
         return switch (entryPoint) {
@@ -401,6 +425,8 @@ public final class MetaStanza {
      * is true when the recipient has a verified business name with
      * host_storage set (indicating a hosted account).
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgMetaNode", exports = "genMetaNode",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private boolean isHostedRecipient(Jid chatJid) {
         // WAWebSendMsgMetaNode.genMetaNode: appendHostedSenderIntent option
         return store.findVerifiedBusinessName(chatJid)
@@ -417,6 +443,8 @@ public final class MetaStanza {
      * @implNote WASmaxOutMessagePublishQuestionTypeQuestionMixin:
      * {@code <meta questiontype="question">}
      */
+    @WhatsAppWebExport(moduleName = "WASmaxOutMessagePublishQuestionTypeQuestionMixin", exports = "applyMixin",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static Node buildNewsletterQuestion() {
         return new NodeBuilder()
                 .description("meta")
@@ -433,6 +461,8 @@ public final class MetaStanza {
      * @implNote WASmaxOutMessagePublishQuestionTypeReplyMixin:
      * {@code <meta questiontype="reply">}
      */
+    @WhatsAppWebExport(moduleName = "WASmaxOutMessagePublishQuestionTypeReplyMixin", exports = "applyMixin",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static Node buildNewsletterQuestionReply() {
         return new NodeBuilder()
                 .description("meta")
@@ -449,6 +479,8 @@ public final class MetaStanza {
      * @implNote WASmaxOutMessagePublishQuestionTypeResponseMixin:
      * {@code <meta questiontype="response">}
      */
+    @WhatsAppWebExport(moduleName = "WASmaxOutMessagePublishQuestionTypeResponseMixin", exports = "applyMixin",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static Node buildNewsletterQuestionResponse() {
         return new NodeBuilder()
                 .description("meta")

@@ -251,43 +251,112 @@ public sealed abstract class WhatsAppSessionException
         }
     }
 
+    /**
+     * Exception thrown when the server invalidates the session because the account
+     * has been logged out.
+     *
+     * <p>This is raised when the server delivers a logout notification (either in
+     * response to an explicit logout from another device or as part of a security
+     * enforcement flow). The local session must be discarded and the user must
+     * re-authenticate before reconnecting.
+     */
     public static final class LoggedOut extends WhatsAppSessionException {
+        /**
+         * Constructs a new logged-out exception with a default message.
+         */
         public LoggedOut() {
             super("Session invalidated: logged out by server");
         }
 
+        /**
+         * Constructs a new logged-out exception with the specified detail message.
+         *
+         * @param message the detail message describing the logout condition
+         */
         public LoggedOut(String message) {
             super(message);
         }
 
+        /**
+         * Constructs a new logged-out exception with the specified detail message
+         * and cause.
+         *
+         * @param message the detail message describing the logout condition
+         * @param cause   the underlying cause of the logout
+         */
         public LoggedOut(String message, Throwable cause) {
             super(message, cause);
         }
     }
 
+    /**
+     * Exception thrown when the server invalidates the session because the account
+     * has been banned.
+     *
+     * <p>A ban is a terminal state: the server has refused to accept further traffic
+     * for this account and the client cannot reconnect until the ban is lifted or
+     * appealed through WhatsApp's support channels.
+     */
     public static final class Banned extends WhatsAppSessionException {
+        /**
+         * Constructs a new banned exception with a default message.
+         */
         public Banned() {
             super("Session invalidated: account banned by server");
         }
 
+        /**
+         * Constructs a new banned exception with the specified detail message.
+         *
+         * @param message the detail message describing the ban condition
+         */
         public Banned(String message) {
             super(message);
         }
 
+        /**
+         * Constructs a new banned exception with the specified detail message and cause.
+         *
+         * @param message the detail message describing the ban condition
+         * @param cause   the underlying cause of the ban
+         */
         public Banned(String message, Throwable cause) {
             super(message, cause);
         }
     }
 
+    /**
+     * Exception thrown when the server signals that the client must close the current
+     * session and reconnect.
+     *
+     * <p>This is typically a server-driven request to re-establish the WebSocket
+     * connection (for example during load balancing, configuration rollouts, or
+     * scheduled maintenance). The credentials remain valid and the client can
+     * immediately connect again after closing the previous session.
+     */
     public static final class Reconnect extends WhatsAppSessionException {
+        /**
+         * Constructs a new reconnect exception with a default message.
+         */
         public Reconnect() {
             super("Session requires reconnect");
         }
 
+        /**
+         * Constructs a new reconnect exception with the specified detail message.
+         *
+         * @param message the detail message describing the reconnect request
+         */
         public Reconnect(String message) {
             super(message);
         }
 
+        /**
+         * Constructs a new reconnect exception with the specified detail message and cause.
+         *
+         * @param message the detail message describing the reconnect request
+         * @param cause   the underlying cause of the reconnect request
+         */
         public Reconnect(String message, Throwable cause) {
             super(message, cause);
         }

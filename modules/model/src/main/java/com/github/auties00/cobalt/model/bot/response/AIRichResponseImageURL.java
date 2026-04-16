@@ -9,13 +9,17 @@ import java.util.Optional;
 
 /**
  * A set of URLs that reference different resolutions of a single image
- * within an AI rich response.
+ * within a WhatsApp AI bot rich response.
  *
  * <p>Clients typically display the {@linkplain #imagePreviewUrl() preview}
  * image first and lazy-load the {@linkplain #imageHighResUrl() high-resolution}
  * variant when the user expands or taps the image. The
  * {@linkplain #sourceUrl() source URL} points to the original web page
  * where the image was found.
+ *
+ * <p>This type is used by both {@link AIRichResponseGridImageMetadata}
+ * and {@link AIRichResponseInlineImageMetadata} to provide multi-resolution
+ * image references.
  */
 @ProtobufMessage(name = "AIRichResponseImageURL")
 public final class AIRichResponseImageURL {
@@ -46,6 +50,13 @@ public final class AIRichResponseImageURL {
     URI sourceUrl;
 
 
+    /**
+     * Constructs a new image URL set.
+     *
+     * @param imagePreviewUrl the low-resolution preview URL, or {@code null}
+     * @param imageHighResUrl the full-resolution URL, or {@code null}
+     * @param sourceUrl       the original web page URL, or {@code null}
+     */
     AIRichResponseImageURL(URI imagePreviewUrl, URI imageHighResUrl, URI sourceUrl) {
         this.imagePreviewUrl = imagePreviewUrl;
         this.imageHighResUrl = imageHighResUrl;

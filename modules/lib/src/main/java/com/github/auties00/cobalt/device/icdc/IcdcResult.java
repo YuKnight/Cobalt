@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.device.icdc;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.device.identity.ADVEncryptionType;
 
 import java.time.Instant;
@@ -8,11 +11,18 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Result of computing ICDC (Identity Change Detection Consistency) metadata
- * for a single user (sender or recipient).
+ * Carries the Identity Change Detection Consistency (ICDC) data derived from a
+ * single user's device list.
  *
- * <p>Contains the identity key hash, device timestamp, key indexes for
- * devices whose identity keys were found, and the optional hosted account type.
+ * <p>Every outgoing message that supports multi-device encryption attaches an
+ * {@code icdcMeta} payload so that the recipient can tell, without an explicit
+ * device list exchange, whether the sender's view of the recipient's companion
+ * devices has drifted from the server's view. This record is the Cobalt-side
+ * representation of that payload for one participant (sender or recipient).
+ *
+ * <p>Produced by {@link IcdcComputer#compute} and {@link IcdcComputer#computeFromDeviceList},
+ * and consumed by the outbound message encoder to populate the
+ * {@code deviceListMetadata} field in messageContextInfo.
  *
  * @implNote WAWebIdentityIcdcApi.getICDCMetaFromDeviceRecord: returns
  * {@code {keyHash, timestamp, keyIndexes, senderAccountType, receiverAccountType}}.
@@ -20,6 +30,7 @@ import java.util.Optional;
  * ({@code IcdcEnricher}) maps sender/receiver based on which JID was used
  * to compute the ICDC metadata.
  */
+@WhatsAppWebModule(moduleName = "WAWebIdentityIcdcApi")
 public final class IcdcResult {
 
     /**
@@ -68,6 +79,9 @@ public final class IcdcResult {
      * @implNote WAWebIdentityIcdcApi.getICDCMetaFromDeviceRecord: constructs
      * the result object {@code n = {keyHash, timestamp, keyIndexes, senderAccountType, receiverAccountType}}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebIdentityIcdcApi",
+            exports = "getICDCMetaFromDeviceRecord",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     IcdcResult(
             byte[] keyHash,
             Instant timestamp,
@@ -88,6 +102,9 @@ public final class IcdcResult {
      * @implNote WAWebIdentityIcdcApi.getICDCMetaFromDeviceRecord: {@code n.keyHash},
      * computed via {@code computeIdentityHash(identityKeysToBinary(curveKeys), hashLength)}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebIdentityIcdcApi",
+            exports = "getICDCMetaFromDeviceRecord",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<byte[]> keyHash() {
         return Optional.ofNullable(keyHash);
     }
@@ -102,6 +119,9 @@ public final class IcdcResult {
      * @implNote WAWebIdentityIcdcApi.getICDCMetaFromDeviceRecord: {@code n.timestamp},
      * included when {@code hasMultipleDevices || isRecent(timestamp)}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebIdentityIcdcApi",
+            exports = "getICDCMetaFromDeviceRecord",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<Instant> timestamp() {
         return Optional.ofNullable(timestamp);
     }
@@ -118,6 +138,9 @@ public final class IcdcResult {
      * @implNote WAWebIdentityIcdcApi.getICDCMetaFromDeviceRecord: {@code n.keyIndexes},
      * only set when {@code y.length !== i.length}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebIdentityIcdcApi",
+            exports = "getICDCMetaFromDeviceRecord",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public List<Integer> keyIndexes() {
         return keyIndexes != null
                 ? Collections.unmodifiableList(keyIndexes)
@@ -137,14 +160,20 @@ public final class IcdcResult {
      * {@code n.senderAccountType} or {@code n.receiverAccountType},
      * gated by {@code WAWebBizCoexGatingUtils.bizHostedDevicesEnabled()}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebIdentityIcdcApi",
+            exports = "getICDCMetaFromDeviceRecord",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<ADVEncryptionType> accountType() {
         return Optional.ofNullable(accountType);
     }
 
     /**
-     * {@inheritDoc}
+     * Returns a human-readable representation of this ICDC result for diagnostic logging.
      *
-     * @implNote NO_WA_BASIS: Java-specific toString for debugging.
+     * <p>The hash is rendered as a byte-length summary rather than the raw bytes to
+     * keep logs concise; the other fields are shown verbatim.
+     *
+     * @return the diagnostic string
      */
     @Override
     public String toString() {

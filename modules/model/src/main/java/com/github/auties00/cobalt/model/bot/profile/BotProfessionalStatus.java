@@ -4,38 +4,41 @@ import it.auties.protobuf.annotation.ProtobufDeserializer;
 import it.auties.protobuf.annotation.ProtobufSerializer;
 
 /**
- * Indicates whether a bot is posing as a professional (e.g. a doctor,
- * lawyer, or financial advisor).
+ * Represents whether a WhatsApp AI bot claims to act as a professional,
+ * such as a doctor, lawyer, or financial advisor.
  *
- * <p>This classification is returned by the server as the {@code type}
- * attribute of the {@code <posing_as_professional>} element in the USync
- * bot profile response. Three values are currently defined:
+ * <p>WhatsApp classifies bots that present themselves as professional
+ * advisors so that users can be informed about the nature of the
+ * advice they receive. This sealed interface models three possible
+ * states:
  * <ul>
- * <li>{@link Yes} — the bot claims a professional role
- * <li>{@link No} — the bot does not claim a professional role
+ * <li>{@link Yes} - the bot claims a professional role
+ * <li>{@link No} - the bot does not claim a professional role
+ * <li>{@link Unknown} - the status has not been determined or the
+ *     server returned an unrecognized value
  * </ul>
  *
- * <p>An {@link Unknown} variant is provided for forward compatibility
- * with values that may be added by the server in the future.
- *
- * <p>The wire format is a plain {@code String} (e.g. {@code "unknown"},
- * {@code "yes"}, {@code "no"}).
+ * <p>Instances are obtained via the {@link #of(String)} factory method,
+ * which maps wire-format strings to the appropriate variant. The three
+ * singleton constants {@link #UNKNOWN}, {@link #YES}, and {@link #NO}
+ * are provided for convenience.
  *
  * @see BotProfile#professionalStatus()
  */
 public sealed interface BotProfessionalStatus {
     /**
-     * The professional status has not been determined.
+     * Singleton indicating that the professional status has not been
+     * determined or the server returned an unrecognized value.
      */
     BotProfessionalStatus UNKNOWN = new Unknown();
 
     /**
-     * The bot claims a professional role.
+     * Singleton indicating that the bot claims a professional role.
      */
     BotProfessionalStatus YES = new Yes();
 
     /**
-     * The bot does not claim a professional role.
+     * Singleton indicating that the bot does not claim a professional role.
      */
     BotProfessionalStatus NO = new No();
 
@@ -43,9 +46,9 @@ public sealed interface BotProfessionalStatus {
      * Returns the {@code BotProfessionalStatus} corresponding to the given
      * wire value.
      *
-     * <p>Recognized values are {@code "yes"}, and
-     * {@code "no"} (case-sensitive). Any other non-{@code null} value yields
-     * an {@link Unknown} instance.
+     * <p>Recognized values are {@code "yes"} and {@code "no"}
+     * (case-sensitive). Any other non-{@code null} value yields an
+     * {@link Unknown} instance.
      *
      * @param value the wire-format string, or {@code null}
      * @return the corresponding status, or {@code null} if {@code value}
@@ -72,7 +75,8 @@ public sealed interface BotProfessionalStatus {
     String value();
 
     /**
-     * The professional status has not been determined.
+     * Variant indicating that the professional status has not been
+     * determined or the server returned an unrecognized value.
      */
     record Unknown() implements BotProfessionalStatus {
         /**
@@ -87,7 +91,7 @@ public sealed interface BotProfessionalStatus {
     }
 
     /**
-     * The bot claims a professional role.
+     * Variant indicating that the bot claims a professional role.
      */
     record Yes() implements BotProfessionalStatus {
         /**
@@ -102,7 +106,7 @@ public sealed interface BotProfessionalStatus {
     }
 
     /**
-     * The bot does not claim a professional role.
+     * Variant indicating that the bot does not claim a professional role.
      */
     record No() implements BotProfessionalStatus {
         /**

@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.message.send.bot;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.bot.feedback.BotFeedbackMessage;
 import com.github.auties00.cobalt.model.message.context.ContextInfo;
 import com.github.auties00.cobalt.model.message.context.ContextualMessage;
@@ -25,6 +28,7 @@ import java.util.Objects;
  * {@code updateFbidBotProtobuf}, {@code updateBotProtobuf}, and
  * {@code updateFbidBotInvokeProtobuf}.
  */
+@WhatsAppWebModule(moduleName = "WAWebE2EProtoGenerator")
 public final class BotProtobufTransform {
     /**
      * The store used for LID-to-phone lookups during FBID bot transforms.
@@ -57,6 +61,8 @@ public final class BotProtobufTransform {
      *
      * @implNote WAWebE2EProtoGenerator.updateBotInvokeMsgProtoCopyForCapi
      */
+    @WhatsAppWebExport(moduleName = "WAWebE2EProtoGenerator", exports = "updateBotInvokeMsgProtoCopyForCapi",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public void transformForCapi(MessageContainer container, byte[] botMessageSecret) {
         // Replace messageSecret with botMessageSecret
         container.messageContextInfo().ifPresent(info -> {
@@ -79,6 +85,8 @@ public final class BotProtobufTransform {
      *
      * @implNote WAWebE2EProtoGenerator.updateFbidBotProtobuf
      */
+    @WhatsAppWebExport(moduleName = "WAWebE2EProtoGenerator", exports = "updateFbidBotProtobuf",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public void transformForFbidBot(MessageContainer container) {
         var contextInfo = resolveInnerContextInfo(container);
         if (contextInfo == null) {
@@ -102,6 +110,8 @@ public final class BotProtobufTransform {
      *
      * @implNote WAWebE2EProtoGenerator.updateFbidBotInvokeProtobuf
      */
+    @WhatsAppWebExport(moduleName = "WAWebE2EProtoGenerator", exports = "updateFbidBotInvokeProtobuf",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public void transformForFbidBotInvoke(MessageContainer container) {
         if (!(container.content() instanceof ProtocolMessage pm)) {
             return;
@@ -128,6 +138,8 @@ public final class BotProtobufTransform {
      *
      * @implNote WAWebE2EProtoGenerator.updateBotProtobuf
      */
+    @WhatsAppWebExport(moduleName = "WAWebE2EProtoGenerator", exports = "updateBotProtobuf",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public void transformForBot(MessageContainer container) {
         if (!(container.content() instanceof ProtocolMessage pm)) {
             return;

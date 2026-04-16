@@ -1,6 +1,9 @@
 package com.github.auties00.cobalt.message.send.stanza;
 
 import com.github.auties00.cobalt.message.send.token.ContentBindingToken;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.text.ExtendedTextMessage;
@@ -23,6 +26,9 @@ import java.util.Map;
  * HMAC tags; the sender's own tag is placed in
  * {@code <sender_content_binding>}.
  */
+@WhatsAppWebModule(moduleName = "WAWebSendMsgCreateFanoutStanza")
+@WhatsAppWebModule(moduleName = "WAWebSendGroupSkmsgJob")
+@WhatsAppWebModule(moduleName = "WAWebMsgRcatUtils")
 public final class SenderContentBindingStanza {
     /**
      * Logger for warning on RCAT generation failures.
@@ -57,6 +63,10 @@ public final class SenderContentBindingStanza {
      * (type=CHAT, isUrlMessage, isSentByMe) are applied here at the
      * call site instead of inside the token generator.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCreateFanoutStanza", exports = "createFanoutMsgStanza",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WAWebMsgRcatUtils", exports = "genContentBindingForMsg",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public static Node buildForUser(ChatMessageInfo messageInfo, Jid selfJid) {
         var messageSecret = messageInfo.messageSecret().orElse(null);
         if (messageSecret == null) {
@@ -98,6 +108,8 @@ public final class SenderContentBindingStanza {
      * binding from the RCAT map using
      * {@code widToUserJid(asUserWidOrThrow(senderJid))}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendGroupSkmsgJob", exports = "encryptAndSendSenderKeyMsg",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static Node build(Jid senderJid, Map<Jid, byte[]> contentBindings) {
         if (contentBindings == null) {
             return null;

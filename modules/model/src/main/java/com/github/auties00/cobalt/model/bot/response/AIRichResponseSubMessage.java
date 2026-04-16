@@ -123,6 +123,24 @@ public final class AIRichResponseSubMessage {
     AIRichResponseContentItemsMetadata contentItemsMetadata;
 
 
+    /**
+     * Constructs a new sub-message with all possible payload fields.
+     *
+     * <p>Callers should prefer the type-safe
+     * {@link #of(AIRichResponseSubMessageContent)} factory method to
+     * ensure that exactly one payload is populated.
+     *
+     * @param messageType          the content type discriminator, or {@code null}
+     * @param gridImageMetadata    the grid image payload, or {@code null}
+     * @param messageText          the text payload, or {@code null}
+     * @param imageMetadata        the inline image payload, or {@code null}
+     * @param codeMetadata         the code block payload, or {@code null}
+     * @param tableMetadata        the table payload, or {@code null}
+     * @param dynamicMetadata      the dynamic media payload, or {@code null}
+     * @param latexMetadata        the LaTeX payload, or {@code null}
+     * @param mapMetadata          the map payload, or {@code null}
+     * @param contentItemsMetadata the content items payload, or {@code null}
+     */
     AIRichResponseSubMessage(AIRichResponseSubMessageType messageType, AIRichResponseGridImageMetadata gridImageMetadata, AIRichResponseText messageText, AIRichResponseInlineImageMetadata imageMetadata, AIRichResponseCodeMetadata codeMetadata, AIRichResponseTableMetadata tableMetadata, AIRichResponseDynamicMetadata dynamicMetadata, AIRichResponseLatexMetadata latexMetadata, AIRichResponseMapMetadata mapMetadata, AIRichResponseContentItemsMetadata contentItemsMetadata) {
         this.messageType = messageType;
         this.gridImageMetadata = gridImageMetadata;

@@ -18,6 +18,9 @@ import com.github.auties00.cobalt.device.stanza.DeviceUSyncResponseParser;
 import com.github.auties00.cobalt.device.timestamp.DeviceExpectedTsUtils;
 import com.github.auties00.cobalt.exception.WhatsAppAdvValidationException;
 import com.github.auties00.cobalt.exception.WhatsAppDeviceSyncException;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.message.send.id.MessageIdGenerator;
 import com.github.auties00.cobalt.message.send.id.MessageIdVersion;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
@@ -51,11 +54,21 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * Manages device lists, USync queries, and message fanout calculations.
- * </p>
- * This service handles synchronization of device information with the WhatsApp server
- * using the USync protocol, validates ADV signatures for companion devices, and calculates
- * which devices should receive messages (fanout).
+ * Orchestrates all device list operations for WhatsApp Multi-Device: synchronises companion
+ * device lists over USync, processes real-time device add/remove notifications, computes
+ * message fanout (1:1 and group), attaches ICDC metadata to outgoing messages, and verifies
+ * business coexistence (hosted) transitions.
+ *
+ * <p>Every outgoing message and every decrypted PKMSG routes through this service so the
+ * client maintains a consistent view of each peer's companion devices and each peer's
+ * identity keys. It also schedules a daily ADV expiration check via
+ * {@link com.github.auties00.cobalt.device.adv.DeviceADVChecker} to invalidate stale device
+ * records and trigger proactive syncs.
+ *
+ * <p>This service is the single entry-point that the message send pipeline uses to decide
+ * who receives a message and with which key; the message receive pipeline uses it to update
+ * the local device cache when it observes identity changes, key rotations, and account-type
+ * transitions in incoming messages.
  *
  * @implNote WAWebAdvSyncDeviceListApi: provides syncDeviceList, syncMyDeviceList, syncAndGetDeviceList.
  * WAWebDBDeviceListFanout.getFanOutList: generates device lists for message fanout.
@@ -63,7 +76,18 @@ import java.util.stream.Stream;
  * WAWebHandleAdvKeyIndexResultApi: processes full device list responses with key index validation.
  * WAWebHandleAdvOmittedResultApi: handles omitted responses when server dhash matches local.
  * WAWebHandleAdvDeviceNotificationApi: processes real-time device add/remove notifications.
+ * WAWebHandleAdvForMessageApi: handles ADV device updates from incoming messages.
+ * WAWebIcdcHandlerApi: handles ICDC data processing for incoming messages.
+ * WAWebApiDeviceList: provides getDeviceIds, getMyDeviceList, hasDevice accessors.
  */
+@WhatsAppWebModule(moduleName = "WAWebAdvSyncDeviceListApi")
+@WhatsAppWebModule(moduleName = "WAWebAdvHandlerApi")
+@WhatsAppWebModule(moduleName = "WAWebHandleAdvKeyIndexResultApi")
+@WhatsAppWebModule(moduleName = "WAWebHandleAdvOmittedResultApi")
+@WhatsAppWebModule(moduleName = "WAWebHandleAdvDeviceNotificationApi")
+@WhatsAppWebModule(moduleName = "WAWebHandleAdvForMessageApi")
+@WhatsAppWebModule(moduleName = "WAWebIcdcHandlerApi")
+@WhatsAppWebModule(moduleName = "WAWebApiDeviceList")
 public final class DeviceService {
     /**
      * Logger for device service operations.
@@ -71,7 +95,17 @@ public final class DeviceService {
     private static final System.Logger LOGGER = System.getLogger(DeviceService.class.getName());
 
     /**
-     * Joiner for parallel USync batch processing using structured concurrency.
+     * Custom structured-concurrency joiner that fans out one USync IQ per batch and collects
+     * the parsed {@link DeviceListResult} entries across all batches into a single flat list.
+     *
+     * <p>Failed subtasks are swallowed rather than cancelling the entire scope so that one
+     * failed batch does not lose the successful results from its siblings; failures surface
+     * later when the expected JID is missing from the collated output and callers fall back
+     * to the primary-only device list.
+     *
+     * @implNote ADAPTED: WAWebUsync.USyncQuery.execute uses Promise.all on sliced batches and
+     * Promise.allSettled semantics; Cobalt implements the same semantics via a bespoke
+     * {@link Joiner} over virtual threads.
      */
     private static final Joiner<List<DeviceListResult>, List<DeviceListResult>> JOINER = new Joiner<>() {
         private final List<Subtask<? extends List<DeviceListResult>>> subtasks = new ArrayList<>();
@@ -226,12 +260,23 @@ public final class DeviceService {
     private final Set<Jid> offlineBizHostedSenderICDCProcessedCache;
 
     /**
-     * Creates a new device service.
+     * Creates a new device service and its owned helpers.
      *
-     * @param client         the WhatsApp client
+     * <p>Instantiates the ADV validator, fanout calculator, phash calculator, ICDC computer,
+     * USync response parser, pre-key handler, and ADV expiration scheduler. All of these
+     * collaborators receive the same store and AB props dependencies so they operate on a
+     * single consistent view of device state.
+     *
+     * @param client         the WhatsApp client providing store and network access
      * @param abPropsService the AB props service for feature gating
-     * @param sessionCipher the session cipher
+     * @param sessionCipher  the Signal session cipher used by the pre-key handler
+     * @implNote ADAPTED: WA Web wires these modules via module-level imports; Cobalt groups
+     * their construction here so a single {@link DeviceService} instance owns and can
+     * deterministically tear down the background ADV scheduler.
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvSyncDeviceListApi",
+            exports = "syncDeviceList",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public DeviceService(WhatsAppClient client, ABPropsService abPropsService, SignalSessionCipher sessionCipher) {
         this.client = client;
         this.store = client.store();
@@ -260,6 +305,9 @@ public final class DeviceService {
      * @implNote WAWebApiGetDeviceUpdateLock.getDeviceUpdateLock: ensures device table updates
      * (device-list, session, sender-key, missing-keys, contact) are serialized.
      */
+    @WhatsAppWebExport(moduleName = "WAWebApiGetDeviceUpdateLock",
+            exports = "getDeviceUpdateLock",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private void withDeviceUpdateLock(Runnable task) {
         deviceUpdateLock.lock();
         try {
@@ -281,6 +329,9 @@ public final class DeviceService {
      * both adv_accept_hosted_devices AND override_adv_account_signature_key_enabled AB props
      * to be true. Used in WAWebHandleAdvDeviceNotificationUtils.verifySKeyIndexWithAccSigKey.
      */
+    @WhatsAppWebExport(moduleName = "WAWebBizCoexGatingUtils",
+            exports = "hostedOverrideAdvAccountSignatureKeyEnabled",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private boolean isHostedOverrideAdvAccountSignatureKeyEnabled() {
         // WAWebBizCoexGatingUtils: first check if hosted devices are enabled at all
         var hostedDevicesEnabled = abPropsService.getBool(ABProp.ADV_ACCEPT_HOSTED_DEVICES);
@@ -307,6 +358,9 @@ public final class DeviceService {
      * @implNote WAWebAdvSyncDeviceListApi.syncAndGetDeviceList: if local phash matches
      * expectedPhash (l===d), the function returns early without sending USync request.
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvSyncDeviceListApi",
+            exports = {"syncDeviceList", "syncAndGetDeviceList"},
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public Set<DeviceList> getDeviceLists(Collection<Jid> userJids, String context, String expectedPhash, boolean shouldMergeAltDevices) {
         // WAWebAdvSyncDeviceListApi.syncDeviceList: if phash is provided (a!=null), check local match
         if (expectedPhash != null && !expectedPhash.isEmpty()) {
@@ -395,6 +449,9 @@ public final class DeviceService {
      * @implNote WAWebLidMigrationUtils: during migration, both PN and LID may have device records.
      * The PN identity is preferred as the canonical representation.
      */
+    @WhatsAppWebExport(moduleName = "WAWebLidMigrationUtils",
+            exports = "getCurrentLid",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private Set<DeviceList> mergeAlternateDeviceLists(Collection<DeviceList> deviceLists) {
         var mergedMap = new LinkedHashMap<Jid, DeviceList>();
 
@@ -431,6 +488,9 @@ public final class DeviceService {
      * @implNote WAWebApiContact.checkPnToLidMapping: diagnostic check that logs warnings
      * for phone number JIDs missing LID mappings. Called before USync requests.
      */
+    @WhatsAppWebExport(moduleName = "WAWebApiContact",
+            exports = "checkPnToLidMapping",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private void checkPnToLidMapping(Collection<Jid> userJids, String caller) {
         // WAWebApiContact.checkPnToLidMapping: filter to only phone number JIDs
         // Excludes bots (!isBot()), hosted (!isHosted()), and LIDs (!isLid())
@@ -475,6 +535,12 @@ public final class DeviceService {
      * requests. Builds USync query via WAWebUsync.USyncQuery with device protocol.
      * Processes results via WAWebAdvHandlerApi.handleADVDeviceSyncResult.
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvSyncDeviceListApi",
+            exports = "syncDeviceList",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WAWebAdvHandlerApi",
+            exports = "handleADVDeviceSyncResult",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private List<DeviceList> fetchDeviceListsFromServer(Collection<Jid> userJids, String context) {
         var result = new ArrayList<DeviceList>();
         var toFetch = new HashSet<Jid>();
@@ -918,7 +984,23 @@ public final class DeviceService {
         }
     }
 
+    /**
+     * Sends all USync batches in parallel and collates the parsed results into a single list.
+     *
+     * @param batches the USync IQ batches to dispatch
+     * @return the flattened list of parsed device list results
+     * @throws RuntimeException if the calling virtual thread is interrupted while waiting
+     * @implNote WAWebUsync.USyncQuery.execute: WA Web iterates batches with {@code Promise.all};
+     * Cobalt forks virtual-thread subtasks with {@link StructuredTaskScope} and accumulates
+     * results via the static {@code JOINER}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebUsync",
+            exports = "USyncQuery",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private List<DeviceListResult> getDevicesFetchedResults(List<NodeBuilder> batches) {
+        // WAWebUsync.USyncQuery.execute
+        // Fans out one virtual-thread subtask per batch and collates their parsed results
+
         try (var scope = StructuredTaskScope.open(JOINER)) {
             for (var batch : batches) {
                 scope.fork(() -> {
@@ -948,6 +1030,9 @@ public final class DeviceService {
      * be in the verification cache (populated during USync). WAWebIdentityUpdateDeviceTableApi:
      * clears Signal sessions when account type changes. WAWebBizCoexUtils: creates system messages.
      */
+    @WhatsAppWebExport(moduleName = "WAWebBizCoexUtils",
+            exports = "handleAccountTypeTransition",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private void handleAccountTypeTransition(Jid userJid, ADVEncryptionType oldType, ADVEncryptionType newType, DeviceList oldList) {
         LOGGER.log(System.Logger.Level.INFO, "Account type changed for {0}: {1} -> {2}", userJid, oldType, newType);
 
@@ -993,6 +1078,9 @@ public final class DeviceService {
      * @implNote WAWebBizCoexUtils: creates system messages for account type transitions.
      * Uses shouldDedupInitialHostedSystemMsg to prevent duplicate messages within the same second.
      */
+    @WhatsAppWebExport(moduleName = "WAWebBizCoexUtils",
+            exports = "shouldDedupInitialHostedSystemMsg",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private void createAccountTypeChangeSystemMessage(Jid userJid, ADVEncryptionType newType) {
         var chat = store.findChatByJid(userJid).orElse(null);
         if (chat == null) {
@@ -1042,6 +1130,9 @@ public final class DeviceService {
      * @implNote WAWebBizCoexUtils.shouldDedupInitialHostedSystemMsg: returns true if a
      * system message was already created for this user within the same second.
      */
+    @WhatsAppWebExport(moduleName = "WAWebBizCoexUtils",
+            exports = "shouldDedupInitialHostedSystemMsg",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private boolean shouldDedupInitialHostedSystemMsg(Jid userJid) {
         // WAWebBizCoexUtils.shouldDedupInitialHostedSystemMsg: uses unixTime() (seconds granularity)
         // Creates key from jid + "_" + unixTime, dedup within same second
@@ -1067,6 +1158,9 @@ public final class DeviceService {
      * @implNote WAWebIdentityUpdateDeviceTableApi.clearDeviceRecord: clears Signal sessions
      * for all non-primary devices when cleaning up a device record.
      */
+    @WhatsAppWebExport(moduleName = "WAWebIdentityUpdateDeviceTableApi",
+            exports = "clearDeviceRecord",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private void cleanupAllSessionsForUser(Jid userJid, DeviceList oldList) {
         for (var device : oldList.devices()) {
             var deviceJid = device.toDeviceJid(userJid.user(), userJid.server());
@@ -1089,6 +1183,9 @@ public final class DeviceService {
      * all Signal sessions must be cleared and the device list rebuilt from scratch.
      * This is the "clearRecord" path in WAWebHandleAdvKeyIndexResultApi.
      */
+    @WhatsAppWebExport(moduleName = "WAWebHandleAdvKeyIndexResultApi",
+            exports = "handleKeyIndexResultSync",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private boolean requiresListReset(DeviceList cachedList, String newRawId) {
         if (cachedList == null || cachedList.deleted()) {
             return false;
@@ -1112,6 +1209,9 @@ public final class DeviceService {
      * @implNote WAWebHandleAdvListResetApi.handleListReset: clears all existing Signal
      * sessions for the user when rawId changes. Called via clearDeviceRecord path.
      */
+    @WhatsAppWebExport(moduleName = "WAWebHandleAdvListResetApi",
+            exports = "handleListReset",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private void handleListReset(Jid userJid, DeviceList cachedList, String oldRawId, String newRawId) {
         LOGGER.log(System.Logger.Level.INFO,
                 "Device list rawId changed for {0}: {1} -> {2}, triggering full reset (handleListReset)",
@@ -1136,6 +1236,9 @@ public final class DeviceService {
      * against cached validIndexes. Throws error if timestamp is not newer but keyIndex is
      * not in validIndexes (indicates replay attack or corrupted state).
      */
+    @WhatsAppWebExport(moduleName = "WAWebHandleAdvNoListResetApi",
+            exports = "handleNoListReset",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private DeviceList handleNoListReset(Jid userJid, DeviceList cachedList, DeviceList newList) {
         // WAWebHandleAdvNoListResetApi.handleNoListReset: detect out-of-order timestamps
         // if(i.timestamp>=p && i.validIndexes && !i.validIndexes.includes(m))
@@ -1190,6 +1293,9 @@ public final class DeviceService {
      * but server only returned the LID entry, duplicate the LID result as if it were the PN entry.
      * Uses getCurrentLid() to find LID mappings and isRegularUserPn() to filter applicable JIDs.
      */
+    @WhatsAppWebExport(moduleName = "WAWebContactSyncUtils",
+            exports = "backfillMissingDeviceSyncEntries",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private List<DeviceListResult> backfillMissingDeviceSyncEntries(
             Set<Jid> requestedJids,
             List<DeviceListResult> results
@@ -1282,6 +1388,9 @@ public final class DeviceService {
      * @implNote WAWebLastADVCheckTimeApi.getLastADVDeviceInfoCheckTime: returns the timestamp
      * of the last scheduled ADV device info check job.
      */
+    @WhatsAppWebExport(moduleName = "WAWebLastADVCheckTimeApi",
+            exports = "getLastADVDeviceInfoCheckTime",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<Instant> lastAdvCheckTime() {
         return store.lastAdvCheckTime();
     }
@@ -1292,6 +1401,9 @@ public final class DeviceService {
      * @implNote WAWebLastADVCheckTimeApi: stores the timestamp when the ADV device info
      * check job runs, used for expected timestamp staleness calculations.
      */
+    @WhatsAppWebExport(moduleName = "WAWebLastADVCheckTimeApi",
+            exports = "setLastADVDeviceInfoCheckTime",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public void updateAdvCheckTime() {
         store.updateAdvCheckTime();
     }
@@ -1307,6 +1419,9 @@ public final class DeviceService {
      * @implNote WAWebDBDeviceListFanout.getFanOutList: when no device record is found,
      * sends to primary device only (l.toString()).
      */
+    @WhatsAppWebExport(moduleName = "WAWebDBDeviceListFanout",
+            exports = "getFanOutList",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private DeviceList createPrimaryOnlyDeviceList(Jid userJid) {
         var now = Instant.now();
         return new DeviceListBuilder()
@@ -1329,6 +1444,9 @@ public final class DeviceService {
      * @implNote WAWebIdentityUpdateDeviceTableApi.clearDeviceRecord: marks device list
      * as deleted=true. WAWebBizCoexUtils: sets deletedChangedToHost for HOSTED transitions.
      */
+    @WhatsAppWebExport(moduleName = "WAWebIdentityUpdateDeviceTableApi",
+            exports = "clearDeviceRecord",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private DeviceList createDeletedDeviceList(Jid userJid, boolean changedToHost) {
         var now = Instant.now();
         return new DeviceListBuilder()
@@ -1346,6 +1464,9 @@ public final class DeviceService {
      * @implNote WAWebAdvDeviceInfoCheckJob.scheduleAdvDeviceInfoCheck: schedules periodic
      * check that runs every 24 hours to verify device list freshness.
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvDeviceInfoCheckJob",
+            exports = "scheduleAdvDeviceInfoCheck",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public void startAdvCheckScheduler() {
         advCheckScheduler.start();
     }
@@ -1355,7 +1476,15 @@ public final class DeviceService {
      *
      * <p>Should be called before client disconnects to prevent background tasks
      * from running on a disconnected client.
+     *
+     * @implNote ADAPTED: WAWebAdvDeviceInfoCheckJob: WA Web has no explicit cancel hook
+     * for the scheduled timeout; the timeout is simply cleared during logout.
+     * Cobalt exposes this as a public method so the connection lifecycle can
+     * deterministically stop background work before disconnect.
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvDeviceInfoCheckJob",
+            exports = "scheduleAdvDeviceInfoCheck",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public void stopAdvCheckScheduler() {
         advCheckScheduler.close();
     }
@@ -1369,6 +1498,9 @@ public final class DeviceService {
      * @implNote WAWebApiPendingDeviceSync.doPendingDeviceSync: called during
      * RESUME_WITH_OPEN_TAB to retry pending device syncs.
      */
+    @WhatsAppWebExport(moduleName = "WAWebApiPendingDeviceSync",
+            exports = "doPendingDeviceSync",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public void retryPendingSyncs() {
         var pending = store.pendingDevicesSyncs();
         for (var sync : pending) {
@@ -1410,6 +1542,9 @@ public final class DeviceService {
      * are removed, update missing sync key entries to remove the device from tracking.
      * If all devices report missing, triggers SyncdFatalErrorType.MISSING_KEY_ON_ALL_CLIENTS.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdStoreMissingKeys",
+            exports = "updateMissingKeyDevices",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public void updateMissingKeyDevices() {
         // WAWebApiGetDeviceUpdateLock: serialize device and missing-key updates
         withDeviceUpdateLock(() -> {
@@ -1470,6 +1605,9 @@ public final class DeviceService {
      * WAWebDBDeviceListFanout.getFanOutList: filters self, includes hosted
      * for 1:1 user chats when bizHostedDevicesEnabled.
      */
+    @WhatsAppWebExport(moduleName = "WAWebDBDeviceListFanout",
+            exports = "getFanOutList",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public Collection<Jid> getUserFanout(Jid chatJid, String expectedPhash) {
         var myDeviceJid = resolveMyDeviceJid(chatJid);
         var deviceLists = getDeviceLists(
@@ -1501,6 +1639,12 @@ public final class DeviceService {
      * sender) and F is the sender's own device JID
      * ({@code isCagAddon || isLidAddressingMode ? getMeDeviceLidOrThrow() : getMeDevicePnOrThrow_DO_NOT_USE()}).
      */
+    @WhatsAppWebExport(moduleName = "WAWebDBDeviceListFanout",
+            exports = "getFanOutList",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebPhashUtils",
+            exports = "phashV2",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public DeviceGroupFanoutResult getGroupFanout(Jid groupJid, Jid senderDeviceJid) {
         var myDeviceJid = resolveMyDeviceJid(groupJid);
         try {
@@ -1540,6 +1684,9 @@ public final class DeviceService {
      * @implNote WAWebIdentityIcdcApi.getICDCMeta: retrieves the device record
      * and delegates to {@code getICDCMetaFromDeviceRecord}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebIdentityIcdcApi",
+            exports = "getICDCMeta",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<IcdcResult> computeIcdc(Jid userJid) {
         return icdcComputer.compute(userJid);
     }
@@ -1555,9 +1702,12 @@ public final class DeviceService {
      *
      * @implNote WAWebSendMsgCreateFanoutStanza.createFanoutMsgStanza:
      * calls {@code ensureE2ESessions(devices)} before encrypting.
-     * WAWebE2ESessionService: deduplicates concurrent session
+     * WAWebManageE2ESessionsJob.ensureE2ESessions: deduplicates concurrent session
      * establishment requests.
      */
+    @WhatsAppWebExport(moduleName = "WAWebManageE2ESessionsJob",
+            exports = "ensureE2ESessions",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public void ensureSessions(Collection<Jid> deviceJids) {
         preKeyHandler.ensureSessions(deviceJids);
     }
@@ -1577,6 +1727,9 @@ public final class DeviceService {
      * WAWebSendGroupSkmsgJob: uses getMeDeviceLid for LID groups,
      * getMeDevicePn otherwise.
      */
+    @WhatsAppWebExport(moduleName = "WAWebUserPrefsMeUser",
+            exports = {"getMeDeviceLid", "getMeDevicePnOrThrow_DO_NOT_USE"},
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private Jid resolveMyDeviceJid(Jid chatJid) {
         var selfJid = store.jid().orElseThrow(() ->
                 new IllegalStateException("Not logged in"));
@@ -1594,6 +1747,9 @@ public final class DeviceService {
      * @implNote WAWebBizCoexGatingUtils.bizHostedDevicesEnabled: returns
      * getABPropConfigValue("adv_accept_hosted_devices"), defaulting to false.
      */
+    @WhatsAppWebExport(moduleName = "WAWebBizCoexGatingUtils",
+            exports = "bizHostedDevicesEnabled",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private boolean isBizHostedDevicesEnabled() {
         // WAWebBizCoexGatingUtils: defaults to false when AB prop is not set
         return abPropsService.getBool(ABProp.ADV_ACCEPT_HOSTED_DEVICES);
@@ -1612,6 +1768,9 @@ public final class DeviceService {
      * @implNote WAWebAdvHandlerApi.handleADVDeviceSyncResult: when bizHostedDevicesEnabled
      * is false, filters out devices where id === HOSTED_DEVICE_ID (99).
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvHandlerApi",
+            exports = "handleADVDeviceSyncResult",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static List<DeviceListResult> filterHostedDevicesFromResults(List<DeviceListResult> results) {
         return results.stream()
                 .map(DeviceListResult::withoutHostedDevices)
@@ -1632,6 +1791,9 @@ public final class DeviceService {
      * handleDeviceAddNotification or handleDeviceRemoveNotification based on action type.
      * Uses device update lock to serialize table updates.
      */
+    @WhatsAppWebExport(moduleName = "WAWebHandleAdvDeviceNotificationApi",
+            exports = {"handleDeviceAddNotification", "handleDeviceRemoveNotification"},
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public void handleDeviceNotification(Node node, String action, Jid userJid) {
         Objects.requireNonNull(node, "node cannot be null");
         Objects.requireNonNull(action, "action cannot be null");
@@ -1675,6 +1837,9 @@ public final class DeviceService {
      * record exists or it's deleted, triggers USync via triggerUsyncForCoexDeviceAdd.
      * Otherwise validates and merges devices following WAWebHandleAdvKeyIndexResultApi logic.
      */
+    @WhatsAppWebExport(moduleName = "WAWebHandleAdvDeviceNotificationApi",
+            exports = "handleDeviceAddNotification",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private void handleDeviceAddNotification(
             Jid userJid,
             Node deviceListNode,
@@ -1894,6 +2059,25 @@ public final class DeviceService {
         LOGGER.log(System.Logger.Level.DEBUG, "Device added for {0}: {1} devices", userJid, devices.size());
     }
 
+    /**
+     * Parses and validates a single device entry from an incoming add notification.
+     *
+     * <p>For notification-sourced devices, only keyIndexes that appear in the
+     * cryptographically signed {@code validIndexes} set are accepted; the
+     * "keyIndex &gt; currentIndex" allowance that applies to cached devices does not apply
+     * here. Hosted devices (id 99) are additionally gated by {@code bizHostedDevicesEnabled}.
+     *
+     * @param deviceNode             the device child node
+     * @param keyIndexMap            map of device id to keyIndex from the key-index-list
+     * @param validatedKeyIndexInfo  the validated key index list, or {@code null}
+     * @return a single-element stream with the parsed device, or empty when rejected
+     * @implNote WAWebHandleAdvDeviceNotificationApi.handleDeviceAddNotification: filters
+     * notification devices against {@code validIndexes} and rejects anything outside that
+     * signed set, unlike cached-device filtering which also allows {@code keyIndex > currentIndex}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebHandleAdvDeviceNotificationApi",
+            exports = "handleDeviceAddNotification",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private Stream<DeviceInfo> parseAndValidateAddedDevice(Node deviceNode, Map<Integer, Integer> keyIndexMap, ValidatedKeyIndexListResult validatedKeyIndexInfo) {
         var id = deviceNode.getAttributeAsInt("id");
         if (id.isEmpty()) {
@@ -1943,6 +2127,9 @@ public final class DeviceService {
      * notification contains devices being REMOVED. Filter logic at line:
      * {@code n.devices.filter(e => e.id !== DEFAULT_DEVICE_ID && (t=r.get(e.id), t==null || t!==e.keyIndex))}
      */
+    @WhatsAppWebExport(moduleName = "WAWebHandleAdvDeviceNotificationApi",
+            exports = "handleDeviceRemoveNotification",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private void handleDeviceRemoveNotification(Jid userJid, Node deviceListNode, Node keyIndexListNode, long timestamp) {
         // WAWebHandleAdvDeviceNotificationApi: need cached list to filter against
         var cachedList = store.findDeviceList(userJid);
@@ -2038,12 +2225,29 @@ public final class DeviceService {
      * @implNote WAWebHandleAdvDeviceNotificationApi: builds map from notification devices
      * using {@code new Map(e.map(e => [e.id, e.keyIndex]))}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebHandleAdvDeviceNotificationApi",
+            exports = "handleDeviceAddNotification",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static Map<Integer, Integer> buildKeyIndexMap(Node keyIndexListNode) {
         return keyIndexListNode.streamChildren("device")
                 .flatMap(DeviceService::parseDevice)
                 .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
+    /**
+     * Parses a device child node into a {@code (deviceId, keyIndex)} entry.
+     *
+     * <p>Returns an empty stream when the JID attribute is missing or the {@code key-index}
+     * attribute cannot be parsed, so callers can {@code flatMap} without explicit null handling.
+     *
+     * @param deviceNode the device child node
+     * @return a single-element stream with the parsed entry, or empty when invalid
+     * @implNote WAWebHandleAdvDeviceNotificationApi: uses
+     * {@code new Map(devices.map(e => [e.id, e.keyIndex]))} to build the same mapping inline.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebHandleAdvDeviceNotificationApi",
+            exports = "handleDeviceAddNotification",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private static Stream<Map.Entry<Integer, Integer>> parseDevice(Node deviceNode) {
         var jid = deviceNode.getAttributeAsJid("jid");
         if (jid.isEmpty()) {
@@ -2067,6 +2271,9 @@ public final class DeviceService {
      * @implNote WAWebHandleAdvDeviceNotificationUtils.decodeSignedKeyIndexBytes: validates
      * Curve25519 signature using embedded or stored accountSignatureKey.
      */
+    @WhatsAppWebExport(moduleName = "WAWebHandleAdvDeviceNotificationUtils",
+            exports = "decodeSignedKeyIndexBytes",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private ValidatedKeyIndexListResult validateKeyIndexList(Node keyIndexListNode) {
         var signedKeyIndexBytes = keyIndexListNode.toContentBytes();
         if (signedKeyIndexBytes.isEmpty()) {
@@ -2094,6 +2301,9 @@ public final class DeviceService {
      * @implNote WAWebBizCoexUtils.triggerUsyncForCoexDeviceAdd: checks resumeFromRestartComplete
      * flag to determine whether to trigger immediate sync or queue for doPendingDeviceSync.
      */
+    @WhatsAppWebExport(moduleName = "WAWebBizCoexUtils",
+            exports = "triggerUsyncForCoexDeviceAdd",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private void triggerUsyncForCoexDeviceAdd(Node deviceListNode, Jid userJid) {
         // WAWebBizCoexUtils: check if this is a hosted device notification
         var isHostedDevice = deviceListNode != null && hasHostedDevice(deviceListNode);
@@ -2117,6 +2327,17 @@ public final class DeviceService {
         }
     }
 
+    /**
+     * Checks whether a device-list node contains the hosted device sentinel (id 99).
+     *
+     * @param deviceListNode the device-list node
+     * @return {@code true} if any child device carries id equal to {@link DeviceConstants#HOSTED_DEVICE_ID}
+     * @implNote WAWebBizCoexUtils: used by {@code triggerUsyncForCoexDeviceAdd} to route
+     * hosted-device notifications.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebBizCoexUtils",
+            exports = "triggerUsyncForCoexDeviceAdd",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private static boolean hasHostedDevice(Node deviceListNode) {
         return deviceListNode.streamChildren("device")
                 .anyMatch(deviceNode -> deviceNode.hasAttribute("id", DeviceConstants.HOSTED_DEVICE_ID));
@@ -2132,6 +2353,9 @@ public final class DeviceService {
      * @implNote WAWebAdvSyncDeviceListApi.syncMyDeviceList: calls syncDeviceList with
      * {@code wids: getMePNandLIDWids(), context: null, phash: null}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvSyncDeviceListApi",
+            exports = "syncMyDeviceList",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public void syncMyDeviceList() {
         // WAWebAdvSyncDeviceListApi.syncMyDeviceList: getMePNandLIDWids returns both PN and LID JIDs
         var myJids = new ArrayList<Jid>();
@@ -2157,6 +2381,9 @@ public final class DeviceService {
      * {@code syncDeviceList({wids, context: null, phash: null})} then returns
      * {@code getDeviceIds(wids)}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvSyncDeviceListApi",
+            exports = "syncAndGetDeviceList",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public List<DeviceList> syncAndGetDeviceList(Collection<Jid> userJids) {
         // WAWebAdvSyncDeviceListApi.syncAndGetDeviceList: sync first, then return device IDs
         getDeviceLists(userJids, null, null, false);
@@ -2181,6 +2408,9 @@ public final class DeviceService {
      * {@code true} immediately. Otherwise calls {@code getDeviceIds([userJid])} and checks
      * if any device in the result has the matching ID.
      */
+    @WhatsAppWebExport(moduleName = "WAWebApiDeviceList",
+            exports = "hasDevice",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public boolean hasDevice(Jid userJid, int deviceId) {
         // WAWebApiDeviceList.hasDevice: primary device always exists
         if (deviceId == DeviceConstants.PRIMARY_DEVICE_ID) {
@@ -2208,6 +2438,9 @@ public final class DeviceService {
      * {@code getMeDevicePnOrThrow()}. If not found or deleted, falls back to LID
      * via {@code getMeDeviceLidOrThrow()}. Throws if both are missing.
      */
+    @WhatsAppWebExport(moduleName = "WAWebApiDeviceList",
+            exports = "getMyDeviceList",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public DeviceList getMyDeviceList() {
         // WAWebApiDeviceList.getMyDeviceList: try PN first
         var pnJid = store.jid().map(Jid::toUserJid).orElse(null);
@@ -2246,6 +2479,9 @@ public final class DeviceService {
      * @implNote WAWebApiDeviceList.getAllDeviceLists: returns all records from the
      * device list table via {@code getDeviceListTable().all()}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebApiDeviceList",
+            exports = "getAllDeviceLists",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public Collection<DeviceList> getAllDeviceLists() {
         // WAWebApiDeviceList.getAllDeviceLists: return all device lists from store
         return store.deviceLists();
@@ -2269,6 +2505,9 @@ public final class DeviceService {
      * Handles two cases: (1) primary device with timestamp-only metadata triggers a minimal
      * ADV sync result, (2) normal case updates expectedTs for both sender and recipient records.
      */
+    @WhatsAppWebExport(moduleName = "WAWebIcdcHandlerApi",
+            exports = "handleICDCData",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public void handleICDCData(Jid senderJid, Jid recipientUserJid, DeviceListMetadata metadata) {
         // WAWebIcdcHandlerApi.handleICDCData: if metadata is null, return
         if (metadata == null) {
@@ -2371,6 +2610,9 @@ public final class DeviceService {
      * @implNote WAWebIcdcHandlerApi.handleICDCData: calls handleADVSyncResult with a minimal
      * device list containing only the primary device and the adjusted timestamp.
      */
+    @WhatsAppWebExport(moduleName = "WAWebIcdcHandlerApi",
+            exports = "handleICDCData",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private void handleMinimalTimestampOnlySync(Jid userJid, Instant adjustedTimestamp) {
         // WAWebIcdcHandlerApi.handleICDCData: handleADVSyncResult(e, {deviceList: [{id: 0, keyIndex: 0}],
         // keyIndex: {ts: castToUnixTime(senderTimestamp+1), signedKeyIndexBytes: null}}, null, null)
@@ -2447,6 +2689,9 @@ public final class DeviceService {
      * device gating, determines sender/receiver account type, detects HOSTED transitions,
      * and triggers device sync when account type changes from E2EE to HOSTED.
      */
+    @WhatsAppWebExport(moduleName = "WAWebIcdcHandlerApi",
+            exports = "handleHostedIcdcMetadataInline",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public HostedIcdcResult handleHostedIcdcMetadataInline(Jid chatJid, Jid authorJid, DeviceListMetadata metadata) {
         // WAWebIcdcHandlerApi.handleHostedIcdcMetadataInline: check gating
         if (!isBizHostedDevicesEnabled()) {
@@ -2582,6 +2827,9 @@ public final class DeviceService {
      * keyIndex assertions, retrieves the device record, determines if primary identity changed,
      * and dispatches to handleListReset or handleNoListReset.
      */
+    @WhatsAppWebExport(moduleName = "WAWebHandleAdvForMessageApi",
+            exports = "handleADVDeviceUpdateForMessage",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public void handleADVDeviceUpdateForMessage(
             Jid deviceJid,
             String rawId,
@@ -2763,6 +3011,9 @@ public final class DeviceService {
      * verifies account signature, and generates device signature using local identity key.
      * Uses advSecretKey (not companion public key) for HMAC verification.
      */
+    @WhatsAppWebExport(moduleName = "WAWebHandlePairSuccess",
+            exports = "handlePairSuccess",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<ADVSignedDeviceIdentity> extractAndValidateLocalSignedDeviceIdentity(Node deviceIdentityNode) {
         try {
             var signedDeviceIdentity = advValidator.extractAndValidateLocalSignedDeviceIdentity(deviceIdentityNode);

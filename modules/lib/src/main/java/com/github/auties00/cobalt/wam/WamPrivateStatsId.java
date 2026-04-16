@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.wam;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.util.DataUtils;
 
 import java.time.Instant;
@@ -18,25 +19,27 @@ import java.util.Map;
  * name, a hash integer (written as the {@code psId} global on the wire),
  * and a rotation period in days:
  * <ul>
- * <li>{@code DefaultPsId} (113760892) — never rotates
- * <li>{@code IdTtlDaily} (248614979) — rotates every day
- * <li>{@code IdTtlWeekly} (42196056) — rotates every 7 days
- * <li>{@code IdTtlMonthly} (191000728) — rotates every 30 days
- * <li>{@code IdTtl90Days} (37887164) — rotates every 90 days
- * <li>{@code GroupExitExperienceId} (152546501) — rotates every 30 days
- * <li>{@code GroupSafetyCheckId} (216763284) — rotates every 30 days
- * <li>{@code IdPreMetrics} (56300709) — never rotates
+ * <li>{@code DefaultPsId} (113760892): never rotates
+ * <li>{@code IdTtlDaily} (248614979): rotates every day
+ * <li>{@code IdTtlWeekly} (42196056): rotates every 7 days
+ * <li>{@code IdTtlMonthly} (191000728): rotates every 30 days
+ * <li>{@code IdTtl90Days} (37887164): rotates every 90 days
+ * <li>{@code GroupExitExperienceId} (152546501): rotates every 30 days
+ * <li>{@code GroupSafetyCheckId} (216763284): rotates every 30 days
+ * <li>{@code IdPreMetrics} (56300709): never rotates
  * </ul>
  *
  * <p>This class is not thread-safe; all calls must be made from the
  * single WAM flush thread.
  *
- * @apiNote WAWebWamPrivateStats: initialises PS IDs from IndexedDB,
- * generates random hex identifiers, and rotates them based on
- * configurable day-aligned periods.
- * WAWebWamGlobals.PrivateStatsAllIds: defines the eight rotation groups
- * with their keyHashInt values and rotation periods.
+ * @implNote Adapts {@code WAWebWamPrivateStats}, which initialises PS IDs
+ *     from IndexedDB, generates random hex identifiers, and rotates them
+ *     based on configurable day-aligned periods. The eight rotation groups
+ *     and their keyHashInt values/rotation periods are defined by
+ *     {@code WAWebWamGlobals.PrivateStatsAllIds}.
  */
+@WhatsAppWebModule(moduleName = "WAWebWamPrivateStats")
+@WhatsAppWebModule(moduleName = "WAWebWamGlobals")
 final class WamPrivateStatsId {
     /**
      * Number of seconds in one day.

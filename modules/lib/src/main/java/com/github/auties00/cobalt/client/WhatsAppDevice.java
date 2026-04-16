@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.client;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.device.DevicePlatformType;
 import com.github.auties00.cobalt.model.device.pairing.ClientAppVersion;
 import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
@@ -12,27 +15,28 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * A protobuf model that describes the physical device and platform characteristics of a
- * WhatsApp companion device.
+ * Describes the hardware and platform identity that a Cobalt client
+ * advertises as its underlying device.
  *
- * <p>Each connected device in a WhatsApp multi-device session carries metadata about its
- * hardware model, manufacturer, operating system version, and client type. This information
- * is used during device registration and pairing to identify the companion to the WhatsApp
- * servers. The {@link DevicePlatformType} protobuf enum defined by WhatsApp Web
- * classifies platforms such as {@code CHROME}, {@code IOS_PHONE}, {@code ANDROID_PHONE},
- * and others. This class maps those platform types to the internal
- * {@link DevicePlatformType} representation used across the codebase.
+ * <p>When Cobalt connects to the WhatsApp servers it must claim a device
+ * identity: model name, manufacturer, operating system version, and
+ * client platform (Android, iOS, Web, Desktop). That identity is embedded
+ * into the handshake payload so the server can categorise the device for
+ * telemetry, feature gating and User-Agent construction. Cobalt does not
+ * auto-detect the host machine; it instead advertises a synthetic device
+ * picked by the caller or by the provided factories.
  *
- * <p>Pre-configured device profiles for common platforms are available through the
- * {@link #web()}, {@link #ios(boolean)}, and {@link #android(boolean)} factory methods.
- * The iOS factory randomly selects from a curated list of realistic device configurations
- * to reduce fingerprinting surface.
+ * <p>Pre-built profiles are available via {@link #web()},
+ * {@link #ios(boolean)}, and {@link #android(boolean)}; the mobile
+ * factories randomise the model/version tuple from a curated list to
+ * reduce fingerprintability.
  *
- * @see Jid
- * @see DevicePlatformType
  * @see WhatsAppClientType
+ * @see WhatsAppClientBuilder.Options#device(WhatsAppDevice)
+ * @see DevicePlatformType
  */
 @ProtobufMessage
+@WhatsAppWebModule(moduleName = "WAWebProtobufsCompanionReg.pb")
 public final class WhatsAppDevice {
     /**
      * A curated list of realistic iOS device configurations used by the
@@ -294,7 +298,12 @@ public final class WhatsAppDevice {
     /**
      * The platform type identifying the operating system and client variant, such as
      * {@link DevicePlatformType#IOS_PHONE} or {@link DevicePlatformType#ANDROID_PHONE}.
+     *
+     * @implNote WAWebProtobufsCompanionReg.pb: {@code DeviceProps$PlatformType}
+     * constrains the set of wire values accepted here.
      */
+    @WhatsAppWebExport(moduleName = "WAWebProtobufsCompanionReg.pb",
+            exports = "DeviceProps$PlatformType", adaptation = WhatsAppAdaptation.DIRECT)
     @ProtobufProperty(index = 3, type = ProtobufType.ENUM)
     ClientPlatformType platform;
 
@@ -434,16 +443,20 @@ public final class WhatsAppDevice {
     }
 
     /**
-     * Builds a User-Agent string suitable for HTTP requests based on this device's
-     * platform and the given client version.
+     * Returns a User-Agent string suitable for HTTP requests issued by
+     * this device.
      *
-     * <p>For desktop platforms ({@code PlatformType#WINDOWS} and
-     * {@code PlatformType#MACOS}), a Chrome browser User-Agent is returned. For
-     * mobile platforms, a WhatsApp-specific User-Agent containing the client version,
-     * platform name, OS version, and device name is returned.
+     * <p>Web and desktop platforms return a Chrome User-Agent (so
+     * companion linking HTTP requests look browser-like), while mobile
+     * platforms return the WhatsApp-specific User-Agent pattern
+     * ({@code WhatsApp/<version> <platform>/<os> Device/<model>}) that
+     * the official mobile clients emit.
      *
-     * @param clientDeviceAppVersion the WhatsApp client version to embed in the User-Agent
+     * @param clientDeviceAppVersion the WhatsApp client version to embed
+     *                               in the User-Agent
      * @return the formatted User-Agent string
+     * @throws IllegalStateException if the underlying platform enum has an
+     *                               unexpected value
      */
     public String toUserAgent(ClientAppVersion clientDeviceAppVersion) {
         if(platform == ClientPlatformType.WINDOWS || platform == ClientPlatformType.MACOS || platform == ClientPlatformType.WEB) {

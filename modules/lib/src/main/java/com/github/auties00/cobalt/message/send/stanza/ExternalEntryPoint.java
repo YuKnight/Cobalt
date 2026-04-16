@@ -1,5 +1,9 @@
 package com.github.auties00.cobalt.message.send.stanza;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
+
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
@@ -26,6 +30,7 @@ import java.util.Optional;
  *                     not available
  * @param addedTime    the instant when this entry point was recorded
  */
+@WhatsAppWebModule(moduleName = "WAWebExternalEntryPointPrefs")
 public record ExternalEntryPoint(
         String deepLinkType,
         boolean authSuccess,
@@ -52,6 +57,8 @@ public record ExternalEntryPoint(
      * @implNote WAWebExternalEntryPointPrefs: checks
      * {@code Date.now() - e.addedTime > WEEK_MILLISECONDS}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebExternalEntryPointPrefs", exports = "getExternalEntryPoint",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public boolean isExpired() {
         return Duration.between(addedTime, Instant.now()).compareTo(MAX_AGE) > 0;
     }

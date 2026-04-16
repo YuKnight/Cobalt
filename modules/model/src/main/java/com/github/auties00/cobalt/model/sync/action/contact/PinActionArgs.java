@@ -5,15 +5,19 @@ import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.SyncActionArgs;
 
 /**
- * Index arguments for {@link PinAction}.
+ * Index arguments that locate a specific {@link PinAction} inside a sync
+ * patch.
  *
- * <p>The sync index produced is {@code ["pin_v1", chatJid]}.
+ * <p>A pinned chat is uniquely addressed by the JID of the chat it refers
+ * to. When building or reading a patch the sync engine translates these
+ * arguments into the index tuple {@code ["pin_v1", chatJid]}.
  *
- * @param chatJid the JID of the chat being pinned or unpinned
+ * @param chatJid the JID of the chat that is being pinned or unpinned
  */
 public record PinActionArgs(Jid chatJid) implements SyncActionArgs {
     /**
-     * {@inheritDoc}
+     * Returns the index components used by the sync engine to address this
+     * pinned chat entry.
      *
      * @return a single-element array containing the chat JID string
      */

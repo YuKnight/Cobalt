@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.device.adv;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.device.DeviceConstants;
 import com.github.auties00.cobalt.exception.WhatsAppAdvValidationException;
 import com.github.auties00.cobalt.model.device.identity.*;
@@ -24,16 +27,28 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Service for validating ADV (Account Device Verification) signatures for companion devices.
+ * Validates Account Device Verification (ADV) signatures that bind companion device
+ * identities to the primary WhatsApp account.
  *
- * <p>ADV prevents MITM attacks by cryptographically linking companion device identities
- * to the primary account. For companion devices (device != 0), the prekey response must
- * contain a device-identity node with a SignedDeviceIdentity protobuf.
+ * <p>When a user links a companion device (Web, Desktop, tablet), the primary phone
+ * signs the companion's identity key so the server and peers can verify that any
+ * messages carrying that identity were authorized by the account owner. This
+ * validator checks those signatures for the local account (during pairing), for
+ * remote companion devices (during prekey fetches), and for signed key index lists
+ * (during device list synchronization and notifications), covering both standard
+ * end-to-end encrypted accounts and hosted business coexistence accounts.
+ *
+ * <p>Used by
+ * {@link com.github.auties00.cobalt.device.DeviceService} and
+ * {@link com.github.auties00.cobalt.device.stanza.DeviceUSyncResponseParser}.
  *
  * @implNote WAWebAdvSignatureApi: provides signature verification for E2EE and hosted devices.
  * WAWebHandleAdvDeviceNotificationUtils: handles key index list validation.
  * WAWebBizCoexGatingUtils: provides bizHostedDevicesEnabled gating.
  */
+@WhatsAppWebModule(moduleName = "WAWebAdvSignatureApi")
+@WhatsAppWebModule(moduleName = "WAWebHandleAdvDeviceNotificationUtils")
+@WhatsAppWebModule(moduleName = "WAWebAdvSignatureConstants")
 public final class DeviceADVValidator {
     /**
      * Header for E2EE account signature verification.
@@ -41,6 +56,9 @@ public final class DeviceADVValidator {
      * @implNote WAWebAdvSignatureConstants.ADV_PREFIX_DEVICE_IDENTITY_ACCOUNT_SIGNATURE: header
      * bytes [6, 0] for E2EE account signatures.
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvSignatureConstants",
+            exports = "ADV_PREFIX_DEVICE_IDENTITY_ACCOUNT_SIGNATURE",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static final byte[] E2EE_ACCOUNT_SIGNATURE_HEADER = {6, 0};
 
     /**
@@ -49,6 +67,9 @@ public final class DeviceADVValidator {
      * @implNote WAWebAdvSignatureConstants.ADV_PREFIX_DEVICE_IDENTITY_DEVICE_SIGNATURE: header
      * bytes [6, 1] for E2EE device signatures.
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvSignatureConstants",
+            exports = "ADV_PREFIX_DEVICE_IDENTITY_DEVICE_SIGNATURE",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static final byte[] E2EE_DEVICE_SIGNATURE_HEADER = {6, 1};
 
     /**
@@ -57,6 +78,9 @@ public final class DeviceADVValidator {
      * @implNote WAWebAdvSignatureConstants.ADV_PREFIX_KEY_INDEX_LIST_ACCOUNT_SIGNATURE: header
      * bytes [6, 2] for signed key index lists.
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvSignatureConstants",
+            exports = "ADV_PREFIX_KEY_INDEX_LIST_ACCOUNT_SIGNATURE",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static final byte[] KEY_INDEX_LIST_SIGNATURE_HEADER = {6, 2};
 
     /**
@@ -65,6 +89,9 @@ public final class DeviceADVValidator {
      * @implNote WAWebAdvSignatureConstants.ADV_HOSTED_PREFIX_DEVICE_IDENTITY_ACCOUNT_SIGNATURE:
      * header bytes [6, 5] for hosted account signatures.
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvSignatureConstants",
+            exports = "ADV_HOSTED_PREFIX_DEVICE_IDENTITY_ACCOUNT_SIGNATURE",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static final byte[] HOSTED_ACCOUNT_SIGNATURE_HEADER = {6, 5};
 
     /**
@@ -74,9 +101,19 @@ public final class DeviceADVValidator {
      * @implNote WAWebAdvSignatureConstants.ADV_HOSTED_PREFIX_DEVICE_IDENTITY_DEVICE_SIGNATURE:
      * header bytes [6, 6] for hosted device signatures.
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvSignatureConstants",
+            exports = "ADV_HOSTED_PREFIX_DEVICE_IDENTITY_DEVICE_SIGNATURE",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static final byte[] HOSTED_DEVICE_SIGNATURE_HEADER = {6, 6};
 
+    /**
+     * The store providing access to stored identities, advSecretKey, and local device info.
+     */
     private final WhatsAppStore store;
+
+    /**
+     * The AB props service for reading the {@code bizHostedDevicesEnabled} gate.
+     */
     private final ABPropsService abProps;
 
     /**
@@ -87,6 +124,9 @@ public final class DeviceADVValidator {
      * @param store   the WhatsApp store for accessing keys and identity
      * @param abProps the AB props service for feature gating
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvSignatureApi",
+            exports = "validateADVwithIdentityKey",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public DeviceADVValidator(WhatsAppStore store, ABPropsService abProps) {
         this.store = Objects.requireNonNull(store, "store cannot be null");
         this.abProps = Objects.requireNonNull(abProps, "abProps cannot be null");
@@ -99,6 +139,9 @@ public final class DeviceADVValidator {
      * {@code getABPropConfigValue("adv_accept_hosted_devices")}.
      * @return {@code true} if hosted devices should be validated with HOSTED headers
      */
+    @WhatsAppWebExport(moduleName = "WAWebBizCoexGatingUtils",
+            exports = "bizHostedDevicesEnabled",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public boolean isBizHostedDevicesEnabled() {
         // Don't wait for sync
         return abProps.getBool(ABProp.ADV_ACCEPT_HOSTED_DEVICES, false);
@@ -117,6 +160,9 @@ public final class DeviceADVValidator {
      * @throws WhatsAppAdvValidationException if validation fails
      * @throws IllegalStateException          if required store values are missing
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvSignatureApi",
+            exports = {"verifyDeviceIdentityAccountSignature", "generateDeviceSignature"},
+            adaptation = WhatsAppAdaptation.DIRECT)
     public ADVSignedDeviceIdentity extractAndValidateLocalSignedDeviceIdentity(Node deviceIdentityNode) {
         Objects.requireNonNull(deviceIdentityNode, "deviceIdentityNode cannot be null");
 
@@ -241,6 +287,9 @@ public final class DeviceADVValidator {
      * @return the validated signed device identity, or empty if not required or already known
      * @throws WhatsAppAdvValidationException if validation fails
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvSignatureApi",
+            exports = "validateADVwithIdentityKey",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public Optional<ADVSignedDeviceIdentity> extractAndValidateRemoteSignedDeviceIdentity(
             Jid remoteJid,
             Node remoteIdentityNode,
@@ -353,6 +402,9 @@ public final class DeviceADVValidator {
      * @param signedKeyIndexBytes the raw signed key index list bytes
      * @return the validated key index list data, or empty if validation fails
      */
+    @WhatsAppWebExport(moduleName = "WAWebHandleAdvDeviceNotificationUtils",
+            exports = "verifySKeyIndexWithAccSigKey",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public Optional<ValidatedKeyIndexListResult> validateAndDecodeSignedKeyIndexList(byte[] signedKeyIndexBytes) {
         Objects.requireNonNull(signedKeyIndexBytes, "signedKeyIndexBytes cannot be null");
 
@@ -422,6 +474,9 @@ public final class DeviceADVValidator {
      * @param deviceJid the device JID (with device number)
      * @return the identity key bytes, or empty if not found
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvSignatureApi",
+            exports = "validateADVwithIdentityKey",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private Optional<byte[]> findStoredDeviceIdentityKey(Jid deviceJid) {
         if (deviceJid == null) {
             return Optional.empty();
@@ -441,6 +496,9 @@ public final class DeviceADVValidator {
      * @param jid the JID (device number is ignored, always looks up device 0)
      * @return the identity key bytes, or empty if not found
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvSignatureApi",
+            exports = "validateADVwithIdentityKey",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private Optional<byte[]> findStoredUserIdentityKey(Jid jid) {
         if (jid == null) {
             return Optional.empty();
@@ -459,6 +517,9 @@ public final class DeviceADVValidator {
      * @param jid the JID to check
      * @return {@code true} if the device requires ADV validation
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvSignatureApi",
+            exports = "validateADVwithIdentityKey",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private boolean requiresValidation(Jid jid) {
         Objects.requireNonNull(jid, "jid cannot be null");
         return jid.device() != DeviceConstants.PRIMARY_DEVICE_ID;

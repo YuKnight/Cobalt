@@ -249,10 +249,18 @@ public final class BotMediaMetadata {
          */
         RIGHT(3);
 
+        /**
+         * Constructs a new {@code OrientationType} with the given protobuf index.
+         *
+         * @param index the protobuf enum index
+         */
         OrientationType(@ProtobufEnumIndex int index) {
             this.index = index;
         }
 
+        /**
+         * The protobuf enum index for this orientation type.
+         */
         final int index;
 
         /**

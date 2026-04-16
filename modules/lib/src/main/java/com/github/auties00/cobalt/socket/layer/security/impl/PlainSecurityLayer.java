@@ -1,8 +1,8 @@
-package com.github.auties00.cobalt.socket.layer.security.impl.transport.plain;
+package com.github.auties00.cobalt.socket.layer.security.impl;
 
 import com.github.auties00.cobalt.socket.layer.SocketClientLayer;
 import com.github.auties00.cobalt.socket.layer.SocketClientLayerListener;
-import com.github.auties00.cobalt.socket.layer.security.SocketClientTransportSecurityLayer;
+import com.github.auties00.cobalt.socket.layer.security.SocketClientSecurityLayer;
 import com.github.auties00.cobalt.socket.threading.SocketClientLayerContext;
 
 import java.io.IOException;
@@ -10,17 +10,24 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 
 /**
- * Transport-level plain (no encryption) security layer implementation.
+ * A plain (no-op) security layer that transparently delegates all
+ * operations to the inner layer.
  *
- * <p>All operations are delegated to the inner layer.  The layer context
- * is registered eagerly on the first {@link #registerLayerContext} call
- * so it appears before the tunnel context in the map.
+ * <p>No layer context is registered because the layer has no state to
+ * maintain and performs no transformation of inbound or outbound bytes.
+ * The linked chain therefore skips this position entirely, which means the
+ * next inner context's {@code nextLayer} points directly at the next outer
+ * context — no wasted link traversals and no placeholder objects.
  */
-public final class TransportPlainSecurityLayer implements SocketClientTransportSecurityLayer {
+public final class PlainSecurityLayer implements SocketClientSecurityLayer {
     private final SocketClientLayer<?> innerLayer;
-    private boolean contextRegistered;
 
-    public TransportPlainSecurityLayer(SocketClientLayer<?> innerLayer) {
+    /**
+     * Creates a plain security layer wrapping the given inner layer.
+     *
+     * @param innerLayer the layer below
+     */
+    public PlainSecurityLayer(SocketClientLayer<?> innerLayer) {
         this.innerLayer = innerLayer;
     }
 
@@ -70,10 +77,6 @@ public final class TransportPlainSecurityLayer implements SocketClientTransportS
 
     @Override
     public void registerLayerContext(SocketClientLayerContext context) throws IOException {
-        if (!contextRegistered) {
-            contextRegistered = true;
-            innerLayer.registerLayerContext(new TransportPlainLayerContext(context));
-        }
         innerLayer.registerLayerContext(context);
     }
 }

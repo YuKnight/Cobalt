@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The public profile metadata of a WhatsApp Business account.
+ * Represents the public profile metadata of a WhatsApp Business account.
  *
  * <p>A business profile contains the information that a WhatsApp Business account owner has
  * configured to be publicly visible to users, including the business description, physical
@@ -26,8 +26,8 @@ import java.util.Optional;
  * third-party fully automated bot ({@link BusinessAutomatedType#FULL_3P}), or is not
  * automated at all.
  *
- * <p>The profile is retrieved from the WhatsApp server via the {@code w:biz} IQ namespace
- * and is parsed from the {@code <business_profile>} stanza node.
+ * <p>This profile is queried from the WhatsApp server and is associated with a specific
+ * business account identified by its {@link com.github.auties00.cobalt.model.jid.Jid}.
  */
 @ProtobufMessage
 public final class BusinessProfile {
@@ -39,18 +39,27 @@ public final class BusinessProfile {
 
     /**
      * The business description text, or {@code null} if not set.
+     *
+     * <p>A free-form text field set by the business owner. The server enforces a maximum
+     * length of 512 characters.
      */
     @ProtobufProperty(index = 2, type = ProtobufType.STRING)
     String description;
 
     /**
      * The business physical address, or {@code null} if not set.
+     *
+     * <p>A free-form text field representing the business's location. The server enforces
+     * a maximum length of 256 characters.
      */
     @ProtobufProperty(index = 3, type = ProtobufType.STRING)
     String address;
 
     /**
      * The business contact email address, or {@code null} if not set.
+     *
+     * <p>Displayed on the business profile as a contact point. The server enforces a
+     * maximum length of 128 characters.
      */
     @ProtobufProperty(index = 4, type = ProtobufType.STRING)
     String email;
@@ -63,18 +72,27 @@ public final class BusinessProfile {
 
     /**
      * Whether the shopping cart feature is enabled for this business.
+     *
+     * <p>When {@code true}, customers can add items from the business catalog to a cart
+     * and submit an order as a WhatsApp message.
      */
     @ProtobufProperty(index = 6, type = ProtobufType.BOOL)
     boolean cartEnabled;
 
     /**
      * The list of website URLs associated with this business.
+     *
+     * <p>A business profile supports up to two website URLs. Each URL is displayed as a
+     * clickable link on the profile, with individual URLs limited to 256 characters.
      */
     @ProtobufProperty(index = 7, type = ProtobufType.STRING)
     List<URI> websites;
 
     /**
      * The list of business categories classifying this business.
+     *
+     * <p>A business profile supports up to three categories, selected by the business owner
+     * during profile setup.
      */
     @ProtobufProperty(index = 8, type = ProtobufType.MESSAGE)
     List<BusinessCategory> categories;
@@ -123,7 +141,6 @@ public final class BusinessProfile {
      * Sets the JID of the business account that owns this profile.
      *
      * @param jid the business account JID
-     * @return this instance
      */
     public void setJid(Jid jid) {
         this.jid = jid;
@@ -147,7 +164,6 @@ public final class BusinessProfile {
      * Sets the business description.
      *
      * @param description the description text, or {@code null} to clear
-     * @return this instance
      */
     public void setDescription(String description) {
         this.description = description;
@@ -170,7 +186,6 @@ public final class BusinessProfile {
      * Sets the business physical address.
      *
      * @param address the physical address, or {@code null} to clear
-     * @return this instance
      */
     public void setAddress(String address) {
         this.address = address;
@@ -193,7 +208,6 @@ public final class BusinessProfile {
      * Sets the business contact email address.
      *
      * @param email the email address, or {@code null} to clear
-     * @return this instance
      */
     public void setEmail(String email) {
         this.email = email;
@@ -213,7 +227,6 @@ public final class BusinessProfile {
      * Sets the business operating hours schedule.
      *
      * @param hours the operating hours schedule, or {@code null} to clear
-     * @return this instance
      */
     public void setHours(BusinessHours hours) {
         this.hours = hours;
@@ -235,7 +248,6 @@ public final class BusinessProfile {
      * Sets whether the shopping cart feature is enabled for this business.
      *
      * @param cartEnabled {@code true} to enable the cart feature, {@code false} to disable it
-     * @return this instance
      */
     public void setCartEnabled(boolean cartEnabled) {
         this.cartEnabled = cartEnabled;
@@ -257,7 +269,6 @@ public final class BusinessProfile {
      * Sets the list of website URLs associated with this business.
      *
      * @param websites the list of website URLs, or {@code null} for an empty list
-     * @return this instance
      */
     public void setWebsites(List<URI> websites) {
         this.websites = websites;
@@ -267,7 +278,8 @@ public final class BusinessProfile {
      * Returns an unmodifiable view of the business categories classifying this business.
      *
      * <p>Categories are assigned by the business owner during profile setup and help users
-     * understand the nature and industry of the business.
+     * understand the nature and industry of the business. A profile supports up to three
+     * categories.
      *
      * @return a non-{@code null}, unmodifiable list of business categories
      */
@@ -279,7 +291,6 @@ public final class BusinessProfile {
      * Sets the list of business categories classifying this business.
      *
      * @param categories the list of categories, or {@code null} for an empty list
-     * @return this instance
      */
     public void setCategories(List<BusinessCategory> categories) {
         this.categories = categories;
@@ -302,7 +313,6 @@ public final class BusinessProfile {
      * Sets the bot automation type for this business account.
      *
      * @param automatedType the automation type, or {@code null} to clear
-     * @return this instance
      */
     public void setAutomatedType(BusinessAutomatedType automatedType) {
         this.automatedType = automatedType;

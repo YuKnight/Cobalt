@@ -10,12 +10,15 @@ import java.util.Optional;
  *
  * <p>A session groups a sequence of user messages and bot responses into a
  * logical conversation turn. The server assigns a unique
- * {@link #sessionId() sessionId} and the client reports a
+ * {@link #sessionId() sessionId} (typically a UUID) and the client reports a
  * {@link #sessionSource() sessionSource} that describes how the user
- * initiated the interaction.
+ * initiated the interaction (for example, via text input, voice, or a
+ * type-ahead suggestion).
  *
- * <p>This metadata is attached to every bot message via
+ * <p>This metadata is carried inside
  * {@link com.github.auties00.cobalt.model.bot.BotMetadata#sessionMetadata()}.
+ *
+ * @see BotSessionSource
  */
 @ProtobufMessage(name = "BotSessionMetadata")
 public final class BotSessionMetadata {

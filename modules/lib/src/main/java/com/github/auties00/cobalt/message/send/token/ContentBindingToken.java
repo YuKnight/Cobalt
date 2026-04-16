@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.message.send.token;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 
 import javax.crypto.KDF;
@@ -30,6 +33,8 @@ import java.util.*;
  * {@code deriveNonce}, {@code deriveNonceString}, {@code getContentIdString},
  * {@code genNonceForMsg}, and the HMAC truncation logic.
  */
+@WhatsAppWebModule(moduleName = "WAWebMsgRcatUtils")
+@WhatsAppWebModule(moduleName = "WAWebUtilsYoutubeUrlParser")
 public final class ContentBindingToken {
     /**
      * The info-suffix appended when deriving the per-recipient nonce.
@@ -109,6 +114,8 @@ public final class ContentBindingToken {
      * WAWebUtilsYoutubeUrlParser.parseYoutubeVideoId: matches
      * youtu.be/ID, youtube.com/watch?v=ID, youtube.com/shorts/ID.
      */
+    @WhatsAppWebExport(moduleName = "WAWebMsgRcatUtils", exports = "getContentIdString",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static String getContentIdString(String matchedText, boolean youtubeOnly) {
         if (matchedText == null || matchedText.isEmpty()) {
             return null;
@@ -132,6 +139,8 @@ public final class ContentBindingToken {
      * calls {@code getContentIdString(msg, false)} then
      * {@code new TextEncoder().encode(result)}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebMsgRcatUtils", exports = "getContentIdString",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static byte[] resolveContentId(String matchedText) {
         Objects.requireNonNull(matchedText, "matchedText");
         // WAWebMsgRcatUtils.h: g(e, false) then encode
@@ -160,6 +169,8 @@ public final class ContentBindingToken {
      * against {@code WAWebPipConst.URL_PATTERNS.ONLINE_VIDEO_URL.YOUTUBE}
      * patterns after stripping {@code www.} via {@code WAWebURLUtils.withoutWww}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebUtilsYoutubeUrlParser", exports = "parseYoutubeVideoId",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private static String parseYoutubeVideoId(String url) {
         // Skip scheme: find the position after "://"
         var schemeEnd = url.indexOf("://");
@@ -242,6 +253,8 @@ public final class ContentBindingToken {
      * recipients, derives a nonce per recipient via {@code deriveNonce},
      * then computes {@code hmacSha256(nonce, contentId).slice(0, 8)}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebMsgRcatUtils", exports = "genContentBindingForMsg",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static Map<Jid, byte[]> generate(
             String messageId,
             byte[] messageSecret,
@@ -290,6 +303,8 @@ public final class ContentBindingToken {
      * WACryptoHkdf.extractAndExpand: calls {@code extractSha256(null, ikm)}
      * (HMAC-SHA256 with zero salt) then {@code expand(prk, info, length)}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebMsgRcatUtils", exports = "deriveNonce",
+            adaptation = WhatsAppAdaptation.DIRECT)
     static byte[] deriveNonce(
             String messageId,
             byte[] messageSecret,
@@ -322,6 +337,8 @@ public final class ContentBindingToken {
      * @implNote WAWebMsgRcatUtils.deriveNonceString: calls {@code deriveNonce}
      * then {@code WABase64.encodeB64UrlSafe(nonce, true)} (with padding).
      */
+    @WhatsAppWebExport(moduleName = "WAWebMsgRcatUtils", exports = "deriveNonceString",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static String deriveNonceString(
             String messageId,
             byte[] messageSecret,
@@ -330,7 +347,7 @@ public final class ContentBindingToken {
     ) throws GeneralSecurityException {
         // WAWebMsgRcatUtils.deriveNonceString
         var nonce = deriveNonce(messageId, messageSecret, senderJid, recipientJid);
-        // WABase64.encodeB64UrlSafe(nonce, true) — second arg true means include padding
+        // WABase64.encodeB64UrlSafe(nonce, true): second arg true means include padding
         return Base64.getUrlEncoder().encodeToString(nonce);
     }
 

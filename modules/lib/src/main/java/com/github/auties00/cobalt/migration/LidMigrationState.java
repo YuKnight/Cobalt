@@ -1,16 +1,28 @@
 package com.github.auties00.cobalt.migration;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import it.auties.protobuf.annotation.ProtobufEnum;
 import it.auties.protobuf.annotation.ProtobufEnumIndex;
 
 /**
- * Represents the state machine for LID 1:1 thread account migration.
- * Maps to the WA Web {@code LidThreadMigrationStatus} internal enum with additional
- * Cobalt-specific states for the error model and initial state tracking.
+ * Tracks the progress of the LID (Long ID) migration pipeline for a single
+ * WhatsApp account.
  *
- * @implNote WAWebLid1X1ThreadAccountMigrations.flow.LidThreadMigrationStatus
+ * <p>LID migration replaces phone-number addressing with privacy-preserving
+ * Long IDs for 1:1 chats. The pipeline starts when a paired client receives
+ * the AB prop enabling migration, waits for the primary device to sync its
+ * mapping tables, executes the migration over the stored chats, and finally
+ * marks the account as fully migrated.
+ *
+ * <p>This state machine is the Cobalt equivalent of WhatsApp Web's
+ * {@code LidThreadMigrationStatus} enum, with two additional Cobalt-only
+ * states ({@link #NOT_STARTED}, {@link #FAILED}, {@link #DISABLED}) used
+ * for initialisation and the configurable error model.
+ *
+ * @implNote WAWebLid1X1ThreadAccountMigrations.flow.LidThreadMigrationStatus.
  */
 @ProtobufEnum
+@WhatsAppWebModule(moduleName = "WAWebLid1X1ThreadAccountMigrations.flow")
 public enum LidMigrationState {
     /**
      * Migration has not been initiated.

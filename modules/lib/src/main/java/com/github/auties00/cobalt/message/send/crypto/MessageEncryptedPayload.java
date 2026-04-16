@@ -1,6 +1,9 @@
 package com.github.auties00.cobalt.message.send.crypto;
 
 import com.github.auties00.cobalt.message.MessageEncryptionType;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 
 /**
@@ -15,8 +18,9 @@ import com.github.auties00.cobalt.model.jid.Jid;
  * WAWebEncryptMsgProtobuf.encryptMsgSenderKey returns
  * {@code {ciphertext, senderKeyBytes}} for group encryption.
  * In Cobalt, both are unified into this record; the {@code recipientJid}
- * field is a Cobalt-specific convenience (NO_WA_BASIS).
+ * field is a Cobalt-specific convenience.
  */
+@WhatsAppWebModule(moduleName = "WAWebEncryptMsgProtobuf")
 public record MessageEncryptedPayload(
         MessageEncryptionType type,
         byte[] ciphertext,
@@ -30,6 +34,8 @@ public record MessageEncryptedPayload(
      * @implNote WAWebSendMsgCreateFanoutStanza: sets {@code shouldHaveIdentity}
      * when any encryption result has type {@code Pkmsg}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCreateFanoutStanza", exports = "createFanoutMsgStanza",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean isPreKeyMessage() {
         return type.isPreKeyMessage();
     }

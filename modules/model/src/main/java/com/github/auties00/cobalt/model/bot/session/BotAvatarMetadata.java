@@ -9,26 +9,30 @@ import java.util.OptionalInt;
  * Metadata controlling the animated avatar displayed alongside a bot response
  * on WhatsApp.
  *
- * <p>When Meta AI sends a response, the client may render an animated avatar
- * whose appearance and behaviour are driven by the fields in this message.
- * The server populates these fields based on the sentiment and content of the
- * generated response so that the avatar's expression and motion match the
- * tone of the text.
+ * <p>When an AI bot (such as Meta AI) sends a response, the client may
+ * render an animated avatar whose appearance and behavior are driven by the
+ * fields in this message. The server populates these fields based on the
+ * sentiment and content of the generated response so that the avatar's
+ * expression and motion match the tone of the text.
  *
- * <p>This metadata is attached to a bot message via
- * {@link com.github.auties00.cobalt.model.bot.BotMetadata#avatarMetadata()}.
+ * <p>The {@link #sentiment()} code selects a facial expression, the
+ * {@link #behaviorGraph()} name selects an animation state machine, the
+ * {@link #action()} code triggers a specific gesture, the
+ * {@link #intensity()} controls how pronounced the animation is, and the
+ * {@link #wordCount()} helps synchronize the animation duration with the
+ * reading time of the response.
  */
 @ProtobufMessage(name = "BotAvatarMetadata")
 public final class BotAvatarMetadata {
     /**
-     * The emotional sentiment of the bot response, represented as a numeric
-     * code that maps to an avatar facial expression.
+     * The emotional sentiment of the bot response, represented as a
+     * server-assigned numeric code that maps to an avatar facial expression.
      */
     @ProtobufProperty(index = 1, type = ProtobufType.UINT32)
     Integer sentiment;
 
     /**
-     * The name of the behaviour graph that drives the avatar animation
+     * The name of the behavior graph that drives the avatar animation
      * state machine, for example {@code "greeting"} or {@code "thinking"}.
      */
     @ProtobufProperty(index = 2, type = ProtobufType.STRING)
@@ -50,7 +54,7 @@ public final class BotAvatarMetadata {
 
     /**
      * The word count of the bot response text, used by the client to
-     * synchronise the avatar animation duration with the reading time.
+     * synchronize the avatar animation duration with the reading time.
      */
     @ProtobufProperty(index = 5, type = ProtobufType.UINT32)
     Integer wordCount;
@@ -59,11 +63,14 @@ public final class BotAvatarMetadata {
     /**
      * Constructs a new {@code BotAvatarMetadata} with the specified values.
      *
-     * @param sentiment     the sentiment code, or {@code null}
-     * @param behaviorGraph the behaviour graph name, or {@code null}
-     * @param action        the action code, or {@code null}
-     * @param intensity     the animation intensity, or {@code null}
-     * @param wordCount     the response word count, or {@code null}
+     * @param sentiment     the sentiment code for the facial expression,
+     *                      or {@code null}
+     * @param behaviorGraph the name of the behavior graph driving the
+     *                      animation, or {@code null}
+     * @param action        the gesture action code, or {@code null}
+     * @param intensity     the animation intensity level, or {@code null}
+     * @param wordCount     the word count of the bot response text used to
+     *                      synchronize animation duration, or {@code null}
      */
     BotAvatarMetadata(Integer sentiment, String behaviorGraph, Integer action, Integer intensity, Integer wordCount) {
         this.sentiment = sentiment;
@@ -84,9 +91,9 @@ public final class BotAvatarMetadata {
     }
 
     /**
-     * Returns the name of the behaviour graph driving the avatar animation.
+     * Returns the name of the behavior graph driving the avatar animation.
      *
-     * @return an {@code Optional} describing the behaviour graph name, or an
+     * @return an {@code Optional} describing the behavior graph name, or an
      *         empty {@code Optional} if not set
      */
     public Optional<String> behaviorGraph() {
@@ -133,9 +140,10 @@ public final class BotAvatarMetadata {
     }
 
     /**
-     * Sets the name of the behaviour graph driving the avatar animation.
+     * Sets the name of the behavior graph driving the avatar animation.
      *
-     * @param behaviorGraph the new behaviour graph name, or {@code null}
+     * @param behaviorGraph the new behavior graph name, or {@code null} to
+     *                      clear the value
      */
     public void setBehaviorGraph(String behaviorGraph) {
         this.behaviorGraph = behaviorGraph;

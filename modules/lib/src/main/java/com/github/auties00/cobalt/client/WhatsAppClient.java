@@ -3,6 +3,9 @@ package com.github.auties00.cobalt.client;
 import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.exception.*;
 import com.github.auties00.cobalt.message.MessageService;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.migration.InactiveGroupLidMigrationService;
 import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.model.bot.profile.*;
@@ -67,35 +70,154 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * A class used to interface a user to Whatsapp
+ * The central entry point for interacting with a WhatsApp account from
+ * Cobalt.
+ *
+ * <p>A {@code WhatsAppClient} owns the lifecycle of a single session: it
+ * wires together the persisted {@link WhatsAppStore}, the Noise-encrypted
+ * socket, the Signal protocol ciphers, and the constellation of services
+ * responsible for device management, message send/receive, sync, LID
+ * migration, and telemetry. Callers obtain instances through
+ * {@link #builder()} and drive them through
+ * {@link #connect()}, {@link #disconnect()},
+ * {@link #reconnect()}, and {@link #logout()}; observation happens through
+ * {@link WhatsAppClientListener} callbacks registered on the underlying
+ * store.
+ *
+ * <p>Every method that performs I/O runs on a virtual thread and blocks
+ * the caller until a response is available. Errors are funneled through
+ * the configured {@link WhatsAppClientErrorHandler} so recovery policy is
+ * pluggable rather than hardcoded.
+ *
+ * @implNote WAWebSocketModel.Socket: the overall shape of the client
+ * mirrors WhatsApp Web's top-level socket model, but with the
+ * Cobalt-specific DI structure (services injected in the constructor) and
+ * virtual-thread blocking replacing module-level imports and async/await.
+ * @see WhatsAppClientBuilder
+ * @see WhatsAppClientListener
+ * @see WhatsAppClientErrorHandler
  */
 @SuppressWarnings({"unused", "UnusedReturnValue"})
+@WhatsAppWebModule(moduleName = "WAWebSocketModel")
 public final class WhatsAppClient {
+    /**
+     * The single-byte encoding of the Signal identity key type, used when
+     * building the {@code <type>} node in pre-key upload stanzas.
+     */
     private static final byte[] SIGNAL_KEY_TYPE = {SignalIdentityPublicKey.type()};
 
+    /**
+     * The edge length in pixels used when requesting profile-picture
+     * thumbnails.
+     */
     private static final int PROFILE_PIC_SIZE = 64;
+    /**
+     * Pattern used to validate email strings of the shape
+     * {@code local@domain}.
+     */
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^(.+)@(\\S+)$");
 
+    /**
+     * The lower bound on the number of pre-keys uploaded per batch; keeps
+     * batches useful even if the caller asks for fewer.
+     */
     private static final long MIN_PRE_KEYS_COUNT = 5;
 
+    /**
+     * The persisted session state (credentials, chats, contacts, Signal
+     * keys, listeners) bound to this client.
+     */
     private final WhatsAppStore store;
+    /**
+     * The strategy that decides how the client should react to errors
+     * raised by any subsystem.
+     */
     private final WhatsAppClientErrorHandler errorHandler;
+    /**
+     * The strategy that enriches outgoing messages with link previews.
+     */
     private final WhatsAppClientMessagePreviewHandler messagePreviewHandler;
 
+    /**
+     * The service that drives companion app-state synchronisation (push
+     * and pull of sync patches).
+     */
     private final WebAppStateService webAppStateService;
+    /**
+     * The service that migrates legacy addressing to LID-based
+     * addressing.
+     */
     private final LidMigrationService lidMigrationService;
+    /**
+     * The service that tracks the companion device list and drives ADV
+     * (Auxiliary Device Verification) checks.
+     */
     private final DeviceService deviceService;
+    /**
+     * The service that maintains the AB (A/B) property cache used across
+     * feature-gating decisions.
+     */
     private final ABPropsService abPropsService;
+    /**
+     * The service that performs LID migration for inactive groups.
+     */
     private final InactiveGroupLidMigrationService inactiveGroupLidMigrationService;
 
+    /**
+     * The service that encapsulates message send and receive plumbing.
+     */
     private final MessageService messageService;
+    /**
+     * The service that batches and flushes WAM (WhatsApp telemetry)
+     * events.
+     */
     private final WamService wamService;
 
+    /**
+     * The live socket to the WhatsApp server, or {@code null} when the
+     * client is not connected.
+     */
     private WhatsAppSocketClient socketClient;
+    /**
+     * The high-level stanza router that consumes nodes from the socket
+     * and dispatches them to handlers.
+     */
     private final SocketStream socketStream;
+    /**
+     * Outstanding request/response IQ stanzas, keyed by the {@code id}
+     * attribute so matching responses can complete them.
+     */
     private final ConcurrentMap<String, WhatsAppSocketStanza> pendingSocketRequests;
+    /**
+     * The JVM shutdown hook that disconnects the session gracefully on
+     * process exit; installed lazily during {@link #connect()}.
+     */
     private Thread shutdownHook;
 
+    /**
+     * Constructs a new client and wires all of its internal services
+     * together.
+     *
+     * <p>This constructor is package-private because it is only meant to
+     * be invoked by the {@link WhatsAppClientBuilder}; use
+     * {@link WhatsAppClient#builder()} to obtain a builder instead.
+     *
+     * @param store                   the persisted session state; must
+     *                                not be {@code null}
+     * @param webVerificationHandler  the companion-linking verification
+     *                                handler; required when
+     *                                {@code store.clientType() == WEB}
+     *                                and ignored otherwise
+     * @param messagePreviewHandler   the outgoing message preview
+     *                                decorator; must not be {@code null}
+     * @param errorHandler            the recovery strategy for failures;
+     *                                must not be {@code null}
+     * @throws NullPointerException      if {@code store} or
+     *                                   {@code errorHandler} is {@code null}
+     * @throws IllegalArgumentException  if the web verification handler
+     *                                   is required but missing, or
+     *                                   present when it should not be
+     */
     WhatsAppClient(WhatsAppStore store, WhatsAppClientVerificationHandler.Web webVerificationHandler, WhatsAppClientMessagePreviewHandler messagePreviewHandler, WhatsAppClientErrorHandler errorHandler) {
         this.store = Objects.requireNonNull(store, "store cannot be null");
         this.errorHandler = Objects.requireNonNull(errorHandler, "errorHandler cannot be null");
@@ -118,9 +240,9 @@ public final class WhatsAppClient {
     }
 
     /**
-     * Creates a new builder
+     * Returns the shared {@link WhatsAppClientBuilder} entry point.
      *
-     * @return a builder
+     * @return the builder singleton
      */
     public static WhatsAppClientBuilder builder() {
         return WhatsAppClientBuilder.INSTANCE;
@@ -129,22 +251,39 @@ public final class WhatsAppClient {
     //<editor-fold desc="Data">
 
     /**
-     * Returns the store associated with this session
+     * Returns the persisted session state bound to this client.
      *
-     * @return a non-null WhatsappStore
+     * @return the store
      */
     public WhatsAppStore store() {
         return store;
     }
 
+    /**
+     * Returns the message preview handler installed on this client.
+     *
+     * @return the preview handler
+     */
     public WhatsAppClientMessagePreviewHandler messagePreviewHandler() {
         return messagePreviewHandler;
     }
 
+    /**
+     * Returns the AB properties service used for feature-gating checks.
+     *
+     * @return the AB properties service
+     */
     public ABPropsService abPropsService() {
         return abPropsService;
     }
 
+    /**
+     * Returns the LID migration service, which tracks the progress of
+     * migrating legacy addressing (phone-number based) to LID-based
+     * addressing across chats.
+     *
+     * @return the LID migration service
+     */
     public com.github.auties00.cobalt.migration.LidMigrationService lidMigrationService() {
         return lidMigrationService;
     }
@@ -154,13 +293,29 @@ public final class WhatsAppClient {
     //<editor-fold desc="Connection">
 
     /**
-     * Connects to Whatsapp
+     * Establishes a connection to the WhatsApp servers.
+     *
+     * <p>This method opens the encrypted socket, installs the shutdown
+     * hook, and starts the stanza pump. It returns as soon as the socket
+     * is up; subsequent handshake and login events are delivered
+     * asynchronously through {@link WhatsAppClientListener} callbacks.
+     *
+     * @return {@code this}, for fluent chaining
+     * @throws IllegalStateException if the client is already connected
      */
     public WhatsAppClient connect() {
         connect(null);
         return this;
     }
 
+    /**
+     * Internal entry point for {@link #connect()} and reconnection paths
+     * that need to flag the cause so transient failures are translated
+     * into {@link WhatsAppReconnectionException}.
+     *
+     * @param reason the disconnection reason driving this connect, or
+     *               {@code null} for the initial connect
+     */
     private void connect(WhatsAppClientDisconnectReason reason) {
         if (isConnected()) {
             throw new IllegalStateException("Client is already connected");
@@ -202,6 +357,13 @@ public final class WhatsAppClient {
         }
     }
 
+    /**
+     * Dispatches an inbound {@link Node} to the listeners and stream
+     * handlers, translating any unhandled error into a recoverable
+     * {@link WhatsAppStreamException}.
+     *
+     * @param node the inbound node
+     */
     private void onNode(Node node) {
         try {
             for (var listener : store.listeners()) {
@@ -216,6 +378,13 @@ public final class WhatsAppClient {
         }
     }
 
+    /**
+     * Completes the pending request whose {@code id} attribute matches
+     * the inbound node, if any.
+     *
+     * @param node the inbound node that may carry a response to a pending
+     *             request
+     */
     public void resolvePendingRequest(Node node) {
         var id = node.getAttributeAsString("id", null);
         if (id == null) {
@@ -228,10 +397,29 @@ public final class WhatsAppClient {
         }
     }
 
+    /**
+     * Tears down the session for the given reason.
+     *
+     * <p>The reason is propagated to listeners via
+     * {@link WhatsAppClientListener#onDisconnected(WhatsAppClient, WhatsAppClientDisconnectReason)}
+     * and drives store-level side effects (for example, deleting
+     * credentials on {@code LOGGED_OUT} or {@code BANNED}).
+     *
+     * @param reason the disconnection reason
+     */
     public void disconnect(WhatsAppClientDisconnectReason reason) {
         disconnect(reason, true);
     }
 
+    /**
+     * Internal implementation of {@link #disconnect(WhatsAppClientDisconnectReason)}
+     * that allows the shutdown-hook cleanup to be suppressed when the
+     * disconnect originates from the hook itself.
+     *
+     * @param reason                 the disconnection reason
+     * @param canRemoveShutdownHook  whether the JVM shutdown hook should
+     *                               be removed as part of this disconnect
+     */
     private void disconnect(WhatsAppClientDisconnectReason reason, boolean canRemoveShutdownHook) {
         // Per WA Web WAWebSocketModel.sendLogout: flush pending sentinel
         // mutations before disconnecting so key expiration is propagated.
@@ -284,22 +472,24 @@ public final class WhatsAppClient {
     }
 
     /**
-     * Flushes any dirty syncd collections on a virtual thread bounded by the
-     * {@code syncd_sentinel_timeout_seconds} AB prop, mirroring WA Web's
-     * {@code WAWebSocketModel.sendLogout} which awaits the sentinel flush only
-     * for {@code Math.min(20, Math.max(0, getSyncdSentinelTimeoutSeconds())) * 1000}
-     * milliseconds before proceeding with the disconnect.
+     * Flushes any dirty syncd collections on a virtual thread bounded by
+     * the {@code syncd_sentinel_timeout_seconds} AB property.
      *
-     * <p>The flush is performed on a daemon virtual thread joined with the
-     * configured timeout. If the join times out or the join is interrupted, the
-     * disconnect proceeds anyway and a warning is logged. Exceptions thrown by
-     * the flush itself are swallowed (best-effort) so a flush failure cannot
-     * block disconnect.
+     * <p>This mirrors the pre-logout sentinel flush performed by WhatsApp
+     * Web so that key-expiration mutations are propagated before the
+     * socket is closed. The flush runs on a daemon virtual thread joined
+     * with the configured timeout; if the join expires or is interrupted,
+     * the disconnect proceeds anyway and a warning is logged. Exceptions
+     * thrown by the flush itself are swallowed because disconnect must
+     * not be blocked by a flush failure.
      *
-     * @implNote WAWebSocketModel.sendLogout — bounded sentinel flush wait;
-     *           {@link SyncKeyUtils#getSyncdSentinelTimeoutSeconds(ABPropsService)}
-     *           supplies the configured timeout.
+     * @implNote WAWebSocketModel.sendLogout: bounded sentinel flush wait,
+     * where {@code var t = Math.min(20, Math.max(0, getSyncdSentinelTimeoutSeconds())) * 1000}
+     * is the upper bound applied here via
+     * {@link SyncKeyUtils#getSyncdSentinelTimeoutSeconds(ABPropsService)}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSocketModel", exports = "Socket",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private void flushDirtyCollectionsWithTimeout() {
         // WAWebSocketModel.sendLogout: var t = Math.min(20, Math.max(0, getSyncdSentinelTimeoutSeconds())) * 1000
         var configuredTimeoutSeconds = SyncKeyUtils.getSyncdSentinelTimeoutSeconds(abPropsService);
@@ -338,6 +528,18 @@ public final class WhatsAppClient {
         }
     }
 
+    /**
+     * Sends the given node on the current socket without waiting for a
+     * response.
+     *
+     * <p>Useful for stanzas that either do not require an acknowledgment
+     * (for example, presence updates) or whose acknowledgment is routed
+     * through an independent channel.
+     *
+     * @param node the node to send
+     * @throws WhatsAppSessionException.Closed if the socket is no longer
+     *                                         open
+     */
     public void sendNodeWithNoResponse(Node node) {
         try {
             socketClient.sendNode(node);
@@ -349,10 +551,40 @@ public final class WhatsAppClient {
         }
     }
 
+    /**
+     * Sends a request node and blocks until the corresponding response
+     * arrives.
+     *
+     * <p>Equivalent to {@link #sendNode(NodeBuilder, Function)} with a
+     * {@code null} filter, which matches the first response carrying the
+     * same {@code id} attribute.
+     *
+     * @param node the outgoing request builder
+     * @return the response node
+     * @throws WhatsAppSessionException.Closed if the socket is no longer
+     *                                         open
+     */
     public Node sendNode(NodeBuilder node) {
         return sendNode(node, null);
     }
 
+    /**
+     * Sends a request node and blocks until a response matching the
+     * supplied filter arrives.
+     *
+     * <p>If the builder has no {@code id} attribute, a random one is
+     * assigned before sending. Listeners receive the outgoing node via
+     * {@link WhatsAppClientListener#onNodeSent(WhatsAppClient, Node)}
+     * before this method returns.
+     *
+     * @param node   the outgoing request builder; may be mutated to
+     *               inject an {@code id} attribute
+     * @param filter an optional predicate restricting the accepted
+     *               responses; {@code null} accepts any response
+     * @return the response node
+     * @throws WhatsAppSessionException.Closed if the socket is no longer
+     *                                         open
+     */
     public Node sendNode(NodeBuilder node, Function<Node, Boolean> filter) {
         if (!node.hasAttribute("id")) {
             node.attribute("id", DataUtils.randomHex(10));
@@ -377,24 +609,37 @@ public final class WhatsAppClient {
     }
 
     /**
-     * Disconnects from Whatsapp Web's WebSocket if a previous connection exists
+     * Disconnects this client from the WhatsApp servers, preserving its
+     * credentials for future reconnections.
      *
+     * <p>Equivalent to
+     * {@link #disconnect(WhatsAppClientDisconnectReason) disconnect(DISCONNECTED)}.
      */
     public void disconnect() {
         disconnect(WhatsAppClientDisconnectReason.DISCONNECTED);
     }
 
     /**
-     * Disconnects and reconnects to Whatsapp Web's WebSocket if a previous connection exists
+     * Disconnects and immediately re-establishes the connection.
      *
+     * <p>Equivalent to
+     * {@link #disconnect(WhatsAppClientDisconnectReason) disconnect(RECONNECTING)}.
      */
     public void reconnect() {
         disconnect(WhatsAppClientDisconnectReason.RECONNECTING);
     }
 
     /**
-     * Disconnects from Whatsapp Web's WebSocket and logs out of WhatsappWeb invalidating the previous
-     * saved credentials. The next time the API is used, the QR code will need to be scanned again.
+     * Logs this client out of WhatsApp, invalidating the stored
+     * credentials.
+     *
+     * <p>For web companion sessions this issues a
+     * {@code remove-companion-device} IQ so that the primary device
+     * detaches the companion; for sessions without a known local JID it
+     * falls back to a local {@link #disconnect(WhatsAppClientDisconnectReason)}
+     * with {@link WhatsAppClientDisconnectReason#LOGGED_OUT}. The next
+     * connection attempt requires a fresh authentication ceremony (QR
+     * scan, pairing code, or phone-number registration).
      */
     public void logout() {
         var localJid = store.jid();
@@ -417,16 +662,26 @@ public final class WhatsAppClient {
     }
 
     /**
-     * Returns whether the connection is active or not
+     * Returns whether a live socket to the WhatsApp servers is currently
+     * open.
      *
-     * @return a boolean
+     * @return {@code true} if the socket is open and the handshake has
+     *         not been torn down, {@code false} otherwise
      */
     public boolean isConnected() {
         return socketClient != null && socketClient.isConnected();
     }
 
     /**
-     * Waits for this session to be disconnected
+     * Blocks the calling thread until this session is disconnected.
+     *
+     * <p>Installs a transient listener that completes once
+     * {@link WhatsAppClientListener#onDisconnected(WhatsAppClient, WhatsAppClientDisconnectReason)}
+     * fires with a reason other than
+     * {@link WhatsAppClientDisconnectReason#RECONNECTING}, so silent
+     * reconnection cycles do not wake the caller.
+     *
+     * @return {@code this}, for fluent chaining
      */
     public WhatsAppClient waitForDisconnection() {
         if (!isConnected()) {
@@ -450,6 +705,13 @@ public final class WhatsAppClient {
 
     //<editor-fold desc="Error handling">
 
+    /**
+     * Delegates to the configured {@link WhatsAppClientErrorHandler} and
+     * applies the returned {@link WhatsAppClientErrorHandler.Result} as a
+     * concrete session-control decision.
+     *
+     * @param exception the exception to handle
+     */
     public void handleFailure(WhatsAppException exception) {
         var result = errorHandler.handleError(this, exception);
         switch (result) {
@@ -460,10 +722,23 @@ public final class WhatsAppClient {
         }
     }
 
+    /**
+     * Pushes a batch of sync mutations for the given patch type to the
+     * companion app-state service.
+     *
+     * @param type    the sync patch type being updated
+     * @param patches the ordered mutations to apply
+     */
     public void pushWebAppState(SyncPatchType type, List<SyncPendingMutation> patches) {
         webAppStateService.pushPatches(type, patches);
     }
 
+    /**
+     * Requests that the companion app-state service pull the latest
+     * patches for the given patch types from the server.
+     *
+     * @param patches the patch types to pull; an empty array is tolerated
+     */
     public void pullWebAppState(SyncPatchType... patches) {
         webAppStateService.pullPatches(patches);
     }
@@ -502,6 +777,14 @@ public final class WhatsAppClient {
         webAppStateService.retryAllOrphanMutations();
     }
 
+    /**
+     * Re-issues the verified-name business certificate after the display
+     * name has changed, using the current Signal identity private key
+     * for signature.
+     *
+     * @param newName the new verified display name; {@code null} falls
+     *                back to {@link WhatsAppStore#name()}
+     */
     private void updateBusinessCertificate(String newName) {
         var details = new BusinessVerifiedNameCertificateDetailsBuilder()
                 .verifiedName(Objects.requireNonNullElse(newName, store.name()))
@@ -531,11 +814,31 @@ public final class WhatsAppClient {
         store.setVerifiedName(verifiedName);
     }
 
+    /**
+     * Sends an acknowledgment stanza for the given inbound node, using
+     * the node's own {@code id} attribute as the acknowledgment id.
+     *
+     * @param node the inbound node to acknowledge
+     */
     public void sendAck(Node node) {
         var id = node.getRequiredAttributeAsString("id");
         sendAck(id, node);
     }
 
+    /**
+     * Sends an acknowledgment stanza for the given inbound node using
+     * the supplied id.
+     *
+     * <p>The acknowledgment is routed to the node's {@code from}
+     * attribute and, when present, propagates the {@code participant}
+     * (as {@code recipient}) and {@code type} attributes. For
+     * non-{@code message} stanzas, the original {@code type} is copied
+     * over so the server can correlate the ack with the intended stanza
+     * class.
+     *
+     * @param id   the acknowledgment id
+     * @param node the inbound node being acknowledged
+     */
     public void sendAck(String id, Node node) {
         var ackBuilder = new NodeBuilder()
                 .description("ack")
@@ -560,6 +863,18 @@ public final class WhatsAppClient {
         sendNodeWithNoResponse(ackBuilder.build());
     }
 
+    /**
+     * Generates and uploads a fresh batch of Signal pre-keys so remote
+     * devices can establish new sessions with this client.
+     *
+     * <p>The requested count is clamped to a minimum of
+     * {@link #MIN_PRE_KEYS_COUNT} so every upload remains useful. The
+     * newly generated keys are appended to the store on success.
+     *
+     * @param keysCount the number of additional pre-keys to generate and
+     *                  upload; internally clamped to
+     *                  {@link #MIN_PRE_KEYS_COUNT}
+     */
     public void sendPreKeys(long keysCount) {
         keysCount = Math.max(keysCount, MIN_PRE_KEYS_COUNT);
         var startId = store.hasPreKeys() ? store.preKeys().getLast().id() + 1 : 1;
@@ -626,6 +941,18 @@ public final class WhatsAppClient {
         }
     }
 
+    /**
+     * Sends a delivery or read receipt for a message.
+     *
+     * <p>This is a no-op when the client does not yet know its own JID;
+     * the receipt is silently dropped to avoid sending unauthenticated
+     * receipts during the very early stages of login.
+     *
+     * @param id   the message id to acknowledge
+     * @param from the JID of the remote party to receipt
+     * @param type the receipt type (for example {@code "read"} or
+     *             {@code "played"}); {@code null} for a delivery receipt
+     */
     public void sendReceipt(String id, Jid from, String type) {
         var me = store.jid()
                 .orElse(null);
@@ -670,6 +997,18 @@ public final class WhatsAppClient {
         return handleChatMetadata(response);
     }
 
+    /**
+     * Extracts the {@code group} subtree from the server response and
+     * updates the local chat store with the parsed metadata.
+     *
+     * <p>If the chat is not yet known, a new entry is added to the store
+     * with the subject from the server as its display name.
+     *
+     * @param response the server response node
+     * @return the parsed metadata
+     * @throws NoSuchElementException if the response does not contain a
+     *                                {@code group} node
+     */
     private ChatMetadata handleChatMetadata(Node response) {
         var metadataNode = Optional.of(response)
                 .filter(entry -> entry.hasDescription("group"))
@@ -683,6 +1022,19 @@ public final class WhatsAppClient {
         return metadata;
     }
 
+    /**
+     * Parses the {@code group} node returned by a chat metadata query
+     * into a {@link ChatMetadata} instance, distinguishing group chats
+     * from communities based on the presence of the {@code parent} child
+     * element.
+     *
+     * <p>For communities, this method issues additional sub-queries to
+     * fetch linked-group participants and sub-groups so the returned
+     * metadata carries the full community structure.
+     *
+     * @param node the {@code group} node from the server response
+     * @return the parsed chat metadata
+     */
     private ChatMetadata parseChatMetadata(Node node) {
         var groupIdUser = node.getRequiredAttributeAsString("id");
         var groupId = Jid.of(groupIdUser, JidServer.groupOrCommunity());
@@ -919,6 +1271,14 @@ public final class WhatsAppClient {
         }
     }
 
+    /**
+     * Parses a {@code participant} node into a {@link GroupParticipant},
+     * skipping entries that carry an {@code error} attribute.
+     *
+     * @param node the participant node
+     * @return a singleton stream with the parsed participant, or an
+     *         empty stream for error entries
+     */
     private Stream<GroupParticipant> parseGroupParticipant(Node node) {
         if (node.hasAttribute("error")) {
             return Stream.empty();
@@ -933,6 +1293,14 @@ public final class WhatsAppClient {
         return Stream.of(result);
     }
 
+    /**
+     * Queries the WhatsApp Business profile associated with the given
+     * contact.
+     *
+     * @param contact the contact whose business profile should be fetched
+     * @return the parsed profile, or empty if the contact is not a
+     *         business
+     */
     public Optional<BusinessProfile> queryBusinessProfile(JidProvider contact) {
         var profileNode = new NodeBuilder()
                 .description("profile")
@@ -955,6 +1323,13 @@ public final class WhatsAppClient {
                 .map(this::parseBusinessProfile);
     }
 
+    /**
+     * Parses the {@code profile} child of a business profile response
+     * into a {@link BusinessProfile}.
+     *
+     * @param node the {@code profile} node
+     * @return the parsed profile
+     */
     private BusinessProfile parseBusinessProfile(Node node) {
         var jid = node.getRequiredAttributeAsJid("value");
         var address = node.getChild("address")
@@ -999,6 +1374,14 @@ public final class WhatsAppClient {
                 .build();
     }
 
+    /**
+     * Parses a {@code category} node into a {@link BusinessCategory},
+     * URL-decoding the human-readable name.
+     *
+     * @param node the category node
+     * @return the parsed category
+     * @throws NoSuchElementException if the category content is missing
+     */
     public BusinessCategory parseBusinessCategory(Node node) {
         var id = node.getRequiredAttributeAsString("id");
         var name = node.toContentString()
@@ -1010,6 +1393,15 @@ public final class WhatsAppClient {
                 .build();
     }
 
+    /**
+     * Parses the {@code business_hours} children of a business profile
+     * into a {@link BusinessHours} anchored at the supplied timezone.
+     *
+     * @param node     the business profile node
+     * @param timezone the timezone attribute from the
+     *                 {@code business_hours} node
+     * @return the parsed business hours configuration
+     */
     private BusinessHours parseBusinessHours(Node node, String timezone) {
         var entries = node.streamChild("business_hours")
                 .flatMap(entry -> entry.streamChildren("business_hours_config"))
@@ -1021,6 +1413,13 @@ public final class WhatsAppClient {
                 .build();
     }
 
+    /**
+     * Parses a single {@code business_hours_config} node into a
+     * {@link BusinessHoursEntry}.
+     *
+     * @param node the config node describing one day of business hours
+     * @return the parsed entry
+     */
     private BusinessHoursEntry parseBusinessHoursEntry(Node node) {
         var dayOfWeek = node.getRequiredAttributeAsString("day_of_week");
         var mode = node.getRequiredAttributeAsString("mode");
@@ -1119,6 +1518,14 @@ public final class WhatsAppClient {
                 .findFirst();
     }
 
+    /**
+     * Parses the {@code profile} child of a usync bot profile response
+     * into a {@link BotProfile}.
+     *
+     * @param botJid  the bot JID the response pertains to
+     * @param profile the profile node
+     * @return the parsed bot profile
+     */
     private BotProfile parseBotProfile(Jid botJid, Node profile) {
         var name = profile.getChild("name")
                 .flatMap(Node::toContentString)
@@ -1186,6 +1593,12 @@ public final class WhatsAppClient {
                 .build();
     }
 
+    /**
+     * Parses a {@code command} node into a {@link BotProfileCommand}.
+     *
+     * @param command the command node from a bot profile
+     * @return the parsed command descriptor
+     */
     private static BotProfileCommand parseBotCommand(Node command) {
         var commandName = command.getChild("name")
                 .flatMap(Node::toContentString)
@@ -1199,6 +1612,12 @@ public final class WhatsAppClient {
                 .build();
     }
 
+    /**
+     * Parses a {@code prompt} node into a {@link BotProfilePrompt}.
+     *
+     * @param prompt the prompt node from a bot profile
+     * @return the parsed suggested-prompt descriptor
+     */
     private static BotProfilePrompt parseBotPrompt(Node prompt) {
         var emoji = prompt.getChild("emoji")
                 .flatMap(Node::toContentString)
@@ -1212,58 +1631,172 @@ public final class WhatsAppClient {
                 .build();
     }
 
+    /**
+     * Builds the IQ node used to initiate a voice or video call with the
+     * given JID.
+     *
+     * @param jid the call recipient
+     * @return the call offer node
+     * @throws UnsupportedOperationException currently a stub pending
+     *                                       implementation
+     */
     private Node createCall(JidProvider jid) {
         throw new UnsupportedOperationException();
     }
 
+    /**
+     * Queries the server for the list of newsletters this account
+     * follows.
+     *
+     * @return the newsletters, in server order
+     * @throws UnsupportedOperationException currently a stub pending
+     *                                       implementation
+     */
     public SequencedCollection<Newsletter> queryNewsletters() {
         throw new UnsupportedOperationException();
     }
 
+    /**
+     * Queries the server for the list of group chats this account
+     * participates in.
+     *
+     * @return the groups, in server order
+     * @throws UnsupportedOperationException currently a stub pending
+     *                                       implementation
+     */
     public SequencedCollection<Chat> queryGroups() {
         throw new UnsupportedOperationException();
     }
 
+    /**
+     * Sends a peer-to-peer control message (for example, a protocol
+     * message to another companion of the same account).
+     *
+     * @param chatJid  the destination JID
+     * @param response the peer message content
+     * @throws UnsupportedOperationException currently a stub pending
+     *                                       implementation
+     */
     public void sendPeerMessage(Jid chatJid, ChatMessageInfo response) {
         throw new UnsupportedOperationException();
     }
 
+    /**
+     * Queries the display name associated with the given user JID.
+     *
+     * @param receiver the user JID
+     * @return the display name, or empty if the server has none
+     * @throws UnsupportedOperationException currently a stub pending
+     *                                       implementation
+     */
     public Optional<String> queryName(Jid receiver) {
         throw new UnsupportedOperationException();
     }
 
+    /**
+     * Requests a batch of historical messages for the given newsletter.
+     *
+     * @param newsletterJid the newsletter JID
+     * @param i             the number of messages to fetch
+     * @throws UnsupportedOperationException currently a stub pending
+     *                                       implementation
+     */
     public void queryNewsletterMessages(Jid newsletterJid, int i) {
         throw new UnsupportedOperationException();
     }
 
+    /**
+     * Queries metadata for a single newsletter with the viewer role the
+     * account currently holds.
+     *
+     * @param newsletterJid the newsletter JID
+     * @param role          the viewer role to assert during the query
+     * @return the newsletter metadata, or empty if not accessible
+     * @throws UnsupportedOperationException currently a stub pending
+     *                                       implementation
+     */
     public Optional<Newsletter> queryNewsletter(Jid newsletterJid, NewsletterViewerRole role) {
         throw new UnsupportedOperationException();
     }
 
+    /**
+     * Queries the "about" status text of the given user.
+     *
+     * @param jid the user JID
+     * @return the about text, or empty if the user has none visible
+     * @throws UnsupportedOperationException currently a stub pending
+     *                                       implementation
+     */
     public Optional<String> queryAbout(Jid jid) {
         throw new UnsupportedOperationException();
     }
 
+    /**
+     * Requests the business catalog for the given business JID.
+     *
+     * @param targetJid the business JID
+     * @throws UnsupportedOperationException currently a stub pending
+     *                                       implementation
+     */
     public void queryBusinessCatalog(Jid targetJid) {
         throw new UnsupportedOperationException();
     }
 
+    /**
+     * Requests the business collections (catalog sub-groupings) for the
+     * given business JID.
+     *
+     * @param targetJid the business JID
+     * @throws UnsupportedOperationException currently a stub pending
+     *                                       implementation
+     */
     public void queryBusinessCollections(Jid targetJid) {
         throw new UnsupportedOperationException();
     }
 
+    /**
+     * Queries the server for the list of contacts currently blocked by
+     * this account.
+     *
+     * @return the blocked JIDs
+     * @throws UnsupportedOperationException currently a stub pending
+     *                                       implementation
+     */
     public SequencedCollection<Jid> queryBlockList() {
         throw new UnsupportedOperationException();
     }
 
+    /**
+     * Queries the profile picture URL for the given JID.
+     *
+     * @param self the JID whose picture should be fetched
+     * @return the picture URL, or empty if none is published
+     * @throws UnsupportedOperationException currently a stub pending
+     *                                       implementation
+     */
     public Optional<URI> queryPicture(Jid self) {
         throw new UnsupportedOperationException();
     }
 
+    /**
+     * Subscribes to presence updates for the given contact.
+     *
+     * @param jid the contact JID
+     * @throws UnsupportedOperationException currently a stub pending
+     *                                       implementation
+     */
     public void subscribeToPresence(Jid jid) {
         throw new UnsupportedOperationException();
     }
 
+    /**
+     * Sends a message to the given JID.
+     *
+     * @param jid       the destination JID
+     * @param container the message container to send
+     * @throws UnsupportedOperationException currently a stub pending
+     *                                       implementation
+     */
     public void sendMessage(Jid jid, MessageContainer container) {
         throw new UnsupportedOperationException();
     }

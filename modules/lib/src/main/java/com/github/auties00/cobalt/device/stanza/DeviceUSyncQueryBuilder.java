@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.device.stanza;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.device.info.DeviceListHashInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidServer;
@@ -10,16 +13,27 @@ import com.github.auties00.cobalt.util.RandomIdUtils;
 import java.util.*;
 
 /**
- * Builds USync IQ stanzas for device list queries.
+ * Builds the USync IQ stanzas Cobalt sends to the WhatsApp server when it needs to learn
+ * which companion devices each user has linked.
  *
- * <p>Constructs batched USync IQ stanzas with the device protocol ({@code <devices version="2">})
- * and optional username protocol. Each query includes a list of user nodes with optional
- * delta update information (device hash, timestamp, expected timestamp).
+ * <p>USync is WhatsApp's multi-user query protocol; the device protocol inside it returns
+ * each user's device list and signed key index list. This builder wraps the repetitive XML
+ * construction (session id generation, per-user nodes, delta update attributes, username
+ * co-query, batching large lists) so callers at {@link com.github.auties00.cobalt.device.DeviceService}
+ * can simply provide a set of JIDs and a sync context.
+ *
+ * <p>Each user entry optionally carries the locally cached {@code device_hash}, timestamp, and
+ * expected timestamp so the server can answer with an "omitted" result (hash still matches)
+ * instead of retransmitting unchanged device lists.
  *
  * @implNote WAWebUsync.USyncQuery: constructs and executes USync requests with configurable
  * protocols and user lists. WAWebUsyncDevice.USyncDeviceProtocol: defines the device protocol
  * with {@code getName()="devices"}, {@code getQueryElement()}, and {@code getUserElement()}.
+ * WAWebUsyncUsername.USyncUsernameProtocol: optional username co-query protocol.
  */
+@WhatsAppWebModule(moduleName = "WAWebUsync")
+@WhatsAppWebModule(moduleName = "WAWebUsyncDevice")
+@WhatsAppWebModule(moduleName = "WAWebUsyncUsername")
 public final class DeviceUSyncQueryBuilder {
 
     /**
@@ -27,12 +41,15 @@ public final class DeviceUSyncQueryBuilder {
      *
      * @implNote WAWebAdvSyncDeviceListApi: batches large user lists to avoid oversized requests.
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvSyncDeviceListApi",
+            exports = "syncDeviceList",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private static final int MAX_USERS_PER_QUERY = 500;
 
     /**
      * Prevents instantiation of this utility class.
      *
-     * @implNote NO_WA_BASIS: Java-specific utility class pattern.
+     * @throws UnsupportedOperationException always
      */
     private DeviceUSyncQueryBuilder() {
         throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
@@ -53,6 +70,9 @@ public final class DeviceUSyncQueryBuilder {
      * @param includeUsernameProtocol whether to include the username protocol
      * @return list of IQ node builders, one per batch
      */
+    @WhatsAppWebExport(moduleName = "WAWebUsync",
+            exports = "USyncQuery",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public static List<NodeBuilder> build(Set<Jid> userJids, String context, Map<Jid, DeviceListHashInfo> hashInfos, boolean includeUsernameProtocol) {
         Objects.requireNonNull(userJids, "userJids cannot be null");
         Objects.requireNonNull(context, "context cannot be null");
@@ -93,6 +113,9 @@ public final class DeviceUSyncQueryBuilder {
      * @param includeUsernameProtocol whether to include the username protocol query element
      * @return the IQ node builder (not yet built, so caller can add id attribute)
      */
+    @WhatsAppWebExport(moduleName = "WAWebUsync",
+            exports = "USyncQuery",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private static NodeBuilder buildEntry(Collection<Jid> userJids, String context, Map<Jid, DeviceListHashInfo> hashInfos, boolean includeUsernameProtocol) {
         // WAWap.generateId(): generates session ID in WhatsApp format
         var sessionId = RandomIdUtils.newId();
@@ -163,6 +186,9 @@ public final class DeviceUSyncQueryBuilder {
      * @param hashInfo the hash info for this user, or {@code null}
      * @return the devices user element, or {@code null} if not needed
      */
+    @WhatsAppWebExport(moduleName = "WAWebUsyncDevice",
+            exports = "USyncDeviceProtocol",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static Node buildUserDevicesElement(DeviceListHashInfo hashInfo) {
         // WAWebUsyncDevice.USyncDeviceProtocol.getUserElement
         if (hashInfo == null) {
@@ -204,6 +230,9 @@ public final class DeviceUSyncQueryBuilder {
      * @param hashInfos hash information for delta updates, or {@code null}
      * @return the user node
      */
+    @WhatsAppWebExport(moduleName = "WAWebUsync",
+            exports = "USyncQuery",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private static Node buildUserNode(Jid jid, Map<Jid, DeviceListHashInfo> hashInfos) {
         var userJid = jid.toUserJid();
         var builder = new NodeBuilder()

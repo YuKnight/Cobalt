@@ -15,39 +15,35 @@ import java.time.Instant;
 import java.util.*;
 
 /**
- * The metadata of a WhatsApp community (parent group).
+ * Represents the metadata of a WhatsApp community.
  *
- * <p>A community is a top-level organizational entity that aggregates one or
- * more subgroups under a single umbrella. In the WhatsApp Web client the same
- * database table ({@code WAWebDBGroupsGroupMetadata}) stores both regular
- * group metadata and community metadata, differentiated by the
- * {@code isParentGroup} flag. When {@code isParentGroup} is {@code true} the
- * record describes a community and its metadata is represented by this class.
+ * <p>A WhatsApp community is a top-level organizational entity that groups
+ * related conversations (subgroups) under a single umbrella. Each community
+ * has its own identity (JID and subject), a founder, an optional description,
+ * a participant list, administrative policy settings, and a set of linked
+ * subgroups accessible via {@link #communityGroups()}.
  *
- * <p>Community metadata captures the identity of the community (its JID and
- * subject), its origin (the founder and foundation timestamp), an optional
- * free-form description with a server-assigned revision identifier, the
- * current list of participants, the community-level administrative settings
- * as direct boolean properties, the ephemeral message expiration timer, the
- * set of linked subgroups, addressing-mode flags, and the open-bot-group
- * toggle.
+ * <p>Communities support extensive administrative controls including:
+ * <ul>
+ *   <li>Announcement mode ({@link #isAnnounce()}) to restrict messaging to
+ *       administrators only</li>
+ *   <li>Metadata restriction ({@link #isRestrict()}) to prevent non-admin
+ *       changes to the subject, description, and profile picture</li>
+ *   <li>Membership approval ({@link #isMembershipApprovalMode()}) to require
+ *       admin approval for new join requests</li>
+ *   <li>Member add mode ({@link #isMemberAddModeAdminOnly()}) to restrict
+ *       who can add new members</li>
+ *   <li>Subgroup creation permissions
+ *       ({@link #isAllowNonAdminSubGroupCreation()}) controlling whether
+ *       non-admin members can create new subgroups</li>
+ *   <li>Growth lock ({@link #growthLockExpiration()}) to temporarily prevent
+ *       new members from joining</li>
+ * </ul>
  *
  * <p>Instances of this class are mutable. All fields can be changed after
- * construction through the fluent setter methods, each of which returns the
- * same instance for method chaining. Collection-typed fields (participants
- * and community groups) additionally expose dedicated add, remove, and clear
- * operations.
- *
- * @apiNote In the WhatsApp Web client the {@code WAWebGroupMetadataModel}
- * derives the community's {@code groupType} from the
- * {@code isParentGroup === true} condition. The
- * {@code WAWebGroupType.GroupType.COMMUNITY} constant identifies this case.
- * The community's subgroups can have their own type: a
- * {@code LINKED_ANNOUNCEMENT_GROUP} (the default subgroup, where
- * {@code defaultSubgroup === true}), a {@code LINKED_GENERAL_GROUP} (the
- * general chat subgroup, where {@code generalSubgroup === true}), or a plain
- * {@code LINKED_SUBGROUP} identified by a non-{@code null}
- * {@code parentGroup} reference.
+ * construction through the setter methods. Collection-typed fields
+ * ({@link #participants()} and {@link #communityGroups()}) additionally
+ * expose dedicated add, remove, and clear operations.
  *
  * @see ChatMetadata
  * @see CommunityLinkedGroup
@@ -55,18 +51,16 @@ import java.util.*;
 @ProtobufMessage
 public final class CommunityMetadata implements ChatMetadata {
     /**
-     * The JID that uniquely identifies this community. In the WhatsApp Web
-     * client this corresponds to the {@code id} property of the
-     * {@code WAWebGroupMetadataModel}.
+     * The JID that uniquely identifies this community within WhatsApp.
+     * Community JIDs use the group JID format and are distinct from the
+     * JIDs of the community's linked subgroups.
      */
     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
     Jid jid;
 
     /**
-     * The subject (display name) of this community. In the WhatsApp Web
-     * client this is the {@code subject} property of the group metadata
-     * record, set by a community administrator and visible to all
-     * participants.
+     * The subject (display name) of this community. The subject is set by
+     * a community administrator and is visible to all participants.
      */
     @ProtobufProperty(index = 2, type = ProtobufType.STRING)
     String subject;
@@ -80,74 +74,69 @@ public final class CommunityMetadata implements ChatMetadata {
 
     /**
      * The instant at which the subject was last changed, or {@code null}
-     * if the timestamp is not available. In the WhatsApp Web client this
-     * corresponds to the {@code subjectTime} property.
+     * if the timestamp is not available.
      */
     @ProtobufProperty(index = 4, type = ProtobufType.INT64, mixins = InstantSecondsMixin.class)
     Instant subjectTimestamp;
 
     /**
      * The instant at which this community was created, or {@code null} if
-     * the timestamp is not available. In the WhatsApp Web client this
-     * corresponds to the {@code creation} property.
+     * the timestamp is not available.
      */
     @ProtobufProperty(index = 5, type = ProtobufType.INT64, mixins = InstantSecondsMixin.class)
     Instant foundationTimestamp;
 
     /**
      * The JID of the user who originally created this community, or
-     * {@code null} if the founder is not known. In the WhatsApp Web client
-     * this corresponds to the {@code owner} property.
+     * {@code null} if the founder is not known.
      */
     @ProtobufProperty(index = 6, type = ProtobufType.STRING)
     Jid founderJid;
 
     /**
      * The free-form description text of this community, or {@code null} if
-     * no description has been set. In the WhatsApp Web client this
-     * corresponds to the {@code desc} property.
+     * no description has been set. The description is typically a paragraph
+     * explaining the purpose or topic of the community.
      */
     @ProtobufProperty(index = 7, type = ProtobufType.STRING)
     String description;
 
     /**
      * The server-assigned identifier for the current description revision,
-     * or {@code null} if no description identifier is available. In the
-     * WhatsApp Web client this corresponds to the {@code descId} property
-     * and is used to detect conflicting concurrent edits.
+     * or {@code null} if no description identifier is available. This
+     * identifier is used to detect conflicting concurrent edits to the
+     * community description.
      */
     @ProtobufProperty(index = 8, type = ProtobufType.STRING)
     String descriptionId;
 
     /**
      * The instant at which the description was last changed, or
-     * {@code null} if the timestamp is not available. In the WhatsApp Web
-     * client this corresponds to the {@code descTime} property.
+     * {@code null} if the timestamp is not available.
      */
     @ProtobufProperty(index = 9, type = ProtobufType.INT64, mixins = InstantSecondsMixin.class)
     Instant descriptionTimestamp;
 
     /**
-     * The ordered set of participants currently in this community. In the
-     * WhatsApp Web client this corresponds to the {@code participants}
-     * collection on the {@code WAWebGroupMetadataModel}.
+     * The ordered set of participants currently in this community. Each
+     * participant has a JID, role (regular member, admin, or super admin),
+     * and other metadata. Community participants are the users who have
+     * joined the community itself (not necessarily every subgroup).
      */
     @ProtobufProperty(index = 10, type = ProtobufType.MESSAGE)
     SequencedSet<GroupParticipant> participants;
 
     /**
      * The JID of the participant who last changed the description, or
-     * {@code null} if not known. In the WhatsApp Web client this
-     * corresponds to the {@code descOwner} property.
+     * {@code null} if not known.
      */
     @ProtobufProperty(index = 11, type = ProtobufType.STRING)
     Jid descriptionAuthorJid;
 
     /**
-     * The number of seconds after which messages in this community
-     * automatically disappear, or {@code 0} if ephemeral messaging is
-     * disabled. In the WhatsApp Web client this corresponds to the
-     * {@code ephemeralDuration} property.
+     * The ephemeral message timer for this community, or {@code null} if
+     * ephemeral messaging is disabled. When set, messages sent to this
+     * community automatically disappear after the specified duration.
      */
     @ProtobufProperty(index = 12, type = ProtobufType.UINT32)
     ChatEphemeralTimer ephemeralExpiration;
@@ -155,295 +144,305 @@ public final class CommunityMetadata implements ChatMetadata {
     /**
      * Whether metadata editing is restricted to administrators only. When
      * {@code true}, only administrators can change the community's subject,
-     * description, and profile picture. In the WhatsApp Web client this
-     * corresponds to the {@code restrict} property (locked/unlocked).
+     * description, and profile picture. When {@code false}, any member can
+     * modify these properties.
      */
     @ProtobufProperty(index = 13, type = ProtobufType.BOOL)
     boolean restrict;
 
     /**
      * Whether the community is in announcement mode. When {@code true},
-     * only administrators can send messages. In the WhatsApp Web client this
-     * corresponds to the {@code announce} property.
+     * only administrators can send messages to the community. Regular
+     * members can only read messages.
      */
     @ProtobufProperty(index = 14, type = ProtobufType.BOOL)
     boolean announce;
 
     /**
-     * The ordered set of subgroups linked to this community. In the
-     * WhatsApp Web client the community's subgroups are tracked by
-     * {@code joinedSubgroups} and {@code unjoinedSubgroups} arrays.
+     * The ordered set of subgroups linked to this community. This includes
+     * both joined and unjoined subgroups, the default announcement subgroup,
+     * the general chat subgroup, and any additional subgroups created by
+     * administrators or permitted members.
      */
     @ProtobufProperty(index = 15, type = ProtobufType.MESSAGE)
     SequencedSet<CommunityLinkedGroup> communityGroups;
 
     /**
      * Whether this community uses LID (Linked Identity) addressing mode
-     * instead of traditional phone-number-based addressing. In the WhatsApp
-     * Web client this corresponds to the {@code isLidAddressingMode}
-     * property.
+     * instead of traditional phone-number-based addressing. In LID mode,
+     * participants are identified by server-assigned opaque identifiers
+     * rather than phone numbers, providing enhanced privacy.
      */
     @ProtobufProperty(index = 16, type = ProtobufType.BOOL)
     boolean isLidAddressingMode;
 
     /**
-     * Whether this community operates in incognito mode. In the WhatsApp
-     * Web client this corresponds to the {@code incognito} column.
+     * Whether this community operates in incognito mode. In incognito
+     * mode, the community's membership and activity details may be
+     * restricted from external visibility.
      */
     @ProtobufProperty(index = 17, type = ProtobufType.BOOL)
     boolean isIncognito;
 
     /**
      * Whether frequently forwarded messages are blocked in this community.
-     * In the WhatsApp Web client this corresponds to the
-     * {@code noFrequentlyForwarded} property.
+     * When {@code true}, messages that WhatsApp has identified as frequently
+     * forwarded cannot be sent into this community.
      */
     @ProtobufProperty(index = 18, type = ProtobufType.BOOL)
     boolean noFrequentlyForwarded;
 
     /**
      * Whether admin approval is required for new members to join this
-     * community. In the WhatsApp Web client this corresponds to the
-     * {@code membershipApprovalMode} property.
+     * community. When {@code true}, users who request to join must be
+     * approved by an administrator before they become members.
      */
     @ProtobufProperty(index = 19, type = ProtobufType.BOOL)
     boolean membershipApprovalMode;
 
     /**
-     * Whether invite link usage is restricted to administrators. When
-     * {@code true}, only administrators can use invite links. In the
-     * WhatsApp Web client this corresponds to the {@code memberLinkMode}
-     * property with values {@code "admin_link"} or {@code "all_member_link"}.
+     * Whether invite link sharing is restricted to administrators. When
+     * {@code true}, only administrators can share the community's invite
+     * link to add new members. When {@code false}, any member can share
+     * the link.
      */
     @ProtobufProperty(index = 20, type = ProtobufType.BOOL)
     boolean memberLinkModeAdminOnly;
 
     /**
-     * Whether non-admin members are allowed to create or link subgroups.
-     * In the WhatsApp Web client this corresponds to the
-     * {@code allowNonAdminSubGroupCreation} flag on the group metadata
-     * record.
+     * Whether non-admin members are allowed to create or link subgroups
+     * within this community. When {@code true}, any member can create new
+     * subgroups. When {@code false}, only administrators can do so.
      */
     @ProtobufProperty(index = 21, type = ProtobufType.BOOL)
     boolean allowNonAdminSubGroupCreation;
 
     /**
      * Whether only administrators can add members to this community. When
-     * {@code true}, adding members is restricted to administrators. In the
-     * WhatsApp Web client this corresponds to the {@code memberAddMode}
-     * field with the value {@code "admin_add"}.
+     * {@code true}, direct member addition is restricted to administrators.
+     * When {@code false}, any existing member can add new participants.
      */
     @ProtobufProperty(index = 22, type = ProtobufType.BOOL)
     boolean memberAddModeAdminOnly;
 
     /**
      * The instant at which the growth lock expires, or {@code null} if no
-     * growth lock is active. In the WhatsApp Web client this corresponds
-     * to the {@code growthLockExpiration} property.
+     * growth lock is active. A growth lock temporarily prevents new members
+     * from joining the community, typically imposed as a policy enforcement
+     * measure.
      */
     @ProtobufProperty(index = 23, type = ProtobufType.INT64, mixins = InstantSecondsMixin.class)
     Instant growthLockExpiration;
 
     /**
-     * The type of growth lock applied to this community (e.g.
-     * {@code "invite"}), or {@code null} if no growth lock is active. In
-     * the WhatsApp Web client this corresponds to the
-     * {@code growthLockType} property.
+     * The type of growth lock applied to this community (for example
+     * {@code "invite"}), or {@code null} if no growth lock is active.
+     * The type indicates which growth vector is restricted.
      */
     @ProtobufProperty(index = 24, type = ProtobufType.STRING)
     String growthLockType;
 
     /**
      * Whether the "report to admin" feature is enabled for this community.
-     * In the WhatsApp Web client this corresponds to the
-     * {@code reportToAdminMode} property.
+     * When enabled, community members can report messages or participants
+     * directly to community administrators for review.
      */
     @ProtobufProperty(index = 25, type = ProtobufType.BOOL)
     boolean reportToAdminMode;
 
     /**
      * The instant of the last report-to-admin event, or {@code null} if no
-     * such event has occurred. In the WhatsApp Web client this corresponds
-     * to the {@code lastReportToAdminTimestamp} property.
+     * report has been filed yet.
      */
     @ProtobufProperty(index = 26, type = ProtobufType.INT64, mixins = InstantSecondsMixin.class)
     Instant lastReportToAdminTimestamp;
 
     /**
-     * The server-reported participant count, or {@code null} if not
-     * available. In the WhatsApp Web client this corresponds to the
-     * {@code size} property.
+     * The server-reported total participant count, or {@code null} if not
+     * available. This is the count reported by the server and may differ
+     * from the size of {@link #participants} if the full participant list
+     * has not been fetched.
      */
     @ProtobufProperty(index = 27, type = ProtobufType.UINT32)
     Integer size;
 
     /**
-     * Whether this is a support group. In the WhatsApp Web client this
-     * corresponds to the {@code support} property.
+     * Whether this is a WhatsApp support group. Support groups are
+     * managed by WhatsApp and have restricted administrative capabilities
+     * for regular members and administrators.
      */
     @ProtobufProperty(index = 28, type = ProtobufType.BOOL)
     boolean support;
 
     /**
-     * Whether this community has been suspended. A suspended community
-     * cannot be interacted with until it is restored. In the WhatsApp Web
-     * client this corresponds to the {@code suspended} property.
+     * Whether this community has been suspended by WhatsApp. A suspended
+     * community cannot receive or send messages until it is restored.
+     * This typically happens as a result of policy enforcement actions.
      */
     @ProtobufProperty(index = 29, type = ProtobufType.BOOL)
     boolean suspended;
 
     /**
-     * Whether this community has been terminated. In the WhatsApp Web
-     * client this corresponds to the {@code terminated} property.
+     * Whether this community has been permanently terminated by WhatsApp.
+     * A terminated community is permanently deactivated and cannot be
+     * restored, unlike a suspended community which may be reinstated.
      */
     @ProtobufProperty(index = 30, type = ProtobufType.BOOL)
     boolean terminated;
 
     /**
-     * Whether the parent group is closed, meaning the default membership
-     * approval is {@code "request_required"}. In the WhatsApp Web client
-     * this corresponds to the {@code isParentGroupClosed} property.
+     * Whether the parent community group is closed. A closed community
+     * requires membership approval for all join requests, effectively
+     * making it invitation-only.
      */
     @ProtobufProperty(index = 31, type = ProtobufType.BOOL)
     boolean isParentGroupClosed;
 
     /**
-     * Whether this community has or is a default (announcement) subgroup.
-     * In the WhatsApp Web client this corresponds to the
-     * {@code defaultSubgroup} property.
+     * Whether this community contains a default announcement subgroup.
+     * The default announcement subgroup is a read-only group where only
+     * administrators can post messages, used for community-wide
+     * announcements.
      */
     @ProtobufProperty(index = 32, type = ProtobufType.BOOL)
     boolean defaultSubgroup;
 
     /**
-     * Whether this community has or is a general chat subgroup. In the
-     * WhatsApp Web client this corresponds to the {@code generalSubgroup}
-     * property.
+     * Whether this community contains a general chat subgroup. The general
+     * chat subgroup is the main open discussion space where all community
+     * members can participate.
      */
     @ProtobufProperty(index = 33, type = ProtobufType.BOOL)
     boolean generalSubgroup;
 
     /**
-     * Whether this community has a hidden subgroup. In the WhatsApp Web
-     * client this corresponds to the {@code hiddenSubgroup} property.
+     * Whether this community contains a hidden subgroup. Hidden subgroups
+     * are not visible in the community's public subgroup list but still
+     * exist and function normally for their members.
      */
     @ProtobufProperty(index = 34, type = ProtobufType.BOOL)
     boolean hiddenSubgroup;
 
     /**
-     * Whether the group safety check flag is set. In the WhatsApp Web
-     * client this corresponds to the {@code groupSafetyCheck} property.
+     * Whether the group safety check flag is set. The safety check is a
+     * trust signal that indicates whether the community has been reviewed
+     * for compliance with platform policies.
      */
     @ProtobufProperty(index = 35, type = ProtobufType.BOOL)
     boolean groupSafetyCheck;
 
     /**
      * The JID of the user who added the current user to this community, or
-     * {@code null} if not known. In the WhatsApp Web client this
-     * corresponds to the {@code groupAdder} property.
+     * {@code null} if the adder is not known. This is used to determine
+     * trust relationships within the community.
      */
     @ProtobufProperty(index = 36, type = ProtobufType.STRING)
     Jid groupAdder;
 
     /**
-     * Whether automatic addition to the general chat is disabled. In the
-     * WhatsApp Web client this corresponds to the
-     * {@code generalChatAutoAddDisabled} property.
+     * Whether automatic addition to the general chat subgroup is disabled.
+     * When {@code true}, new community members are not automatically added
+     * to the general chat subgroup and must join it manually.
      */
     @ProtobufProperty(index = 37, type = ProtobufType.BOOL)
     boolean generalChatAutoAddDisabled;
 
     /**
      * The instant of the last community poll, or {@code null} if no poll
-     * has occurred. In the WhatsApp Web client this corresponds to the
-     * {@code lastCommunityPollTimestamp} property.
+     * has been conducted. Community polls are periodic server-side checks
+     * to refresh community metadata.
      */
     @ProtobufProperty(index = 38, type = ProtobufType.INT64, mixins = InstantSecondsMixin.class)
     Instant lastCommunityPollTimestamp;
 
     /**
      * The instant of the last activity in this community, or {@code null}
-     * if not available. In the WhatsApp Web client this corresponds to the
-     * {@code lastActivityTimestamp} property.
+     * if not available. Activity includes messages, membership changes,
+     * and administrative actions across the community and its subgroups.
      */
     @ProtobufProperty(index = 39, type = ProtobufType.INT64, mixins = InstantSecondsMixin.class)
     Instant lastActivityTimestamp;
 
     /**
      * The instant of the last seen activity in this community, or
-     * {@code null} if not available. In the WhatsApp Web client this
-     * corresponds to the {@code lastSeenActivityTimestamp} property.
+     * {@code null} if not available. This tracks the most recent activity
+     * that the current user has seen, as opposed to
+     * {@link #lastActivityTimestamp} which tracks overall activity.
      */
     @ProtobufProperty(index = 40, type = ProtobufType.INT64, mixins = InstantSecondsMixin.class)
     Instant lastSeenActivityTimestamp;
 
     /**
-     * Whether this community has CAPI (Community API) capabilities. In the
-     * WhatsApp Web client this corresponds to the {@code hasCapi} property.
+     * Whether this community has CAPI (Community API) capabilities enabled.
+     * CAPI provides programmatic access to community management features
+     * for business integrations.
      */
     @ProtobufProperty(index = 41, type = ProtobufType.BOOL)
     boolean hasCapi;
 
     /**
-     * Whether this community is a TEE bot group. In the WhatsApp Web client
-     * this corresponds to the {@code isTeeBotGroup} property.
+     * Whether this community is a TEE (Trusted Execution Environment) bot
+     * group. TEE bot groups run AI bots in a secure enclave environment
+     * for privacy-preserving interactions.
      */
     @ProtobufProperty(index = 42, type = ProtobufType.BOOL)
     boolean isTeeBotGroup;
 
     /**
      * The trigger that caused the disappearing message mode to be set, or
-     * {@code null} if not set. In the WhatsApp Web client this corresponds
-     * to the {@code disappearingModeTrigger} property.
+     * {@code null} if disappearing messages have not been configured. The
+     * trigger indicates whether the setting was changed per-chat, via
+     * account-wide defaults, or by a group administrator.
      */
     @ProtobufProperty(index = 43, type = ProtobufType.ENUM)
     ChatDisappearingMode.Trigger disappearingModeTrigger;
 
     /**
-     * Whether the current user initiated the disappearing message mode.
-     * In the WhatsApp Web client this corresponds to the
-     * {@code disappearingModeInitiatedByMe} property.
+     * Whether the current user initiated the disappearing message mode
+     * for this community. This is {@code true} if the logged-in user was
+     * the one who enabled disappearing messages.
      */
     @ProtobufProperty(index = 44, type = ProtobufType.BOOL)
     boolean disappearingModeInitiatedByMe;
 
     /**
-     * The number of subgroups in this community, or {@code null} if not
-     * available. In the WhatsApp Web client this corresponds to the
-     * {@code numSubgroups} property on the model.
+     * The server-reported number of subgroups in this community, or
+     * {@code null} if not available. This count may include both joined
+     * and unjoined subgroups.
      */
     @ProtobufProperty(index = 45, type = ProtobufType.UINT32)
     Integer numSubgroups;
 
     /**
-     * Whether the limit sharing feature is enabled for this community. In
-     * the WhatsApp Web client this corresponds to the
-     * {@code limitSharingEnabled} property.
+     * Whether the limit sharing feature is enabled for this community.
+     * When enabled, personal information sharing between members is
+     * restricted to enhance privacy.
      */
     @ProtobufProperty(index = 46, type = ProtobufType.BOOL)
     boolean limitSharingEnabled;
 
     /**
-     * The group evolution version, or {@code null} if not available. In
-     * the WhatsApp Web client this corresponds to the
-     * {@code evolutionVersion} property.
+     * The group evolution version, or {@code null} if not available. This
+     * version number tracks schema or feature-level changes to the
+     * community structure over time.
      */
     @ProtobufProperty(index = 47, type = ProtobufType.UINT32)
     Integer evolutionVersion;
 
     /**
-     * Whether participant labels are enabled for this community. In the
-     * WhatsApp Web client this corresponds to the
-     * {@code participantLabelEnabled} property.
+     * Whether participant labels are enabled for this community. When
+     * enabled, administrators can assign labels to community members to
+     * categorize or tag them.
      */
     @ProtobufProperty(index = 48, type = ProtobufType.BOOL)
     boolean participantLabelEnabled;
 
     /**
-     * Whether this community has the open Meta AI bot feature enabled. This
-     * field is not serialized as a protobuf property and is instead
-     * populated programmatically from the group query response when bot
-     * participants are detected.
+     * Whether this community has the open Meta AI bot feature enabled.
+     * When enabled, the Meta AI bot can participate in the community and
+     * respond to messages. This field is not serialized as a protobuf
+     * property and is instead populated programmatically from the group
+     * query response when bot participants are detected.
      */
     boolean isOpenBotGroup;
 
@@ -456,82 +455,89 @@ public final class CommunityMetadata implements ChatMetadata {
      * are {@code null} are replaced with empty mutable collections so that
      * callers can safely add elements after construction.
      *
-     * @param jid                          the non-{@code null} community JID
-     * @param subject                      the non-{@code null} subject
-     * @param subjectAuthorJid             the author of the last subject
-     *                                     change, or {@code null}
+     * @param jid                           the non-{@code null} community JID
+     * @param subject                       the non-{@code null} display name
+     * @param subjectAuthorJid              the author of the last subject
+     *                                      change, or {@code null}
      * @param subjectTimestamp              the subject change instant, or
-     *                                     {@code null}
+     *                                      {@code null}
      * @param foundationTimestamp           the community creation instant, or
-     *                                     {@code null}
-     * @param founderJid                   the founder JID, or {@code null}
-     * @param description                  the description text, or
-     *                                     {@code null}
-     * @param descriptionId                the server-assigned description
-     *                                     revision identifier, or
-     *                                     {@code null}
-     * @param descriptionTimestamp         the description change instant, or
-     *                                     {@code null}
-     * @param participants                 the participant set, or
-     *                                     {@code null}
-     * @param descriptionAuthorJid         the description author JID, or
-     *                                     {@code null}
-     * @param ephemeralExpiration   the ephemeral expiration in
-     *                                     seconds, or {@code 0} to disable
-     * @param restrict                     whether metadata editing is
-     *                                     restricted to admins
-     * @param announce                     whether announcement mode is on
-     * @param communityGroups              the linked subgroups, or
-     *                                     {@code null}
-     * @param isLidAddressingMode          whether LID addressing is enabled
-     * @param isIncognito                  whether incognito mode is enabled
-     * @param noFrequentlyForwarded        whether forwarded messages are
-     *                                     blocked
-     * @param membershipApprovalMode       whether admin approval is required
-     * @param memberLinkModeAdminOnly      whether invite links are admin-only
+     *                                      {@code null}
+     * @param founderJid                    the founder JID, or {@code null}
+     * @param description                   the description text, or
+     *                                      {@code null}
+     * @param descriptionId                 the server-assigned description
+     *                                      revision identifier, or
+     *                                      {@code null}
+     * @param descriptionTimestamp          the description change instant, or
+     *                                      {@code null}
+     * @param participants                  the participant set, or
+     *                                      {@code null}
+     * @param descriptionAuthorJid          the description author JID, or
+     *                                      {@code null}
+     * @param ephemeralExpiration            the ephemeral timer, or
+     *                                      {@code null} to disable
+     * @param restrict                      whether metadata editing is
+     *                                      restricted to admins
+     * @param announce                      whether announcement mode is on
+     * @param communityGroups               the linked subgroups, or
+     *                                      {@code null}
+     * @param isLidAddressingMode           whether LID addressing is enabled
+     * @param isIncognito                   whether incognito mode is enabled
+     * @param noFrequentlyForwarded         whether forwarded messages are
+     *                                      blocked
+     * @param membershipApprovalMode        whether admin approval is required
+     *                                      to join
+     * @param memberLinkModeAdminOnly       whether invite links are
+     *                                      admin-only
      * @param allowNonAdminSubGroupCreation whether non-admins can create
-     *                                     subgroups
-     * @param memberAddModeAdminOnly       whether only admins can add members
-     * @param growthLockExpiration         the growth lock expiration instant,
-     *                                     or {@code null}
-     * @param growthLockType               the growth lock type, or
-     *                                     {@code null}
-     * @param reportToAdminMode            whether report-to-admin is enabled
-     * @param lastReportToAdminTimestamp   the last report-to-admin instant,
-     *                                     or {@code null}
-     * @param size                         the server-reported participant
-     *                                     count, or {@code null}
-     * @param support                      whether this is a support group
-     * @param suspended                    whether the community is suspended
-     * @param terminated                   whether the community is terminated
-     * @param isParentGroupClosed          whether the parent group is closed
-     * @param defaultSubgroup              whether this has a default subgroup
-     * @param generalSubgroup              whether this has a general subgroup
-     * @param hiddenSubgroup               whether this has a hidden subgroup
-     * @param groupSafetyCheck             whether the safety check flag is
-     *                                     set
-     * @param groupAdder                   the JID of who added the user, or
-     *                                     {@code null}
-     * @param generalChatAutoAddDisabled   whether auto-add to general chat
-     *                                     is disabled
-     * @param lastCommunityPollTimestamp   the last community poll instant, or
-     *                                     {@code null}
-     * @param lastActivityTimestamp        the last activity instant, or
-     *                                     {@code null}
-     * @param lastSeenActivityTimestamp    the last seen activity instant, or
-     *                                     {@code null}
-     * @param hasCapi                      whether CAPI is available
-     * @param isTeeBotGroup                whether this is a TEE bot group
-     * @param disappearingModeTrigger      the disappearing mode trigger, or
-     *                                     {@code null}
-     * @param disappearingModeInitiatedByMe whether the user initiated
-     *                                     disappearing mode
-     * @param numSubgroups                 the subgroup count, or {@code null}
-     * @param limitSharingEnabled          whether limit sharing is enabled
-     * @param evolutionVersion             the evolution version, or
-     *                                     {@code null}
-     * @param participantLabelEnabled      whether participant labels are
-     *                                     enabled
+     *                                      subgroups
+     * @param memberAddModeAdminOnly        whether only admins can add
+     *                                      members
+     * @param growthLockExpiration          the growth lock expiration instant,
+     *                                      or {@code null}
+     * @param growthLockType                the growth lock type, or
+     *                                      {@code null}
+     * @param reportToAdminMode             whether report-to-admin is enabled
+     * @param lastReportToAdminTimestamp    the last report-to-admin instant,
+     *                                      or {@code null}
+     * @param size                          the server-reported participant
+     *                                      count, or {@code null}
+     * @param support                       whether this is a support group
+     * @param suspended                     whether the community is suspended
+     * @param terminated                    whether the community is
+     *                                      terminated
+     * @param isParentGroupClosed           whether the community is closed
+     * @param defaultSubgroup               whether a default announcement
+     *                                      subgroup exists
+     * @param generalSubgroup               whether a general chat subgroup
+     *                                      exists
+     * @param hiddenSubgroup                whether a hidden subgroup exists
+     * @param groupSafetyCheck              whether the safety check flag is
+     *                                      set
+     * @param groupAdder                    the JID of who added the current
+     *                                      user, or {@code null}
+     * @param generalChatAutoAddDisabled    whether auto-add to general chat
+     *                                      is disabled
+     * @param lastCommunityPollTimestamp    the last community poll instant,
+     *                                      or {@code null}
+     * @param lastActivityTimestamp         the last activity instant, or
+     *                                      {@code null}
+     * @param lastSeenActivityTimestamp     the last seen activity instant, or
+     *                                      {@code null}
+     * @param hasCapi                       whether CAPI is available
+     * @param isTeeBotGroup                 whether this is a TEE bot group
+     * @param disappearingModeTrigger       the disappearing mode trigger, or
+     *                                      {@code null}
+     * @param disappearingModeInitiatedByMe whether the current user initiated
+     *                                      disappearing mode
+     * @param numSubgroups                  the subgroup count, or
+     *                                      {@code null}
+     * @param limitSharingEnabled           whether limit sharing is enabled
+     * @param evolutionVersion              the evolution version, or
+     *                                      {@code null}
+     * @param participantLabelEnabled       whether participant labels are
+     *                                      enabled
      */
     CommunityMetadata(
             Jid jid,
@@ -884,6 +890,8 @@ public final class CommunityMetadata implements ChatMetadata {
 
     /**
      * Returns whether metadata editing is restricted to administrators.
+     * When {@code true}, only administrators can change the community's
+     * subject, description, and profile picture.
      *
      * @return {@code true} if only administrators can edit metadata
      */
@@ -920,7 +928,9 @@ public final class CommunityMetadata implements ChatMetadata {
 
     /**
      * Returns an unmodifiable view of the subgroups linked to this
-     * community. If no subgroups have been linked an empty set is returned.
+     * community. The set includes the default announcement subgroup,
+     * general chat subgroup, and any additional subgroups. If no subgroups
+     * have been linked, an empty set is returned.
      *
      * @return an unmodifiable {@code SequencedSet} of linked groups, never
      *         {@code null}
@@ -1006,9 +1016,10 @@ public final class CommunityMetadata implements ChatMetadata {
     }
 
     /**
-     * Returns whether frequently forwarded messages are blocked.
+     * Returns whether frequently forwarded messages are blocked in this
+     * community.
      *
-     * @return {@code true} if forwarded messages are blocked
+     * @return {@code true} if frequently forwarded messages are blocked
      */
     public boolean isNoFrequentlyForwarded() {
         return noFrequentlyForwarded;
@@ -1042,9 +1053,9 @@ public final class CommunityMetadata implements ChatMetadata {
     }
 
     /**
-     * Returns whether invite link usage is restricted to administrators.
+     * Returns whether invite link sharing is restricted to administrators.
      *
-     * @return {@code true} if only admins can use invite links
+     * @return {@code true} if only admins can share invite links
      */
     public boolean isMemberLinkModeAdminOnly() {
         return memberLinkModeAdminOnly;
@@ -1196,7 +1207,9 @@ public final class CommunityMetadata implements ChatMetadata {
     }
 
     /**
-     * Returns the server-reported participant count, if available.
+     * Returns the server-reported total participant count, if available.
+     * This value may differ from the size of the {@link #participants()}
+     * set if the full participant list has not been fetched.
      *
      * @return an {@code OptionalInt} containing the count, or empty if not
      *         available
@@ -1215,7 +1228,8 @@ public final class CommunityMetadata implements ChatMetadata {
     }
 
     /**
-     * Returns whether this is a support group.
+     * Returns whether this is a WhatsApp support group. Support groups
+     * have restricted administrative capabilities.
      *
      * @return {@code true} if this is a support group
      */
@@ -1233,7 +1247,8 @@ public final class CommunityMetadata implements ChatMetadata {
     }
 
     /**
-     * Returns whether this community is suspended.
+     * Returns whether this community has been suspended by WhatsApp. A
+     * suspended community cannot receive or send messages.
      *
      * @return {@code true} if suspended
      */
@@ -1251,7 +1266,8 @@ public final class CommunityMetadata implements ChatMetadata {
     }
 
     /**
-     * Returns whether this community is terminated.
+     * Returns whether this community has been permanently terminated. A
+     * terminated community cannot be restored, unlike a suspended one.
      *
      * @return {@code true} if terminated
      */
@@ -1269,16 +1285,17 @@ public final class CommunityMetadata implements ChatMetadata {
     }
 
     /**
-     * Returns whether the parent group is closed.
+     * Returns whether the community is closed. A closed community requires
+     * membership approval for all join requests.
      *
-     * @return {@code true} if the parent group is closed
+     * @return {@code true} if the community is closed
      */
     public boolean isParentGroupClosed() {
         return isParentGroupClosed;
     }
 
     /**
-     * Sets whether the parent group is closed.
+     * Sets whether the community is closed.
      *
      * @param parentGroupClosed {@code true} to mark as closed
      */
@@ -1287,43 +1304,45 @@ public final class CommunityMetadata implements ChatMetadata {
     }
 
     /**
-     * Returns whether this community has a default subgroup.
+     * Returns whether this community contains a default announcement
+     * subgroup.
      *
-     * @return {@code true} if a default subgroup exists
+     * @return {@code true} if a default announcement subgroup exists
      */
     public boolean isDefaultSubgroup() {
         return defaultSubgroup;
     }
 
     /**
-     * Sets whether this community has a default subgroup.
+     * Sets whether this community contains a default announcement subgroup.
      *
-     * @param defaultSubgroup {@code true} if a default subgroup exists
+     * @param defaultSubgroup {@code true} if a default announcement
+     *                        subgroup exists
      */
     public void setDefaultSubgroup(boolean defaultSubgroup) {
         this.defaultSubgroup = defaultSubgroup;
     }
 
     /**
-     * Returns whether this community has a general chat subgroup.
+     * Returns whether this community contains a general chat subgroup.
      *
-     * @return {@code true} if a general subgroup exists
+     * @return {@code true} if a general chat subgroup exists
      */
     public boolean isGeneralSubgroup() {
         return generalSubgroup;
     }
 
     /**
-     * Sets whether this community has a general chat subgroup.
+     * Sets whether this community contains a general chat subgroup.
      *
-     * @param generalSubgroup {@code true} if a general subgroup exists
+     * @param generalSubgroup {@code true} if a general chat subgroup exists
      */
     public void setGeneralSubgroup(boolean generalSubgroup) {
         this.generalSubgroup = generalSubgroup;
     }
 
     /**
-     * Returns whether this community has a hidden subgroup.
+     * Returns whether this community contains a hidden subgroup.
      *
      * @return {@code true} if a hidden subgroup exists
      */
@@ -1341,7 +1360,8 @@ public final class CommunityMetadata implements ChatMetadata {
     }
 
     /**
-     * Returns whether the group safety check flag is set.
+     * Returns whether the group safety check flag is set for this
+     * community.
      *
      * @return {@code true} if the safety check is set
      */
@@ -1379,7 +1399,8 @@ public final class CommunityMetadata implements ChatMetadata {
     }
 
     /**
-     * Returns whether auto-add to general chat is disabled.
+     * Returns whether automatic addition of new community members to the
+     * general chat subgroup is disabled.
      *
      * @return {@code true} if auto-add is disabled
      */
@@ -1456,7 +1477,8 @@ public final class CommunityMetadata implements ChatMetadata {
     }
 
     /**
-     * Returns whether this community has CAPI capabilities.
+     * Returns whether this community has CAPI (Community API) capabilities
+     * enabled for business integrations.
      *
      * @return {@code true} if CAPI is available
      */
@@ -1474,7 +1496,8 @@ public final class CommunityMetadata implements ChatMetadata {
     }
 
     /**
-     * Returns whether this community is a TEE bot group.
+     * Returns whether this community is a TEE (Trusted Execution
+     * Environment) bot group.
      *
      * @return {@code true} if this is a TEE bot group
      */
@@ -1621,17 +1644,38 @@ public final class CommunityMetadata implements ChatMetadata {
         this.isOpenBotGroup = openBotGroup;
     }
 
+    /**
+     * Returns whether this community metadata is equal to another object.
+     * Two {@code CommunityMetadata} instances are considered equal if and
+     * only if they have the same {@link #jid()}.
+     *
+     * @param o the object to compare with
+     * @return {@code true} if the given object is a {@code CommunityMetadata}
+     *         with the same JID
+     */
     @Override
     public boolean equals(Object o) {
         return o instanceof CommunityMetadata that
                 && Objects.equals(jid, that.jid);
     }
 
+    /**
+     * Returns a hash code based on this community's {@link #jid()}.
+     *
+     * @return the hash code
+     */
     @Override
     public int hashCode() {
         return Objects.hashCode(jid);
     }
 
+    /**
+     * Returns a string representation of this community metadata, including
+     * the JID and subject.
+     *
+     * @return a string in the format
+     *         {@code CommunityMetadata[jid=..., subject=...]}
+     */
     @Override
     public String toString() {
         return "CommunityMetadata[jid=" + jid + ", subject=" + subject + ']';

@@ -9,14 +9,21 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Metadata for a collection of content items within an AI rich response.
+ * Metadata for a collection of content items within a WhatsApp AI bot rich
+ * response.
  *
  * <p>Content items are typically rendered as a horizontally scrollable
  * carousel when the {@linkplain #contentType() content type} is
  * {@link ContentType#CAROUSEL}. Each item in the collection is wrapped
- * in an {@link AIRichResponseContentItemMetadata} that carries
- * one of the supported content variants (currently only
+ * in an {@link AIRichResponseContentItemMetadata} that carries one of the
+ * supported content variants (currently only
  * {@link AIRichResponseReelItem reels}).
+ *
+ * <p>This type implements {@link AIRichResponseSubMessageContent} and
+ * appears as the {@link AIRichResponseSubMessageType#CONTENT_ITEMS CONTENT_ITEMS}
+ * variant within an {@link AIRichResponseSubMessage}.
+ *
+ * @see AIRichResponseSubMessage#content()
  */
 @ProtobufMessage(name = "AIRichResponseContentItemsMetadata")
 public final class AIRichResponseContentItemsMetadata implements AIRichResponseSubMessageContent {
@@ -33,6 +40,12 @@ public final class AIRichResponseContentItemsMetadata implements AIRichResponseS
     ContentType contentType;
 
 
+    /**
+     * Constructs a new content items metadata instance.
+     *
+     * @param itemsMetadata the list of content item wrappers, or {@code null}
+     * @param contentType   the layout type for rendering, or {@code null}
+     */
     AIRichResponseContentItemsMetadata(List<AIRichResponseContentItemMetadata> itemsMetadata, ContentType contentType) {
         this.itemsMetadata = itemsMetadata;
         this.contentType = contentType;
@@ -77,19 +90,20 @@ public final class AIRichResponseContentItemsMetadata implements AIRichResponseS
     }
 
     /**
-     * A sealed interface representing the concrete content item
-     * variants that can appear in an
-     * {@link AIRichResponseContentItemMetadata}.
+     * Sealed interface representing the concrete content item variants
+     * that can appear in an {@link AIRichResponseContentItemMetadata}.
      *
      * <p>Currently the only supported variant is
-     * {@link AIRichResponseReelItem}.
+     * {@link AIRichResponseReelItem}. Callers should use pattern matching
+     * on the result of {@link AIRichResponseContentItemMetadata#content()}
+     * to handle each variant.
      */
     public sealed interface AIRichResponseContentItem permits AIRichResponseReelItem {
     }
 
     /**
-     * A layout type that determines how content items are rendered
-     * within an AI rich response.
+     * Layout type that determines how content items are rendered within
+     * an AI rich response.
      */
     @ProtobufEnum(name = "AIRichResponseContentItemsMetadata.ContentType")
     public static enum ContentType {
@@ -103,10 +117,18 @@ public final class AIRichResponseContentItemsMetadata implements AIRichResponseS
          */
         CAROUSEL(1);
 
+        /**
+         * Constructs a content type constant with the given protobuf index.
+         *
+         * @param index the protobuf enum index
+         */
         ContentType(@ProtobufEnumIndex int index) {
             this.index = index;
         }
 
+        /**
+         * The protobuf enum index for this content type.
+         */
         final int index;
 
         /**
@@ -140,6 +162,11 @@ public final class AIRichResponseContentItemsMetadata implements AIRichResponseS
         AIRichResponseReelItem reelItem;
 
 
+        /**
+         * Constructs a new content item metadata wrapping a reel item.
+         *
+         * @param reelItem the reel item variant, or {@code null}
+         */
         AIRichResponseContentItemMetadata(AIRichResponseReelItem reelItem) {
             this.reelItem = reelItem;
         }
@@ -177,12 +204,13 @@ public final class AIRichResponseContentItemsMetadata implements AIRichResponseS
     }
 
     /**
-     * A short-form video reel item within an AI rich response
-     * content collection.
+     * A short-form video reel item within an AI rich response content
+     * collection.
      *
-     * <p>Reel items are typically displayed as vertically-oriented
-     * cards in a carousel, showing a thumbnail preview with the
-     * creator's profile icon and title.
+     * <p>Reel items are typically displayed as vertically-oriented cards
+     * in a carousel, showing a thumbnail preview with the creator's
+     * profile icon and title. Tapping the card opens the video at the
+     * {@linkplain #videoUrl() video URL}.
      */
     @ProtobufMessage(name = "AIRichResponseContentItemsMetadata.AIRichResponseReelItem")
     public static final class AIRichResponseReelItem implements AIRichResponseContentItem {
@@ -219,6 +247,14 @@ public final class AIRichResponseContentItemsMetadata implements AIRichResponseS
         URI videoUrl;
 
 
+        /**
+         * Constructs a new reel item with the given metadata.
+         *
+         * @param title          the reel title or caption, or {@code null}
+         * @param profileIconUrl the creator's profile icon URL, or {@code null}
+         * @param thumbnailUrl   the thumbnail image URL, or {@code null}
+         * @param videoUrl       the video content URL, or {@code null}
+         */
         AIRichResponseReelItem(String title, URI profileIconUrl, URI thumbnailUrl, URI videoUrl) {
             this.title = title;
             this.profileIconUrl = profileIconUrl;

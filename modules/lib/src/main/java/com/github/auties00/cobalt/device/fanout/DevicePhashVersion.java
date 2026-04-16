@@ -1,11 +1,25 @@
 package com.github.auties00.cobalt.device.fanout;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
+
 /**
- * Participant hash (phash) version for group message verification.
+ * Selects the participant hash (phash) algorithm when verifying group message recipient sets.
+ *
+ * <p>WhatsApp embeds a {@code phash} attribute on group message stanzas so that the server
+ * and the sender can agree on the list of participant devices being addressed. V1 (SHA-1)
+ * is the legacy format, V2 (SHA-256) is the current format and is the only one that
+ * supports Meta AI bot injection for groups. Callers pick the appropriate version based on
+ * the stanza they are producing.
+ *
+ * <p>Used by {@link DevicePhashCalculator} to drive both the hash algorithm and the JID
+ * serialization shape.
  *
  * @implNote WAWebPhashUtils: defines phashV1 (SHA-1) and phashV2 (SHA-256) algorithms
  * for calculating participant hashes used in group message stanzas.
  */
+@WhatsAppWebModule(moduleName = "WAWebPhashUtils")
 public enum DevicePhashVersion {
 
     /**
@@ -49,6 +63,9 @@ public enum DevicePhashVersion {
      * @implNote WAWebPhashUtils: phashV1 uses SHA-1 with "1:" prefix, phashV2 uses SHA-256
      * with "2:" prefix. Bot injection is only supported in phashV2.
      */
+    @WhatsAppWebExport(moduleName = "WAWebPhashUtils",
+            exports = {"phashV1", "phashV2"},
+            adaptation = WhatsAppAdaptation.ADAPTED)
     DevicePhashVersion(String algorithm, String prefix, boolean supportsMetaBot) {
         this.algorithm = algorithm;
         this.prefix = prefix;
@@ -62,6 +79,9 @@ public enum DevicePhashVersion {
      * @implNote WAWebPhashUtils: phashV1 uses {@code crypto.subtle.digest({name: "SHA-1"})},
      * phashV2 uses {@code WACryptoSha256.sha256()}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebPhashUtils",
+            exports = {"phashV1", "phashV2"},
+            adaptation = WhatsAppAdaptation.DIRECT)
     public String algorithm() {
         return algorithm;
     }
@@ -72,6 +92,9 @@ public enum DevicePhashVersion {
      * @return the prefix (e.g., "1:", "2:")
      * @implNote WAWebPhashUtils: phashV1 returns "1:" + base64, phashV2 returns "2:" + base64.
      */
+    @WhatsAppWebExport(moduleName = "WAWebPhashUtils",
+            exports = {"phashV1", "phashV2"},
+            adaptation = WhatsAppAdaptation.DIRECT)
     public String prefix() {
         return prefix;
     }
@@ -83,6 +106,9 @@ public enum DevicePhashVersion {
      * @implNote WAWebPhashUtils: only phashV2 supports bot injection via
      * WAWebBotGroupGatingUtils checks.
      */
+    @WhatsAppWebExport(moduleName = "WAWebPhashUtils",
+            exports = "phashV2",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean supportsMetaBot() {
         return supportsMetaBot;
     }

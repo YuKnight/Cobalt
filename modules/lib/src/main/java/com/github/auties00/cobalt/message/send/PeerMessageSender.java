@@ -5,6 +5,9 @@ import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
 import com.github.auties00.cobalt.message.send.ack.AckParser;
 import com.github.auties00.cobalt.message.send.ack.AckResult;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.MessageContainerSpec;
@@ -36,6 +39,8 @@ import java.util.Objects;
  * WAWebSendMsgCreateDeviceStanza.createUserDeviceMsgStanza: builds the
  * single-device stanza for peer messages.
  */
+@WhatsAppWebModule(moduleName = "WAWebSendAppStateSyncMsgJob")
+@WhatsAppWebModule(moduleName = "WAWebSendMsgCreateDeviceStanza")
 final class PeerMessageSender extends MessageSender<ChatMessageInfo> {
     /**
      * Logger for peer message sending diagnostics.
@@ -71,6 +76,8 @@ final class PeerMessageSender extends MessageSender<ChatMessageInfo> {
      * @implNote ADAPTED: WAWebSendAppStateSyncMsgJob uses module-level
      * imports; Cobalt uses constructor-based DI instead.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendAppStateSyncMsgJob", exports = "encryptAndSendKeyMsg",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     PeerMessageSender(
             WhatsAppClient client,
             MessageEncryption encryption,
@@ -101,6 +108,10 @@ final class PeerMessageSender extends MessageSender<ChatMessageInfo> {
      * {@code push_priority="high"}, and {@code appdata="default"} on
      * the meta node. Finally sends via deprecatedSendStanzaAndWaitForAck.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendAppStateSyncMsgJob", exports = "encryptAndSendKeyMsg",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCreateDeviceStanza", exports = "createUserDeviceMsgStanza",
+            adaptation = WhatsAppAdaptation.DIRECT)
     @Override
     AckResult send(Jid targetDevice, ChatMessageInfo messageInfo) {
         // WAWebSendAppStateSyncMsgJob: yield waitForOfflineDeliveryEnd()
@@ -135,7 +146,7 @@ final class PeerMessageSender extends MessageSender<ChatMessageInfo> {
                 .build();
 
         // WAWebSendMsgCreateDeviceStanza: the edit attribute comes from
-        // editAttribute(n, d.subtype) — returns DROP_ATTR for peer messages
+        // editAttribute(n, d.subtype) returns DROP_ATTR for peer messages
         // since none of the edit/revoke conditions apply.
         // There is NO "subtype" attribute on the wire stanza.
         // WAWebE2EProtoUtils.typeAttributeFromProtobuf: protocolMessage → "text"

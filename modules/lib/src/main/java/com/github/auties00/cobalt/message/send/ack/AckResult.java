@@ -1,5 +1,9 @@
 package com.github.auties00.cobalt.message.send.ack;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
+
 import java.time.Instant;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -20,12 +24,15 @@ import java.util.OptionalInt;
  * @see AckParser
  * @see NackReason
  */
+@WhatsAppWebModule(moduleName = "WAWebSendMsgCommonApi")
 public final class AckResult {
     /**
      * The server timestamp from the {@code t} attribute.
      *
      * @implNote WAWebSendMsgCommonApi: {@code e.attrTime("t")}
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "sendMsgAckSyncParser",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private final Instant timestamp;
 
     /**
@@ -33,6 +40,8 @@ public final class AckResult {
      *
      * @implNote WAWebSendMsgCommonApi: {@code e.maybeAttrString("sync")}
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "sendMsgAckSyncParser",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private final String sync;
 
     /**
@@ -40,6 +49,8 @@ public final class AckResult {
      *
      * @implNote WAWebSendMsgCommonApi: {@code e.maybeAttrString("phash")}
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "sendMsgAckSyncParser",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private final String phash;
 
     /**
@@ -48,6 +59,8 @@ public final class AckResult {
      * @implNote WAWebSendMsgCommonApi:
      * {@code e.hasAttr("refresh_lid") ? e.attrString("refresh_lid") === "true" : false}
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "sendMsgAckSyncParser",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private final boolean refreshLid;
 
     /**
@@ -55,6 +68,8 @@ public final class AckResult {
      *
      * @implNote WAWebSendMsgCommonApi: {@code e.maybeAttrString("addressing_mode")}
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "sendMsgAckSyncParser",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private final String addressingMode;
 
     /**
@@ -62,6 +77,8 @@ public final class AckResult {
      *
      * @implNote WAWebSendMsgCommonApi: {@code e.maybeAttrInt("count")}
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "sendMsgAckSyncParser",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private final Integer count;
 
     /**
@@ -69,6 +86,8 @@ public final class AckResult {
      *
      * @implNote WAWebSendMsgCommonApi: {@code e.maybeAttrInt("error")}
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "sendMsgAckSyncParser",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private final Integer error;
 
     /**
@@ -84,6 +103,8 @@ public final class AckResult {
      * @param count          the recipient count, or {@code null}
      * @param error          the error code, or {@code null}
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "sendMsgAckSyncParser",
+            adaptation = WhatsAppAdaptation.DIRECT)
     AckResult(
             Instant timestamp,
             String sync,
@@ -108,6 +129,8 @@ public final class AckResult {
      * @implNote WAWebSendMsgCommonApi: {@code e.attrTime("t")}
      * @return the timestamp, or empty if absent
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "sendMsgAckSyncParser",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public Optional<Instant> timestamp() {
         return Optional.ofNullable(timestamp);
     }
@@ -118,6 +141,8 @@ public final class AckResult {
      * @implNote WAWebSendMsgCommonApi: {@code e.maybeAttrString("sync")}
      * @return the sync value, or empty if absent
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "sendMsgAckSyncParser",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public Optional<String> sync() {
         return Optional.ofNullable(sync);
     }
@@ -134,6 +159,8 @@ public final class AckResult {
      * WAWebSendUserMsgJob: triggers resendUserMsg when {@code phash != null}.
      * @return the server phash, or empty if the hashes matched
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "sendMsgAckSyncParser",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public Optional<String> phash() {
         return Optional.ofNullable(phash);
     }
@@ -147,6 +174,8 @@ public final class AckResult {
      * when {@code true}.
      * @return {@code true} if a LID refresh is requested
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "sendMsgAckSyncParser",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public boolean refreshLid() {
         return refreshLid;
     }
@@ -164,6 +193,8 @@ public final class AckResult {
      * @return the addressing mode ({@code "pn"} or {@code "lid"}),
      *         or empty if absent
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "sendMsgAckSyncParser",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public Optional<String> addressingMode() {
         return Optional.ofNullable(addressingMode);
     }
@@ -175,6 +206,8 @@ public final class AckResult {
      * WAWebSendGroupSkmsgJob: merges into the message table when present.
      * @return the count, or empty if absent
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "sendMsgAckSyncParser",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public OptionalInt count() {
         return count != null
                 ? OptionalInt.of(count)
@@ -191,6 +224,8 @@ public final class AckResult {
      * {@link NackReason#STALE_GROUP_ADDRESSING_MODE} (421).
      * @return the error code, or empty if successful
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "sendMsgAckSyncParser",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public OptionalInt error() {
         return error != null
                 ? OptionalInt.of(error)

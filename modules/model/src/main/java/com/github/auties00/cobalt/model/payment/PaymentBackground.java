@@ -8,24 +8,24 @@ import java.util.OptionalInt;
 import java.util.OptionalLong;
 
 /**
- * A background image displayed behind a payment message in the WhatsApp chat view.
+ * A background image displayed behind a payment message in the chat view.
  *
- * <p>The background carries an image resource identified by {@link #id() id}, together with
- * its dimensions, MIME type, and ARGB colour values used for placeholder rendering before
- * the image has loaded. The actual encrypted image bytes are referenced indirectly through
- * the {@link #mediaData() mediaData} field, which provides the media key, SHA-256 hashes,
- * and the CDN direct path needed to download and decrypt the image.
+ * <p>The background carries an image resource identified by {@link #id() id},
+ * together with its dimensions, MIME type, and ARGB colour values used for
+ * placeholder rendering before the image has loaded. The actual encrypted image
+ * bytes are referenced indirectly through the {@link #mediaData() mediaData} field,
+ * which provides the media key, SHA-256 hashes, and the CDN direct path needed to
+ * download and decrypt the image.
  *
- * <p>The {@link #type() type} field classifies the background variant. Currently the
- * protocol defines {@link Type#DEFAULT DEFAULT} for the standard payment background and
- * {@link Type#UNKNOWN UNKNOWN} as a fallback.
+ * <p>The {@link #type() type} field classifies the background variant. The current
+ * set of variants defines {@link Type#DEFAULT DEFAULT} for the standard payment
+ * background and {@link Type#UNKNOWN UNKNOWN} as a fallback.
  *
- * <p>This model mirrors the {@code PaymentBackground} protobuf message defined in the
- * WhatsApp Web end-to-end protocol and is referenced by both
+ * <p>Payment backgrounds are attached to
  * {@link com.github.auties00.cobalt.model.message.payment.RequestPaymentMessage
  * RequestPaymentMessage} and
  * {@link com.github.auties00.cobalt.model.message.payment.SendPaymentMessage
- * SendPaymentMessage}.
+ * SendPaymentMessage} to give the payment message a distinctive visual appearance.
  */
 @ProtobufMessage(name = "PaymentBackground")
 public final class PaymentBackground {
@@ -216,7 +216,6 @@ public final class PaymentBackground {
      * Sets the unique identifier of the background image resource.
      *
      * @param id the image identifier
-     * @return this instance
      */
     public void setId(String id) {
         this.id = id;
@@ -226,7 +225,6 @@ public final class PaymentBackground {
      * Sets the size of the background image file in bytes.
      *
      * @param fileLength the file length
-     * @return this instance
      */
     public void setFileLength(Long fileLength) {
         this.fileLength = fileLength;
@@ -236,7 +234,6 @@ public final class PaymentBackground {
      * Sets the width of the background image in pixels.
      *
      * @param width the width
-     * @return this instance
      */
     public void setWidth(Integer width) {
         this.width = width;
@@ -246,7 +243,6 @@ public final class PaymentBackground {
      * Sets the height of the background image in pixels.
      *
      * @param height the height
-     * @return this instance
      */
     public void setHeight(Integer height) {
         this.height = height;
@@ -256,7 +252,6 @@ public final class PaymentBackground {
      * Sets the MIME type of the background image.
      *
      * @param mimetype the MIME type
-     * @return this instance
      */
     public void setMimetype(String mimetype) {
         this.mimetype = mimetype;
@@ -266,7 +261,6 @@ public final class PaymentBackground {
      * Sets the ARGB placeholder colour value.
      *
      * @param placeholderArgb the ARGB colour
-     * @return this instance
      */
     public void setPlaceholderArgb(Integer placeholderArgb) {
         this.placeholderArgb = placeholderArgb;
@@ -276,7 +270,6 @@ public final class PaymentBackground {
      * Sets the ARGB primary text colour value.
      *
      * @param textArgb the ARGB colour
-     * @return this instance
      */
     public void setTextArgb(Integer textArgb) {
         this.textArgb = textArgb;
@@ -286,7 +279,6 @@ public final class PaymentBackground {
      * Sets the ARGB secondary text colour value.
      *
      * @param subtextArgb the ARGB colour
-     * @return this instance
      */
     public void setSubtextArgb(Integer subtextArgb) {
         this.subtextArgb = subtextArgb;
@@ -296,7 +288,6 @@ public final class PaymentBackground {
      * Sets the encrypted media data for the background image.
      *
      * @param mediaData the media data
-     * @return this instance
      */
     public void setMediaData(MediaData mediaData) {
         this.mediaData = mediaData;
@@ -306,7 +297,6 @@ public final class PaymentBackground {
      * Sets the variant of this payment background.
      *
      * @param type the background variant
-     * @return this instance
      */
     public void setType(Type type) {
         this.type = type;
@@ -315,9 +305,9 @@ public final class PaymentBackground {
     /**
      * The variant of a payment background image.
      *
-     * <p>The WhatsApp protocol currently defines two variants: {@link #DEFAULT} for
-     * the standard payment background and {@link #UNKNOWN} as a fallback when the
-     * type is not recognized or not set.
+     * <p>Two variants are currently defined: {@link #DEFAULT} for the standard
+     * payment background and {@link #UNKNOWN} as a fallback when the type is not
+     * recognized or not set.
      */
     @ProtobufEnum(name = "PaymentBackground.Type")
     public enum Type {
@@ -471,50 +461,45 @@ public final class PaymentBackground {
          * Sets the AES-256 encryption key for the background image.
          *
          * @param mediaKey the media key bytes
-         * @return this instance
          */
         public void setMediaKey(byte[] mediaKey) {
             this.mediaKey = mediaKey;
-    }
+        }
 
         /**
          * Sets the epoch-second timestamp of when the media key was generated.
          *
          * @param mediaKeyTimestamp the timestamp as epoch seconds
-         * @return this instance
          */
         public void setMediaKeyTimestamp(Long mediaKeyTimestamp) {
             this.mediaKeyTimestamp = mediaKeyTimestamp;
-    }
+        }
 
         /**
          * Sets the SHA-256 hash of the plaintext background image file.
          *
          * @param fileSha256 the hash bytes
-         * @return this instance
          */
         public void setFileSha256(byte[] fileSha256) {
             this.fileSha256 = fileSha256;
-    }
+        }
 
         /**
          * Sets the SHA-256 hash of the encrypted background image file.
          *
          * @param fileEncSha256 the hash bytes
-         * @return this instance
          */
         public void setFileEncSha256(byte[] fileEncSha256) {
             this.fileEncSha256 = fileEncSha256;
-    }
+        }
 
         /**
          * Sets the CDN direct path for the encrypted background image.
          *
          * @param directPath the CDN path
-         * @return this instance
          */
         public void setDirectPath(String directPath) {
             this.directPath = directPath;
-    }
+        }
     }
 }

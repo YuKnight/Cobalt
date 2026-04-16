@@ -2,6 +2,9 @@ package com.github.auties00.cobalt.message.send.stanza;
 
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryptedPayload;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
@@ -20,7 +23,12 @@ import java.util.Map;
  * WAWebSendGroupSkmsgJob: same structure with {@code decrypt-fail="hide"}
  * for SK distribution, plus optional {@code <content_binding>} children.
  */
+@WhatsAppWebModule(moduleName = "WAWebSendMsgCreateFanoutStanza")
+@WhatsAppWebModule(moduleName = "WAWebSendGroupSkmsgJob")
 public final class ParticipantsStanza {
+    /**
+     * Prevents instantiation of this utility class.
+     */
     private ParticipantsStanza() {
         throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
     }
@@ -47,6 +55,8 @@ public final class ParticipantsStanza {
      * {@code <to jid=...><enc v="2" type="..." decrypt-fail="...">},
      * with optional {@code <content_binding>} per device from the RCAT map.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendGroupSkmsgJob", exports = "encryptAndSendSenderKeyMsg",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static Node buildSenderKeyDistribution(
             List<MessageEncryptedPayload> payloads,
             Map<Jid, byte[]> contentBindings,
@@ -106,6 +116,8 @@ public final class ParticipantsStanza {
      * with just {@code <to jid=...><content_binding>tag</content_binding></to>}
      * for each existing SK device.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendGroupSkmsgJob", exports = "encryptAndSendSenderKeyMsg",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static Node buildContentBindingOnly(
             List<Jid> devices,
             Map<Jid, byte[]> contentBindings
@@ -144,6 +156,8 @@ public final class ParticipantsStanza {
      * @apiNote WAWebSendMsgCreateFanoutStanza: sets
      * {@code shouldHaveIdentity = true} when any result has type Pkmsg.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCreateFanoutStanza", exports = "createFanoutMsgStanza",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static boolean requiresIdentityNode(List<MessageEncryptedPayload> payloads) {
         return payloads != null
                 && payloads.stream()
@@ -158,6 +172,8 @@ public final class ParticipantsStanza {
      * by converting the device JID to a user JID via
      * {@code widToUserJid(asUserWidOrThrow(device))}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendGroupSkmsgJob", exports = "encryptAndSendSenderKeyMsg",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static Node resolveContentBinding(Jid deviceJid, Map<Jid, byte[]> contentBindings) {
         if (contentBindings == null) {
             return null;

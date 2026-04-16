@@ -8,6 +8,9 @@ import com.github.auties00.cobalt.message.send.ack.AckResult;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryptedPayload;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
 import com.github.auties00.cobalt.message.send.stanza.*;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.business.profile.BusinessAutomatedType;
 import com.github.auties00.cobalt.model.business.profile.BusinessProfile;
 import com.github.auties00.cobalt.model.chat.Chat;
@@ -51,6 +54,9 @@ import java.util.stream.Collectors;
  * WAWebSendMsgToDeviceList.sendMsgToDeviceList: sends the stanza and
  * parses the server ack.
  */
+@WhatsAppWebModule(moduleName = "WAWebSendUserMsgJob")
+@WhatsAppWebModule(moduleName = "WAWebSendMsgToDeviceList")
+@WhatsAppWebModule(moduleName = "WAWebSendMsgCreateFanoutStanza")
 final class UserMessageSender extends MessageSender<ChatMessageInfo> {
     /**
      * Logger for diagnostics.
@@ -66,6 +72,8 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
      * @implNote WAWebUsernameTypes.LidOriginType.PNH_CTWA: the string value
      * {@code "ctwa"} used when comparing {@code chat.lidOriginType}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebUsernameTypes", exports = "LidOriginType",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static final String LID_ORIGIN_TYPE_PNH_CTWA = "ctwa";
 
     /**
@@ -158,6 +166,8 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
      * @implNote ADAPTED: WAWebSendUserMsgJob uses module-level imports;
      * Cobalt uses constructor-based DI instead.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendUserMsgJob", exports = "encryptAndSendUserMsg",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     UserMessageSender(
             WhatsAppClient client,
             MessageEncryption encryption,
@@ -197,6 +207,8 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
      * via {@code getFanOutList}, calls {@code sendMsgToDeviceList}, then
      * handles {@code maybeRefreshLid} and phash mismatch resend.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendUserMsgJob", exports = "encryptAndSendUserMsg",
+            adaptation = WhatsAppAdaptation.DIRECT)
     @Override
     AckResult send(Jid chatJid, ChatMessageInfo messageInfo) {
         // WAWebSendUserMsgJob.encryptAndSendUserMsg: waits for offline delivery
@@ -212,10 +224,10 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
         // WAWebSendUserMsgJob.encryptAndSendUserMsg: yield sendMsgToDeviceList(...)
         var ack = encryptBuildAndSend(chatJid, messageInfo, fanoutDevices, false);
 
-        // WAWebSendUserMsgJob.encryptAndSendUserMsg: f(v, I) — maybeRefreshLid
+        // WAWebSendUserMsgJob.encryptAndSendUserMsg: f(v, I), maybeRefreshLid
         maybeRefreshLid(chatJid, ack);
 
-        // WAWebSendUserMsgJob.encryptAndSendUserMsg: if (T != null) — phash mismatch
+        // WAWebSendUserMsgJob.encryptAndSendUserMsg: if (T != null), phash mismatch
         ack.phash().ifPresent(serverPhash ->
                 handlePhashMismatch(chatJid, messageInfo, fanoutDevices, serverPhash));
 
@@ -241,6 +253,8 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
      * contact sync job, since both trigger a USync request that updates
      * LID-to-PN mappings.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendUserMsgJob", exports = "maybeRefreshLid",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private void maybeRefreshLid(Jid chatJid, AckResult ack) {
         if (!ack.refreshLid()) {
             return;
@@ -285,6 +299,8 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
      * {@code sendMsgAckSyncParser.parse}, and throws if
      * {@code C.error} is present.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgToDeviceList", exports = "sendMsgToDeviceList",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private AckResult encryptBuildAndSend(
             Jid chatJid,
             ChatMessageInfo messageInfo,
@@ -332,6 +348,8 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
      * builds the message stanza with all child nodes, attributes, and
      * per-device encrypted payloads.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCreateFanoutStanza", exports = "createFanoutMsgStanza",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private NodeBuilder buildStanza(
             Jid chatJid,
             ChatMessageInfo messageInfo,
@@ -395,6 +413,8 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
      * and {@code K.accountLid} exists and {@code J.isLid()}, includes
      * {@code J} as the {@code peer_recipient_lid} attribute.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCreateFanoutStanza", exports = "createFanoutMsgStanza",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private Jid resolvePeerRecipientLid(Jid chatJid) {
         if (!chatJid.hasUserServer()) {
             return null;
@@ -420,6 +440,8 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
      * (Z = getPhoneNumber(L))}. {@code te} is {@code isLidMigrated()},
      * which is always true in Cobalt.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCreateFanoutStanza", exports = "createFanoutMsgStanza",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private Jid resolvePeerRecipientPn(Jid chatJid) {
         if (!chatJid.hasLidServer()) {
             return null;
@@ -453,6 +475,8 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
      * && (j?.shareOwnPn) !== true && (j?.phoneNumber) != null
      * && (Y = j?.phoneNumber)}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCreateFanoutStanza", exports = "createFanoutMsgStanza",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private Jid resolveRecipientPn(Jid chatJid) {
         if (!chatJid.hasLidServer()) {
             return null;
@@ -488,6 +512,8 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
      * usernameDisplayedEnabled() && (j?.username) != null
      * && (ee = j.username)}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCreateFanoutStanza", exports = "createFanoutMsgStanza",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private String resolvePeerRecipientUsername(Jid chatJid) {
         if (!chatJid.hasLidServer()) {
             return null;
@@ -518,6 +544,8 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
      * (type), {@code ie} (local_automated_type), {@code N.key.id}
      * (client_thread_id) and builds {@code me} when any is present.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCreateFanoutStanza", exports = "createFanoutMsgStanza",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private Node resolveBotMetadataNode(Jid chatJid, ChatMessageInfo messageInfo) {
         var container = messageInfo.message();
         var content = container.content();
@@ -568,6 +596,8 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
      * bot's registered command names.
      * WAWebSendTextMsgChatAction: sets botMsgBodyType from caller options.
      */
+    @WhatsAppWebExport(moduleName = "WAWebBotCommandFormatMutator", exports = "formatBotCommand",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private String resolveBotMsgBodyType(Jid botJid, Message content) {
         if (!(content instanceof ExtendedTextMessage textMessage) || textMessage.text().isEmpty()) {
             return "prompt";
@@ -595,6 +625,8 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
      * {@code differenceBy(b, a, String)}, resends with
      * {@code isResendingMsg: true} (device_fanout="false").
      */
+    @WhatsAppWebExport(moduleName = "WAWebResendUserMsg", exports = "resendUserMsg",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private void handlePhashMismatch(
             Jid chatJid,
             ChatMessageInfo messageInfo,

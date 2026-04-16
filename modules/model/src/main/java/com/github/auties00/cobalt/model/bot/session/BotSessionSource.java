@@ -4,14 +4,14 @@ import it.auties.protobuf.annotation.ProtobufEnum;
 import it.auties.protobuf.annotation.ProtobufEnumIndex;
 
 /**
- * The origin that triggered the creation of a bot conversation session on
- * WhatsApp.
+ * Enumerates the origins that can trigger the creation of a bot conversation
+ * session on WhatsApp.
  *
  * <p>Each constant identifies a distinct user action or system event that
  * started the session. The value is recorded in
  * {@link BotSessionMetadata#sessionSource()} and used by the server to tailor
- * the conversation flow (e.g. pre-populating suggestions for a
- * {@link #TYPEAHEAD} session, or optimising latency for a {@link #VOICE}
+ * the conversation flow (for example, pre-populating suggestions for a
+ * {@link #TYPEAHEAD} session or optimizing latency for a {@link #VOICE}
  * session).
  */
 @ProtobufEnum(name = "BotSessionSource")

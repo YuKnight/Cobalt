@@ -1,5 +1,9 @@
 package com.github.auties00.cobalt.exception;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
+
 import java.util.OptionalInt;
 
 /**
@@ -50,7 +54,7 @@ import java.util.OptionalInt;
  *   <li>Re-request media URL for expired download links</li>
  * </ul>
  *
- * @implNote WAWebMmsClientErrors — maps WA Web's six MMS error classes
+ * @implNote WAWebMmsClientErrors - maps WA Web's six MMS error classes
  *     ({@code MediaNotFoundError}, {@code MediaTooLargeError}, {@code MediaInvalidError},
  *     {@code MMSUnauthorizedError}, {@code MMSForbiddenError}, {@code MMSThrottleError})
  *     into the sealed {@code Upload}/{@code Download} subtypes with HTTP status code metadata
@@ -59,6 +63,8 @@ import java.util.OptionalInt;
  * @see Download
  * @see Processing
  */
+@WhatsAppWebModule(moduleName = "WAWebMmsClientErrors")
+@WhatsAppWebModule(moduleName = "WAWebHttpErrors")
 public sealed class WhatsAppMediaException extends WhatsAppException
         permits WhatsAppMediaException.Download,
                 WhatsAppMediaException.Processing,
@@ -73,6 +79,8 @@ public sealed class WhatsAppMediaException extends WhatsAppException
      *
      * @implNote WAWebMmsClientErrors.MMSUnauthorizedError
      */
+    @WhatsAppWebExport(moduleName = "WAWebMmsClientErrors", exports = "MMSUnauthorizedError",
+                       adaptation = WhatsAppAdaptation.ADAPTED)
     public static final int HTTP_UNAUTHORIZED = 401;
 
     /**
@@ -84,6 +92,8 @@ public sealed class WhatsAppMediaException extends WhatsAppException
      *
      * @implNote WAWebMmsClientErrors.MMSForbiddenError
      */
+    @WhatsAppWebExport(moduleName = "WAWebMmsClientErrors", exports = "MMSForbiddenError",
+                       adaptation = WhatsAppAdaptation.ADAPTED)
     public static final int HTTP_FORBIDDEN = 403;
 
     /**
@@ -95,6 +105,8 @@ public sealed class WhatsAppMediaException extends WhatsAppException
      *
      * @implNote WAWebMmsClientErrors.MediaNotFoundError
      */
+    @WhatsAppWebExport(moduleName = "WAWebMmsClientErrors", exports = "MediaNotFoundError",
+                       adaptation = WhatsAppAdaptation.ADAPTED)
     public static final int HTTP_NOT_FOUND = 404;
 
     /**
@@ -105,6 +117,8 @@ public sealed class WhatsAppMediaException extends WhatsAppException
      *
      * @implNote WAWebMmsClientErrors.MediaTooLargeError
      */
+    @WhatsAppWebExport(moduleName = "WAWebMmsClientErrors", exports = "MediaTooLargeError",
+                       adaptation = WhatsAppAdaptation.ADAPTED)
     public static final int HTTP_TOO_LARGE = 413;
 
     /**
@@ -115,6 +129,8 @@ public sealed class WhatsAppMediaException extends WhatsAppException
      *
      * @implNote WAWebMmsClientErrors.MediaInvalidError
      */
+    @WhatsAppWebExport(moduleName = "WAWebMmsClientErrors", exports = "MediaInvalidError",
+                       adaptation = WhatsAppAdaptation.ADAPTED)
     public static final int HTTP_INVALID_MEDIA = 415;
 
     /**
@@ -126,6 +142,8 @@ public sealed class WhatsAppMediaException extends WhatsAppException
      *
      * @implNote WAWebMmsClientErrors.MMSThrottleError
      */
+    @WhatsAppWebExport(moduleName = "WAWebMmsClientErrors", exports = "MMSThrottleError",
+                       adaptation = WhatsAppAdaptation.ADAPTED)
     public static final int HTTP_THROTTLE = 507;
 
     /**
@@ -137,7 +155,7 @@ public sealed class WhatsAppMediaException extends WhatsAppException
      * Constructs a new media exception with the specified detail message.
      *
      * @param message the detail message describing the media error
-     * @implNote WAWebMmsClientErrors — base constructor without HTTP status code
+     * @implNote WAWebMmsClientErrors - base constructor without HTTP status code
      */
     public WhatsAppMediaException(String message) {
         super(message);
@@ -149,7 +167,7 @@ public sealed class WhatsAppMediaException extends WhatsAppException
      *
      * @param httpStatusCode the HTTP status code from the MMS CDN server
      * @param message        the detail message describing the media error
-     * @implNote WAWebHttpErrors.HttpStatusCodeError — preserves the {@code status} field
+     * @implNote WAWebHttpErrors.HttpStatusCodeError - preserves the {@code status} field
      */
     public WhatsAppMediaException(int httpStatusCode, String message) {
         super(message);
@@ -161,7 +179,7 @@ public sealed class WhatsAppMediaException extends WhatsAppException
      *
      * @param message the detail message describing the media error
      * @param cause   the underlying cause of this exception
-     * @implNote WAWebMmsClientErrors — base constructor without HTTP status code
+     * @implNote WAWebMmsClientErrors - base constructor without HTTP status code
      */
     public WhatsAppMediaException(String message, Throwable cause) {
         super(message, cause);
@@ -172,7 +190,7 @@ public sealed class WhatsAppMediaException extends WhatsAppException
      * Constructs a new media exception wrapping the specified cause.
      *
      * @param cause the underlying cause of this exception
-     * @implNote WAWebMmsClientErrors — base constructor without HTTP status code
+     * @implNote WAWebMmsClientErrors - base constructor without HTTP status code
      */
     public WhatsAppMediaException(Throwable cause) {
         super(cause);
@@ -186,7 +204,7 @@ public sealed class WhatsAppMediaException extends WhatsAppException
      * but do not compromise the overall session or connection.
      *
      * @return {@code false} for all media exceptions
-     * @implNote WAWebMmsClientErrors — all MMS errors are non-fatal; WA Web handles
+     * @implNote WAWebMmsClientErrors - all MMS errors are non-fatal; WA Web handles
      *     them with catch blocks that log or surface UI errors without disconnecting
      */
     @Override
@@ -214,7 +232,7 @@ public sealed class WhatsAppMediaException extends WhatsAppException
      *
      * @return an {@link OptionalInt} containing the HTTP status code, or empty if the
      *     error did not originate from an HTTP response
-     * @implNote WAWebHttpErrors.HttpStatusCodeError.status — the {@code status} field
+     * @implNote WAWebHttpErrors.HttpStatusCodeError.status - the {@code status} field
      *     stored on all {@code HttpStatusCodeError} subclasses
      */
     public OptionalInt httpStatusCode() {
@@ -243,14 +261,15 @@ public sealed class WhatsAppMediaException extends WhatsAppException
      *   <li>Retry the media operation with the new connection</li>
      * </ol>
      *
-     * @implNote WAWebMediaHostsErrors.NoMediaHostsError — connection-level errors
+     * @implNote WAWebMediaHostsErrors.NoMediaHostsError - connection-level errors
      *     are not part of WAWebMmsClientErrors but represent media infrastructure failures
      */
+    @WhatsAppWebModule(moduleName = "WAWebMediaHostsErrors")
     public static final class Connection extends WhatsAppMediaException {
         /**
          * Constructs a new media connection exception with a default message.
          *
-         * @implNote WAWebMediaHostsErrors.NoMediaHostsError — default connection failure
+         * @implNote WAWebMediaHostsErrors.NoMediaHostsError - default connection failure
          */
         public Connection() {
             super("Media connection failed");
@@ -260,7 +279,7 @@ public sealed class WhatsAppMediaException extends WhatsAppException
          * Constructs a new media connection exception with the specified message.
          *
          * @param message the detail message describing the connection failure
-         * @implNote WAWebMediaHostsErrors.NoMediaHostsError — connection failure with context
+         * @implNote WAWebMediaHostsErrors.NoMediaHostsError - connection failure with context
          */
         public Connection(String message) {
             super(message);
@@ -271,7 +290,7 @@ public sealed class WhatsAppMediaException extends WhatsAppException
          *
          * @param message the detail message describing the connection failure
          * @param cause   the underlying cause of the connection failure
-         * @implNote WAWebMediaHostsErrors.NoMediaHostsError — connection failure with cause chain
+         * @implNote WAWebMediaHostsErrors.NoMediaHostsError - connection failure with cause chain
          */
         public Connection(String message, Throwable cause) {
             super(message, cause);
@@ -281,7 +300,7 @@ public sealed class WhatsAppMediaException extends WhatsAppException
          * Constructs a new media connection exception wrapping the specified cause.
          *
          * @param cause the underlying cause of the connection failure
-         * @implNote WAWebMediaHostsErrors.NoMediaHostsError — connection failure wrapping cause
+         * @implNote WAWebMediaHostsErrors.NoMediaHostsError - connection failure wrapping cause
          */
         public Connection(Throwable cause) {
             super(cause);
@@ -328,15 +347,17 @@ public sealed class WhatsAppMediaException extends WhatsAppException
      * </ul>
      *
      * @implNote WAWebMmsClientErrors.MediaNotFoundError, WAWebMmsClientErrors.MMSForbiddenError,
-     *     WAWebMmsClientErrors.MMSUnauthorizedError, WAWebMmsClientErrors.MMSThrottleError —
+     *     WAWebMmsClientErrors.MMSUnauthorizedError, WAWebMmsClientErrors.MMSThrottleError -
      *     download-context MMS errors are collapsed into this single type with HTTP status code metadata
      */
+    @WhatsAppWebModule(moduleName = "WAWebMmsClientErrors")
+    @WhatsAppWebModule(moduleName = "WAWebMmsClientMmsDownload")
     public static final class Download extends WhatsAppMediaException {
         /**
          * Constructs a new media download exception with the specified message.
          *
          * @param message the detail message describing the download failure
-         * @implNote WAWebMmsClientErrors — download error without HTTP status code context
+         * @implNote WAWebMmsClientErrors - download error without HTTP status code context
          */
         public Download(String message) {
             super(message);
@@ -351,7 +372,7 @@ public sealed class WhatsAppMediaException extends WhatsAppException
          *
          * @param httpStatusCode the HTTP status code from the MMS CDN server
          * @param message        the detail message describing the download failure
-         * @implNote WAWebMmsClientMmsDownload.validateMmsResponse — maps HTTP status codes
+         * @implNote WAWebMmsClientMmsDownload.validateMmsResponse - maps HTTP status codes
          *     to specific MMS error types: 401 ({@code MMSUnauthorizedError}),
          *     403 ({@code MMSForbiddenError} or {@code MediaNotFoundError} if expired),
          *     404/410 ({@code MediaNotFoundError}), 507 ({@code MMSThrottleError})
@@ -365,7 +386,7 @@ public sealed class WhatsAppMediaException extends WhatsAppException
          *
          * @param message the detail message describing the download failure
          * @param cause   the underlying cause of the download failure
-         * @implNote WAWebMmsClientErrors — download error with cause chain
+         * @implNote WAWebMmsClientErrors - download error with cause chain
          */
         public Download(String message, Throwable cause) {
             super(message, cause);
@@ -375,7 +396,7 @@ public sealed class WhatsAppMediaException extends WhatsAppException
          * Constructs a new media download exception wrapping the specified cause.
          *
          * @param cause the underlying cause of the download failure
-         * @implNote WAWebMmsClientErrors — download error wrapping cause
+         * @implNote WAWebMmsClientErrors - download error wrapping cause
          */
         public Download(Throwable cause) {
             super(cause);
@@ -423,15 +444,16 @@ public sealed class WhatsAppMediaException extends WhatsAppException
      * </ul>
      *
      * @implNote WAWebMmsClientErrors.MMSUnauthorizedError, WAWebMmsClientErrors.MediaTooLargeError,
-     *     WAWebMmsClientErrors.MediaInvalidError, WAWebMmsClientErrors.MMSThrottleError —
+     *     WAWebMmsClientErrors.MediaInvalidError, WAWebMmsClientErrors.MMSThrottleError -
      *     upload-context MMS errors are collapsed into this single type with HTTP status code metadata
      */
+    @WhatsAppWebModule(moduleName = "WAWebMmsClientErrors")
     public static final class Upload extends WhatsAppMediaException {
         /**
          * Constructs a new media upload exception with the specified message.
          *
          * @param message the detail message describing the upload failure
-         * @implNote WAWebMmsClientErrors — upload error without HTTP status code context
+         * @implNote WAWebMmsClientErrors - upload error without HTTP status code context
          */
         public Upload(String message) {
             super(message);
@@ -446,7 +468,7 @@ public sealed class WhatsAppMediaException extends WhatsAppException
          *
          * @param httpStatusCode the HTTP status code from the MMS CDN server
          * @param message        the detail message describing the upload failure
-         * @implNote WAWebMmsClientMmsUpload — maps HTTP status codes to specific MMS error types:
+         * @implNote WAWebMmsClientMmsUpload - maps HTTP status codes to specific MMS error types:
          *     401 ({@code MMSUnauthorizedError}), 413 ({@code MediaTooLargeError}),
          *     415 ({@code MediaInvalidError}), 507 ({@code MMSThrottleError})
          */
@@ -459,7 +481,7 @@ public sealed class WhatsAppMediaException extends WhatsAppException
          *
          * @param message the detail message describing the upload failure
          * @param cause   the underlying cause of the upload failure
-         * @implNote WAWebMmsClientErrors — upload error with cause chain
+         * @implNote WAWebMmsClientErrors - upload error with cause chain
          */
         public Upload(String message, Throwable cause) {
             super(message, cause);
@@ -469,7 +491,7 @@ public sealed class WhatsAppMediaException extends WhatsAppException
          * Constructs a new media upload exception wrapping the specified cause.
          *
          * @param cause the underlying cause of the upload failure
-         * @implNote WAWebMmsClientErrors — upload error wrapping cause
+         * @implNote WAWebMmsClientErrors - upload error wrapping cause
          */
         public Upload(Throwable cause) {
             super(cause);
@@ -507,15 +529,16 @@ public sealed class WhatsAppMediaException extends WhatsAppException
      *   <li>For codec errors: Use fallback processing or skip optional features</li>
      * </ul>
      *
-     * @implNote WAWebHttpErrors.MmsDownloadFilehashMismatchError — processing-level errors
+     * @implNote WAWebHttpErrors.MmsDownloadFilehashMismatchError - processing-level errors
      *     like hash mismatches are separate from the HTTP status code errors in WAWebMmsClientErrors
      */
+    @WhatsAppWebModule(moduleName = "WAWebHttpErrors")
     public static final class Processing extends WhatsAppMediaException {
         /**
          * Constructs a new media processing exception with the specified message.
          *
          * @param message the detail message describing the processing failure
-         * @implNote WAWebHttpErrors.MmsDownloadFilehashMismatchError — processing error
+         * @implNote WAWebHttpErrors.MmsDownloadFilehashMismatchError - processing error
          */
         public Processing(String message) {
             super(message);
@@ -526,7 +549,7 @@ public sealed class WhatsAppMediaException extends WhatsAppException
          *
          * @param message the detail message describing the processing failure
          * @param cause   the underlying cause of the processing failure
-         * @implNote WAWebHttpErrors.MmsDownloadFilehashMismatchError — processing error with cause
+         * @implNote WAWebHttpErrors.MmsDownloadFilehashMismatchError - processing error with cause
          */
         public Processing(String message, Throwable cause) {
             super(message, cause);
@@ -536,7 +559,7 @@ public sealed class WhatsAppMediaException extends WhatsAppException
          * Constructs a new media processing exception wrapping the specified cause.
          *
          * @param cause the underlying cause of the processing failure
-         * @implNote WAWebHttpErrors.MmsDownloadFilehashMismatchError — processing error wrapping cause
+         * @implNote WAWebHttpErrors.MmsDownloadFilehashMismatchError - processing error wrapping cause
          */
         public Processing(Throwable cause) {
             super(cause);

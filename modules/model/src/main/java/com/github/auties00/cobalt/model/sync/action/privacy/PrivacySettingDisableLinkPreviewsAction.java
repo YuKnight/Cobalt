@@ -9,25 +9,46 @@ import it.auties.protobuf.model.ProtobufType;
 
 import java.util.Optional;
 
+/**
+ * Records the user's preference to disable automatic link previews in chats.
+ *
+ * <p>Link previews generate an inline summary of any URL shared in a
+ * conversation by fetching the target page's metadata. When a user disables
+ * this feature from the privacy settings, WhatsApp propagates the change to
+ * every linked device via this sync action so that no linked device fetches
+ * link metadata on the user's behalf.
+ *
+ * <p>The action carries a single boolean flag. The raw flag can be read via
+ * {@link #rawIsPreviewsDisabled()} when callers need to distinguish between
+ * an absent value and an explicit {@code false}; otherwise
+ * {@link #isPreviewsDisabled()} returns the effective boolean preference.
+ */
 @ProtobufMessage(name = "SyncActionValue.PrivacySettingDisableLinkPreviewsAction")
 public final class PrivacySettingDisableLinkPreviewsAction implements SyncAction<SyncActionEmptyArgs> {
     /**
-     * Canonical WhatsApp Web action name for this action type.
+     * The canonical action name used to identify this sync action on the
+     * wire.
      */
     public static final String ACTION_NAME = "setting_disableLinkPreviews";
 
     /**
-     * Canonical WhatsApp Web action version for this action type.
+     * The canonical protocol version of this sync action.
      */
     public static final int ACTION_VERSION = 8;
 
     /**
-     * Canonical WhatsApp Web collection name for this action type.
+     * The sync collection this action is stored in.
+     *
+     * <p>Link preview preferences are persisted in the regular sync patch
+     * collection alongside other account-wide privacy settings.
      */
     public static final SyncPatchType COLLECTION_NAME = SyncPatchType.REGULAR;
 
     /**
-     * {@inheritDoc}
+     * Returns the canonical action name used to identify this sync action on
+     * the wire.
+     *
+     * @return the action name {@link #ACTION_NAME}
      */
     @Override
     public String actionName() {
@@ -35,7 +56,9 @@ public final class PrivacySettingDisableLinkPreviewsAction implements SyncAction
     }
 
     /**
-     * {@inheritDoc}
+     * Returns the canonical protocol version of this sync action.
+     *
+     * @return the action version {@link #ACTION_VERSION}
      */
     @Override
     public int actionVersion() {
@@ -43,22 +66,35 @@ public final class PrivacySettingDisableLinkPreviewsAction implements SyncAction
     }
 
 
+    /**
+     * Flag indicating whether link previews are disabled for the account.
+     *
+     * <p>A {@code null} value means the field was absent on the wire, which
+     * WhatsApp treats as "previews enabled".
+     */
     @ProtobufProperty(index = 1, type = ProtobufType.BOOL)
     Boolean isPreviewsDisabled;
 
 
+    /**
+     * Constructs a new action carrying the supplied link previews flag.
+     *
+     * @param isPreviewsDisabled the preview disable flag to persist, or
+     *                           {@code null} if the field is absent
+     */
     PrivacySettingDisableLinkPreviewsAction(Boolean isPreviewsDisabled) {
         this.isPreviewsDisabled = isPreviewsDisabled;
     }
 
     /**
-     * Returns whether link previews are disabled, coalescing an absent value
-     * to {@code false}.
+     * Returns whether link previews are disabled for the account, coalescing
+     * an absent value to {@code false}.
      *
-     * @implNote {@code WAWebPrivacySettingDisableLinkPreviewsSyncAction.apply}
-     *           treats both an absent value and an explicit {@code false} as
-     *           "previews enabled"; callers that must distinguish the two
-     *           cases should use {@link #rawIsPreviewsDisabled()}.
+     * <p>Both an absent value and an explicit {@code false} are treated as
+     * "previews enabled", which matches the default behaviour of every
+     * WhatsApp client. Callers that need to distinguish the two cases should
+     * use {@link #rawIsPreviewsDisabled()} instead.
+     *
      * @return {@code true} if link previews are disabled, otherwise
      *         {@code false}
      */
@@ -67,27 +103,22 @@ public final class PrivacySettingDisableLinkPreviewsAction implements SyncAction
     }
 
     /**
-     * Returns the raw nullable {@code isPreviewsDisabled} flag as provided by
-     * the remote sync action, preserving the distinction between an absent
-     * field and an explicitly set value.
+     * Returns the raw nullable link previews flag as delivered by the sync
+     * action, preserving the distinction between an absent field and an
+     * explicitly set value.
      *
-     * @implNote WA Web treats absent isPreviewsDisabled as malformed; this
-     *           accessor exposes the raw nullable value for handlers that need
-     *           to distinguish absent from explicit false.
-     * @return an {@link Optional} containing the raw {@link Boolean} value, or
-     *         an empty {@code Optional} if the field was not present on the
-     *         wire
+     * @return an {@link Optional} containing the raw {@link Boolean} value,
+     *         or an empty {@code Optional} if the field was not present on
+     *         the wire
      */
     public Optional<Boolean> rawIsPreviewsDisabled() {
         return Optional.ofNullable(isPreviewsDisabled);
     }
 
     /**
-     * Sets the {@code isPreviewsDisabled} flag, which indicates whether link
-     * previews should be suppressed for this account.
+     * Sets the link previews flag, which indicates whether link previews
+     * should be suppressed for the account.
      *
-     * @implNote {@code WAWebPrivacySettingDisableLinkPreviewsSyncAction.apply}
-     *           mirrors updates to this preference from the primary device.
      * @param isPreviewsDisabled the new flag value, or {@code null} to clear
      *                           the field
      */

@@ -3,6 +3,7 @@ package com.github.auties00.cobalt.stream.message;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.exception.WhatsAppMessageException;
 import com.github.auties00.cobalt.message.MessageService;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.message.receive.receipt.MessageReceiptHandler;
 import com.github.auties00.cobalt.message.receive.stanza.MessageReceiveStanza;
 import com.github.auties00.cobalt.message.receive.stanza.MessageReceiveStanzaParser;
@@ -69,6 +70,9 @@ import java.util.zip.GZIPInputStream;
  * WAWebCommsHandleMessagingStanza.handleMessagingStanza: wraps
  * WAWebHandleMsg with error handling.
  */
+@WhatsAppWebModule(moduleName = "WAWebHandleMsg")
+@WhatsAppWebModule(moduleName = "WAWebCommsHandleMessagingStanza")
+@WhatsAppWebModule(moduleName = "WAWebCommsHandleWorkerCompatibleStanza")
 public final class MessageStreamHandler implements SocketStream.Handler {
     /**
      * Logger for this handler.

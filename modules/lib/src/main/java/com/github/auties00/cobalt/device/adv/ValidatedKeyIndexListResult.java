@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.device.adv;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.device.identity.ADVEncryptionType;
 
 import java.time.Instant;
@@ -8,13 +11,29 @@ import java.util.Objects;
 import java.util.SequencedSet;
 
 /**
- * Result of validating a signed key index list protobuf.
+ * Holds the decoded payload of a signed key index list after cryptographic validation.
+ *
+ * <p>A signed key index list accompanies every device list update and establishes which
+ * companion-device key indexes the account considers legitimate. When Cobalt receives
+ * a device sync response or a device add/remove notification, the raw protobuf is
+ * verified against the primary account's signature key and the resulting payload is
+ * exposed through this container so downstream code can reason about companion device
+ * validity, account type (E2EE vs HOSTED), and identity rotation state without
+ * re-decoding the protobuf.
+ *
+ * <p>Consumed by {@link DeviceADVValidator} and
+ * {@link com.github.auties00.cobalt.device.stanza.DeviceUSyncResponseParser} when
+ * validating USync responses and by
+ * {@link com.github.auties00.cobalt.device.DeviceService} when handling device add
+ * notifications.
  *
  * @implNote WAWebHandleAdvDeviceNotificationUtils.verifySKeyIndexWithAccSigKey: decodes
- * and validates the signed key index list, extracting these fields after signature verification.
- * The WA Web return value also includes an {@code identityUpdatePromise} for saving the identity
- * key, which in Cobalt is handled by the caller ({@code DeviceService}).
+ * and validates the signed key index list, extracting these fields after signature
+ * verification. The WA Web return value also includes an {@code identityUpdatePromise}
+ * for saving the identity key, which in Cobalt is handled by the caller
+ * ({@code DeviceService}).
  */
+@WhatsAppWebModule(moduleName = "WAWebHandleAdvDeviceNotificationUtils")
 public final class ValidatedKeyIndexListResult {
     private final long rawId;
     private final Instant timestamp;
@@ -36,6 +55,9 @@ public final class ValidatedKeyIndexListResult {
      * @param accountType         the account type (E2EE or HOSTED)
      * @param accountSignatureKey the account signature key (32 bytes)
      */
+    @WhatsAppWebExport(moduleName = "WAWebHandleAdvDeviceNotificationUtils",
+            exports = "verifySKeyIndexWithAccSigKey",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public ValidatedKeyIndexListResult(
             long rawId,
             Instant timestamp,
@@ -59,6 +81,9 @@ public final class ValidatedKeyIndexListResult {
      * {@code rawId} field from decoded {@code ADVKeyIndexListSpec}.
      * @return the raw identity ID
      */
+    @WhatsAppWebExport(moduleName = "WAWebHandleAdvDeviceNotificationUtils",
+            exports = "verifySKeyIndexWithAccSigKey",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public long rawId() {
         return rawId;
     }
@@ -70,6 +95,9 @@ public final class ValidatedKeyIndexListResult {
      * {@code timestamp} field from decoded {@code ADVKeyIndexListSpec}.
      * @return the timestamp
      */
+    @WhatsAppWebExport(moduleName = "WAWebHandleAdvDeviceNotificationUtils",
+            exports = "verifySKeyIndexWithAccSigKey",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public Instant timestamp() {
         return timestamp;
     }
@@ -81,6 +109,9 @@ public final class ValidatedKeyIndexListResult {
      * {@code validIndexes} field from decoded {@code ADVKeyIndexListSpec}.
      * @return an unmodifiable view of the valid indexes
      */
+    @WhatsAppWebExport(moduleName = "WAWebHandleAdvDeviceNotificationUtils",
+            exports = "verifySKeyIndexWithAccSigKey",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public SequencedSet<Integer> validIndexes() {
         return Collections.unmodifiableSequencedSet(validIndexes);
     }
@@ -92,6 +123,9 @@ public final class ValidatedKeyIndexListResult {
      * {@code currentIndex} field from decoded {@code ADVKeyIndexListSpec}.
      * @return the current index
      */
+    @WhatsAppWebExport(moduleName = "WAWebHandleAdvDeviceNotificationUtils",
+            exports = "verifySKeyIndexWithAccSigKey",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public int currentIndex() {
         return currentIndex;
     }
@@ -103,6 +137,9 @@ public final class ValidatedKeyIndexListResult {
      * {@code accountType} field from decoded {@code ADVKeyIndexListSpec}.
      * @return the account type
      */
+    @WhatsAppWebExport(moduleName = "WAWebHandleAdvDeviceNotificationUtils",
+            exports = "verifySKeyIndexWithAccSigKey",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public ADVEncryptionType accountType() {
         return accountType;
     }
@@ -114,6 +151,9 @@ public final class ValidatedKeyIndexListResult {
      * {@code accountSignatureKey} field from outer {@code ADVSignedKeyIndexListSpec}.
      * @return the account signature key
      */
+    @WhatsAppWebExport(moduleName = "WAWebHandleAdvDeviceNotificationUtils",
+            exports = "verifySKeyIndexWithAccSigKey",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public byte[] accountSignatureKey() {
         return accountSignatureKey;
     }

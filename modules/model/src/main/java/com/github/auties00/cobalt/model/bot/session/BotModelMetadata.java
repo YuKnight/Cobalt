@@ -7,11 +7,12 @@ import java.util.Optional;
 /**
  * Metadata about the AI model used to generate a bot response on WhatsApp.
  *
- * <p>This message identifies which large-language model variant was used,
- * whether the premium (higher-quality) model tier is available, and an
- * optional display-name override for the model branding shown in the UI.
+ * <p>This message identifies which large-language model variant was used to
+ * produce the response, whether the premium (higher-quality) model tier is
+ * available to the user, and an optional display-name override for the
+ * model branding shown in the UI (for example {@code "Meta Llama 4"}).
  *
- * <p>This metadata is attached to a bot message via
+ * <p>This metadata is carried inside
  * {@link com.github.auties00.cobalt.model.bot.BotMetadata#modelMetadata()}.
  */
 @ProtobufMessage(name = "BotModelMetadata")
@@ -107,8 +108,8 @@ public final class BotModelMetadata {
     }
 
     /**
-     * The variant of large-language model used by the WhatsApp AI bot to
-     * generate responses.
+     * Enumerates the variants of large-language model used by the WhatsApp
+     * AI bot to generate responses.
      */
     @ProtobufEnum(name = "BotModelMetadata.ModelType")
     public static enum ModelType {
@@ -151,8 +152,8 @@ public final class BotModelMetadata {
     }
 
     /**
-     * The availability status of the premium AI model tier for the current
-     * user.
+     * Enumerates the availability states of the premium AI model tier for
+     * the current user.
      */
     @ProtobufEnum(name = "BotModelMetadata.PremiumModelStatus")
     public static enum PremiumModelStatus {

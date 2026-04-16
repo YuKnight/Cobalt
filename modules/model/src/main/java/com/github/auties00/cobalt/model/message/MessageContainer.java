@@ -46,57 +46,63 @@ import java.util.Optional;
 import java.util.function.Consumer;
 
 /**
- * A container that holds exactly one WhatsApp message of any known type.
+ * Discriminated union holding exactly one WhatsApp message payload of any
+ * known type, together with a small number of transport-level side-channel
+ * fields.
  *
- * <p>This class is the Java counterpart of WhatsApp's {@code Message} protobuf
- * definition. It models a discriminated union: although the container declares
- * many fields (one per message type), at most one payload field is populated
- * in any given instance. The populated field determines the type of message
- * that was sent or received.
+ * <p>Every message transmitted on WhatsApp is carried inside a container
+ * of this shape. Although the type declares many fields (one for each
+ * kind of payload the protocol can deliver), at most one payload field is
+ * populated in any given instance: the populated field determines the
+ * kind of content the recipient actually sees (text, image, poll, call,
+ * protocol action, and so on).
  *
- * <p>In addition to the payload field, three side-channel fields may coexist
- * alongside the actual message:
+ * <p>Three additional fields may coexist alongside the payload without
+ * counting as content on their own:
  * <ul>
- * <li>{@link #messageContextInfo()} — per-message metadata such as device
- *     list information, encryption secrets, and bot metadata. This is
- *     transport-level metadata, not a message type.
- * <li>{@link #senderKeyDistributionMessage()} — group Signal encryption
- *     key distribution data that piggybacks on regular messages.
- * <li>{@link #fastRatchetKeySenderKeyDistributionMessage()} — fast ratchet
- *     variant of the sender key distribution.
+ * <li>{@link #messageContextInfo()} carries per-message transport
+ *     metadata such as the sender's device list, message encryption
+ *     secrets, and bot metadata.</li>
+ * <li>{@link #senderKeyDistributionMessage()} piggybacks a group
+ *     Signal sender-key distribution onto the message so that new
+ *     participants can decrypt subsequent group messages.</li>
+ * <li>{@link #fastRatchetKeySenderKeyDistributionMessage()} carries
+ *     the fast-ratchet variant of the same sender-key distribution.</li>
  * </ul>
  *
- * <h2>FutureProofMessage Wrappers</h2>
+ * <h2>FutureProofMessage wrappers</h2>
  *
- * <p>Some fields use {@link FutureProofMessage} as their type rather than a
- * concrete message class. These are forward-compatibility envelopes: each
- * {@code FutureProofMessage} contains a nested {@code MessageContainer},
- * which in turn holds the actual message in one of its fields. This design
- * allows older clients that do not recognize a new message type to still
- * forward the raw protobuf bytes to other participants.
+ * <p>A subset of fields is typed as {@link FutureProofMessage} rather
+ * than as a concrete payload. These are forward-compatibility envelopes
+ * containing a nested {@code MessageContainer}, which in turn holds the
+ * actual content. The indirection lets older clients that do not
+ * recognise a new payload type forward the raw protobuf bytes untouched
+ * so that other participants can still display them.
  *
- * <p>Examples include ephemeral (disappearing) messages, view-once media,
- * message edits, and documents with captions. The {@link #content()}
- * method recursively unwraps all envelopes to return the innermost
- * {@link Message}.
+ * <p>Ephemeral (disappearing) messages, view-once media, message edits,
+ * documents with captions, and several status features all use this
+ * wrapping. {@link #content()} recursively unwraps every envelope and
+ * returns the innermost {@link Message}.
  *
  * <h2>DeviceSentMessage</h2>
  *
- * <p>When a message is sent from one linked device, WhatsApp distributes it
- * to the user's other devices wrapped in a {@link DeviceSentMessage}. The
- * {@link #content()} method transparently unwraps this layer so callers
- * receive the original message regardless of how it was delivered.
+ * <p>When the logged-in user sends a message from one of their linked
+ * devices, WhatsApp distributes a copy to every other device owned by
+ * the same user, wrapped inside a {@link DeviceSentMessage}.
+ * {@link #content()} transparently unwraps this layer so callers always
+ * receive the original payload regardless of how it arrived.
  *
- * <h2>Versioned Messages</h2>
+ * <h2>Versioned payloads</h2>
  *
- * <p>Several message types have multiple protobuf field versions to
- * maintain backward compatibility across client generations. For example,
- * poll creation occupies five different field indices, and view-once media
- * has three versions. All versions share the same Java type. The factory
- * methods ({@link #of(Message)}, {@link #ofViewOnce(Message)}, etc.) and
- * instance converters ({@link #toViewOnce()}, {@link #toGroupStatus()},
- * etc.) always produce the newest version. The {@link #content()}
- * method transparently reads any version.
+ * <p>Several message kinds occupy multiple protobuf field indices to
+ * maintain backwards compatibility across client generations. Poll
+ * creation messages for example occupy five different indices and
+ * view-once media three. Cobalt maps every version to the same Java
+ * type. The factory methods (such as {@link #of(Message)} and
+ * {@link #ofViewOnce(Message)}) and the instance converters (such as
+ * {@link #toViewOnce()} and {@link #toGroupStatus()}) always produce
+ * the newest version; {@link #content()} transparently reads any
+ * version.
  *
  * <h2>Usage</h2>
  *
@@ -107,10 +113,10 @@ import java.util.function.Consumer;
  *     MessageContainer ephemeral = MessageContainer.ofEphemeral(myTextMessage);
  * }</pre>
  *
- * <p>Retrieve the content, unwrapping all envelopes:
+ * <p>Retrieve the innermost payload, unwrapping every envelope:
  * <pre>{@code
- *     Optional<Message> msg = container.content();
- *     Optional<ContextualMessage> ctx = container.contentWithContext();
+ *     Message msg = container.content();
+ *     Optional<ContextualMessage> ctx = container.contextualContent();
  * }</pre>
  */
 @ProtobufMessage(name = "Message")
@@ -763,6 +769,22 @@ public final class MessageContainer {
     FutureProofMessage newsletterAdminProfileMessageV2;
 
 
+    /**
+     * Constructs a new {@code MessageContainer} with every payload and
+     * side-channel field explicitly specified.
+     *
+     * <p>The constructor is package-private and is intended to be
+     * invoked by {@code MessageContainerBuilder} or by protobuf
+     * deserialisation. Client code should prefer the static factories
+     * {@link #of(Message)}, {@link #of(String)}, or the
+     * {@code of*} wrappers to build containers with the correct
+     * version and envelope for the target feature.
+     *
+     * <p>At most one payload field is expected to be non-{@code null}:
+     * populating more than one is valid on the wire but ambiguous and
+     * should be avoided. Any combination of the three side-channel
+     * fields may coexist with the payload.
+     */
     MessageContainer(String conversation, SenderKeyDistributionMessage senderKeyDistributionMessage, ImageMessage imageMessage, ContactMessage contactMessage, LocationMessage locationMessage, ExtendedTextMessage extendedTextMessage, DocumentMessage documentMessage, AudioMessage audioMessage, VideoMessage videoMessage, CallOfferMessage call, ChatProtocolMessage chat, ProtocolMessage protocolMessage, ContactsArrayMessage contactsArrayMessage, HighlyStructuredMessage highlyStructuredMessage, SenderKeyDistributionMessage fastRatchetKeySenderKeyDistributionMessage, SendPaymentMessage sendPaymentMessage, LiveLocationMessage liveLocationMessage, RequestPaymentMessage requestPaymentMessage, DeclinePaymentRequestMessage declinePaymentRequestMessage, CancelPaymentRequestMessage cancelPaymentRequestMessage, TemplateMessage templateMessage, StickerMessage stickerMessage, GroupInviteMessage groupInviteMessage, TemplateButtonReplyMessage templateButtonReplyMessage, ProductMessage productMessage, DeviceSentMessage deviceSentMessage, ChatMessageContextInfo messageContextInfo, ListMessage listMessage, FutureProofMessage viewOnceMessage, OrderMessage orderMessage, ListResponseMessage listResponseMessage, FutureProofMessage ephemeralMessage, InvoiceMessage invoiceMessage, ButtonsMessage buttonsMessage, ButtonsResponseMessage buttonsResponseMessage, PaymentInviteMessage paymentInviteMessage, InteractiveMessage interactiveMessage, ReactionMessage reactionMessage, StickerSyncRMRMessage stickerSyncRmrMessage, InteractiveResponseMessage interactiveResponseMessage, PollCreationMessage pollCreationMessage, PollUpdateMessage pollUpdateMessage, KeepInChatMessage keepInChatMessage, FutureProofMessage documentWithCaptionMessage, RequestPhoneNumberMessage requestPhoneNumberMessage, FutureProofMessage viewOnceMessageV2, EncReactionMessage encReactionMessage, FutureProofMessage editedMessage, FutureProofMessage viewOnceMessageV2Extension, PollCreationMessage pollCreationMessageV2, ScheduledCallCreationMessage scheduledCallCreationMessage, FutureProofMessage groupMentionedMessage, PinInChatMessage pinInChatMessage, PollCreationMessage pollCreationMessageV3, ScheduledCallEditMessage scheduledCallEditMessage, VideoMessage ptvMessage, FutureProofMessage botInvokeMessage, CallLogMessage callLogMesssage, MessageHistoryBundle messageHistoryBundle, EncCommentMessage encCommentMessage, BCallMessage bcallMessage, FutureProofMessage lottieStickerMessage, EventMessage eventMessage, EncEventResponseMessage encEventResponseMessage, CommentMessage commentMessage, NewsletterAdminInviteMessage newsletterAdminInviteMessage, PlaceholderMessage placeholderMessage, SecretEncMessage secretEncryptedMessage, AlbumMessage albumMessage, FutureProofMessage eventCoverImage, StickerPackMessage stickerPackMessage, FutureProofMessage statusMentionMessage, PollResultSnapshotMessage pollResultSnapshotMessage, FutureProofMessage pollCreationOptionImageMessage, FutureProofMessage associatedChildMessage, FutureProofMessage groupStatusMentionMessage, FutureProofMessage pollCreationMessageV4, FutureProofMessage statusAddYours, FutureProofMessage groupStatusMessage, AIRichResponseMessage richResponseMessage, StatusNotificationMessage statusNotificationMessage, FutureProofMessage limitSharingMessage, FutureProofMessage botTaskMessage, FutureProofMessage questionMessage, MessageHistoryNotice messageHistoryNotice, FutureProofMessage groupStatusMessageV2, FutureProofMessage botForwardedMessage, StatusQuestionAnswerMessage statusQuestionAnswerMessage, FutureProofMessage questionReplyMessage, QuestionResponseMessage questionResponseMessage, StatusQuotedMessage statusQuotedMessage, StatusStickerInteractionMessage statusStickerInteractionMessage, PollCreationMessage pollCreationMessageV5, NewsletterFollowerInviteMessage newsletterFollowerInviteMessageV2, PollResultSnapshotMessage pollResultSnapshotMessageV3, FutureProofMessage newsletterAdminProfileMessage, FutureProofMessage newsletterAdminProfileMessageV2) {
         this.conversation = conversation;
         this.senderKeyDistributionMessage = senderKeyDistributionMessage;
@@ -1259,7 +1281,13 @@ public final class MessageContainer {
     }
 
     /**
-     * Creates a {@link FutureProofMessage} wrapping the given message.
+     * Builds a {@link FutureProofMessage} envelope that contains a
+     * single-payload {@link MessageContainer} wrapping the given
+     * message.
+     *
+     * @param message the message to wrap
+     * @param <T>     the compile-time message type
+     * @return a non-{@code null} envelope containing the message
      */
     private static <T extends Message> FutureProofMessage wrapFutureProof(T message) {
         return new FutureProofMessageBuilder()
@@ -1283,7 +1311,7 @@ public final class MessageContainer {
      * @return a {@code Message} describing the innermost {@link Message}
      */
     public Message content() {
-        // FutureProofMessage wrappers — WhatsApp priority order first
+        // FutureProofMessage wrappers, in WhatsApp priority order first
         if (groupMentionedMessage != null) return unboxFutureProof(groupMentionedMessage).content();
         if (documentWithCaptionMessage != null) return unboxFutureProof(documentWithCaptionMessage).content();
         if (viewOnceMessage != null) return unboxFutureProof(viewOnceMessage).content();
@@ -1432,8 +1460,13 @@ public final class MessageContainer {
     }
 
     /**
-     * Extracts the inner container from a {@link FutureProofMessage},
-     * falling back to an empty container if the wrapper is empty.
+     * Extracts the nested {@link MessageContainer} carried inside a
+     * {@link FutureProofMessage} envelope, returning
+     * {@link #empty()} when the envelope carries no container.
+     *
+     * @param wrapper the envelope to unwrap
+     * @return the inner container, or {@link #empty()} if the
+     *         envelope is empty
      */
     private static MessageContainer unboxFutureProof(FutureProofMessage wrapper) {
         return wrapper.message().orElseGet(MessageContainer::empty);
@@ -1775,8 +1808,10 @@ public final class MessageContainer {
     }
 
     /**
-     * Creates a {@link FutureProofMessage} wrapping the content
-     * of this container.
+     * Builds a {@link FutureProofMessage} envelope whose inner
+     * container carries the payload currently held by this container.
+     *
+     * @return a non-{@code null} envelope
      */
     private FutureProofMessage wrapInner() {
         return new FutureProofMessageBuilder()
@@ -1785,9 +1820,14 @@ public final class MessageContainer {
     }
 
     /**
-     * Builds a new container by applying the given wrapper configuration
-     * to a fresh builder, then copying all three sidecar fields from this
-     * container.
+     * Builds a new container by applying the given wrapper
+     * configuration to a fresh builder and copying this container's
+     * three side-channel fields onto the result.
+     *
+     * @param wrapperSetter the callback that populates the payload
+     *                      field on the new builder
+     * @return a new container holding the configured payload and this
+     *         container's side-channel metadata
      */
     private MessageContainer wrapAs(Consumer<MessageContainerBuilder> wrapperSetter) {
         var builder = new MessageContainerBuilder();

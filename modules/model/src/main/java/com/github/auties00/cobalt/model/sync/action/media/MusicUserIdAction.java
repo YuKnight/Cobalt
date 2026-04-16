@@ -13,27 +13,30 @@ import java.util.Optional;
  * A sync action that propagates the user's music streaming service identifier
  * across linked devices.
  *
- * <p>The action carries the resolved music user identifier together with a map
- * of provider-specific identifiers, mirroring the {@code SyncActionValue.MusicUserIdAction}
- * message used by WhatsApp Web to share the music linking state established on
- * one device with the user's other linked devices.
- *
- * @implNote WAWebProtobufSyncAction.pb MusicUserIdAction
+ * <p>The action carries both a primary music user identifier and a map of
+ * provider-specific identifiers so that the music linking state established
+ * on one device becomes visible to every other device linked to the same
+ * account. Consumers typically use the action to render the user's connected
+ * music provider inside profile and sharing UIs.
  */
 @ProtobufMessage(name = "SyncActionValue.MusicUserIdAction")
 public final class MusicUserIdAction implements SyncAction<SyncActionEmptyArgs> {
     /**
-     * Canonical WhatsApp Web action name for this action type.
+     * The app-state action name that identifies this action type on the wire.
      */
     public static final String ACTION_NAME = "music_user_id";
 
     /**
-     * Canonical WhatsApp Web action version for this action type.
+     * The app-state action version that identifies this action revision on the
+     * wire.
      */
     public static final int ACTION_VERSION = 1;
 
     /**
-     * {@inheritDoc}
+     * Returns the action name used to route this action through the app-state
+     * sync pipeline.
+     *
+     * @return the canonical action name
      */
     @Override
     public String actionName() {
@@ -41,7 +44,10 @@ public final class MusicUserIdAction implements SyncAction<SyncActionEmptyArgs> 
     }
 
     /**
-     * {@inheritDoc}
+     * Returns the action version used to route this action through the
+     * app-state sync pipeline.
+     *
+     * @return the canonical action version
      */
     @Override
     public int actionVersion() {
@@ -51,17 +57,13 @@ public final class MusicUserIdAction implements SyncAction<SyncActionEmptyArgs> 
 
     /**
      * The user's primary music user identifier.
-     *
-     * @implNote WAWebProtobufSyncAction.pb MusicUserIdAction.musicUserId
      */
     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
     String musicUserId;
 
     /**
-     * Map of music provider identifiers (e.g. service name to user identifier)
-     * that supplement the primary {@code musicUserId} field.
-     *
-     * @implNote WAWebProtobufSyncAction.pb MusicUserIdAction.musicUserIdMap
+     * Map of music provider identifiers (service name to user identifier) that
+     * supplement the primary {@link #musicUserId} field.
      */
     @ProtobufProperty(index = 2, type = ProtobufType.MAP, mapKeyType = ProtobufType.STRING, mapValueType = ProtobufType.STRING)
     Map<String, String> musicUserIdMap;
@@ -71,7 +73,6 @@ public final class MusicUserIdAction implements SyncAction<SyncActionEmptyArgs> 
      * Constructs a new {@code MusicUserIdAction} carrying the supplied primary
      * music identifier and provider identifier map.
      *
-     * @implNote WAWebProtobufSyncAction.pb MusicUserIdAction
      * @param musicUserId    the primary music user identifier, or {@code null} if unset
      * @param musicUserIdMap the provider identifier map, or {@code null} if unset
      */
@@ -83,7 +84,6 @@ public final class MusicUserIdAction implements SyncAction<SyncActionEmptyArgs> 
     /**
      * Returns the primary music user identifier carried by this action.
      *
-     * @implNote WAWebProtobufSyncAction.pb MusicUserIdAction.musicUserId
      * @return the music user identifier, or {@link Optional#empty()} if unset
      */
     public Optional<String> musicUserId() {
@@ -93,7 +93,6 @@ public final class MusicUserIdAction implements SyncAction<SyncActionEmptyArgs> 
     /**
      * Returns the provider identifier map carried by this action.
      *
-     * @implNote WAWebProtobufSyncAction.pb MusicUserIdAction.musicUserIdMap
      * @return an unmodifiable view of the provider identifier map, never {@code null}
      */
     public Map<String, String> musicUserIdMap() {
@@ -103,7 +102,6 @@ public final class MusicUserIdAction implements SyncAction<SyncActionEmptyArgs> 
     /**
      * Sets the primary music user identifier carried by this action.
      *
-     * @implNote WAWebProtobufSyncAction.pb MusicUserIdAction.musicUserId
      * @param musicUserId the new music user identifier, or {@code null} to clear it
      */
     public void setMusicUserId(String musicUserId) {
@@ -113,7 +111,6 @@ public final class MusicUserIdAction implements SyncAction<SyncActionEmptyArgs> 
     /**
      * Sets the provider identifier map carried by this action.
      *
-     * @implNote WAWebProtobufSyncAction.pb MusicUserIdAction.musicUserIdMap
      * @param musicUserIdMap the new provider identifier map, or {@code null} to clear it
      */
     public void setMusicUserIdMap(Map<String, String> musicUserIdMap) {

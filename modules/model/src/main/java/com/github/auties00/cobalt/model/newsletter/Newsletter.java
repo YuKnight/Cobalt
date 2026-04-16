@@ -11,37 +11,89 @@ import java.time.Instant;
 import java.util.*;
 
 /**
- * A WhatsApp newsletter (channel), containing its JID, state, metadata,
- * viewer metadata, and an abstract message store.
+ * Represents a WhatsApp newsletter, also known as a channel.
  *
- * <p>Newsletters are not end-to-end encrypted. Message content is
- * received as plaintext protobuf and decoded using the standard
- * {@code Message} protobuf specification.
+ * <p>A newsletter is a one-to-many broadcast surface where administrators publish
+ * content that subscribers can read, react to, and forward. Unlike chats, newsletter
+ * messages are not end-to-end encrypted: payloads travel as plaintext protobuf and
+ * are decoded using the standard message specification.
  *
- * <p>All metadata fields and their accessors are concrete. Message
- * operations are abstract so that different store implementations
- * can provide their own storage strategy.
+ * <p>This class is the top-level aggregate for a newsletter and bundles:
+ * <ul>
+ *   <li>its {@link Jid} identifier</li>
+ *   <li>the {@link NewsletterState} describing whether the channel is active,
+ *       suspended, or geo-suspended</li>
+ *   <li>the {@link NewsletterMetadata} exposing name, description, pictures,
+ *       handle, privacy, invite code, and other administrative fields</li>
+ *   <li>the {@link NewsletterViewerMetadata} describing the current viewer's
+ *       role and mute preference</li>
+ *   <li>a count of unread messages and a last-activity timestamp</li>
+ *   <li>an abstract message collection whose storage strategy is provided by
+ *       the concrete subclass selected by the store implementation</li>
+ * </ul>
+ *
+ * <p>Only the message-collection operations are abstract; metadata accessors
+ * and mutators are final and share the same semantics across all subclasses.
  */
 @ProtobufMessage
 public abstract non-sealed class Newsletter implements JidProvider {
+    /**
+     * The JID that uniquely identifies this newsletter on the WhatsApp network.
+     */
     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
     private Jid jid;
 
+    /**
+     * The current lifecycle state of this newsletter (for example active or
+     * suspended). May be {@code null} when the state has not been reported by
+     * the server.
+     */
     @ProtobufProperty(index = 2, type = ProtobufType.MESSAGE)
     private NewsletterState state;
 
+    /**
+     * The administrative metadata of this newsletter such as name,
+     * description, picture, handle, and privacy. May be {@code null} when
+     * metadata has not yet been fetched.
+     */
     @ProtobufProperty(index = 3, type = ProtobufType.MESSAGE)
     private NewsletterMetadata metadata;
 
+    /**
+     * The metadata describing the current viewer's relationship to this
+     * newsletter, including their role and mute preference. May be
+     * {@code null} when the current session has no relationship with the
+     * newsletter.
+     */
     @ProtobufProperty(index = 4, type = ProtobufType.MESSAGE)
     private NewsletterViewerMetadata viewerMetadata;
 
+    /**
+     * The number of messages the current viewer has not yet read.
+     */
     @ProtobufProperty(index = 6, type = ProtobufType.INT32)
     private int unreadMessagesCount;
 
+    /**
+     * The timestamp of the most recent activity in this newsletter, used to
+     * order newsletters in the channel list.
+     */
     @ProtobufProperty(index = 7, type = ProtobufType.UINT64, mixins = InstantSecondsMixin.class)
     private Instant timestamp;
 
+    /**
+     * Constructs a new {@code Newsletter} with the supplied identifier,
+     * state, metadata, viewer metadata, unread counter, and activity
+     * timestamp. Invoked by the generated protobuf deserializer and by
+     * concrete subclasses.
+     *
+     * @param jid                 the newsletter JID
+     * @param state               the current lifecycle state, or {@code null}
+     * @param metadata            the administrative metadata, or {@code null}
+     * @param viewerMetadata      the viewer relationship metadata, or {@code null}
+     * @param unreadMessagesCount the number of unread messages
+     * @param timestamp           the last-activity timestamp, or {@code null}
+     */
     protected Newsletter(Jid jid, NewsletterState state, NewsletterMetadata metadata, NewsletterViewerMetadata viewerMetadata, int unreadMessagesCount, Instant timestamp) {
         this.jid = jid;
         this.state = state;
@@ -52,60 +104,67 @@ public abstract non-sealed class Newsletter implements JidProvider {
     }
 
     /**
-     * Adds a message to this newsletter's message collection.
+     * Appends the given message to this newsletter's message collection.
+     *
+     * <p>The ordering policy (chronological, server-id order, or insertion
+     * order) is defined by the concrete subclass.
      *
      * @param info the message to add
      */
     public abstract void addMessage(NewsletterMessageInfo info);
 
     /**
-     * Removes a message from this newsletter by its identifier.
+     * Removes a stored message by its client identifier.
      *
-     * @param messageId the message identifier
-     * @return {@code true} if the message was removed
+     * @param messageId the message identifier to remove
+     * @return {@code true} if a message with the given identifier existed and
+     *         was removed, {@code false} otherwise
      */
     public abstract boolean removeMessage(String messageId);
 
     /**
-     * Removes all messages from this newsletter.
+     * Clears every stored message in this newsletter.
      */
     public abstract void removeMessages();
 
     /**
-     * Returns an unmodifiable sequenced view of the messages.
+     * Returns an unmodifiable, ordered view of every stored message.
      *
      * @return the messages view, never {@code null}
      */
     public abstract SequencedCollection<NewsletterMessageInfo> messages();
 
     /**
-     * Finds a message by its identifier.
+     * Looks up a stored message by its client identifier.
      *
-     * @param messageId the message identifier
-     * @return an {@link Optional} containing the message, or empty if not found
+     * @param messageId the message identifier to look up
+     * @return an {@link Optional} holding the matching message, or empty if
+     *         no such message is stored
      */
     public abstract Optional<NewsletterMessageInfo> getMessageById(String messageId);
 
     /**
-     * Returns the oldest message in this newsletter, if any.
+     * Returns the oldest stored message, typically the one with the lowest
+     * server-assigned identifier.
      *
-     * @return an {@link Optional} containing the oldest message,
-     *         or empty if there are no messages
+     * @return an {@link Optional} holding the oldest message, or empty if the
+     *         collection is empty
      */
     public abstract Optional<NewsletterMessageInfo> oldestMessage();
 
     /**
-     * Returns the newest message in this newsletter, if any.
+     * Returns the most recently stored message, typically the one with the
+     * highest server-assigned identifier.
      *
-     * @return an {@link Optional} containing the newest message,
-     *         or empty if there are no messages
+     * @return an {@link Optional} holding the newest message, or empty if the
+     *         collection is empty
      */
     public abstract Optional<NewsletterMessageInfo> newestMessage();
 
     /**
-     * Returns this newsletter's JID.
+     * Returns the JID that identifies this newsletter.
      *
-     * @return the JID, never {@code null}
+     * @return the newsletter JID, never {@code null} for a well-formed instance
      */
     @Override
     public Jid toJid() {
@@ -113,18 +172,18 @@ public abstract non-sealed class Newsletter implements JidProvider {
     }
 
     /**
-     * Returns this newsletter's JID.
+     * Returns the JID that identifies this newsletter.
      *
-     * @return the JID, never {@code null}
+     * @return the newsletter JID, never {@code null} for a well-formed instance
      */
     public Jid jid() {
         return jid;
     }
 
     /**
-     * Sets this newsletter's JID.
+     * Sets the JID that identifies this newsletter.
      *
-     * @param jid the JID, must not be {@code null}
+     * @param jid the newsletter JID, must not be {@code null}
      * @throws NullPointerException if {@code jid} is {@code null}
      */
     public void setJid(Jid jid) {
@@ -132,96 +191,112 @@ public abstract non-sealed class Newsletter implements JidProvider {
     }
 
     /**
-     * Returns the newsletter state, if available.
+     * Returns the current lifecycle state of this newsletter.
      *
-     * @return an {@link Optional} containing the state, or empty if not set
+     * @return an {@link Optional} holding the state, or empty if the server
+     *         has not reported one
      */
     public Optional<NewsletterState> state() {
         return Optional.ofNullable(state);
     }
 
     /**
-     * Sets the newsletter state.
+     * Sets the current lifecycle state of this newsletter.
      *
-     * @param state the newsletter state
+     * @param state the new state, or {@code null} to clear it
      */
     public void setState(NewsletterState state) {
         this.state = state;
     }
 
     /**
-     * Returns the newsletter metadata, if available.
+     * Returns the administrative metadata of this newsletter.
      *
-     * @return an {@link Optional} containing the metadata, or empty if not set
+     * @return an {@link Optional} holding the metadata, or empty if it has
+     *         not been fetched
      */
     public Optional<NewsletterMetadata> metadata() {
         return Optional.ofNullable(metadata);
     }
 
     /**
-     * Sets the newsletter metadata.
+     * Sets the administrative metadata of this newsletter.
      *
-     * @param metadata the newsletter metadata
+     * @param metadata the new metadata, or {@code null} to clear it
      */
     public void setMetadata(NewsletterMetadata metadata) {
         this.metadata = metadata;
     }
 
     /**
-     * Returns the viewer's metadata, if available.
+     * Returns the metadata describing the current viewer's relationship to
+     * this newsletter.
      *
-     * @return an {@link Optional} containing the viewer metadata,
-     *         or empty if not set
+     * @return an {@link Optional} holding the viewer metadata, or empty if
+     *         the current session has no relationship with the newsletter
      */
     public Optional<NewsletterViewerMetadata> viewerMetadata() {
         return Optional.ofNullable(viewerMetadata);
     }
 
     /**
-     * Sets the viewer's metadata.
+     * Sets the viewer metadata for this newsletter.
      *
-     * @param viewerMetadata the viewer metadata
+     * @param viewerMetadata the new viewer metadata, or {@code null} to clear it
      */
     public void setViewerMetadata(NewsletterViewerMetadata viewerMetadata) {
         this.viewerMetadata = viewerMetadata;
     }
 
     /**
-     * Returns the number of unread messages.
+     * Returns the number of messages the current viewer has not yet read.
      *
-     * @return the unread messages count
+     * @return the unread message counter
      */
     public int unreadMessagesCount() {
         return unreadMessagesCount;
     }
 
     /**
-     * Sets the number of unread messages.
+     * Sets the number of messages the current viewer has not yet read.
      *
-     * @param unreadMessagesCount the unread messages count
+     * @param unreadMessagesCount the new unread counter
      */
     public void setUnreadMessagesCount(int unreadMessagesCount) {
         this.unreadMessagesCount = unreadMessagesCount;
     }
 
     /**
-     * Returns the timestamp in seconds of the last activity.
+     * Returns the timestamp of the most recent activity in this newsletter.
      *
-     * @return the timestamp in seconds
+     * @return an {@link Optional} holding the last-activity timestamp, or
+     *         empty if not reported
      */
     public Optional<Instant> timestamp() {
         return Optional.ofNullable(timestamp);
     }
 
     /**
-     * Sets the timestamp in seconds of the last activity.
+     * Sets the timestamp of the most recent activity in this newsletter.
      *
-     * @param timestamp the timestamp in seconds
+     * @param timestamp the new last-activity timestamp, or {@code null} to
+     *                  clear it
      */
     public void setTimestamp(Instant timestamp) {
         this.timestamp = timestamp;
     }
 
+    /**
+     * Returns whether this {@code Newsletter} equals the supplied object.
+     *
+     * <p>Two newsletters are equal when their JID, state, metadata, viewer
+     * metadata, unread counter, and timestamp are all equal. The message
+     * collection is deliberately excluded so that subclasses can use
+     * different storage strategies without affecting equality.
+     *
+     * @param o the object to compare against
+     * @return {@code true} if {@code o} represents the same newsletter
+     */
     @Override
     public boolean equals(Object o) {
         return o == this || o instanceof Newsletter that
@@ -233,6 +308,11 @@ public abstract non-sealed class Newsletter implements JidProvider {
                             && Objects.equals(timestamp, that.timestamp);
     }
 
+    /**
+     * Returns a hash code consistent with {@link #equals(Object)}.
+     *
+     * @return the hash code for this newsletter
+     */
     @Override
     public int hashCode() {
         return Objects.hash(jid, state, metadata, viewerMetadata, unreadMessagesCount, timestamp);

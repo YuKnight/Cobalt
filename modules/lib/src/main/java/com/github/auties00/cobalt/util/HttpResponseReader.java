@@ -41,6 +41,10 @@ import java.nio.ByteBuffer;
  *       enough to amortize the vector setup cost, falling back to a
  *       scalar loop otherwise.</li>
  * </ul>
+ *
+ * @implNote Cobalt-specific helper that parses the HTTP responses emitted
+ *     during proxy CONNECT and WebSocket upgrade handshakes; WhatsApp Web
+ *     relies on the browser to handle the equivalent negotiations.
  */
 public final class HttpResponseReader {
     private static final int HTTP_VERSION_MAJOR = 1;

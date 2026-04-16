@@ -10,76 +10,88 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Metadata describing the rendering capabilities that the client advertises to
- * the server for rich bot responses.
+ * Describes the rendering capabilities that a WhatsApp client advertises to the
+ * Meta AI bot server, so that the server can tailor its rich responses to match
+ * what the client is able to display.
  *
- * <p>This message is attached to {@code BotMetadata} (field 13). The client
- * sends a list of {@link BotCapabilityType} values to indicate which rich
- * response features it supports (e.g. tables, code blocks, LaTeX, maps). The
- * server then tailors the bot response format to match the client's
- * capabilities.
+ * <p>When sending a message to a Meta AI bot, the client includes a list of
+ * {@link BotCapabilityType} values in this metadata. Each value declares
+ * support for a specific rich-response feature such as tables, code blocks,
+ * LaTeX rendering, inline images, or interactive maps. The server inspects
+ * these capabilities and omits or downgrades any content the client cannot
+ * render. This metadata is carried inside the parent {@code BotMetadata}
+ * protobuf attached to the message.
+ *
+ * @see BotPluginMetadata
  */
 @ProtobufMessage(name = "BotCapabilityMetadata")
 public final class BotCapabilityMetadata {
     /**
-     * The list of capabilities the client supports for rendering bot responses.
+     * The list of rendering capabilities that the client declares support for.
+     * Each entry identifies a specific rich-response feature the client can
+     * display, such as tables, code blocks, or inline images.
      */
     @ProtobufProperty(index = 1, type = ProtobufType.ENUM)
     List<BotCapabilityType> capabilities;
 
     /**
-     * Constructs a new {@code BotCapabilityMetadata} with the specified
-     * capabilities.
+     * Constructs a new {@code BotCapabilityMetadata} with the specified list
+     * of capabilities.
      *
-     * @param capabilities the list of supported capabilities, or {@code null}
+     * @param capabilities the list of rendering capabilities the client
+     *                     supports, or {@code null} if none are declared
      */
     BotCapabilityMetadata(List<BotCapabilityType> capabilities) {
         this.capabilities = capabilities;
     }
 
     /**
-     * Returns the list of capabilities the client supports for rendering bot
-     * responses.
+     * Returns the list of rendering capabilities the client supports.
      *
-     * @return an unmodifiable list of capabilities, possibly empty
+     * @return an unmodifiable list of {@link BotCapabilityType} values, or an
+     *         empty list if none are declared
      */
     public List<BotCapabilityType> capabilities() {
         return capabilities == null ? List.of() : Collections.unmodifiableList(capabilities);
     }
 
     /**
-     * Sets the list of capabilities the client supports.
+     * Sets the list of rendering capabilities the client supports.
      *
-     * @param capabilities the new list of capabilities, or {@code null}
+     * @param capabilities the new list of capabilities, or {@code null} to
+     *                     clear all declared capabilities
      */
     public void setCapabilities(List<BotCapabilityType> capabilities) {
         this.capabilities = capabilities;
     }
 
     /**
-     * A rendering capability that the WhatsApp client can advertise to the
-     * server, indicating which rich response features it supports.
+     * Enumerates the rendering capabilities that a WhatsApp client can
+     * advertise to the Meta AI bot server.
      *
-     * <p>Capabilities are grouped into several categories:
+     * <p>Each constant represents a specific rich-response feature. The client
+     * includes the relevant constants in a {@link BotCapabilityMetadata} to
+     * inform the server which content formats it can display. Capabilities are
+     * organized into several functional areas:
      * <ul>
-     * <li>Core rendering — {@link #PROGRESS_INDICATOR},
+     * <li>Core rendering: {@link #PROGRESS_INDICATOR},
      *     {@link #RICH_RESPONSE_HEADING}, {@link #RICH_RESPONSE_SUB_HEADING},
      *     {@link #RICH_RESPONSE_NESTED_LIST}
-     * <li>Media — {@link #RICH_RESPONSE_INLINE_IMAGE},
+     * <li>Media: {@link #RICH_RESPONSE_INLINE_IMAGE},
      *     {@link #RICH_RESPONSE_GRID_IMAGE},
      *     {@link #RICH_RESPONSE_GRID_IMAGE_3P},
      *     {@link #RICH_RESPONSE_INLINE_REELS}
-     * <li>Structured content — {@link #RICH_RESPONSE_TABLE},
+     * <li>Structured content: {@link #RICH_RESPONSE_TABLE},
      *     {@link #RICH_RESPONSE_CODE}, {@link #RICH_RESPONSE_LATEX},
      *     {@link #RICH_RESPONSE_LATEX_INLINE}, {@link #RICH_RESPONSE_MAPS}
-     * <li>AI features — {@link #AI_MEMORY}, {@link #AI_SHARED_MEMORY},
+     * <li>AI features: {@link #AI_MEMORY}, {@link #AI_SHARED_MEMORY},
      *     {@link #AI_STUDIO_UGC_MEMORY}, {@link #AGENTIC_PLANNING},
      *     {@link #QUERY_PLAN}
-     * <li>Unified response — {@link #RICH_RESPONSE_UNIFIED_RESPONSE},
+     * <li>Unified response: {@link #RICH_RESPONSE_UNIFIED_RESPONSE},
      *     {@link #RICH_RESPONSE_UNIFIED_TEXT_COMPONENT},
      *     {@link #RICH_RESPONSE_UNIFIED_SOURCES},
      *     {@link #RICH_RESPONSE_UNIFIED_DOMAIN_CITATIONS}
-     * <li>Account and session — {@link #ACCOUNT_LINKING},
+     * <li>Account and session: {@link #ACCOUNT_LINKING},
      *     {@link #SESSION_TRANSPARENCY_SYSTEM_MESSAGE},
      *     {@link #AI_RESPONSE_MODEL_BRANDING}
      * </ul>
@@ -387,19 +399,21 @@ public final class BotCapabilityMetadata {
         RICH_RESPONSE_INLINE_LINKS_ENABLED(56);
 
         /**
-         * Constructs a new capability type constant with the specified
-         * protobuf index.
+         * Constructs a new capability type constant.
          *
-         * @param index the protobuf enum index
+         * @param index the protobuf-assigned numeric index for this constant
          */
         BotCapabilityType(@ProtobufEnumIndex int index) {
             this.index = index;
         }
 
+        /**
+         * The protobuf-assigned numeric index for this constant.
+         */
         final int index;
 
         /**
-         * Returns the protobuf enum index of this capability type.
+         * Returns the protobuf-assigned numeric index for this constant.
          *
          * @return the protobuf index
          */

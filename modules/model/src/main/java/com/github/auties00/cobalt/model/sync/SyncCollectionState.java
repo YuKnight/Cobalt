@@ -1,61 +1,69 @@
 package com.github.auties00.cobalt.model.sync;
 
 /**
- * Represents the synchronization state of a collection.
+ * State in the lifecycle of an app state sync collection on the local
+ * device.
  *
- * <p>Collections transition through these states during the sync lifecycle:
+ * <p>Every collection transitions through these states as sync requests
+ * are issued, acknowledged, or retried. Under normal operation the cycle
+ * is:
  * <pre>
- * UpToDate → Dirty → InFlight → Success → UpToDate
- *                                    ↓
- *                                 Pending
+ * UP_TO_DATE &gt; DIRTY &gt; IN_FLIGHT &gt; UP_TO_DATE
+ *                                    |
+ *                                    v
+ *                                 PENDING (more data available)
  * </pre>
  *
- * <p>Error states:
+ * <p>In addition to the normal path, the collection may enter one of the
+ * error states:
  * <ul>
- *   <li>{@link #BLOCKED} - Missing encryption keys</li>
- *   <li>{@link #ERROR_RETRY} - Transient errors (will retry)</li>
- *   <li>{@link #ERROR_FATAL} - Permanent errors (requires intervention)</li>
+ *   <li>{@link #BLOCKED} when encryption keys are missing</li>
+ *   <li>{@link #ERROR_RETRY} for transient errors that trigger a retry</li>
+ *   <li>{@link #ERROR_FATAL} for permanent errors that require intervention
+ *       or a snapshot recovery</li>
  * </ul>
  */
 public enum SyncCollectionState {
     /**
-     * Collection is synchronized with the server.
-     * Local version matches server version.
+     * Collection is fully synchronised with the server: the local version
+     * matches the server version and no pending mutations remain.
      */
     UP_TO_DATE,
 
     /**
-     * Collection has local changes or server has newer version.
-     * Needs to be synchronized.
+     * Collection has local changes to push or the server is known to have
+     * a newer version that needs to be pulled.
      */
     DIRTY,
 
     /**
-     * Sync request sent, waiting for server response.
+     * A sync request has been sent to the server and the local side is
+     * waiting for the response.
      */
     IN_FLIGHT,
 
     /**
-     * More data available from server.
-     * Need to perform another sync to fetch remaining data.
+     * The server indicated that more data is available and another sync
+     * round is required to fetch the remaining patches.
      */
     PENDING,
 
     /**
-     * Cannot sync due to missing encryption keys.
-     * Will automatically resume when keys become available.
+     * Sync cannot proceed because the required encryption keys are missing
+     * locally; sync resumes automatically when the keys become available.
      */
     BLOCKED,
 
     /**
-     * Transient error occurred (e.g., network timeout).
-     * Will retry with exponential backoff.
+     * A transient error has occurred (such as a network timeout) and sync
+     * will be retried with exponential backoff.
      */
     ERROR_RETRY,
 
     /**
-     * Fatal error occurred (e.g., decryption failure, tampering detected).
-     * Requires manual intervention or snapshot recovery.
+     * A fatal error has occurred (such as a decryption failure or a
+     * detected tampering condition) and sync cannot proceed without manual
+     * intervention or a fresh snapshot download.
      */
     ERROR_FATAL
 }

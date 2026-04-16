@@ -8,30 +8,33 @@ import it.auties.protobuf.model.ProtobufType;
 import java.time.LocalTime;
 
 /**
- * A business hours configuration entry that defines the operating schedule for a single day
- * of the week.
+ * Represents a business hours configuration entry that defines the operating schedule for
+ * a single day of the week.
  *
  * <p>Each entry specifies the day of the week, an operating mode that determines how the
  * business's availability is interpreted, and optional opening and closing times expressed
- * as a {@link LocalTime} relative to the business's local time zone.
+ * as a {@link LocalTime} relative to the business's local time zone (specified in the
+ * parent {@link BusinessHours#timeZone()}).
  *
- * <p>The operating mode determines the semantics of the time fields. When the mode is
- * {@link BusinessHoursMode#SPECIFIC_HOURS}, the opening and closing time fields define
- * the time range during which the business is open. When the mode is
- * {@link BusinessHoursMode#OPEN_24H}, the business is considered open for the entire day
- * and the time fields are not meaningful. When the mode is
- * {@link BusinessHoursMode#APPOINTMENT_ONLY}, the business operates by appointment and
- * the time fields are likewise not meaningful.
+ * <p>The operating mode determines the semantics of the time fields:
+ * <ul>
+ *   <li>{@link BusinessHoursMode#SPECIFIC_HOURS}: the opening and closing time fields
+ *       define the time range during which the business is open.
+ *   <li>{@link BusinessHoursMode#OPEN_24H}: the business is open for the entire day
+ *       and the time fields are not meaningful.
+ *   <li>{@link BusinessHoursMode#APPOINTMENT_ONLY}: the business operates by appointment
+ *       and the time fields are not meaningful.
+ * </ul>
  *
  * <p>A single day of the week can have multiple entries to represent split operating hours,
  * such as a morning and afternoon session separated by a break. In that case, two entries
- * sharing the same day value and {@link BusinessHoursMode#SPECIFIC_HOURS} mode will be
- * present, each covering a different time range.
+ * sharing the same day value and {@code SPECIFIC_HOURS} mode will be present, each covering
+ * a different time range.
  */
 @ProtobufMessage
 public final class BusinessHoursEntry {
     /**
-     * The day of the week for this entry.
+     * The day of the week that this entry applies to.
      */
     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
     BusinessHoursDay day;
@@ -43,13 +46,19 @@ public final class BusinessHoursEntry {
     BusinessHoursMode mode;
 
     /**
-     * The opening time, stored on the wire as minutes from midnight.
+     * The opening time for this day, stored on the wire as minutes since midnight.
+     *
+     * <p>Only meaningful when the {@linkplain #mode() mode} is
+     * {@link BusinessHoursMode#SPECIFIC_HOURS}.
      */
     @ProtobufProperty(index = 3, type = ProtobufType.INT64, mixins = LocalTimeMinutesMixin.class)
     LocalTime openTime;
 
     /**
-     * The closing time, stored on the wire as minutes from midnight.
+     * The closing time for this day, stored on the wire as minutes since midnight.
+     *
+     * <p>Only meaningful when the {@linkplain #mode() mode} is
+     * {@link BusinessHoursMode#SPECIFIC_HOURS}.
      */
     @ProtobufProperty(index = 4, type = ProtobufType.INT64, mixins = LocalTimeMinutesMixin.class)
     LocalTime closeTime;
@@ -82,7 +91,6 @@ public final class BusinessHoursEntry {
      * Sets the day of the week for this entry.
      *
      * @param day the day of the week
-     * @return this instance
      */
     public void setDay(BusinessHoursDay day) {
         this.day = day;
@@ -101,7 +109,6 @@ public final class BusinessHoursEntry {
      * Sets the operating mode for this day.
      *
      * @param mode the operating mode
-     * @return this instance
      */
     public void setMode(BusinessHoursMode mode) {
         this.mode = mode;
@@ -125,7 +132,6 @@ public final class BusinessHoursEntry {
      * Sets the opening time.
      *
      * @param openTime the opening time of day
-     * @return this instance
      */
     public void setOpenTime(LocalTime openTime) {
         this.openTime = openTime;
@@ -149,7 +155,6 @@ public final class BusinessHoursEntry {
      * Sets the closing time.
      *
      * @param closeTime the closing time of day
-     * @return this instance
      */
     public void setCloseTime(LocalTime closeTime) {
         this.closeTime = closeTime;

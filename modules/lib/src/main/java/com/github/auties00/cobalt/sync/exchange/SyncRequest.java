@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.sync.exchange;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.sync.SyncActionValue;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
@@ -21,7 +22,11 @@ import java.util.List;
  * @param node       the IQ request node builder
  * @param uploadInfo the upload metadata, or {@code null} if no mutations
  *                   were included in this request
+ * @implNote Holds the encoded push/pull IQ plus the state needed by
+ *     {@code WAWebSyncdServerSync._uploadSuccessful} to finalise the
+ *     local collection after the server acknowledges the push.
  */
+@WhatsAppWebModule(moduleName = "WAWebSyncdServerSync")
 public record SyncRequest(
         NodeBuilder node,
         UploadedPatchInfo uploadInfo

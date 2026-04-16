@@ -8,15 +8,18 @@ import java.util.Optional;
 
 /**
  * Base exception for message processing errors in the WhatsApp protocol.
- * <p>
- * This sealed class hierarchy represents all message-related failures that can occur during
+ *
+ * <p>This sealed class hierarchy represents all message-related failures that can occur during
  * message sending, receiving, and processing operations. Message exceptions are categorized
  * into decryption failures ({@link Receive}) which represent cryptographic and protocol-level
- * errors that prevent message content from being accessed.
- * <p>
- * Message exceptions are generally non-fatal errors, meaning the client connection should
+ * errors that prevent message content from being accessed, and send failures ({@link Send})
+ * which represent encryption, addressing, and server-rejection errors that prevent outgoing
+ * messages from reaching their recipients.
+
+ * <p>Message exceptions are generally non-fatal errors, meaning the client connection should
  * remain active and continue processing other messages. The specific error information is
- * used to generate appropriate retry receipts or error acknowledgments back to the sender.
+ * used by the configurable error handler to generate appropriate retry receipts or error
+ * acknowledgments back to the sender, or to decide whether to re-attempt an outgoing send.
  *
  * <h2>Exception Hierarchy</h2>
  * <ul>
@@ -511,6 +514,11 @@ public sealed class WhatsAppMessageException extends WhatsAppException
                 return isGroupSession;
             }
 
+            /**
+             * Returns the retry reason code for this decryption failure.
+             *
+             * @return {@link RetryReason#SIGNAL_ERROR_NO_SESSION}
+             */
             @Override
             public RetryReason retryReason() {
                 return RetryReason.SIGNAL_ERROR_NO_SESSION;
@@ -562,6 +570,11 @@ public sealed class WhatsAppMessageException extends WhatsAppException
                 super(message, cause);
             }
 
+            /**
+             * Returns the retry reason code for this decryption failure.
+             *
+             * @return {@link RetryReason#SIGNAL_ERROR_INVALID_KEY}
+             */
             @Override
             public RetryReason retryReason() {
                 return RetryReason.SIGNAL_ERROR_INVALID_KEY;
@@ -627,6 +640,11 @@ public sealed class WhatsAppMessageException extends WhatsAppException
                 return Optional.ofNullable(keyId);
             }
 
+            /**
+             * Returns the retry reason code for this decryption failure.
+             *
+             * @return {@link RetryReason#SIGNAL_ERROR_INVALID_KEY_ID}
+             */
             @Override
             public RetryReason retryReason() {
                 return RetryReason.SIGNAL_ERROR_INVALID_KEY_ID;
@@ -691,6 +709,11 @@ public sealed class WhatsAppMessageException extends WhatsAppException
                 return Optional.ofNullable(prekeyId);
             }
 
+            /**
+             * Returns the retry reason code for this decryption failure.
+             *
+             * @return {@link RetryReason#SIGNAL_ERROR_INVALID_KEY}
+             */
             @Override
             public RetryReason retryReason() {
                 return RetryReason.SIGNAL_ERROR_INVALID_KEY;
@@ -756,6 +779,11 @@ public sealed class WhatsAppMessageException extends WhatsAppException
                 return Optional.ofNullable(signedPrekeyId);
             }
 
+            /**
+             * Returns the retry reason code for this decryption failure.
+             *
+             * @return {@link RetryReason#SIGNAL_ERROR_INVALID_KEY}
+             */
             @Override
             public RetryReason retryReason() {
                 return RetryReason.SIGNAL_ERROR_INVALID_KEY;
@@ -805,6 +833,11 @@ public sealed class WhatsAppMessageException extends WhatsAppException
                 super(message, cause);
             }
 
+            /**
+             * Returns the retry reason code for this decryption failure.
+             *
+             * @return {@link RetryReason#SIGNAL_ERROR_INVALID_MESSAGE}
+             */
             @Override
             public RetryReason retryReason() {
                 return RetryReason.SIGNAL_ERROR_INVALID_MESSAGE;
@@ -854,6 +887,11 @@ public sealed class WhatsAppMessageException extends WhatsAppException
                 super(message, cause);
             }
 
+            /**
+             * Returns the retry reason code for this decryption failure.
+             *
+             * @return {@link RetryReason#SIGNAL_ERROR_INVALID_SIGNATURE}
+             */
             @Override
             public RetryReason retryReason() {
                 return RetryReason.SIGNAL_ERROR_INVALID_SIGNATURE;
@@ -922,6 +960,11 @@ public sealed class WhatsAppMessageException extends WhatsAppException
                 return Optional.ofNullable(counter);
             }
 
+            /**
+             * Returns the retry reason code for this decryption failure.
+             *
+             * @return {@link RetryReason#SIGNAL_ERROR_FUTURE_MESSAGE}
+             */
             @Override
             public RetryReason retryReason() {
                 return RetryReason.SIGNAL_ERROR_FUTURE_MESSAGE;
@@ -1019,6 +1062,11 @@ public sealed class WhatsAppMessageException extends WhatsAppException
                 return isGroupMessage;
             }
 
+            /**
+             * Returns the retry reason code for this decryption failure.
+             *
+             * @return {@link RetryReason#SIGNAL_ERROR_FUTURE_MESSAGE}
+             */
             @Override
             public RetryReason retryReason() {
                 return RetryReason.SIGNAL_ERROR_FUTURE_MESSAGE;
@@ -1100,6 +1148,11 @@ public sealed class WhatsAppMessageException extends WhatsAppException
                 return errorType;
             }
 
+            /**
+             * Returns the retry reason code for this decryption failure.
+             *
+             * @return {@link RetryReason#SIGNAL_ERROR_BAD_MAC}
+             */
             @Override
             public RetryReason retryReason() {
                 return RetryReason.SIGNAL_ERROR_BAD_MAC;
@@ -1181,6 +1234,11 @@ public sealed class WhatsAppMessageException extends WhatsAppException
                 super(message, cause);
             }
 
+            /**
+             * Returns the retry reason code for this decryption failure.
+             *
+             * @return {@link RetryReason#SIGNAL_ERROR_NO_SESSION}
+             */
             @Override
             public RetryReason retryReason() {
                 return RetryReason.SIGNAL_ERROR_NO_SESSION;
@@ -1220,6 +1278,11 @@ public sealed class WhatsAppMessageException extends WhatsAppException
                 super(message, cause);
             }
 
+            /**
+             * Returns the retry reason code for this decryption failure.
+             *
+             * @return {@link RetryReason#SIGNAL_ERROR_NO_SESSION}
+             */
             @Override
             public RetryReason retryReason() {
                 return RetryReason.SIGNAL_ERROR_NO_SESSION;
@@ -1264,6 +1327,11 @@ public sealed class WhatsAppMessageException extends WhatsAppException
                 super(message, cause);
             }
 
+            /**
+             * Returns the retry reason code for this decryption failure.
+             *
+             * @return {@link RetryReason#UNKNOWN_COMPANION_NO_PREKEY}
+             */
             @Override
             public RetryReason retryReason() {
                 return RetryReason.UNKNOWN_COMPANION_NO_PREKEY;
@@ -1332,11 +1400,21 @@ public sealed class WhatsAppMessageException extends WhatsAppException
                 return errorType;
             }
 
+            /**
+             * Returns the retry reason code for this decryption failure.
+             *
+             * @return {@link RetryReason#UNKNOWN_ERROR}
+             */
             @Override
             public RetryReason retryReason() {
                 return RetryReason.UNKNOWN_ERROR;
             }
 
+            /**
+             * Returns the NACK error code associated with this failure.
+             *
+             * @return {@code "400"}
+             */
             @Override
             public Optional<String> errorCode() {
                 return Optional.of("400");
@@ -1452,6 +1530,11 @@ public sealed class WhatsAppMessageException extends WhatsAppException
                 super(message, cause);
             }
 
+            /**
+             * Returns the retry reason code for this decryption failure.
+             *
+             * @return {@link RetryReason#ADV_FAILURE}
+             */
             @Override
             public RetryReason retryReason() {
                 return RetryReason.ADV_FAILURE;
@@ -1558,11 +1641,21 @@ public sealed class WhatsAppMessageException extends WhatsAppException
                 return errorReason;
             }
 
+            /**
+             * Returns the retry reason code for this decryption failure.
+             *
+             * @return {@link RetryReason#UNKNOWN_ERROR}
+             */
             @Override
             public RetryReason retryReason() {
                 return RetryReason.UNKNOWN_ERROR;
             }
 
+            /**
+             * Returns the NACK error code associated with this failure.
+             *
+             * @return the error code string (typically {@code "400"})
+             */
             @Override
             public Optional<String> errorCode() {
                 return Optional.of(errorCode);
@@ -1625,6 +1718,11 @@ public sealed class WhatsAppMessageException extends WhatsAppException
                 super(message, cause);
             }
 
+            /**
+             * Returns the retry reason code for this decryption failure.
+             *
+             * @return {@link RetryReason#BAD_BROADCAST_EPH_SETTINGS}
+             */
             @Override
             public RetryReason retryReason() {
                 return RetryReason.BAD_BROADCAST_EPH_SETTINGS;
@@ -1670,11 +1768,21 @@ public sealed class WhatsAppMessageException extends WhatsAppException
                 super(message, cause);
             }
 
+            /**
+             * Returns the retry reason code for this decryption failure.
+             *
+             * @return {@link RetryReason#UNKNOWN_ERROR}
+             */
             @Override
             public RetryReason retryReason() {
                 return RetryReason.UNKNOWN_ERROR;
             }
 
+            /**
+             * Returns the NACK error code associated with this failure.
+             *
+             * @return {@code "400"}
+             */
             @Override
             public Optional<String> errorCode() {
                 return Optional.of("400");
@@ -1715,6 +1823,11 @@ public sealed class WhatsAppMessageException extends WhatsAppException
                 super(message, cause);
             }
 
+            /**
+             * Returns the retry reason code for this decryption failure.
+             *
+             * @return {@link RetryReason#UNKNOWN_ERROR}
+             */
             @Override
             public RetryReason retryReason() {
                 return RetryReason.UNKNOWN_ERROR;
@@ -1843,6 +1956,11 @@ public sealed class WhatsAppMessageException extends WhatsAppException
                 return deviceJid;
             }
 
+            /**
+             * Returns whether this send failure is retryable.
+             *
+             * @return {@code true}; fetching a prekey bundle establishes the session
+             */
             @Override
             public boolean isRetryable() {
                 return true;
@@ -1895,6 +2013,12 @@ public sealed class WhatsAppMessageException extends WhatsAppException
                 return deviceJid;
             }
 
+            /**
+             * Returns whether this send failure is retryable.
+             *
+             * @return {@code true}; refreshing the recipient's key bundle can
+             *         replace the invalid key
+             */
             @Override
             public boolean isRetryable() {
                 return true;
@@ -1951,6 +2075,12 @@ public sealed class WhatsAppMessageException extends WhatsAppException
                 return groupJid;
             }
 
+            /**
+             * Returns whether this send failure is retryable.
+             *
+             * @return {@code true}; generating and distributing a new sender key
+             *         unblocks the send
+             */
             @Override
             public boolean isRetryable() {
                 return true;
@@ -1988,6 +2118,12 @@ public sealed class WhatsAppMessageException extends WhatsAppException
                 return groupJid;
             }
 
+            /**
+             * Returns whether this send failure is retryable.
+             *
+             * @return {@code true}; rotating the sender key and re-distributing it
+             *         resolves the expiration
+             */
             @Override
             public boolean isRetryable() {
                 return true;
@@ -2014,7 +2150,8 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             /**
              * Constructs a new phash mismatch exception.
              *
-             * @param expectedHash the phash the client sent
+             * @param expectedHash the phash the server expected
+             * @param actualHash   the phash the client computed and sent
              */
             public PhashMismatch(String expectedHash, String actualHash) {
                 super("Phash mismatch: computed " + expectedHash);
@@ -2040,6 +2177,11 @@ public sealed class WhatsAppMessageException extends WhatsAppException
                 return actualHash;
             }
 
+            /**
+             * Returns whether this send failure is retryable.
+             *
+             * @return {@code true}; refreshing the device list recomputes a matching phash
+             */
             @Override
             public boolean isRetryable() {
                 return true;
@@ -2077,6 +2219,11 @@ public sealed class WhatsAppMessageException extends WhatsAppException
                 return devices;
             }
 
+            /**
+             * Returns whether this send failure is retryable.
+             *
+             * @return {@code true}; fetching the missing prekey bundles unblocks the send
+             */
             @Override
             public boolean isRetryable() {
                 return true;
@@ -2118,6 +2265,12 @@ public sealed class WhatsAppMessageException extends WhatsAppException
                 return devices;
             }
 
+            /**
+             * Returns whether this send failure is retryable.
+             *
+             * @return {@code true}; accepting the new identity keys and refreshing
+             *         sessions allows the send to proceed (subject to user confirmation)
+             */
             @Override
             public boolean isRetryable() {
                 return true;
@@ -2246,6 +2399,15 @@ public sealed class WhatsAppMessageException extends WhatsAppException
                 return errorDescription;
             }
 
+            /**
+             * Returns whether this send failure is retryable based on the NACK error code.
+             *
+             * <p>Only a whitelisted subset of server NACK codes is retryable:
+             * stale group addressing, stale Signal counter, and generic unhandled
+             * server errors. All other codes indicate permanent rejections.
+             *
+             * @return {@code true} if the error code is recoverable, {@code false} otherwise
+             */
             @Override
             public boolean isRetryable() {
                 return switch (errorCode) {
@@ -2307,6 +2469,11 @@ public sealed class WhatsAppMessageException extends WhatsAppException
                 return reason;
             }
 
+            /**
+             * Returns whether this send failure is retryable.
+             *
+             * @return {@code false}; the recipient is permanently unreachable by this client
+             */
             @Override
             public boolean isRetryable() {
                 return false;
@@ -2360,6 +2527,11 @@ public sealed class WhatsAppMessageException extends WhatsAppException
                 return maxSize;
             }
 
+            /**
+             * Returns whether this send failure is retryable.
+             *
+             * @return {@code false}; the payload must be reduced before it can be sent
+             */
             @Override
             public boolean isRetryable() {
                 return false;
@@ -2390,6 +2562,12 @@ public sealed class WhatsAppMessageException extends WhatsAppException
                 super("Message " + messageId + " expired before delivery");
             }
 
+            /**
+             * Returns whether this send failure is retryable.
+             *
+             * @return {@code false}; expired messages cannot be delivered and must
+             *         be re-composed with a fresh identifier
+             */
             @Override
             public boolean isRetryable() {
                 return false;
@@ -2410,6 +2588,11 @@ public sealed class WhatsAppMessageException extends WhatsAppException
                 super("Monthly new chat message limit reached");
             }
 
+            /**
+             * Returns whether this send failure is retryable.
+             *
+             * @return {@code false}; the user must wait until the monthly cap resets
+             */
             @Override
             public boolean isRetryable() {
                 return false;
@@ -2435,6 +2618,11 @@ public sealed class WhatsAppMessageException extends WhatsAppException
                 super("Message send timed out");
             }
 
+            /**
+             * Returns whether this send failure is retryable.
+             *
+             * @return {@code true}; transient timeouts can be retried after backoff
+             */
             @Override
             public boolean isRetryable() {
                 return true;
@@ -2474,6 +2662,11 @@ public sealed class WhatsAppMessageException extends WhatsAppException
                 super(message, cause);
             }
 
+            /**
+             * Returns whether this send failure is retryable.
+             *
+             * @return {@code false}; unknown failures should not be retried blindly
+             */
             @Override
             public boolean isRetryable() {
                 return false;
@@ -2514,6 +2707,11 @@ public sealed class WhatsAppMessageException extends WhatsAppException
                 return messageId;
             }
 
+            /**
+             * Returns whether this send failure is retryable.
+             *
+             * @return {@code false}; duplicate sends must not be retried
+             */
             @Override
             public boolean isRetryable() {
                 return false;
@@ -2546,6 +2744,11 @@ public sealed class WhatsAppMessageException extends WhatsAppException
                 super(message);
             }
 
+            /**
+             * Returns whether this send failure is retryable.
+             *
+             * @return {@code false}; permission errors cannot be recovered by retrying
+             */
             @Override
             public boolean isRetryable() {
                 return false;

@@ -5,6 +5,9 @@ import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.device.timestamp.DeviceExpectedTsUtils;
 import com.github.auties00.cobalt.exception.WhatsAppAdvCheckException;
 import com.github.auties00.cobalt.exception.WhatsAppOwnDeviceListExpiredException;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.device.info.DeviceList;
 import com.github.auties00.cobalt.model.device.info.DeviceListBuilder;
 import com.github.auties00.cobalt.model.device.sync.PendingDeviceSync;
@@ -22,12 +25,22 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Schedules periodic ADV device info checks to prevent device list expiration.
+ * Schedules the recurring ADV (Account Device Verification) device info check that
+ * keeps cached device lists fresh.
  *
- * <p>Runs every 24 hours to check device list timestamps and expectedTs-based staleness.
- * On each run, device lists that have expired are cleaned up (Signal sessions removed,
- * group sender keys rotated, record marked deleted), and users approaching expiration
- * are queued for proactive device sync.
+ * <p>Once every 24 hours this checker walks all cached device lists and decides
+ * which are expired (based on their timestamp, the expected-timestamp tracking
+ * fields, and the age of the last check) and which are merely approaching
+ * expiration. Expired records have their Signal sessions torn down, group sender
+ * keys rotated, and the record itself marked deleted; both expired and
+ * close-to-expiration records are queued for a proactive device sync so that
+ * message sends made after them use an up-to-date view of the recipient's
+ * companion devices. If the user's own device list expires and the corresponding
+ * AB prop is on, the client logs out to avoid sending with a stale view of its
+ * own devices.
+ *
+ * <p>Started by {@link DeviceService#startAdvCheckScheduler()} and stopped via
+ * {@link DeviceService#stopAdvCheckScheduler()}.
  *
  * @apiNote WAWebAdvDeviceInfoCheckJob: manages automated periodic verification and
  * expiration of device information lists for Advanced Device Verification.
@@ -36,11 +49,10 @@ import java.util.concurrent.TimeUnit;
  * Cobalt inlines the bridge logic and uses {@code ScheduledExecutorService} with
  * virtual threads instead.
  */
+@WhatsAppWebModule(moduleName = "WAWebAdvDeviceInfoCheckJob")
 public final class DeviceADVChecker implements AutoCloseable {
     /**
-     * Logger for ADV device info check operations.
-     *
-     * @implNote NO_WA_BASIS: Java logging infrastructure.
+     * Logger for ADV device info check diagnostics.
      */
     private static final System.Logger LOGGER = System.getLogger(DeviceADVChecker.class.getName());
 
@@ -55,6 +67,9 @@ public final class DeviceADVChecker implements AutoCloseable {
      * WA Web uses {@code DAY_SECONDS} as the base interval for recursive
      * scheduling; Cobalt uses {@code scheduleWithFixedDelay} with 24 hours.
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvDeviceInfoCheckJob",
+            exports = "scheduleAdvDeviceInfoCheck",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private static final Duration CHECK_INTERVAL = Duration.ofHours(24);
 
     /**
@@ -102,6 +117,9 @@ public final class DeviceADVChecker implements AutoCloseable {
      * @param deviceService the device service for sync operations
      * @param abPropsService the AB props service for thresholds
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvDeviceInfoCheckJob",
+            exports = "runAdvDeviceInfoCheck",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public DeviceADVChecker(WhatsAppClient client, DeviceService deviceService, ABPropsService abPropsService) {
         this.client = client;
         this.deviceService = deviceService;
@@ -121,6 +139,9 @@ public final class DeviceADVChecker implements AutoCloseable {
      * {@code max(DAY_SECONDS - (now - lastCheck), 0)}, and schedules the callback
      * which runs the check, records the timestamp, and recursively reschedules.
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvDeviceInfoCheckJob",
+            exports = "scheduleAdvDeviceInfoCheck",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public void start() {
         if (scheduler == null || scheduler.isShutdown()) {
             synchronized (this) {
@@ -156,6 +177,9 @@ public final class DeviceADVChecker implements AutoCloseable {
      * {@code t == null}, delay is 0 and action is a no-op.
      * @return the computed initial delay
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvDeviceInfoCheckJob",
+            exports = "scheduleAdvDeviceInfoCheck",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private Duration computeInitialDelay() {
         var lastCheck = deviceService.lastAdvCheckTime();
         if (lastCheck.isEmpty()) {
@@ -191,6 +215,9 @@ public final class DeviceADVChecker implements AutoCloseable {
      * {@code sendADVStoredTimestampExpiredEvents} (WAM, skipped),
      * and {@code sendOrQueueDeviceUsyncQuery}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvDeviceInfoCheckJob",
+            exports = "runAdvDeviceInfoCheck",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private void performCheck() {
         var lastCheck = deviceService.lastAdvCheckTime();
         if (lastCheck.isEmpty()) {
@@ -279,6 +306,9 @@ public final class DeviceADVChecker implements AutoCloseable {
      * @param myUserJid        the current user's JID, or {@code null}
      * @return the analysis result containing expired lists and JIDs needing sync
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvDeviceInfoCheckJob",
+            exports = "runAdvDeviceInfoCheck",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private AnalysisResult analyzeDeviceLists(
             Iterable<DeviceList> deviceLists,
             Instant now,
@@ -329,6 +359,9 @@ public final class DeviceADVChecker implements AutoCloseable {
      * @param deviceList the device list to check
      * @return {@code true} if the list contains only the primary device
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvDeviceInfoCheckJob",
+            exports = "runAdvDeviceInfoCheck",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private boolean isPrimaryOnly(DeviceList deviceList) {
         var devices = deviceList.devices();
         return devices.size() == 1 && devices.getFirst().isPrimary();
@@ -341,6 +374,9 @@ public final class DeviceADVChecker implements AutoCloseable {
      * checks {@code WAWebABProps.getABPropConfigValue("web_adv_logout_on_self_device_list_expired")}
      * @return {@code true} if the AB prop indicates logout on self device list expiration
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvDeviceInfoCheckJob",
+            exports = "runAdvDeviceInfoCheck",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private boolean shouldLogoutOnSelfExpired() {
         return abPropsService.getBool(ABProp.WEB_ADV_LOGOUT_ON_SELF_DEVICE_LIST_EXPIRED);
     }

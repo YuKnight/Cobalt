@@ -5,17 +5,21 @@ import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.SyncActionArgs;
 
 /**
- * Index arguments for {@link PnForLidChatAction}.
+ * Index arguments for a {@link PnForLidChatAction}.
  *
- * <p>The sync index produced is {@code ["pnForLidChat", chatJid]}.
+ * <p>The mapping is keyed by the LID chat JID, so the sync index is built
+ * from the canonical action name followed by the chat JID.
  *
- * @param chatJid the JID of the chat whose phone-number-for-LID mapping is being synced
+ * <p>The encoded index is {@code ["pnForLidChat", chatJid]}.
+ *
+ * @param chatJid the {@link Jid} of the LID chat whose phone-number
+ *                association is being synced
  */
 public record PnForLidChatActionArgs(Jid chatJid) implements SyncActionArgs {
     /**
-     * {@inheritDoc}
+     * Converts this record into the tail portion of the sync index array.
      *
-     * @return a single-element array containing the chat JID string
+     * @return a single-element array containing the chat JID as a string
      */
     @Override
     public String[] toIndexArgs() {

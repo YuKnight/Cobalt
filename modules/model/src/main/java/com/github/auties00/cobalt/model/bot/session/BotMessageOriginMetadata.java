@@ -8,14 +8,15 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * A container for the list of origins that describe how a bot message was
+ * Container for the list of origins that describe how a bot message was
  * initiated on WhatsApp.
  *
- * <p>A single bot message may be attributed to multiple origination sources.
- * This metadata wraps a list of {@link BotMessageOrigin} entries, each
- * identifying one such source.
+ * <p>A single bot message may be attributed to multiple origination sources
+ * (for example, if a proactive AI message was triggered by multiple signals).
+ * This metadata wraps a repeated list of {@link BotMessageOrigin} entries,
+ * each identifying one such source.
  *
- * <p>This metadata is attached to a bot message via
+ * <p>This metadata is carried inside
  * {@link com.github.auties00.cobalt.model.bot.BotMetadata#botMessageOriginMetadata()}.
  */
 @ProtobufMessage(name = "BotMessageOriginMetadata")

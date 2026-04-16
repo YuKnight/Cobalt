@@ -1,6 +1,9 @@
 package com.github.auties00.cobalt.message.send.stanza;
 
 import com.github.auties00.cobalt.message.send.token.ReportingToken;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.Message;
@@ -40,6 +43,9 @@ import java.util.Objects;
  * WAWebMessagePluginGenerateReportingTokenContent.isMsgTypeReportingTokenCompatible:
  * excludes reactions, encrypted reactions, event responses, and poll votes.
  */
+@WhatsAppWebModule(moduleName = "WAWebReportingTokenUtils")
+@WhatsAppWebModule(moduleName = "WAWebMessagingGatingUtils")
+@WhatsAppWebModule(moduleName = "WAWebMessagePluginGenerateReportingTokenContent")
 public final class ReportingStanza {
     /**
      * Logger for reporting token generation failures.
@@ -68,6 +74,8 @@ public final class ReportingStanza {
      * use {@code WAWebMessagingGatingUtils} which reads AB props;
      * Cobalt injects the AB props service via constructor.
      */
+    @WhatsAppWebExport(moduleName = "WAWebReportingTokenUtils", exports = "genReportingTokenBody",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public ReportingStanza(ABPropsService abPropsService) {
         this.abPropsService = Objects.requireNonNull(abPropsService, "abPropsService");
     }
@@ -89,6 +97,8 @@ public final class ReportingStanza {
      * WAWebReportingTokenUtils.genReportingTokenBodyForStanza: delegates
      * to {@code genReportingTokenBody} for non-history-bundle messages.
      */
+    @WhatsAppWebExport(moduleName = "WAWebReportingTokenUtils", exports = "genReportingTokenBody",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public Node build(ChatMessageInfo messageInfo, Jid selfJid, Jid remoteJid) {
         // WAWebMessagingGatingUtils.isReportingTokenSendingEnabled:
         // rt_sender_reporting_token_version > 0
@@ -162,6 +172,8 @@ public final class ReportingStanza {
      * @implNote WAWebMessagePluginGenerateReportingTokenContent.isMsgTypeReportingTokenCompatible:
      * returns {@code false} for REACTION, REACTION_ENC, EVENT_RESPONSE, POLL_UPDATE.
      */
+    @WhatsAppWebExport(moduleName = "WAWebMessagePluginGenerateReportingTokenContent",
+            exports = "isMsgTypeReportingTokenCompatible", adaptation = WhatsAppAdaptation.DIRECT)
     private static boolean isMsgTypeCompatible(Message message) {
         return switch (message) {
             case ReactionMessage _, PollUpdateMessage _, EncReactionMessage _, EncEventResponseMessage _ -> false;

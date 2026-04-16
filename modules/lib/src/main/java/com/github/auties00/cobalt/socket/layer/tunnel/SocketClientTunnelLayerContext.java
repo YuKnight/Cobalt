@@ -12,7 +12,7 @@ import com.github.auties00.cobalt.socket.threading.SocketClientPendingRead;
  * upgrade, etc.).  After the connection transitions to asynchronous mode,
  * it becomes a pure passthrough to the next layer above.
  */
-public non-sealed interface SocketClientTunnelLayerContext extends SocketClientLayerContext {
+public interface SocketClientTunnelLayerContext extends SocketClientLayerContext {
     /**
      * Sets the pending binary read request.
      *

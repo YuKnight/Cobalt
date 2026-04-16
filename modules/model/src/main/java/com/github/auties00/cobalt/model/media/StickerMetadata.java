@@ -9,53 +9,50 @@ import java.util.OptionalInt;
 import java.util.OptionalLong;
 
 /**
- * The metadata associated with a sticker that is synchronized as part of the
- * history sync process.
+ * Metadata describing a single sticker as synchronized across a user's
+ * companion devices.
  *
- * <p>This message is defined in {@code WAWebProtobufsHistorySync.pb} and
- * contains all the information required to reconstruct a sticker on a
- * companion device: the CDN location of the encrypted file (via {@code url}
- * and {@code directPath}), the cryptographic material needed for decryption
- * and integrity verification ({@code mediaKey}, {@code fileSha256},
- * {@code fileEncSha256}), visual dimensions ({@code height}, {@code width}),
- * and behavioral flags ({@code isLottie}, {@code isAvatarSticker}).
+ * <p>When a user adds a sticker to their collection on one device, the sticker
+ * must be made available on every companion device that shares the account.
+ * This type carries everything a companion needs to reconstruct the sticker:
+ * the CDN location of the encrypted image ({@link #url()} and
+ * {@link #directPath()}), the cryptographic material for decryption and
+ * integrity checks ({@link #mediaKey()}, {@link #fileSha256()},
+ * {@link #fileEncSha256()}), the visual dimensions, and flags describing the
+ * sticker kind (animated Lottie, personalized avatar sticker).
  *
- * <p>The {@code weight} field is used by the client for sorting and ranking
- * stickers in the sticker picker, and the {@code lastStickerSentTs} timestamp
- * records when the sticker was last sent, enabling recency-based ordering.
+ * <p>The {@link #weight()} value and {@link #lastStickerSentTs()} timestamp are
+ * used by the sticker picker UI to order stickers by recency and user affinity.
  */
 @ProtobufMessage(name = "StickerMetadata")
 public final class StickerMetadata {
     /**
-     * The CDN URL from which the encrypted sticker file can be downloaded.
+     * The CDN URL at which the encrypted sticker can be downloaded.
      */
     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
     String url;
 
     /**
-     * The SHA-256 digest of the plaintext (decrypted) sticker file, used
-     * for integrity verification after decryption.
+     * The SHA-256 digest of the plaintext sticker file.
      */
     @ProtobufProperty(index = 2, type = ProtobufType.BYTES)
     byte[] fileSha256;
 
     /**
-     * The SHA-256 digest of the encrypted sticker file, used for integrity
-     * verification before decryption.
+     * The SHA-256 digest of the encrypted sticker file.
      */
     @ProtobufProperty(index = 3, type = ProtobufType.BYTES)
     byte[] fileEncSha256;
 
     /**
-     * The symmetric encryption key used to decrypt the sticker file.
+     * The symmetric key used to decrypt the sticker file.
      */
     @ProtobufProperty(index = 4, type = ProtobufType.BYTES)
     byte[] mediaKey;
 
     /**
      * The MIME type of the sticker file, typically {@code "image/webp"} for
-     * static stickers or {@code "image/webp"} with Lottie animation data
-     * for animated stickers.
+     * both static and animated stickers.
      */
     @ProtobufProperty(index = 5, type = ProtobufType.STRING)
     String mimetype;
@@ -73,41 +70,40 @@ public final class StickerMetadata {
     Integer width;
 
     /**
-     * The CDN direct path from which the encrypted sticker file can be fetched.
+     * The CDN direct path at which the encrypted sticker file can be fetched.
      */
     @ProtobufProperty(index = 8, type = ProtobufType.STRING)
     String directPath;
 
     /**
-     * The total length of the sticker file in bytes.
+     * The size of the sticker file in bytes.
      */
     @ProtobufProperty(index = 9, type = ProtobufType.UINT64)
     Long fileLength;
 
     /**
-     * A floating-point weight used by the client for ranking and sorting
-     * stickers in the sticker picker.
+     * A ranking weight used by the sticker picker for ordering stickers.
+     * Higher values indicate stickers the user interacts with more often.
      */
     @ProtobufProperty(index = 10, type = ProtobufType.FLOAT)
     Float weight;
 
     /**
-     * The epoch-second timestamp of when this sticker was last sent by the
-     * user, used for recency-based sorting in the sticker picker.
+     * The epoch-second timestamp of when the user last sent this sticker.
      */
     @ProtobufProperty(index = 11, type = ProtobufType.INT64)
     Long lastStickerSentTs;
 
     /**
-     * Whether this sticker uses the Lottie animation format rather than
-     * a static WebP image.
+     * Whether this sticker is animated using the Lottie format rather than a
+     * static WebP image.
      */
     @ProtobufProperty(index = 12, type = ProtobufType.BOOL)
     Boolean isLottie;
 
     /**
-     * A perceptual hash of the sticker image, used for deduplication and
-     * similarity matching.
+     * A perceptual hash of the sticker image used to identify duplicates and
+     * near-duplicates.
      */
     @ProtobufProperty(index = 13, type = ProtobufType.STRING)
     String imageHash;
@@ -120,17 +116,17 @@ public final class StickerMetadata {
     Boolean isAvatarSticker;
 
     /**
-     * Constructs a new {@code StickerMetadata} with the given field values.
+     * Constructs a new {@code StickerMetadata} with the given fields.
      *
-     * @param url               the CDN URL for the sticker file
-     * @param fileSha256        the SHA-256 digest of the plaintext file
-     * @param fileEncSha256     the SHA-256 digest of the encrypted file
-     * @param mediaKey          the symmetric encryption key
-     * @param mimetype          the MIME type of the sticker
+     * @param url               the CDN URL
+     * @param fileSha256        the plaintext hash bytes
+     * @param fileEncSha256     the encrypted hash bytes
+     * @param mediaKey          the encryption key
+     * @param mimetype          the MIME type
      * @param height            the image height in pixels
      * @param width             the image width in pixels
      * @param directPath        the CDN direct path
-     * @param fileLength        the file length in bytes
+     * @param fileLength        the file size in bytes
      * @param weight            the ranking weight
      * @param lastStickerSentTs the epoch-second timestamp of last send
      * @param isLottie          whether the sticker uses Lottie animation
@@ -155,7 +151,7 @@ public final class StickerMetadata {
     }
 
     /**
-     * Returns the CDN URL from which the encrypted sticker file can be downloaded.
+     * Returns the CDN URL at which the encrypted sticker can be downloaded.
      *
      * @return an {@link Optional} containing the URL, or empty if not set
      */
@@ -166,7 +162,7 @@ public final class StickerMetadata {
     /**
      * Returns the SHA-256 digest of the plaintext sticker file.
      *
-     * @return an {@link Optional} containing the SHA-256 hash, or empty if not set
+     * @return an {@link Optional} containing the hash bytes, or empty if not set
      */
     public Optional<byte[]> fileSha256() {
         return Optional.ofNullable(fileSha256);
@@ -175,14 +171,14 @@ public final class StickerMetadata {
     /**
      * Returns the SHA-256 digest of the encrypted sticker file.
      *
-     * @return an {@link Optional} containing the encrypted SHA-256 hash, or empty if not set
+     * @return an {@link Optional} containing the hash bytes, or empty if not set
      */
     public Optional<byte[]> fileEncSha256() {
         return Optional.ofNullable(fileEncSha256);
     }
 
     /**
-     * Returns the symmetric encryption key used to decrypt the sticker file.
+     * Returns the symmetric key used to decrypt the sticker file.
      *
      * @return an {@link Optional} containing the media key, or empty if not set
      */
@@ -218,8 +214,8 @@ public final class StickerMetadata {
     }
 
     /**
-     * Returns the CDN direct path from which the encrypted sticker file can
-     * be fetched.
+     * Returns the CDN direct path at which the encrypted sticker file can be
+     * fetched.
      *
      * @return an {@link Optional} containing the direct path, or empty if not set
      */
@@ -228,7 +224,7 @@ public final class StickerMetadata {
     }
 
     /**
-     * Returns the total length of the sticker file in bytes.
+     * Returns the size of the sticker file in bytes.
      *
      * @return an {@link OptionalLong} containing the file length, or empty if not set
      */
@@ -237,7 +233,7 @@ public final class StickerMetadata {
     }
 
     /**
-     * Returns the ranking weight used for sorting stickers.
+     * Returns the ranking weight used by the sticker picker.
      *
      * @return an {@link OptionalDouble} containing the weight, or empty if not set
      */
@@ -246,20 +242,19 @@ public final class StickerMetadata {
     }
 
     /**
-     * Returns the timestamp of when this sticker was last sent as an
-     * {@link Instant}.
+     * Returns the timestamp of when the user last sent this sticker.
      *
-     * @return an {@link Optional} containing the last-sent instant, or empty if not set
+     * @return an {@link Optional} containing the instant, or empty if not set
      */
     public Optional<Instant> lastStickerSentTs() {
         return lastStickerSentTs == null ? Optional.empty() : Optional.of(Instant.ofEpochSecond(lastStickerSentTs));
     }
 
     /**
-     * Returns whether this sticker uses the Lottie animation format.
+     * Returns whether the sticker is animated using the Lottie format.
      *
-     * @return {@code true} if the sticker is animated with Lottie,
-     *         {@code false} otherwise or if not set
+     * @return {@code true} if the sticker is a Lottie animation, {@code false}
+     *         otherwise or if not set
      */
     public boolean isLottie() {
         return isLottie != null && isLottie;
@@ -296,7 +291,7 @@ public final class StickerMetadata {
     /**
      * Sets the SHA-256 digest of the plaintext sticker file.
      *
-     * @param fileSha256 the plaintext SHA-256 hash
+     * @param fileSha256 the plaintext hash bytes
      */
     public void setFileSha256(byte[] fileSha256) {
         this.fileSha256 = fileSha256;
@@ -305,14 +300,14 @@ public final class StickerMetadata {
     /**
      * Sets the SHA-256 digest of the encrypted sticker file.
      *
-     * @param fileEncSha256 the encrypted SHA-256 hash
+     * @param fileEncSha256 the encrypted hash bytes
      */
     public void setFileEncSha256(byte[] fileEncSha256) {
         this.fileEncSha256 = fileEncSha256;
     }
 
     /**
-     * Sets the symmetric encryption key for the sticker file.
+     * Sets the symmetric key for decrypting the sticker file.
      *
      * @param mediaKey the encryption key
      */
@@ -357,7 +352,7 @@ public final class StickerMetadata {
     }
 
     /**
-     * Sets the total file length in bytes.
+     * Sets the size of the sticker file in bytes.
      *
      * @param fileLength the file length
      */
@@ -366,7 +361,7 @@ public final class StickerMetadata {
     }
 
     /**
-     * Sets the ranking weight for sticker sorting.
+     * Sets the ranking weight used by the sticker picker.
      *
      * @param weight the ranking weight
      */
@@ -375,16 +370,16 @@ public final class StickerMetadata {
     }
 
     /**
-     * Sets the timestamp of when this sticker was last sent.
+     * Sets the timestamp of when the user last sent this sticker.
      *
-     * @param lastStickerSentTs the last-sent instant, or {@code null} to clear
+     * @param lastStickerSentTs the instant, or {@code null} to clear
      */
     public void setLastStickerSentTs(Instant lastStickerSentTs) {
         this.lastStickerSentTs = lastStickerSentTs == null ? null : lastStickerSentTs.getEpochSecond();
     }
 
     /**
-     * Sets whether this sticker uses the Lottie animation format.
+     * Sets whether this sticker is animated using the Lottie format.
      *
      * @param isLottie {@code true} for Lottie animated stickers
      */

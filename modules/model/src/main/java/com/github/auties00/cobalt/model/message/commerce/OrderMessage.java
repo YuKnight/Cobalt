@@ -11,54 +11,145 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
 
+/**
+ * A message describing a customer order placed against a WhatsApp
+ * Business catalog.
+ *
+ * <p>Order messages are produced when a customer submits an order inquiry
+ * from a business's catalog, and again when the business accepts or
+ * declines the request. Each message carries the order identifier, a
+ * thumbnail preview, the number of items, the current {@link OrderStatus}
+ * of the order, the surface (e.g. catalog) where it was created, the
+ * seller's JID, a monetary total expressed in thousandths of the unit of
+ * the given currency, a payment token, and a {@link MessageKey} pointing
+ * back to the original order request message.
+ */
 @ProtobufMessage(name = "Message.OrderMessage")
 public final class OrderMessage implements ContextualMessage {
+    /**
+     * The server-issued identifier of this order.
+     */
     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
     String orderId;
 
+    /**
+     * A thumbnail preview of the order, typically showing the first
+     * ordered product.
+     */
     @ProtobufProperty(index = 2, type = ProtobufType.BYTES)
     byte[] thumbnail;
 
+    /**
+     * The number of distinct items included in the order.
+     */
     @ProtobufProperty(index = 3, type = ProtobufType.INT32)
     Integer itemCount;
 
+    /**
+     * The current lifecycle status of the order.
+     */
     @ProtobufProperty(index = 4, type = ProtobufType.ENUM)
     OrderStatus status;
 
+    /**
+     * Declares the surface of the business account that produced the order.
+     */
     @ProtobufProperty(index = 5, type = ProtobufType.ENUM)
     OrderSurface surface;
 
+    /**
+     * An optional free-text message accompanying the order.
+     */
     @ProtobufProperty(index = 6, type = ProtobufType.STRING)
     String message;
 
+    /**
+     * The human-readable title of the order, typically the name of the
+     * catalog or the lead product.
+     */
     @ProtobufProperty(index = 7, type = ProtobufType.STRING)
     String orderTitle;
 
+    /**
+     * The JID of the business account that owns the catalog from which
+     * the order was placed.
+     */
     @ProtobufProperty(index = 8, type = ProtobufType.STRING)
     Jid sellerJid;
 
+    /**
+     * The server-issued token used to correlate the order with the
+     * downstream payment flow.
+     */
     @ProtobufProperty(index = 9, type = ProtobufType.STRING)
     String token;
 
+    /**
+     * The total price of the order expressed in thousandths of the
+     * currency unit declared in {@link #totalCurrencyCode}.
+     *
+     * <p>For example, a value of {@code 12345} in {@code USD} represents
+     * {@code 12.345} US dollars.
+     */
     @ProtobufProperty(index = 10, type = ProtobufType.INT64)
     Long totalAmount1000;
 
+    /**
+     * The ISO 4217 currency code used to interpret {@link #totalAmount1000}.
+     */
     @ProtobufProperty(index = 11, type = ProtobufType.STRING)
     String totalCurrencyCode;
 
+    /**
+     * Contextual metadata attached to this message.
+     */
     @ProtobufProperty(index = 17, type = ProtobufType.MESSAGE)
     ContextInfo contextInfo;
 
+    /**
+     * The version of the order message format, used by clients to handle
+     * backward-compatible changes to the payload.
+     */
     @ProtobufProperty(index = 12, type = ProtobufType.INT32)
     Integer messageVersion;
 
+    /**
+     * The key of the original order request message that this order
+     * responds to, allowing buyers and sellers to correlate the full
+     * order conversation.
+     */
     @ProtobufProperty(index = 13, type = ProtobufType.MESSAGE)
     MessageKey orderRequestMessageId;
 
+    /**
+     * The type of catalog the order was placed from.
+     */
     @ProtobufProperty(index = 15, type = ProtobufType.STRING)
     String catalogType;
 
 
+    /**
+     * Constructs a new order message with every field set explicitly.
+     *
+     * <p>This constructor is package-private; callers should use the
+     * generated {@code OrderMessageBuilder} to create instances.
+     *
+     * @param orderId the server-issued order identifier
+     * @param thumbnail the preview thumbnail bytes
+     * @param itemCount the number of items in the order
+     * @param status the current lifecycle status of the order
+     * @param surface the originating surface of the order
+     * @param message a free-text message accompanying the order
+     * @param orderTitle the human-readable title of the order
+     * @param sellerJid the JID of the selling business
+     * @param token the payment correlation token
+     * @param totalAmount1000 the total price in thousandths of the currency unit
+     * @param totalCurrencyCode the ISO 4217 currency code
+     * @param contextInfo the contextual metadata of the message
+     * @param messageVersion the order message format version
+     * @param orderRequestMessageId the key of the originating order request
+     * @param catalogType the catalog type from which the order was placed
+     */
     OrderMessage(String orderId, byte[] thumbnail, Integer itemCount, OrderStatus status, OrderSurface surface, String message, String orderTitle, Jid sellerJid, String token, Long totalAmount1000, String totalCurrencyCode, ContextInfo contextInfo, Integer messageVersion, MessageKey orderRequestMessageId, String catalogType) {
         this.orderId = orderId;
         this.thumbnail = thumbnail;
@@ -77,153 +168,353 @@ public final class OrderMessage implements ContextualMessage {
         this.catalogType = catalogType;
     }
 
+    /**
+     * Returns the server-issued identifier of this order.
+     *
+     * @return an {@link Optional} containing the order identifier, or empty if not set
+     */
     public Optional<String> orderId() {
         return Optional.ofNullable(orderId);
     }
 
+    /**
+     * Returns the thumbnail preview of this order.
+     *
+     * @return an {@link Optional} containing the thumbnail bytes, or empty if not set
+     */
     public Optional<byte[]> thumbnail() {
         return Optional.ofNullable(thumbnail);
     }
 
+    /**
+     * Returns the number of distinct items included in the order.
+     *
+     * @return an {@link OptionalInt} containing the item count, or empty if not set
+     */
     public OptionalInt itemCount() {
         return itemCount == null ? OptionalInt.empty() : OptionalInt.of(itemCount);
     }
 
+    /**
+     * Returns the current lifecycle status of the order.
+     *
+     * @return an {@link Optional} containing the status, or empty if not set
+     */
     public Optional<OrderStatus> status() {
         return Optional.ofNullable(status);
     }
 
+    /**
+     * Returns the surface of the business account that produced the order.
+     *
+     * @return an {@link Optional} containing the surface, or empty if not set
+     */
     public Optional<OrderSurface> surface() {
         return Optional.ofNullable(surface);
     }
 
+    /**
+     * Returns the free-text message accompanying the order.
+     *
+     * @return an {@link Optional} containing the message text, or empty if not set
+     */
     public Optional<String> message() {
         return Optional.ofNullable(message);
     }
 
+    /**
+     * Returns the human-readable title of the order.
+     *
+     * @return an {@link Optional} containing the title, or empty if not set
+     */
     public Optional<String> orderTitle() {
         return Optional.ofNullable(orderTitle);
     }
 
+    /**
+     * Returns the JID of the business account that owns the catalog from
+     * which the order was placed.
+     *
+     * @return an {@link Optional} containing the seller JID, or empty if not set
+     */
     public Optional<Jid> sellerJid() {
         return Optional.ofNullable(sellerJid);
     }
 
+    /**
+     * Returns the payment correlation token.
+     *
+     * @return an {@link Optional} containing the token, or empty if not set
+     */
     public Optional<String> token() {
         return Optional.ofNullable(token);
     }
 
+    /**
+     * Returns the total price of the order expressed in thousandths of
+     * the currency unit declared in {@link #totalCurrencyCode()}.
+     *
+     * @return an {@link OptionalLong} containing the total in thousandths, or empty if not set
+     */
     public OptionalLong totalAmount1000() {
         return totalAmount1000 == null ? OptionalLong.empty() : OptionalLong.of(totalAmount1000);
     }
 
+    /**
+     * Returns the ISO 4217 currency code used to interpret the total
+     * amount.
+     *
+     * @return an {@link Optional} containing the currency code, or empty if not set
+     */
     public Optional<String> totalCurrencyCode() {
         return Optional.ofNullable(totalCurrencyCode);
     }
 
+    /**
+     * Returns the contextual metadata of this message.
+     *
+     * @return an {@link Optional} containing the context info, or empty if not set
+     */
     public Optional<ContextInfo> contextInfo() {
         return Optional.ofNullable(contextInfo);
     }
 
+    /**
+     * Returns the version of the order message format.
+     *
+     * @return an {@link OptionalInt} containing the message version, or empty if not set
+     */
     public OptionalInt messageVersion() {
         return messageVersion == null ? OptionalInt.empty() : OptionalInt.of(messageVersion);
     }
 
+    /**
+     * Returns the key of the original order request message that this
+     * order responds to.
+     *
+     * @return an {@link Optional} containing the request message key, or empty if not set
+     */
     public Optional<MessageKey> orderRequestMessageId() {
         return Optional.ofNullable(orderRequestMessageId);
     }
 
+    /**
+     * Returns the type of catalog the order was placed from.
+     *
+     * @return an {@link Optional} containing the catalog type, or empty if not set
+     */
     public Optional<String> catalogType() {
         return Optional.ofNullable(catalogType);
     }
 
+    /**
+     * Sets the server-issued identifier of this order.
+     *
+     * @param orderId the order identifier, or {@code null} to clear it
+     */
     public void setOrderId(String orderId) {
         this.orderId = orderId;
     }
 
+    /**
+     * Sets the thumbnail preview of this order.
+     *
+     * @param thumbnail the thumbnail bytes, or {@code null} to clear them
+     */
     public void setThumbnail(byte[] thumbnail) {
         this.thumbnail = thumbnail;
     }
 
+    /**
+     * Sets the number of items included in the order.
+     *
+     * @param itemCount the item count, or {@code null} to clear it
+     */
     public void setItemCount(Integer itemCount) {
         this.itemCount = itemCount;
     }
 
+    /**
+     * Sets the current lifecycle status of the order.
+     *
+     * @param status the status, or {@code null} to clear it
+     */
     public void setStatus(OrderStatus status) {
         this.status = status;
     }
 
+    /**
+     * Sets the surface of the business account that produced the order.
+     *
+     * @param surface the surface, or {@code null} to clear it
+     */
     public void setSurface(OrderSurface surface) {
         this.surface = surface;
     }
 
+    /**
+     * Sets the free-text message accompanying the order.
+     *
+     * @param message the message text, or {@code null} to clear it
+     */
     public void setMessage(String message) {
         this.message = message;
     }
 
+    /**
+     * Sets the human-readable title of the order.
+     *
+     * @param orderTitle the title, or {@code null} to clear it
+     */
     public void setOrderTitle(String orderTitle) {
         this.orderTitle = orderTitle;
     }
 
+    /**
+     * Sets the JID of the business account that owns the catalog.
+     *
+     * @param sellerJid the seller JID, or {@code null} to clear it
+     */
     public void setSellerJid(Jid sellerJid) {
         this.sellerJid = sellerJid;
     }
 
+    /**
+     * Sets the payment correlation token.
+     *
+     * @param token the token, or {@code null} to clear it
+     */
     public void setToken(String token) {
         this.token = token;
     }
 
+    /**
+     * Sets the total price of the order expressed in thousandths of the
+     * currency unit.
+     *
+     * @param totalAmount1000 the total in thousandths, or {@code null} to clear it
+     */
     public void setTotalAmount1000(Long totalAmount1000) {
         this.totalAmount1000 = totalAmount1000;
     }
 
+    /**
+     * Sets the ISO 4217 currency code used to interpret the total amount.
+     *
+     * @param totalCurrencyCode the currency code, or {@code null} to clear it
+     */
     public void setTotalCurrencyCode(String totalCurrencyCode) {
         this.totalCurrencyCode = totalCurrencyCode;
     }
 
+    /**
+     * Sets the contextual metadata of this message.
+     *
+     * @param contextInfo the context info, or {@code null} to clear it
+     */
     public void setContextInfo(ContextInfo contextInfo) {
         this.contextInfo = contextInfo;
     }
 
+    /**
+     * Sets the version of the order message format.
+     *
+     * @param messageVersion the message version, or {@code null} to clear it
+     */
     public void setMessageVersion(Integer messageVersion) {
         this.messageVersion = messageVersion;
     }
 
+    /**
+     * Sets the key of the original order request message.
+     *
+     * @param orderRequestMessageId the request message key, or {@code null} to clear it
+     */
     public void setOrderRequestMessageId(MessageKey orderRequestMessageId) {
         this.orderRequestMessageId = orderRequestMessageId;
     }
 
+    /**
+     * Sets the type of catalog the order was placed from.
+     *
+     * @param catalogType the catalog type, or {@code null} to clear it
+     */
     public void setCatalogType(String catalogType) {
         this.catalogType = catalogType;
     }
 
+    /**
+     * Declares the lifecycle state of an {@link OrderMessage}.
+     */
     @ProtobufEnum(name = "Message.OrderMessage.OrderStatus")
     public static enum OrderStatus {
+        /**
+         * The customer has submitted an order inquiry and is awaiting a
+         * response from the seller.
+         */
         INQUIRY(1),
+        /**
+         * The seller has accepted the order.
+         */
         ACCEPTED(2),
+        /**
+         * The seller has declined the order.
+         */
         DECLINED(3);
 
+        /**
+         * Constructs an order status with the given protobuf wire index.
+         *
+         * @param index the protobuf wire index
+         */
         OrderStatus(@ProtobufEnumIndex int index) {
             this.index = index;
         }
 
+        /**
+         * The protobuf wire index of this enum constant.
+         */
         final int index;
 
+        /**
+         * Returns the protobuf wire index of this enum constant.
+         *
+         * @return the protobuf wire index
+         */
         public int index() {
             return this.index;
         }
     }
 
+    /**
+     * Declares the surface from which an {@link OrderMessage} originates.
+     */
     @ProtobufEnum(name = "Message.OrderMessage.OrderSurface")
     public static enum OrderSurface {
+        /**
+         * The order was placed from a WhatsApp Business catalog.
+         */
         CATALOG(1);
 
+        /**
+         * Constructs an order surface with the given protobuf wire index.
+         *
+         * @param index the protobuf wire index
+         */
         OrderSurface(@ProtobufEnumIndex int index) {
             this.index = index;
         }
 
+        /**
+         * The protobuf wire index of this enum constant.
+         */
         final int index;
 
+        /**
+         * Returns the protobuf wire index of this enum constant.
+         *
+         * @return the protobuf wire index
+         */
         public int index() {
             return this.index;
         }

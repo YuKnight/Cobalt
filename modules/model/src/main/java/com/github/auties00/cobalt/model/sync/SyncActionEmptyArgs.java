@@ -1,27 +1,34 @@
 package com.github.auties00.cobalt.model.sync;
 
 /**
- * An arguments variant carrying no additional index parameters.
+ * Shared arguments carrier used by sync actions that require no trailing
+ * index arguments.
  *
- * <p>Used by actions whose index is simply {@code ["actionName"]}.
+ * <p>Used for actions whose encoded index is simply
+ * {@code ["actionName"]} with no additional parameters (for example, global
+ * settings whose key is identified purely by the action name). A single
+ * shared instance is exposed via {@link SyncActionArgs#empty()}.
  */
 public final class SyncActionEmptyArgs implements SyncActionArgs {
     /**
-     * A shared singleton instance, since no state is carried.
+     * The shared singleton instance, reused by all actions that have no
+     * trailing index arguments.
      */
     static final SyncActionEmptyArgs INSTANCE = new SyncActionEmptyArgs();
 
     /**
-     * Constructs a new {@code EmptyArgs} instance.
+     * Private constructor preventing additional instantiation; callers use
+     * {@link SyncActionArgs#empty()} to obtain the shared instance.
      */
     private SyncActionEmptyArgs() {
 
     }
 
     /**
-     * {@inheritDoc}
+     * Returns an empty array because this carrier contributes no trailing
+     * arguments to the encoded index.
      *
-     * @return an empty array
+     * @return a zero length string array
      */
     @Override
     public String[] toIndexArgs() {

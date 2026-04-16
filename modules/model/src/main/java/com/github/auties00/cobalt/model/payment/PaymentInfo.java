@@ -13,25 +13,23 @@ import java.util.Optional;
 import java.util.OptionalLong;
 
 /**
- * Metadata describing the state and financial details of an in-app payment transaction
- * attached to a {@code WebMessageInfo}.
+ * Metadata describing the state and financial details of an in-app payment
+ * transaction attached to a chat message.
  *
- * <p>A {@code PaymentInfo} instance is present on every message that participates in the
- * WhatsApp Payments lifecycle, including payment requests, sent payments, and
- * server-side payment notification stubs. It carries the monetary amount in thousandths
- * of the major currency unit, the JID of the payment receiver, the high-level
- * {@link Status} visible to users, and the fine-grained {@link TxnStatus} that tracks
- * the internal transaction state machine.
+ * <p>A {@code PaymentInfo} instance is present on every message that participates in
+ * the payments lifecycle, including payment requests, sent payments, and server-side
+ * payment notification stubs. It carries the monetary amount in thousandths of the
+ * major currency unit, the JID of the payment receiver, the high-level
+ * {@link Status} visible to users, and the fine-grained {@link TxnStatus} that
+ * tracks the internal transaction state machine.
  *
- * <p>The {@link #currencyDeprecated() currencyDeprecated} field is an older enum-based
- * currency identifier that has been superseded by the string-based
+ * <p>The {@link #currencyDeprecated() currencyDeprecated} field is an older
+ * enum-based currency identifier that has been superseded by the string-based
  * {@link #currency() currency} field, which carries a standard ISO 4217 code. The
  * structured {@link Money} fields {@link #primaryAmount() primaryAmount} and
  * {@link #exchangeAmount() exchangeAmount} were introduced alongside the Novi
- * cryptocurrency wallet integration and provide explicit value-plus-offset semantics.
- *
- * <p>This model mirrors the {@code PaymentInfo} protobuf message defined in the
- * WhatsApp Web protocol.
+ * cryptocurrency wallet integration and provide explicit value-plus-offset
+ * semantics.
  */
 @ProtobufMessage(name = "PaymentInfo")
 public final class PaymentInfo {
@@ -83,9 +81,10 @@ public final class PaymentInfo {
     Long expiryTimestamp;
 
     /**
-     * Whether this payment message uses a future-proofed format that the current
-     * client version cannot fully render. When {@code true}, the client displays the
-     * message as a "phone only" feature prompt.
+     * Whether this payment message uses a future-proofed format that older client
+     * versions cannot fully render. When {@code true}, compatible clients may
+     * display the message as a placeholder prompting the user to open the app on
+     * their phone to see the full content.
      */
     @ProtobufProperty(index = 8, type = ProtobufType.BOOL)
     Boolean futureproofed;
@@ -293,7 +292,6 @@ public final class PaymentInfo {
      * Sets the deprecated enum-based currency identifier.
      *
      * @param currencyDeprecated the currency enum value
-     * @return this instance
      */
     public void setCurrencyDeprecated(Currency currencyDeprecated) {
         this.currencyDeprecated = currencyDeprecated;
@@ -303,7 +301,6 @@ public final class PaymentInfo {
      * Sets the payment amount in thousandths of the major currency unit.
      *
      * @param amount1000 the amount
-     * @return this instance
      */
     public void setAmount1000(Long amount1000) {
         this.amount1000 = amount1000;
@@ -313,7 +310,6 @@ public final class PaymentInfo {
      * Sets the JID of the payment receiver.
      *
      * @param receiverJid the receiver JID
-     * @return this instance
      */
     public void setReceiverJid(Jid receiverJid) {
         this.receiverJid = receiverJid;
@@ -323,7 +319,6 @@ public final class PaymentInfo {
      * Sets the high-level payment status.
      *
      * @param status the payment status
-     * @return this instance
      */
     public void setStatus(Status status) {
         this.status = status;
@@ -333,7 +328,6 @@ public final class PaymentInfo {
      * Sets the epoch-second timestamp of when the transaction was executed.
      *
      * @param transactionTimestamp the timestamp as epoch seconds
-     * @return this instance
      */
     public void setTransactionTimestamp(Long transactionTimestamp) {
         this.transactionTimestamp = transactionTimestamp;
@@ -343,7 +337,6 @@ public final class PaymentInfo {
      * Sets the message key of the original payment request.
      *
      * @param requestMessageKey the request message key
-     * @return this instance
      */
     public void setRequestMessageKey(MessageKey requestMessageKey) {
         this.requestMessageKey = requestMessageKey;
@@ -353,7 +346,6 @@ public final class PaymentInfo {
      * Sets the epoch-second timestamp after which this payment request expires.
      *
      * @param expiryTimestamp the expiry timestamp as epoch seconds
-     * @return this instance
      */
     public void setExpiryTimestamp(Long expiryTimestamp) {
         this.expiryTimestamp = expiryTimestamp;
@@ -363,7 +355,6 @@ public final class PaymentInfo {
      * Sets whether this payment message uses a future-proofed format.
      *
      * @param futureproofed {@code true} for future-proofed, {@code false} otherwise
-     * @return this instance
      */
     public void setFutureproofed(Boolean futureproofed) {
         this.futureproofed = futureproofed;
@@ -373,7 +364,6 @@ public final class PaymentInfo {
      * Sets the ISO 4217 currency code.
      *
      * @param currency the currency code
-     * @return this instance
      */
     public void setCurrency(String currency) {
         this.currency = currency;
@@ -383,7 +373,6 @@ public final class PaymentInfo {
      * Sets the fine-grained internal transaction status.
      *
      * @param txnStatus the transaction status
-     * @return this instance
      */
     public void setTxnStatus(TxnStatus txnStatus) {
         this.txnStatus = txnStatus;
@@ -394,7 +383,6 @@ public final class PaymentInfo {
      *
      * @param useNoviFiatFormat {@code true} for Novi formatting, {@code false}
      *                          otherwise
-     * @return this instance
      */
     public void setUseNoviFiatFormat(Boolean useNoviFiatFormat) {
         this.useNoviFiatFormat = useNoviFiatFormat;
@@ -404,7 +392,6 @@ public final class PaymentInfo {
      * Sets the primary monetary amount of this payment.
      *
      * @param primaryAmount the primary amount
-     * @return this instance
      */
     public void setPrimaryAmount(Money primaryAmount) {
         this.primaryAmount = primaryAmount;
@@ -414,7 +401,6 @@ public final class PaymentInfo {
      * Sets the exchange monetary amount for currency conversions.
      *
      * @param exchangeAmount the exchange amount
-     * @return this instance
      */
     public void setExchangeAmount(Money exchangeAmount) {
         this.exchangeAmount = exchangeAmount;

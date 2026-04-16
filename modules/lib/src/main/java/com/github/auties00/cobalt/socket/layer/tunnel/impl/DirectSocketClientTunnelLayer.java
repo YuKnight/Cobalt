@@ -1,83 +1,90 @@
-package com.github.auties00.cobalt.socket.layer.security.impl;
+package com.github.auties00.cobalt.socket.layer.tunnel.impl;
 
 import com.github.auties00.cobalt.socket.layer.SocketClientLayer;
 import com.github.auties00.cobalt.socket.layer.SocketClientLayerListener;
+import com.github.auties00.cobalt.socket.layer.tunnel.SocketClientTunnelLayer;
 import com.github.auties00.cobalt.socket.threading.SocketClientLayerContext;
-import com.github.auties00.cobalt.socket.WhatsAppSslEngineFactory;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 
 /**
- * A sealed security layer that provides TLS encryption over an existing
- * connection.
+ * A direct (no-proxy) tunnel layer that provides the
+ * {@link CommonSocketTunnelLayerContext} required by all connections for blocking
+ * reads during the handshake phase.
  *
- * <p>Two concrete subclasses distinguish transport-level TLS (secure
- * WebSocket, end-to-end to the target) from tunnel-level TLS (HTTPS
- * proxy, client-to-proxy encryption).  The subclass determines which
- * {@link TlsSocketClientLayerContext} variant is created.
+ * <p>This layer is a pure passthrough: all I/O methods delegate to
+ * the inner layer.  Its only purpose is to register a
+ * {@link CommonSocketTunnelLayerContext} during {@link #connect(InetSocketAddress,
+ * SocketClientLayerListener)} so that {@code readBinary()} calls work
+ * before the connection transitions to asynchronous mode.
  */
-public abstract class TlsSocketClientSecurityLayer {
-    private static final int HANDSHAKE_TIMEOUT = 30_000;
-
+public final class DirectSocketClientTunnelLayer implements SocketClientTunnelLayer {
+    /**
+     * The inner layer that provides raw I/O.
+     */
     private final SocketClientLayer<?> innerLayer;
-    private final WhatsAppSslEngineFactory engineFactory;
-    private InetSocketAddress peerAddress;
 
-    protected TlsSocketClientSecurityLayer(SocketClientLayer<?> innerLayer, WhatsAppSslEngineFactory engineFactory) {
+    /**
+     * Creates a direct tunnel layer wrapping the given inner layer.
+     *
+     * @param innerLayer the layer below (typically a transport layer)
+     */
+    public DirectSocketClientTunnelLayer(SocketClientLayer<?> innerLayer) {
         this.innerLayer = innerLayer;
-        this.engineFactory = engineFactory;
     }
 
     /**
-     * Creates the appropriate TLS layer context subclass.
+     * Connects the inner layer and registers a {@link CommonSocketTunnelLayerContext}
+     * in pre-tunnel mode for blocking reads during handshakes.
      *
-     * @return a new TLS layer context
+     * @param address  the remote endpoint
+     * @param listener the callback for events
+     * @throws IOException if the connection fails
      */
-    protected abstract TlsSocketClientLayerContext createLayerContext();
-
-    public void startHandshake() throws IOException {
-        var ctx = createLayerContext();
-        ctx.initSsl(engineFactory.createSSLEngine(peerAddress));
-        innerLayer.registerLayerContext(ctx);
-        innerLayer.startHandshake(ctx, HANDSHAKE_TIMEOUT);
-    }
-
+    @Override
     public void connect(InetSocketAddress address, SocketClientLayerListener listener) throws IOException {
-        this.peerAddress = address;
         innerLayer.connect(address, listener);
-        startHandshake();
+        innerLayer.registerLayerContext(new CommonSocketTunnelLayerContext());
     }
 
+    @Override
     public void disconnect() {
         innerLayer.disconnect();
     }
 
+    @Override
     public boolean isConnected() {
         return innerLayer.isConnected();
     }
 
+    @Override
     public void sendBinary(ByteBuffer... buffers) throws IOException {
         innerLayer.sendBinary(buffers);
     }
 
+    @Override
     public int readBinary(ByteBuffer buffer, boolean fully) throws IOException {
         return innerLayer.readBinary(buffer, fully);
     }
 
+    @Override
     public void finishConnect() throws IOException {
         innerLayer.finishConnect();
     }
 
+    @Override
     public void finishConnect(ByteBuffer leftover) throws IOException {
         innerLayer.finishConnect(leftover);
     }
 
+    @Override
     public void startHandshake(SocketClientLayerContext tlsContext, long timeout) throws IOException {
         innerLayer.startHandshake(tlsContext, timeout);
     }
 
+    @Override
     public void registerLayerContext(SocketClientLayerContext context) throws IOException {
         innerLayer.registerLayerContext(context);
     }

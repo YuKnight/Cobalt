@@ -5,15 +5,19 @@ import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.SyncActionArgs;
 
 /**
- * Index arguments for {@link LidContactAction}.
+ * Index arguments that locate a specific {@link LidContactAction} inside a
+ * sync patch.
  *
- * <p>The sync index produced is {@code ["lid_contact", contactLidJid]}.
+ * <p>A LID contact entry is uniquely addressed by the contact's LID JID.
+ * When building or reading a patch the sync engine translates these arguments
+ * into the index tuple {@code ["lid_contact", contactLidJid]}.
  *
- * @param contactLidJid the LID-based JID of the contact being synced
+ * @param contactLidJid the LID-based JID of the contact this entry describes
  */
 public record LidContactActionArgs(Jid contactLidJid) implements SyncActionArgs {
     /**
-     * {@inheritDoc}
+     * Returns the index components used by the sync engine to address this
+     * LID contact entry.
      *
      * @return a single-element array containing the contact LID JID string
      */

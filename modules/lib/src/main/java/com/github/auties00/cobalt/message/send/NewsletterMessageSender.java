@@ -6,6 +6,9 @@ import com.github.auties00.cobalt.message.send.ack.AckParser;
 import com.github.auties00.cobalt.message.send.ack.AckResult;
 import com.github.auties00.cobalt.message.send.stanza.MetaStanza;
 import com.github.auties00.cobalt.message.send.stanza.NewsletterStanza;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.FutureProofMessageType;
 import com.github.auties00.cobalt.model.message.Message;
@@ -64,6 +67,9 @@ import java.util.Optional;
  * newsletterText, newsletterMediaPublish, newsletterEdit,
  * newsletterRevoke, newsletterPollCreation, etc.
  */
+@WhatsAppWebModule(moduleName = "WAWebNewsletterSendMessageQueryJob")
+@WhatsAppWebModule(moduleName = "WASmaxMessagePublishNewsletterRPC")
+@WhatsAppWebModule(moduleName = "WASmaxOutMessagePublishNewsletterClientIdContent")
 final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo> {
     /**
      * Logger for newsletter message sending diagnostics.
@@ -78,6 +84,8 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
      * @implNote WAWebAck.EDIT_ATTR.NEWSLETTER_MSG_EDIT = 3,
      * distinct from MESSAGE_EDIT (1) and PIN_IN_CHAT (2).
      */
+    @WhatsAppWebExport(moduleName = "WAWebAck", exports = "EDIT_ATTR",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static final String NEWSLETTER_MSG_EDIT = "3";
 
     /**
@@ -88,6 +96,8 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
      * @implNote ADAPTED: WAWebNewsletterSendMessageQueryJob uses module-level
      * imports; Cobalt uses constructor-based DI instead.
      */
+    @WhatsAppWebExport(moduleName = "WAWebNewsletterSendMessageQueryJob", exports = "querySendNewsletterMessage",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     NewsletterMessageSender(WhatsAppClient client) {
         super(client);
     }
@@ -108,6 +118,8 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
      * validates the newsletter JID, builds the content-type-specific mixin
      * arguments, and sends via WASmaxMessagePublishNewsletterRPC.sendNewsletterRPC.
      */
+    @WhatsAppWebExport(moduleName = "WAWebNewsletterSendMessageQueryJob", exports = "querySendNewsletterMessage",
+            adaptation = WhatsAppAdaptation.DIRECT)
     @Override
     AckResult send(Jid newsletterJid, NewsletterMessageInfo messageInfo) {
         var container = messageInfo.message();
@@ -186,6 +198,8 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
      * @apiNote WASmaxOutMessagePublishNewsletterTextMixin:
      * {@code <message type="text"><plaintext>payload</plaintext></message>}
      */
+    @WhatsAppWebExport(moduleName = "WASmaxOutMessagePublishNewsletterTextMixin", exports = "applyMixin",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private NodeBuilder buildText(NewsletterMessageInfo info, Jid newsletterJid) {
         var payload = MessageContainerSpec.encode(info.message());
         var plaintextNode = NewsletterStanza.buildPlaintext(payload);
@@ -204,6 +218,8 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
      * {@code <message server_id="..."><meta questiontype="response"/>
      * <plaintext>payload</plaintext></message>}
      */
+    @WhatsAppWebExport(moduleName = "WASmaxOutMessagePublishNewsletterQuestionResponsePublishMixin",
+            exports = "applyMixin", adaptation = WhatsAppAdaptation.DIRECT)
     private static NodeBuilder buildQuestionResponse(NewsletterMessageInfo messageInfo, Jid newsletterJid, MessageContainer container) {
         var payload = MessageContainerSpec.encode(container);
         var metaNode = MetaStanza.buildNewsletterQuestionResponse();
@@ -226,6 +242,8 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
      * {@code <message type="..."><plaintext>payload</plaintext>
      * <media_id>handle</media_id></message>}
      */
+    @WhatsAppWebExport(moduleName = "WASmaxOutMessagePublishNewsletterMediaPublishMixin", exports = "applyMixin",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private NodeBuilder buildMedia(
             NewsletterMessageInfo info, Jid newsletterJid, String mediaType
     ) {
@@ -248,6 +266,10 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
      * {@code <message type="poll"><meta polltype="..."/>
      * <plaintext>payload</plaintext></message>}
      */
+    @WhatsAppWebExport(moduleName = "WASmaxOutMessagePublishContentTypePollCreationMixin", exports = "applyMixin",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WASmaxOutMessagePublishContentTypePollResultSnapshotMixin", exports = "applyMixin",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private NodeBuilder buildPoll(
             NewsletterMessageInfo info, Jid newsletterJid, String polltype
     ) {
@@ -271,6 +293,8 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
      * @apiNote WASmaxOutMessagePublishNewsletterRevokeMixin:
      * {@code <message edit="7"><admin_revoke/></message>}
      */
+    @WhatsAppWebExport(moduleName = "WASmaxOutMessagePublishNewsletterRevokeMixin", exports = "applyMixin",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private NodeBuilder buildRevoke(NewsletterMessageInfo info, Jid newsletterJid) {
         var adminRevokeNode = new NodeBuilder()
                 .description("admin_revoke")
@@ -293,6 +317,8 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
      * {@code <message edit="1"><admin_edit/>
      * <plaintext>payload</plaintext></message>}
      */
+    @WhatsAppWebExport(moduleName = "WASmaxOutMessagePublishNewsletterEditMixin", exports = "applyMixin",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private NodeBuilder buildEdit(NewsletterMessageInfo info, Jid newsletterJid) {
         var protocolMessage = (ProtocolMessage) info.message().content();
         var editedMessage = protocolMessage.editedMessage();
@@ -330,6 +356,8 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
      * {@code <message server_id="..."><reaction code="emoji"/></message>}
      * or {@code <message server_id="..."><reaction_revoke/></message>}
      */
+    @WhatsAppWebExport(moduleName = "WASmaxOutMessagePublishContentTypeReactionMixin", exports = "applyMixin",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private NodeBuilder buildReaction(
             NewsletterMessageInfo info, Jid newsletterJid, ReactionMessage reaction
     ) {
@@ -358,6 +386,8 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
      * @implNote WAWebNewsletterSendMessageQueryJob.c:
      * {@code {newsletterReaction: {reactionCode: t}}}.
      */
+    @WhatsAppWebExport(moduleName = "WASmaxOutMessagePublishContentTypeReactionMixin", exports = "applyMixin",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private Node buildReactionContent(String s) {
         return new NodeBuilder()
                 .description("reaction")
@@ -373,6 +403,8 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
      * @implNote WAWebNewsletterSendMessageQueryJob.c:
      * {@code {isNewsletterReactionRevoke: true}}.
      */
+    @WhatsAppWebExport(moduleName = "WASmaxOutMessagePublishContentTypeReactionMixin", exports = "applyMixin",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private Node buildReactionRevoke() {
         return new NodeBuilder()
                 .description("reaction_revoke")
@@ -386,6 +418,8 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
      * {@code <message server_id="..."><poll_vote>
      * <vote>hash</vote>...</poll_vote></message>}
      */
+    @WhatsAppWebExport(moduleName = "WASmaxOutMessagePublishContentTypePollVoteMixin", exports = "applyMixin",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private NodeBuilder buildPollVote(
             NewsletterMessageInfo info, Jid newsletterJid, PollUpdateMessage pollUpdate
     ) {
@@ -432,6 +466,8 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
      * @apiNote WAWebNewsletterSendMessageQueryJob: uses the media type
      * string directly as the SMAX {@code type} attribute.
      */
+    @WhatsAppWebExport(moduleName = "WAWebNewsletterSendMessageQueryJob", exports = "querySendNewsletterMessage",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private static String resolveSmaxMediaType(Message message) {
         return switch (message) {
             case ImageMessage _ -> "image";

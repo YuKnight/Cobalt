@@ -7,16 +7,21 @@ import it.auties.protobuf.model.*;
 import java.util.Optional;
 
 /**
- * Metadata for a syntax-highlighted code block fragment within an
- * AI rich response.
+ * Metadata for a syntax-highlighted code block fragment within a WhatsApp
+ * AI bot rich response.
  *
- * <p>The code block is decomposed into a sequence of
- * {@link AIRichResponseCodeBlock} tokens, each carrying a
- * {@linkplain AIRichResponseCodeHighlightType highlight type} that
- * the client uses for syntax colouring. The
- * {@linkplain #codeLanguage() code language} identifies the
- * programming language so the client can apply the correct syntax
- * theme.
+ * <p>When the AI bot returns source code in its answer, the code is
+ * decomposed into a sequence of {@link AIRichResponseCodeBlock} tokens,
+ * each carrying a {@linkplain AIRichResponseCodeHighlightType highlight type}
+ * that the client uses for syntax colouring. The
+ * {@linkplain #codeLanguage() code language} identifies the programming
+ * language so the client can apply the correct syntax theme.
+ *
+ * <p>This type implements {@link AIRichResponseSubMessageContent} and
+ * appears as the {@link AIRichResponseSubMessageType#CODE CODE} variant
+ * within an {@link AIRichResponseSubMessage}.
+ *
+ * @see AIRichResponseSubMessage#content()
  */
 @ProtobufMessage(name = "AIRichResponseCodeMetadata")
 public final class AIRichResponseCodeMetadata implements AIRichResponseSubMessageContent {
@@ -43,6 +48,12 @@ public final class AIRichResponseCodeMetadata implements AIRichResponseSubMessag
     List<AIRichResponseCodeBlock> codeBlocks;
 
 
+    /**
+     * Constructs a new code metadata instance with the given language and tokens.
+     *
+     * @param codeLanguage the programming language identifier, or {@code null}
+     * @param codeBlocks   the ordered list of syntax-highlighted tokens, or {@code null}
+     */
     AIRichResponseCodeMetadata(String codeLanguage, List<AIRichResponseCodeBlock> codeBlocks) {
         this.codeLanguage = codeLanguage;
         this.codeBlocks = codeBlocks;
@@ -88,10 +99,12 @@ public final class AIRichResponseCodeMetadata implements AIRichResponseSubMessag
     }
 
     /**
-     * A syntax highlight category for a token within a code block.
+     * Syntax highlight category for a token within an AI rich response
+     * code block.
      *
      * <p>Clients map each constant to a colour in their syntax
-     * highlighting theme.
+     * highlighting theme. The categories cover the most common lexical
+     * elements: keywords, methods, strings, numbers, and comments.
      */
     @ProtobufEnum(name = "AIRichResponseCodeMetadata.AIRichResponseCodeHighlightType")
     public static enum AIRichResponseCodeHighlightType {
@@ -112,24 +125,32 @@ public final class AIRichResponseCodeMetadata implements AIRichResponseSubMessag
         METHOD(2),
 
         /**
-         * A string literal.
+         * A string literal (single-quoted, double-quoted, or template).
          */
         STRING(3),
 
         /**
-         * A numeric literal.
+         * A numeric literal (integer or floating-point).
          */
         NUMBER(4),
 
         /**
-         * A code comment.
+         * A code comment (line or block).
          */
         COMMENT(5);
 
+        /**
+         * Constructs a highlight type constant with the given protobuf index.
+         *
+         * @param index the protobuf enum index
+         */
         AIRichResponseCodeHighlightType(@ProtobufEnumIndex int index) {
             this.index = index;
         }
 
+        /**
+         * The protobuf enum index for this highlight type.
+         */
         final int index;
 
         /**
@@ -143,11 +164,13 @@ public final class AIRichResponseCodeMetadata implements AIRichResponseSubMessag
     }
 
     /**
-     * A single syntax-highlighted token within a code block.
+     * A single syntax-highlighted token within an AI rich response code block.
      *
      * <p>Each token carries a fragment of source code text and a
      * {@linkplain #highlightType() highlight type} that determines
-     * how the client renders it (e.g. keyword colour, string colour).
+     * how the client renders it (for example, keyword colour or string colour).
+     * The full code block is reconstructed by concatenating the
+     * {@linkplain #codeContent() content} of all tokens in order.
      */
     @ProtobufMessage(name = "AIRichResponseCodeMetadata.AIRichResponseCodeBlock")
     public static final class AIRichResponseCodeBlock {
@@ -166,6 +189,12 @@ public final class AIRichResponseCodeMetadata implements AIRichResponseSubMessag
         String codeContent;
 
 
+        /**
+         * Constructs a new code block token.
+         *
+         * @param highlightType the syntax highlight category, or {@code null}
+         * @param codeContent   the source code text of this token, or {@code null}
+         */
         AIRichResponseCodeBlock(AIRichResponseCodeHighlightType highlightType, String codeContent) {
             this.highlightType = highlightType;
             this.codeContent = codeContent;

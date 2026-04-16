@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.message.send.stanza;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.business.BusinessVerifiedName;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.MessageContainer;
@@ -31,9 +34,25 @@ import java.util.Objects;
  * business name record for the recipient JID.
  * @see ChatFanoutStanza
  */
+@WhatsAppWebModule(moduleName = "WAWebSendMsgCreateFanoutStanza")
 public final class BizStanza {
+    /**
+     * The WhatsApp store, used to look up the recipient's verified
+     * business name and privacy mode data.
+     *
+     * @implNote WAWebSendMsgCreateFanoutStanza.createFanoutMsgStanza:
+     * looks up {@code contact.privacyMode} from the contact collection.
+     */
     private final WhatsAppStore store;
 
+    /**
+     * Creates a new biz stanza builder with the given store.
+     *
+     * @param store the WhatsApp store for contact lookups
+     *
+     * @implNote ADAPTED: WAWebSendMsgCreateFanoutStanza uses module-level
+     * imports; Cobalt uses constructor-based DI instead.
+     */
     public BizStanza(WhatsAppStore store) {
         this.store = Objects.requireNonNull(store, "store");
     }
@@ -57,6 +76,8 @@ public final class BizStanza {
      * native_flow_name="..."/>} when the contact has a verified business
      * name with privacy mode.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCreateFanoutStanza", exports = "createFanoutMsgStanza",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public Node build(Jid chatJid) {
         return build(chatJid, null, false);
     }
@@ -96,6 +117,8 @@ public final class BizStanza {
      * but native flow name exists, builds alternative biz nodes
      * (interactive or simple).
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCreateFanoutStanza", exports = "createFanoutMsgStanza",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public Node build(Jid chatJid, String nativeFlowName, boolean isNativeFlowInteractive) {
         // WAWebSendMsgCreateFanoutStanza: check contact.privacyMode first
         var verifiedName = store.findVerifiedBusinessName(chatJid)
@@ -165,6 +188,8 @@ public final class BizStanza {
      * when {@code nativeFlowName === PAYMENT_INFO && nativeFlowInteractiveMsg}.
      * @see GroupSkmsgFanoutStanza
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendGroupSkmsgJob", exports = "encryptAndSendSenderKeyMsg",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public Node buildGroup(MessageContainer container) {
         if (!(container.content() instanceof InteractiveMessage im)) {
             return null;

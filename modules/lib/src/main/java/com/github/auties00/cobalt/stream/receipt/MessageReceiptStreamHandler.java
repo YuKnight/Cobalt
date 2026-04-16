@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.stream.receipt;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.message.MessageService;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.MessageInfo;
@@ -34,6 +35,10 @@ import java.util.Objects;
  *           WAWebHandleRetryRequest.handleRetryRequest,
  *           WAWebHandleRetryRequest.getTargetChat
  */
+@WhatsAppWebModule(moduleName = "WAWebHandleMsgReceipt")
+@WhatsAppWebModule(moduleName = "WAWebHandleMsgReceiptParser")
+@WhatsAppWebModule(moduleName = "WAWebHandleMessageRetryRequest")
+@WhatsAppWebModule(moduleName = "WAWebHandleRetryRequest")
 public final class MessageReceiptStreamHandler implements SocketStream.Handler {
     /**
      * Logger instance for this handler.

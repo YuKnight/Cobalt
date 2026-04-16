@@ -32,10 +32,44 @@ import static java.lang.System.Logger.Level.ERROR;
 import static java.lang.System.Logger.Level.WARNING;
 import static java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor;
 
+/**
+ * Fully in-memory implementation of {@link WhatsAppStore} that persists its
+ * state to protobuf files on disk.
+ *
+ * <p>This class specialises {@link AbstractWhatsAppStore} by:
+ * <ul>
+ *   <li>holding all chats and newsletters in {@link ConcurrentHashMap}s
+ *       that are also serialised as protobuf {@code MAP} fields on the
+ *       outer store message</li>
+ *   <li>serialising the root store to {@code store.proto} and every chat
+ *       or newsletter to its own {@code chat_*.proto} or
+ *       {@code newsletter_*.proto} file so that per-entity writes do not
+ *       require rewriting the whole store</li>
+ *   <li>tracking per-entity hash codes so that {@link #save()} only
+ *       rewrites files whose content has changed</li>
+ *   <li>starting a virtual-thread worker to deserialise chats and
+ *       newsletters in the background after loading, keeping the boot
+ *       path fast for sessions with a large history</li>
+ * </ul>
+ *
+ * @implNote Cobalt merges WA Web's IndexedDB-backed chat/newsletter/message
+ * tables into these in-memory maps; the dirty-checking save pattern mimics
+ * IndexedDB's record-level put semantics without requiring a full embedded
+ * database.
+ */
 @SuppressWarnings({"unused", "UnusedReturnValue"})
 @ProtobufMessage
 final class InMemoryStore extends AbstractWhatsAppStore {
+    /**
+     * File-name prefix used for per-chat protobuf files under the session
+     * directory.
+     */
     private static final String CHAT_PREFIX = "chat_";
+
+    /**
+     * File-name prefix used for per-newsletter protobuf files under the
+     * session directory.
+     */
     private static final String NEWSLETTER_PREFIX = "newsletter_";
 
     @ProtobufProperty(index = 82, type = ProtobufType.MAP, mapKeyType =  ProtobufType.STRING, mapValueType = ProtobufType.MESSAGE)

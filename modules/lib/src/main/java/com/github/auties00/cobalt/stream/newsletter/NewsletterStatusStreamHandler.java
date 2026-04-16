@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.stream.newsletter;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.MessageContainer;
 import com.github.auties00.cobalt.model.message.MessageContainerSpec;
@@ -38,6 +39,8 @@ import java.time.Instant;
  *
  * @implNote WAWebHandleNewsletterStatus.default
  */
+@WhatsAppWebModule(moduleName = "WAWebHandleNewsletterStatus")
+@WhatsAppWebModule(moduleName = "WAWebNewsletterStatusUtils")
 public final class NewsletterStatusStreamHandler implements SocketStream.Handler {
     /**
      * Logger for diagnostic messages during newsletter status processing.

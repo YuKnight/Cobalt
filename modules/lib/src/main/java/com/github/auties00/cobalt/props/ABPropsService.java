@@ -1,6 +1,9 @@
 package com.github.auties00.cobalt.props;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 
@@ -31,7 +34,17 @@ import java.util.concurrent.atomic.AtomicReference;
  * <p>This class is thread-safe.
  *
  * @see ABProp
+ *
+ * @implNote WAWebAbPropsSyncJob: adapts the {@code syncABProps} and
+ * {@code syncABPropsTask} exports, which send a {@code GetExperimentConfigRPC}
+ * and update the local AB prop cache. Cobalt also absorbs the inline parsing
+ * performed by WAWebApiAbPropConfig.updateABPropConfigs into this class.
  */
+@WhatsAppWebModule(moduleName = "WAWebAbPropsSyncJob")
+@WhatsAppWebModule(moduleName = "WAGetAbPropsProtocol")
+@WhatsAppWebModule(moduleName = "WAWebApiAbPropConfig")
+@WhatsAppWebModule(moduleName = "WAWebApiAbPropEventSamplingConfig")
+@WhatsAppWebModule(moduleName = "WAWebABPropsLocalStorage")
 public final class ABPropsService {
     private static final System.Logger LOGGER = System.getLogger(ABPropsService.class.getName());
 
@@ -117,6 +130,8 @@ public final class ABPropsService {
      *
      * @return {@code true} if sync succeeded, {@code false} otherwise
      */
+    @WhatsAppWebExport(moduleName = "WAWebAbPropsSyncJob", exports = {"syncABProps", "syncABPropsTask"},
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean sync() {
         try {
             var request = createSyncRequest();
@@ -207,6 +222,8 @@ public final class ABPropsService {
      * @return {@code true} if the response was processed successfully, {@code false} otherwise
      * @throws NullPointerException if {@code response} is {@code null}
      */
+    @WhatsAppWebExport(moduleName = "WAWebApiAbPropConfig", exports = "updateABPropConfigs",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean process(Node response) {
         Objects.requireNonNull(response, "response cannot be null");
 

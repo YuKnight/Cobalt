@@ -5,14 +5,17 @@ import it.auties.protobuf.model.*;
 import java.util.Optional;
 
 /**
- * Metadata describing the transparency disclosure shown to users during
+ * Carries metadata describing the transparency disclosure shown to users during
  * an AI bot session.
  *
- * <p>Certain jurisdictions require AI interactions to include safety
- * disclaimers. This metadata carries the {@linkplain #disclaimerText() disclaimer text},
- * an optional {@linkplain #hcaId() human content analyst identifier} for
- * sessions reviewed by humans, and the {@linkplain #sessionTransparencyType() type}
- * of transparency notice being displayed.
+ * <p>Certain jurisdictions require AI interactions to include safety disclaimers
+ * (for example, the New York State AI safety disclaimer). This metadata carries the
+ * {@linkplain #disclaimerText() disclaimer text} displayed to the user, an optional
+ * {@linkplain #hcaId() human content analyst identifier} for sessions that are
+ * being reviewed by a human analyst, and the {@linkplain #sessionTransparencyType()
+ * type} of transparency notice being displayed.
+ *
+ * @see SessionTransparencyType
  */
 @ProtobufMessage(name = "SessionTransparencyMetadata")
 public final class SessionTransparencyMetadata {
@@ -24,8 +27,9 @@ public final class SessionTransparencyMetadata {
     String disclaimerText;
 
     /**
-     * The identifier of the human content analyst reviewing this session,
-     * for example {@code "hca_12345"}.
+     * The identifier of the human content analyst (HCA) reviewing this session,
+     * if the conversation is being monitored by a human reviewer. This field is
+     * typically only present for flagged or escalated sessions.
      */
     @ProtobufProperty(index = 2, type = ProtobufType.STRING)
     String hcaId;

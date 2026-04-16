@@ -365,10 +365,18 @@ public final class BotProgressIndicatorMetadata {
              */
             BING(3);
 
+            /**
+             * Constructs a new {@code BotSearchSourceProvider} with the given protobuf index.
+             *
+             * @param index the protobuf enum index
+             */
             BotSearchSourceProvider(@ProtobufEnumIndex int index) {
                 this.index = index;
             }
 
+            /**
+             * The protobuf enum index for this search provider.
+             */
             final int index;
 
             /**
@@ -407,10 +415,18 @@ public final class BotProgressIndicatorMetadata {
              */
             FINISHED(3);
 
+            /**
+             * Constructs a new {@code PlanningStepStatus} with the given protobuf index.
+             *
+             * @param index the protobuf enum index
+             */
             PlanningStepStatus(@ProtobufEnumIndex int index) {
                 this.index = index;
             }
 
+            /**
+             * The protobuf enum index for this step status.
+             */
             final int index;
 
             /**
@@ -680,10 +696,18 @@ public final class BotProgressIndicatorMetadata {
                  */
                 BING(3);
 
+                /**
+                 * Constructs a new {@code BotPlanningSearchSourceProvider} with the given protobuf index.
+                 *
+                 * @param index the protobuf enum index
+                 */
                 BotPlanningSearchSourceProvider(@ProtobufEnumIndex int index) {
                     this.index = index;
                 }
 
+                /**
+                 * The protobuf enum index for this search provider.
+                 */
                 final int index;
 
                 /**

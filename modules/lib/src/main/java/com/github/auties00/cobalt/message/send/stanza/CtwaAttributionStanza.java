@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.message.send.stanza;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.chat.Chat;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
@@ -39,6 +42,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * which chats qualify (first message only, or all messages).
  * WAWebExternalEntryPointPrefs: stores/retrieves per-chat entry points.
  */
+@WhatsAppWebModule(moduleName = "WAWebSendMsgCtwaAttributionNode")
+@WhatsAppWebModule(moduleName = "WAWebExternalEntryPointPrefs")
+@WhatsAppWebModule(moduleName = "WAWebExternalCtxConfig")
 public final class CtwaAttributionStanza {
 
     /**
@@ -69,6 +75,8 @@ public final class CtwaAttributionStanza {
      * {@code WAWebExternalCtxConfig} (AB props) and
      * {@code WAWebExternalEntryPointPrefs} (user prefs storage).
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCtwaAttributionNode", exports = "getCtwaAttributionNode",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public CtwaAttributionStanza(WhatsAppStore store, ABPropsService abPropsService) {
         this.store = Objects.requireNonNull(store, "store");
         this.abPropsService = Objects.requireNonNull(abPropsService, "abPropsService");
@@ -87,6 +95,8 @@ public final class CtwaAttributionStanza {
      * adds the entry point to the map, prunes expired entries, and
      * persists via {@code WAWebUserPrefsStore}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebExternalEntryPointPrefs", exports = "saveExternalEntryPoint",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public void saveEntryPoint(Jid chatJid, ExternalEntryPoint entryPoint) {
         // WAWebExternalEntryPointPrefs.saveExternalEntryPoint
         entryPoints.put(chatJid.toString(), entryPoint);
@@ -100,6 +110,8 @@ public final class CtwaAttributionStanza {
      * @implNote WAWebExternalEntryPointPrefs.deleteExternalEntryPoint:
      * removes the entry from the map and persists.
      */
+    @WhatsAppWebExport(moduleName = "WAWebExternalEntryPointPrefs", exports = "deleteExternalEntryPoint",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public void deleteEntryPoint(Jid chatJid) {
         // WAWebExternalEntryPointPrefs.deleteExternalEntryPoint
         entryPoints.remove(chatJid.toString());
@@ -114,6 +126,8 @@ public final class CtwaAttributionStanza {
      * @implNote WAWebExternalEntryPointPrefs.getExternalEntryPoint:
      * returns {@code null} if not found or expired.
      */
+    @WhatsAppWebExport(moduleName = "WAWebExternalEntryPointPrefs", exports = "getExternalEntryPoint",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<ExternalEntryPoint> getEntryPoint(Jid chatJid) {
         // WAWebExternalEntryPointPrefs.getExternalEntryPoint
         var entry = entryPoints.get(chatJid.toString());
@@ -144,6 +158,8 @@ public final class CtwaAttributionStanza {
      * ({@code lt}, {@code s}, {@code p}), encodes to UTF-8 bytes, and wraps
      * via {@code makeCtwaAttributionCtwaAttribution}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCtwaAttributionNode", exports = "getCtwaAttributionNode",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public Node build(Jid chatJid) {
         // WAWebSendMsgCtwaAttributionNode.getCtwaAttributionNode: if(e == null ...)
         if (chatJid == null) {
@@ -216,6 +232,8 @@ public final class CtwaAttributionStanza {
      * delegates to {@code WAWebExternalCtxConfig.getFirstMessageLoggingOption()}
      * and {@code hasMultipleNonSystemMessages(chat)}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebExternalCtxConfig", exports = "getFirstMessageLoggingOption",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private boolean shouldLogFirstMessage(Chat chat, String partnerName) {
         // WAWebExternalCtxConfig.getFirstMessageLoggingOption
         var loggingOption = abPropsService.getInt(ABProp.EXTERNAL_CTX_AUTHORISE_EXISTING_CHATS);
@@ -243,6 +261,8 @@ public final class CtwaAttributionStanza {
      * {@code SYSTEM_MESSAGE_TYPES} and {@code isSendFailure === true},
      * and returns {@code true} if the count exceeds 1.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCtwaAttributionNode", exports = "getCtwaAttributionNode",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private boolean hasMultipleNonSystemMessages(Chat chat) {
         // WAWebSendMsgCtwaAttributionNode: function e(e)
         if (chat == null) {
@@ -282,6 +302,8 @@ public final class CtwaAttributionStanza {
      * checking for {@code stubType} presence (which marks notification
      * and system messages) and protocol messages.
      */
+    @WhatsAppWebExport(moduleName = "WAWebMsgType", exports = "SYSTEM_MESSAGE_TYPES",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private boolean isSystemMessage(ChatMessageInfo msg) {
         // WAWebMsgType.SYSTEM_MESSAGE_TYPES includes notification types
         // (which in Cobalt have a non-null stubType) and protocol messages
@@ -304,6 +326,8 @@ public final class CtwaAttributionStanza {
      * @implNote WAWebExternalEntryPointPrefs: function {@code c(t)}
      * iterates all entry points and removes those older than one week.
      */
+    @WhatsAppWebExport(moduleName = "WAWebExternalEntryPointPrefs", exports = "saveExternalEntryPoint",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private void pruneExpired() {
         // WAWebExternalEntryPointPrefs: Object.keys(t).forEach(...)
         entryPoints.entrySet().removeIf(entry -> entry.getValue().isExpired());

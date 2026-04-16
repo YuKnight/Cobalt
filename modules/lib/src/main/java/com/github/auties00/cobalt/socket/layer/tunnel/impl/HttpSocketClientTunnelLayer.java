@@ -1,9 +1,8 @@
-package com.github.auties00.cobalt.socket.layer.tunnel.impl.http;
+package com.github.auties00.cobalt.socket.layer.tunnel.impl;
 
 import com.github.auties00.cobalt.socket.layer.SocketClientLayer;
 import com.github.auties00.cobalt.socket.layer.SocketClientLayerListener;
 import com.github.auties00.cobalt.socket.layer.tunnel.SocketClientTunnelLayer;
-import com.github.auties00.cobalt.socket.layer.tunnel.impl.SocketTunnelLayerContextImpl;
 import com.github.auties00.cobalt.socket.threading.SocketClientLayerContext;
 import com.github.auties00.cobalt.client.WhatsAppClientProxy;
 import com.github.auties00.cobalt.util.HttpResponseReader;
@@ -145,7 +144,7 @@ public final class HttpSocketClientTunnelLayer implements SocketClientTunnelLaye
                     listener
             );
             if (redirects == 0) {
-                innerLayer.registerLayerContext(new SocketTunnelLayerContextImpl());
+                innerLayer.registerLayerContext(new CommonSocketTunnelLayerContext());
             }
 
             var deadline = System.currentTimeMillis() + OVERALL_HANDSHAKE_TIMEOUT;

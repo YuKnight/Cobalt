@@ -9,26 +9,32 @@ import java.util.OptionalDouble;
 import java.util.OptionalInt;
 
 /**
- * A two-dimensional coordinate used as a vertex in the polygon that defines
- * the tappable region of an
- * {@link InteractiveAnnotation InteractiveAnnotation}
- * on image and video messages.
+ * A two-dimensional coordinate used as a vertex of the tappable polygon
+ * attached to an image or video message.
  *
- * <p>Interactive annotations allow the WhatsApp client to overlay a tappable
- * area on top of a media message. The boundary of that area is described by
- * a list of {@code Point} instances stored in
+ * <p>Interactive annotations overlay a tappable region on top of a media
+ * message. The boundary of that region is described by an ordered list of
+ * {@code Point} instances stored in
  * {@link InteractiveAnnotation#polygonVertices() InteractiveAnnotation.polygonVertices()}.
- * The vertices are connected in order to form a closed polygon; tapping
- * inside the polygon triggers the annotation's associated action (for
- * example, opening a {@link Location} on a map).
+ * Consecutive vertices are connected in order and the final vertex is
+ * implicitly joined back to the first to form a closed polygon. Tapping
+ * inside the polygon triggers the annotation's associated action, for
+ * example, opening a {@link Location} on a map.
  *
- * <p>Originally, the coordinate system used integer values exposed through
- * the {@link #xDeprecated()} and {@link #yDeprecated()} accessors. The
+ * <p>Coordinates are expressed as normalised values relative to the media
+ * content: {@code x} measures the horizontal position from the left edge
+ * and {@code y} measures the vertical position from the top edge, both
+ * typically in the range {@code [0.0, 1.0]}.
+ *
+ * <p>Earlier versions of the protocol encoded vertices as integers
+ * exposed through {@link #xDeprecated()} and {@link #yDeprecated()}. The
  * protocol has since moved to double-precision floating-point coordinates
  * accessible through {@link #x()} and {@link #y()}. New code should use
- * the double-precision accessors exclusively.
+ * the double-precision accessors exclusively; the integer accessors are
+ * retained only for backward compatibility with older peers.
  *
  * @see InteractiveAnnotation
+ * @see Location
  */
 @ProtobufMessage(name = "Point")
 public final class Point {

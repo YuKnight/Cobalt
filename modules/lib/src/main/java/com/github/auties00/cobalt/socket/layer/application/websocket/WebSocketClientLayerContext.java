@@ -14,7 +14,7 @@ import java.nio.ByteBuffer;
 /**
  * A layer context that handles WebSocket frame decoding and encoding.
  */
-public final class WebSocketClientLayerContext implements SocketClientApplicationLayerContext {
+final class WebSocketClientLayerContext implements SocketClientApplicationLayerContext {
     private static final int READ_BUFFER_SIZE = 16384;
 
     /**
@@ -46,7 +46,7 @@ public final class WebSocketClientLayerContext implements SocketClientApplicatio
     /**
      * Creates a WebSocket layer context.
      */
-    public WebSocketClientLayerContext() {
+    WebSocketClientLayerContext() {
         this.readBuffer = ByteBuffer.allocateDirect(READ_BUFFER_SIZE);
         this.frameDecoder = new WebSocketFrameDecoder();
     }

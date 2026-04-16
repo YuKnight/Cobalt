@@ -1,5 +1,9 @@
 package com.github.auties00.cobalt.message.send.token;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
+
 import java.util.Objects;
 
 /**
@@ -10,6 +14,7 @@ import java.util.Objects;
  * {@code {version, reportingToken}}.
  * @see ReportingToken
  */
+@WhatsAppWebModule(moduleName = "WAWebReportingTokenUtils")
 public final class ReportingTokenResult {
     private final int version;
     private final byte[] token;
@@ -24,6 +29,8 @@ public final class ReportingTokenResult {
      * @implNote WAWebReportingTokenUtils.genReportingToken: returns
      * {@code {version: c, reportingToken: new Uint8Array(f)}}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebReportingTokenUtils", exports = "genReportingToken",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public ReportingTokenResult(int version, byte[] token) {
         this.version = version;
         this.token = Objects.requireNonNull(token, "token");
@@ -37,6 +44,8 @@ public final class ReportingTokenResult {
      * @implNote WAWebReportingTokenConstants.REPORTING_TOKEN_VERSION:
      * {@code {DEFAULT: 1, HISTORY_SYNC: -1}}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebReportingTokenUtils", exports = "genReportingToken",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return version;
     }
@@ -49,6 +58,8 @@ public final class ReportingTokenResult {
      * @implNote WAWebReportingTokenUtils.genReportingToken:
      * {@code reportingToken} field of the return value.
      */
+    @WhatsAppWebExport(moduleName = "WAWebReportingTokenUtils", exports = "genReportingToken",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public byte[] token() {
         return token;
     }

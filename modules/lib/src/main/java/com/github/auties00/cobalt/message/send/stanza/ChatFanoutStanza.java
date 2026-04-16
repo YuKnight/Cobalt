@@ -2,6 +2,9 @@ package com.github.auties00.cobalt.message.send.stanza;
 
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryptedPayload;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
@@ -23,7 +26,7 @@ import java.util.Objects;
  *
  * @implNote WAWebSendMsgCreateFanoutStanza.createFanoutMsgStanza: builds
  * the stanza for CHAT and GROUP_DIRECT fanout types. The token child
- * is {@code (yield S(K)) ?? (yield T(K, l))} -- tctoken from
+ * is {@code (yield S(K)) ?? (yield T(K, l))}, tctoken from
  * {@link TcTokenStanza} with cstoken from {@link CsTokenStanza} as
  * fallback.
  * @see GroupSkmsgFanoutStanza
@@ -31,6 +34,8 @@ import java.util.Objects;
  * @see TcTokenStanza
  * @see CsTokenStanza
  */
+@WhatsAppWebModule(moduleName = "WAWebSendMsgCreateFanoutStanza")
+@WhatsAppWebModule(moduleName = "WAWebSendDirectMsgToDeviceList")
 public final class ChatFanoutStanza {
     /**
      * Prevents instantiation of this utility class.
@@ -82,11 +87,13 @@ public final class ChatFanoutStanza {
      *
      * @implNote WAWebSendMsgCreateFanoutStanza.createFanoutMsgStanza:
      * builds the message stanza with all child nodes.
-     * The token node is {@code (yield S(K)) ?? (yield T(K, l))} -- tctoken
+     * The token node is {@code (yield S(K)) ?? (yield T(K, l))}, tctoken
      * with cstoken fallback.
      * WAWebSendDirectMsgToDeviceList: includes an empty
      * {@code <enc type="skmsg">} for GROUP_DIRECT fanout type.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCreateFanoutStanza", exports = "createFanoutMsgStanza",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static NodeBuilder build(
             String messageId,
             Jid chatJid,
@@ -190,6 +197,8 @@ public final class ChatFanoutStanza {
      * backward-compatible overload for callers that do not provide a
      * cstoken node.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCreateFanoutStanza", exports = "createFanoutMsgStanza",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static NodeBuilder build(
             String messageId,
             Jid chatJid,
@@ -239,6 +248,8 @@ public final class ChatFanoutStanza {
      * {@code <enc v="2" type="pkmsg|msg" mediatype="..." decrypt-fail="..."
      * native_flow_name="...">ciphertext</enc>}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCreateFanoutStanza", exports = "createFanoutMsgStanza",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static Node buildEncNode(
             MessageEncryptedPayload payload,
             String mediaType,
@@ -263,6 +274,8 @@ public final class ChatFanoutStanza {
      * @implNote WAWebSendMsgCreateFanoutStanza: wraps each payload in
      * {@code <to jid=...><enc ...>ciphertext</enc><content_binding>tag</content_binding></to>}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCreateFanoutStanza", exports = "createFanoutMsgStanza",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static Node buildParticipantsNode(
             List<MessageEncryptedPayload> payloads,
             String mediaType,

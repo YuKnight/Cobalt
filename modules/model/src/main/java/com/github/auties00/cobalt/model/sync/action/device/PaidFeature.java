@@ -13,41 +13,38 @@ import java.util.OptionalLong;
  * {@link SubscriptionsSyncV2Action}.
  *
  * <p>Each entry advertises whether a named paid feature is enabled for the
- * authenticated business account, optionally bounded by a usage limit and
- * an expiration timestamp.
+ * authenticated WhatsApp Business account, optionally bounded by a usage limit
+ * (for example a monthly cap on marketing messages) and an expiration timestamp
+ * after which the feature reverts to its free tier behaviour.
  *
- * @implNote WAWebProtobufsServerSync.SyncActionValue$SubscriptionsSyncV2Action$PaidFeature
+ * <p>A business account can carry many of these entries in parallel, one per
+ * feature; the containing {@link SubscriptionsSyncV2Action} replicates the full
+ * list to every linked device whenever subscription state changes server side.
  */
 @ProtobufMessage(name = "SyncActionValue.SubscriptionsSyncV2Action.PaidFeature")
 public final class PaidFeature {
     /**
-     * The canonical paid feature name reported by the server.
-     *
-     * @implNote WAWebProtobufsServerSync.SyncActionValue$SubscriptionsSyncV2Action$PaidFeature.name
+     * Canonical name of the paid feature, as defined by the server side catalog.
      */
     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
     String name;
 
     /**
-     * Whether the feature is currently enabled for the account.
-     *
-     * @implNote WAWebProtobufsServerSync.SyncActionValue$SubscriptionsSyncV2Action$PaidFeature.enabled
+     * Flag indicating whether the feature is currently enabled for the account.
      */
     @ProtobufProperty(index = 2, type = ProtobufType.BOOL)
     Boolean enabled;
 
     /**
-     * The optional usage limit attached to this feature.
-     *
-     * @implNote WAWebProtobufsServerSync.SyncActionValue$SubscriptionsSyncV2Action$PaidFeature.limit
+     * Optional usage limit attached to the feature, for example a maximum number
+     * of messages that can be sent within a billing window.
      */
     @ProtobufProperty(index = 3, type = ProtobufType.INT32)
     Integer limit;
 
     /**
-     * The optional expiration timestamp, in seconds since the epoch.
-     *
-     * @implNote WAWebProtobufsServerSync.SyncActionValue$SubscriptionsSyncV2Action$PaidFeature.expirationTime
+     * Optional expiration timestamp, expressed in seconds since the epoch, after
+     * which the feature is no longer considered enabled.
      */
     @ProtobufProperty(index = 4, type = ProtobufType.INT64)
     Long expirationTime;
@@ -55,11 +52,11 @@ public final class PaidFeature {
     /**
      * Constructs a new {@code PaidFeature} from raw protobuf field values.
      *
-     * @param name           the feature name
-     * @param enabled        the enabled flag
-     * @param limit          the usage limit
-     * @param expirationTime the expiration timestamp in seconds
-     * @implNote WAWebProtobufsServerSync.SyncActionValue$SubscriptionsSyncV2Action$PaidFeature
+     * @param name           the canonical feature name, possibly {@code null}
+     * @param enabled        whether the feature is enabled, possibly {@code null}
+     * @param limit          the optional usage limit, possibly {@code null}
+     * @param expirationTime the optional expiration timestamp in seconds,
+     *                       possibly {@code null}
      */
     PaidFeature(String name, Boolean enabled, Integer limit, Long expirationTime) {
         this.name = name;
@@ -69,53 +66,52 @@ public final class PaidFeature {
     }
 
     /**
-     * Returns the canonical paid feature name, if present.
+     * Returns the canonical name of this paid feature, if one was encoded.
      *
-     * @return an {@link Optional} containing the feature name
-     * @implNote WAWebProtobufsServerSync.SyncActionValue$SubscriptionsSyncV2Action$PaidFeature.name
+     * @return an {@link Optional} containing the feature name, or
+     *         {@link Optional#empty()} if absent
      */
     public Optional<String> name() {
         return Optional.ofNullable(name);
     }
 
     /**
-     * Returns whether this feature is enabled.
+     * Returns whether this feature is currently enabled for the account.
      *
-     * <p>Returns {@code false} if the field was unset on the wire.
-     *
-     * @return {@code true} if the feature is enabled
-     * @implNote WAWebProtobufsServerSync.SyncActionValue$SubscriptionsSyncV2Action$PaidFeature.enabled
+     * @return {@code true} if the feature is enabled, {@code false} otherwise
+     *         (including when the field was unset on the wire)
      */
     public boolean enabled() {
         return enabled != null && enabled;
     }
 
     /**
-     * Returns the usage limit attached to this feature, if any.
+     * Returns the optional usage limit attached to this feature, if one was
+     * encoded.
      *
-     * @return an {@link OptionalInt} containing the limit
-     * @implNote WAWebProtobufsServerSync.SyncActionValue$SubscriptionsSyncV2Action$PaidFeature.limit
+     * @return an {@link OptionalInt} containing the limit, or
+     *         {@link OptionalInt#empty()} if absent
      */
     public OptionalInt limit() {
         return limit == null ? OptionalInt.empty() : OptionalInt.of(limit);
     }
 
     /**
-     * Returns the expiration timestamp, in seconds since the epoch, if any.
+     * Returns the optional expiration timestamp for this feature, expressed in
+     * seconds since the epoch, if one was encoded.
      *
-     * @return an {@link OptionalLong} containing the expiration timestamp
-     * @implNote WAWebProtobufsServerSync.SyncActionValue$SubscriptionsSyncV2Action$PaidFeature.expirationTime
+     * @return an {@link OptionalLong} containing the expiration timestamp, or
+     *         {@link OptionalLong#empty()} if absent
      */
     public OptionalLong expirationTime() {
         return expirationTime == null ? OptionalLong.empty() : OptionalLong.of(expirationTime);
     }
 
     /**
-     * Sets the canonical paid feature name.
+     * Sets the canonical feature name.
      *
-     * @param name the feature name
+     * @param name the new feature name, or {@code null} to clear
      * @return this instance for method chaining
-     * @implNote WAWebProtobufsServerSync.SyncActionValue$SubscriptionsSyncV2Action$PaidFeature.name
      */
     public PaidFeature setName(String name) {
         this.name = name;
@@ -123,11 +119,11 @@ public final class PaidFeature {
     }
 
     /**
-     * Sets the enabled flag.
+     * Sets the enabled flag for this feature.
      *
-     * @param enabled the enabled flag
+     * @param enabled {@code true} to enable, {@code false} to disable, or
+     *                {@code null} to clear
      * @return this instance for method chaining
-     * @implNote WAWebProtobufsServerSync.SyncActionValue$SubscriptionsSyncV2Action$PaidFeature.enabled
      */
     public PaidFeature setEnabled(Boolean enabled) {
         this.enabled = enabled;
@@ -135,11 +131,10 @@ public final class PaidFeature {
     }
 
     /**
-     * Sets the usage limit.
+     * Sets the optional usage limit.
      *
-     * @param limit the limit
+     * @param limit the new usage limit, or {@code null} to clear
      * @return this instance for method chaining
-     * @implNote WAWebProtobufsServerSync.SyncActionValue$SubscriptionsSyncV2Action$PaidFeature.limit
      */
     public PaidFeature setLimit(Integer limit) {
         this.limit = limit;
@@ -147,11 +142,11 @@ public final class PaidFeature {
     }
 
     /**
-     * Sets the expiration timestamp.
+     * Sets the optional expiration timestamp.
      *
-     * @param expirationTime the expiration timestamp in seconds
+     * @param expirationTime the new expiration timestamp in seconds since the
+     *                       epoch, or {@code null} to clear
      * @return this instance for method chaining
-     * @implNote WAWebProtobufsServerSync.SyncActionValue$SubscriptionsSyncV2Action$PaidFeature.expirationTime
      */
     public PaidFeature setExpirationTime(Long expirationTime) {
         this.expirationTime = expirationTime;

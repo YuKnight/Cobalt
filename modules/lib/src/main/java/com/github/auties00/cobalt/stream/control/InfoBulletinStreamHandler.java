@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.stream.control;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.node.Node;
@@ -26,6 +27,11 @@ import java.util.*;
  * @implNote WAWebHandleInfoBulletin.default: the main {@code infoBulletinParser}
  * callback and the async dispatch function {@code _} / {@code f}.
  */
+@WhatsAppWebModule(moduleName = "WAWebHandleInfoBulletin")
+@WhatsAppWebModule(moduleName = "WAWebHandleDirtyBits")
+@WhatsAppWebModule(moduleName = "WAWebClearDirtyBitsJob")
+@WhatsAppWebModule(moduleName = "WAWebHandleRoutingInfo")
+@WhatsAppWebModule(moduleName = "WAWebHandleServerClientExpiration")
 public final class InfoBulletinStreamHandler implements SocketStream.Handler {
     /**
      * Logger for info bulletin events.

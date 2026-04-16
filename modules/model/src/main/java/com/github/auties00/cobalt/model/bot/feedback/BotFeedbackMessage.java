@@ -9,24 +9,33 @@ import java.util.OptionalInt;
 import java.util.OptionalLong;
 
 /**
- * A protobuf message representing user feedback on a WhatsApp AI bot response.
+ * Represents user feedback submitted on an AI bot response within a WhatsApp conversation.
  *
- * <p>This message captures the user's evaluation of an AI-generated response,
- * including thumbs-up (positive) or thumbs-down (negative) feedback, optional
- * free-text commentary, and categorized reasons for the feedback. The
- * {@code kindNegative} and {@code kindPositive} fields are bitmasks composed of
+ * <p>When a user interacts with Meta AI in WhatsApp, they can rate the quality of
+ * individual bot responses using thumbs-up or thumbs-down controls. This message
+ * captures that evaluation, including the overall {@linkplain #kind() feedback kind}
+ * (positive, negative with a specific reason, or a report), an optional
+ * {@linkplain #text() free-text comment}, and multi-select bitmasks for detailed
+ * categorization. The {@linkplain #kindNegative() negative bitmask} and
+ * {@linkplain #kindPositive() positive bitmask} are composed of
  * {@link BotFeedbackKindMultipleNegative} and {@link BotFeedbackKindMultiplePositive}
  * flag values respectively, allowing multiple feedback reasons to be expressed
  * simultaneously.
  *
- * <p>Additionally, this message may contain {@link SideBySideSurveyMetadata}
- * for A/B testing scenarios where the user compares two AI-generated responses
- * side by side.
+ * <p>In A/B testing scenarios, the message may also carry
+ * {@link SideBySideSurveyMetadata} when the user was shown two alternative AI
+ * responses and asked to choose which one was better.
+ *
+ * <p>Use {@link BotFeedbackMessagePositiveBuilder} or
+ * {@link BotFeedbackMessageNegativeBuilder} to construct instances of this class.
  */
 @ProtobufMessage(name = "BotFeedbackMessage", generateBuilder = false)
 public final class BotFeedbackMessage {
     /**
-     * The key identifying the AI bot message that this feedback refers to.
+     * The key identifying the specific AI bot message that this feedback refers to.
+     *
+     * <p>This links the feedback to the exact message in the conversation thread so the
+     * server can correlate the rating with the response that was evaluated.
      */
     @ProtobufProperty(index = 1, type = ProtobufType.MESSAGE)
     MessageKey messageKey;
@@ -47,9 +56,11 @@ public final class BotFeedbackMessage {
     /**
      * A bitmask of negative feedback reasons selected by the user.
      *
-     * <p>Each bit corresponds to a value in {@link BotFeedbackKindMultipleNegative},
-     * allowing multiple reasons to be combined, for example {@code 3L} to indicate
-     * both generic and unhelpful.
+     * <p>Each bit position corresponds to a value in
+     * {@link BotFeedbackKindMultipleNegative}, allowing multiple reasons to be
+     * bitwise-ORed together. For example, {@code 3L} would indicate both
+     * {@code BOT_FEEDBACK_MULTIPLE_NEGATIVE_GENERIC} (1) and
+     * {@code BOT_FEEDBACK_MULTIPLE_NEGATIVE_HELPFUL} (2).
      */
     @ProtobufProperty(index = 4, type = ProtobufType.UINT64)
     Long kindNegative;
@@ -77,6 +88,17 @@ public final class BotFeedbackMessage {
     @ProtobufProperty(index = 7, type = ProtobufType.MESSAGE)
     SideBySideSurveyMetadata sideBySideSurveyMetadata;
 
+    /**
+     * Constructs a new {@code BotFeedbackMessage} with the specified values.
+     *
+     * @param messageKey              the key of the bot message being rated, or {@code null}
+     * @param kind                    the overall feedback kind, or {@code null}
+     * @param text                    free-text feedback, or {@code null}
+     * @param kindNegative            bitmask of negative reasons, or {@code null}
+     * @param kindPositive            bitmask of positive reasons, or {@code null}
+     * @param kindReport              the report kind, or {@code null}
+     * @param sideBySideSurveyMetadata metadata from a side-by-side comparison, or {@code null}
+     */
     BotFeedbackMessage(MessageKey messageKey, BotFeedbackKind kind, String text, Long kindNegative, Long kindPositive, ReportKind kindReport, SideBySideSurveyMetadata sideBySideSurveyMetadata) {
         this.messageKey = messageKey;
         this.kind = kind;
@@ -208,12 +230,13 @@ public final class BotFeedbackMessage {
     }
 
     /**
-     * An enumeration of individual feedback kinds that a user can provide on
-     * an AI bot response.
+     * Enumerates the single-select feedback categories that a user can choose
+     * when rating an AI bot response.
      *
-     * <p>These values represent single-select feedback categories, as opposed
-     * to the multi-select bitmask variants in {@link BotFeedbackKindMultipleNegative}
-     * and {@link BotFeedbackKindMultiplePositive}.
+     * <p>These values represent the primary classification of the feedback.
+     * For fine-grained multi-select reasons, see the bitmask variants
+     * {@link BotFeedbackKindMultipleNegative} and
+     * {@link BotFeedbackKindMultiplePositive}.
      */
     @ProtobufEnum(name = "BotFeedbackMessage.BotFeedbackKind")
     public static enum BotFeedbackKind {
@@ -320,11 +343,13 @@ public final class BotFeedbackMessage {
     }
 
     /**
-     * An enumeration of negative feedback flag values that can be combined as a
-     * bitmask in the {@link BotFeedbackMessage#kindNegative()} field.
+     * Enumerates negative feedback flag values that can be combined as a bitmask
+     * in the {@link BotFeedbackMessage#kindNegative()} field.
      *
-     * <p>Each constant's index is a power of two, allowing multiple reasons to be
-     * bitwise-ORed together into a single {@code long} value.
+     * <p>Each constant's index is a power of two, allowing multiple reasons to
+     * be bitwise-ORed together into a single {@code long} value. For example,
+     * combining {@link #BOT_FEEDBACK_MULTIPLE_NEGATIVE_GENERIC} and
+     * {@link #BOT_FEEDBACK_MULTIPLE_NEGATIVE_HELPFUL} yields {@code 3L}.
      */
     @ProtobufEnum(name = "BotFeedbackMessage.BotFeedbackKindMultipleNegative")
     public static enum BotFeedbackKindMultipleNegative {
@@ -407,11 +432,12 @@ public final class BotFeedbackMessage {
     }
 
     /**
-     * An enumeration of positive feedback flag values that can be combined as a
-     * bitmask in the {@link BotFeedbackMessage#kindPositive()} field.
+     * Enumerates positive feedback flag values that can be combined as a bitmask
+     * in the {@link BotFeedbackMessage#kindPositive()} field.
      *
-     * <p>Each constant's index is a power of two, allowing multiple reasons to be
-     * bitwise-ORed together into a single {@code long} value.
+     * <p>Each constant's index is a power of two, allowing multiple reasons to
+     * be bitwise-ORed together into a single {@code long} value. Currently only
+     * a single generic positive flag is defined.
      */
     @ProtobufEnum(name = "BotFeedbackMessage.BotFeedbackKindMultiplePositive")
     public static enum BotFeedbackKindMultiplePositive {
@@ -446,8 +472,8 @@ public final class BotFeedbackMessage {
     }
 
     /**
-     * An enumeration of report kinds that a user can select when reporting an
-     * AI bot response as problematic.
+     * Enumerates the report kinds that a user can select when flagging an AI
+     * bot response as problematic, beyond simple positive or negative feedback.
      */
     @ProtobufEnum(name = "BotFeedbackMessage.ReportKind")
     public static enum ReportKind {
@@ -486,11 +512,14 @@ public final class BotFeedbackMessage {
     }
 
     /**
-     * A protobuf message containing metadata from a side-by-side survey in which
-     * a user compares two AI-generated responses and selects a preferred one.
+     * Represents metadata from a side-by-side survey in which a user compares
+     * two AI-generated responses and selects which one they prefer.
      *
-     * <p>This metadata captures the user's selection, the survey identifier, and
-     * analytics data used for A/B testing of AI response quality.
+     * <p>During A/B testing of Meta AI response quality, the client may present
+     * two alternative responses and ask the user to pick the better one. This
+     * metadata captures the user's selection, the survey and session identifiers
+     * (mapped from WA Web's internal "Simon" and "Tessa" analytics platforms),
+     * and detailed analytics event data for telemetry.
      */
     @ProtobufMessage(name = "BotFeedbackMessage.SideBySideSurveyMetadata")
     public static final class SideBySideSurveyMetadata {
@@ -508,21 +537,22 @@ public final class BotFeedbackMessage {
         Integer surveyId;
 
         /**
-         * The session identifier for the survey platform, for example {@code "1234567890"}.
+         * The survey platform session identifier. In WA Web this is the internal
+         * "Simon" session FBID used by Meta's survey infrastructure.
          */
         @ProtobufProperty(index = 3, type = ProtobufType.STRING)
         String surveySessionId;
 
         /**
-         * The original trace identifier of the AI response being evaluated,
-         * for example {@code "otid_xyz789"}.
+         * The original trace identifier (OTID) of the AI response being evaluated.
+         * In WA Web this field is named {@code responseOtid}.
          */
         @ProtobufProperty(index = 4, type = ProtobufType.STRING)
         String responseOriginalTraceId;
 
         /**
-         * The timestamp in milliseconds when the AI response was generated,
-         * encoded as a string, for example {@code "1700000000000"}.
+         * The timestamp in milliseconds when the AI response was generated, encoded
+         * as a string. In WA Web this field is named {@code responseTimestampMsString}.
          */
         @ProtobufProperty(index = 5, type = ProtobufType.STRING)
         String responseTimestampMillis;
@@ -743,28 +773,32 @@ public final class BotFeedbackMessage {
     }
 
         /**
-         * A protobuf message containing analytics event tracking data for a
-         * side-by-side survey.
+         * Carries analytics event tracking data for a side-by-side survey.
          *
          * <p>This captures the analytics event name and session identifiers used
-         * to correlate survey interactions with backend analytics systems.
+         * to correlate survey interactions with Meta's backend analytics systems.
+         * The fields map to WA Web's internal "Tessa" (analytics) and "Simon"
+         * (survey) platform identifiers.
          */
         @ProtobufMessage(name = "BotFeedbackMessage.SideBySideSurveyMetadata.SideBySideSurveyAnalyticsData")
         public static final class SideBySideSurveyAnalyticsData {
             /**
-             * The name of the analytics event to log, for example {@code "sbs_survey_completed"}.
+             * The name of the analytics event to log. In WA Web this field is
+             * named {@code tessaEvent} after Meta's Tessa analytics platform.
              */
             @ProtobufProperty(index = 1, type = ProtobufType.STRING)
             String analyticsEvent;
 
             /**
-             * The analytics platform session identifier, for example {@code "9876543210"}.
+             * The analytics platform session identifier. In WA Web this field is
+             * named {@code tessaSessionFbid} after Meta's Tessa analytics platform.
              */
             @ProtobufProperty(index = 2, type = ProtobufType.STRING)
             String analyticsSessionId;
 
             /**
-             * The survey platform session identifier, for example {@code "1234567890"}.
+             * The survey platform session identifier. In WA Web this field is
+             * named {@code simonSessionFbid} after Meta's Simon survey platform.
              */
             @ProtobufProperty(index = 3, type = ProtobufType.STRING)
             String surveySessionId;
@@ -772,9 +806,9 @@ public final class BotFeedbackMessage {
             /**
              * Constructs a new {@code SideBySideSurveyAnalyticsData} with the specified fields.
              *
-             * @param analyticsEvent    the analytics event name
-             * @param analyticsSessionId the analytics platform session identifier
-             * @param surveySessionId   the survey platform session identifier
+             * @param analyticsEvent     the analytics event name, or {@code null}
+             * @param analyticsSessionId the analytics platform session identifier, or {@code null}
+             * @param surveySessionId    the survey platform session identifier, or {@code null}
              */
             SideBySideSurveyAnalyticsData(String analyticsEvent, String analyticsSessionId, String surveySessionId) {
                 this.analyticsEvent = analyticsEvent;
@@ -838,12 +872,14 @@ public final class BotFeedbackMessage {
         }
 
         /**
-         * A protobuf message containing Meta AI-specific analytics data for a
-         * side-by-side survey.
+         * Carries Meta AI-specific analytics data for a side-by-side survey.
          *
-         * <p>This captures detailed event data including CTA impressions, clicks,
-         * card impressions, response selections, and survey abandonment events,
-         * along with their associated timing and metadata.
+         * <p>This captures granular event data for each step of the survey user
+         * journey: CTA impressions, CTA clicks, card impressions, response
+         * selections, and survey abandonment. Each event sub-message records
+         * timing (dwell time) and contextual metadata. Timestamps in this
+         * message are encoded as millisecond strings (matching WA Web's
+         * {@code timestampMsString} convention).
          */
         @ProtobufMessage(name = "BotFeedbackMessage.SideBySideSurveyMetadata.SidebySideSurveyMetaAiAnalyticsData")
         public static final class SidebySideSurveyMetaAiAnalyticsData {
@@ -869,7 +905,8 @@ public final class BotFeedbackMessage {
 
             /**
              * The timestamp in milliseconds when this analytics event occurred,
-             * encoded as a string, for example {@code "1700000000000"}.
+             * encoded as a string. In WA Web this field is named
+             * {@code timestampMsString}.
              */
             @ProtobufProperty(index = 4, type = ProtobufType.STRING)
             String timestampMillis;
@@ -1092,14 +1129,16 @@ public final class BotFeedbackMessage {
     }
 
             /**
-             * A protobuf message containing event data recorded when a user abandons
-             * a side-by-side survey without completing it.
+             * Carries event data recorded when a user abandons a side-by-side
+             * survey without completing it. The dwell time captures how long
+             * the user had the survey open before navigating away.
              */
             @ProtobufMessage(name = "BotFeedbackMessage.SideBySideSurveyMetadata.SidebySideSurveyMetaAiAnalyticsData.SideBySideSurveyAbandonEventData")
             public static final class SideBySideSurveyAbandonEventData {
                 /**
                  * The dwell time in milliseconds before the user abandoned the survey,
-                 * encoded as a string, for example {@code "5000"}.
+                 * encoded as a string. In WA Web this field is named
+                 * {@code abandonDwellTimeMsString}.
                  */
                 @ProtobufProperty(index = 1, type = ProtobufType.STRING)
                 String abandonDwellTimeMillis;
@@ -1134,8 +1173,9 @@ public final class BotFeedbackMessage {
             }
 
             /**
-             * A protobuf message containing event data recorded when a user clicks
-             * the call-to-action button of a side-by-side survey.
+             * Carries event data recorded when a user clicks the call-to-action
+             * button of a side-by-side survey. Captures whether the survey had
+             * already expired and the time the user spent before clicking.
              */
             @ProtobufMessage(name = "BotFeedbackMessage.SideBySideSurveyMetadata.SidebySideSurveyMetaAiAnalyticsData.SideBySideSurveyCTAClickEventData")
             public static final class SideBySideSurveyCTAClickEventData {
@@ -1147,7 +1187,8 @@ public final class BotFeedbackMessage {
 
                 /**
                  * The dwell time in milliseconds before the user clicked the CTA,
-                 * encoded as a string, for example {@code "3000"}.
+                 * encoded as a string. In WA Web this field is named
+                 * {@code clickDwellTimeMsString}.
                  */
                 @ProtobufProperty(index = 2, type = ProtobufType.STRING)
                 String clickDwellTimeMillis;
@@ -1202,11 +1243,9 @@ public final class BotFeedbackMessage {
             }
 
             /**
-             * A protobuf message containing event data recorded when the survey
-             * comparison card is displayed to the user.
-             *
-             * <p>This is a marker message with no fields, used to signal that the
-             * card impression event occurred.
+             * Carries event data recorded when the survey call-to-action is
+             * displayed to the user (impression event). Tracks whether the
+             * survey had already expired at the time of the impression.
              */
             @ProtobufMessage(name = "BotFeedbackMessage.SideBySideSurveyMetadata.SidebySideSurveyMetaAiAnalyticsData.SideBySideSurveyCTAImpressionEventData")
             public static final class SideBySideSurveyCTAImpressionEventData {
@@ -1246,8 +1285,7 @@ public final class BotFeedbackMessage {
             }
 
             /**
-             * A protobuf message representing a card impression event in a side-by-side
-             * survey.
+             * Represents a card impression event in a side-by-side survey.
              *
              * <p>This is a marker message with no fields, used to signal that the
              * survey comparison card was displayed to the user.
@@ -1262,14 +1300,16 @@ public final class BotFeedbackMessage {
             }
 
             /**
-             * A protobuf message containing event data recorded when a user submits
-             * a response selection in a side-by-side survey.
+             * Carries event data recorded when a user submits a response selection
+             * in a side-by-side survey, including how long the user deliberated
+             * and which response they chose.
              */
             @ProtobufMessage(name = "BotFeedbackMessage.SideBySideSurveyMetadata.SidebySideSurveyMetaAiAnalyticsData.SideBySideSurveyResponseEventData")
             public static final class SideBySideSurveyResponseEventData {
                 /**
                  * The dwell time in milliseconds before the user submitted a response,
-                 * encoded as a string, for example {@code "8000"}.
+                 * encoded as a string. In WA Web this field is named
+                 * {@code responseDwellTimeMsString}.
                  */
                 @ProtobufProperty(index = 1, type = ProtobufType.STRING)
                 String responseDwellTimeMillis;

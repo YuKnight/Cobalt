@@ -7,20 +7,20 @@ import java.util.OptionalInt;
 import java.util.OptionalLong;
 
 /**
- * A monetary amount expressed as a scaled integer value together with an ISO 4217 currency
- * code.
+ * A monetary amount expressed as a scaled integer value together with an ISO 4217
+ * currency code.
  *
- * <p>The {@link #value() value} field carries the raw numeric amount. To obtain the real
- * monetary figure, divide by the {@link #offset() offset}. When the offset is absent or
- * {@code 0}, the WhatsApp client treats it as {@code 1000}, meaning the value is expressed
- * in thousandths of the major currency unit. For example, a value of {@code 5500} with an
- * offset of {@code 1000} (or absent) represents {@code 5.50} in the currency indicated by
- * {@link #currencyCode()}.
+ * <p>The {@link #value() value} field carries the raw numeric amount. To obtain the
+ * real monetary figure, divide by the {@link #offset() offset}. When the offset is
+ * absent or {@code 0}, it is treated as {@code 1000}, meaning the value is expressed
+ * in thousandths of the major currency unit. For example, a value of {@code 5500}
+ * with an offset of {@code 1000} (or absent) represents {@code 5.50} in the currency
+ * indicated by {@link #currencyCode()}.
  *
- * <p>This model mirrors the {@code Money} protobuf message defined in the WhatsApp Web
- * protocol and is referenced by {@link PaymentInfo} as well as by
+ * <p>This type is used by {@link PaymentInfo} as well as by
  * {@link com.github.auties00.cobalt.model.message.payment.RequestPaymentMessage
- * RequestPaymentMessage} to carry structured amount information.
+ * RequestPaymentMessage} to carry structured amount information alongside payment
+ * messages.
  */
 @ProtobufMessage(name = "Money")
 public final class Money {
@@ -34,8 +34,7 @@ public final class Money {
 
     /**
      * The scale divisor applied to {@link #value() value} to convert it into the
-     * major currency unit. When absent or {@code 0}, the WhatsApp client defaults
-     * this to {@code 1000}.
+     * major currency unit. When absent or {@code 0}, this defaults to {@code 1000}.
      */
     @ProtobufProperty(index = 2, type = ProtobufType.UINT32)
     Integer offset;
@@ -92,7 +91,6 @@ public final class Money {
      * Sets the raw numeric monetary value.
      *
      * @param value the scaled integer value
-     * @return this instance
      */
     public void setValue(Long value) {
         this.value = value;
@@ -102,7 +100,6 @@ public final class Money {
      * Sets the scale divisor for the monetary value.
      *
      * @param offset the divisor, or {@code null} to default to {@code 1000}
-     * @return this instance
      */
     public void setOffset(Integer offset) {
         this.offset = offset;
@@ -112,7 +109,6 @@ public final class Money {
      * Sets the ISO 4217 currency code.
      *
      * @param currencyCode the currency code
-     * @return this instance
      */
     public void setCurrencyCode(String currencyCode) {
         this.currencyCode = currencyCode;

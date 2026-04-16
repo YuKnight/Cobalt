@@ -6,46 +6,47 @@ import java.util.Optional;
 import java.util.OptionalLong;
 
 /**
- * A server-originated notification that informs the client about the
- * availability of a media file through an express download path.
+ * A server-originated notification announcing that a media file can be fetched
+ * through an optimized express download path.
  *
- * <p>When a media file is available on the CDN via an optimized express path,
- * the server sends this notification so the client can bypass the standard
- * download flow and fetch the file directly from the express path URL. The
- * client uses the encrypted file hash to match this notification to the
- * corresponding media message and the file length for download validation.
+ * <p>WhatsApp can make certain media available on a faster CDN route than the
+ * default one; when it does, the server emits this notification so the client
+ * can bypass the normal download flow and retrieve the file directly from the
+ * express path URL. The notification is correlated with the originating media
+ * message through the encrypted-file hash, and the file length is included for
+ * download validation.
  *
- * <p>This message is defined in {@code WAWebProtobufsE2E.pb} and appears at
- * field index 21 inside the {@code ProtocolMessage} structure.
+ * <p>Instances of this type are typically received as part of a wider protocol
+ * message rather than constructed by client code.
  */
 @ProtobufMessage(name = "MediaNotifyMessage")
 public final class MediaNotifyMessage {
     /**
-     * The express path URL from which the media file can be downloaded
-     * through the optimized CDN route.
+     * The optimized CDN URL from which the media file can be retrieved.
      */
     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
     String expressPathUrl;
 
     /**
-     * The SHA-256 digest of the encrypted media file, used to correlate
-     * this notification with the corresponding media message.
+     * The SHA-256 digest of the encrypted media file, used to match this
+     * notification to the corresponding media message.
      */
     @ProtobufProperty(index = 2, type = ProtobufType.BYTES)
     byte[] fileEncSha256;
 
     /**
-     * The total length of the media file in bytes.
+     * The total size of the media file in bytes.
      */
     @ProtobufProperty(index = 3, type = ProtobufType.UINT64)
     Long fileLength;
 
     /**
-     * Constructs a new {@code MediaNotifyMessage} with the given field values.
+     * Constructs a new {@code MediaNotifyMessage} with the given express-path
+     * coordinates.
      *
-     * @param expressPathUrl the express path URL for optimized download
+     * @param expressPathUrl the optimized CDN URL
      * @param fileEncSha256  the SHA-256 digest of the encrypted file
-     * @param fileLength     the total file length in bytes
+     * @param fileLength     the file size in bytes
      */
     MediaNotifyMessage(String expressPathUrl, byte[] fileEncSha256, Long fileLength) {
         this.expressPathUrl = expressPathUrl;
@@ -54,9 +55,9 @@ public final class MediaNotifyMessage {
     }
 
     /**
-     * Returns the express path URL from which the media file can be downloaded.
+     * Returns the optimized CDN URL from which the media file can be retrieved.
      *
-     * @return an {@link Optional} containing the express path URL, or empty if not set
+     * @return an {@link Optional} containing the URL, or empty if not set
      */
     public Optional<String> expressPathUrl() {
         return Optional.ofNullable(expressPathUrl);
@@ -65,14 +66,14 @@ public final class MediaNotifyMessage {
     /**
      * Returns the SHA-256 digest of the encrypted media file.
      *
-     * @return an {@link Optional} containing the encrypted file hash, or empty if not set
+     * @return an {@link Optional} containing the hash bytes, or empty if not set
      */
     public Optional<byte[]> fileEncSha256() {
         return Optional.ofNullable(fileEncSha256);
     }
 
     /**
-     * Returns the total length of the media file in bytes.
+     * Returns the total size of the media file in bytes.
      *
      * @return an {@link OptionalLong} containing the file length, or empty if not set
      */
@@ -81,7 +82,7 @@ public final class MediaNotifyMessage {
     }
 
     /**
-     * Sets the express path URL for optimized download.
+     * Sets the optimized CDN URL.
      *
      * @param expressPathUrl the express path URL
      */
@@ -99,7 +100,7 @@ public final class MediaNotifyMessage {
     }
 
     /**
-     * Sets the total file length in bytes.
+     * Sets the total size of the media file in bytes.
      *
      * @param fileLength the file length
      */

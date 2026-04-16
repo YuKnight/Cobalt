@@ -5,99 +5,107 @@ import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
 
 /**
- * Stores per-mutation state in the sync action entry map, including the MAC
- * values used for LT-Hash computation, the key ID of the encrypting key, and
- * the plaintext index and action data needed for key rotation re-encryption.
+ * Persistent state kept for each app state sync mutation that has been
+ * observed locally.
  *
- * <p>The key ID is preserved so that REMOVE operations can use the original
- * SET mutation's key for encryption, matching WhatsApp Web behavior.
+ * <p>The entry stores everything required to:
+ * <ul>
+ *   <li>recompute the collection level integrity hash (via the index and
+ *       value MAC pair)</li>
+ *   <li>re-encrypt the mutation under a newer app state sync key during key
+ *       rotation, without requiring a full resync from the server</li>
+ *   <li>audit mutation processing and drive orphan retry through the
+ *       {@link SyncActionState} category together with the target entity
+ *       type and identifier</li>
+ * </ul>
  *
- * <p>The plaintext index and action value are preserved so that key rotation
- * can re-encrypt entries using the latest app state sync key without requiring
- * a full re-sync from the server.
+ * <p>The key identifier of the encrypting key is preserved so that the
+ * {@code REMOVE} operation that follows a {@code SET} can reuse the same
+ * key, matching the protocol requirement for paired set and remove
+ * mutations.
  */
 @ProtobufMessage
 public final class SyncActionEntry {
     /**
-     * The HMAC of the mutation's plaintext index, used as a lookup key in the
+     * HMAC of the plaintext mutation index, used as the lookup key in the
      * sync action entry map.
      */
     @ProtobufProperty(index = 1, type = ProtobufType.BYTES)
     byte[] indexMac;
 
     /**
-     * The HMAC of the mutation's encrypted value, used in LT-Hash computation.
+     * HMAC of the encrypted mutation value, used as input to the collection
+     * integrity hash that protects against tampering and reordering.
      */
     @ProtobufProperty(index = 2, type = ProtobufType.BYTES)
     byte[] valueMac;
 
     /**
-     * The ID of the app state sync key that was used to encrypt this mutation.
+     * Identifier of the app state sync key that was used to encrypt the
+     * mutation, preserved so that matched set and remove mutations reuse
+     * the same key.
      */
     @ProtobufProperty(index = 3, type = ProtobufType.BYTES)
     byte[] keyId;
 
     /**
-     * The plaintext index string of the mutation, preserved for key rotation
-     * re-encryption.
+     * Plaintext index string of the mutation, preserved so the entry can be
+     * re-encrypted under a rotated app state sync key without a full resync.
      */
     @ProtobufProperty(index = 4, type = ProtobufType.STRING)
     String actionIndex;
 
     /**
-     * The decoded action value of the mutation, preserved for key rotation
-     * re-encryption.
+     * Decoded action value of the mutation, preserved so the entry can be
+     * re-encrypted under a rotated app state sync key without a full resync.
      */
     @ProtobufProperty(index = 5, type = ProtobufType.MESSAGE)
     SyncActionValue actionValue;
 
     /**
-     * The action version of the mutation, preserved for key rotation
-     * re-encryption.
+     * Action schema version of the mutation, preserved so the entry can be
+     * re-encrypted under a rotated app state sync key without a full resync.
      */
     @ProtobufProperty(index = 6, type = ProtobufType.INT32)
     int actionVersion;
 
     /**
-     * The processing state of this sync action mutation.
-     *
-     * <p>Per WhatsApp Web, every mutation is tracked with a state such as
-     * {@code SUCCESS}, {@code ORPHAN}, or {@code UNSUPPORTED} to enable
-     * proper auditing and re-processing.
+     * Processing outcome of the mutation, enabling auditing, orphan
+     * management, and replay of mutations that could not be applied during
+     * their initial sync round.
      */
     @ProtobufProperty(index = 7, type = ProtobufType.INT32)
     SyncActionState actionState;
 
     /**
-     * The identifier of the entity this action targets.
-     *
-     * <p>For example, a chat JID for chat actions, or a message ID for
-     * message actions. Used for event-driven orphan retry.
+     * Identifier of the entity targeted by the mutation, such as a chat JID
+     * for chat actions or a message id for message actions, used together
+     * with {@link #modelType} to drive targeted orphan replay on entity
+     * arrival.
      */
     @ProtobufProperty(index = 8, type = ProtobufType.STRING)
     String modelId;
 
     /**
-     * The type of entity this action targets.
-     *
-     * <p>For example, {@code "chat"}, {@code "message"}, or {@code "contact"}.
-     * Used in combination with {@code modelId} for targeted orphan retry.
+     * Kind of entity targeted by the mutation, such as {@code "chat"},
+     * {@code "message"}, or {@code "contact"}, used together with
+     * {@link #modelId} to drive targeted orphan replay on entity arrival.
      */
     @ProtobufProperty(index = 9, type = ProtobufType.STRING)
     String modelType;
 
     /**
-     * Constructs a new {@code SyncActionEntry} with the given field values.
+     * Constructs a new sync action entry with the given fields.
      *
-     * @param indexMac      the HMAC of the mutation index
-     * @param valueMac      the HMAC of the encrypted value
-     * @param keyId         the encrypting key ID
-     * @param actionIndex   the plaintext index string
-     * @param actionValue   the decoded action value
-     * @param actionVersion the action version number
-     * @param actionState   the processing state of this mutation
-     * @param modelId       the entity identifier this action targets
-     * @param modelType     the entity type this action targets
+     * @param indexMac the HMAC of the plaintext index
+     * @param valueMac the HMAC of the encrypted value
+     * @param keyId the identifier of the encrypting app state sync key
+     * @param actionIndex the plaintext index string
+     * @param actionValue the decoded action payload
+     * @param actionVersion the action schema version
+     * @param actionState the processing outcome for the mutation
+     * @param modelId the identifier of the targeted entity
+     * @param modelType the kind of the targeted entity
      */
     SyncActionEntry(byte[] indexMac, byte[] valueMac, byte[] keyId, String actionIndex, SyncActionValue actionValue, int actionVersion, SyncActionState actionState, String modelId, String modelType) {
         this.indexMac = indexMac;
@@ -112,7 +120,7 @@ public final class SyncActionEntry {
     }
 
     /**
-     * Returns the HMAC of the mutation index.
+     * Returns the HMAC of the plaintext mutation index.
      *
      * @return the index MAC bytes
      */
@@ -121,7 +129,7 @@ public final class SyncActionEntry {
     }
 
     /**
-     * Returns the HMAC of the encrypted value.
+     * Returns the HMAC of the encrypted mutation value.
      *
      * @return the value MAC bytes
      */
@@ -130,16 +138,17 @@ public final class SyncActionEntry {
     }
 
     /**
-     * Returns the ID of the encrypting key.
+     * Returns the identifier of the encrypting app state sync key.
      *
-     * @return the key ID bytes
+     * @return the key identifier bytes
      */
     public byte[] keyId() {
         return keyId;
     }
 
     /**
-     * Returns the plaintext index string.
+     * Returns the plaintext index string preserved for key rotation
+     * re-encryption.
      *
      * @return the index string, or {@code null} if not stored
      */
@@ -148,7 +157,8 @@ public final class SyncActionEntry {
     }
 
     /**
-     * Returns the decoded action value.
+     * Returns the decoded action value preserved for key rotation
+     * re-encryption.
      *
      * @return the action value, or {@code null} if not stored
      */
@@ -157,7 +167,8 @@ public final class SyncActionEntry {
     }
 
     /**
-     * Returns the action version number.
+     * Returns the action schema version preserved for key rotation
+     * re-encryption.
      *
      * @return the action version
      */
@@ -166,7 +177,7 @@ public final class SyncActionEntry {
     }
 
     /**
-     * Sets the HMAC of the mutation index.
+     * Sets the HMAC of the plaintext mutation index.
      *
      * @param indexMac the index MAC bytes
      */
@@ -175,7 +186,7 @@ public final class SyncActionEntry {
     }
 
     /**
-     * Sets the HMAC of the encrypted value.
+     * Sets the HMAC of the encrypted mutation value.
      *
      * @param valueMac the value MAC bytes
      */
@@ -184,16 +195,17 @@ public final class SyncActionEntry {
     }
 
     /**
-     * Sets the ID of the encrypting key.
+     * Sets the identifier of the encrypting app state sync key.
      *
-     * @param keyId the key ID bytes
+     * @param keyId the key identifier bytes
      */
     public void setKeyId(byte[] keyId) {
         this.keyId = keyId;
     }
 
     /**
-     * Sets the plaintext index string.
+     * Sets the plaintext index string preserved for key rotation
+     * re-encryption.
      *
      * @param actionIndex the index string
      */
@@ -202,7 +214,7 @@ public final class SyncActionEntry {
     }
 
     /**
-     * Sets the decoded action value.
+     * Sets the decoded action value preserved for key rotation re-encryption.
      *
      * @param actionValue the action value
      */
@@ -211,7 +223,7 @@ public final class SyncActionEntry {
     }
 
     /**
-     * Sets the action version number.
+     * Sets the action schema version preserved for key rotation re-encryption.
      *
      * @param actionVersion the action version
      */
@@ -220,7 +232,7 @@ public final class SyncActionEntry {
     }
 
     /**
-     * Returns the processing state of this sync action mutation.
+     * Returns the processing outcome of the mutation.
      *
      * @return the action state, or {@code null} if not set
      */
@@ -229,7 +241,7 @@ public final class SyncActionEntry {
     }
 
     /**
-     * Sets the processing state of this sync action mutation.
+     * Sets the processing outcome of the mutation.
      *
      * @param actionState the action state
      */
@@ -238,36 +250,36 @@ public final class SyncActionEntry {
     }
 
     /**
-     * Returns the identifier of the entity this action targets.
+     * Returns the identifier of the entity targeted by the mutation.
      *
-     * @return the model ID, or {@code null} if not set
+     * @return the entity identifier, or {@code null} if not set
      */
     public String modelId() {
         return modelId;
     }
 
     /**
-     * Sets the identifier of the entity this action targets.
+     * Sets the identifier of the entity targeted by the mutation.
      *
-     * @param modelId the model ID
+     * @param modelId the entity identifier
      */
     public void setModelId(String modelId) {
         this.modelId = modelId;
     }
 
     /**
-     * Returns the type of entity this action targets.
+     * Returns the kind of entity targeted by the mutation.
      *
-     * @return the model type, or {@code null} if not set
+     * @return the entity kind, or {@code null} if not set
      */
     public String modelType() {
         return modelType;
     }
 
     /**
-     * Sets the type of entity this action targets.
+     * Sets the kind of entity targeted by the mutation.
      *
-     * @param modelType the model type
+     * @param modelType the entity kind
      */
     public void setModelType(String modelType) {
         this.modelType = modelType;

@@ -5,17 +5,20 @@ import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.SyncActionArgs;
 
 /**
- * Index arguments for {@link MarkChatAsReadAction}.
+ * Index arguments for a {@link MarkChatAsReadAction}.
  *
- * <p>The sync index produced is {@code ["markChatAsRead", chatJid]}.
+ * <p>Read status is keyed by the target chat, so the sync index is built
+ * from the canonical action name followed by the chat JID.
  *
- * @param chatJid the JID of the chat being marked as read or unread
+ * <p>The encoded index is {@code ["markChatAsRead", chatJid]}.
+ *
+ * @param chatJid the {@link Jid} of the chat being marked as read or unread
  */
 public record MarkChatAsReadActionArgs(Jid chatJid) implements SyncActionArgs {
     /**
-     * {@inheritDoc}
+     * Converts this record into the tail portion of the sync index array.
      *
-     * @return a single-element array containing the chat JID string
+     * @return a single-element array containing the chat JID as a string
      */
     @Override
     public String[] toIndexArgs() {

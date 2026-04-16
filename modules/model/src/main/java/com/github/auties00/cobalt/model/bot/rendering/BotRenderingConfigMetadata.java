@@ -6,14 +6,15 @@ import java.util.Optional;
 import java.util.OptionalDouble;
 
 /**
- * Configuration metadata that controls how the AI bot response is rendered on
- * the client.
+ * Configuration metadata that controls how the AI bot response is rendered on the client.
  *
  * <p>This metadata is sent from the server as part of
- * {@link com.github.auties00.cobalt.model.bot.BotMetadata BotMetadata} to
- * specify the version of Meta's Bloks UI rendering framework that should be
- * used, along with the device's pixel density for resolution-appropriate
- * rendering.
+ * {@link com.github.auties00.cobalt.model.bot.BotMetadata BotMetadata} to specify the
+ * version of Meta's Bloks UI rendering framework that should be used, along with the
+ * device's pixel density for resolution-appropriate rendering.
+ *
+ * <p>This type is referenced from {@code BotMetadata} as the
+ * {@code botRenderingConfigMetadata} field (protobuf index 36).
  */
 @ProtobufMessage(name = "BotRenderingConfigMetadata")
 public final class BotRenderingConfigMetadata {

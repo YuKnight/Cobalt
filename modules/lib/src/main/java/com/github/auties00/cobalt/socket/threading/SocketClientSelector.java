@@ -1,8 +1,6 @@
 package com.github.auties00.cobalt.socket.threading;
 
 import com.github.auties00.cobalt.socket.layer.application.SocketClientApplicationLayerContext;
-import com.github.auties00.cobalt.socket.layer.security.SocketClientTransportSecurityLayerContext;
-import com.github.auties00.cobalt.socket.layer.security.SocketClientTunnelSecurityLayerContext;
 import com.github.auties00.cobalt.socket.layer.tunnel.SocketClientTunnelLayerContext;
 import com.github.auties00.cobalt.socket.layer.transport.SocketClientTransportLayerContext;
 
@@ -13,7 +11,10 @@ import java.nio.channels.CancelledKeyException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Predicate;
 
@@ -360,8 +361,15 @@ public final class SocketClientSelector implements Runnable {
     }
 
     /**
-     * Feeds leftover bytes from a proxy handshake into the datagram
-     * pipeline.
+     * Feeds leftover bytes from a synchronous protocol upgrade into the
+     * datagram pipeline.
+     *
+     * <p>Leftover bytes are produced by a synchronous parser that read
+     * slightly past its own message boundary (for example, the WebSocket
+     * HTTP upgrade parser consuming bytes past the empty-header terminator).
+     * Those bytes are already post-crypto plaintext and belong at the
+     * first application-layer context's buffer — feeding them any lower in
+     * the chain would re-decrypt or re-read them.
      *
      * @param channel  the channel
      * @param leftover the leftover bytes in read mode
@@ -378,20 +386,9 @@ public final class SocketClientSelector implements Runnable {
         }
 
         var ctx = (AttachmentData) key.attachment();
-
-        // Leftover bytes from the HTTP upgrade parser are already
-        // TLS-decrypted.  Feed them into the first layer above transport
-        // (which skips both the raw transport and TLS layers) so they are
-        // not erroneously re-read or re-decrypted.
-        var tunnelCtx = ctx.tunnelContext();
-        SocketClientLayerContext target;
-        if (tunnelCtx.isPresent()) {
-            target = tunnelCtx.get();
-        } else {
-            target = ctx.firstLayerAboveTransport();
-            if (target == null) {
-                return false;
-            }
+        var target = ctx.firstApplicationContext();
+        if (target == null) {
+            return false;
         }
 
         try {
@@ -578,55 +575,48 @@ public final class SocketClientSelector implements Runnable {
     }
 
     /**
-     * Per-connection context attached to a {@link SelectionKey}
-     * as its attachment.
+     * Per-connection context attached to a {@link SelectionKey}.
      *
-     * <p>Layer contexts are stored as explicit typed fields in a fixed
-     * bottom-to-top order: transport security, tunnel security, tunnel,
-     * then application layers. When a new context is registered, the
-     * chain is rebuilt automatically so the inbound processing pipeline
-     * is wired correctly.
+     * <p>Layer contexts are stored as a singly-linked list that is built
+     * in the order the factories register them (bottom-to-top).  Each new
+     * registration appends to the tail and wires the previous tail's
+     * {@code nextLayer} forward — no rebuilding, no type-based ordering,
+     * no field-per-position switch.
+     *
+     * <p>The chain order is therefore exactly the composition order used
+     * by the factory in {@code WhatsAppSocketClient.newCipheredSocketClient},
+     * so the selector can never disagree with the factory about layer
+     * positions.
+     *
+     * <p>Typed accessors are kept only for what the selector genuinely
+     * needs position-awareness of — the bottom (transport) for the write
+     * queue and connection lifecycle, and the tunnel for the pre-tunnel
+     * blocking-read phase.  All other accesses walk the chain.
      */
     private static final class AttachmentData {
         /**
          * Transport-level state: connection lifecycle, pending writes.
+         * Always the head of the chain.
          */
         private final SocketClientTransportLayerContext transportContext;
 
         /**
-         * Transport-level security context (TLS or plain passthrough).
+         * The layers in registration order, first entry is {@link #transportContext}.
+         * Short — typical depth is 3–5 entries.
          */
-        private SocketClientTransportSecurityLayerContext transportSecurity;
+        private final List<SocketClientLayerContext> layers;
 
-        /**
-         * Tunnel-level security context (TLS or plain passthrough).
-         */
-        private SocketClientTunnelSecurityLayerContext tunnelSecurity;
-
-        /**
-         * Tunnel layer context (proxy handshake and blocking reads).
-         */
-        private SocketClientTunnelLayerContext tunnel;
-
-        /**
-         * Application layer contexts in registration order (bottom-to-top).
-         */
-        private final SequencedCollection<SocketClientApplicationLayerContext> applicationLayers = new ArrayList<>();
-
-        /**
-         * Creates a context with the given transport context.
-         *
-         * @param transportContext the transport-level state
-         */
         private AttachmentData(SocketClientTransportLayerContext transportContext) {
             this.transportContext = Objects.requireNonNull(transportContext);
+            this.layers = new ArrayList<>(5);
+            this.layers.add(transportContext);
         }
 
         /**
          * Creates a new connection context wrapping the given transport context.
          *
          * @param transportContext the transport-level state for the connection
-         * @return a new {@code SocketClientContext}
+         * @return a new {@code AttachmentData}
          */
         static AttachmentData newConnectionContext(SocketClientTransportLayerContext transportContext) {
             return new AttachmentData(transportContext);
@@ -656,50 +646,62 @@ public final class SocketClientSelector implements Runnable {
         /**
          * Returns the first layer context above the transport layer.
          *
-         * <p>This is the first non-null processing layer above the raw
-         * transport, used when leftover bytes are already TLS-decrypted
-         * and should not be re-fed through the transport layer.
-         *
          * @return the first layer above transport, or {@code null} if no
          *         processing layers are registered
          */
         SocketClientLayerContext firstLayerAboveTransport() {
-            if (transportSecurity != null) return transportSecurity;
-            if (tunnelSecurity != null) return tunnelSecurity;
-            if (tunnel != null) return tunnel;
-            if (!applicationLayers.isEmpty()) return applicationLayers.getFirst();
+            return layers.size() >= 2 ? layers.get(1) : null;
+        }
+
+        /**
+         * Returns the first application layer context in the chain.
+         *
+         * <p>Used as the feed point for leftover bytes from a synchronous
+         * protocol upgrade (for example the WebSocket HTTP upgrade parser).
+         * By the time the upgrade completes, all crypto layers have been
+         * unwrapping bytes, so leftover bytes are plaintext that belongs at
+         * the first application-layer buffer.
+         *
+         * @return the first application-layer context, or {@code null}
+         *         if no application layer is registered
+         */
+        SocketClientApplicationLayerContext firstApplicationContext() {
+            for (var layer : layers) {
+                if (layer instanceof SocketClientApplicationLayerContext app) {
+                    return app;
+                }
+            }
             return null;
         }
 
         /**
-         * Registers a layer context and rebuilds the processing chain.
-         *
-         * <p>The concrete type of the context determines which field is set.
-         * Transport and tunnel security are distinguished by their
-         * respective context interfaces.
+         * Appends a layer context to the tail of the chain and wires it as
+         * the previous tail's {@code nextLayer}.
          *
          * @param layerContext the context to register
          */
         void addLayerContext(SocketClientLayerContext layerContext) {
-            switch (layerContext) {
-                case SocketClientTransportLayerContext _ -> { /* set at construction, no-op */ }
-                case SocketClientTransportSecurityLayerContext ctx -> this.transportSecurity = ctx;
-                case SocketClientTunnelSecurityLayerContext ctx -> this.tunnelSecurity = ctx;
-                case SocketClientTunnelLayerContext t -> this.tunnel = t;
-                case SocketClientApplicationLayerContext ctx -> this.applicationLayers.add(ctx);
-                default -> throw new IllegalArgumentException("Unknown layer context type: " + layerContext.getClass());
+            if (layerContext == transportContext) {
+                return;
             }
-            rebuildChain();
+            var previous = layers.getLast();
+            layers.add(layerContext);
+            previous.setNextLayer(layerContext);
         }
 
         /**
-         * Returns the tunnel layer context, if present.
+         * Returns the tunnel layer context, if any appears in the chain.
          *
          * @return an optional containing the tunnel context, or empty if
          *         no tunnel layer is registered
          */
         Optional<SocketClientTunnelLayerContext> tunnelContext() {
-            return Optional.ofNullable(tunnel);
+            for (var layer : layers) {
+                if (layer instanceof SocketClientTunnelLayerContext t) {
+                    return Optional.of(t);
+                }
+            }
+            return Optional.empty();
         }
 
         /**
@@ -739,56 +741,23 @@ public final class SocketClientSelector implements Runnable {
          * @throws IOException if layer processing fails
          */
         boolean drainAllLayers() throws IOException {
-            if (!transportContext.drainToNextLayer()) return false;
-            if (transportSecurity != null && !transportSecurity.drainToNextLayer()) return false;
-            if (tunnelSecurity != null && !tunnelSecurity.drainToNextLayer()) return false;
-            if (tunnel != null && !tunnel.drainToNextLayer()) return false;
-            for (var appLayer : applicationLayers) {
-                if (!appLayer.drainToNextLayer()) return false;
+            for (var layer : layers) {
+                if (!layer.drainToNextLayer()) {
+                    return false;
+                }
             }
             return true;
         }
 
         /**
-         * Rebuilds the {@code nextLayer} chain by walking the fields in
-         * bottom-to-top order and linking each context to the next.
-         */
-        private void rebuildChain() {
-            var layers = new ArrayList<SocketClientLayerContext>();
-            layers.add(transportContext);
-            if (transportSecurity != null) layers.add(transportSecurity);
-            if (tunnelSecurity != null) layers.add(tunnelSecurity);
-            if (tunnel != null) layers.add(tunnel);
-            layers.addAll(applicationLayers);
-            linkLayers(layers.toArray(SocketClientLayerContext[]::new));
-        }
-
-        /**
-         * Links non-null contexts in the given order, setting each one's
-         * {@code nextLayer} to the next non-null context.
-         */
-        private static void linkLayers(SocketClientLayerContext... layers) {
-            SocketClientLayerContext previous = null;
-            for (var ctx : layers) {
-                if (ctx == null) continue;
-                if (previous != null) {
-                    previous.setNextLayer(ctx);
-                }
-                previous = ctx;
-            }
-        }
-
-        /**
          * Returns the first layer context matching the predicate, walking
-         * fields in bottom-to-top order.
+         * the chain from head to tail.
          */
         private Optional<SocketClientLayerContext> findFirst(Predicate<SocketClientLayerContext> predicate) {
-            if (predicate.test(transportContext)) return Optional.of(transportContext);
-            if (transportSecurity != null && predicate.test(transportSecurity)) return Optional.of(transportSecurity);
-            if (tunnelSecurity != null && predicate.test(tunnelSecurity)) return Optional.of(tunnelSecurity);
-            if (tunnel != null && predicate.test(tunnel)) return Optional.of(tunnel);
-            for (var appLayer : applicationLayers) {
-                if (predicate.test(appLayer)) return Optional.of(appLayer);
+            for (var layer : layers) {
+                if (predicate.test(layer)) {
+                    return Optional.of(layer);
+                }
             }
             return Optional.empty();
         }

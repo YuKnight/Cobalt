@@ -13,33 +13,56 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * The reaction settings for a newsletter, controlling which emoji
- * reactions are allowed on messages.
+ * Controls which emoji reactions subscribers are allowed to post on messages
+ * published in a newsletter.
  *
- * <p>The {@link Type} determines the overall reaction policy (all,
- * basic set, none, or a custom blocklist). When the type is
- * {@link Type#BLOCKLIST}, the {@link #blockedCodes()} list contains
- * the specific emoji codes that are not permitted.
+ * <p>A newsletter admin may choose between four policies exposed by
+ * {@link Type}:
+ * <ul>
+ *   <li>{@link Type#ALL} admits every emoji</li>
+ *   <li>{@link Type#BASIC} restricts reactions to a small curated set</li>
+ *   <li>{@link Type#NONE} disables reactions entirely</li>
+ *   <li>{@link Type#BLOCKLIST} admits every emoji except those listed in
+ *       {@link #blockedCodes()}</li>
+ * </ul>
+ *
+ * <p>The {@linkplain #enabledTimestampSeconds() enabled timestamp} records
+ * when the current policy was activated, allowing clients to invalidate
+ * locally cached reaction aggregates that predate the change.
  */
 @ProtobufMessage
 public final class NewsletterReactionSettings {
+    /**
+     * The active reaction policy. Defaults to {@link Type#UNKNOWN} when not
+     * set.
+     */
     @ProtobufProperty(index = 1, type = ProtobufType.ENUM)
     Type value;
 
+    /**
+     * The emoji codes that are explicitly blocked when the policy is
+     * {@link Type#BLOCKLIST}. Ignored for all other policies.
+     */
     @ProtobufProperty(index = 2, type = ProtobufType.STRING)
     List<String> blockedCodes;
 
+    /**
+     * The moment at which the current policy was last activated, used to
+     * invalidate stale client-side caches.
+     */
     @ProtobufProperty(index = 3, type = ProtobufType.UINT64, mixins = InstantSecondsMixin.class)
     Instant enabledTimestamp;
 
     /**
-     * Constructs a new {@code NewsletterReactionSettings} with the specified
-     * type, blocked codes, and enabled timestamp.
+     * Constructs a new {@code NewsletterReactionSettings}. Invoked by the
+     * generated protobuf deserializer.
      *
-     * @param value            the reaction type policy, defaults to {@link Type#UNKNOWN}
-     *                         if {@code null}
-     * @param blockedCodes     the list of blocked emoji codes, may be {@code null}
-     * @param enabledTimestamp the timestamp when reactions were enabled, may be {@code null}
+     * @param value            the reaction policy, defaulted to
+     *                         {@link Type#UNKNOWN} when {@code null}
+     * @param blockedCodes     the blocked emoji codes, defaulted to an
+     *                         empty mutable list when {@code null}
+     * @param enabledTimestamp the moment the current policy was activated,
+     *                         may be {@code null}
      */
     NewsletterReactionSettings(Type value, List<String> blockedCodes, Instant enabledTimestamp) {
         this.value = Objects.requireNonNullElse(value, Type.UNKNOWN);
@@ -48,60 +71,75 @@ public final class NewsletterReactionSettings {
     }
 
     /**
-     * Returns the reaction type policy.
+     * Returns the active reaction policy.
      *
-     * @return the reaction type, never {@code null}
+     * @return the current policy, never {@code null}
      */
     public Type value() {
         return value;
     }
 
     /**
-     * Sets the reaction type policy.
+     * Sets the active reaction policy.
      *
-     * @param value the reaction type, defaults to {@link Type#UNKNOWN} if {@code null}
+     * @param value the new policy, defaulted to {@link Type#UNKNOWN} when
+     *              {@code null}
      */
     public void setValue(Type value) {
         this.value = Objects.requireNonNullElse(value, Type.UNKNOWN);
     }
 
     /**
-     * Returns the list of blocked emoji codes.
+     * Returns the emoji codes that are currently blocked.
      *
-     * @return an unmodifiable list of blocked codes, never {@code null}
+     * <p>The returned list is meaningful only when the policy is
+     * {@link Type#BLOCKLIST}; for every other policy clients should ignore
+     * it.
+     *
+     * @return an unmodifiable list of blocked emoji codes, never
+     *         {@code null}
      */
     public List<String> blockedCodes() {
         return blockedCodes == null ? List.of(): Collections.unmodifiableList(blockedCodes);
     }
 
     /**
-     * Sets the list of blocked emoji codes.
+     * Sets the emoji codes that are blocked when the policy is
+     * {@link Type#BLOCKLIST}.
      *
-     * @param blockedCodes the blocked codes list
+     * @param blockedCodes the new blocked codes list, or {@code null}
      */
     public void setBlockedCodes(List<String> blockedCodes) {
         this.blockedCodes = blockedCodes;
     }
 
     /**
-     * Returns the timestamp when reactions were enabled, if available.
+     * Returns the moment at which the current policy was last activated.
      *
-     * @return an {@link Optional} containing the enabled timestamp,
-     *         or empty if not set
+     * @return an {@link Optional} holding the activation instant, or empty
+     *         if it is unknown
      */
     public Optional<Instant> enabledTimestampSeconds() {
         return Optional.ofNullable(enabledTimestamp);
     }
 
     /**
-     * Sets the timestamp when reactions were enabled.
+     * Sets the moment at which the current policy was activated.
      *
-     * @param enabledTimestamp the enabled timestamp
+     * @param enabledTimestamp the new activation instant, or {@code null}
      */
     public void setEnabledTimestamp(Instant enabledTimestamp) {
         this.enabledTimestamp = enabledTimestamp;
     }
 
+    /**
+     * Returns whether these settings equal the supplied object.
+     *
+     * @param o the object to compare against
+     * @return {@code true} if {@code o} is a
+     *         {@code NewsletterReactionSettings} whose fields are all equal
+     *         to this one's
+     */
     @Override
     public boolean equals(Object o) {
         return o == this || o instanceof NewsletterReactionSettings that
@@ -110,59 +148,81 @@ public final class NewsletterReactionSettings {
                             && Objects.equals(enabledTimestamp, that.enabledTimestamp);
     }
 
+    /**
+     * Returns a hash code consistent with {@link #equals(Object)}.
+     *
+     * @return the hash code for these settings
+     */
     @Override
     public int hashCode() {
         return Objects.hash(value, blockedCodes, enabledTimestamp);
     }
 
     /**
-     * The reaction policy type for a newsletter.
-     *
-     * @since 0.1.0
+     * Enumerates the four reaction policies that may be configured for a
+     * newsletter.
      */
     @ProtobufEnum
     public enum Type {
         /**
-         * The reaction policy is not known.
+         * The policy was not reported by the server or is unrecognized by
+         * this version of the client.
          */
         UNKNOWN(0),
 
         /**
-         * All emoji reactions are allowed.
+         * Every emoji is accepted as a reaction.
          */
         ALL(1),
 
         /**
-         * Only a basic set of emoji reactions is allowed.
+         * Only a curated set of basic emoji is accepted as a reaction.
          */
         BASIC(2),
 
         /**
-         * No reactions are allowed.
+         * No reactions are accepted.
          */
         NONE(3),
 
         /**
-         * All reactions except those in the blocklist are allowed.
+         * Every emoji is accepted except those listed in
+         * {@link NewsletterReactionSettings#blockedCodes()}.
          */
         BLOCKLIST(4);
 
+        /**
+         * Lookup table from the lowercase enum name to the constant, used
+         * by {@link #of(String)} for case-insensitive parsing.
+         */
         private static final Map<String, Type> BY_NAME = Arrays.stream(values())
                 .collect(Collectors.toUnmodifiableMap(key -> key.name().toLowerCase(), Function.identity()));
 
         /**
-         * Returns the {@code Type} constant matching the given
-         * case-insensitive name, or {@link #UNKNOWN} if no match is found.
+         * Returns the constant whose name matches the supplied string,
+         * case-insensitively.
          *
-         * @param name the type name, may be {@code null}
-         * @return the matching type constant, never {@code null}
+         * @param name the policy name as reported by the server, may be
+         *             {@code null}
+         * @return the matching policy constant, or {@link #UNKNOWN} when
+         *         {@code name} is {@code null} or does not match any
+         *         constant
          */
         static Type of(String name) {
             return name == null ? UNKNOWN : BY_NAME.getOrDefault(name.toLowerCase(), UNKNOWN);
         }
 
+        /**
+         * The protobuf wire index associated with this constant.
+         */
         final int index;
 
+        /**
+         * Constructs a new enum constant bound to the supplied protobuf
+         * wire index.
+         *
+         * @param index the protobuf wire index
+         */
         Type(@ProtobufEnumIndex int index) {
             this.index = index;
         }

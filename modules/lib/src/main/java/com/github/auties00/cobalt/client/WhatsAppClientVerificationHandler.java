@@ -23,25 +23,57 @@ import static java.lang.System.Logger.Level.INFO;
 import static java.nio.file.Files.createTempFile;
 
 /**
- * A sealed interface that defines handlers for verification methods in WhatsApp.
- * This interface provides mechanisms for handling both Web and Mobile verification processes.
+ * A pluggable strategy for completing the authentication ceremony that
+ * links or registers a WhatsApp client.
+ *
+ * <p>The two sub-hierarchies address the two supported flavours of
+ * authentication:
+ * <ul>
+ *   <li>{@link Web} handles the companion-device linking ceremony used by
+ *       {@link WhatsAppClientType#WEB} clients, which can complete either
+ *       by scanning a QR code on the primary device or by entering a
+ *       pairing code;</li>
+ *   <li>{@link Mobile} handles the registration ceremony used by
+ *       {@link WhatsAppClientType#MOBILE} clients, which starts with an
+ *       SMS, voice, or in-app WhatsApp verification code request.</li>
+ * </ul>
+ *
+ * <p>Handlers are wired into a {@link WhatsAppClient} via the builder
+ * ({@link WhatsAppClientBuilder.Options.Web#unregistered(WhatsAppClientVerificationHandler.Web.QrCode)}
+ * and the Mobile {@code register} variants).
+ *
+ * @see WhatsAppClientBuilder
  */
 public sealed interface WhatsAppClientVerificationHandler {
     /**
-     * A sealed interface that represents verification methods for WhatsApp Web Client.
-     * Provides handling for QR codes and pairing codes used in the WhatsApp Web verification process.
+     * A verification handler for WhatsApp Web companion-device linking.
+     *
+     * <p>Implementations receive the value that the primary device must
+     * authorise: either the payload encoded in a QR code that the user
+     * scans on their phone, or a short pairing code that the user types
+     * into the Linked Devices screen.
      */
     sealed interface Web extends WhatsAppClientVerificationHandler {
         /**
-         * Handles the verification value provided by WhatsApp Web.
+         * Receives the verification value produced by the Cobalt client
+         * and surfaces it to the user.
          *
-         * @param value The verification value to be processed (either QR code data or pairing code)
+         * <p>The value is either a QR code payload (for
+         * {@link QrCode} handlers) or a short pairing code (for
+         * {@link PairingCode} handlers).
+         *
+         * @param value the verification value produced by the client
          */
         void handle(String value);
 
         /**
-         * An interface for handling QR codes sent by WhatsApp Web during authentication.
-         * Provides various methods to process and display QR codes in different formats.
+         * A verification handler that renders the QR code produced by
+         * Cobalt during the companion-linking flow.
+         *
+         * <p>The handler receives the raw QR payload as a string; the
+         * static factory methods provide common renderers (terminal,
+         * temporary file, desktop viewer) so callers can pick a behaviour
+         * without writing boilerplate.
          */
         @FunctionalInterface
         non-sealed interface QrCode extends Web {
@@ -112,8 +144,15 @@ public sealed interface WhatsAppClientVerificationHandler {
             }
 
             /**
-             * An interface for consuming a file path containing a saved QR code.
-             * Provides various methods to process the file path.
+             * A consumer that reacts to a file path where a QR code has
+             * been rendered.
+             *
+             * <p>Callers combine a rendering path supplier (typically a
+             * {@link Path} returned by
+             * {@link java.nio.file.Files#createTempFile(String, String, java.nio.file.attribute.FileAttribute[])})
+             * with a {@code ToFile} consumer to decide what to do with the
+             * resulting image: ignore it, log its location, or open it in
+             * a desktop viewer.
              */
             interface ToFile extends Consumer<Path> {
                 /**
@@ -157,8 +196,13 @@ public sealed interface WhatsAppClientVerificationHandler {
         }
 
         /**
-         * An interface for handling pairing codes sent by WhatsApp Web during authentication.
-         * Provides methods to process and display pairing codes.
+         * A verification handler that surfaces the short pairing code
+         * produced by Cobalt during the companion-linking flow.
+         *
+         * <p>Pairing codes are typed into the Linked Devices screen on the
+         * primary device instead of scanning a QR. The handler receives
+         * the code as a plain string and is responsible for presenting it
+         * to the user.
          */
         @FunctionalInterface
         non-sealed interface PairingCode extends Web {
@@ -174,21 +218,36 @@ public sealed interface WhatsAppClientVerificationHandler {
     }
 
     /**
-     * An interface that represents verification methods for WhatsApp Mobile Client.
-     * Handles verification processes for mobile authentication through various channels.
+     * A verification handler for the WhatsApp mobile registration flow.
+     *
+     * <p>Mobile registration requires the user to receive a one-time code
+     * on the phone number being registered and to feed it back into the
+     * client. Implementations expose two decisions: which delivery channel
+     * to request (SMS, voice call, in-app WhatsApp, or server-chosen) and
+     * how to obtain the code once it has been delivered.
      */
     non-sealed interface Mobile extends WhatsAppClientVerificationHandler {
         /**
-         * Returns the preferred verification method to be requested.
+         * Returns the preferred delivery channel for the verification
+         * code.
          *
-         * @return An Optional containing the verification method name, or empty if no specific method is requested
+         * <p>Supported values mirror the WhatsApp server-side method
+         * identifiers: {@code sms}, {@code voice}, and {@code wa_old}.
+         * Returning {@link Optional#empty()} lets the server pick a
+         * default channel.
+         *
+         * @return the preferred delivery method, or empty to defer the
+         *         choice to the server
          */
         Optional<String> requestMethod();
 
         /**
-         * Returns the verification code to be used for authentication.
+         * Returns the verification code supplied by the user.
          *
-         * @return The verification code value
+         * <p>Implementations typically block on user input (e.g., reading
+         * a console line) and return the code once it has been entered.
+         *
+         * @return the verification code
          */
         String verificationCode();
 

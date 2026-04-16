@@ -8,12 +8,17 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Metadata containing cryptographic signature proofs used to verify the
- * authenticity of AI bot messages.
+ * Carries cryptographic signature proofs used to verify the authenticity of
+ * AI bot messages.
  *
- * <p>Each proof in the {@linkplain #proofs() proofs list} corresponds to a
- * specific use case and includes the signature bytes and certificate chain
- * needed for verification.
+ * <p>WhatsApp attaches signature verification metadata to bot messages so that
+ * clients can confirm the message was genuinely produced by Meta AI and has not
+ * been tampered with. Each proof in the {@linkplain #proofs() proofs list}
+ * corresponds to a specific {@link BotSignatureVerificationUseCaseProof.BotSignatureUseCase
+ * use case} and includes the signature bytes and certificate chain needed for
+ * cryptographic verification.
+ *
+ * @see BotSignatureVerificationUseCaseProof
  */
 @ProtobufMessage(name = "BotSignatureVerificationMetadata")
 public final class BotSignatureVerificationMetadata {

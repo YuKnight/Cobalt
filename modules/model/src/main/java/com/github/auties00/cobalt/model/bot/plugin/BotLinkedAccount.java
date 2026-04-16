@@ -5,36 +5,39 @@ import it.auties.protobuf.model.*;
 import java.util.Optional;
 
 /**
- * A single external account linked to the bot for enhanced plugin
- * functionality.
+ * Represents a single external account that has been linked to the Meta AI
+ * bot, enabling it to access additional services on behalf of the user.
  *
- * <p>Linked accounts allow the bot to access first-party services on behalf
- * of the user (e.g. accessing Meta services). Each linked account has a
- * {@link BotLinkedAccountType} that identifies the type of linkage.
+ * <p>Account linking allows the bot to interact with first-party Meta
+ * services (such as Instagram or Facebook) using the user's credentials.
+ * Each linked account entry carries a {@link BotLinkedAccountType} that
+ * identifies the kind of linkage. Multiple linked accounts are aggregated
+ * inside a {@link BotLinkedAccountsMetadata} container.
  *
  * @see BotLinkedAccountsMetadata
  */
 @ProtobufMessage(name = "BotLinkedAccount")
 public final class BotLinkedAccount {
     /**
-     * The type of linked account.
+     * The kind of linkage this account represents, identifying which external
+     * service the bot can access through it.
      */
     @ProtobufProperty(index = 1, type = ProtobufType.ENUM)
     BotLinkedAccountType type;
 
     /**
-     * Constructs a new {@code BotLinkedAccount} with the specified type.
+     * Constructs a new {@code BotLinkedAccount} with the specified linkage type.
      *
-     * @param type the linked account type, or {@code null}
+     * @param type the linked account type, or {@code null} if unknown
      */
     BotLinkedAccount(BotLinkedAccountType type) {
         this.type = type;
     }
 
     /**
-     * Returns the type of linked account.
+     * Returns the kind of linkage this account represents.
      *
-     * @return an {@code Optional} describing the linked account type, or an
+     * @return an {@link Optional} describing the linked account type, or an
      *         empty {@code Optional} if not set
      */
     public Optional<BotLinkedAccountType> type() {
@@ -42,39 +45,42 @@ public final class BotLinkedAccount {
     }
 
     /**
-     * Sets the type of linked account.
+     * Sets the kind of linkage this account represents.
      *
-     * @param type the new linked account type, or {@code null}
+     * @param type the new linked account type, or {@code null} to clear
      */
     public void setType(BotLinkedAccountType type) {
         this.type = type;
     }
 
     /**
-     * The type of external account linked to the bot.
+     * Enumerates the types of external account linkages that a bot can have,
+     * identifying which service category the linked account belongs to.
      */
     @ProtobufEnum(name = "BotLinkedAccount.BotLinkedAccountType")
     public static enum BotLinkedAccountType {
         /**
-         * A first-party (1P) linked account, providing access to Meta's own
-         * services.
+         * A first-party linked account, granting the bot access to Meta's own
+         * services such as Instagram or Facebook on behalf of the user.
          */
         BOT_LINKED_ACCOUNT_TYPE_1P(0);
 
         /**
-         * Constructs a new linked account type constant with the specified
-         * protobuf index.
+         * Constructs a new linked account type constant.
          *
-         * @param index the protobuf enum index
+         * @param index the protobuf-assigned numeric index for this constant
          */
         BotLinkedAccountType(@ProtobufEnumIndex int index) {
             this.index = index;
         }
 
+        /**
+         * The protobuf-assigned numeric index for this constant.
+         */
         final int index;
 
         /**
-         * Returns the protobuf enum index of this linked account type.
+         * Returns the protobuf-assigned numeric index for this constant.
          *
          * @return the protobuf index
          */

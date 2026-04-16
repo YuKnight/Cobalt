@@ -5,13 +5,16 @@ import it.auties.protobuf.model.*;
 import java.util.Optional;
 
 /**
- * Metadata for a promotional message displayed within the AI bot chat
- * interface.
+ * Metadata for a promotional message displayed within the AI bot chat interface.
  *
- * <p>Promotional messages are used by Meta to surface offers or surveys to
- * users interacting with the AI bot. Each promotion has a
- * {@linkplain BotPromotionType type} that determines the promotion campaign
- * and a {@linkplain #buttonTitle() button title} for the call-to-action.
+ * <p>Promotional messages are used by Meta to surface offers, feature announcements,
+ * or feedback surveys to users interacting with the AI bot. Each promotion has a
+ * {@linkplain BotPromotionType type} that identifies the campaign and a
+ * {@linkplain #buttonTitle() button title} for the call-to-action element.
+ *
+ * <p>This type is referenced from
+ * {@link com.github.auties00.cobalt.model.bot.BotMetadata BotMetadata} as the
+ * {@code botPromotionMessageMetadata} field (protobuf index 21).
  */
 @ProtobufMessage(name = "BotPromotionMessageMetadata")
 public final class BotPromotionMessageMetadata {
@@ -100,10 +103,18 @@ public final class BotPromotionMessageMetadata {
          */
         SURVEY_PLATFORM(2);
 
+        /**
+         * Constructs a new {@code BotPromotionType} with the given protobuf index.
+         *
+         * @param index the protobuf enum index
+         */
         BotPromotionType(@ProtobufEnumIndex int index) {
             this.index = index;
         }
 
+        /**
+         * The protobuf enum index for this promotion type.
+         */
         final int index;
 
         /**

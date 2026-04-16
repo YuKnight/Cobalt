@@ -53,6 +53,16 @@ public final class WhatsAppOwnDeviceListExpiredException extends WhatsAppExcepti
         super("Own device list has expired");
     }
 
+    /**
+     * Returns whether this exception represents a fatal error.
+     *
+     * <p>The client's own device list has exceeded the server-enforced staleness
+     * threshold and cannot be used for message routing without a full refresh.
+     * Cobalt treats this condition as fatal and delegates the recovery policy
+     * (refresh list, reconnect, or log out) to the configurable error handler.
+     *
+     * @return {@code true}
+     */
     @Override
     public boolean isFatal() {
         return true;

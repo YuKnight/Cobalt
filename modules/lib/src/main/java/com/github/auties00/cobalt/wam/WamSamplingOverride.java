@@ -1,5 +1,7 @@
 package com.github.auties00.cobalt.wam;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+
 import java.util.Map;
 import java.util.OptionalInt;
 import java.util.concurrent.ConcurrentHashMap;
@@ -19,10 +21,11 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>This class is thread-safe: the backing map is a
  * {@link ConcurrentHashMap} and individual lookups are atomic.
  *
- * @apiNote WAWebEventSampling: allows runtime override of per-event
- * sampling weights via a pluggable function set from AB props
- * configuration.
+ * @implNote Adapts {@code WAWebEventSampling}, which exposes a pluggable
+ *     function that allows runtime override of per-event sampling weights
+ *     from AB props configuration.
  */
+@WhatsAppWebModule(moduleName = "WAWebEventSampling")
 final class WamSamplingOverride {
     /**
      * Map from event id to the overridden sampling weight. Absent keys

@@ -7,13 +7,19 @@ import java.util.OptionalInt;
 import java.util.OptionalLong;
 
 /**
- * Metadata for a dynamic media fragment within an AI rich response,
- * such as an animated GIF or a statically loaded image.
+ * Metadata for a dynamic media fragment within a WhatsApp AI bot rich
+ * response, such as an animated GIF or a statically loaded image.
  *
  * <p>The media is fetched from the provided {@linkplain #url() URL}
  * and rendered according to its {@linkplain #type() type}. For GIF
  * content, the {@linkplain #loopCount() loop count} controls how
  * many times the animation plays before stopping.
+ *
+ * <p>This type implements {@link AIRichResponseSubMessageContent} and
+ * appears as the {@link AIRichResponseSubMessageType#DYNAMIC DYNAMIC}
+ * variant within an {@link AIRichResponseSubMessage}.
+ *
+ * @see AIRichResponseSubMessage#content()
  */
 @ProtobufMessage(name = "AIRichResponseDynamicMetadata")
 public final class AIRichResponseDynamicMetadata implements AIRichResponseSubMessageContent {
@@ -48,6 +54,14 @@ public final class AIRichResponseDynamicMetadata implements AIRichResponseSubMes
     Integer loopCount;
 
 
+    /**
+     * Constructs a new dynamic metadata instance.
+     *
+     * @param type      the media type, or {@code null}
+     * @param version   the cache version identifier, or {@code null}
+     * @param url       the media URL, or {@code null}
+     * @param loopCount the GIF loop count, or {@code null}
+     */
     AIRichResponseDynamicMetadata(AIRichResponseDynamicMediaType type, Long version, String url, Integer loopCount) {
         this.type = type;
         this.version = version;
@@ -132,7 +146,7 @@ public final class AIRichResponseDynamicMetadata implements AIRichResponseSubMes
     }
 
     /**
-     * A media type for dynamic content within an AI rich response.
+     * Media type for dynamic content within an AI rich response.
      */
     @ProtobufEnum(name = "AIRichResponseDynamicMetadata.AIRichResponseDynamicMetadataType")
     public static enum AIRichResponseDynamicMediaType {
@@ -151,10 +165,18 @@ public final class AIRichResponseDynamicMetadata implements AIRichResponseSubMes
          */
         GIF(2);
 
+        /**
+         * Constructs a dynamic media type constant with the given protobuf index.
+         *
+         * @param index the protobuf enum index
+         */
         AIRichResponseDynamicMediaType(@ProtobufEnumIndex int index) {
             this.index = index;
         }
 
+        /**
+         * The protobuf enum index for this media type.
+         */
         final int index;
 
         /**

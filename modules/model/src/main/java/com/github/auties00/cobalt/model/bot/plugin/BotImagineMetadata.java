@@ -5,24 +5,31 @@ import it.auties.protobuf.model.*;
 import java.util.Optional;
 
 /**
- * Metadata describing an AI image-generation ("Imagine") response from a
- * WhatsApp bot.
+ * Describes an AI image-generation ("Imagine") response produced by the
+ * Meta AI bot in WhatsApp.
  *
- * <p>This message is attached to {@code BotMetadata} (field 14) and indicates
- * the type of image generation that was performed and, optionally, a
- * shortened version of the prompt used.
+ * <p>When the Meta AI bot generates an image in response to a user prompt,
+ * this metadata accompanies the reply to indicate which type of image
+ * generation was performed (standard text-to-image, personalized MeMu,
+ * flash generation, or image editing) and, optionally, a condensed version
+ * of the prompt that was used. Clients can use the {@link #shortPrompt()}
+ * to display a summary of the original request alongside the generated image.
+ *
+ * @see BotMemuMetadata
  */
 @ProtobufMessage(name = "BotImagineMetadata")
 public final class BotImagineMetadata {
     /**
-     * The type of image-generation operation that was performed.
+     * The type of image-generation operation that produced this result, such
+     * as standard text-to-image, personalized MeMu, or image editing.
      */
     @ProtobufProperty(index = 1, type = ProtobufType.ENUM)
     ImagineType imagineType;
 
     /**
-     * A shortened version of the user's prompt used for image generation, for
-     * example {@code "sunset over mountains"}.
+     * A condensed version of the user's prompt used for image generation,
+     * suitable for display alongside the generated image. For example,
+     * {@code "sunset over mountains"}.
      */
     @ProtobufProperty(index = 2, type = ProtobufType.STRING)
     String shortPrompt;
@@ -30,8 +37,10 @@ public final class BotImagineMetadata {
     /**
      * Constructs a new {@code BotImagineMetadata} with the specified values.
      *
-     * @param imagineType the image-generation type, or {@code null}
-     * @param shortPrompt the shortened prompt, or {@code null}
+     * @param imagineType the type of image generation performed, or
+     *                    {@code null} if unknown
+     * @param shortPrompt a condensed version of the original prompt, or
+     *                    {@code null} if not available
      */
     BotImagineMetadata(ImagineType imagineType, String shortPrompt) {
         this.imagineType = imagineType;
@@ -39,9 +48,9 @@ public final class BotImagineMetadata {
     }
 
     /**
-     * Returns the type of image-generation operation that was performed.
+     * Returns the type of image-generation operation that produced this result.
      *
-     * @return an {@code Optional} describing the imagine type, or an empty
+     * @return an {@link Optional} describing the imagine type, or an empty
      *         {@code Optional} if not set
      */
     public Optional<ImagineType> imagineType() {
@@ -49,35 +58,38 @@ public final class BotImagineMetadata {
     }
 
     /**
-     * Returns the shortened version of the user's prompt.
+     * Returns the condensed version of the user's prompt used for image
+     * generation.
      *
-     * @return an {@code Optional} describing the short prompt, or an empty
-     *         {@code Optional} if not set
+     * @return an {@link Optional} describing the short prompt string, or an
+     *         empty {@code Optional} if not available
      */
     public Optional<String> shortPrompt() {
         return Optional.ofNullable(shortPrompt);
     }
 
     /**
-     * Sets the type of image-generation operation.
+     * Sets the type of image-generation operation that produced this result.
      *
-     * @param imagineType the new imagine type, or {@code null}
+     * @param imagineType the new imagine type, or {@code null} to clear
      */
     public void setImagineType(ImagineType imagineType) {
         this.imagineType = imagineType;
     }
 
     /**
-     * Sets the shortened version of the user's prompt.
+     * Sets the condensed version of the user's prompt.
      *
-     * @param shortPrompt the new short prompt, or {@code null}
+     * @param shortPrompt the new short prompt string, or {@code null} to clear
      */
     public void setShortPrompt(String shortPrompt) {
         this.shortPrompt = shortPrompt;
     }
 
     /**
-     * The type of AI image-generation operation that was performed by the bot.
+     * Enumerates the types of AI image-generation operations that the Meta AI
+     * bot can perform, ranging from standard text-to-image generation to
+     * personalized face-based generation and image editing.
      */
     @ProtobufEnum(name = "BotImagineMetadata.ImagineType")
     public static enum ImagineType {
@@ -108,19 +120,21 @@ public final class BotImagineMetadata {
         EDIT(4);
 
         /**
-         * Constructs a new imagine type constant with the specified protobuf
-         * index.
+         * Constructs a new imagine type constant.
          *
-         * @param index the protobuf enum index
+         * @param index the protobuf-assigned numeric index for this constant
          */
         ImagineType(@ProtobufEnumIndex int index) {
             this.index = index;
         }
 
+        /**
+         * The protobuf-assigned numeric index for this constant.
+         */
         final int index;
 
         /**
-         * Returns the protobuf enum index of this imagine type.
+         * Returns the protobuf-assigned numeric index for this constant.
          *
          * @return the protobuf index
          */

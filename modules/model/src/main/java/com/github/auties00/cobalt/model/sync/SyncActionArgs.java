@@ -1,41 +1,45 @@
 package com.github.auties00.cobalt.model.sync;
 
 /**
- * An index-argument type for WhatsApp Web sync actions.
+ * Typed carrier for the trailing arguments that follow the action name in
+ * an app state sync mutation index.
  *
- * <p>Each implementation encodes a specific combination of parameters that,
- * together with the action name, form the full index array
- * ({@code ["actionName", ...args]}) used by the WhatsApp Web app-state sync
- * protocol. The {@link #toIndexArgs()} method returns only the trailing
- * argument portion; the action name is prepended by
- * {@link SyncAction#toIndex(SyncActionArgs)}.
+ * <p>Every app state mutation is keyed by a JSON array of the form
+ * {@code ["actionName", arg0, arg1, ...]}. Implementations of this
+ * interface encode the argument list specific to an action category (for
+ * example, a chat JID for archive or mute actions, or a message key for
+ * star and delete actions). The action itself prepends the action name via
+ * {@link SyncAction#toIndex(SyncActionArgs)}; callers supply the trailing
+ * arguments through this carrier.
  *
- * <p>Actions that require no trailing index arguments use
- * {@link #empty()}. Actions that require trailing arguments define
- * their own nested class implementing this interface.
+ * <p>Actions that take no trailing arguments use {@link #empty()} to obtain
+ * the shared empty arguments singleton; actions that take trailing arguments
+ * define their own dedicated implementation that produces them in the
+ * correct order.
  *
- * <p>Callers should construct the appropriate implementation before invoking
- * {@code toIndex}. JID resolution (e.g. LID migration) must be performed at
- * the call site before passing the resolved JID into the constructor.
+ * <p>Any JID normalisation (such as lid migration) must be performed by the
+ * caller before constructing the arguments; the arguments carrier treats
+ * its inputs as already canonical.
  */
 public interface SyncActionArgs {
 
     /**
-     * Returns the trailing index arguments for this action invocation.
+     * Returns the trailing arguments to append after the action name when
+     * building the encoded index.
      *
-     * <p>The returned array is appended after the action name when building
-     * the full JSON index via {@link SyncAction#toIndex(SyncActionArgs)}.
+     * <p>The returned strings are appended in order and must reflect the
+     * canonical encoding expected by the action category.
      *
-     * @return a non-{@code null} array of string arguments
+     * @return a non {@code null} array of trailing index arguments
      */
     String[] toIndexArgs();
 
     /**
-     * Returns a shared instance carrying no additional index parameters.
+     * Returns the shared arguments instance that carries no trailing
+     * arguments, used by actions whose index is simply
+     * {@code ["actionName"]}.
      *
-     * <p>Used by actions whose index is simply {@code ["actionName"]}.
-     *
-     * @return a singleton empty-arguments instance
+     * @return the shared empty arguments singleton
      */
     static SyncActionArgs empty() {
         return SyncActionEmptyArgs.INSTANCE;

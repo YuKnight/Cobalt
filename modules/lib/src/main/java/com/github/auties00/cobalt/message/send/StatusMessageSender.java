@@ -13,6 +13,9 @@ import com.github.auties00.cobalt.message.send.stanza.ChatFanoutStanza;
 import com.github.auties00.cobalt.message.send.stanza.MetaStanza;
 import com.github.auties00.cobalt.message.send.stanza.ParticipantsStanza;
 import com.github.auties00.cobalt.message.send.stanza.ReportingStanza;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.MessageContainer;
@@ -39,6 +42,7 @@ import java.util.*;
  * the status stanza with sender-key encryption, SK distribution for
  * new devices, and optional status_setting meta attribute.
  */
+@WhatsAppWebModule(moduleName = "WAWebEncryptAndSendStatusMsg")
 final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
     /**
      * Logger for status message sending diagnostics.
@@ -102,6 +106,8 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
      * @implNote ADAPTED: WAWebEncryptAndSendStatusMsg uses module-level
      * imports; Cobalt uses constructor-based DI instead.
      */
+    @WhatsAppWebExport(moduleName = "WAWebEncryptAndSendStatusMsg", exports = "encryptAndSendStatusMsg",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     StatusMessageSender(
             WhatsAppClient client,
             MessageEncryption encryption,
@@ -136,6 +142,8 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
      * resolution, revoke handling, SK distribution, receipt record
      * creation, sender-key encryption, and stanza building.
      */
+    @WhatsAppWebExport(moduleName = "WAWebEncryptAndSendStatusMsg", exports = "encryptAndSendStatusMsg",
+            adaptation = WhatsAppAdaptation.DIRECT)
     @Override
     AckResult send(Jid statusJid, ChatMessageInfo messageInfo) {
         waitForOfflineDelivery();
@@ -143,7 +151,7 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
         var selfJid = requireSelfJid();
 
         // WAWebEncryptAndSendStatusMsg: get status audience fanout
-        // WAWebEncryptAndSendStatusMsg: R = getMaybeMeDeviceLid() — sender LID for phash
+        // WAWebEncryptAndSendStatusMsg: R = getMaybeMeDeviceLid(), sender LID for phash
         var fanout = deviceService.getGroupFanout(statusJid, selfLidOrPn());
 
         // WAWebEncryptAndSendStatusMsg: for revokes, resolve the target
@@ -299,6 +307,8 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
      * {@code AllowList → "allowlist"}, {@code DenyList → "denylist"}.
      * WA Web throws on unknown values; Cobalt returns {@code null} (ADAPTED).
      */
+    @WhatsAppWebExport(moduleName = "WAWebEncryptAndSendStatusMsg", exports = "encryptAndSendStatusMsg",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private String resolveStatusSetting() {
         var entry = store.findPrivacySetting(PrivacySettingType.STATUS)
                 .orElse(null);
@@ -322,6 +332,8 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
      * WAWebEncryptAndSendStatusMsg.D: returns true if any original
      * recipient is not self and not in the current status list.
      */
+    @WhatsAppWebExport(moduleName = "WAWebEncryptAndSendStatusMsg", exports = "encryptAndSendStatusMsg",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private RevokeResolution resolveRevokeDevices(
             MessageContainer container,
             Collection<Jid> currentAudience
@@ -400,6 +412,8 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
      * SessionScope.STATUS. Encrypts per-device, builds via
      * ChatFanoutStanza, and sends via deprecatedSendStanzaAndReturnAck.
      */
+    @WhatsAppWebExport(moduleName = "WAWebEncryptAndSendStatusMsg", exports = "encryptAndSendStatusDirectMsg",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private AckResult sendDirectRevoke(
             Jid statusJid,
             ChatMessageInfo messageInfo,

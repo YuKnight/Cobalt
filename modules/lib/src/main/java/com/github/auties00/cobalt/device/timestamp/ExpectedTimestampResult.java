@@ -1,19 +1,29 @@
 package com.github.auties00.cobalt.device.timestamp;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
+
 import java.time.Instant;
 import java.util.Optional;
 
 /**
- * Result of computing expected timestamp fields for a device record.
+ * Carries the three expected-timestamp tracking fields produced while processing a
+ * device list update.
  *
- * <p>Encapsulates the three fields that WA Web tracks together in the return
- * object of {@code computeNewExpectedTs} and {@code computeExpectedTsForDeviceRecord}:
- * {@code expectedTs}, {@code expectedTsLastDeviceJobTs}, and {@code expectedTsUpdateTs}.
+ * <p>WhatsApp's ADV (advanced device verification) system detects stale device lists
+ * even when the cheap device-hash (dhash) check passes, by comparing incoming
+ * timestamps against a locally tracked "expected timestamp" plus two auxiliary
+ * timestamps that record when the expectation was last refreshed and when the last
+ * periodic ADV job ran. This record bundles those three values so
+ * {@link DeviceExpectedTsUtils} and {@link com.github.auties00.cobalt.device.DeviceService}
+ * can carry them through the update pipeline without spreading null-checks.
  *
  * @implNote WAWebAdvExpectedTsApi: these three fields are tracked together in a
  * plain JS object {@code {expectedTs, expectedTsLastDeviceJobTs, expectedTsUpdateTs}}
  * to detect staleness even when dhash matches.
  */
+@WhatsAppWebModule(moduleName = "WAWebAdvExpectedTsApi")
 public final class ExpectedTimestampResult {
     /**
      * The expected timestamp value, or {@code null} if not set.
@@ -49,6 +59,9 @@ public final class ExpectedTimestampResult {
      * @param expectedTimestampLastDeviceJobTimestamp the last ADV job timestamp, or {@code null}
      * @param expectedTimestampUpdateTimestamp        when expectedTs was last modified, or {@code null}
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvExpectedTsApi",
+            exports = "computeNewExpectedTs",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public ExpectedTimestampResult(
             Instant expectedTimestamp,
             Instant expectedTimestampLastDeviceJobTimestamp,
@@ -65,6 +78,9 @@ public final class ExpectedTimestampResult {
      * @implNote WAWebAdvExpectedTsApi.expectedTs
      * @return an optional containing the expected timestamp, or empty if not set
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvExpectedTsApi",
+            exports = "computeNewExpectedTs",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<Instant> expectedTimestamp() {
         return Optional.ofNullable(expectedTimestamp);
     }
@@ -75,6 +91,9 @@ public final class ExpectedTimestampResult {
      * @implNote WAWebAdvExpectedTsApi.expectedTsLastDeviceJobTs
      * @return an optional containing the last ADV job timestamp, or empty if not set
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvExpectedTsApi",
+            exports = "computeNewExpectedTs",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<Instant> expectedTimestampLastDeviceJobTimestamp() {
         return Optional.ofNullable(expectedTimestampLastDeviceJobTimestamp);
     }
@@ -85,6 +104,9 @@ public final class ExpectedTimestampResult {
      * @implNote WAWebAdvExpectedTsApi.expectedTsUpdateTs
      * @return an optional containing the update timestamp, or empty if not set
      */
+    @WhatsAppWebExport(moduleName = "WAWebAdvExpectedTsApi",
+            exports = "computeNewExpectedTs",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<Instant> expectedTimestampUpdateTimestamp() {
         return Optional.ofNullable(expectedTimestampUpdateTimestamp);
     }

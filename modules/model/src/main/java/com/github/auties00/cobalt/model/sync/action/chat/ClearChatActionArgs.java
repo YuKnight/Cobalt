@@ -5,21 +5,27 @@ import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.SyncActionArgs;
 
 /**
- * Index arguments for {@link ClearChatAction}.
+ * Index arguments for a {@link ClearChatAction}.
  *
- * <p>The sync index produced is
- * {@code ["clearChat", chatJid, deleteStarred, deleteMedia]}
- * where each boolean flag is serialized as {@code "1"} (true) or {@code "0"} (false).
+ * <p>Clear-chat operations are uniquely identified by the target chat plus
+ * the user's choice of whether starred messages and media attachments should
+ * also be removed. All three values participate in the mutation index so
+ * that variants of the same logical operation do not collide.
  *
- * @param chatJid       the JID of the chat being cleared
- * @param deleteStarred whether starred messages should also be deleted
- * @param deleteMedia   whether media files should also be deleted
+ * <p>Boolean flags are encoded as {@code "1"} for {@code true} and
+ * {@code "0"} for {@code false}. The full encoded index is
+ * {@code ["clearChat", chatJid, deleteStarred, deleteMedia]}.
+ *
+ * @param chatJid       the {@link Jid} of the chat being cleared
+ * @param deleteStarred {@code true} to also delete starred messages
+ * @param deleteMedia   {@code true} to also delete media files
  */
 public record ClearChatActionArgs(Jid chatJid, boolean deleteStarred, boolean deleteMedia) implements SyncActionArgs {
     /**
-     * {@inheritDoc}
+     * Converts this record into the tail portion of the sync index array.
      *
-     * @return a three-element array containing the chat JID string and both boolean flags
+     * @return a three-element array containing the chat JID string and the
+     *         two boolean flags encoded as {@code "1"} or {@code "0"}
      */
     @Override
     public String[] toIndexArgs() {

@@ -13,12 +13,13 @@ import java.util.List;
  * Metadata describing the AI processing modes the user has selected for a
  * bot interaction on WhatsApp.
  *
- * <p>The user can choose between different response modes — for example, the
+ * <p>The user can choose between different response modes, for example the
  * default fast mode or a deeper "Think Hard" reasoning mode that takes
- * longer but produces more thorough answers. Multiple modes may be active
- * simultaneously.
+ * longer but produces more thorough answers. The selected modes are sent to
+ * the server as part of the bot request so the AI backend can adjust its
+ * generation strategy accordingly.
  *
- * <p>This metadata is attached to a bot message via
+ * <p>This metadata is carried inside
  * {@link com.github.auties00.cobalt.model.bot.BotMetadata#botModeSelectionMetadata()}.
  */
 @ProtobufMessage(name = "BotModeSelectionMetadata")
@@ -61,8 +62,8 @@ public final class BotModeSelectionMetadata {
     }
 
     /**
-     * An AI processing mode that the user can select to control how the bot
-     * generates its response.
+     * Enumerates the AI processing modes a user can select to control how
+     * the bot generates its response.
      */
     @ProtobufEnum(name = "BotModeSelectionMetadata.BotUserSelectionMode")
     public static enum BotUserSelectionMode {

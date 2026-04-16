@@ -1,6 +1,9 @@
 package com.github.auties00.cobalt.node.binary;
 
 import com.github.auties00.cobalt.exception.WhatsAppStreamException;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidServer;
 import com.github.auties00.cobalt.node.Node;
@@ -18,34 +21,31 @@ import static com.github.auties00.cobalt.node.binary.NodeTags.*;
 import static com.github.auties00.cobalt.node.binary.NodeTokens.*;
 
 /**
- * A utility class responsible for encoding {@link Node} objects into binary format
- * for transmission in the WhatsApp protocol.
- * <p>
- * This encoder implements WhatsApp's proprietary binary protocol that uses token-based
- * compression to reduce message size. The encoding process involves:
- * <ul>
- *   <li>Converting strings to dictionary tokens when possible (using single-byte or multi-dictionary lookup)</li>
- *   <li>Encoding binary data with length prefixes</li>
- *   <li>Efficiently serializing node trees with attributes and children</li>
- *   <li>Supporting various children types: text, binary buffers, JIDs, streams, and child nodes</li>
- * </ul>
- * <p>
- * The encoding format is optimized for small message sizes and includes:
- * <ul>
- *   <li>Token dictionaries (SINGLE_BYTE_TOKENS, DICTIONARY_0-3_TOKENS) for common strings</li>
- *   <li>Variable-length integer encoding (8-bit, 20-bit, 32-bit)</li>
- *   <li>List size encoding (8-bit or 16-bit)</li>
- *   <li>Special encoding for WhatsApp JIDs</li>
- * </ul>
- * <p>
- * This class is thread-safe as all methods are static and operate on provided parameters
- * without shared mutable state.
+ * Serialises {@link Node} trees into WhatsApp's compact binary wire
+ * format.
  *
+ * <p>Every outgoing stanza is run through this encoder before being
+ * wrapped in a Noise-encrypted frame. The encoder implements the same
+ * WAWap protocol as the server: strings are replaced with dictionary
+ * tokens where possible, short numeric strings are packed as nibble
+ * or hex sequences, binary blobs are length-prefixed with 8-, 20-, or
+ * 32-bit widths, and JIDs are serialised in one of four shapes
+ * ({@code JID_PAIR}, {@code AD_JID}, {@code JID_INTEROP}, {@code JID_FB})
+ * depending on their server and device.
+ *
+ * <p>All methods are static and stateless; the class is a pure utility.
+ * Callers typically compute the output size via {@link #sizeOf(Node)},
+ * allocate a buffer, and call {@link #encode(Node, byte[], int, int)}.
+ *
+ * @implNote WAWap.encodeStanza: the JS encoder this class mirrors.
+ *           Token lookups use {@link NodeTokens} (WAWapDict in WA Web),
+ *           and the numeric constants come from {@link NodeTags}.
  * @see Node
  * @see NodeDecoder
  * @see NodeTokens
  * @see NodeTags
  */
+@WhatsAppWebModule(moduleName = "WAWap")
 public final class NodeEncoder {
     /**
      * VarHandle for writing 16-bit values in big-endian byte order to byte arrays.
@@ -108,15 +108,20 @@ public final class NodeEncoder {
     }
 
     /**
-     * Calculates the total size in bytes required to encode the given node.
-     * <p>
-     * This includes the message header (1 byte) and the full encoded length of the node
-     * including its description, attributes, and children.
+     * Computes the exact number of bytes required to encode the given
+     * node, including the leading flags byte.
      *
-     * @param node the node to calculate the size for
+     * <p>Callers use this method to size the output buffer before calling
+     * {@link #encode(Node, byte[], int, int)}.
+     *
+     * @implNote WAWap.encodeStanza: the JS encoder performs the same
+     *           length pre-pass via {@code nodeLength}.
+     * @param node the node to size
      * @return the total number of bytes required to encode the node
      * @throws IllegalArgumentException if the node is too large to encode
      */
+    @WhatsAppWebExport(moduleName = "WAWap", exports = "encodeStanza",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public static int sizeOf(Node node) {
         return 1 + nodeLength(node);
     }
@@ -364,15 +369,27 @@ public final class NodeEncoder {
     }
 
     /**
-     * Encodes a node into the provided byte array at the specified offset.
+     * Encodes a node into the given buffer at the specified offset.
      *
+     * <p>The caller must pass a {@code length} equal to the value
+     * returned by {@link #sizeOf(Node)}; a mismatch indicates a bug in
+     * the encoder and throws {@link WhatsAppStreamException.MalformedNode}.
+     *
+     * @implNote WAWap.encodeStanza: the JS encoder writes the same
+     *           leading zero flags byte and then walks the node tree
+     *           producing the wire bytes.
      * @param node   the node to encode
      * @param output the output byte array
-     * @param offset the offset in the output array where encoding should start
-     * @param length the length of the output array, in bytes, to encode to.
-     * @throws WhatsAppStreamException.MalformedNode if the node is shorter/longer than the specified length
+     * @param offset the offset in the output array where encoding should
+     *               start
+     * @param length the expected number of bytes to write, as returned by
+     *               {@link #sizeOf(Node)}
      * @return the new offset after writing
+     * @throws WhatsAppStreamException.MalformedNode if the node encodes
+     *         to a different size than {@code length}
      */
+    @WhatsAppWebExport(moduleName = "WAWap", exports = "encodeStanza",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public static int encode(Node node, byte[] output, int offset, int length) {
         output[offset] = 0;
         var result = writeNode(node, output, offset + 1);

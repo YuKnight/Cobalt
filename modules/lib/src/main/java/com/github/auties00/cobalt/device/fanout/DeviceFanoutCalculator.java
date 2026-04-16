@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.device.fanout;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.device.info.DeviceList;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.props.ABProp;
@@ -9,15 +12,26 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Service that calculates which devices should receive a message (fanout list).
+ * Computes the set of recipient device JIDs ("fanout") for a WhatsApp message.
  *
- * <p>Retrieves device identifiers for specified users, filtering out the sender's
- * own device and applying hosted device logic based on {@code bizHostedDevicesEnabled}
- * and the chat type.
+ * <p>When sending either a 1:1 or a group message, the sender must decide exactly
+ * which companion devices receive an encrypted copy. This calculator walks the
+ * resolved per-user device lists and removes the sender's own device, applies the
+ * hosted-device gating rules (business coexistence), and falls back to the primary
+ * device when no device record exists. It also filters devices with unconfirmed
+ * identity changes so Cobalt never silently re-encrypts to a device whose key
+ * rotation the user has not acknowledged.
+ *
+ * <p>Invoked by
+ * {@link com.github.auties00.cobalt.device.DeviceService#getUserFanout(Jid, String)}
+ * and {@link com.github.auties00.cobalt.device.DeviceService#getGroupFanout(Jid, Jid)}.
  *
  * @implNote WAWebDBDeviceListFanout.getFanOutList: retrieves device identifiers for
- * specified users, filtering out the sender's own device and applying hosted device logic.
+ * specified users, filtering out the sender's own device and applying hosted device
+ * logic. Hosted inclusion gated via WAWebBizCoexGatingUtils.bizHostedDevicesEnabled.
+ * Identity change filtering is WAWebSendMsgCommonApi.filterDeviceWithChangedIdentity.
  */
+@WhatsAppWebModule(moduleName = "WAWebDBDeviceListFanout")
 public final class DeviceFanoutCalculator {
 
     /**
@@ -44,6 +58,9 @@ public final class DeviceFanoutCalculator {
      * @implNote WAWebDBDeviceListFanout: module-level dependency on WAWebBizCoexGatingUtils
      * for the {@code bizHostedDevicesEnabled} check.
      */
+    @WhatsAppWebExport(moduleName = "WAWebDBDeviceListFanout",
+            exports = "getFanOutList",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public DeviceFanoutCalculator(ABPropsService abPropsService) {
         this.abPropsService = Objects.requireNonNull(abPropsService, "abPropsService cannot be null");
     }
@@ -73,6 +90,9 @@ public final class DeviceFanoutCalculator {
      * Uses a {@code Map} keyed by {@code toString()} for deduplication; Cobalt uses a
      * {@code HashSet} which achieves the same deduplication via {@code equals}/{@code hashCode}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebDBDeviceListFanout",
+            exports = "getFanOutList",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public Set<Jid> calculate(
             Jid senderJid,
             Set<DeviceList> deviceLists,
@@ -150,6 +170,9 @@ public final class DeviceFanoutCalculator {
      * @implNote WAWebBizCoexGatingUtils.bizHostedDevicesEnabled: returns true if the
      * {@code adv_accept_hosted_devices} AB prop is enabled.
      */
+    @WhatsAppWebExport(moduleName = "WAWebBizCoexGatingUtils",
+            exports = "bizHostedDevicesEnabled",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean isBizHostedDevicesEnabled() {
         return abPropsService.getBool(ABProp.ADV_ACCEPT_HOSTED_DEVICES);
     }
@@ -162,6 +185,9 @@ public final class DeviceFanoutCalculator {
      * @implNote WAWebWid.isUser: returns {@code true} for {@code c.us}, {@code lid},
      * {@code bot}, {@code hosted}, {@code hosted.lid} servers.
      */
+    @WhatsAppWebExport(moduleName = "WAWebWid",
+            exports = "isUser",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private static boolean isUserJid(Jid jid) {
         return jid.hasUserServer()
                 || jid.hasLidServer()
@@ -179,6 +205,9 @@ public final class DeviceFanoutCalculator {
      * @implNote WAWebUserPrefsMeUser.isMeDevice: checks exact device JID equality via
      * {@code equals()} against the logged-in device's PN and LID wids.
      */
+    @WhatsAppWebExport(moduleName = "WAWebUserPrefsMeUser",
+            exports = "isMeDevice",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private static boolean isSameDevice(Jid a, Jid b) {
         return Objects.equals(a, b);
     }
@@ -196,6 +225,9 @@ public final class DeviceFanoutCalculator {
      * which compares user part and handles hosted server mappings (hosted-to-c.us,
      * hosted.lid-to-lid).
      */
+    @WhatsAppWebExport(moduleName = "WAWebUserPrefsMeUser",
+            exports = "isMeAccount",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private static boolean isSameAccount(Jid a, Jid b) {
         if (a == null || b == null) {
             return false;
@@ -218,6 +250,9 @@ public final class DeviceFanoutCalculator {
      * called separately from {@code getFanOutList}; in Cobalt it is co-located in this
      * calculator for convenience.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi",
+            exports = "filterDeviceWithChangedIdentity",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public Set<Jid> filterIdentityChanges(Set<Jid> devices, Set<Jid> changedIdentities) {
         if (changedIdentities.isEmpty()) {
             return devices;

@@ -5,12 +5,13 @@ import it.auties.protobuf.model.*;
 import java.util.Optional;
 
 /**
- * Describes how a bot message was initiated on WhatsApp.
+ * Describes the origination mechanism for a single bot message on WhatsApp.
  *
- * <p>Each instance carries a {@link #type()} that identifies the origination
- * mechanism. Currently the only supported origin is
+ * <p>Each instance carries a {@link #type()} that identifies how the
+ * message was initiated. Currently the only defined origin is
  * {@link BotMessageOriginType#AI_INITIATED AI_INITIATED}, indicating
- * that the bot proactively sent the message without a direct user prompt.
+ * that the bot proactively sent the message without a direct user prompt
+ * (for example, a scheduled reminder or a proactive notification).
  *
  * @see BotMessageOriginMetadata
  */
@@ -52,7 +53,7 @@ public final class BotMessageOrigin {
     }
 
     /**
-     * The mechanism by which a bot message was initiated.
+     * Enumerates the mechanisms by which a bot message can be initiated.
      */
     @ProtobufEnum(name = "BotMessageOrigin.BotMessageOriginType")
     public static enum BotMessageOriginType {

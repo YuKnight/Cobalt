@@ -5,17 +5,21 @@ import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.SyncActionArgs;
 
 /**
- * Index arguments for {@link ChatAssignmentAction}.
+ * Index arguments for a {@link ChatAssignmentAction}.
  *
- * <p>The sync index produced is {@code ["agentChatAssignment", chatJid]}.
+ * <p>The assignment is keyed by the chat being assigned, so the app state
+ * mutation index is built from the canonical action name followed by the
+ * chat's JID.
  *
- * @param chatJid the JID of the chat being assigned to an agent
+ * <p>The encoded index is {@code ["agentChatAssignment", chatJid]}.
+ *
+ * @param chatJid the {@link Jid} of the chat being assigned to an agent
  */
 public record ChatAssignmentActionArgs(Jid chatJid) implements SyncActionArgs {
     /**
-     * {@inheritDoc}
+     * Converts this record into the tail portion of the sync index array.
      *
-     * @return a single-element array containing the chat JID string
+     * @return a single-element array containing the chat JID as a string
      */
     @Override
     public String[] toIndexArgs() {

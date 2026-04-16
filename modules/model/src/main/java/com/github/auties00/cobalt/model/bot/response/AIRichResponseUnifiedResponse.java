@@ -5,14 +5,15 @@ import it.auties.protobuf.model.*;
 import java.util.Optional;
 
 /**
- * A raw container for the unified response payload sent by the
- * WhatsApp AI bot.
+ * Raw container for the unified response payload sent by the WhatsApp
+ * AI bot.
  *
- * <p>The {@linkplain #data() data} field carries a UTF-8 encoded
- * JSON document that the client decodes and renders as a structured
- * response. This format is used when the server opts to send a
- * single unified blob instead of (or in addition to) a list of
- * typed {@link AIRichResponseSubMessage} fragments.
+ * <p>The {@linkplain #data() data} field carries a UTF-8 encoded JSON
+ * document that the client decodes and renders as a structured response.
+ * This format is used when the server opts to send a single unified blob
+ * instead of (or in addition to) a list of typed
+ * {@link AIRichResponseSubMessage} fragments. It is carried as field
+ * index 3 of the parent {@code AIRichResponseMessage} protobuf message.
  */
 @ProtobufMessage(name = "AIRichResponseUnifiedResponse")
 public final class AIRichResponseUnifiedResponse {
@@ -24,6 +25,11 @@ public final class AIRichResponseUnifiedResponse {
     byte[] data;
 
 
+    /**
+     * Constructs a new unified response container.
+     *
+     * @param data the raw bytes of the unified response, or {@code null}
+     */
     AIRichResponseUnifiedResponse(byte[] data) {
         this.data = data;
     }

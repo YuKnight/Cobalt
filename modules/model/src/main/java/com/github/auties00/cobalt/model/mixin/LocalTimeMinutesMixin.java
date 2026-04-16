@@ -7,17 +7,30 @@ import it.auties.protobuf.annotation.ProtobufSerializer;
 import java.time.LocalTime;
 
 /**
- * A protobuf mixin that converts between {@link LocalTime} and a {@code Long} representing
- * minutes from midnight.
+ * Protobuf mixin that bridges the gap between {@link LocalTime} and the minute-of-day
+ * integer used on the wire for time-only fields.
+ *
+ * <p>The WhatsApp protocol expresses certain time-of-day values (such as business hour
+ * schedules and do-not-disturb windows) as an integer counting minutes from midnight, where
+ * {@code 0} is {@code 00:00} and {@code 1439} is {@code 23:59}. This mixin lets these
+ * fields be declared as {@link LocalTime} in Cobalt's model classes while the serializer
+ * continues to read and write the underlying integer. Both 32-bit and 64-bit encodings are
+ * supported: {@code Long} is used when the schema declares a 64-bit integer, while
+ * {@code Integer} is used for 32-bit integer fields.
  */
 @ProtobufMixin
 public final class LocalTimeMinutesMixin {
     /**
-     * Converts a {@link LocalTime} to its minutes-from-midnight representation.
+     * Serializes a {@link LocalTime} into a 64-bit minute-of-day representation for
+     * transmission on the wire.
      *
-     * @param time the local time, or {@code null}
-     * @return the number of minutes from midnight, or {@code null} if {@code time}
-     *         is {@code null}
+     * <p>The returned value counts minutes elapsed since midnight. Seconds and nanoseconds
+     * in the input are truncated, so {@code 09:30:45} and {@code 09:30:00} both serialize
+     * to {@code 570}.
+     *
+     * @param time the local time to serialize, or {@code null} if the field is unset
+     * @return the number of minutes from midnight, or {@code null} when {@code time} is
+     *         {@code null}
      */
     @ProtobufSerializer
     public static Long toMinutesLong(LocalTime time) {
@@ -25,11 +38,16 @@ public final class LocalTimeMinutesMixin {
     }
 
     /**
-     * Converts a minutes-from-midnight {@code Long} value to a {@link LocalTime}.
+     * Deserializes a 64-bit minute-of-day {@code Long} into a {@link LocalTime}.
      *
-     * @param value the number of minutes from midnight, or {@code null}
-     * @return the corresponding {@link LocalTime}, or {@code null} if {@code value}
-     *         is {@code null}
+     * <p>The input is interpreted as minutes elapsed since midnight. A {@code null} input
+     * yields a {@code null} time so that optional protobuf fields can remain absent after
+     * decoding.
+     *
+     * @param value the minute-of-day value read from the wire, or {@code null} when the
+     *              field was absent
+     * @return the reconstructed {@link LocalTime}, or {@code null} when {@code value} is
+     *         {@code null}
      */
     @ProtobufDeserializer
     public static LocalTime fromMinutesLong(Long value) {
@@ -37,12 +55,15 @@ public final class LocalTimeMinutesMixin {
     }
 
     /**
-     * Converts a {@link LocalTime} to its minutes-from-midnight representation
-     * as an {@code Integer}.
+     * Serializes a {@link LocalTime} into a 32-bit minute-of-day representation for
+     * transmission on the wire.
      *
-     * @param time the local time, or {@code null}
-     * @return the number of minutes from midnight, or {@code null} if {@code time}
-     *         is {@code null}
+     * <p>This overload is used when the protobuf schema declares the field as a 32-bit
+     * integer. Seconds and nanoseconds in the input are truncated.
+     *
+     * @param time the local time to serialize, or {@code null} if the field is unset
+     * @return the number of minutes from midnight, or {@code null} when {@code time} is
+     *         {@code null}
      */
     @ProtobufSerializer
     public static Integer toMinutesInt(LocalTime time) {
@@ -50,11 +71,16 @@ public final class LocalTimeMinutesMixin {
     }
 
     /**
-     * Converts a minutes-from-midnight {@code Integer} value to a {@link LocalTime}.
+     * Deserializes a 32-bit minute-of-day {@code Integer} into a {@link LocalTime}.
      *
-     * @param value the number of minutes from midnight, or {@code null}
-     * @return the corresponding {@link LocalTime}, or {@code null} if {@code value}
-     *         is {@code null}
+     * <p>The input is interpreted as minutes elapsed since midnight. A {@code null} input
+     * yields a {@code null} time so that optional protobuf fields can remain absent after
+     * decoding.
+     *
+     * @param value the 32-bit minute-of-day value read from the wire, or {@code null} when
+     *              the field was absent
+     * @return the reconstructed {@link LocalTime}, or {@code null} when {@code value} is
+     *         {@code null}
      */
     @ProtobufDeserializer
     public static LocalTime fromMinutesInt(Integer value) {

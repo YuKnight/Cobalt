@@ -4,6 +4,9 @@ import com.github.auties00.cobalt.exception.WhatsAppMessageException;
 import com.github.auties00.cobalt.message.MessageEncryptionType;
 import com.github.auties00.cobalt.message.receive.crypto.MessageDecryption;
 import com.github.auties00.cobalt.message.receive.crypto.SenderKeyNameFactory;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.store.WhatsAppStore;
 import com.github.auties00.cobalt.util.DataUtils;
@@ -25,6 +28,10 @@ import java.util.Objects;
  * In Cobalt, constructor-based DI replaces module-level imports for
  * WAWebSignal.Cipher and WAWebSignalProtocolStore.
  */
+@WhatsAppWebModule(moduleName = "WAWebEncryptMsgProtobuf")
+@WhatsAppWebModule(moduleName = "WAWebBackendJobsCommon")
+@WhatsAppWebModule(moduleName = "WAWebSignalCipherApi")
+@WhatsAppWebModule(moduleName = "WAWebSignalSessionApi")
 public final class MessageEncryption {
     /**
      * Logger for encryption diagnostics.
@@ -40,6 +47,8 @@ public final class MessageEncryption {
      * @implNote WAWebBackendJobsCommon.CIPHERTEXT_VERSION: constant {@code m = 2},
      * exported as {@code CIPHERTEXT_VERSION}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebBackendJobsCommon", exports = "CIPHERTEXT_VERSION",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static final int CIPHERTEXT_VERSION = 2;
 
     /**
@@ -94,6 +103,8 @@ public final class MessageEncryption {
      * for WAWebSignal.Cipher and WAWebSignalProtocolStore;
      * Cobalt uses constructor-based DI instead.
      */
+    @WhatsAppWebExport(moduleName = "WAWebEncryptMsgProtobuf", exports = {"encryptMsgProtobuf", "encryptMsgSenderKey"},
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public MessageEncryption(
             WhatsAppStore store,
             SignalSessionCipher sessionCipher,
@@ -123,6 +134,10 @@ public final class MessageEncryption {
      * WAM metrics ({@code postSuccessDirectE2eMessageSendMetric} /
      * {@code postFailureDirectE2eMessageSendMetric}) are intentionally skipped.
      */
+    @WhatsAppWebExport(moduleName = "WAWebEncryptMsgProtobuf", exports = "encryptMsgProtobuf",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebSignalCipherApi", exports = "encryptSignalProto",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public MessageEncryptedPayload encryptForDevice(Jid recipientJid, byte[] plaintext) {
         Objects.requireNonNull(recipientJid, "recipientJid cannot be null");
         Objects.requireNonNull(plaintext, "plaintext cannot be null");
@@ -199,6 +214,10 @@ public final class MessageEncryption {
      * bytes are obtained separately via {@link #getSenderKeyBytes(Jid, Jid)}.
      * WAM metrics ({@code E2eMessageSendWamEvent}) are intentionally skipped.
      */
+    @WhatsAppWebExport(moduleName = "WAWebEncryptMsgProtobuf", exports = "encryptMsgSenderKey",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebSignalCipherApi", exports = "encryptSenderKeyMsgSignalProto",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public MessageEncryptedPayload encryptForGroup(Jid groupJid, Jid senderJid, byte[] plaintext) {
         Objects.requireNonNull(groupJid, "groupJid cannot be null");
         Objects.requireNonNull(senderJid, "senderJid cannot be null");
@@ -250,6 +269,8 @@ public final class MessageEncryption {
      * WAWebSignalCommonUtils.writeRandomPadMax16 and
      * WAWebSendMsgCommonApi.encodeAndPad.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "encodeAndPad",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static byte[] addPadding(byte[] plaintext) {
         Objects.requireNonNull(plaintext, "plaintext cannot be null");
 
@@ -283,6 +304,8 @@ public final class MessageEncryption {
      * WAWebGetGroupKeyDistributionMsg.getKeyDistributionMsg: builds
      * the distribution message to send to other participants.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSignalSessionApi", exports = "getGroupSenderKeyInfo",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public SignalSenderKeyDistributionMessage createSenderKeyDistributionMessage(Jid groupJid, Jid senderJid) {
         Objects.requireNonNull(groupJid, "groupJid cannot be null");
         Objects.requireNonNull(senderJid, "senderJid cannot be null");
@@ -304,6 +327,8 @@ public final class MessageEncryption {
      * {@code axolotlSenderKeyDistributionMessage} for ICDC construction.
      * In Cobalt, sender key bytes are obtained separately from encryption.
      */
+    @WhatsAppWebExport(moduleName = "WAWebGetGroupKeyDistributionMsg", exports = "getKeyDistributionMsg",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public byte[] getSenderKeyBytes(Jid groupJid, Jid senderJid) {
         var distributionMessage = createSenderKeyDistributionMessage(groupJid, senderJid);
         return distributionMessage.toSerialized();
@@ -321,6 +346,8 @@ public final class MessageEncryption {
      * the sender key session for the group/sender pair from the
      * signal protocol store.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSignalSessionApi", exports = "deleteGroupSenderKeyInfo",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public void rotateSenderKey(Jid groupJid, Jid senderJid) {
         Objects.requireNonNull(groupJid, "groupJid cannot be null");
         Objects.requireNonNull(senderJid, "senderJid cannot be null");
@@ -343,6 +370,8 @@ public final class MessageEncryption {
      * @implNote WAWebSignalSessionApi.hasSignalSessions: checks
      * the signal protocol store for an existing session with the device.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSignalSessionApi", exports = "hasSignalSessions",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public boolean hasSessionWith(Jid deviceJid) {
         Objects.requireNonNull(deviceJid, "deviceJid cannot be null");
         var address = deviceJid.toSignalAddress();

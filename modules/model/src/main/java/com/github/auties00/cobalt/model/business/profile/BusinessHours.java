@@ -8,8 +8,8 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * A business hours schedule that contains the time zone and the list of daily operating
- * hour entries for a WhatsApp Business account.
+ * Represents the business hours schedule for a WhatsApp Business account, containing the
+ * time zone and the list of daily operating hour entries.
  *
  * <p>The time zone is an IANA time zone identifier (such as {@code "America/New_York"} or
  * {@code "Europe/London"}) used to interpret the opening and closing times in each
@@ -19,11 +19,14 @@ import java.util.List;
  * <p>A day of the week that is absent from the entries list is considered closed. A single
  * day may appear in multiple entries to represent split operating hours, such as a morning
  * and afternoon session separated by a break.
+ *
+ * @see BusinessProfile#hours()
  */
 @ProtobufMessage
 public final class BusinessHours {
     /**
-     * The IANA time zone identifier for this schedule.
+     * The IANA time zone identifier for this schedule, such as {@code "America/New_York"} or
+     * {@code "Europe/London"}.
      */
     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
     String timeZone;
@@ -61,7 +64,6 @@ public final class BusinessHours {
      * Sets the IANA time zone identifier for this schedule.
      *
      * @param timeZone the time zone identifier
-     * @return this instance
      */
     public void setTimeZone(String timeZone) {
         this.timeZone = timeZone;
@@ -83,7 +85,6 @@ public final class BusinessHours {
      * Sets the list of business hours configuration entries.
      *
      * @param entries the list of daily operating hour entries, or {@code null} for an empty list
-     * @return this instance
      */
     public void setEntries(List<BusinessHoursEntry> entries) {
         this.entries = entries;

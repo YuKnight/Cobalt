@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.message.send.stanza;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
@@ -13,7 +16,12 @@ import com.github.auties00.cobalt.node.NodeBuilder;
  * WASmaxOutMessagePublishNewsletterMediaPublishMixin: includes
  * {@code <media_id>handle</media_id>} when a media handle is available.
  */
+@WhatsAppWebModule(moduleName = "WASmaxOutMessagePublishPayloadMixin")
+@WhatsAppWebModule(moduleName = "WASmaxOutMessagePublishNewsletterMediaPublishMixin")
 public final class NewsletterStanza {
+    /**
+     * Prevents instantiation of this utility class.
+     */
     private NewsletterStanza() {
         throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
     }
@@ -26,6 +34,8 @@ public final class NewsletterStanza {
      *
      * @apiNote WASmaxOutMessagePublishPayloadMixin
      */
+    @WhatsAppWebExport(moduleName = "WASmaxOutMessagePublishPayloadMixin", exports = "applyMixin",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static Node buildPlaintext(byte[] payload) {
         return new NodeBuilder()
                 .description("plaintext")
@@ -43,6 +53,8 @@ public final class NewsletterStanza {
      * @apiNote WASmaxOutMessagePublishNewsletterMediaPublishMixin:
      * includes {@code mediatype} attribute on the plaintext node.
      */
+    @WhatsAppWebExport(moduleName = "WASmaxOutMessagePublishNewsletterMediaPublishMixin", exports = "applyMixin",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static Node buildPlaintext(byte[] payload, String mediaType) {
         return new NodeBuilder()
                 .description("plaintext")
@@ -60,12 +72,26 @@ public final class NewsletterStanza {
      *
      * @apiNote WASmaxOutMessagePublishNewsletterMediaPublishMixin
      */
+    @WhatsAppWebExport(moduleName = "WASmaxOutMessagePublishNewsletterMediaPublishMixin", exports = "applyMixin",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static Node buildMediaId(NewsletterMessageInfo info) {
         return info.mediaHandle()
                 .map(NewsletterStanza::buildMediaId)
                 .orElse(null);
     }
 
+    /**
+     * Builds a {@code <media_id>} node from a literal handle string.
+     *
+     * @param handle the media handle
+     * @return the media_id node
+     *
+     * @implNote WASmaxOutMessagePublishNewsletterMediaPublishMixin:
+     * emits {@code <media_id>handle</media_id>} as a child of the
+     * {@code <message>} stanza.
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxOutMessagePublishNewsletterMediaPublishMixin", exports = "applyMixin",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static Node buildMediaId(String handle) {
         return new NodeBuilder()
                 .description("media_id")

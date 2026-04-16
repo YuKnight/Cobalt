@@ -20,33 +20,67 @@ import com.github.auties00.libsignal.groups.SignalGroupCipher;
 import java.util.Objects;
 
 /**
- * Unified service that coordinates both outgoing and incoming message
- * processing through the WhatsApp protocol.
+ * Facade that exposes a single entry point for both outgoing and incoming
+ * message traffic on top of Cobalt's split send/receive subsystems.
  *
- * @apiNote WAWebSendMsgJob.encryptAndSendMsg: main outbound entry point.
- * WAWebCommsHandleMessagingStanza.handleMessagingStanza: main inbound
- * entry point that routes newsletter and E2E messages.
+ * <p>Internally the service wires a {@link MessageSendingService} and a
+ * {@link MessageReceivingService} that share the same Signal ciphers and
+ * {@link WhatsAppClient} instance; each call delegates to the appropriate
+ * subsystem. Callers who need finer-grained control can still instantiate the
+ * sending and receiving services directly, but the facade is the recommended
+ * integration surface and mirrors the coarse send / handle split that WA Web
+ * exposes at the top of its messaging stack.
+ *
+ * <p>The facade does not own any state of its own: all caches, queues, and
+ * counters live on the underlying services. Stopping the facade therefore
+ * reduces to clearing any transient caches on the receive side via
+ * {@link #clearPendingMessages()}.
+ *
+ * @apiNote WA Web ships two entry points with equivalent responsibilities:
+ * {@code WAWebSendMsgJob.encryptAndSendMsg} drives outbound fanout and
+ * {@code WAWebCommsHandleMessagingStanza.handleMessagingStanza} drives inbound
+ * dispatch. Cobalt collapses them into a single service so the high-level API
+ * is easier to consume.
  */
 public final class MessageService {
     /**
-     * The service for processing outbound messages.
+     * The sending service that owns outbound fanout, device fetch, and stanza
+     * emission.
+     *
+     * @implNote ADAPTED: the responsibilities held by
+     * {@code WAWebSendMsgJob.encryptAndSendMsg} and friends in WA Web.
      */
     private final MessageSendingService sendingService;
 
     /**
-     * The service for processing inbound messages.
+     * The receiving service that owns inbound stanza parsing, Signal
+     * decryption, and message info construction.
+     *
+     * @implNote ADAPTED: the responsibilities held by
+     * {@code WAWebCommsHandleMessagingStanza.handleMessagingStanza} and the
+     * downstream {@code WAWebMsgProcessing} modules in WA Web.
      */
     private final MessageReceivingService receivingService;
 
     /**
-     * Creates a new unified message service, assembling both the sending
-     * and receiving pipelines from the provided dependencies.
+     * Assembles the send and receive pipelines from the supplied
+     * collaborators.
      *
-     * @param client         the WhatsApp client for sending stanzas
-     * @param sessionCipher  the Signal session cipher for 1:1 encryption
-     * @param groupCipher    the Signal group cipher for sender-key encryption
-     * @param deviceService  the device service for device-list resolution
-     * @param abPropsService the AB props service for feature gating
+     * <p>The caller is responsible for providing a Signal session cipher and
+     * a Signal group cipher that are both backed by the same
+     * {@link WhatsAppClient#store() store}; otherwise the send and receive
+     * sides will disagree about session state.
+     *
+     * @param client         the WhatsApp client used to send and register
+     *                       stanza handlers
+     * @param sessionCipher  the Signal session cipher used for one-to-one
+     *                       encryption
+     * @param groupCipher    the Signal group cipher used for sender-key fanout
+     * @param deviceService  the device service used to resolve per-user
+     *                       device lists before fanout
+     * @param abPropsService the AB props service used to gate optional
+     *                       protocol behaviour
+     * @throws NullPointerException if any argument is {@code null}
      */
     public MessageService(
             WhatsAppClient client,
@@ -69,88 +103,104 @@ public final class MessageService {
     }
 
     /**
-     * Prepares and sends a message to the specified chat.
+     * Sends a fresh message to the given chat, handling all preparation,
+     * device fanout, and ack tracking.
      *
-     * <p>The raw {@link MessageContainer} is prepared into a fully-populated
-     * message info before being dispatched to the appropriate sender.
+     * <p>This overload accepts a raw {@link MessageContainer}; the sending
+     * service is responsible for allocating a message id, resolving the
+     * sender/recipient device lists, encrypting, and waiting for the server
+     * acknowledgment.
      *
      * @param chatJid   the recipient chat JID
-     * @param container the raw message content
+     * @param container the raw message payload
      * @return the server ack result
      * @throws NullPointerException if any argument is {@code null}
-     *
      * @see MessageSendingService#send(Jid, MessageContainer)
      */
     public AckResult send(Jid chatJid, MessageContainer container) {
+        // Delegates to the sending service that owns the outbound pipeline
+
         return sendingService.send(chatJid, container);
     }
 
     /**
-     * Sends a pre-prepared message directly without any preparation.
+     * Sends a pre-populated message that the caller has already decorated with
+     * a key, timestamp, and any extension metadata.
      *
-     * <p>Use this overload when the caller has already constructed a
-     * fully-populated {@link ChatMessageInfo} or
-     * {@link NewsletterMessageInfo}
-     * with all required fields.
+     * <p>Use this overload when the message has been prepared by the caller
+     * (for example when rehydrating a draft or re-transmitting after a
+     * nack): the sending service will not mutate the incoming
+     * {@link MessageInfo}.
      *
-     * @param messageInfo the fully-prepared outgoing message
+     * @param messageInfo the fully-prepared outgoing message, either a
+     *                    {@link ChatMessageInfo} or a
+     *                    {@link NewsletterMessageInfo}
      * @return the server ack result
-     * @throws NullPointerException if any argument is {@code null}
-     *
+     * @throws NullPointerException if {@code messageInfo} is {@code null}
      * @see MessageSendingService#send(MessageInfo)
      */
     public AckResult send(MessageInfo messageInfo) {
+        // Delegates to the sending service for already-prepared outgoing messages
+
         return sendingService.send(messageInfo);
     }
 
     /**
-     * Sends a peer protocol message to the user's own primary device.
+     * Sends a peer protocol message to one of the user's own devices.
      *
-     * <p>Peer messages include app state sync, key shares, and fatal
-     * exception notifications.
+     * <p>Peer messages never reach other users: they carry app-state sync
+     * payloads, key shares, and fatal-exception notifications between the
+     * linked devices of the current account.
      *
      * @param targetDevice the target device JID (typically the primary device)
-     * @param messageInfo  the protocol message
+     * @param messageInfo  the peer protocol message
      * @return the server ack result
      * @throws NullPointerException if any argument is {@code null}
-     *
      * @see MessageSendingService#sendPeer(Jid, ChatMessageInfo)
      */
     public AckResult sendPeer(Jid targetDevice, ChatMessageInfo messageInfo) {
+        // Delegates to the sending service for peer (self-device) messages
+
         return sendingService.sendPeer(targetDevice, messageInfo);
     }
 
     /**
-     * Processes an incoming {@code <message>} node, producing the
-     * appropriate {@link MessageInfo} subtype.
+     * Processes an inbound {@code <message>} stanza and returns a typed
+     * {@link MessageInfo} suitable for application-level consumption.
      *
-     * <p>Newsletter messages produce
-     * {@link NewsletterMessageInfo};
-     * all other messages go through E2E decryption and produce
-     * {@link ChatMessageInfo}.  Returns {@code null} for unavailable
-     * (fanout placeholder) messages.
+     * <p>Newsletter messages are returned as
+     * {@link NewsletterMessageInfo}. All other messages go through the Signal
+     * decryption pipeline and are returned as {@link ChatMessageInfo}.
+     * Fanout placeholders for messages that the server could not deliver
+     * produce a {@code null} return value so the caller can distinguish them
+     * from real messages.
      *
-     * @param node the raw incoming {@code <message>} node
+     * @param node the raw inbound {@code <message>} node
      * @return the processed message info, or {@code null} for unavailable
-     *         messages
+     *         fanout placeholders
      * @throws com.github.auties00.cobalt.exception.WhatsAppMessageException.Receive
-     *         if decryption or validation fails for E2E messages
-     *
+     *         if decryption or validation fails for an encrypted payload
      * @see MessageReceivingService#process(Node)
      */
     public MessageInfo process(Node node) {
+        // Delegates to the receiving service for inbound stanza decoding
+
         return receivingService.process(node);
     }
 
     /**
-     * Clears the pending-message dedup cache.
+     * Clears the pending-message deduplication cache held by the receiving
+     * service.
      *
-     * <p>Should be called when offline delivery ends so that messages
-     * received in a new session are not falsely considered duplicates.
+     * <p>Should be invoked when the offline delivery phase completes so that
+     * stanzas replayed in a new session are not mistakenly treated as
+     * duplicates of the pre-reconnect traffic.
      *
      * @see MessageReceivingService#clearPendingMessages()
      */
     public void clearPendingMessages() {
+        // Resets the receiving-side dedup cache when offline delivery ends
+
         receivingService.clearPendingMessages();
     }
 }

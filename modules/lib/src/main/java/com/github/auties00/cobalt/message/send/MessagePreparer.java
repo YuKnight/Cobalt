@@ -3,6 +3,9 @@ package com.github.auties00.cobalt.message.send;
 import com.github.auties00.cobalt.message.addon.EncMessageFactory;
 import com.github.auties00.cobalt.message.send.id.MessageIdGenerator;
 import com.github.auties00.cobalt.message.send.id.MessageIdVersion;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.chat.ChatMessageContextInfoBuilder;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfoBuilder;
@@ -54,6 +57,9 @@ import java.util.Optional;
  * WAWebAddonEncryptAddonMsgData.encryptAddOn: applies inner AES-GCM
  * encryption for addon message types.
  */
+@WhatsAppWebModule(moduleName = "WAWebOutgoingMessage")
+@WhatsAppWebModule(moduleName = "WAWebE2EProtoGenerator")
+@WhatsAppWebModule(moduleName = "WAWebAddonEncryptAddonMsgData")
 final class MessagePreparer {
     /**
      * Logger for diagnostic output during message preparation.
@@ -72,6 +78,8 @@ final class MessagePreparer {
      * @implNote WAWebAddonEncryptionError.getValidatedMessageSecret:
      * validates that messageSecret is exactly 32 bytes.
      */
+    @WhatsAppWebExport(moduleName = "WAWebAddonEncryptionError", exports = "getValidatedMessageSecret",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static final int MESSAGE_SECRET_SIZE = 32;
 
     /**
@@ -90,6 +98,8 @@ final class MessagePreparer {
      * @implNote ADAPTED: WAWebE2EProtoGenerator uses module-level imports;
      * Cobalt uses constructor-injected store.
      */
+    @WhatsAppWebExport(moduleName = "WAWebE2EProtoGenerator", exports = "getProtobufMessage",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     MessagePreparer(WhatsAppStore store) {
         this.store = Objects.requireNonNull(store, "store");
     }
@@ -114,6 +124,10 @@ final class MessagePreparer {
      * WAWebE2EProtoGenerator.getProtobufMessage: sets messageSecret
      * on messageContextInfo when not invoking a bot.
      */
+    @WhatsAppWebExport(moduleName = "WAWebOutgoingMessage", exports = "createOutgoingMessageProtobuf",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WAWebE2EProtoGenerator", exports = "getProtobufMessage",
+            adaptation = WhatsAppAdaptation.DIRECT)
     ChatMessageInfo prepareChat(Jid chatJid, MessageContainer container) {
         Objects.requireNonNull(chatJid, "chatJid");
         Objects.requireNonNull(container, "container");
@@ -169,6 +183,8 @@ final class MessagePreparer {
      * @implNote WAWebNewsletterSendMessageQueryJob: newsletters don't use
      *           E2E encryption or messageSecret, so the container is sent as plaintext.
      */
+    @WhatsAppWebExport(moduleName = "WAWebNewsletterSendMessageQueryJob", exports = "querySendNewsletterMessage",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     NewsletterMessageInfo prepareNewsletter(Jid newsletterJid, MessageContainer container) {
         Objects.requireNonNull(newsletterJid, "newsletterJid");
         Objects.requireNonNull(container, "container");
@@ -212,6 +228,8 @@ final class MessagePreparer {
      * WAWebSendGroupMsgJob.isCagAddon: detects CAG context for
      * auto-conversion of reactions to encrypted reactions.
      */
+    @WhatsAppWebExport(moduleName = "WAWebAddonEncryptAddonMsgData", exports = "encryptAddOn",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private MessageContainer prepareAddonContent(
             MessageContainer container,
             Jid chatJid,
@@ -306,6 +324,8 @@ final class MessagePreparer {
      * @implNote WAWebSendGroupMsgJob.isCagAddon: returns true for
      * reaction_enc in linked groups with LID addressing.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendGroupMsgJob", exports = "isCagAddon",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private boolean requiresEncryptedReaction(Jid chatJid) {
         if (!chatJid.hasGroupOrCommunityServer()) {
             return false;
@@ -326,6 +346,8 @@ final class MessagePreparer {
      * @implNote ADAPTED: WAWebAddonEncryptAddonMsgData.encryptAddOn resolves
      * the parent message from the MsgCollection; Cobalt uses the store.
      */
+    @WhatsAppWebExport(moduleName = "WAWebAddonEncryptAddonMsgData", exports = "encryptAddOn",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private Optional<ChatMessageInfo> resolveParentMessage(Jid parentJid, MessageKey key) {
         return key == null ? Optional.empty() : key.id()
                 .flatMap(id -> store.findMessageById(parentJid, id))

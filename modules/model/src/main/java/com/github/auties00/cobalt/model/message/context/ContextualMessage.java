@@ -31,11 +31,29 @@ import com.github.auties00.cobalt.model.message.text.ExtendedTextMessage;
 import java.util.Optional;
 
 /**
- * A {@link Message} that carries {@link ContextInfo} metadata such as quoted
- * messages, mentions, forwarding status, and other contextual attributes.
+ * Represents a {@link Message} that can carry contextual metadata in the form
+ * of a {@link ContextInfo} instance.
  *
- * <p>Not every message type supports context information. Only the permitted
- * subtypes of this interface expose a {@code contextInfo} accessor and setter.
+ * <p>Context information is the extra data that travels alongside a message
+ * body and is not part of the message content itself. It is used to model
+ * features such as replies to a previous message, mentions of chat or group
+ * members, forwarding history, ad attribution (Click-To-WhatsApp), status
+ * reshares, ephemeral (disappearing) message settings and a number of
+ * business, bot and newsletter related attributes.
+ *
+ * <p>Only a specific set of message types is allowed to expose context
+ * information. These types are declared in the {@code permits} clause of this
+ * sealed interface and include, among others, text, media, interactive,
+ * template, list, location, contact, commerce, poll and system messages.
+ * Messages that are not part of this set (for example protocol or encryption
+ * control messages) intentionally do not expose a {@link ContextInfo} and
+ * therefore cannot be replied to, forwarded or tagged with mentions.
+ *
+ * <p>The context information is optional: a contextual message that has never
+ * been tagged with any contextual metadata returns an empty {@code Optional}
+ * from {@link #contextInfo()}. When present, callers typically inspect it to
+ * determine whether the message is a reply, whether it contains mentions, or
+ * whether it was originated from an ad or a forwarded status.
  */
 public sealed interface ContextualMessage extends Message permits
         MediaMessage,
@@ -69,18 +87,29 @@ public sealed interface ContextualMessage extends Message permits
     TemplateMessage {
 
     /**
-     * Returns the context information associated with this message, if present.
+     * Returns the context information currently attached to this message.
      *
-     * @return an {@code Optional} describing the {@link ContextInfo}, or an
-     *         empty {@code Optional} if no context information is set
+     * <p>The returned {@link ContextInfo}, when present, exposes data such as
+     * the quoted message, the list of mentioned JIDs, forwarding flags, ad
+     * attribution data, ephemeral settings and many other contextual
+     * attributes. An empty result means that no contextual metadata has been
+     * set on this message.
+     *
+     * @return an {@code Optional} containing the {@link ContextInfo} if any
+     *         has been attached, or {@code Optional.empty()} otherwise
      */
     Optional<ContextInfo> contextInfo();
 
     /**
-     * Sets the context information for this message.
+     * Attaches the given context information to this message, replacing any
+     * previously set value.
      *
-     * @param contextInfo the context information to associate with this message
-     * @return this message instance for method chaining
+     * <p>Passing {@code null} clears the context information and makes
+     * subsequent calls to {@link #contextInfo()} return an empty
+     * {@code Optional}.
+     *
+     * @param contextInfo the {@link ContextInfo} to attach, or {@code null}
+     *                    to clear it
      */
     void setContextInfo(ContextInfo contextInfo);
 }

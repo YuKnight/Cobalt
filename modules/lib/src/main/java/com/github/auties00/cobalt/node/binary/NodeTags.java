@@ -1,27 +1,34 @@
 package com.github.auties00.cobalt.node.binary;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.node.Node;
 
 /**
- * A utility class that defines binary tag constants used in WhatsApp's node serialization protocol.
- * <p>
- * These tags are used during the encoding and decoding of WhatsApp protocol messages to identify
- * the type and structure of data elements within binary node representations. Each tag corresponds
- * to a specific data type or structure format used in the WhatsApp binary protocol.
- * </p>
- * <p>
- * This class cannot be instantiated as it only contains static constant definitions.
- * </p>
+ * Byte-tag constants used by WhatsApp's compact binary XML protocol.
  *
+ * <p>The WhatsApp wire format uses a single leading byte to identify the
+ * type of each value in the stanza tree: empty lists, dictionary tokens,
+ * list sizes, JID shapes, hex/nibble-packed strings, or binary blobs of
+ * various length widths. The constants defined here are the numeric tag
+ * values referenced by {@link NodeEncoder} and {@link NodeDecoder} while
+ * translating between {@link Node} trees and their serialised form.
+ *
+ * <p>This class is intentionally non-instantiable and consists solely of
+ * {@code public static final} byte constants.
+ *
+ * @implNote WAWap: the JS module exposes these same byte values as
+ *           module-level constants used by the encode/decode pipeline.
  * @see Node
  * @see NodeEncoder
  * @see NodeDecoder
  */
+@WhatsAppWebModule(moduleName = "WAWap")
 public final class NodeTags {
     /**
-     * Private constructor to prevent instantiation of this utility class.
+     * Prevents instantiation of this utility class.
      *
-     * @throws UnsupportedOperationException always, as this class should not be instantiated
+     * @throws UnsupportedOperationException always, as this class holds
+     *         only static constants
      */
     private NodeTags() {
         throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");

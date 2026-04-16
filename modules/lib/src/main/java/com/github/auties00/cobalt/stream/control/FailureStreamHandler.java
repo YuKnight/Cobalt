@@ -4,6 +4,7 @@ import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.exception.WhatsAppConnectionException;
 import com.github.auties00.cobalt.exception.WhatsAppSessionException;
 import com.github.auties00.cobalt.exception.WhatsAppServerRuntimeException;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.stream.SocketStream;
 
@@ -30,6 +31,8 @@ import com.github.auties00.cobalt.stream.SocketStream;
  *
  * @implNote WAWebHandleFailure.default
  */
+@WhatsAppWebModule(moduleName = "WAWebHandleFailure")
+@WhatsAppWebModule(moduleName = "WAWebFailureErrorCodes")
 public final class FailureStreamHandler implements SocketStream.Handler {
 
     /**

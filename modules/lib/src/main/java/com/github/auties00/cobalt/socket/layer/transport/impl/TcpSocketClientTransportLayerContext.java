@@ -1,4 +1,4 @@
-package com.github.auties00.cobalt.socket.layer.transport.impl.tcp;
+package com.github.auties00.cobalt.socket.layer.transport.impl;
 
 import com.github.auties00.cobalt.socket.threading.SocketClientInboundResult;
 import com.github.auties00.cobalt.socket.layer.transport.SocketClientTransportLayerContext;

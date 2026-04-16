@@ -6,6 +6,9 @@ import com.github.auties00.cobalt.exception.WhatsAppMessageException;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryptedPayload;
 import com.github.auties00.cobalt.message.send.icdc.IcdcEnricher;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.MessageContainer;
 import com.github.auties00.cobalt.model.message.MessageContainerSpec;
@@ -31,6 +34,7 @@ import java.util.*;
  * each device in the sender-key distribution list.  Also provides
  * {@code getCompanionDsmPhashMsg} for companion device DSM with phash.
  */
+@WhatsAppWebModule(moduleName = "WAWebGetGroupKeyDistributionMsg")
 public final class SenderKeyDistribution {
     /**
      * Logger for sender-key distribution diagnostics.
@@ -81,6 +85,8 @@ public final class SenderKeyDistribution {
      * @implNote ADAPTED: WAWebGetGroupKeyDistributionMsg uses module-level
      * imports; Cobalt uses constructor-based DI instead.
      */
+    @WhatsAppWebExport(moduleName = "WAWebGetGroupKeyDistributionMsg", exports = "getKeyDistributionMsg",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public SenderKeyDistribution(
             MessageEncryption encryption,
             DeviceService deviceService,
@@ -116,6 +122,8 @@ public final class SenderKeyDistribution {
      * WAWebEncryptAndSendStatusMsg with {@code shouldWrapDSM=false} and
      * no phash.
      */
+    @WhatsAppWebExport(moduleName = "WAWebGetGroupKeyDistributionMsg", exports = "getKeyDistributionMsg",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public List<MessageEncryptedPayload> encrypt(
             Jid groupJid,
             byte[] senderKeyBytes,
@@ -162,6 +170,8 @@ public final class SenderKeyDistribution {
      * {@code WAWebSendMsgCommonApi.isPrimaryDevice(device)} is {@code true},
      * the failure is rejected (thrown).
      */
+    @WhatsAppWebExport(moduleName = "WAWebGetGroupKeyDistributionMsg", exports = "getKeyDistributionMsg",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public List<MessageEncryptedPayload> encrypt(
             Jid groupJid,
             byte[] senderKeyBytes,
@@ -248,6 +258,8 @@ public final class SenderKeyDistribution {
      * {@code WAWebE2EProtoGenerator.populateMessageContextInfo(m, selfIcdc, null)},
      * then encrypts for each companion device.
      */
+    @WhatsAppWebExport(moduleName = "WAWebGetGroupKeyDistributionMsg", exports = "getCompanionDsmPhashMsg",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public List<MessageEncryptedPayload> encryptCompanionDsmPhash(
             MessageContainer message,
             Collection<Jid> companionDevices,
@@ -336,6 +348,8 @@ public final class SenderKeyDistribution {
      * {@code shouldWrapDsm} is {@code true}, adds phash to DSM when present,
      * then calls {@code WAWebE2EProtoGenerator.populateMessageContextInfo}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebGetGroupKeyDistributionMsg", exports = "generateMsgProtobufs",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private Map<Jid, MessageContainer> generateMsgProtobufs(
             MessageContainer baseContainer,
             Collection<Jid> devices,
@@ -417,6 +431,8 @@ public final class SenderKeyDistribution {
      * {@code e.device == null || e.device === DEFAULT_DEVICE_ID}
      * where {@code DEFAULT_DEVICE_ID} is {@code 0}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "isPrimaryDevice",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static boolean isPrimaryDevice(Jid device) {
         return device.device() == 0; // WAWebSendMsgCommonApi.isPrimaryDevice
     }

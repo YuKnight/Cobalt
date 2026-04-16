@@ -2,30 +2,69 @@
 
 package com.github.auties00.cobalt.node;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidProvider;
 
 import java.util.*;
 
 /**
- * A builder class for constructing WhatsApp protocol {@link Node} instances.
- * <p>
- * This builder provides a fluent API to create nodes with various types of content and attributes.
- * Nodes are the fundamental data structure used in WhatsApp's protocol communication, similar to XML elements.
+ * Fluent builder for assembling WhatsApp protocol {@link Node} instances.
  *
+ * <p>All outbound stanzas in Cobalt are built through this class: callers
+ * set a tag name, attach attributes conditionally with {@code attribute()}
+ * methods, then call one of the {@code content()} overloads to set the
+ * payload before calling {@link #build()}. The builder picks the
+ * appropriate concrete {@link Node} variant automatically based on the
+ * content type.
+ *
+ * <p>Attribute setters are null-safe: a {@code null} value (or a
+ * {@code condition} of {@code false}) skips the attribute entirely,
+ * which removes the need for per-call null checks at every call site.
+ *
+ * @implNote WAWap.makeWapNode: equivalent to the JS factory used to
+ *           construct {@code WapNode} instances with an attributes hash
+ *           and a content payload. Cobalt uses a builder so optional
+ *           attributes can be chained without building an intermediate
+ *           map.
  * @see Node
  * @see NodeAttribute
  */
+@WhatsAppWebModule(moduleName = "WAWap")
 public final class NodeBuilder {
+    /**
+     * The pending tag name of the node being built.
+     */
     private String description;
+
+    /**
+     * The accumulating map of attributes in insertion order.
+     */
     private final SequencedMap<String, NodeAttribute> attributes;
+
+    /**
+     * Pending text content, or {@code null} if not set.
+     */
     private String textContent;
+
+    /**
+     * Pending JID content, or {@code null} if not set.
+     */
     private JidProvider jidContent;
+
+    /**
+     * Pending binary content, or {@code null} if not set.
+     */
     private byte[] bytesContent;
+
+    /**
+     * Pending child-node content, or {@code null} if not set.
+     */
     private SequencedCollection<Node> childrenContent;
 
     /**
-     * Constructs a new NodeBuilder with empty attributes.
+     * Constructs a new builder with no description, no attributes, and
+     * no content.
      */
     public NodeBuilder() {
         this.attributes = new LinkedHashMap<>();

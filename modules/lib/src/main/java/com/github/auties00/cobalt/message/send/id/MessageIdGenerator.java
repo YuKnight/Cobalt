@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.message.send.id;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.util.DataUtils;
 
@@ -19,9 +22,9 @@ import java.util.Objects;
  * <p>All generated IDs share the {@value #PREFIX} prefix.  The remainder
  * depends on the {@linkplain MessageIdVersion version} in use:
  * <ul>
- *   <li>{@link MessageIdVersion#V2 V2} — 18 hex chars from SHA-256
+ *   <li>{@link MessageIdVersion#V2 V2} gives 18 hex chars from SHA-256
  *       (22 total)</li>
- *   <li>{@link MessageIdVersion#V1 V1} — 16 random hex chars
+ *   <li>{@link MessageIdVersion#V1 V1} gives 16 random hex chars
  *       (20 total)</li>
  * </ul>
  *
@@ -29,6 +32,8 @@ import java.util.Objects;
  * WAWebMsgKeyNewId.getMsgKeyNewSHA256Id then falls back to newId_DEPRECATED.
  * @see MessageIdVersion
  */
+@WhatsAppWebModule(moduleName = "WAWebMsgKey")
+@WhatsAppWebModule(moduleName = "WAWebMsgKeyNewId")
 public final class MessageIdGenerator {
     /**
      * The 4-character prefix shared by all WhatsApp Web message IDs.
@@ -36,6 +41,8 @@ public final class MessageIdGenerator {
      * @implNote WAWebMsgKey.newId / WAWebMsgKey.newId_DEPRECATED:
      * both hard-code the literal {@code "3EB0"} as the message ID prefix.
      */
+    @WhatsAppWebExport(moduleName = "WAWebMsgKey", exports = {"newId", "newId_DEPRECATED"},
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static final String PREFIX = "3EB0";
 
     /**
@@ -113,6 +120,8 @@ public final class MessageIdGenerator {
      * component of the SHA-256 pre-image, which is always the sender's
      * own PN user JID.
      */
+    @WhatsAppWebExport(moduleName = "WAWebMsgKey", exports = "newId",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public static String generate(MessageIdVersion version, Jid senderJid) {
         Objects.requireNonNull(version, "version");
         Objects.requireNonNull(senderJid, "senderJid");
@@ -135,6 +144,8 @@ public final class MessageIdGenerator {
      * where {@code randomHex(n)} produces {@code 2n} uppercase hex characters
      * from {@code n} random bytes.
      */
+    @WhatsAppWebExport(moduleName = "WAWebMsgKey", exports = "newId_DEPRECATED",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static String generateV1() {
         // WARandomHex.randomHex(8): 8 random bytes → 16 hex chars
         var randomBytes = DataUtils.randomByteArray(V1_RANDOM_BYTES);
@@ -149,6 +160,8 @@ public final class MessageIdGenerator {
      * genMsgKeyUint (WABinary.writeInt64 + writeString + writeBuffer),
      * then {@code "3EB0" + toHex(SHA256(payload)[0:9])}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebMsgKeyNewId", exports = {"getMsgKeyNewSHA256Id", "genMsgKeyUint"},
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static String generateV2(Jid senderJid) throws NoSuchAlgorithmException {
         // WAWebMsgKeyNewId.genMsgKeyUint: build the pre-image payload
         var timestamp = Instant.now().getEpochSecond();

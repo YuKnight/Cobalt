@@ -5,12 +5,15 @@ import it.auties.protobuf.model.*;
 import java.util.Optional;
 
 /**
- * A single fact that the AI bot has memorized about the user.
+ * Represents a single fact that the AI bot has memorized about the user.
  *
  * <p>Meta AI can remember user preferences and personal details across
  * conversations. Each remembered piece of information is represented as a
- * {@code BotMemoryFact} with a human-readable {@linkplain #fact() text}
- * and a unique {@linkplain #factId() identifier}.
+ * {@code BotMemoryFact} with a human-readable {@linkplain #fact() text
+ * description} and a unique {@linkplain #factId() server-assigned identifier}
+ * that can be used to reference or remove the fact later.
+ *
+ * @see BotMemoryMetadata
  */
 @ProtobufMessage(name = "BotMemoryFact")
 public final class BotMemoryFact {

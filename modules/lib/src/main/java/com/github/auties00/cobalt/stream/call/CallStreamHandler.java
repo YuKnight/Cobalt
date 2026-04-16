@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.stream.call;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.call.CallOffer;
 import com.github.auties00.cobalt.model.call.CallOfferBuilder;
 import com.github.auties00.cobalt.model.jid.Jid;
@@ -27,6 +28,7 @@ import java.time.Instant;
  *
  * @implNote WAWebHandleVoipCall
  */
+@WhatsAppWebModule(moduleName = "WAWebHandleVoipCall")
 public final class CallStreamHandler implements SocketStream.Handler {
     /**
      * The logger for this handler.

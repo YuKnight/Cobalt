@@ -1,9 +1,9 @@
-package com.github.auties00.cobalt.socket.layer.tunnel.impl.direct;
+package com.github.auties00.cobalt.socket.layer.security.impl;
 
+import com.github.auties00.cobalt.socket.WhatsAppSslEngineFactory;
 import com.github.auties00.cobalt.socket.layer.SocketClientLayer;
 import com.github.auties00.cobalt.socket.layer.SocketClientLayerListener;
-import com.github.auties00.cobalt.socket.layer.tunnel.SocketClientTunnelLayer;
-import com.github.auties00.cobalt.socket.layer.tunnel.impl.SocketTunnelLayerContextImpl;
+import com.github.auties00.cobalt.socket.layer.security.SocketClientSecurityLayer;
 import com.github.auties00.cobalt.socket.threading.SocketClientLayerContext;
 
 import java.io.IOException;
@@ -11,43 +11,44 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 
 /**
- * A direct (no-proxy) tunnel layer that provides the
- * {@link SocketClientTunnelLayerContext} required by all connections for blocking
- * reads during the handshake phase.
+ * A concrete security layer that provides TLS encryption over an existing
+ * connection.
  *
- * <p>This layer is a pure passthrough: all I/O methods delegate to
- * the inner layer.  Its only purpose is to register a
- * {@link SocketClientTunnelLayerContext} during {@link #connect(InetSocketAddress,
- * SocketClientLayerListener)} so that {@code readBinary()} calls work
- * before the connection transitions to asynchronous mode.
+ * <p>This layer is positionally polymorphic — it can be composed anywhere
+ * in the stack (over raw transport for end-to-end TLS, or over a tunnel
+ * for client-to-proxy TLS). Its behavior is identical at either position.
  */
-public final class DirectSocketClientTunnelLayer implements SocketClientTunnelLayer {
-    /**
-     * The inner layer that provides raw I/O.
-     */
+public final class TlsSecurityLayer implements SocketClientSecurityLayer {
+    private static final int HANDSHAKE_TIMEOUT = 30_000;
+
     private final SocketClientLayer<?> innerLayer;
+    private final WhatsAppSslEngineFactory engineFactory;
+    private InetSocketAddress peerAddress;
 
     /**
-     * Creates a direct tunnel layer wrapping the given inner layer.
+     * Creates a TLS security layer wrapping the given inner layer.
      *
-     * @param innerLayer the layer below (typically a transport layer)
+     * @param innerLayer    the layer below
+     * @param engineFactory the factory for creating {@link javax.net.ssl.SSLEngine} instances
      */
-    public DirectSocketClientTunnelLayer(SocketClientLayer<?> innerLayer) {
+    public TlsSecurityLayer(SocketClientLayer<?> innerLayer, WhatsAppSslEngineFactory engineFactory) {
         this.innerLayer = innerLayer;
+        this.engineFactory = engineFactory;
     }
 
-    /**
-     * Connects the inner layer and registers a {@link SocketClientTunnelLayerContext}
-     * in pre-tunnel mode for blocking reads during handshakes.
-     *
-     * @param address  the remote endpoint
-     * @param listener the callback for events
-     * @throws IOException if the connection fails
-     */
+    @Override
+    public void startHandshake() throws IOException {
+        var ctx = new TlsLayerContext();
+        ctx.initSsl(engineFactory.createSSLEngine(peerAddress));
+        innerLayer.registerLayerContext(ctx);
+        innerLayer.startHandshake(ctx, HANDSHAKE_TIMEOUT);
+    }
+
     @Override
     public void connect(InetSocketAddress address, SocketClientLayerListener listener) throws IOException {
+        this.peerAddress = address;
         innerLayer.connect(address, listener);
-        innerLayer.registerLayerContext(new SocketTunnelLayerContextImpl());
+        startHandshake();
     }
 
     @Override

@@ -1,38 +1,84 @@
 package com.github.auties00.cobalt.client;
 
 /**
- * A convenient interface to provide functional overloads for {@link WhatsAppClientListener}
+ * A sealed marker interface that groups the functional consumer shapes used
+ * to register lambda-based listeners with a {@link WhatsAppClient}.
+ *
+ * <p>Individual {@link WhatsAppClientListener} callback methods accept
+ * different numbers of parameters (from zero to three) depending on the
+ * event they describe. Because Java lambdas cannot be polymorphic across
+ * arities, this interface provides a permit hierarchy of arity-specific
+ * functional interfaces that convenience overloads on {@link WhatsAppClient}
+ * can accept. Callers pick the variant that matches the event signature they
+ * want to observe.
+ *
+ * @see WhatsAppClientListener
  */
 public sealed interface WhatsappClientListenerConsumer {
     /**
-     * A functional listener that takes no parameters
+     * A nullary functional consumer used for listener overloads whose
+     * underlying event carries no payload of interest (for example,
+     * {@link WhatsAppClientListener#onLoggedIn(WhatsAppClient)}).
      */
     @FunctionalInterface
     non-sealed interface Empty extends WhatsappClientListenerConsumer {
+        /**
+         * Invokes the consumer.
+         */
         void accept();
     }
 
     /**
-     * A functional listener that takes one parameter
+     * A unary functional consumer used for listener overloads whose
+     * underlying event carries a single payload of interest.
+     *
+     * @param <F> the payload type
      */
     @FunctionalInterface
     non-sealed interface Unary<F> extends WhatsappClientListenerConsumer {
+        /**
+         * Invokes the consumer with the given payload.
+         *
+         * @param value the event payload
+         */
         void accept(F value);
     }
 
     /**
-     * A functional listener that takes two parameters
+     * A binary functional consumer used for listener overloads whose
+     * underlying event carries two payloads of interest.
+     *
+     * @param <F> the first payload type
+     * @param <S> the second payload type
      */
     @FunctionalInterface
     non-sealed interface Binary<F, S> extends WhatsappClientListenerConsumer {
+        /**
+         * Invokes the consumer with the given payloads.
+         *
+         * @param first  the first event payload
+         * @param second the second event payload
+         */
         void accept(F first, S second);
     }
 
     /**
-     * A functional listener that takes three parameters
+     * A ternary functional consumer used for listener overloads whose
+     * underlying event carries three payloads of interest.
+     *
+     * @param <F> the first payload type
+     * @param <S> the second payload type
+     * @param <T> the third payload type
      */
     @FunctionalInterface
     non-sealed interface Ternary<F, S, T> extends WhatsappClientListenerConsumer {
+        /**
+         * Invokes the consumer with the given payloads.
+         *
+         * @param first  the first event payload
+         * @param second the second event payload
+         * @param third  the third event payload
+         */
         void accept(F first, S second, T third);
     }
 }

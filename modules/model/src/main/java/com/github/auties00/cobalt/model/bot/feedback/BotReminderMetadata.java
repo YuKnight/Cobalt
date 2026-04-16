@@ -12,15 +12,20 @@ import java.time.Instant;
 import java.util.Optional;
 
 /**
- * Metadata for an AI bot reminder that the user has created, updated, or
- * that is being triggered.
+ * Carries metadata for an AI bot reminder that the user has created, updated,
+ * or that is being triggered.
  *
- * <p>Users can ask Meta AI to set reminders (e.g. "Remind me to call Mom
+ * <p>Users can ask Meta AI to set reminders (for example, "Remind me to call Mom
  * tomorrow at 5 PM"). This metadata captures the reminder's
- * {@linkplain #name() name}, the {@linkplain #action() action} being performed
- * (create, update, delete, or notify), the
+ * {@linkplain #name() human-readable name}, the {@linkplain #action() lifecycle action}
+ * being performed ({@link ReminderAction#CREATE CREATE},
+ * {@link ReminderAction#UPDATE UPDATE}, {@link ReminderAction#DELETE DELETE}, or
+ * {@link ReminderAction#NOTIFY NOTIFY}), the
  * {@linkplain #nextTriggerTimestamp() next trigger time}, and the
  * {@linkplain #frequency() recurrence frequency}.
+ *
+ * <p>The {@linkplain #requestMessageKey() request message key} links this metadata
+ * back to the original user message that initiated the reminder request.
  */
 @ProtobufMessage(name = "BotReminderMetadata")
 public final class BotReminderMetadata {
@@ -169,7 +174,7 @@ public final class BotReminderMetadata {
     }
 
     /**
-     * The action being performed on an AI bot reminder.
+     * Enumerates the lifecycle actions that can be performed on an AI bot reminder.
      */
     @ProtobufEnum(name = "BotReminderMetadata.ReminderAction")
     public static enum ReminderAction {
@@ -193,6 +198,11 @@ public final class BotReminderMetadata {
          */
         UPDATE(4);
 
+        /**
+         * Constructs a new {@code ReminderAction} with the specified protobuf index.
+         *
+         * @param index the protobuf index value
+         */
         ReminderAction(@ProtobufEnumIndex int index) {
             this.index = index;
         }
@@ -213,7 +223,7 @@ public final class BotReminderMetadata {
     }
 
     /**
-     * The recurrence frequency of an AI bot reminder.
+     * Enumerates the recurrence frequencies supported for AI bot reminders.
      */
     @ProtobufEnum(name = "BotReminderMetadata.ReminderFrequency")
     public static enum ReminderFrequency {
@@ -242,6 +252,11 @@ public final class BotReminderMetadata {
          */
         MONTHLY(5);
 
+        /**
+         * Constructs a new {@code ReminderFrequency} with the specified protobuf index.
+         *
+         * @param index the protobuf index value
+         */
         ReminderFrequency(@ProtobufEnumIndex int index) {
             this.index = index;
         }

@@ -11,67 +11,57 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Top-level container action carrying the authoritative snapshot of the
- * authenticated business account's paid subscriptions and feature flags.
+ * Represents a sync action that replicates the authoritative snapshot of a
+ * WhatsApp Business account's paid subscriptions and feature flags.
  *
- * <p>Mutations of this type are singletons (the index is
- * {@code ["subscriptions_sync_v2"]}). On {@code SET} the receiver replaces
- * its locally cached subscription state and feature flag table with the
- * lists carried in this message; {@code REMOVE} simply clears that local
- * state.
- *
- * @implNote WAWebProtobufsServerSync.SyncActionValue$SubscriptionsSyncV2Action
+ * <p>This action carries the full server state for business monetisation: the
+ * catalog of active or historical {@link SubscriptionInfo} entries and the
+ * current {@link PaidFeature} flag table. On {@code SET} the receiver replaces
+ * its locally cached subscription state and feature flag table with the lists
+ * carried in this message, and on {@code REMOVE} it clears that local state
+ * entirely. The mutation is singleton, so the sync index is composed solely of
+ * {@link #ACTION_NAME} with no trailing arguments.
  */
 @ProtobufMessage(name = "SyncActionValue.SubscriptionsSyncV2Action")
 public final class SubscriptionsSyncV2Action implements SyncAction<SyncActionEmptyArgs> {
     /**
-     * Canonical WhatsApp Web action name for this action type.
-     *
-     * @implNote WASyncdConst.Actions.SubscriptionsSyncV2 — string constant
-     *           {@code "subscriptions_sync_v2"}
+     * Canonical action name used as the sole component of the singleton mutation
+     * index for this action type.
      */
     public static final String ACTION_NAME = "subscriptions_sync_v2";
 
     /**
-     * Canonical WhatsApp Web action version for this action type.
-     *
-     * @implNote WAWebSubscriptionsSyncV2Sync.getVersion — returns {@code 1}
+     * Schema version advertised by this action, used by sync handlers to gate
+     * deserialisation and handling of newer payload shapes.
      */
     public static final int ACTION_VERSION = 1;
 
     /**
-     * Canonical WhatsApp Web collection name for this action type.
-     *
-     * @implNote WAWebSubscriptionsSyncV2Sync — constructor sets
-     *           {@code collectionName = WASyncdConst.CollectionName.Regular}
+     * Collection this action belongs to, used by the sync protocol to route the
+     * mutation into the correct replication stream.
      */
     public static final SyncPatchType COLLECTION_NAME = SyncPatchType.REGULAR;
 
     /**
-     * The repeated list of {@link SubscriptionInfo} entries describing
-     * every paid subscription known to the server for this account.
-     *
-     * @implNote WAWebProtobufsServerSync.SyncActionValue$SubscriptionsSyncV2Action.subscriptions
+     * Repeated list of {@link SubscriptionInfo} entries describing every paid
+     * subscription known to the server for this business account.
      */
     @ProtobufProperty(index = 1, type = ProtobufType.MESSAGE)
     List<SubscriptionInfo> subscriptions;
 
     /**
-     * The repeated list of {@link PaidFeature} entries describing every
-     * paid business feature flag known to the server for this account.
-     *
-     * @implNote WAWebProtobufsServerSync.SyncActionValue$SubscriptionsSyncV2Action.paidFeature
+     * Repeated list of {@link PaidFeature} entries describing every paid
+     * business feature flag known to the server for this account.
      */
     @ProtobufProperty(index = 2, type = ProtobufType.MESSAGE)
     List<PaidFeature> paidFeatures;
 
     /**
-     * Constructs a new {@code SubscriptionsSyncV2Action} from raw protobuf
-     * field values.
+     * Constructs a new {@code SubscriptionsSyncV2Action} from raw protobuf field
+     * values.
      *
-     * @param subscriptions the subscriptions list
-     * @param paidFeatures  the paid features list
-     * @implNote WAWebProtobufsServerSync.SyncActionValue$SubscriptionsSyncV2Action
+     * @param subscriptions the subscriptions list, possibly {@code null}
+     * @param paidFeatures  the paid features list, possibly {@code null}
      */
     SubscriptionsSyncV2Action(List<SubscriptionInfo> subscriptions, List<PaidFeature> paidFeatures) {
         this.subscriptions = subscriptions;
@@ -79,11 +69,9 @@ public final class SubscriptionsSyncV2Action implements SyncAction<SyncActionEmp
     }
 
     /**
-     * {@inheritDoc}
+     * Returns the canonical action name for every {@code SubscriptionsSyncV2Action}.
      *
-     * @implNote WAWebSubscriptionsSyncV2Sync.getAction — returns
-     *           {@code WASyncdConst.Actions.SubscriptionsSyncV2}, the
-     *           constant {@code "subscriptions_sync_v2"}
+     * @return the constant {@link #ACTION_NAME}
      */
     @Override
     public String actionName() {
@@ -91,9 +79,9 @@ public final class SubscriptionsSyncV2Action implements SyncAction<SyncActionEmp
     }
 
     /**
-     * {@inheritDoc}
+     * Returns the schema version for every {@code SubscriptionsSyncV2Action}.
      *
-     * @implNote WAWebSubscriptionsSyncV2Sync.getVersion — returns {@code 1}
+     * @return the constant {@link #ACTION_VERSION}
      */
     @Override
     public int actionVersion() {
@@ -101,39 +89,36 @@ public final class SubscriptionsSyncV2Action implements SyncAction<SyncActionEmp
     }
 
     /**
-     * Returns the unmodifiable list of {@link SubscriptionInfo} entries
-     * carried by this action.
+     * Returns the unmodifiable list of {@link SubscriptionInfo} entries carried
+     * by this action.
      *
-     * <p>The list is never {@code null}; an empty list is returned when no
-     * subscription entries were present on the wire.
+     * <p>An empty list is returned when no subscription entries were present on
+     * the wire; the result is never {@code null}.
      *
-     * @return the subscriptions list
-     * @implNote WAWebProtobufsServerSync.SyncActionValue$SubscriptionsSyncV2Action.subscriptions
+     * @return the unmodifiable subscriptions list
      */
     public List<SubscriptionInfo> subscriptions() {
         return subscriptions == null ? List.of() : Collections.unmodifiableList(subscriptions);
     }
 
     /**
-     * Returns the unmodifiable list of {@link PaidFeature} entries carried
-     * by this action.
+     * Returns the unmodifiable list of {@link PaidFeature} entries carried by
+     * this action.
      *
-     * <p>The list is never {@code null}; an empty list is returned when no
-     * paid feature entries were present on the wire.
+     * <p>An empty list is returned when no paid feature entries were present on
+     * the wire; the result is never {@code null}.
      *
-     * @return the paid features list
-     * @implNote WAWebProtobufsServerSync.SyncActionValue$SubscriptionsSyncV2Action.paidFeature
+     * @return the unmodifiable paid features list
      */
     public List<PaidFeature> paidFeatures() {
         return paidFeatures == null ? List.of() : Collections.unmodifiableList(paidFeatures);
     }
 
     /**
-     * Sets the subscriptions list.
+     * Sets the list of {@link SubscriptionInfo} entries.
      *
-     * @param subscriptions the new subscriptions list
+     * @param subscriptions the new subscriptions list, or {@code null} to clear
      * @return this instance for method chaining
-     * @implNote WAWebProtobufsServerSync.SyncActionValue$SubscriptionsSyncV2Action.subscriptions
      */
     public SubscriptionsSyncV2Action setSubscriptions(List<SubscriptionInfo> subscriptions) {
         this.subscriptions = subscriptions;
@@ -141,11 +126,10 @@ public final class SubscriptionsSyncV2Action implements SyncAction<SyncActionEmp
     }
 
     /**
-     * Sets the paid features list.
+     * Sets the list of {@link PaidFeature} entries.
      *
-     * @param paidFeatures the new paid features list
+     * @param paidFeatures the new paid features list, or {@code null} to clear
      * @return this instance for method chaining
-     * @implNote WAWebProtobufsServerSync.SyncActionValue$SubscriptionsSyncV2Action.paidFeature
      */
     public SubscriptionsSyncV2Action setPaidFeatures(List<PaidFeature> paidFeatures) {
         this.paidFeatures = paidFeatures;

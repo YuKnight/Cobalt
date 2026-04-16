@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.wam;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.wam.model.WamEventSpec;
 
 import java.util.concurrent.CompletableFuture;
@@ -13,7 +14,10 @@ import java.util.concurrent.CompletableFuture;
  * @param flushFuture       an optional future that is completed when the buffer
  *                          containing this event is flushed, or {@code null}
  *                          for fire-and-forget commits
+ * @implNote Mirrors the per-event envelope that {@code WAWebWam} places in
+ *     its internal buffers while awaiting a batched flush.
  */
+@WhatsAppWebModule(moduleName = "WAWebWam")
 record WamPendingEvent(WamEventSpec event, long commitTimeSeconds, CompletableFuture<Void> flushFuture) {
     /**
      * Constructs a fire-and-forget pending event with no flush future.

@@ -1,73 +1,96 @@
 package com.github.auties00.cobalt.media;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.media.MediaPath;
 import com.github.auties00.cobalt.model.media.MediaProvider;
 
 import java.util.*;
 
 /**
- * Represents a media CDN host entry returned by the WhatsApp media connection
- * query. Each host stores its hostname, the list of IP addresses advertised
- * by the server, and the sets of media types that the host supports for
- * download and upload operations. A primary host may additionally carry a
- * fallback hostname, fallback IPs, and download bucket assignments for
- * deterministic routing.
+ * Represents a CDN host entry returned by the WhatsApp {@code media_conn}
+ * query.
  *
- * <p>This is a sealed interface with two permitted implementations:
+ * <p>Each host carries a hostname, the IP addresses advertised by the
+ * server, the sets of media types it accepts for download and upload
+ * operations, and the list of download buckets it owns. Primary hosts
+ * may additionally carry a nested fallback hostname and a list of fallback
+ * IP addresses which the retry loop rotates to when the primary fails.
+ *
+ * <p>The sealed interface has two permitted implementations:
  * <ul>
- *   <li>{@link Primary} -- a host with type {@code "primary"}, which may
- *       carry a nested fallback hostname derived from the server-supplied
- *       {@code fallback} sub-object.</li>
- *   <li>{@link Fallback} -- a host with type {@code "fallback"}, which
- *       never carries a nested fallback.</li>
+ *   <li>{@link Primary}: a host with type {@code "primary"} that may
+ *       advertise a nested fallback hostname.</li>
+ *   <li>{@link Fallback}: a host with type {@code "fallback"} that never
+ *       advertises a nested fallback.</li>
  * </ul>
  *
- * <p>Both variants apply media-type normalization before checking the
- * supported-type sets, matching the behavior of
- * {@code WAWebMediaHost.supportsDownloadMediaType} (via helper {@code d})
- * and {@code WAWebMediaHost.supportsUploadMediaType} (via helper {@code m}).
+ * <p>Both variants normalise the media type before checking their
+ * download/upload supported sets, mirroring WA Web's helper
+ * {@code d(t)} for downloads and {@code m(t)} for uploads which collapse
+ * PTV/newsletter-PTV to video and product/product-catalog-image down to
+ * their base types.
  *
- * @implNote WAWebMediaHost.MediaHost, WAWebMediaHost.HOST_TYPE
+ * @implNote WAWebMediaHost: {@code MediaHost} class and {@code HOST_TYPE}
+ * enum. WAWebMediaHostsRouteSelection: {@code routeSelection} and
+ * {@code OPERATIONS}. WABase64Modulo: deterministic bucket selection.
  */
+@WhatsAppWebModule(moduleName = "WAWebMediaHost")
+@WhatsAppWebModule(moduleName = "WAWebMediaHostsRouteSelection")
+@WhatsAppWebModule(moduleName = "WABase64Modulo")
 public sealed interface MediaHost {
 
     /**
      * Enumerates the two media operations that can be performed against a
-     * CDN host: uploading new media and downloading existing media.
+     * CDN host.
      *
-     * <p>These constants are used by {@link #routeSelection} to determine
-     * which host-type-support check to apply when searching for a suitable
-     * host.
+     * <p>Used by {@link #routeSelection} to pick the correct supported-type
+     * check: {@link #UPLOAD} matches against the host's upload media type
+     * set, while {@link #DOWNLOAD} matches against the download set and
+     * additionally participates in the bucket-based host selection.
      *
-     * @implNote WAWebMediaHostsRouteSelection.OPERATIONS
+     * @implNote WAWebMediaHostsRouteSelection.OPERATIONS.
      */
+    @WhatsAppWebModule(moduleName = "WAWebMediaHostsRouteSelection")
     enum Operation {
         /**
-         * The upload operation, corresponding to host upload-type checks.
+         * The upload operation; route selection chooses the first host
+         * whose upload media type set contains the requested media type.
          *
-         * @implNote WAWebMediaHostsRouteSelection.OPERATIONS.UPLOAD
+         * @implNote WAWebMediaHostsRouteSelection.OPERATIONS: {@code UPLOAD}
+         * constant.
          */
         UPLOAD,
 
         /**
-         * The download operation, corresponding to host download-type checks
-         * and bucket-based host selection.
+         * The download operation; route selection applies bucket-based
+         * host matching (when vcache aggregation is enabled) and then
+         * falls back to the first host whose download media type set
+         * contains the requested media type.
          *
-         * @implNote WAWebMediaHostsRouteSelection.OPERATIONS.DOWNLOAD
+         * @implNote WAWebMediaHostsRouteSelection.OPERATIONS: {@code DOWNLOAD}
+         * constant.
          */
         DOWNLOAD
     }
 
     /**
-     * Holds the result of a route selection: an optional selected host
-     * (the best match for the requested operation and media type) and
-     * an optional fallback host (the first host whose type is
-     * {@link Fallback}).
+     * The outcome of a route selection pass: the best-matching host for
+     * the requested operation and media type, plus the first
+     * fallback-class host from the connection's host list.
      *
-     * @implNote WAWebMediaHostsRouteSelection.routeSelection return value
+     * <p>Consumed by {@link MediaConnection#upload(MediaProvider, java.io.InputStream)}
+     * and {@link MediaConnection#download(MediaProvider)} which feed the
+     * pair into the {@code selectHost} rotation strategy.
+     *
+     * @implNote WAWebMediaHostsRouteSelection.routeSelection: the return
+     * value of the function, which exposes {@code selectedHost} and
+     * {@code fallback} on the route object.
      * @param selectedHost the selected host, or empty if none matched
      * @param fallbackHost the fallback host, or empty if none exists
      */
+    @WhatsAppWebModule(moduleName = "WAWebMediaHostsRouteSelection")
     record RouteSelectionResult(
             Optional<MediaHost> selectedHost,
             Optional<MediaHost> fallbackHost
@@ -75,25 +98,30 @@ public sealed interface MediaHost {
     }
 
     /**
-     * Selects the best media host for the given operation and media type from
-     * the provided host list. For download operations, the method first
-     * attempts bucket-based deterministic routing when the vcache aggregation
-     * AB prop is enabled:
+     * Picks the best CDN host for the given operation and media type from
+     * a parsed host list.
+     *
+     * <p>For download operations the method tries bucket-based routing
+     * first when vcache aggregation is enabled:
      * <ol>
-     *   <li>If {@code encFileHash} is {@code null}, bucket 0 is selected.</li>
-     *   <li>Otherwise, the bucket is computed as
+     *   <li>When {@code encFileHash} is {@code null} the bucket defaults
+     *       to {@code 0}.</li>
+     *   <li>Otherwise the bucket is computed as
      *       {@code base64Modulo(encFileHash, maxBuckets) + 100}.</li>
-     *   <li>The host whose {@code downloadBuckets} contains the computed
-     *       bucket is preferred; if none, the host at bucket 0 is tried.</li>
+     *   <li>The host whose {@code downloadBuckets} list claims the
+     *       computed bucket is preferred; when no host claims the bucket
+     *       the {@code 0}-bucket host is tried.</li>
      * </ol>
-     * If bucket-based selection does not yield a result (or the operation is
-     * upload), the method falls back to a linear scan for the first host
-     * that supports the requested media type.
+     * When bucket-based selection finds nothing (or for upload
+     * operations) the method falls back to a linear scan for the first
+     * host that supports the requested media type.
      *
-     * <p>The fallback host is always the first host in the list whose type is
-     * {@link Fallback}, regardless of the operation.
+     * <p>Regardless of the operation, the fallback host is always the
+     * first host in the list whose type is {@link Fallback}.
      *
-     * @implNote WAWebMediaHostsRouteSelection.routeSelection
+     * @implNote WAWebMediaHostsRouteSelection.routeSelection combined with
+     * its internal bucket map helper ({@code u}) and the primary/fallback
+     * selection loop.
      * @param operation                  the operation to perform
      * @param mediaType                  the media path to match
      * @param hosts                      the list of available hosts
@@ -107,6 +135,8 @@ public sealed interface MediaHost {
      * @return the route selection result containing the selected and fallback
      *         hosts
      */
+    @WhatsAppWebExport(moduleName = "WAWebMediaHostsRouteSelection", exports = "routeSelection",
+            adaptation = WhatsAppAdaptation.DIRECT)
     static RouteSelectionResult routeSelection(
             Operation operation,
             MediaPath mediaType,
@@ -116,13 +146,20 @@ public sealed interface MediaHost {
             boolean vcacheAggregationEnabled
     ) {
         // WAWebMediaHostsRouteSelection.routeSelection
+        // Empty host list yields an empty RouteSelectionResult, matching
+        // the null branch in the WA Web source
+
         if (hosts.isEmpty()) {
             return new RouteSelectionResult(Optional.empty(), Optional.empty());
         }
 
         MediaHost selected = null;
         if (operation == Operation.DOWNLOAD) {
-            // WAWebMediaHostsRouteSelection.routeSelection — bucket computation
+            // WAWebMediaHostsRouteSelection.routeSelection
+            // Computes the bucket for deterministic host selection:
+            // null encFileHash uses bucket 0; otherwise vcache aggregation
+            // combined with maxBuckets yields base64Modulo(n, i) + 100
+
             Integer bucket;
             if (encFileHash == null) {
                 bucket = 0;
@@ -132,7 +169,10 @@ public sealed interface MediaHost {
                 bucket = null;
             }
 
-            // WAWebMediaHostsRouteSelection.u — build bucket-to-host map
+            // WAWebMediaHostsRouteSelection.routeSelection
+            // Builds the bucket -> host map once and then consults it for
+            // the computed bucket; the bucket-0 host is used as a default
+
             var bucketMap = buildBucketMap(hosts);
             var bucketHost = bucket != null ? bucketMap.get(bucket) : null;
             var defaultHost = bucketMap.get(0);
@@ -144,7 +184,10 @@ public sealed interface MediaHost {
             }
         }
 
-        // WAWebMediaHostsRouteSelection.routeSelection — find fallback host
+        // WAWebMediaHostsRouteSelection.routeSelection
+        // Finds the first fallback-class host independently of the
+        // selected host choice
+
         MediaHost fallback = null;
         for (var host : hosts) {
             if (host instanceof Fallback) {
@@ -153,7 +196,10 @@ public sealed interface MediaHost {
             }
         }
 
-        // WAWebMediaHostsRouteSelection.routeSelection — linear scan fallback
+        // WAWebMediaHostsRouteSelection.routeSelection
+        // Falls back to a linear scan when bucket routing did not find a
+        // supporting host (or the operation is upload)
+
         if (selected == null) {
             for (var host : hosts) {
                 if (operation == Operation.UPLOAD
@@ -172,43 +218,56 @@ public sealed interface MediaHost {
     }
 
     /**
-     * Checks whether the given host supports downloading the specified media
-     * type, after applying download-type normalization.
+     * Returns whether the given host can serve a download for the
+     * specified media type, after collapsing the media type through the
+     * WA Web download-type normalisation map.
      *
-     * @implNote WAWebMediaHost.MediaHost.supportsDownloadMediaType
+     * @implNote WAWebMediaHost.MediaHost.supportsDownloadMediaType.
      * @param host      the host to check
      * @param mediaType the media type to check
      * @return {@code true} if the normalized type is in the host's download set
      */
+    @WhatsAppWebExport(moduleName = "WAWebMediaHost", exports = "MediaHost",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static boolean supportsDownloadMediaType(MediaHost host, MediaPath mediaType) {
         return host.download().contains(normalizeDownloadMediaType(mediaType));
     }
 
     /**
-     * Checks whether the given host supports uploading the specified media
-     * type, after applying upload-type normalization.
+     * Returns whether the given host can accept an upload for the
+     * specified media type, after collapsing the media type through the
+     * WA Web upload-type normalisation map.
      *
-     * @implNote WAWebMediaHost.MediaHost.supportsUploadMediaType
+     * @implNote WAWebMediaHost.MediaHost.supportsUploadMediaType.
      * @param host      the host to check
      * @param mediaType the media type to check
      * @return {@code true} if the normalized type is in the host's upload set
      */
+    @WhatsAppWebExport(moduleName = "WAWebMediaHost", exports = "MediaHost",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static boolean supportsUploadMediaType(MediaHost host, MediaPath mediaType) {
         return host.upload().contains(normalizeUploadMediaType(mediaType));
     }
 
     /**
-     * Builds a map from download bucket number to the host that owns that
-     * bucket. Each host's {@code downloadBuckets} list is iterated and each
-     * bucket number is mapped to the host. If multiple hosts claim the same
-     * bucket, the last one wins.
+     * Builds a map from download bucket number to the host that claims
+     * that bucket.
      *
-     * @implNote WAWebMediaHostsRouteSelection local function {@code u}
+     * <p>Iterates every host's {@code downloadBuckets} list; if multiple
+     * hosts claim the same bucket the last writer wins, mirroring the
+     * plain assignment semantics of the JS object in the source module.
+     *
+     * @implNote WAWebMediaHostsRouteSelection local function {@code u}.
      * @param hosts the list of hosts to index
      * @return a map from bucket number to host
      */
+    @WhatsAppWebExport(moduleName = "WAWebMediaHostsRouteSelection", exports = "routeSelection",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static Map<Integer, MediaHost> buildBucketMap(List<? extends MediaHost> hosts) {
-        // WAWebMediaHostsRouteSelection.u
+        // WAWebMediaHostsRouteSelection.routeSelection
+        // Iterates every host's bucket list and maps each bucket number to
+        // the owning host; later assignments overwrite earlier ones
+
         var map = new HashMap<Integer, MediaHost>();
         for (var host : hosts) {
             for (var bucket : host.downloadBuckets()) {
@@ -219,18 +278,26 @@ public sealed interface MediaHost {
     }
 
     /**
-     * Computes a base64-decoded modulo value for deterministic bucket
-     * assignment. The base64-encoded input is decoded, and each byte is
-     * processed as two 4-bit nibbles. The running remainder is accumulated
-     * via {@code ((remainder << 4) + nibble) % divisor}.
+     * Computes the modulo of a base64-encoded string treated as a
+     * big-endian byte stream.
      *
-     * @implNote WABase64Modulo (default export)
+     * <p>Decodes the input, then processes each byte as two 4-bit nibbles,
+     * accumulating the remainder via
+     * {@code ((remainder << 4) + nibble) % divisor}. Used as the
+     * deterministic bucket-selection hash for download route selection.
+     *
+     * @implNote WABase64Modulo.default.
      * @param base64 the base64-encoded string
      * @param divisor the modulo divisor (maxBuckets)
      * @return the modulo result
      */
+    @WhatsAppWebExport(moduleName = "WABase64Modulo", exports = "default",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static int base64Modulo(String base64, int divisor) {
-        // WABase64Modulo
+        // WABase64Modulo.default
+        // Decodes the base64 string into raw bytes and processes each byte
+        // as two 4-bit nibbles to mirror the JS BigInt-free implementation
+
         var decoded = Base64.getDecoder().decode(base64);
         var remainder = 0;
         for (var b : decoded) {
@@ -244,113 +311,145 @@ public sealed interface MediaHost {
     }
 
     /**
-     * Returns the hostname of this media CDN host.
+     * Returns the hostname of this CDN host.
      *
-     * @implNote WAWebMediaHost.MediaHost constructor -- {@code this.hostname = t.hostname}
+     * @implNote WAWebMediaHost.MediaHost constructor: {@code this.hostname = t.hostname}.
      * @return the hostname, never {@code null}
      */
+    @WhatsAppWebExport(moduleName = "WAWebMediaHost", exports = "MediaHost",
+            adaptation = WhatsAppAdaptation.DIRECT)
     String hostname();
 
     /**
-     * Returns the list of IP addresses advertised by the server for this
+     * Returns the list of IP addresses the server advertises for this
      * host.
      *
-     * @implNote WAWebMediaHost.MediaHost constructor -- {@code this.ips = t.ips || []}
+     * @implNote WAWebMediaHost.MediaHost constructor: {@code this.ips = t.ips || []}.
      * @return an unmodifiable list of IP address strings, never {@code null}
      */
+    @WhatsAppWebExport(moduleName = "WAWebMediaHost", exports = "MediaHost",
+            adaptation = WhatsAppAdaptation.DIRECT)
     List<String> ips();
 
     /**
-     * Returns the set of media types that this host supports for download
-     * operations. When the server response does not specify any download
-     * types in its rules, this defaults to all known media type values.
+     * Returns the set of media types this host accepts for downloads.
      *
-     * @implNote WAWebMediaHost.MediaHost constructor -- {@code this.$1} via
-     *           helper {@code c} (parseRules), defaulting to
-     *           {@code MEDIA_TYPE_VALUES}
+     * <p>When the server response omits the download rules the set
+     * defaults to all known server media types (minus the handful of
+     * non-routable entries filtered by {@code compactMap}).
+     *
+     * @implNote WAWebMediaHost.MediaHost constructor: {@code this.$1}
+     * produced by the {@code c(parseRules)} helper, defaulting to
+     * {@code MEDIA_TYPE_VALUES}.
      * @return an unmodifiable set of supported download media paths
      */
+    @WhatsAppWebExport(moduleName = "WAWebMediaHost", exports = "MediaHost",
+            adaptation = WhatsAppAdaptation.DIRECT)
     Set<MediaPath> download();
 
     /**
-     * Returns the set of media types that this host supports for upload
-     * operations. When the server response does not specify any upload
-     * types in its rules, this defaults to all known media type values.
+     * Returns the set of media types this host accepts for uploads.
      *
-     * @implNote WAWebMediaHost.MediaHost constructor -- {@code this.$2} via
-     *           helper {@code c} (parseRules), defaulting to
-     *           {@code MEDIA_TYPE_VALUES}
+     * <p>When the server response omits the upload rules the set
+     * defaults to all known server media types (minus the handful of
+     * non-routable entries filtered by {@code compactMap}).
+     *
+     * @implNote WAWebMediaHost.MediaHost constructor: {@code this.$2}
+     * produced by the {@code c(parseRules)} helper, defaulting to
+     * {@code MEDIA_TYPE_VALUES}.
      * @return an unmodifiable set of supported upload media paths
      */
+    @WhatsAppWebExport(moduleName = "WAWebMediaHost", exports = "MediaHost",
+            adaptation = WhatsAppAdaptation.DIRECT)
     Set<MediaPath> upload();
 
     /**
-     * Returns the download bucket assignments for this host. Buckets are
-     * integer identifiers used by the route selection algorithm for
-     * deterministic host selection based on the encrypted file hash.
+     * Returns the download bucket identifiers owned by this host.
      *
-     * @implNote WAWebMediaHost.MediaHost constructor --
-     *           {@code this.downloadBuckets = r} from {@code c(t.rules)}
+     * <p>Buckets participate in the deterministic download host
+     * selection: the file hash is reduced modulo {@code maxBuckets} to
+     * pick the bucket, then the owning host is looked up.
+     *
+     * @implNote WAWebMediaHost.MediaHost constructor:
+     * {@code this.downloadBuckets = r} from the {@code c(t.rules)} helper.
      * @return an unmodifiable list of bucket numbers, never {@code null}
      */
+    @WhatsAppWebExport(moduleName = "WAWebMediaHost", exports = "MediaHost",
+            adaptation = WhatsAppAdaptation.DIRECT)
     List<Integer> downloadBuckets();
 
     /**
-     * Returns the fallback hostname for this host, if present. Only
-     * {@link Primary} hosts may carry a fallback hostname; {@link Fallback}
-     * hosts always return empty.
+     * Returns the nested fallback hostname declared by this host, if any.
      *
-     * @implNote WAWebMediaHost.MediaHost constructor --
-     *           {@code this.fallback = t.fallback != null ? new MediaHost(...) : null}
+     * <p>Only {@link Primary} hosts can advertise a nested fallback;
+     * {@link Fallback} hosts always return an empty optional. The nested
+     * fallback is rotated in by {@code selectHost} when the selected host
+     * itself fails.
+     *
+     * @implNote WAWebMediaHost.MediaHost constructor:
+     * {@code this.fallback = t.fallback != null ? new MediaHost(...) : null}.
      * @return an {@link Optional} containing the fallback hostname, or empty
      */
+    @WhatsAppWebExport(moduleName = "WAWebMediaHost", exports = "MediaHost",
+            adaptation = WhatsAppAdaptation.DIRECT)
     Optional<String> fallbackHostname();
 
     /**
-     * Checks whether this host supports downloading the media type of the
-     * given provider. Before checking the supported set, the media type is
-     * normalized: {@link MediaPath#PTV} and {@link MediaPath#NEWSLETTER_PTV}
-     * are mapped to {@link MediaPath#VIDEO}, and {@link MediaPath#PRODUCT}
-     * is mapped to {@link MediaPath#IMAGE}.
+     * Returns whether this host accepts a download of the media produced
+     * by the given provider.
      *
-     * @implNote WAWebMediaHost.MediaHost.supportsDownloadMediaType,
-     *           WAWebMediaHost.d (normalizeDownloadMediaType)
+     * <p>The provider's media path is first normalised to collapse PTV
+     * variants onto video and product onto image before the host's
+     * supported-type set is consulted.
+     *
+     * @implNote WAWebMediaHost.MediaHost.supportsDownloadMediaType combined
+     * with {@code WAWebMediaHost.d} for download-type normalisation.
      * @param provider the media provider whose type to check
      * @return {@code true} if this host supports downloading that media type
      */
+    @WhatsAppWebExport(moduleName = "WAWebMediaHost", exports = "MediaHost",
+            adaptation = WhatsAppAdaptation.DIRECT)
     boolean canDownload(MediaProvider provider);
 
     /**
-     * Checks whether this host supports uploading the media type of the
-     * given provider. Before checking the supported set, the media type is
-     * normalized: {@link MediaPath#PTV} is mapped to
-     * {@link MediaPath#VIDEO}, and {@link MediaPath#PRODUCT_CATALOG_IMAGE}
-     * is mapped to {@link MediaPath#PRODUCT}.
+     * Returns whether this host accepts an upload of the media produced
+     * by the given provider.
      *
-     * @implNote WAWebMediaHost.MediaHost.supportsUploadMediaType,
-     *           WAWebMediaHost.m (normalizeUploadMediaType)
+     * <p>The provider's media path is first normalised to collapse PTV
+     * onto video and product-catalog-image onto product before the
+     * host's supported-type set is consulted.
+     *
+     * @implNote WAWebMediaHost.MediaHost.supportsUploadMediaType combined
+     * with {@code WAWebMediaHost.m} for upload-type normalisation.
      * @param provider the media provider whose type to check
      * @return {@code true} if this host supports uploading that media type
      */
+    @WhatsAppWebExport(moduleName = "WAWebMediaHost", exports = "MediaHost",
+            adaptation = WhatsAppAdaptation.DIRECT)
     boolean canUpload(MediaProvider provider);
 
     /**
-     * Normalizes a media path for download-type checking. This mirrors the
-     * WA Web helper function {@code d} in {@code WAWebMediaHost}:
+     * Normalises a media path before consulting a host's download support
+     * set. Mirrors the WA Web helper {@code d(t)}:
      * <ul>
-     *   <li>{@link MediaPath#PTV} and {@link MediaPath#NEWSLETTER_PTV} are
-     *       mapped to {@link MediaPath#VIDEO}</li>
-     *   <li>{@link MediaPath#PRODUCT} is mapped to
-     *       {@link MediaPath#IMAGE}</li>
-     *   <li>All other types are returned unchanged.</li>
+     *   <li>{@link MediaPath#PTV} and {@link MediaPath#NEWSLETTER_PTV}
+     *       collapse to {@link MediaPath#VIDEO}.</li>
+     *   <li>{@link MediaPath#PRODUCT} collapses to
+     *       {@link MediaPath#IMAGE}.</li>
+     *   <li>Every other type is returned unchanged.</li>
      * </ul>
      *
-     * @implNote WAWebMediaHost.d
+     * @implNote WAWebMediaHost local helper {@code d}.
      * @param path the media path to normalize
      * @return the normalized media path for download checking
      */
+    @WhatsAppWebExport(moduleName = "WAWebMediaHost", exports = "MediaHost",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static MediaPath normalizeDownloadMediaType(MediaPath path) {
-        // WAWebMediaHost.d
+        // WAWebMediaHost.MediaHost
+        // Collapses PTV / newsletter-PTV to VIDEO and PRODUCT to IMAGE
+        // before consulting the download-type set
+
         return switch (path) {
             case PTV, NEWSLETTER_PTV -> MediaPath.VIDEO;
             case PRODUCT -> MediaPath.IMAGE;
@@ -359,22 +458,27 @@ public sealed interface MediaHost {
     }
 
     /**
-     * Normalizes a media path for upload-type checking. This mirrors the
-     * WA Web helper function {@code m} in {@code WAWebMediaHost}:
+     * Normalises a media path before consulting a host's upload support
+     * set. Mirrors the WA Web helper {@code m(t)}:
      * <ul>
-     *   <li>{@link MediaPath#PTV} is mapped to
-     *       {@link MediaPath#VIDEO}</li>
-     *   <li>{@link MediaPath#PRODUCT_CATALOG_IMAGE} is mapped to
-     *       {@link MediaPath#PRODUCT}</li>
-     *   <li>All other types are returned unchanged.</li>
+     *   <li>{@link MediaPath#PTV} collapses to
+     *       {@link MediaPath#VIDEO}.</li>
+     *   <li>{@link MediaPath#PRODUCT_CATALOG_IMAGE} collapses to
+     *       {@link MediaPath#PRODUCT}.</li>
+     *   <li>Every other type is returned unchanged.</li>
      * </ul>
      *
-     * @implNote WAWebMediaHost.m
+     * @implNote WAWebMediaHost local helper {@code m}.
      * @param path the media path to normalize
      * @return the normalized media path for upload checking
      */
+    @WhatsAppWebExport(moduleName = "WAWebMediaHost", exports = "MediaHost",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static MediaPath normalizeUploadMediaType(MediaPath path) {
-        // WAWebMediaHost.m
+        // WAWebMediaHost.MediaHost
+        // Collapses PTV to VIDEO and PRODUCT_CATALOG_IMAGE to PRODUCT
+        // before consulting the upload-type set
+
         return switch (path) {
             case PTV -> MediaPath.VIDEO;
             case PRODUCT_CATALOG_IMAGE -> MediaPath.PRODUCT;
@@ -383,12 +487,16 @@ public sealed interface MediaHost {
     }
 
     /**
-     * A primary media CDN host. Primary hosts have type {@code "primary"}
-     * and may carry a nested fallback hostname, fallback IPs, and download
-     * bucket assignments for deterministic routing.
+     * A primary CDN host.
      *
-     * @implNote WAWebMediaHost.MediaHost (type = HOST_TYPE.PRIMARY),
-     *           WAWebMediaHost.HOST_TYPE.PRIMARY
+     * <p>Primary hosts have type {@code "primary"} and may advertise a
+     * nested fallback hostname together with its own IP list. The route
+     * selection algorithm prefers primary hosts over fallback-class hosts
+     * and consults the download bucket assignments to pick one
+     * deterministically.
+     *
+     * @implNote WAWebMediaHost.MediaHost for a {@code HOST_TYPE.PRIMARY}
+     * instance.
      * @param hostname         the hostname of this host
      * @param ips              the list of IP addresses advertised by the server
      * @param fallbackHostname the fallback hostname, or empty if no fallback
@@ -397,6 +505,7 @@ public sealed interface MediaHost {
      * @param download         the set of supported download media types
      * @param upload           the set of supported upload media types
      */
+    @WhatsAppWebModule(moduleName = "WAWebMediaHost")
     record Primary(
             String hostname,
             List<String> ips,
@@ -408,49 +517,63 @@ public sealed interface MediaHost {
     ) implements MediaHost {
 
         /**
-         * Checks whether this primary host supports downloading the media
-         * type of the given provider, after applying download-type
-         * normalization.
+         * Returns whether this primary host accepts a download of the
+         * media produced by the given provider, after applying the
+         * download-type normalisation.
          *
-         * @implNote WAWebMediaHost.MediaHost.supportsDownloadMediaType
+         * @implNote WAWebMediaHost.MediaHost.supportsDownloadMediaType.
          * @param provider the media provider whose type to check
          * @return {@code true} if the normalized type is in the download set
          */
+        @WhatsAppWebExport(moduleName = "WAWebMediaHost", exports = "MediaHost",
+                adaptation = WhatsAppAdaptation.DIRECT)
         @Override
         public boolean canDownload(MediaProvider provider) {
             Objects.requireNonNull(provider, "provider cannot be null");
-            // WAWebMediaHost.supportsDownloadMediaType -> this.$1.has(d(t))
+            // WAWebMediaHost.MediaHost
+            // supportsDownloadMediaType(t) = this.$1.has(d(t))
+
             return download.contains(normalizeDownloadMediaType(provider.mediaPath()));
         }
 
         /**
-         * Checks whether this primary host supports uploading the media type
-         * of the given provider, after applying upload-type normalization.
+         * Returns whether this primary host accepts an upload of the
+         * media produced by the given provider, after applying the
+         * upload-type normalisation.
          *
-         * @implNote WAWebMediaHost.MediaHost.supportsUploadMediaType
+         * @implNote WAWebMediaHost.MediaHost.supportsUploadMediaType.
          * @param provider the media provider whose type to check
          * @return {@code true} if the normalized type is in the upload set
          */
+        @WhatsAppWebExport(moduleName = "WAWebMediaHost", exports = "MediaHost",
+                adaptation = WhatsAppAdaptation.DIRECT)
         @Override
         public boolean canUpload(MediaProvider provider) {
             Objects.requireNonNull(provider, "provider cannot be null");
-            // WAWebMediaHost.supportsUploadMediaType -> this.$2.has(m(t))
+            // WAWebMediaHost.MediaHost
+            // supportsUploadMediaType(t) = this.$2.has(m(t))
+
             return upload.contains(normalizeUploadMediaType(provider.mediaPath()));
         }
     }
 
     /**
-     * A fallback media CDN host. Fallback hosts have type
-     * {@code "fallback"} and never carry a nested fallback.
+     * A fallback-class CDN host.
      *
-     * @implNote WAWebMediaHost.MediaHost (type = HOST_TYPE.FALLBACK),
-     *           WAWebMediaHost.HOST_TYPE.FALLBACK
+     * <p>Fallback hosts have type {@code "fallback"} and never advertise
+     * a nested fallback of their own. They are used by the retry loop as
+     * an alternate endpoint after the primary host has exhausted its
+     * attempts.
+     *
+     * @implNote WAWebMediaHost.MediaHost for a {@code HOST_TYPE.FALLBACK}
+     * instance.
      * @param hostname         the hostname of this host
      * @param ips              the list of IP addresses advertised by the server
      * @param downloadBuckets  the download bucket assignments for this host
      * @param download         the set of supported download media types
      * @param upload           the set of supported upload media types
      */
+    @WhatsAppWebModule(moduleName = "WAWebMediaHost")
     record Fallback(
             String hostname,
             List<String> ips,
@@ -460,45 +583,55 @@ public sealed interface MediaHost {
     ) implements MediaHost {
 
         /**
-         * Checks whether this fallback host supports downloading the media
-         * type of the given provider, after applying download-type
-         * normalization.
+         * Returns whether this fallback host accepts a download of the
+         * media produced by the given provider, after applying the
+         * download-type normalisation.
          *
-         * @implNote WAWebMediaHost.MediaHost.supportsDownloadMediaType
+         * @implNote WAWebMediaHost.MediaHost.supportsDownloadMediaType.
          * @param provider the media provider whose type to check
          * @return {@code true} if the normalized type is in the download set
          */
+        @WhatsAppWebExport(moduleName = "WAWebMediaHost", exports = "MediaHost",
+                adaptation = WhatsAppAdaptation.DIRECT)
         @Override
         public boolean canDownload(MediaProvider provider) {
             Objects.requireNonNull(provider, "provider cannot be null");
-            // WAWebMediaHost.supportsDownloadMediaType -> this.$1.has(d(t))
+            // WAWebMediaHost.MediaHost
+            // supportsDownloadMediaType(t) = this.$1.has(d(t))
+
             return download.contains(normalizeDownloadMediaType(provider.mediaPath()));
         }
 
         /**
-         * Checks whether this fallback host supports uploading the media
-         * type of the given provider, after applying upload-type
-         * normalization.
+         * Returns whether this fallback host accepts an upload of the
+         * media produced by the given provider, after applying the
+         * upload-type normalisation.
          *
-         * @implNote WAWebMediaHost.MediaHost.supportsUploadMediaType
+         * @implNote WAWebMediaHost.MediaHost.supportsUploadMediaType.
          * @param provider the media provider whose type to check
          * @return {@code true} if the normalized type is in the upload set
          */
+        @WhatsAppWebExport(moduleName = "WAWebMediaHost", exports = "MediaHost",
+                adaptation = WhatsAppAdaptation.DIRECT)
         @Override
         public boolean canUpload(MediaProvider provider) {
             Objects.requireNonNull(provider, "provider cannot be null");
-            // WAWebMediaHost.supportsUploadMediaType -> this.$2.has(m(t))
+            // WAWebMediaHost.MediaHost
+            // supportsUploadMediaType(t) = this.$2.has(m(t))
+
             return upload.contains(normalizeUploadMediaType(provider.mediaPath()));
         }
 
         /**
-         * Returns an empty optional, as fallback hosts never carry a nested
-         * fallback hostname.
+         * Always returns an empty optional because fallback-class hosts
+         * never advertise a nested fallback hostname of their own.
          *
-         * @implNote WAWebMediaHost.MediaHost constructor -- fallback hosts
-         *           are constructed with {@code fallback: void 0}
+         * @implNote WAWebMediaHost.MediaHost constructor: fallback hosts
+         * are built with {@code fallback: void 0}.
          * @return an empty {@link Optional}
          */
+        @WhatsAppWebExport(moduleName = "WAWebMediaHost", exports = "MediaHost",
+                adaptation = WhatsAppAdaptation.DIRECT)
         @Override
         public Optional<String> fallbackHostname() {
             return Optional.empty();

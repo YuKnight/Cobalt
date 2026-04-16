@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.wam;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.client.WhatsAppClientType;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.node.Node;
@@ -49,10 +50,18 @@ import java.util.logging.Logger;
  * This implementation logs warnings instead, as WAM system health
  * telemetry is not a goal of this project.
  *
+ * @implNote Adapts the WA Web WAM telemetry pipeline: event commit comes
+ *     from {@code WAWebWamCommonLogEvent}, buffer rotation and flush from
+ *     {@code WAWebWam}, AB-prop sampling overrides from
+ *     {@code WAWebEventSampling}, beacon sequence numbers from
+ *     {@code WAWebWamBeaconing} and private-stats identifier rotation from
+ *     {@code WAWebWamPrivateStats}.
  * @see WamEventSpec
  * @see WamGlobalEncoder
  * @see WamChannel
  */
+@WhatsAppWebModule(moduleName = "WAWebWam")
+@WhatsAppWebModule(moduleName = "WAWebWamCommonLogEvent")
 public final class WamService {
     private static final Logger LOGGER = Logger.getLogger(WamService.class.getName());
 

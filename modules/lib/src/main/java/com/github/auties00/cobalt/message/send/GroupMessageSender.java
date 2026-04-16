@@ -12,6 +12,9 @@ import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
 import com.github.auties00.cobalt.message.send.senderkey.SenderKeyDistribution;
 import com.github.auties00.cobalt.message.send.stanza.*;
 import com.github.auties00.cobalt.message.send.token.ContentBindingToken;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.chat.ChatMessageContextInfoBuilder;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.chat.group.GroupMetadata;
@@ -59,20 +62,112 @@ import java.util.stream.Stream;
  * WAWebSendGroupDirectJob.encryptAndSendGroupDirectMsg: DIRECT path
  * used for resends after phash mismatch.
  */
+@WhatsAppWebModule(moduleName = "WAWebSendGroupMsgJob")
+@WhatsAppWebModule(moduleName = "WAWebSendGroupSkmsgJob")
+@WhatsAppWebModule(moduleName = "WAWebSendGroupDirectJob")
+@WhatsAppWebModule(moduleName = "WAWebSendGroupKeyDistributionMsgJob")
 final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
+    /**
+     * Logger for group send diagnostics.
+     */
     private static final System.Logger LOGGER = System.getLogger(GroupMessageSender.class.getName());
 
 
+    /**
+     * The encryption service for sender-key and per-device encryption.
+     *
+     * @implNote ADAPTED: WAWebEncryptMsgProtobuf is module-level;
+     * Cobalt uses constructor-based DI.
+     */
     private final MessageEncryption encryption;
+
+    /**
+     * The device service for fanout resolution and session management.
+     *
+     * @implNote ADAPTED: WAWebDBDeviceListFanout, WAWebManageE2ESessionsJob
+     * are module-level; Cobalt uses constructor-based DI.
+     */
     private final DeviceService deviceService;
+
+    /**
+     * The AB props service for feature flag and configuration lookups.
+     *
+     * @implNote ADAPTED: WAWebABProps is module-level; Cobalt uses
+     * constructor-based DI.
+     */
     private final ABPropsService abPropsService;
+
+    /**
+     * The sender-key distribution service for SK distribution encryption.
+     *
+     * @implNote ADAPTED: WAWebGetGroupKeyDistributionMsg is module-level;
+     * Cobalt uses constructor-based DI.
+     */
     private final SenderKeyDistribution senderKeyDistribution;
+
+    /**
+     * The bot stanza builder.
+     *
+     * @implNote ADAPTED: bot node building is inline in WA Web;
+     * Cobalt delegates to {@link BotStanza}.
+     */
     private final BotStanza botStanza;
+
+    /**
+     * The business stanza builder for payment native flow messages.
+     *
+     * @implNote ADAPTED: WA Web builds biz nodes inline; Cobalt
+     * delegates to {@link BizStanza}.
+     */
     private final BizStanza bizStanza;
+
+    /**
+     * The meta stanza builder for the {@code <meta>} child node.
+     *
+     * @implNote ADAPTED: WAWebSendMsgMetaNode is module-level; Cobalt
+     * delegates to {@link MetaStanza}.
+     */
     private final MetaStanza metaStanza;
+
+    /**
+     * The reporting stanza builder for reporting tokens.
+     *
+     * @implNote ADAPTED: WAWebReportingTokenUtils is module-level;
+     * Cobalt delegates to {@link ReportingStanza}.
+     */
     private final ReportingStanza reportingStanza;
+
+    /**
+     * Per-group locks used to serialise sender-key encryption per group.
+     *
+     * <p>The Signal sender-key counter must increase monotonically per
+     * group per sender, so concurrent sends to the same group are
+     * serialised on this lock map.
+     *
+     * @implNote WAWebSendMsgQueueMap.sendMsgQueueMap: WA Web keeps a
+     * per-group task queue keyed by group JID string; Cobalt replaces
+     * the queue with a lock map.
+     */
     private final ConcurrentMap<String, ReentrantLock> locks;
 
+    /**
+     * Creates a new group message sender.
+     *
+     * @param client                the WhatsApp client
+     * @param encryption            the encryption service
+     * @param deviceService         the device service
+     * @param abPropsService        the AB props service
+     * @param senderKeyDistribution the SK distribution service
+     * @param botStanza             the bot stanza builder
+     * @param bizStanza             the business stanza builder
+     * @param metaStanza            the meta stanza builder
+     * @param reportingStanza       the reporting stanza builder
+     *
+     * @implNote ADAPTED: WAWebSendGroupMsgJob uses module-level imports;
+     * Cobalt uses constructor-based DI.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebSendGroupMsgJob", exports = "encryptAndSendGroupMsg",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     GroupMessageSender(
             WhatsAppClient client,
             MessageEncryption encryption,
@@ -112,6 +207,8 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
      * @apiNote WAWebSendMsgQueueMap.sendMsgQueueMap.enqueue: serialises
      * the send task per group JID string key.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgQueueMap", exports = "sendMsgQueueMap",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private  <T> T enqueue(String key, Callable<T> task) throws Exception {
         Objects.requireNonNull(key, "key");
         Objects.requireNonNull(task, "task");
@@ -124,6 +221,10 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
         }
     }
 
+    @WhatsAppWebExport(moduleName = "WAWebSendGroupMsgJob", exports = "encryptAndSendGroupMsg",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WAWebSendGroupSkmsgJob", exports = "encryptAndSendSenderKeyMsg",
+            adaptation = WhatsAppAdaptation.DIRECT)
     @Override
     AckResult send(Jid groupJid, ChatMessageInfo messageInfo) {
         waitForOfflineDelivery();
@@ -226,7 +327,7 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
                         && pm.type().orElse(null) == ProtocolMessage.Type.BOT_FEEDBACK_MESSAGE;
 
                 // WAWebEncryptMsgProtobuf.encryptMsgSenderKey: encrypt with sender key
-                // WAWebSendGroupSkmsgJob: E = g ? null : enc(...) — skip for bot feedback
+                // WAWebSendGroupSkmsgJob: E = g ? null : enc(...), skip for bot feedback
                 byte[] skmsgCiphertext;
                 if (isBotFeedback) {
                     skmsgCiphertext = null;
@@ -397,6 +498,8 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
      * if needed, encrypts distribution messages, builds a minimal stanza
      * with {@code device_fanout="false"}, sends and marks SK as distributed.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendGroupKeyDistributionMsgJob",
+            exports = "encryptAndSendGroupKeyDistributionMsg", adaptation = WhatsAppAdaptation.DIRECT)
     void sendKeyDistribution(Jid groupJid, String msgId) {
         Objects.requireNonNull(groupJid, "groupJid");
         Objects.requireNonNull(msgId, "msgId");
@@ -527,6 +630,8 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
      * isUrlMessage, isSentByMe, messageSecret != null,
      * recipients.length <= maximum_group_size_for_rcat.
      */
+    @WhatsAppWebExport(moduleName = "WAWebMsgRcatUtils", exports = "genContentBindingForMsg",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private Map<Jid, byte[]> generateContentBindings(
             ChatMessageInfo messageInfo,
             List<Jid> participantJids
@@ -577,6 +682,8 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
      * deep-clones the proto and sets
      * {@code messageContextInfo.capiCreatedGroup = true}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebE2EProtoGenerator", exports = "updateGroupMsgProtoWithCapiFlag",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static MessageContainer applyCapiFlag(MessageContainer container) {
         var existingCtxInfo = container.messageContextInfo().orElse(null);
         if (existingCtxInfo != null) {
@@ -602,6 +709,8 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
      * for reaction_enc, comment, event_response, poll_vote, and
      * protocol addon revokes.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendGroupMsgJob", exports = "isCagAddon",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static boolean isCagAddonMessage(MessageContainer container) {
         return switch (container.content()) {
             case EncReactionMessage _, EncCommentMessage _, EncEventResponseMessage _, PollUpdateMessage _ -> true;
@@ -617,6 +726,10 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
      * computes delta device list, sends via sendDirectMsgToDeviceList
      * with GROUP_DIRECT fanout type.
      */
+    @WhatsAppWebExport(moduleName = "WAWebResendGroupMsg", exports = "resendGroupMsg",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WAWebSendGroupDirectJob", exports = "encryptAndSendGroupDirectMsg",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private void resendAsGroupDirect(
             Jid groupJid,
             ChatMessageInfo messageInfo,
@@ -723,6 +836,10 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
      * maps each JID through {@code toAddressingModeFactory(isLid)},
      * resets all sender keys to not-distributed, and persists the changes.
      */
+    @WhatsAppWebExport(moduleName = "WAWebGroupHandleAddressingModeMismatch", exports = "handleAddressingModeMismatch",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WAWebDBGroupParticipant", exports = "migrateParticipantInfoAddressingMode",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private void migrateAddressingMode(Jid groupJid, boolean toLid) {
         var metadata = store.findChatMetadata(groupJid).orElse(null);
         if (metadata == null) {
@@ -773,6 +890,8 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
      * @apiNote WAWebLidMigrationUtils.toAddressingModeFactory: returns a
      * function that converts between PN and LID addressing modes.
      */
+    @WhatsAppWebExport(moduleName = "WAWebLidMigrationUtils", exports = "toAddressingModeFactory",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private Jid convertJid(Jid jid, boolean toLid) {
         if (toLid) {
             return jid.hasLidServer() ? jid : store.findLidByPhone(jid).orElse(null);
