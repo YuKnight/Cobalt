@@ -98,11 +98,9 @@ public sealed interface DeleteNewsletterMex extends MexJsonOperation permits Del
         public NodeBuilder toNode() {
             // WAWebMexDeleteNewsletterJob.mexDeleteNewsletter
             // Opens a UTF-8 JSON writer that will serialise the GraphQL variables envelope
-
             try (var writer = JSONWriter.ofUTF8()) {
                 // WAWebMexDeleteNewsletterJob.mexDeleteNewsletter
                 // Begins the outer envelope and the nested "variables" object
-
                 writer.startObject();
                 writer.writeName("variables");
                 writer.writeColon();
@@ -110,7 +108,6 @@ public sealed interface DeleteNewsletterMex extends MexJsonOperation permits Del
 
                 // WAWebMexDeleteNewsletterJob.mexDeleteNewsletter
                 // Emits the newsletter_id variable when present, skipping it otherwise
-
                 if (newsletterId != null) {
                     writer.writeName("newsletter_id");
                     writer.writeColon();
@@ -121,7 +118,6 @@ public sealed interface DeleteNewsletterMex extends MexJsonOperation permits Del
 
                 // ADAPTED: WAWebMexDeleteNewsletterJob.mexDeleteNewsletter
                 // Flushes the JSON into a StringWriter and wraps it in the shared MEX IQ envelope
-
                 try (var output = new StringWriter()) {
                     writer.flushTo(output);
                     return MexJsonOperation.createMexNode(QUERY_ID, output.toString());
@@ -283,7 +279,6 @@ public sealed interface DeleteNewsletterMex extends MexJsonOperation permits Del
         private static Optional<Response> of(byte[] json) {
             // WAWebMexDeleteNewsletterJob.mexDeleteNewsletter
             // Parses the raw JSON payload, bailing out if fastjson2 returns null
-
             var jsonObject = JSON.parseObject(json);
             if (jsonObject == null) {
                 return Optional.empty();
@@ -291,7 +286,6 @@ public sealed interface DeleteNewsletterMex extends MexJsonOperation permits Del
 
             // WAWebMexDeleteNewsletterJob.mexDeleteNewsletter
             // Descends into the standard GraphQL "data" envelope
-
             var data = jsonObject.getJSONObject("data");
             if (data == null) {
                 return Optional.empty();
@@ -299,7 +293,6 @@ public sealed interface DeleteNewsletterMex extends MexJsonOperation permits Del
 
             // WAWebMexDeleteNewsletterJob.mexDeleteNewsletter
             // Extracts the mutation-specific root keyed by xwa2_newsletter_delete_v2
-
             var root = data.getJSONObject("xwa2_newsletter_delete_v2");
             if (root == null) {
                 return Optional.empty();

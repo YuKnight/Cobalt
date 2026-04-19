@@ -212,7 +212,6 @@ public final class PinChatHandler implements WebAppStateActionHandler {
             // ADAPTED: Cobalt's PinAction.pinned() boolean accessor coalesces null to false,
             // following the project-wide nullable boolean accessor pattern. A null pinned
             // field is therefore treated as "unpin" rather than "malformed".
-
             var currentTimestamp = mutation.timestamp(); // WAWebPinChatSync.applyMutation: var i = t.timestamp
             var isNewsletter = chatJid.hasNewsletterServer(); // WAWebPinChatSync.applyMutation: y.isNewsletter()
 

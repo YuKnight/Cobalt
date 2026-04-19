@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.message.send;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceService;
+import com.github.auties00.cobalt.message.send.crypto.MessageEncryptedPayload;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
 import com.github.auties00.cobalt.message.send.ack.AckParser;
 import com.github.auties00.cobalt.message.send.ack.AckResult;
@@ -122,7 +123,19 @@ final class PeerMessageSender extends MessageSender<ChatMessageInfo> {
 
         // WAWebSendMsgCreateDeviceStanza: ensureE2ESessions then encrypt
         deviceService.ensureSessions(List.of(targetDevice));
-        var payload = encryption.encryptForDevice(targetDevice, plaintext);
+        MessageEncryptedPayload payload;
+        try {
+            payload = encryption.encryptForDevice(targetDevice, plaintext);
+            // WAWebEncryptMsgProtobuf -> WAWebPostE2eMessageSendMetric.postSuccessDirectE2eMessageSendMetric:
+            // peer/app-state-sync send path also routes through encryptMsgProtobuf and
+            // therefore emits E2eMessageSend (id 476) on success.
+            emitE2eMessageSendEvent(targetDevice, container, true, payload.type(), 0);
+        } catch (RuntimeException encryptionError) {
+            // WAWebEncryptMsgProtobuf -> WAWebPostE2eMessageSendMetric.postFailureDirectE2eMessageSendMetric:
+            // emit E2eMessageSend (id 476) with e2eSuccessful=false on failure before rethrowing.
+            emitE2eMessageSendEvent(targetDevice, container, false, null, 0);
+            throw encryptionError;
+        }
 
         // WAWebSendMsgCreateDeviceStanza: identity node when pkmsg
         var identityNode = payload.isPreKeyMessage()

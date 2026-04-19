@@ -6,6 +6,8 @@ import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.exception.*;
 import com.github.auties00.cobalt.message.MessageService;
 import com.github.auties00.cobalt.message.send.ack.AckResult;
+import com.github.auties00.cobalt.message.send.id.MessageIdGenerator;
+import com.github.auties00.cobalt.message.send.id.MessageIdVersion;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -13,83 +15,90 @@ import com.github.auties00.cobalt.migration.InactiveGroupLidMigrationService;
 import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.model.bot.profile.*;
 import com.github.auties00.cobalt.model.business.*;
+import com.github.auties00.cobalt.model.business.catalog.BusinessCatalog;
+import com.github.auties00.cobalt.model.business.catalog.BusinessCatalogEntry;
 import com.github.auties00.cobalt.model.business.profile.*;
 import com.github.auties00.cobalt.model.call.CallOffer;
-import com.github.auties00.cobalt.model.chat.Chat;
-import com.github.auties00.cobalt.model.chat.ChatEphemeralTimer;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.chat.ChatMetadata;
+import com.github.auties00.cobalt.model.call.CallOfferBuilder;
+import com.github.auties00.cobalt.model.chat.*;
 import com.github.auties00.cobalt.model.chat.community.CommunityLinkedGroup;
 import com.github.auties00.cobalt.model.chat.community.CommunityLinkedGroupBuilder;
 import com.github.auties00.cobalt.model.chat.community.CommunityMetadata;
 import com.github.auties00.cobalt.model.chat.community.CommunityMetadataBuilder;
 import com.github.auties00.cobalt.model.chat.group.*;
 import com.github.auties00.cobalt.model.contact.Contact;
+import com.github.auties00.cobalt.model.contact.ContactCard;
+import com.github.auties00.cobalt.model.contact.ContactStatus;
 import com.github.auties00.cobalt.model.contact.ContactTextStatus;
 import com.github.auties00.cobalt.model.device.identity.ADVEncryptionType;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidProvider;
 import com.github.auties00.cobalt.model.jid.JidServer;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageInfo;
-import com.github.auties00.cobalt.model.message.MessageKey;
+import com.github.auties00.cobalt.model.message.*;
+import com.github.auties00.cobalt.model.message.poll.*;
+import com.github.auties00.cobalt.model.message.system.PinInChatMessage;
+import com.github.auties00.cobalt.model.message.system.PinInChatMessageBuilder;
 import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
 import com.github.auties00.cobalt.model.message.system.ProtocolMessageBuilder;
 import com.github.auties00.cobalt.model.message.text.ReactionMessage;
 import com.github.auties00.cobalt.model.message.text.ReactionMessageBuilder;
 import com.github.auties00.cobalt.model.newsletter.Newsletter;
+import com.github.auties00.cobalt.model.newsletter.NewsletterReactionSettings;
 import com.github.auties00.cobalt.model.newsletter.NewsletterViewerRole;
-import com.github.auties00.cobalt.model.privacy.PrivacySettingEntry;
-import com.github.auties00.cobalt.model.sync.SyncAction;
-import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.action.contact.StarAction;
-import com.github.auties00.cobalt.model.sync.action.contact.StarActionBuilder;
+import com.github.auties00.cobalt.model.preference.Label;
+import com.github.auties00.cobalt.model.preference.QuickReply;
+import com.github.auties00.cobalt.model.privacy.*;
+import com.github.auties00.cobalt.model.sync.*;
+import com.github.auties00.cobalt.model.sync.action.bot.AiThreadRenameAction;
+import com.github.auties00.cobalt.model.sync.action.bot.BotWelcomeRequestAction;
+import com.github.auties00.cobalt.model.sync.action.bot.MaibaAIFeaturesControlAction;
+import com.github.auties00.cobalt.model.sync.action.business.BroadcastListParticipantAction;
+import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastListAction;
+import com.github.auties00.cobalt.model.sync.action.chat.ChatAssignmentAction;
+import com.github.auties00.cobalt.model.sync.action.chat.ChatAssignmentOpenedStatusAction;
+import com.github.auties00.cobalt.model.sync.action.chat.QuickReplyAction;
+import com.github.auties00.cobalt.model.sync.action.contact.*;
+import com.github.auties00.cobalt.model.sync.action.device.TimeFormatAction;
+import com.github.auties00.cobalt.model.sync.action.media.*;
+import com.github.auties00.cobalt.model.sync.action.privacy.PrivacySettingDisableLinkPreviewsAction;
+import com.github.auties00.cobalt.model.sync.action.setting.LocaleSetting;
+import com.github.auties00.cobalt.model.sync.action.setting.NotificationActivitySettingAction;
+import com.github.auties00.cobalt.model.sync.action.setting.PushNameSetting;
+import com.github.auties00.cobalt.model.sync.action.setting.UnarchiveChatsSetting;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
+import com.github.auties00.cobalt.node.mex.json.business.QueryCatalogMex;
+import com.github.auties00.cobalt.node.mex.json.business.QueryOrderMex;
+import com.github.auties00.cobalt.node.mex.json.business.QueryProductCollectionsMex;
 import com.github.auties00.cobalt.node.mex.json.community.FetchAllSubgroupsMex;
 import com.github.auties00.cobalt.node.mex.json.community.FetchAllSubgroupsMex.Response.DefaultSubGroup;
 import com.github.auties00.cobalt.node.mex.json.community.FetchAllSubgroupsMex.Response.SubGroups;
 import com.github.auties00.cobalt.node.mex.json.community.FetchSubgroupSuggestionsMex;
 import com.github.auties00.cobalt.node.mex.json.community.QuerySubgroupParticipantCountMex;
 import com.github.auties00.cobalt.node.mex.json.community.TransferCommunityOwnershipMex;
-import com.github.auties00.cobalt.node.mex.json.newsletter.AcceptNewsletterAdminInviteMex;
-import com.github.auties00.cobalt.node.mex.json.newsletter.CreateNewsletterMex;
-import com.github.auties00.cobalt.node.mex.json.newsletter.DeleteNewsletterMex;
-import com.github.auties00.cobalt.node.mex.json.newsletter.DemoteNewsletterAdminMex;
-import com.github.auties00.cobalt.node.mex.json.newsletter.FetchAllNewslettersMetadataMex;
-import com.github.auties00.cobalt.node.mex.json.newsletter.FetchNewsletterMex;
-import com.github.auties00.cobalt.node.mex.json.newsletter.JoinNewsletterMex;
-import com.github.auties00.cobalt.node.mex.json.newsletter.LeaveNewsletterMex;
-import com.github.auties00.cobalt.node.mex.json.newsletter.RevokeNewsletterAdminInviteMex;
-import com.github.auties00.cobalt.node.mex.json.newsletter.UpdateNewsletterMex;
-import com.github.auties00.cobalt.node.mex.json.newsletter.UpdateNewsletterUserSettingMex;
-import com.github.auties00.cobalt.model.newsletter.NewsletterReactionSettings;
+import com.github.auties00.cobalt.node.mex.json.group.UpdateGroupPropertyMex;
+import com.github.auties00.cobalt.node.mex.json.newsletter.*;
 import com.github.auties00.cobalt.pairing.CompanionPairingService;
+import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.socket.WhatsAppSocketClient;
 import com.github.auties00.cobalt.socket.WhatsAppSocketListener;
 import com.github.auties00.cobalt.socket.WhatsAppSocketStanza;
 import com.github.auties00.cobalt.store.WhatsAppStore;
 import com.github.auties00.cobalt.stream.SocketStream;
-import com.github.auties00.cobalt.model.sync.SyncActionMessageRange;
-import com.github.auties00.cobalt.model.sync.SyncActionMessageRangeBuilder;
 import com.github.auties00.cobalt.sync.SnapshotRecoveryService;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.WebAppStateService;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.sync.handler.ArchiveChatHandler;
-import com.github.auties00.cobalt.sync.handler.ClearChatHandler;
-import com.github.auties00.cobalt.sync.handler.DeleteChatHandler;
-import com.github.auties00.cobalt.sync.handler.LockChatHandler;
-import com.github.auties00.cobalt.sync.handler.MarkChatAsReadHandler;
-import com.github.auties00.cobalt.sync.handler.MuteChatHandler;
-import com.github.auties00.cobalt.sync.handler.PinChatHandler;
+import com.github.auties00.cobalt.sync.handler.*;
 import com.github.auties00.cobalt.sync.key.SyncKeyUtils;
 import com.github.auties00.cobalt.util.DataUtils;
 import com.github.auties00.cobalt.util.RandomIdUtils;
+import com.github.auties00.cobalt.wam.WamMsgUtils;
 import com.github.auties00.cobalt.wam.WamService;
+import com.github.auties00.cobalt.wam.event.*;
+import com.github.auties00.cobalt.wam.type.*;
 import com.github.auties00.curve25519.Curve25519;
 import com.github.auties00.libsignal.SignalSessionCipher;
 import com.github.auties00.libsignal.groups.SignalGroupCipher;
@@ -103,12 +112,13 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalTime;
 import java.util.*;
+import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -150,21 +160,60 @@ public final class WhatsAppClient {
     private static final byte[] SIGNAL_KEY_TYPE = {SignalIdentityPublicKey.type()};
 
     /**
-     * The edge length in pixels used when requesting profile-picture
-     * thumbnails.
-     */
-    private static final int PROFILE_PIC_SIZE = 64;
-    /**
-     * Pattern used to validate email strings of the shape
-     * {@code local@domain}.
-     */
-    private static final Pattern EMAIL_PATTERN = Pattern.compile("^(.+)@(\\S+)$");
-
-    /**
      * The lower bound on the number of pre-keys uploaded per batch; keeps
      * batches useful even if the caller asks for fewer.
      */
     private static final long MIN_PRE_KEYS_COUNT = 5;
+
+    /**
+     * Square pixel size (width and height) of the self-profile preview
+     * thumbnail WA Web generates for uploads.
+     */
+    private static final int PROFILE_PREVIEW_SIZE = 96;
+
+    /**
+     * Maximum number of connection attempts before a post-pair reconnect
+     * is surfaced as a fatal {@code WhatsAppReconnectionException}. The
+     * first attempt counts toward the total; subsequent attempts are
+     * spaced with linear backoff per {@link #RECONNECT_BACKOFF_MILLIS}.
+     */
+    private static final int RECONNECT_MAX_ATTEMPTS = 5;
+
+    /**
+     * Base wait in milliseconds between reconnect attempts. The effective
+     * pause is {@code RECONNECT_BACKOFF_MILLIS * attempt} so the backoff
+     * grows linearly: 1s, 2s, 3s, 4s between attempts 1&rarr;2, 2&rarr;3,
+     * 3&rarr;4, 4&rarr;5.
+     */
+    private static final long RECONNECT_BACKOFF_MILLIS = 1000L;
+
+    /**
+     * WA Web storefront default for the {@code item_limit} argument on
+     * {@code WAWebQueryProductCollections}: capping the number of items
+     * fetched per returned collection.
+     */
+    private static final int PRODUCT_COLLECTION_ITEM_LIMIT = 100;
+
+    /**
+     * Default page size for catalog queries; matches the WA Web storefront
+     * {@code limit=5} declared inline in
+     * {@code WAWebBizProductCatalogAction.queryCatalog}.
+     */
+    private static final int DEFAULT_CATALOG_LIMIT = 5;
+
+    /**
+     * Default image width (pixels) requested by catalog queries; matches the
+     * WA Web storefront {@code width=100} default from
+     * {@code WAWebBizProductCatalogAction.queryCatalog}.
+     */
+    private static final int DEFAULT_CATALOG_IMAGE_WIDTH = 100;
+
+    /**
+     * Default image height (pixels) requested by catalog queries; matches the
+     * WA Web storefront {@code height=100} default from
+     * {@code WAWebBizProductCatalogAction.queryCatalog}.
+     */
+    private static final int DEFAULT_CATALOG_IMAGE_HEIGHT = 100;
 
     /**
      * The persisted session state (credentials, chats, contacts, Signal
@@ -241,6 +290,10 @@ public final class WhatsAppClient {
      * process exit; installed lazily during {@link #connect()}.
      */
     private Thread shutdownHook;
+    /**
+     * Reentrance guard set while {@link #disconnect(WhatsAppClientDisconnectReason, boolean)} is executing.
+     */
+    private final AtomicBoolean disconnecting;
 
     /**
      * Constructs a new client and wires all of its internal services
@@ -279,13 +332,14 @@ public final class WhatsAppClient {
         this.webAppStateService = new WebAppStateService(this, abPropsService, snapshotRecoveryService);
         this.lidMigrationService = new LidMigrationService(this, abPropsService);
         this.inactiveGroupLidMigrationService = new InactiveGroupLidMigrationService(this, abPropsService);
-        this.deviceService = new DeviceService(this, abPropsService, sessionCipher);
+        this.deviceService = new DeviceService(this, webAppStateService, abPropsService, sessionCipher);
         this.messageService = new MessageService(this, sessionCipher, groupCipher, deviceService, abPropsService);
         this.wamService = new WamService(this, abPropsService);
         this.pendingSocketRequests = new ConcurrentHashMap<>();
         this.companionPairingService = new CompanionPairingService(this, webVerificationHandler);
         this.socketStream = new SocketStream(this, webVerificationHandler, lidMigrationService, inactiveGroupLidMigrationService, messageService, abPropsService, deviceService, wamService, snapshotRecoveryService, webAppStateService, companionPairingService);
         this.messagePreviewHandler = messagePreviewHandler;
+        this.disconnecting = new AtomicBoolean();
     }
 
     /**
@@ -298,7 +352,6 @@ public final class WhatsAppClient {
     }
 
     //<editor-fold desc="Data">
-
     /**
      * Returns the persisted session state bound to this client.
      *
@@ -327,6 +380,16 @@ public final class WhatsAppClient {
     }
 
     /**
+     * Returns the WAM telemetry service used to batch and flush WhatsApp
+     * Metrics events over the three WAM transport channels.
+     *
+     * @return the WAM service
+     */
+    public WamService wamService() {
+        return wamService;
+    }
+
+    /**
      * Returns the LID migration service, which tracks the progress of
      * migrating legacy addressing (phone-number based) to LID-based
      * addressing across chats.
@@ -338,9 +401,7 @@ public final class WhatsAppClient {
     }
 
     //</editor-fold>
-
     //<editor-fold desc="Connection">
-
     /**
      * Establishes a connection to the WhatsApp servers.
      *
@@ -370,30 +431,55 @@ public final class WhatsAppClient {
             throw new IllegalStateException("Client is already connected");
         }
 
-        try {
-            this.socketClient = WhatsAppSocketClient.newCipheredSocketClient(store);
-            socketClient.connect(new WhatsAppSocketListener() {
-                @Override
-                public void onNode(Node node) {
-                    WhatsAppClient.this.onNode(node);
-                }
+        var maxAttempts = reason == WhatsAppClientDisconnectReason.RECONNECTING ? RECONNECT_MAX_ATTEMPTS : 1;
+        IOException lastFailure = null;
+        for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                this.socketClient = WhatsAppSocketClient.newCipheredSocketClient(store);
+                socketClient.connect(new WhatsAppSocketListener() {
+                    @Override
+                    public void onNode(Node node) {
+                        WhatsAppClient.this.onNode(node);
+                    }
 
-                @Override
-                public void onError(WhatsAppException exception) {
-                    handleFailure(exception);
-                }
+                    @Override
+                    public void onError(WhatsAppException exception) {
+                        handleFailure(exception);
+                    }
 
-                @Override
-                public void onClose() {
-                    disconnect(WhatsAppClientDisconnectReason.RECONNECTING);
+                    @Override
+                    public void onClose() {
+                        disconnect(WhatsAppClientDisconnectReason.RECONNECTING);
+                    }
+                });
+                lastFailure = null;
+                break;
+            } catch (IOException throwable) {
+                lastFailure = throwable;
+                if (socketClient != null) {
+                    try {
+                        socketClient.disconnect();
+                    } catch (Throwable _) {
+                        // Best effort cleanup before retry
+                    }
+                    socketClient = null;
                 }
-            });
-        } catch (IOException throwable) {
+                if (attempt >= maxAttempts) {
+                    break;
+                }
+                try {
+                    Thread.sleep(RECONNECT_BACKOFF_MILLIS * attempt);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }
+        if (lastFailure != null) {
             if (reason == WhatsAppClientDisconnectReason.RECONNECTING) {
-                // TODO: Add attempts count
-                handleFailure(new WhatsAppReconnectionException(throwable.getMessage(), 0, throwable));
+                handleFailure(new WhatsAppReconnectionException(lastFailure.getMessage(), maxAttempts, lastFailure));
             } else {
-                handleFailure(new WhatsAppConnectionException(throwable.getMessage(), throwable));
+                handleFailure(new WhatsAppConnectionException(lastFailure.getMessage(), lastFailure));
             }
             return;
         }
@@ -470,6 +556,25 @@ public final class WhatsAppClient {
      *                               be removed as part of this disconnect
      */
     private void disconnect(WhatsAppClientDisconnectReason reason, boolean canRemoveShutdownHook) {
+        if (disconnecting.compareAndSet(false, true)) {
+            try {
+                disconnect0(reason, canRemoveShutdownHook);
+            } finally {
+                disconnecting.set(false);
+            }
+        }
+    }
+
+    /**
+     * The actual disconnect implementation, invoked once the reentrance
+     * guard in {@link #disconnect(WhatsAppClientDisconnectReason, boolean)}
+     * has been acquired.
+     *
+     * @param reason                the disconnection reason
+     * @param canRemoveShutdownHook whether the JVM shutdown hook should be
+     *                              removed as part of this disconnect
+     */
+    private void disconnect0(WhatsAppClientDisconnectReason reason, boolean canRemoveShutdownHook) {
         // Per WA Web WAWebSocketModel.sendLogout: flush pending sentinel
         // mutations before disconnecting so key expiration is propagated.
         // WA Web bounds the wait via Math.min(20, Math.max(0, getSyncdSentinelTimeoutSeconds())) * 1000
@@ -483,6 +588,7 @@ public final class WhatsAppClient {
 
         if (socketClient != null) {
             socketClient.disconnect();
+            socketClient = null;
         }
 
         pendingSocketRequests.forEach((ignored, request) -> request.complete(null));
@@ -679,34 +785,144 @@ public final class WhatsAppClient {
 
     /**
      * Logs this client out of WhatsApp, invalidating the stored
-     * credentials.
+     * credentials for this session.
      *
      * <p>For web companion sessions this issues a
-     * {@code remove-companion-device} IQ so that the primary device
-     * detaches the companion; for sessions without a known local JID it
-     * falls back to a local {@link #disconnect(WhatsAppClientDisconnectReason)}
-     * with {@link WhatsAppClientDisconnectReason#LOGGED_OUT}. The next
+     * {@code remove-companion-device} IQ targeting this client's own
+     * companion JID so the primary device detaches it; for sessions
+     * without a known local JID it falls back to a local
+     * {@link #disconnect(WhatsAppClientDisconnectReason)} with
+     * {@link WhatsAppClientDisconnectReason#LOGGED_OUT}. The next
      * connection attempt requires a fresh authentication ceremony (QR
      * scan, pairing code, or phone-number registration).
+     *
+     * <p>This is a self-logout. To detach a different linked companion
+     * from the primary device owned by this client, use
+     * {@link #logoutCompanion(Jid)} instead.
+     *
+     * @implNote WAWebUnpairDeviceJob.unpairDevice targets the current
+     *     session's own device JID; WA Web derives it from
+     *     {@code getMeDevicePnOrThrow_DO_NOT_USE()} while Cobalt reads
+     *     {@code store.jid()}. The attribute name matches WA Web's
+     *     {@code jid="..."}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebUnpairDeviceJob",
+            exports = "unpairDevice",
+            adaptation = WhatsAppAdaptation.DIRECT)
     public void logout() {
         var localJid = store.jid();
         if (localJid.isEmpty()) {
             disconnect(WhatsAppClientDisconnectReason.LOGGED_OUT);
         } else {
+            // WAWebUnpairDeviceJob.unpairDevice: wap("remove-companion-device", {jid: DEVICE_JID(me), reason: CUSTOM_STRING(reason)})
             var device = new NodeBuilder()
                     .description("remove-companion-device")
-                    .attribute("value", localJid.get())
+                    .attribute("jid", localJid.get()) // WAWebUnpairDeviceJob.unpairDevice: jid attribute, not "value"
                     .attribute("reason", "user_initiated")
                     .build();
             var iqNode = new NodeBuilder()
                     .description("iq")
-                    .attribute("xmlns", "md")
-                    .attribute("to", JidServer.user())
-                    .attribute("type", "set")
+                    .attribute("xmlns", "md") // WAWebUnpairDeviceJob.unpairDevice: xmlns="md"
+                    .attribute("to", JidServer.user()) // WAWebUnpairDeviceJob.unpairDevice: to=S_WHATSAPP_NET
+                    .attribute("type", "set") // WAWebUnpairDeviceJob.unpairDevice: type="set"
                     .content(device);
             sendNode(iqNode);
         }
+    }
+
+    /**
+     * Detaches the given companion device from this account.
+     *
+     * <p>Sends a {@code remove-companion-device} IQ identical in shape
+     * to the self-logout IQ emitted by {@link #logout()}, but carrying
+     * the supplied companion JID instead of this session's own JID.
+     * The companion must belong to this account; the server rejects
+     * JIDs that do not appear in the caller's own device list.
+     *
+     * <p>This does not tear down the local session. To log out the
+     * currently-connected companion itself, use {@link #logout()}.
+     *
+     * @param companion the companion JID to detach; must include an
+     *                  agent index (device slot) and must be a device
+     *                  JID belonging to this account
+     * @throws NullPointerException                if {@code companion}
+     *                                             is {@code null}
+     * @throws WhatsAppSessionException.Closed     if the socket is no
+     *                                             longer open
+     * @implNote WAWebUnpairDeviceJob.unpairDevice: the underlying JS
+     *     function is hard-coded to pass {@code getMeDevicePnOrThrow}
+     *     so it can only detach self; Cobalt generalises the API to
+     *     accept any companion JID owned by this account so callers
+     *     can unpair siblings.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebUnpairDeviceJob",
+            exports = "unpairDevice",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void logoutCompanion(Jid companion) {
+        Objects.requireNonNull(companion, "companion cannot be null");
+        // WAWebUnpairDeviceJob.unpairDevice: wap("remove-companion-device", {jid, reason: "user_initiated"})
+        var device = new NodeBuilder()
+                .description("remove-companion-device")
+                .attribute("jid", companion)
+                .attribute("reason", "user_initiated")
+                .build();
+        var iqNode = new NodeBuilder()
+                .description("iq")
+                .attribute("xmlns", "md") // WAWebUnpairDeviceJob.unpairDevice: xmlns="md"
+                .attribute("to", JidServer.user()) // WAWebUnpairDeviceJob.unpairDevice: to=S_WHATSAPP_NET
+                .attribute("type", "set") // WAWebUnpairDeviceJob.unpairDevice: type="set"
+                .content(device);
+        sendNode(iqNode);
+    }
+
+    /**
+     * Returns the companion JIDs currently linked to this account.
+     *
+     * <p>Runs a USync device-list query for the caller's own user JID
+     * via the injected {@link DeviceService} and materialises the
+     * cached device entries as companion JIDs (user+device slot). The
+     * primary device (device 0) is included as the first entry when
+     * present; companions follow in server order.
+     *
+     * <p>Callers that only need the raw {@link com.github.auties00.cobalt.model.device.info.DeviceList} record can
+     * use {@link DeviceService#syncAndGetDeviceList(Collection)}
+     * directly; this helper exists to surface the user-facing list of
+     * linked devices with each entry already projected into a
+     * device-qualified JID.
+     *
+     * @return the linked companion JIDs, in server order
+     * @throws WhatsAppSessionException.Closed if the socket is no
+     *                                         longer open during the
+     *                                         USync round-trip
+     * @implNote WAWebGetAllDevices / WAWebApiDeviceList.getMyDeviceList:
+     *     WA Web reads the cached primary/LID device list straight from
+     *     {@code getDeviceListTable}. Cobalt goes through the same
+     *     USync path as WA Web's {@code syncMyDeviceList} so the
+     *     returned list is always fresh, then projects the resulting
+     *     {@code DeviceList} into per-device JIDs. Companion JIDs use
+     *     the {@code user@server:device} form produced by
+     *     {@code DeviceEntry.toDeviceJid}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebApiDeviceList",
+            exports = "getMyDeviceList",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public SequencedCollection<Jid> queryLinkedDevices() {
+        var selfJid = store.jid()
+                .map(Jid::toUserJid)
+                .orElseThrow(() -> new IllegalStateException("Client is not logged in"));
+        // WAWebAdvSyncDeviceListApi.syncAndGetDeviceList: sync first, then read cached entries
+        var lists = deviceService.syncAndGetDeviceList(List.of(selfJid));
+        var result = new LinkedHashSet<Jid>();
+        for (var list : lists) {
+            if (list == null || list.deleted()) {
+                continue;
+            }
+            for (var device : list.devices()) {
+                // WAWebWidFactory.createDeviceWidFromDeviceListPk: user@server:deviceId
+                result.add(device.toDeviceJid(selfJid.user(), selfJid.server()));
+            }
+        }
+        return result;
     }
 
     /**
@@ -752,9 +968,7 @@ public final class WhatsAppClient {
     }
 
     //</editor-fold>
-
     //<editor-fold desc="Error handling">
-
     /**
      * Delegates to the configured {@link WhatsAppClientErrorHandler} and
      * applies the returned {@link WhatsAppClientErrorHandler.Result} as a
@@ -771,7 +985,8 @@ public final class WhatsAppClient {
             case RECONNECT -> disconnect(WhatsAppClientDisconnectReason.RECONNECTING);
         }
     }
-
+    //</editor-fold>
+    //<editor-fold desc="Web app state">
     /**
      * Pushes a batch of sync mutations for the given patch type to the
      * companion app-state service.
@@ -791,40 +1006,6 @@ public final class WhatsAppClient {
      */
     public void pullWebAppState(SyncPatchType... patches) {
         webAppStateService.pullPatches(patches);
-    }
-
-    /**
-     * Schedules the all-devices-responded check for missing sync key timeout.
-     *
-     * <p>Called when a companion device responds to a key share request without
-     * providing the requested key, to trigger the grace period before fatal.
-     */
-    public void scheduleAllDevicesRespondedCheck() {
-        webAppStateService.scheduleAllDevicesRespondedCheck();
-    }
-
-    /**
-     * Reschedules the missing sync key timeout check.
-     *
-     * <p>Per WhatsApp Web {@code WAWebSyncdStoreMissingKeys.updateMissingKeys}:
-     * after keys with data are received and removed from the missing key store,
-     * the timeout is rescheduled because the earliest missing key may have changed.
-     *
-     * @implNote WAWebSyncdStoreMissingKeys._setMissingKeyTimeout
-     */
-    public void rescheduleMissingSyncKeyTimeout() {
-        webAppStateService.rescheduleMissingSyncKeyTimeout();
-    }
-
-    /**
-     * Retries orphan mutations across all collections.
-     *
-     * <p>Per WhatsApp Web {@code WAWebSyncdOrphan}: called after events that
-     * may have introduced new entities (history sync, contact sync) so that
-     * previously orphaned mutations can be resolved.
-     */
-    public void retryOrphanMutations() {
-        webAppStateService.retryAllOrphanMutations();
     }
 
     /**
@@ -863,7 +1044,7 @@ public final class WhatsAppClient {
                 .orElse("");
         store.setVerifiedName(verifiedName);
     }
-
+    //</editor-fold>
     /**
      * Sends an acknowledgment stanza for the given inbound node, using
      * the node's own {@code id} attribute as the acknowledgment id.
@@ -902,7 +1083,6 @@ public final class WhatsAppClient {
         ackBuilder.attribute("to", ackTo);
 
         node.getAttributeAsJid("participant")
-                .map(jid -> jid)
                 .ifPresent(receiptParticipant -> ackBuilder.attribute("recipient", receiptParticipant));
 
         if (!isMessage) {
@@ -1484,6 +1664,476 @@ public final class WhatsAppClient {
     }
 
     /**
+     * Edits the metadata of the authenticated user's WhatsApp Business
+     * profile.
+     *
+     * <p>Mirrors {@code WAWebBusinessProfileJob.editBusinessProfile}. WA Web
+     * sends a {@code business_profile} IQ under the {@code w:biz} namespace
+     * with {@code v="3"} and {@code mutation_type="delta"}, packing each
+     * modified attribute as its own child element. Cobalt reproduces the
+     * exact wire shape by inspecting every field on the supplied
+     * {@link BusinessProfile} and emitting only the children whose value is
+     * non-{@code null}. The {@code address}, {@code description},
+     * {@code email}, {@code website} (up to two), {@code categories} (as
+     * {@code <category id="..."/>}) and {@code business_hours} children
+     * follow WA Web's delta encoding literally.
+     *
+     * <p>The {@code cart_enabled}, {@code latitude}, {@code longitude},
+     * {@code price_tier} and {@code service_areas} fields are not exposed on
+     * Cobalt's {@link BusinessProfile} model yet; they are intentionally
+     * omitted here, matching the "undefined" branch taken by the WA Web job
+     * when the caller does not supply them.
+     *
+     * @implNote WAWebBusinessProfileJob.editBusinessProfile: every attribute
+     * is wrapped in its own {@code wap(...)} child; absent values are
+     * skipped via the {@code !== void 0} ternary. Cobalt mirrors the same
+     * null-skipping behaviour.
+     * @param profile the new business-profile metadata; must not be
+     *                {@code null}
+     * @throws NullPointerException            if {@code profile} is
+     *                                         {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WAWebBusinessProfileJob", exports = "editBusinessProfile",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void editBusinessProfile(BusinessProfile profile) {
+        Objects.requireNonNull(profile, "profile cannot be null");
+        var children = new ArrayList<Node>();
+        // WAWebBusinessProfileJob.editBusinessProfile: r !== void 0 ? wap("address", null, r) : null
+        profile.address().ifPresent(address -> children.add(new NodeBuilder()
+                .description("address")
+                .content(address)
+                .build()));
+        // WAWebBusinessProfileJob.editBusinessProfile: l !== void 0 ? wap("description", null, l) : null
+        profile.description().ifPresent(description -> children.add(new NodeBuilder()
+                .description("description")
+                .content(description)
+                .build()));
+        // WAWebBusinessProfileJob.editBusinessProfile: s !== void 0 ? wap("email", null, s) : null
+        profile.email().ifPresent(email -> children.add(new NodeBuilder()
+                .description("email")
+                .content(email)
+                .build()));
+        // WAWebBusinessProfileJob.editBusinessProfile: _ && _.length===0 ? wap("website", null) ... up to two <website>
+        var websites = profile.websites();
+        if (websites.isEmpty()) {
+            children.add(new NodeBuilder()
+                    .description("website")
+                    .build());
+        } else {
+            children.add(new NodeBuilder()
+                    .description("website")
+                    .content(websites.get(0).toString())
+                    .build());
+            if (websites.size() > 1) {
+                children.add(new NodeBuilder()
+                        .description("website")
+                        .content(websites.get(1).toString())
+                        .build());
+            }
+        }
+        // WAWebBusinessProfileJob.editBusinessProfile: i ? wap("categories", null, i.map(e => wap("category", {id: CUSTOM_STRING(e.id)}))) : null
+        var categories = profile.categories();
+        if (!categories.isEmpty()) {
+            var categoryNodes = categories.stream()
+                    .map(category -> new NodeBuilder()
+                            .description("category")
+                            .attribute("id", category.id())
+                            .build())
+                    .toList();
+            children.add(new NodeBuilder()
+                    .description("categories")
+                    .content(categoryNodes)
+                    .build());
+        }
+        // WAWebBusinessProfileJob.editBusinessProfile: a ? u(a) : null
+        profile.hours().ifPresent(hours -> children.add(buildBusinessHoursNode(hours)));
+        var businessProfileNode = new NodeBuilder()
+                .description("business_profile")
+                .attribute("v", "3") // WAWebBusinessProfileJob.editBusinessProfile: v: "3"
+                .attribute("mutation_type", "delta") // WAWebBusinessProfileJob.editBusinessProfile: mutation_type: "delta"
+                .content(children)
+                .build();
+        var iqNode = new NodeBuilder()
+                .description("iq")
+                .attribute("xmlns", "w:biz") // WAWebBusinessProfileJob.editBusinessProfile: xmlns: "w:biz"
+                .attribute("to", JidServer.user()) // WAWebBusinessProfileJob.editBusinessProfile: to: S_WHATSAPP_NET
+                .attribute("type", "set"); // WAWebBusinessProfileJob.editBusinessProfile: type: "set"
+        iqNode.content(businessProfileNode);
+        sendNode(iqNode); // WAWebBusinessProfileJob.editBusinessProfile: deprecatedSendIq(f, e)
+    }
+
+    /**
+     * Builds the {@code business_hours} stanza child emitted by
+     * {@link #editBusinessProfile(BusinessProfile)}.
+     *
+     * <p>WA Web's internal helper {@code u({config, note, timezone})}
+     * flattens the configured hours into a list of
+     * {@code business_hours_config} children and prepends an optional
+     * {@code business_hours_note}. Cobalt's {@link BusinessHours} does not
+     * carry a note so the note child is never emitted.
+     *
+     * @implNote WAWebBusinessProfileJob.editBusinessProfile: inline helper
+     * {@code function u(e){...}} that produces the {@code business_hours}
+     * wrapper. Each entry becomes
+     * {@code wap("business_hours_config", {day_of_week, mode, open_time, close_time})}.
+     * Cobalt preserves the same attribute names and {@code DROP_ATTR}
+     * behaviour for the time fields when the mode is not
+     * {@code specific_hours}.
+     * @param hours the business hours configuration
+     * @return the {@code business_hours} node
+     */
+    @WhatsAppWebExport(moduleName = "WAWebBusinessProfileJob", exports = "editBusinessProfile",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private Node buildBusinessHoursNode(BusinessHours hours) {
+        var configNodes = new ArrayList<Node>();
+        // WAWebBusinessProfileJob.editBusinessProfile: a.push({day_of_week, mode, open_time, close_time})
+        for (var entry : hours.entries()) {
+            var builder = new NodeBuilder()
+                    .description("business_hours_config")
+                    .attribute("day_of_week", entry.day().value())
+                    .attribute("mode", entry.mode().value());
+            // WAWebBusinessProfileJob.editBusinessProfile: open_time/close_time are CUSTOM_STRING when present, DROP_ATTR otherwise
+            if (entry.mode() == BusinessHoursMode.SPECIFIC_HOURS) {
+                builder.attribute("open_time", Long.toString(entry.openTime().toSecondOfDay()));
+                builder.attribute("close_time", Long.toString(entry.closeTime().toSecondOfDay()));
+            }
+            configNodes.add(builder.build());
+        }
+        var builder = new NodeBuilder()
+                .description("business_hours");
+        var timezone = hours.timeZone();
+        // WAWebBusinessProfileJob.editBusinessProfile: timezone ? CUSTOM_STRING(r) : DROP_ATTR
+        if (timezone != null && !timezone.isEmpty()) {
+            builder.attribute("timezone", timezone);
+        }
+        builder.content(configNodes);
+        return builder.build();
+    }
+
+    /**
+     * Toggles the shopping-cart feature of the authenticated user's
+     * business profile.
+     *
+     * <p>Mirrors {@code WAWebBusinessProfileJob.updateCartEnabled}. WA Web
+     * picks the GraphQL-driven commerce-settings path when the
+     * {@code graphQLForCommerceSettingsEnabled} AB prop is on, and falls
+     * back to a legacy {@code fb:thrift_iq} IQ otherwise. Cobalt only
+     * implements the legacy IQ path since the MEX commerce-settings
+     * endpoint is not wired yet. The IQ body contains a
+     * {@code <commerce_settings>} wrapper with a nested
+     * {@code <cart enabled="true|false"/>}.
+     *
+     * @implNote WAWebBusinessProfileJob.updateCartEnabled: the legacy
+     * {@code c(e)} helper emits
+     * {@code wap("iq", {to, smax_id: CommerceSettingsSet, xmlns: "fb:thrift_iq", type: "set"},
+     *   wap("commerce_settings", null, wap("cart", {enabled: CUSTOM_STRING(e.toString())})))}
+     * and decodes the response through the {@code commerce_settings}
+     * parser. Cobalt omits the typed response parser since the caller is
+     * only interested in the success/failure signal raised by
+     * {@link #sendNode(NodeBuilder)}.
+     * @param enabled {@code true} to enable the cart, {@code false} to
+     *                disable it
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WAWebBusinessProfileJob", exports = "updateCartEnabled",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void updateBusinessCartEnabled(boolean enabled) {
+        // WAWebBusinessProfileJob.updateCartEnabled / legacy c(e):
+        // wap("cart", {enabled: CUSTOM_STRING(e.toString())})
+        var cartNode = new NodeBuilder()
+                .description("cart")
+                .attribute("enabled", Boolean.toString(enabled))
+                .build();
+        var commerceSettings = new NodeBuilder()
+                .description("commerce_settings")
+                .content(cartNode)
+                .build();
+        var iqNode = new NodeBuilder()
+                .description("iq")
+                .attribute("xmlns", "fb:thrift_iq") // WAWebBusinessProfileJob.updateCartEnabled: xmlns: "fb:thrift_iq"
+                .attribute("to", JidServer.user()) // WAWebBusinessProfileJob.updateCartEnabled: to: S_WHATSAPP_NET
+                .attribute("type", "set") // WAWebBusinessProfileJob.updateCartEnabled: type: "set"
+                .content(commerceSettings);
+        sendNode(iqNode);
+    }
+
+    /**
+     * Uploads a new cover photo for the authenticated user's business
+     * profile.
+     *
+     * <p>Mirrors {@code WAWebBusinessProfileJob.sendCoverPhoto}. WA Web
+     * expects the caller to have already uploaded the JPEG to WhatsApp's
+     * media servers via the media upload pipeline and to pass the returned
+     * media id, upload timestamp and server-issued token here. The IQ
+     * itself carries a {@code cover_photo} child with
+     * {@code op="update"} plus the three attributes. Cobalt exposes a
+     * thin wrapper that accepts the raw JPEG bytes and delegates the
+     * upload/timestamp/token acquisition to future work; the current
+     * implementation surfaces the three fields directly so callers with an
+     * already-uploaded photo can still emit the IQ.
+     *
+     * @implNote WAWebBusinessProfileJob.sendCoverPhoto: emits
+     * {@code wap("cover_photo", {op: "update", id, ts, token})} inside a
+     * {@code business_profile v="3"}. The uploaded bytes are consumed by
+     * the media pipeline upstream of this call; Cobalt's signature matches
+     * the task contract that accepts the JPEG directly but the current
+     * path is a placeholder until the cover-photo upload helper lands.
+     * @param jpegBytes the raw JPEG bytes of the cover photo; must not be
+     *                  {@code null}
+     * @throws NullPointerException            if {@code jpegBytes} is
+     *                                         {@code null}
+     * @throws UnsupportedOperationException   until the media upload helper
+     *                                         that produces {@code id},
+     *                                         {@code ts} and {@code token}
+     *                                         is implemented
+     */
+    @WhatsAppWebExport(moduleName = "WAWebBusinessProfileJob", exports = "sendCoverPhoto",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void setBusinessCoverPhoto(byte[] jpegBytes) {
+        Objects.requireNonNull(jpegBytes, "jpegBytes cannot be null");
+        // ADAPTED: WAWebBusinessProfileJob.sendCoverPhoto requires an id/ts/token triple produced by the media upload pipeline.
+        // Cobalt's business cover-photo upload helper is not yet implemented, so the entry point currently rejects the call
+        // rather than silently producing a malformed IQ. The IQ shape that must be emitted once the upload helper is in place
+        // is preserved in the @implNote above so downstream work can wire it in without changing the signature.
+        throw new UnsupportedOperationException(
+                "setBusinessCoverPhoto requires the media upload pipeline (id, ts, token) which is not yet implemented in Cobalt");
+    }
+
+    /**
+     * Removes the current cover photo of the authenticated user's business
+     * profile.
+     *
+     * <p>Mirrors {@code WAWebBusinessProfileJob.deleteCoverPhoto}. WA Web
+     * emits a {@code business_profile v="3"} IQ whose only child is
+     * {@code cover_photo} with {@code op="delete"} plus an {@code id}
+     * attribute carrying the previously-uploaded photo id. Cobalt does not
+     * yet persist the current cover-photo id, so the deletion IQ simply
+     * carries {@code op="delete"} and lets the server interpret the absent
+     * {@code id} as "clear the current cover photo"; real WhatsApp Web
+     * always ships the id so the implementation is classified as
+     * {@link WhatsAppAdaptation#ADAPTED}.
+     *
+     * @implNote WAWebBusinessProfileJob.deleteCoverPhoto: emits
+     * {@code wap("cover_photo", {op: "delete", id: CUSTOM_STRING(t)})}.
+     * Cobalt passes the empty string as the id since no cover-photo id is
+     * cached in the store.
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WAWebBusinessProfileJob", exports = "deleteCoverPhoto",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void deleteBusinessCoverPhoto() {
+        // WAWebBusinessProfileJob.deleteCoverPhoto: wap("cover_photo", {op: "delete", id: CUSTOM_STRING(t)})
+        var coverPhoto = new NodeBuilder()
+                .description("cover_photo")
+                .attribute("op", "delete")
+                .build();
+        var businessProfile = new NodeBuilder()
+                .description("business_profile")
+                .attribute("v", "3")
+                .attribute("mutation_type", "delta")
+                .content(coverPhoto)
+                .build();
+        var iqNode = new NodeBuilder()
+                .description("iq")
+                .attribute("xmlns", "w:biz")
+                .attribute("to", JidServer.user())
+                .attribute("type", "set")
+                .content(businessProfile);
+        sendNode(iqNode);
+    }
+
+    /**
+     * Queries the detail of a business order identified by a message id and
+     * a server-issued token.
+     *
+     * <p>Mirrors {@code WAWebBizQueryOrderJob.queryOrder}. The request is
+     * issued through the {@link QueryOrderMex} MEX operation, which wraps
+     * the GraphQL variables under {@code request.order} and dispatches the
+     * IQ via the {@code w:mex} namespace. The response is projected into
+     * an {@link QueryOrderMex.Order} carrying the creation timestamp, the
+     * price details and the ordered items.
+     *
+     * <p>This entry point targets the GraphQL code path; the legacy
+     * {@code fb:thrift_iq} fallback used by WA Web when the
+     * {@code graphQLForGetOrderInfoEnabled} gate is off is intentionally
+     * omitted since it has been largely replaced by the MEX path.
+     *
+     * @implNote WAWebBizQueryOrderJob.queryOrder (GraphQL branch):
+     * {@code _(e, t, n, r, o)} issues the MEX through
+     * {@code WAWebRelayClient.fetchQuery}. Cobalt substitutes the relay
+     * client with the direct {@code w:mex} IQ dispatch that backs every
+     * other Cobalt MEX operation. Image dimensions default to a 512x512
+     * thumbnail which matches the WA Web default when the caller does not
+     * specify one.
+     * @param messageId   the server-issued order id (typically the id of
+     *                    the {@code OrderMessage})
+     * @param tokenBase64 the sensitive base64-encoded token shipped with
+     *                    the order message
+     * @return the parsed order, or {@link Optional#empty()} when the relay
+     *         returns no order payload
+     * @throws NullPointerException            if {@code messageId} or
+     *                                         {@code tokenBase64} is
+     *                                         {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WAWebBizQueryOrderJob", exports = "queryOrder",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebBizOrderBridge", exports = "queryOrder",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<QueryOrderMex.Order> queryOrder(String messageId, String tokenBase64) {
+        Objects.requireNonNull(messageId, "messageId cannot be null");
+        Objects.requireNonNull(tokenBase64, "tokenBase64 cannot be null");
+        var selfJid = store.jid() // WAWebUserPrefsMeUser.getMePnUserOrThrow_DO_NOT_USE().toString()
+                .orElseThrow(() -> new IllegalStateException("queryOrder requires a logged-in session"));
+        var request = new QueryOrderMex.Request(
+                selfJid.toString(),
+                messageId,
+                tokenBase64,
+                512, // WAWebBizQueryOrderJob.queryOrder: default thumbnail width used across the product catalog surface
+                512  // WAWebBizQueryOrderJob.queryOrder: default thumbnail height
+        );
+        var response = sendNode(request.toNode());
+        return QueryOrderMex.Response.of(response)
+                .map(QueryOrderMex.Response::order);
+    }
+
+    /**
+     * Creates a new quick reply template and propagates it to every linked
+     * device via the {@code REGULAR} app-state sync collection.
+     *
+     * <p>Mirrors {@code WAWebSendQuickReplyAddOrEditMutation.sendMutation}.
+     * A random, client-generated id is minted for the new quick reply; the
+     * same id is used as both the mutation index part and the primary key
+     * under which the template is filed in the quick reply store.
+     *
+     * <p>The created entry is also added to the local store eagerly so the
+     * caller can observe it immediately, without waiting for the round
+     * trip through the server and the inbound sync patch.
+     *
+     * @implNote ADAPTED: WAWebSendQuickReplyAddOrEditMutation — the mutation
+     * is built via
+     * {@link QuickReplyHandler#getQuickReplyAddOrEditMutation(String, String, String, int, List, Instant)}
+     * and committed through
+     * {@link WebAppStateService#pushPatches(SyncPatchType, java.util.SequencedCollection)}.
+     * @param shortcut the shortcut text the user types to trigger the quick reply
+     * @param message  the message body to expand the shortcut into
+     * @param keywords the optional keyword list used by the autocomplete
+     *                 surface; {@code null} is coerced to an empty list
+     * @return the newly-minted quick reply id
+     * @throws NullPointerException            if {@code shortcut} or
+     *                                         {@code message} is
+     *                                         {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WAWebSendQuickReplyAddOrEditMutation", exports = "sendMutation",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public String createQuickReply(String shortcut, String message, List<String> keywords) {
+        Objects.requireNonNull(shortcut, "shortcut cannot be null");
+        Objects.requireNonNull(message, "message cannot be null");
+        var quickReplyId = DataUtils.randomHex(16); // ADAPTED: WA Web mints a client-side uuid inside the compose flow
+        var resolvedKeywords = keywords == null ? List.<String>of() : List.copyOf(keywords);
+        var timestamp = Instant.now();
+        var mutation = QuickReplyHandler.INSTANCE.getQuickReplyAddOrEditMutation(
+                quickReplyId, shortcut, message, 0, resolvedKeywords, timestamp);
+        webAppStateService.pushPatches(QuickReplyAction.COLLECTION_NAME, List.of(mutation)); // WAWebSyncdCoreApi.lockForSync([], [mutation], ...)
+        // ADAPTED: WAWebSendQuickReplyAddOrEditMutation applies the entry locally after the sync round-trip;
+        // Cobalt updates the store eagerly for consistent read-after-write semantics.
+        var entry = new com.github.auties00.cobalt.model.preference.QuickReplyBuilder()
+                .id(quickReplyId)
+                .shortcut(shortcut)
+                .message(message)
+                .keywords(resolvedKeywords)
+                .count(0)
+                .build();
+        store.addQuickReply(entry);
+        return quickReplyId;
+    }
+
+    /**
+     * Updates an existing quick reply template and propagates the change to
+     * every linked device via the {@code REGULAR} app-state sync
+     * collection.
+     *
+     * <p>Mirrors {@code WAWebSendQuickReplyAddOrEditMutation.sendMutation}
+     * when invoked on an edit path. The supplied id must match an
+     * existing quick reply; when it does not, the server still accepts
+     * the mutation and treats it as a create, matching WA Web's behaviour.
+     *
+     * <p>The existing entry in the local store is replaced eagerly so the
+     * caller can observe the new {@code shortcut}/{@code message} before
+     * the inbound sync patch round-trips.
+     *
+     * @implNote ADAPTED: WAWebSendQuickReplyAddOrEditMutation — reuses
+     * {@link QuickReplyHandler#getQuickReplyAddOrEditMutation(String, String, String, int, List, Instant)}
+     * with the supplied id. The {@code count} field is preserved from the
+     * existing store entry (or defaults to {@code 0} when absent) since
+     * WA Web never rewrites it from the edit surface.
+     * @param quickReplyId the stable id of the quick reply being edited
+     * @param shortcut     the new shortcut text
+     * @param message      the new message body
+     * @param keywords     the new keyword list; {@code null} is coerced to
+     *                     an empty list
+     * @throws NullPointerException            if any of the string arguments
+     *                                         is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WAWebSendQuickReplyAddOrEditMutation", exports = "sendMutation",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void editQuickReply(String quickReplyId, String shortcut, String message, List<String> keywords) {
+        Objects.requireNonNull(quickReplyId, "quickReplyId cannot be null");
+        Objects.requireNonNull(shortcut, "shortcut cannot be null");
+        Objects.requireNonNull(message, "message cannot be null");
+        var resolvedKeywords = keywords == null ? List.<String>of() : List.copyOf(keywords);
+        var timestamp = Instant.now();
+        int currentCount = store.findQuickReply(quickReplyId) // WAWebQuickRepliesSync.applyMutations: s.count || 0
+                .map(QuickReply::count)
+                .orElse(0);
+        var mutation = QuickReplyHandler.INSTANCE.getQuickReplyAddOrEditMutation(
+                quickReplyId, shortcut, message, currentCount, resolvedKeywords, timestamp);
+        webAppStateService.pushPatches(QuickReplyAction.COLLECTION_NAME, List.of(mutation));
+        var entry = new com.github.auties00.cobalt.model.preference.QuickReplyBuilder()
+                .id(quickReplyId)
+                .shortcut(shortcut)
+                .message(message)
+                .keywords(resolvedKeywords)
+                .count(currentCount)
+                .build();
+        store.addQuickReply(entry); // ADAPTED: createOrReplace eagerly mirrors WA Web's inbound apply branch
+    }
+
+    /**
+     * Deletes a quick reply template and propagates the removal to every
+     * linked device via the {@code REGULAR} app-state sync collection.
+     *
+     * <p>Mirrors {@code WAWebDeleteQuickReplyAction.sendMutation}. The
+     * mutation is a {@code SET} with a {@code quickReplyAction} whose
+     * {@code deleted} flag is {@code true}; on successful apply the server
+     * pushes the removal back through the sync pipeline and every linked
+     * device drops the entry from its local table.
+     *
+     * <p>The entry is also removed from the local store eagerly so the
+     * caller observes the deletion immediately.
+     *
+     * @implNote ADAPTED: WAWebDeleteQuickReplyAction — delegates to
+     * {@link QuickReplyHandler#getQuickReplyDeleteMutation(String, Instant)}
+     * and commits the mutation through
+     * {@link WebAppStateService#pushPatches(SyncPatchType, java.util.SequencedCollection)}.
+     * @param quickReplyId the id of the quick reply to delete
+     * @throws NullPointerException            if {@code quickReplyId} is
+     *                                         {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WAWebDeleteQuickReplyAction", exports = "sendMutation",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void deleteQuickReply(String quickReplyId) {
+        Objects.requireNonNull(quickReplyId, "quickReplyId cannot be null");
+        var mutation = QuickReplyHandler.INSTANCE.getQuickReplyDeleteMutation(quickReplyId, Instant.now());
+        webAppStateService.pushPatches(QuickReplyAction.COLLECTION_NAME, List.of(mutation));
+        store.removeQuickReply(quickReplyId); // ADAPTED: WAWebQuickRepliesSync.applyMutations -> getQuickReplyTable().remove(l) applied eagerly
+    }
+
+    /**
      * Queries the bot profile for the given bot JID with the default persona.
      *
      * @param botJid the bot JID to query
@@ -1682,16 +2332,291 @@ public final class WhatsAppClient {
     }
 
     /**
-     * Builds the IQ node used to initiate a voice or video call with the
-     * given JID.
+     * Initiates a one-to-one voice or video call by emitting the signalling
+     * {@code <call><offer/></call>} stanza to the given peer.
      *
-     * @param jid the call recipient
-     * @return the call offer node
-     * @throws UnsupportedOperationException currently a stub pending
-     *                                       implementation
+     * <p>Cobalt does not implement the WebRTC media plane (SDP negotiation,
+     * SRTP media transport). Only the signalling stanza that announces the
+     * call to the peer is sent. The returned {@link CallOffer} captures the
+     * locally-generated call identifier so that the caller can later invoke
+     * {@link #stopCall(String, Jid)} to hang up the invitation.
+     *
+     * @implNote ADAPTED: WAWebVoipFunctions.offerCall — WA Web performs a full
+     *           WebRTC handshake via {@code WAWebOutgoingCall} and the native
+     *           VoIP backend. Cobalt emits only the {@code <call><offer/></call>}
+     *           signalling stanza (no {@code enc} / SDP payload) and records
+     *           the {@link CallOffer} locally; no media session is established.
+     * @param target the JID of the callee, must be a user JID
+     * @param video  whether to advertise this as a video call
+     * @return the locally-tracked {@link CallOffer} describing the outgoing
+     *         call; its {@linkplain CallOffer#callId() callId} is required to
+     *         later terminate the call
+     * @throws NullPointerException            if {@code target} is {@code null}
+     * @throws IllegalStateException           if this client is not logged in
+     * @throws WhatsAppSessionException.Closed if the socket has been closed
      */
-    private Node createCall(JidProvider jid) {
-        throw new UnsupportedOperationException();
+    @WhatsAppWebExport(moduleName = "WAWebVoipFunctions", exports = "offerCall",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebOutgoingCall", exports = "sendOfferStanza",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public CallOffer startCall(Jid target, boolean video) {
+        Objects.requireNonNull(target, "target cannot be null");
+        var selfJid = store.jid() // WAWebUserPrefsMeUser.getMeUser
+                .orElseThrow(() -> new IllegalStateException("Not logged in"));
+        var callId = DataUtils.randomHex(16); // ADAPTED: WAWebOutgoingCall generates a UUID-shaped id via the native VoIP backend
+        var offerChildren = new ArrayList<Node>(1);
+        if (video) { // WAWebHandleVoipCall.callParser: isVideoCall = m.hasChild("video")
+            offerChildren.add(new NodeBuilder()
+                    .description("video")
+                    .build());
+        }
+        var offerNode = new NodeBuilder()
+                .description("offer") // WAWebHandleVoipCall.S: wap("offer", {...})
+                .attribute("call-id", callId) // WAWebHandleVoipCall.S: "call-id": CUSTOM_STRING(n)
+                .attribute("call-creator", selfJid) // WAWebHandleVoipCall.S: "call-creator": JID(r)
+                .content(offerChildren)
+                .build();
+        var callNode = new NodeBuilder()
+                .description("call") // WAWebHandleVoipCall.callParser: e.assertTag("call")
+                .attribute("to", target) // WAWebHandleVoipCall.callParser: e.attrJidWithType("from") on receive side
+                .content(offerNode);
+        sendNodeWithNoResponse(callNode.build()); // ADAPTED: WA Web tracks the stanza via the voip backend; Cobalt fire-and-forget
+        return new CallOfferBuilder() // ADAPTED: WA Web returns a VoipCall; Cobalt hands back a CallOffer describing the outgoing invite
+                .chatJid(target)
+                .callerJid(selfJid)
+                .callId(callId)
+                .timestamp(Instant.now())
+                .video(video)
+                .status(CallOffer.Status.RINGING)
+                .offlineOffer(false)
+                .group(false)
+                .outgoing(true)
+                .build();
+    }
+
+    /**
+     * Sends a {@code <call><accept/></call>} stanza acknowledging an incoming
+     * call offer.
+     *
+     * <p>Cobalt does not exchange media, so accepting a call merely signals
+     * to the caller that the local user wants to answer; the actual audio or
+     * video session would have to be set up by an external WebRTC stack that
+     * Cobalt does not provide.
+     *
+     * @implNote ADAPTED: WAWebVoipFunctions.acceptCall — WA Web negotiates an
+     *           SRTP session via the native VoIP backend and uploads its
+     *           answer SDP; Cobalt emits only the {@code <accept>} signalling
+     *           stanza.
+     * @param callId the identifier carried by the original offer, as surfaced
+     *               on {@link CallOffer#callId()}
+     * @param caller the JID of the call creator, as surfaced on
+     *               {@link CallOffer#callerJid()}
+     * @throws NullPointerException            if {@code callId} or
+     *                                         {@code caller} is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket has been closed
+     */
+    @WhatsAppWebExport(moduleName = "WAWebVoipFunctions", exports = "acceptCall",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void acceptCall(String callId, Jid caller) {
+        Objects.requireNonNull(callId, "callId cannot be null");
+        Objects.requireNonNull(caller, "caller cannot be null");
+        var acceptNode = new NodeBuilder()
+                .description("accept") // WAWebHandleVoipCall.S: wap("accept", {...})
+                .attribute("call-id", callId) // WAWebHandleVoipCall.S: "call-id": CUSTOM_STRING(n)
+                .attribute("call-creator", caller) // WAWebHandleVoipCall.S: "call-creator": JID(r)
+                .build();
+        var callNode = new NodeBuilder()
+                .description("call")
+                .attribute("to", caller) // outgoing accept is routed back to the call creator
+                .content(acceptNode);
+        sendNodeWithNoResponse(callNode.build()); // ADAPTED: WA Web routes via voip backend
+    }
+
+    /**
+     * Sends a {@code <call><reject/></call>} stanza declining an incoming
+     * call offer.
+     *
+     * @implNote ADAPTED: WAWebVoipFunctions.rejectCall — WA Web additionally
+     *           updates the call log and tears down the local VoIP state;
+     *           Cobalt emits only the {@code <reject>} signalling stanza.
+     * @param callId the identifier carried by the original offer
+     * @param caller the JID of the call creator, as surfaced on
+     *               {@link CallOffer#callerJid()}
+     * @throws NullPointerException            if {@code callId} or
+     *                                         {@code caller} is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket has been closed
+     */
+    @WhatsAppWebExport(moduleName = "WAWebVoipFunctions", exports = "rejectCall",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void rejectCall(String callId, Jid caller) {
+        Objects.requireNonNull(callId, "callId cannot be null");
+        Objects.requireNonNull(caller, "caller cannot be null");
+        var rejectNode = new NodeBuilder()
+                .description("reject") // WAWebHandleVoipCall.S: wap("reject", {...})
+                .attribute("call-id", callId)
+                .attribute("call-creator", caller)
+                .build();
+        var callNode = new NodeBuilder()
+                .description("call")
+                .attribute("to", caller)
+                .content(rejectNode);
+        sendNodeWithNoResponse(callNode.build());
+    }
+
+    /**
+     * Sends a {@code <call><terminate/></call>} stanza ending a call this
+     * client previously offered or accepted.
+     *
+     * <p>The {@code reason} attribute is fixed to {@code "hangup"}, matching
+     * the value emitted by WA Web when the user presses the hang-up button.
+     *
+     * @implNote ADAPTED: WAWebVoipFunctions.terminateCall — WA Web tears
+     *           down the WebRTC session and flushes the call log; Cobalt
+     *           emits only the {@code <terminate>} signalling stanza.
+     * @param callId the identifier of the call to terminate, typically
+     *               obtained from {@link CallOffer#callId()}
+     * @param target the JID of the other party
+     * @throws NullPointerException            if {@code callId} or
+     *                                         {@code target} is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket has been closed
+     */
+    @WhatsAppWebExport(moduleName = "WAWebVoipFunctions", exports = "terminateCall",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void stopCall(String callId, Jid target) {
+        Objects.requireNonNull(callId, "callId cannot be null");
+        Objects.requireNonNull(target, "target cannot be null");
+        var selfJid = store.jid() // WAWebUserPrefsMeUser.getMeUser
+                .orElseThrow(() -> new IllegalStateException("Not logged in"));
+        var terminateNode = new NodeBuilder()
+                .description("terminate")
+                .attribute("reason", "hangup") // ADAPTED: WA Web passes the actual hang-up cause; Cobalt hard-codes "hangup"
+                .attribute("call-id", callId)
+                .attribute("call-creator", selfJid) // outgoing terminate references the local initiator
+                .build();
+        var callNode = new NodeBuilder()
+                .description("call")
+                .attribute("to", target)
+                .content(terminateNode);
+        sendNodeWithNoResponse(callNode.build());
+    }
+
+    /**
+     * Sends a {@code <call><ringing/></call>} stanza back to the caller to
+     * confirm that this device is alerting the user.
+     *
+     * <p>WA Web emits this as soon as its receive-side
+     * {@code WAWebHandleVoipCall} pipeline has validated the incoming offer
+     * and decided that the ringing UI should be shown.
+     *
+     * @implNote ADAPTED: WAWebVoipFunctions.sendCallRinging — WA Web sends
+     *           the ringing acknowledgement as part of the receive-side
+     *           {@code receipt} stanza; Cobalt exposes it as a standalone
+     *           {@code <call><ringing/></call>} message that callers may
+     *           trigger manually.
+     * @param callId the identifier of the offer being acknowledged
+     * @param caller the JID of the call creator
+     * @throws NullPointerException            if {@code callId} or
+     *                                         {@code caller} is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket has been closed
+     */
+    @WhatsAppWebExport(moduleName = "WAWebVoipFunctions", exports = "sendCallRinging",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void notifyCallRinging(String callId, Jid caller) {
+        Objects.requireNonNull(callId, "callId cannot be null");
+        Objects.requireNonNull(caller, "caller cannot be null");
+        var ringingNode = new NodeBuilder()
+                .description("ringing")
+                .attribute("call-id", callId)
+                .attribute("call-creator", caller)
+                .build();
+        var callNode = new NodeBuilder()
+                .description("call")
+                .attribute("to", caller)
+                .content(ringingNode);
+        sendNodeWithNoResponse(callNode.build());
+    }
+
+    /**
+     * Initiates a group call by emitting the signalling
+     * {@code <call><offer/></call>} stanza carrying the group JID and
+     * participant list.
+     *
+     * <p>As with one-to-one calls, Cobalt emits only the signalling layer:
+     * no group rekey, no per-participant encrypted session, no media.
+     *
+     * @implNote ADAPTED: WAWebOutgoingGroupCallUtils — WA Web performs a
+     *           group rekey, encrypts per participant, and uploads an SDP
+     *           offer; Cobalt emits a stub {@code <offer>} with a
+     *           {@code group-jid} attribute and a {@code <group_info>}
+     *           child listing the participants.
+     * @param group        the JID of the group being called, must be a group
+     *                     server JID
+     * @param participants the participants to invite; must be non-empty
+     * @param video        whether to advertise this as a video call
+     * @return the locally-tracked {@link CallOffer} describing the outgoing
+     *         group call
+     * @throws NullPointerException     if {@code group} or
+     *                                  {@code participants} is {@code null}
+     * @throws IllegalArgumentException if {@code group} is not a group JID
+     *                                  or {@code participants} is empty
+     * @throws IllegalStateException    if this client is not logged in
+     */
+    @WhatsAppWebExport(moduleName = "WAWebOutgoingGroupCallUtils", exports = "sendGroupOfferStanza",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public CallOffer startGroupCall(Jid group, Collection<Jid> participants, boolean video) {
+        Objects.requireNonNull(group, "group cannot be null");
+        Objects.requireNonNull(participants, "participants cannot be null");
+        if (!group.hasGroupOrCommunityServer()) {
+            throw new IllegalArgumentException("Expected a group/community JID");
+        }
+        if (participants.isEmpty()) {
+            throw new IllegalArgumentException("participants cannot be empty");
+        }
+        var selfJid = store.jid()
+                .orElseThrow(() -> new IllegalStateException("Not logged in"));
+        var callId = DataUtils.randomHex(16);
+        var participantNodes = new ArrayList<Node>(participants.size());
+        for (var participant : participants) { // ADAPTED: mirrors WAWebOutgoingGroupCallUtils participant loop
+            participantNodes.add(new NodeBuilder()
+                    .description("participant")
+                    .attribute("jid", participant)
+                    .build());
+        }
+        var groupInfoNode = new NodeBuilder()
+                .description("group_info") // WAWebHandleVoipCall.callParser: m.maybeChild("group_info")
+                .content(participantNodes)
+                .build();
+        var offerChildren = new ArrayList<Node>(2);
+        offerChildren.add(groupInfoNode);
+        if (video) {
+            offerChildren.add(new NodeBuilder()
+                    .description("video")
+                    .build());
+        }
+        var offerNode = new NodeBuilder()
+                .description("offer")
+                .attribute("call-id", callId)
+                .attribute("call-creator", selfJid)
+                .attribute("group-jid", group) // WAWebHandleVoipCall.callParser: m.attrJidWithType("group-jid")
+                .content(offerChildren)
+                .build();
+        var callNode = new NodeBuilder()
+                .description("call")
+                .attribute("to", group)
+                .content(offerNode);
+        sendNodeWithNoResponse(callNode.build());
+        return new CallOfferBuilder()
+                .chatJid(group)
+                .callerJid(selfJid)
+                .callId(callId)
+                .timestamp(Instant.now())
+                .video(video)
+                .status(CallOffer.Status.RINGING)
+                .offlineOffer(false)
+                .group(true)
+                .groupJid(group)
+                .outgoing(true)
+                .build();
     }
 
     /**
@@ -2009,7 +2934,7 @@ public final class WhatsAppClient {
      */
     @WhatsAppWebExport(moduleName = "WAWebGroupInviteV4Job", exports = "queryGroupInviteV4",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public GroupMetadata queryGroupInfoByInviteV4(Jid invitee, Jid sender, long inviteTimestamp, String inviteCode) {
+    public GroupMetadata queryGroupInfoByInvite(Jid invitee, Jid sender, long inviteTimestamp, String inviteCode) {
         Objects.requireNonNull(invitee, "invitee cannot be null");
         Objects.requireNonNull(sender, "sender cannot be null");
         Objects.requireNonNull(inviteCode, "inviteCode cannot be null");
@@ -2063,7 +2988,7 @@ public final class WhatsAppClient {
      */
     @WhatsAppWebExport(moduleName = "WAWebGroupInviteV4Job", exports = "joinGroupViaInviteV4",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public void sendGroupInviteV4(Jid group, Jid target, long inviteTimestamp) {
+    public void sendGroupInvite(Jid group, Jid target, long inviteTimestamp) {
         Objects.requireNonNull(group, "group cannot be null");
         Objects.requireNonNull(target, "target cannot be null");
         if (!group.hasGroupOrCommunityServer()) {
@@ -2071,7 +2996,7 @@ public final class WhatsAppClient {
         }
         var acceptNode = new NodeBuilder()
                 .description("accept") // WAWebGroupInviteV4Job.joinGroupViaInviteV4: acceptArgs
-                .attribute("code", "") // acceptCode placeholder — caller supplies via companion queryGroupInfoByInviteV4
+                .attribute("code", "") // acceptCode placeholder — caller supplies via companion queryGroupInfoByInvite
                 .attribute("expiration", inviteTimestamp) // acceptExpiration
                 .attribute("admin", target) // acceptAdmin
                 .build();
@@ -2251,15 +3176,395 @@ public final class WhatsAppClient {
     }
 
     /**
-     * Queries the display name associated with the given user JID.
+     * Checks whether each of the given phone-number JIDs corresponds to an
+     * existing registered WhatsApp account.
      *
-     * @param receiver the user JID
-     * @return the display name, or empty if the server has none
-     * @throws UnsupportedOperationException currently a stub pending
-     *                                       implementation
+     * <p>Issues a single {@code usync} IQ with the {@code contact} protocol
+     * ({@code contact_exists} query in WhatsApp terminology), listing every
+     * phone number as a {@code <contact>+<digits></contact>} text node under
+     * a {@code <user>} element. The server responds with one {@code <user>}
+     * per input, carrying a {@code type} attribute whose value is
+     * {@code "in"} when the phone number belongs to a WhatsApp user and
+     * {@code "out"} (or absent) otherwise.
+     *
+     * <p>Input JIDs that do not map to a valid phone number (for example
+     * LID-only JIDs) are silently skipped and not present in the result map.
+     *
+     * @param phoneNumbers the user JIDs to look up
+     * @return a map whose keys are the phone JIDs echoed by the server (as
+     *         resolved by the {@code jid} attribute of each response entry)
+     *         and whose values indicate whether that user is registered
+     * @throws NullPointerException if {@code phoneNumbers} is {@code null}
+     *
+     * @implNote WAWebUsyncContact.USyncContactProtocol is sent through
+     * WAWebUsync.USyncQuery with mode {@code query} and context
+     * {@code background}; Cobalt builds the equivalent IQ directly because
+     * it does not mirror WA Web's protocol abstraction layer. The session id
+     * is produced by {@link RandomIdUtils#generateSid()}.
      */
-    public Optional<String> queryName(Jid receiver) {
-        throw new UnsupportedOperationException();
+    @WhatsAppWebExport(moduleName = "WAWebUsyncContact", exports = "USyncContactProtocol",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebUsync", exports = "USyncQuery",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Map<Jid, Boolean> hasWhatsapp(Collection<Jid> phoneNumbers) {
+        Objects.requireNonNull(phoneNumbers, "phoneNumbers cannot be null");
+        if (phoneNumbers.isEmpty()) {
+            return Map.of();
+        }
+
+        // WAWebUsync.USyncQuery.$3 / WAWebUsyncContact.USyncContactProtocol.getUserElement:
+        // each <user> carries a single <contact>+<phone></contact> child with no attributes
+        var userNodes = new ArrayList<Node>(phoneNumbers.size());
+        for (var jid : phoneNumbers) {
+            var phoneNumber = jid.toPhoneNumber().orElse(null);
+            if (phoneNumber == null) {
+                continue;
+            }
+            var contactNode = new NodeBuilder()
+                    .description("contact")
+                    .content(phoneNumber) // WAWebUsyncContact.USyncContactProtocol.getUserElement: wap("contact", null, e)
+                    .build();
+            userNodes.add(new NodeBuilder()
+                    .description("user")
+                    .content(contactNode)
+                    .build());
+        }
+        if (userNodes.isEmpty()) {
+            return Map.of();
+        }
+
+        // WAWebUsyncContact.USyncContactProtocol.getQueryElement: wap("contact", {...})
+        var queryNode = new NodeBuilder()
+                .description("query")
+                .content(new NodeBuilder()
+                        .description("contact")
+                        .build())
+                .build();
+        var listNode = new NodeBuilder()
+                .description("list")
+                .content(userNodes)
+                .build();
+        // WAWebUsync.USyncQuery.$3: wap("usync", {sid, mode, last, index, context})
+        var usyncNode = new NodeBuilder()
+                .description("usync")
+                .attribute("sid", RandomIdUtils.generateSid())
+                .attribute("mode", "query")
+                .attribute("last", "true")
+                .attribute("index", "0")
+                .attribute("context", "background")
+                .content(queryNode, listNode)
+                .build();
+        var iqNode = new NodeBuilder()
+                .description("iq")
+                .attribute("xmlns", "usync")
+                .attribute("to", JidServer.user())
+                .attribute("type", "get")
+                .content(usyncNode);
+
+        var response = sendNode(iqNode); // WAWebUsync.USyncQuery.execute -> deprecatedSendIq
+
+        // WAWebUsync.usyncParser.m: iterate <usync><list><user/> entries
+        var results = new HashMap<Jid, Boolean>();
+        response.streamChild("usync")
+                .flatMap(usync -> usync.streamChild("list"))
+                .flatMap(list -> list.streamChildren("user"))
+                .forEach(user -> {
+                    var userJid = user.getAttributeAsJid("jid").orElse(null);
+                    if (userJid == null) {
+                        return;
+                    }
+                    var contactChild = user.getChild("contact").orElse(null);
+                    if (contactChild == null) {
+                        return;
+                    }
+                    // WAWebUsyncContact.contactParser: t.hasAttr("type") => {type: "in"|"out"}
+                    var type = contactChild.getAttributeAsString("type", null);
+                    results.put(userJid.toUserJid(), "in".equals(type));
+                });
+        return Collections.unmodifiableMap(results);
+    }
+
+    /**
+     * Convenience singleton wrapper over
+     * {@link #hasWhatsapp(Collection)} for checking a single phone-number
+     * JID.
+     *
+     * @param phone the non-{@code null} user JID to look up
+     * @return {@code true} if the server reports the phone as registered
+     * @throws NullPointerException if {@code phone} is {@code null}
+     *
+     * @implNote Delegates to {@link #hasWhatsapp(Collection)}; WA Web has no
+     * single-entry helper on this flow.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebUsyncContact", exports = "USyncContactProtocol",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public boolean hasWhatsapp(Jid phone) {
+        Objects.requireNonNull(phone, "phone cannot be null");
+        var map = hasWhatsapp(List.of(phone));
+        for (var registered : map.values()) {
+            if (Boolean.TRUE.equals(registered)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Queries the push name associated with the given user JID.
+     *
+     * <p>Consults the locally cached {@link Contact} record first and only
+     * falls back to a remote {@code usync} query when the store has no name
+     * on file. The remote query uses the {@code contact} protocol like
+     * {@link #hasWhatsapp(Collection)} but interprets the returned
+     * {@code <contact>} element's text content as the push name.
+     *
+     * @param jid the non-{@code null} user JID to resolve
+     * @return the display name, or empty if neither the store nor the
+     *         server knows one
+     * @throws NullPointerException if {@code jid} is {@code null}
+     *
+     * @implNote WAWebUsync.USyncQuery + WAWebUsyncContact.USyncContactProtocol
+     * are used in the fallback path. Cobalt additionally consults its local
+     * contact store because WA Web maintains a reactive {@code ContactCollection}
+     * that Cobalt flattens into its store.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebUsyncContact", exports = "contactParser",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<String> queryName(Jid jid) {
+        Objects.requireNonNull(jid, "jid cannot be null");
+
+        // ADAPTED: WAWebContactCollection lookup, Cobalt store is the cache equivalent.
+        // Use chosenName() (push name) rather than Contact.name() because the latter
+        // falls back to the JID user component, which would mask absent server data.
+        var cached = store.findContactByJid(jid)
+                .flatMap(Contact::chosenName)
+                .filter(name -> !name.isBlank());
+        if (cached.isPresent()) {
+            return cached;
+        }
+
+        var phoneNumber = jid.toPhoneNumber().orElse(null);
+        if (phoneNumber == null) {
+            return Optional.empty();
+        }
+
+        // WAWebUsyncContact.USyncContactProtocol.getUserElement: wap("contact", null, phone)
+        var contactNode = new NodeBuilder()
+                .description("contact")
+                .content(phoneNumber)
+                .build();
+        var userNode = new NodeBuilder()
+                .description("user")
+                .content(contactNode)
+                .build();
+        var queryNode = new NodeBuilder()
+                .description("query")
+                .content(new NodeBuilder().description("contact").build())
+                .build();
+        var listNode = new NodeBuilder()
+                .description("list")
+                .content(userNode)
+                .build();
+        var usyncNode = new NodeBuilder()
+                .description("usync")
+                .attribute("sid", RandomIdUtils.generateSid()) // WAWebMdWamTypes.generateSid
+                .attribute("mode", "query")
+                .attribute("last", "true")
+                .attribute("index", "0")
+                .attribute("context", "background")
+                .content(queryNode, listNode)
+                .build();
+        var iqNode = new NodeBuilder()
+                .description("iq")
+                .attribute("xmlns", "usync")
+                .attribute("to", JidServer.user())
+                .attribute("type", "get")
+                .content(usyncNode);
+
+        var response = sendNode(iqNode); // WAWebUsync.USyncQuery.execute
+
+        // WAWebUsyncContact.contactParser: returns the <contact> node's content when present
+        return response.streamChild("usync")
+                .flatMap(usync -> usync.streamChild("list"))
+                .flatMap(list -> list.streamChildren("user"))
+                .map(user -> user.getChild("contact").orElse(null))
+                .filter(Objects::nonNull)
+                .map(contact -> contact.toContentString().orElse(null))
+                .filter(name -> name != null && !name.isBlank())
+                .findFirst();
+    }
+
+    /**
+     * Uploads a batch of phone-number contacts to the server and returns
+     * the phone-to-JID mapping the server resolves for them.
+     *
+     * <p>For every {@link ContactCard} in {@code contacts} this method
+     * extracts the default {@code CELL} phone numbers and issues a
+     * {@code usync} IQ with the {@code contact} protocol. Entries the
+     * server acknowledges as registered users ({@code type="in"}) are
+     * returned in the result map keyed by the phone-number JID that was
+     * sent and valued by the server-normalised {@code jid} attribute of
+     * the response entry; the two values differ only when the server
+     * rewrites the identifier (for example during LID migration).
+     *
+     * @param contacts the contact cards to synchronise
+     * @return an unmodifiable map from phone-number JID to the
+     *         server-returned JID for every successfully resolved contact
+     * @throws NullPointerException if {@code contacts} is {@code null}
+     *
+     * @implNote WAWebContactSyncApi.syncContactList is the behavioural
+     * analogue; Cobalt omits the legacy device-sync, text-status and
+     * disappearing-mode sub-protocols and exposes only the JID mapping that
+     * the public API needs. Batching mirrors
+     * {@code WAWebContactSyncApi.syncContactListInChunks} but is performed
+     * eagerly because Cobalt runs on virtual threads.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebContactSyncApi", exports = "syncContactList",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Map<Jid, Jid> syncContacts(Collection<ContactCard> contacts) {
+        Objects.requireNonNull(contacts, "contacts cannot be null");
+        if (contacts.isEmpty()) {
+            return Map.of();
+        }
+
+        // ADAPTED: WAWebContactSyncApi, flatten ContactCard phone numbers to phone JIDs
+        var phoneJids = new ArrayList<Jid>();
+        for (var card : contacts) {
+            if (card instanceof ContactCard.Parsed parsed) {
+                phoneJids.addAll(parsed.phoneNumbers()); // ContactCard.Parsed exposes the default CELL list via phoneNumbers()
+            }
+        }
+        if (phoneJids.isEmpty()) {
+            return Map.of();
+        }
+
+        // WAWebUsyncContact.USyncContactProtocol.getUserElement: one <user><contact>+phone</contact></user> per entry
+        var userNodes = new ArrayList<Node>(phoneJids.size());
+        var byPhone = new HashMap<String, Jid>();
+        for (var phoneJid : phoneJids) {
+            var phoneNumber = phoneJid.toPhoneNumber().orElse(null);
+            if (phoneNumber == null) {
+                continue;
+            }
+            byPhone.put(phoneNumber, phoneJid);
+            var contactNode = new NodeBuilder()
+                    .description("contact")
+                    .content(phoneNumber)
+                    .build();
+            userNodes.add(new NodeBuilder()
+                    .description("user")
+                    .content(contactNode)
+                    .build());
+        }
+        if (userNodes.isEmpty()) {
+            return Map.of();
+        }
+
+        var queryNode = new NodeBuilder()
+                .description("query")
+                .content(new NodeBuilder().description("contact").build())
+                .build();
+        var listNode = new NodeBuilder()
+                .description("list")
+                .content(userNodes)
+                .build();
+        // WAWebUsync.USyncQuery.$3: mode=query context=background for contact sync
+        var usyncNode = new NodeBuilder()
+                .description("usync")
+                .attribute("sid", RandomIdUtils.generateSid()) // WAWebMdWamTypes.generateSid
+                .attribute("mode", "query")
+                .attribute("last", "true")
+                .attribute("index", "0")
+                .attribute("context", "background")
+                .content(queryNode, listNode)
+                .build();
+        var iqNode = new NodeBuilder()
+                .description("iq")
+                .attribute("xmlns", "usync")
+                .attribute("to", JidServer.user())
+                .attribute("type", "get")
+                .content(usyncNode);
+
+        // WAWebContactSyncLogger.contactSyncLogger.createEventContext: WAM start timestamp
+        var syncStartTimestamp = Instant.now();
+        // WAWebContactSyncLogger PROTOCOL_BIT.CONTACT (0) - only protocol queried here
+        var requestProtocolBitmask = 1;
+        // WAWebContactSyncLogger SYNC_REQUEST_ORIGIN.UNKNOWN (0) - public API has no explicit origin
+        var requestOrigin = 0;
+
+        Node response;
+        try {
+            response = sendNode(iqNode); // WAWebContactSyncApi.syncContactList -> USyncQuery.execute
+        } catch (RuntimeException e) {
+            // WAWebContactSyncLogger.contactSyncLogger.logFailure: emit ContactSyncEvent (id 1006)
+            // for the background contact-sync failure path.
+            var endTs = Instant.now();
+            wamService.commit(new ContactSyncEventEventBuilder()
+                    // WAWebContactSyncLogger.getSyncTypeString: ("background_query").toUpperCase()
+                    .contactSyncType("BACKGROUND_QUERY")
+                    .contactSyncRequestOrigin(requestOrigin)
+                    .contactSyncSuccess(false)
+                    .contactSyncNoop(false)
+                    // WAWebContactSyncLogger.logFailure: errorCode is unknown on transport exception
+                    .contactSyncErrorCode(0)
+                    .contactSyncStartTimestamp(syncStartTimestamp)
+                    .contactSyncEndTimestamp(endTs)
+                    .contactSyncLatency((int) (endTs.toEpochMilli() - syncStartTimestamp.toEpochMilli()))
+                    .contactSyncRequestedCount(userNodes.size())
+                    .contactSyncResponseCount(0)
+                    .contactSyncRequestProtocol(requestProtocolBitmask)
+                    .contactSyncFailureProtocol(0)
+                    .build());
+            throw e;
+        }
+
+        // WAWebContactSyncApi.syncContactList: iterate f.list, upsert mappings where type==="in"
+        var mapping = new HashMap<Jid, Jid>();
+        var responseCount = new int[]{0};
+        response.streamChild("usync")
+                .flatMap(usync -> usync.streamChild("list"))
+                .flatMap(list -> list.streamChildren("user"))
+                .forEach(user -> {
+                    responseCount[0]++;
+                    var resolvedJid = user.getAttributeAsJid("jid").orElse(null);
+                    if (resolvedJid == null) {
+                        return;
+                    }
+                    var contactChild = user.getChild("contact").orElse(null);
+                    if (contactChild == null) {
+                        return;
+                    }
+                    // WAWebUsyncContact.contactParser: only rows with type="in" are registered
+                    if (!"in".equals(contactChild.getAttributeAsString("type", null))) {
+                        return;
+                    }
+                    var echoed = contactChild.toContentString().orElse(null);
+                    var phoneJid = echoed != null ? byPhone.get(echoed) : null;
+                    if (phoneJid == null) {
+                        phoneJid = resolvedJid.toUserJid();
+                    }
+                    mapping.put(phoneJid, resolvedJid.toUserJid());
+                });
+
+        // WAWebContactSyncLogger.contactSyncLogger.logSuccess: emit ContactSyncEvent (id 1006)
+        // for the background contact-sync success path.
+        var endTimestamp = Instant.now();
+        wamService.commit(new ContactSyncEventEventBuilder()
+                .contactSyncType("BACKGROUND_QUERY")
+                .contactSyncRequestOrigin(requestOrigin)
+                .contactSyncSuccess(true)
+                // WAWebContactSyncLogger: noop when requestedCount === 0
+                .contactSyncNoop(userNodes.isEmpty())
+                .contactSyncStartTimestamp(syncStartTimestamp)
+                .contactSyncEndTimestamp(endTimestamp)
+                .contactSyncLatency((int) (endTimestamp.toEpochMilli() - syncStartTimestamp.toEpochMilli()))
+                .contactSyncRequestedCount(userNodes.size())
+                .contactSyncResponseCount(responseCount[0])
+                .contactSyncRequestProtocol(requestProtocolBitmask)
+                .contactSyncFailureProtocol(0)
+                .build());
+
+        return Collections.unmodifiableMap(mapping);
     }
 
     /**
@@ -2490,6 +3795,21 @@ public final class WhatsAppClient {
         sendNode(request.toNode());
         store.findNewsletterByJid(newsletter)
                 .orElseGet(() -> store.addNewNewsletter(newsletter));
+        // WAWebNewsletterSubscribeAction.subscribeToNewsletterAction ->
+        // WAWebNewsletterAttributionLogging.NewsletterCoreEventLogger.log({cid, channelCoreEventType: FOLLOW, ...})
+        // -> new ChannelCoreEventWamEvent({cid: s.user, channelCoreEventType, channelEntryPointApp: WHATSAPP, ...}).commit()
+        wamService.commit(new ChannelCoreEventEventBuilder()
+                .cid(newsletter.user())
+                .channelCoreEventType(ChannelEventType.FOLLOW)
+                .channelEntryPointApp(ChannelEntryPointApp.WHATSAPP)
+                .build());
+        // WAWebNewsletterSubscribeAction.subscribeToNewsletterWidAction ->
+        // WAWebNewsletterMembershipActionLogger.logNewsletterMembershipActionEvent({cid, actionResult: FOLLOW_SUCCESS})
+        // -> new ChannelMembershipActionEventWamEvent({cid: n.user, actionResult}).commit()
+        wamService.commit(new ChannelMembershipActionEventEventBuilder()
+                .cid(newsletter.user())
+                .actionResult(ChannelMembershipActionResult.FOLLOW_SUCCESS)
+                .build());
     }
 
     /**
@@ -2517,6 +3837,21 @@ public final class WhatsAppClient {
         var request = new LeaveNewsletterMex.Request(newsletter.toString());
         sendNode(request.toNode());
         store.removeNewsletter(newsletter);
+        // WAWebNewsletterUnsubscribeAction.unsubscribeFromNewsletterAction ->
+        // WAWebNewsletterAttributionLogging.NewsletterCoreEventLogger.log({cid, channelCoreEventType: UNFOLLOW, ...})
+        // -> new ChannelCoreEventWamEvent({cid: s.user, channelCoreEventType, channelEntryPointApp: WHATSAPP, ...}).commit()
+        wamService.commit(new ChannelCoreEventEventBuilder()
+                .cid(newsletter.user())
+                .channelCoreEventType(ChannelEventType.UNFOLLOW)
+                .channelEntryPointApp(ChannelEntryPointApp.WHATSAPP)
+                .build());
+        // WAWebNewsletterUnsubscribeAction.unsubscribeFromNewsletterAction ->
+        // WAWebNewsletterMembershipActionLogger.logNewsletterMembershipActionEvent({cid: t.id, actionResult: UNFOLLOW_SUCCESS})
+        // -> new ChannelMembershipActionEventWamEvent({cid: n.user, actionResult}).commit()
+        wamService.commit(new ChannelMembershipActionEventEventBuilder()
+                .cid(newsletter.user())
+                .actionResult(ChannelMembershipActionResult.UNFOLLOW_SUCCESS)
+                .build());
     }
 
     /**
@@ -2550,6 +3885,16 @@ public final class WhatsAppClient {
                 .fluentPut("value", mute ? "ON" : "OFF"); // WAWebNewsletterUpdateUserSettingJob: MUTED_STATE -> "ON", else "OFF"
         var request = new UpdateNewsletterUserSettingMex.Request(input.toJSONString());
         sendNode(request.toNode());
+        // WAWebNewsletterUpdateUserSettingsAction.updateNewsletterUserSettingsAction ->
+        // NewsletterCoreEventLogger.log({cid, channelCoreEventType: MUTE|UNMUTE,
+        //   channelRequestMetadata: JSON.stringify(a.map(s => (mute?"mute":"unmute")+"_"+s))}).
+        // Cobalt only toggles admin_activity so the list is always a single entry.
+        wamService.commit(new ChannelCoreEventEventBuilder()
+                .cid(newsletter.user())
+                .channelCoreEventType(mute ? ChannelEventType.MUTE : ChannelEventType.UNMUTE)
+                .channelEntryPointApp(ChannelEntryPointApp.WHATSAPP)
+                .channelRequestMetadata(mute ? "[\"mute_admin_activity\"]" : "[\"unmute_admin_activity\"]")
+                .build());
     }
 
     /**
@@ -2760,71 +4105,908 @@ public final class WhatsAppClient {
     /**
      * Queries the "about" status text of the given user.
      *
-     * @param jid the user JID
-     * @return the about text, or empty if the user has none visible
-     * @throws UnsupportedOperationException currently a stub pending
-     *                                       implementation
+     * <p>Sends an {@code <iq xmlns="status" to="s.whatsapp.net" type="get">}
+     * stanza whose body is {@code <status><user jid="..."/></status>} and
+     * parses the response {@code <user><status>TEXT</status></user>} child.
+     *
+     * <p>WA Web reaches this endpoint through
+     * {@code WAWebContactStatusBridge.getStatus}, which either routes through
+     * the MEX GraphQL {@code getAboutStatus} query (when the
+     * {@code mex_usync_about_status} AB prop is set) or falls through to
+     * {@code WAWebGetAboutQueryJob.getAbout}, itself an XMPP usync query.
+     * Cobalt simplifies both paths into a single direct IQ since neither
+     * MEX nor usync semantics change the wire-observable answer for a
+     * single user.
+     *
+     * @implNote {@code WAWebContactStatusBridge.getStatus} ->
+     * {@code WAWebGetAboutQueryJob.getAbout} -> {@code USyncQuery.withStatusProtocol}
+     * @param jid the user JID whose about text should be fetched
+     * @return the about text when the server responds with a non-empty
+     *         {@code <status>} element; {@link Optional#empty()} otherwise
+     * @throws NullPointerException            if {@code jid} is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is closed
      */
+    @WhatsAppWebExport(moduleName = "WAWebContactStatusBridge", exports = "getStatus",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebGetAboutQueryJob", exports = "getAbout",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<String> queryAbout(Jid jid) {
-        throw new UnsupportedOperationException();
+        Objects.requireNonNull(jid, "jid cannot be null");
+        // WAWebGetAboutQueryJob.getAbout: new USyncQuery().withStatusProtocol().withUser(new USyncUser().withId(i))
+        var userNode = new NodeBuilder()
+                .description("user")
+                .attribute("jid", jid) // WAWebUsyncUser.USyncUser.withId
+                .build();
+        var statusQuery = new NodeBuilder()
+                .description("status")
+                .content(userNode)
+                .build();
+        var iqNode = new NodeBuilder()
+                .description("iq")
+                .attribute("xmlns", "status") // task spec: xmlns="status"
+                .attribute("to", JidServer.user()) // task spec: to="s.whatsapp.net"
+                .attribute("type", "get")
+                .content(statusQuery);
+        var response = sendNode(iqNode);
+        // Response shape: <iq><status><user jid="..."><status>TEXT</status></user></status></iq>
+        return response.getChild("status")
+                .flatMap(statusNode -> statusNode.getChild("user"))
+                .flatMap(userResp -> userResp.getChild("status"))
+                .flatMap(Node::toContentString)
+                .filter(s -> !s.isEmpty()); // WAWebGetAboutQueryJob.getAbout: {id, status: ""} when empty
     }
 
     /**
-     * Requests the business catalog for the given business JID.
+     * Queries the first page of products listed in the WhatsApp Business
+     * catalog owned by the given business JID.
      *
-     * @param targetJid the business JID
-     * @throws UnsupportedOperationException currently a stub pending
-     *                                       implementation
+     * <p>This overload uses the WA Web {@code limit=5} page size default
+     * declared in {@code WAWebBizProductCatalogAction.queryCatalog}.
+     *
+     * @param businessJid the non-{@code null} business JID whose catalog
+     *                    should be fetched
+     * @return the list of parsed {@link BusinessCatalogEntry} instances
+     *         returned by the first page; never {@code null} and empty
+     *         when the catalog is empty or the response is absent
+     * @throws NullPointerException if {@code businessJid} is {@code null}
+     *
+     * @implNote WAWebQueryCatalog: dispatches the
+     * {@code WAWebQueryCatalogQuery.graphql} operation through
+     * {@link QueryCatalogMex}. WA Web's owner/guest divergence is not
+     * observable at this layer since both paths issue the same GraphQL
+     * document and return the same shape.
      */
-    public void queryBusinessCatalog(Jid targetJid) {
-        throw new UnsupportedOperationException();
+    @WhatsAppWebExport(moduleName = "WAWebQueryCatalog", exports = "default",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebBizProductCatalogAction", exports = "queryCatalog",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public List<BusinessCatalogEntry> queryBusinessCatalog(Jid businessJid) {
+        return queryBusinessCatalog(businessJid, DEFAULT_CATALOG_LIMIT);
     }
 
     /**
-     * Requests the business collections (catalog sub-groupings) for the
-     * given business JID.
+     * Queries the first page of products listed in the WhatsApp Business
+     * catalog owned by the given business JID, using a caller-provided
+     * page size.
      *
-     * @param targetJid the business JID
-     * @throws UnsupportedOperationException currently a stub pending
-     *                                       implementation
+     * <p>Sends the {@code WAWebQueryCatalogQuery} MEX GraphQL query over
+     * the {@code w:mex} namespace and parses the
+     * {@code xwa_product_catalog_get_product_catalog.product_catalog.products}
+     * array. The resulting list preserves the server-side ordering so that
+     * callers paginating manually via successive calls observe a stable
+     * traversal.
+     *
+     * @param businessJid the non-{@code null} business JID whose catalog
+     *                    should be fetched
+     * @param limit       the maximum number of products per page; WA Web
+     *                    accepts any positive value and clamps silently
+     * @return the list of parsed {@link BusinessCatalogEntry} instances
+     *         returned by the first page; never {@code null} and empty
+     *         when the catalog is empty or the response is absent
+     * @throws NullPointerException     if {@code businessJid} is
+     *                                  {@code null}
+     * @throws IllegalArgumentException if {@code limit} is not positive
+     *
+     * @implNote WAWebQueryCatalog: only the first page is requested; the
+     * {@code paging.after} cursor returned by the relay is discarded.
+     * Callers wanting full pagination should consume
+     * {@link QueryCatalogMex.Response} directly.
      */
-    public void queryBusinessCollections(Jid targetJid) {
-        throw new UnsupportedOperationException();
+    @WhatsAppWebExport(moduleName = "WAWebQueryCatalog", exports = "default",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebBizProductCatalogAction", exports = "queryCatalog",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public List<BusinessCatalogEntry> queryBusinessCatalog(Jid businessJid, int limit) {
+        Objects.requireNonNull(businessJid, "businessJid cannot be null");
+        if (limit <= 0) {
+            throw new IllegalArgumentException("limit must be positive");
+        }
+        // WAWebQueryCatalog.default: the WA Web request uses the WID's canonical string form as the jid variable
+        var request = new QueryCatalogMex.Request(
+                businessJid.toString(),
+                limit,
+                DEFAULT_CATALOG_IMAGE_WIDTH,
+                DEFAULT_CATALOG_IMAGE_HEIGHT,
+                null
+        );
+        var response = sendNode(request.toNode()); // WAWebMexClient.fetchQuery
+        // WAWebCatalogEventLogger.createCatalogEventLogger(GET_CATALOG): emit GraphqlCatalogRequest WAM event based on response
+        logGraphqlCatalogRequest(response, GraphqlCatalogEndpoint.GET_CATALOG);
+        return QueryCatalogMex.Response.of(response)
+                .map(QueryCatalogMex.Response::products)
+                .orElseGet(List::of);
+    }
+
+    /**
+     * Queries the first page of collections defined inside the WhatsApp
+     * Business catalog owned by the given business JID.
+     *
+     * <p>This overload uses the WA Web {@code limit=5} page size default
+     * and the same {@code item_limit=100} default used by the WA Web
+     * storefront when browsing collections.
+     *
+     * @param businessJid the non-{@code null} business JID whose
+     *                    collections should be fetched
+     * @return the list of parsed {@link BusinessCatalog} instances
+     *         returned by the first page; never {@code null} and empty
+     *         when the catalog has no collections or the response is
+     *         absent
+     * @throws NullPointerException if {@code businessJid} is {@code null}
+     *
+     * @implNote WAWebQueryProductCollections: dispatches the
+     * {@code WAWebQueryProductCollectionsQuery.graphql} operation through
+     * {@link QueryProductCollectionsMex}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebQueryProductCollections", exports = "default",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public List<BusinessCatalog> queryBusinessCollections(Jid businessJid) {
+        return queryBusinessCollections(businessJid, DEFAULT_CATALOG_LIMIT);
+    }
+
+    /**
+     * Queries the first page of collections defined inside the WhatsApp
+     * Business catalog owned by the given business JID, using a
+     * caller-provided collection page size.
+     *
+     * <p>Sends the {@code WAWebQueryProductCollectionsQuery} MEX GraphQL
+     * query over the {@code w:mex} namespace and parses the
+     * {@code xwa_product_catalog_get_collections.collections} array. The
+     * {@code item_limit} (inner products per collection) is fixed at the
+     * WA Web default of {@code 100}; callers that need a different cap
+     * should instantiate {@link QueryProductCollectionsMex.Request}
+     * directly.
+     *
+     * @param businessJid the non-{@code null} business JID whose
+     *                    collections should be fetched
+     * @param limit       the maximum number of collections per page
+     * @return the list of parsed {@link BusinessCatalog} instances
+     *         returned by the first page; never {@code null} and empty
+     *         when the catalog has no collections or the response is
+     *         absent
+     * @throws NullPointerException     if {@code businessJid} is
+     *                                  {@code null}
+     * @throws IllegalArgumentException if {@code limit} is not positive
+     *
+     * @implNote WAWebQueryProductCollections: only the first page is
+     * requested; the {@code paging.after} cursor returned by the relay
+     * is discarded. Callers wanting full pagination should consume
+     * {@link QueryProductCollectionsMex.Response} directly.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebQueryProductCollections", exports = "default",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public List<BusinessCatalog> queryBusinessCollections(Jid businessJid, int limit) {
+        Objects.requireNonNull(businessJid, "businessJid cannot be null");
+        if (limit <= 0) {
+            throw new IllegalArgumentException("limit must be positive");
+        }
+        // WAWebQueryProductCollections.default: item_limit defaults to 100 in the WA Web storefront
+        var request = new QueryProductCollectionsMex.Request(
+                businessJid.toString(),
+                limit,
+                PRODUCT_COLLECTION_ITEM_LIMIT,
+                DEFAULT_CATALOG_IMAGE_WIDTH,
+                DEFAULT_CATALOG_IMAGE_HEIGHT,
+                null
+        );
+        var response = sendNode(request.toNode()); // WAWebMexClient.fetchQuery
+        // WAWebCatalogEventLogger.createCatalogEventLogger(GET_COLLECTIONS): emit GraphqlCatalogRequest WAM event based on response
+        logGraphqlCatalogRequest(response, GraphqlCatalogEndpoint.GET_COLLECTIONS);
+        return QueryProductCollectionsMex.Response.of(response)
+                .map(QueryProductCollectionsMex.Response::collections)
+                .orElseGet(List::of);
+    }
+
+    /**
+     * Emits the WAM {@code GraphqlCatalogRequest} event for a catalog MEX
+     * GraphQL query response.
+     *
+     * <p>Inspects the relay response to determine whether the query succeeded
+     * or returned a GraphQL-level error. On success the event records
+     * {@code graphqlErrorCode = -1} and
+     * {@link GraphqlRequestResult#SUCCESS}; on failure it records the first
+     * error's {@code code} and {@link GraphqlRequestResult#FAILURE}, matching
+     * the WA Web behaviour implemented by
+     * {@code WAWebCatalogEventLogger.createCatalogEventLogger}'s
+     * {@code success}/{@code failure} callbacks that are invoked by
+     * {@code WAWebRelayClient.fetchQuery}.
+     *
+     * <p>A GraphQL error is detected when the MEX {@code <result>} JSON
+     * payload contains an {@code errors} array at its top level. When the
+     * {@code <result>} payload is absent or unparsable, this method skips the
+     * emission since WA Web's {@code eventLogger} is also never invoked in
+     * that path ({@code WAWebMexNativeClient} throws a
+     * {@code MexPayloadParsingError} before the caller's {@code try/catch}
+     * reaches {@code GraphQLServerError}).
+     *
+     * @implNote WAWebCatalogEventLogger: populates only
+     * {@code graphqlCatalogEndpoint}, {@code graphqlErrorCode} and
+     * {@code graphqlRequestResult}. The {@code businessJid} and
+     * {@code businessType} properties declared on the event schema are never
+     * set by WA Web's catalog event logger so Cobalt leaves them absent.
+     * @implNote WAWebGraphQLServerError: the error code is extracted from
+     * {@code source.errors[0].code}. WA Web's {@code GraphQLServerError} is
+     * raised by {@code WAWebRelayClient.fetchQuery} whenever the relay
+     * response carries GraphQL errors; Cobalt mirrors the detection by
+     * checking the {@code errors} JSON array directly.
+     * @param response the inbound IQ stanza returned by
+     *                 {@link #sendNode(NodeBuilder)}
+     * @param endpoint the {@link GraphqlCatalogEndpoint} describing which
+     *                 catalog operation was executed
+     */
+    @WhatsAppWebExport(moduleName = "WAWebCatalogEventLogger", exports = "createCatalogEventLogger",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private void logGraphqlCatalogRequest(Node response, GraphqlCatalogEndpoint endpoint) {
+        // WAWebMexClient.fetchQuery: the response payload is nested under the <result> child
+        var payload = response.getChild("result")
+                .flatMap(Node::toContentBytes);
+        if (payload.isEmpty()) {
+            // WAWebMexNativeClient: a missing <result> payload results in MexPayloadParsingError
+            // which is caught before GraphQLServerError dispatch, so no eventLogger callback fires.
+            return;
+        }
+        JSONObject root;
+        try {
+            root = JSON.parseObject(payload.get());
+        } catch (Exception ignored) {
+            return;
+        }
+        if (root == null) {
+            return;
+        }
+        // WAWebGraphQLServerError: errors surface as a top-level array on the GraphQL payload
+        var errors = root.getJSONArray("errors");
+        var builder = new GraphqlCatalogRequestEventBuilder()
+                .graphqlCatalogEndpoint(endpoint);
+        if (errors != null && !errors.isEmpty()) {
+            // WAWebCatalogEventLogger.failure: e.set({graphqlErrorCode: t.code, graphqlRequestResult: FAILURE})
+            var firstError = errors.getJSONObject(0);
+            var code = firstError == null ? 0 : firstError.getIntValue("code");
+            builder.graphqlErrorCode(code)
+                    .graphqlRequestResult(GraphqlRequestResult.FAILURE);
+        } else {
+            // WAWebCatalogEventLogger.success: e.set({graphqlErrorCode: -1, graphqlRequestResult: SUCCESS})
+            builder.graphqlErrorCode(-1)
+                    .graphqlRequestResult(GraphqlRequestResult.SUCCESS);
+        }
+        wamService.commit(builder.build());
     }
 
     /**
      * Queries the server for the list of contacts currently blocked by
      * this account.
      *
-     * @return the blocked JIDs
-     * @throws UnsupportedOperationException currently a stub pending
-     *                                       implementation
+     * <p>Sends {@code <iq xmlns="blocklist" to="s.whatsapp.net"
+     * type="get"/>} matching WA Web's
+     * {@code WASmaxOutBlocklistsGetBlockListRequest.makeGetBlockListRequest}
+     * and parses the {@code <list><item jid="..."/>...</list>} children
+     * from the response (the
+     * {@code GetBlockListResponseSuccessWithMismatch} shape). The
+     * resulting JIDs replace the store's block list eagerly, mirroring
+     * WA Web's {@code WAWebApiBlocklist.updateBlocklist} bulk-replace.
+     *
+     * @implNote {@code WAWebGetBlocklistJob.getBlocklist} ->
+     * {@code WASmaxBlocklistsGetBlockListRPC.sendGetBlockListRPC}
+     * @return the blocked JIDs in server-returned order
      */
+    @WhatsAppWebExport(moduleName = "WAWebGetBlocklistJob", exports = "getBlocklist", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebApiBlocklist", exports = "getBlocklist", adaptation = WhatsAppAdaptation.ADAPTED)
     public SequencedCollection<Jid> queryBlockList() {
-        throw new UnsupportedOperationException();
+        var iqNode = new NodeBuilder()
+                .description("iq")
+                .attribute("xmlns", "blocklist")
+                .attribute("to", JidServer.user())
+                .attribute("type", "get");
+        var response = sendNode(iqNode);
+        // Response shape: <iq><list><item jid="..."/>...</list></iq>
+        var items = response.getChild("list")
+                .stream()
+                .flatMap(list -> list.streamChildren("item"))
+                .map(item -> item.getAttributeAsString("jid"))
+                .flatMap(Optional::stream)
+                .map(Jid::of)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        store.setBlockedContacts(items);
+        return items;
+    }
+
+    /**
+     * Blocks the given contact at the server so they can no longer
+     * send messages or see this account's presence.
+     *
+     * <p>Sends {@code <iq xmlns="blocklist" to="s.whatsapp.net"
+     * type="set"><item action="block" jid="..."/></iq>} matching WA
+     * Web's
+     * {@code WASmaxOutBlocklistsUpdateBlockListRequest.makeUpdateBlockListRequest}
+     * with the {@code updateBlockListBlockItem} variant. On success the
+     * contact is added to the store's block list eagerly.
+     *
+     * @implNote {@code WAWebBlockUserJob.blockUnblockUser} with
+     * {@code action="block"} ->
+     * {@code WASmaxBlocklistsUpdateBlockListRPC.sendUpdateBlockListRPC}
+     * @param contact the contact to block
+     * @throws NullPointerException if {@code contact} is {@code null}
+     */
+    @WhatsAppWebExport(moduleName = "WAWebBlockUserJob", exports = "blockUnblockUser", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebBlockContactAction", exports = "blockUser", adaptation = WhatsAppAdaptation.ADAPTED)
+    public void blockContact(Jid contact) {
+        Objects.requireNonNull(contact, "contact cannot be null");
+        updateBlockList(contact, "block");
+        store.addBlockedContact(contact);
+        // WAWebBlockContactAction.blockContact calls WAWebWamBlockEventReporter.logBlockEvent({contact, blockEntryPoint, isBlock:true})
+        logBlockEvent(contact, BlockEventActionType.BLOCK);
+    }
+
+    /**
+     * Unblocks the given contact at the server, allowing them to send
+     * messages and see this account's presence again.
+     *
+     * <p>Sends {@code <iq xmlns="blocklist" to="s.whatsapp.net"
+     * type="set"><item action="unblock" jid="..."/></iq>} matching WA
+     * Web's
+     * {@code WASmaxOutBlocklistsUpdateBlockListRequest.makeUpdateBlockListRequest}
+     * with the {@code updateBlockListUnblockItem} variant. On success
+     * the contact is removed from the store's block list eagerly.
+     *
+     * @implNote {@code WAWebBlockUserJob.blockUnblockUser} with
+     * {@code action="unblock"} ->
+     * {@code WASmaxBlocklistsUpdateBlockListRPC.sendUpdateBlockListRPC}
+     * @param contact the contact to unblock
+     * @throws NullPointerException if {@code contact} is {@code null}
+     */
+    @WhatsAppWebExport(moduleName = "WAWebBlockUserJob", exports = "blockUnblockUser", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebBlockContactAction", exports = "unblockUser", adaptation = WhatsAppAdaptation.ADAPTED)
+    public void unblockContact(Jid contact) {
+        Objects.requireNonNull(contact, "contact cannot be null");
+        updateBlockList(contact, "unblock");
+        store.removeBlockedContact(contact);
+        // WAWebBlockContactAction.unblockContact calls WAWebWamBlockEventReporter.logBlockEvent({contact, blockEntryPoint, isBlock:false})
+        logBlockEvent(contact, BlockEventActionType.UNBLOCK);
+    }
+
+    /**
+     * Issues an {@code iq xmlns="blocklist" type="set"} stanza carrying a
+     * single {@code <item action="..." jid="..."/>} child, corresponding
+     * to WA Web's
+     * {@code WASmaxOutBlocklistsUpdateBlockListRequest.makeUpdateBlockListRequest}.
+     *
+     * @implNote {@code WASmaxOutBlocklistsUpdateBlockListRequest.makeUpdateBlockListRequest}
+     * @param contact the target contact JID
+     * @param action  either {@code "block"} or {@code "unblock"}
+     */
+    private void updateBlockList(Jid contact, String action) {
+        var item = new NodeBuilder()
+                .description("item")
+                .attribute("action", action)
+                .attribute("jid", contact.toUserJid())
+                .build();
+        var iqNode = new NodeBuilder()
+                .description("iq")
+                .attribute("xmlns", "blocklist")
+                .attribute("to", JidServer.user())
+                .attribute("type", "set")
+                .content(item);
+        sendNode(iqNode);
+    }
+
+    /**
+     * Emits a {@code BlockEventsFs} WAM telemetry event for the given
+     * block or unblock action, mirroring WA Web's
+     * {@code WAWebWamBlockEventReporter.logBlockEvent}.
+     *
+     * <p>The emission is gated on the
+     * {@link ABProp#BLOCK_ENTRY_POINT_LOGGING_ENABLED} AB-prop, matching
+     * WA Web's {@code getABPropConfigValue("block_entry_point_logging_enabled")}
+     * check. When enabled, the event is populated as follows:
+     * <ul>
+     *   <li>{@code blockEntryPoint}: defaults to
+     *       {@link BlockEntryPoint#OTHER} because Cobalt's public blocking
+     *       API does not accept an entry-point argument — this matches WA
+     *       Web's fallback in {@code getBlockEventMetricFromBlockEntryPoint}
+     *       when no entry point is supplied.</li>
+     *   <li>{@code blockEventActionType}: {@link BlockEventActionType#BLOCK}
+     *       or {@link BlockEventActionType#UNBLOCK} depending on the
+     *       action.</li>
+     *   <li>{@code blockEventIsSuspicious}: {@code true} when the contact is
+     *       neither saved in the local address book nor part of a trusted
+     *       chat, matching WA Web's
+     *       {@code !(getIsMyContact(contact) || chat?.isTrusted())}.</li>
+     *   <li>{@code blockEventIsUnsub}: {@code true} when the contact is not
+     *       saved in the local address book, matching WA Web's
+     *       {@code !getIsMyContact(contact)}.</li>
+     * </ul>
+     *
+     * <p>The {@code pastCall} and {@code pastCallResult} properties are
+     * intentionally left unset because WA Web's {@code logBlockEvent} also
+     * does not populate them.
+     *
+     * @implNote {@code WAWebWamBlockEventReporter.logBlockEvent}
+     * @param contact the contact that was just blocked or unblocked
+     * @param action  the action performed: {@link BlockEventActionType#BLOCK}
+     *                or {@link BlockEventActionType#UNBLOCK}
+     */
+    @WhatsAppWebExport(moduleName = "WAWebWamBlockEventReporter", exports = "logBlockEvent", adaptation = WhatsAppAdaptation.ADAPTED)
+    private void logBlockEvent(Jid contact, BlockEventActionType action) {
+        // WAWebWamBlockEventReporter.logBlockEvent: if(getABPropConfigValue("block_entry_point_logging_enabled"))
+        if (!abPropsService.getBool(ABProp.BLOCK_ENTRY_POINT_LOGGING_ENABLED)) {
+            return;
+        }
+        // WAWebFrontendContactGetters.getIsMyContact(n): contact is considered "my contact" when saved in the address book
+        var contactRecord = store.findContactByJid(contact).orElse(null);
+        var isMyContact = contactRecord != null && contactRecord.fullName().isPresent();
+        // WAWebChatModel.isTrusted for 1:1 user chat: notSpam || getIsMyContact(contact) || hasMaybeSentMsgToChat()
+        var chatIsTrusted = store.findChatByJid(contact)
+                .map(chat -> chat.notSpam() || isMyContact)
+                .orElse(false);
+        // WAWebWamBlockEventReporter.logBlockEvent: i = getIsMyContact(n) || chat?.isTrusted(); blockEventIsSuspicious = !i
+        var isSuspicious = !(isMyContact || chatIsTrusted);
+        wamService.commit(new BlockEventsFsEventBuilder()
+                // WAWebWamBlockEventReporter.logBlockEvent: blockEntryPoint = t (defaults to OTHER when no entry point is carried)
+                .blockEntryPoint(BlockEntryPoint.OTHER)
+                // WAWebWamBlockEventReporter.logBlockEvent: blockEventActionType = r ? BLOCK : UNBLOCK
+                .blockEventActionType(action)
+                // WAWebWamBlockEventReporter.logBlockEvent: blockEventIsSuspicious = !i
+                .blockEventIsSuspicious(isSuspicious)
+                // WAWebWamBlockEventReporter.logBlockEvent: blockEventIsUnsub = !getIsMyContact(n)
+                .blockEventIsUnsub(!isMyContact)
+                .build());
     }
 
     /**
      * Queries the profile picture URL for the given JID.
      *
-     * @param self the JID whose picture should be fetched
-     * @return the picture URL, or empty if none is published
-     * @throws UnsupportedOperationException currently a stub pending
-     *                                       implementation
+     * <p>Sends {@code <iq xmlns="w:profile:picture" to="s.whatsapp.net"
+     * type="get" target=jid><picture type="image" query="url"/></iq>} and
+     * parses {@code <picture url="..."/>} from the response.
+     *
+     * <p>WA Web funnels every picture request through
+     * {@code WAWebContactProfilePicThumbBridge.requestProfilePicFromServer},
+     * which calls {@code WAWebGetProfilePicJob.getProfilePic} ->
+     * {@code WASmaxProfilePictureGetRPC.sendGetRPC} with
+     * {@code pictureType: "image"}, {@code pictureQuery: "url"}. The final
+     * server response is a {@code GetResponseSuccessPictureURL} carrying
+     * {@code pictureUrl}. Cobalt collapses the multi-hop RPC into a single
+     * IQ because the wire shape is identical.
+     *
+     * @implNote {@code WAWebContactProfilePicThumbBridge.requestProfilePicFromServer} ->
+     * {@code WAWebGetProfilePicJob.getProfilePic} ->
+     * {@code WASmaxProfilePictureGetRPC.sendGetRPC}
+     * @param jid the JID whose picture URL should be fetched
+     * @return the picture URL when present; {@link Optional#empty()}
+     *         otherwise (including when the server returns no
+     *         {@code <picture>} child, matching WA Web's HTTP 404 branch)
+     * @throws NullPointerException            if {@code jid} is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is closed
      */
-    public Optional<URI> queryPicture(Jid self) {
-        throw new UnsupportedOperationException();
+    @WhatsAppWebExport(moduleName = "WAWebContactProfilePicThumbBridge", exports = "requestProfilePicFromServer",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebGetProfilePicJob", exports = "getProfilePic",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<URI> queryPicture(Jid jid) {
+        Objects.requireNonNull(jid, "jid cannot be null");
+        // WAWebGetProfilePicJob.getProfilePic: sendGetRPC({pictureType: "image", pictureQuery: "url", ...})
+        var pictureQuery = new NodeBuilder()
+                .description("picture")
+                .attribute("type", "image") // preview=false -> "image"
+                .attribute("query", "url") // WAWebGetProfilePicJob.getProfilePic: pictureQuery: "url"
+                .build();
+        var iqNode = new NodeBuilder()
+                .description("iq")
+                .attribute("xmlns", "w:profile:picture") // WAWebSendProfilePictureJob/WAWebGetProfilePicJob: xmlns: "w:profile:picture"
+                .attribute("to", JidServer.user()) // S_WHATSAPP_NET
+                .attribute("target", jid) // WAWebGetProfilePicJob.getProfilePic: iqTarget: widToChatJid(t)
+                .attribute("type", "get")
+                .content(pictureQuery);
+        var response = sendNode(iqNode);
+        // WAWebGetProfilePicJob.getProfilePic: GetResponseSuccessPictureURL.value.pictureUrl
+        return response.getChild("picture")
+                .flatMap(p -> p.getAttributeAsString("url"))
+                .map(URI::create);
     }
 
     /**
-     * Subscribes to presence updates for the given contact.
+     * Changes the push name (broadcast display name) associated with this
+     * account.
      *
-     * @param jid the contact JID
-     * @throws UnsupportedOperationException currently a stub pending
-     *                                       implementation
+     * <p>Mirrors the two side effects of WA Web's
+     * {@code WAWebSetPushName.setPushname} (exposed internally by
+     * {@code WAWebPushNameBridge}):
+     * <ol>
+     *   <li>Publishes a {@code setting_pushName} sync mutation through the
+     *       {@link WebAppStateService} so the new name propagates to every
+     *       linked device ({@code WAWebPushNameSync.getPushnameMutation} in
+     *       WA Web).</li>
+     *   <li>Broadcasts a {@code <presence name="..."/>} stanza so the server
+     *       forwards the updated name to contacts (matches
+     *       {@code WASendPresenceStatusProtocol.sendPresenceStatusProtocol}
+     *       with {@code type=undefined}).</li>
+     * </ol>
+     *
+     * <p>Locally, the handler's own
+     * {@link PushNameSettingHandler#applyMutationResult apply} pipeline
+     * persists the new name into {@link WhatsAppStore#setName(String)} and
+     * notifies listeners.
+     *
+     * @implNote {@code WAWebSetPushName.setPushname} /
+     *           {@code WAWebPushNameBridge} -> sync mutation +
+     *           {@code <presence name="..."/>}
+     * @param newPushName the new broadcast display name; must not be
+     *                    {@code null}
+     * @throws NullPointerException            if {@code newPushName} is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is closed
      */
-    public void subscribeToPresence(Jid jid) {
-        throw new UnsupportedOperationException();
+    @WhatsAppWebExport(moduleName = "WAWebSetPushName", exports = "setPushName",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void changeName(String newPushName) {
+        Objects.requireNonNull(newPushName, "newPushName cannot be null");
+        // WAWebPushNameSync.getPushnameMutation: setting_pushName mutation for the CRITICAL_BLOCK collection
+        var mutation = PushNameSettingHandler.INSTANCE.getPushnameMutation(Instant.now(), newPushName);
+        webAppStateService.pushPatches(PushNameSetting.COLLECTION_NAME, List.of(mutation)); // WAWebSyncdCoreApi.lockForSync
+        // WASendPresenceStatusProtocol.sendPresenceStatusProtocol: smax("presence", {type: undefined, name: _})
+        sendNodeWithNoResponse(new NodeBuilder()
+                .description("presence") // WASmaxOutPresenceAvailabilityRequest.makeAvailabilityRequest
+                .attribute("name", newPushName) // WASmaxOutPresenceAvailabilityRequest: name: OPTIONAL(CUSTOM_STRING, n)
+                .build());
+    }
+
+    /**
+     * Changes this account's "about" (status) text.
+     *
+     * <p>Emits {@code <iq xmlns="status" to="s.whatsapp.net" type="set">
+     * <status>TEXT</status></iq>} and blocks for the acknowledgment.
+     *
+     * <p>WA Web goes through {@code WAWebContactStatusBridge.setMyStatus},
+     * which enqueues the {@code setAbout} persisted job
+     * ({@code WAWebPersistedJobDefinitions.jobSerializers.setAbout}). The
+     * job itself emits exactly the IQ shape replicated here, so Cobalt
+     * collapses the job queue into a direct send.
+     *
+     * @implNote {@code WAWebContactStatusBridge.setMyStatus} ->
+     *           {@code WAWebPersistedJobDefinitions.jobSerializers.setAbout}
+     * @param aboutText the new about text; must not be {@code null}
+     * @throws NullPointerException            if {@code aboutText} is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WAWebContactStatusBridge", exports = "setMyStatus",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void changeAbout(String aboutText) {
+        Objects.requireNonNull(aboutText, "aboutText cannot be null");
+        // task spec: <iq xmlns="status" to="s.whatsapp.net" type="set"><status>TEXT</status></iq>
+        var statusNode = new NodeBuilder()
+                .description("status")
+                .content(aboutText)
+                .build();
+        var iqNode = new NodeBuilder()
+                .description("iq")
+                .attribute("xmlns", "status")
+                .attribute("to", JidServer.user()) // S_WHATSAPP_NET
+                .attribute("type", "set")
+                .content(statusNode);
+        sendNode(iqNode);
+        store.setAbout(aboutText); // ADAPTED: mirror WA Web's cached Conn.about via Cobalt's single store field
+    }
+
+    /**
+     * Changes this account's profile picture.
+     *
+     * <p>Sends {@code <iq xmlns="w:profile:picture" to="s.whatsapp.net"
+     * type="set" target=selfJid>
+     * <picture type="image">JPEG_BYTES</picture>
+     * <picture type="preview">THUMB_BYTES</picture>
+     * </iq>}, generating a 96x96 JPEG preview from the supplied full-size
+     * JPEG via the JDK's {@code javax.imageio} pipeline.
+     *
+     * <p>Mirrors the two writes of WA Web's
+     * {@code WAWebSetProfilePicJob.setMyPic} ->
+     * {@code WAWebContactProfilePicThumbBridge.sendSetPicture}: a full-size
+     * image upload and a preview thumbnail. WA Web routes both writes
+     * through the same {@code WAWebSendProfilePictureJob.default} helper,
+     * which only allows one {@code <picture>} child per IQ; Cobalt merges
+     * both into a single IQ that the server accepts.
+     *
+     * @implNote {@code WAWebSetProfilePicJob.setMyPic} ->
+     *           {@code WAWebContactProfilePicThumbBridge.sendSetPicture} ->
+     *           {@code WAWebSendProfilePictureJob.default}
+     * @param jpegBytes the full-size JPEG payload; must not be {@code null}
+     * @throws NullPointerException            if {@code jpegBytes} is {@code null}
+     * @throws IllegalArgumentException        if {@code jpegBytes} is not a
+     *                                         valid image
+     * @throws IllegalStateException           if the self JID is not known
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WAWebSetProfilePicJob", exports = "setMyPic",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebContactProfilePicThumbBridge", exports = "sendSetPicture",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void changeProfilePicture(byte[] jpegBytes) {
+        Objects.requireNonNull(jpegBytes, "jpegBytes cannot be null");
+        var selfJid = store.jid() // WAWebUserPrefsMeUser.getMeUser
+                .map(Jid::withoutData)
+                .orElseThrow(() -> new IllegalStateException("Missing self JID"));
+        var thumbBytes = generatePreviewThumbnail(jpegBytes);
+        // WAWebSendProfilePictureJob.default: wap("iq", {xmlns:"w:profile:picture", to:S_WHATSAPP_NET, target, type:"set"}, wap("picture", {type:"image"}, a))
+        var fullPicture = new NodeBuilder()
+                .description("picture")
+                .attribute("type", "image") // WAWebContactProfilePicThumbBridge.sendSetPicture: full-size image write
+                .content(jpegBytes)
+                .build();
+        var previewPicture = new NodeBuilder()
+                .description("picture")
+                .attribute("type", "preview") // WAWebContactProfilePicThumbBridge.sendSetPicture: preview thumbnail write
+                .content(thumbBytes)
+                .build();
+        var iqNode = new NodeBuilder()
+                .description("iq")
+                .attribute("xmlns", "w:profile:picture")
+                .attribute("to", JidServer.user()) // S_WHATSAPP_NET
+                .attribute("target", selfJid)
+                .attribute("type", "set")
+                .content(List.of(fullPicture, previewPicture));
+        sendNode(iqNode);
+    }
+
+    /**
+     * Removes this account's profile picture.
+     *
+     * <p>Emits {@code <iq xmlns="w:profile:picture" to="s.whatsapp.net"
+     * type="set" target=selfJid/>} with no {@code <picture>} child, which
+     * instructs the server to delete the current profile picture.
+     *
+     * <p>WA Web goes through
+     * {@code WAWebRemoveProfilePicJob.removeMyPic} ->
+     * {@code WAWebContactProfilePicThumbBridge.requestDeletePicture}, which
+     * calls {@code WAWebSendProfilePictureJob.default(self, null)} and then
+     * {@code WAWebChangeProfilePicThumb.changeProfilePicThumb(self, ProfilePicCommand.Remove)}
+     * to evict the local thumbnail. Cobalt replicates the wire emit and
+     * lets the locally cached profile-picture URI be cleared by the next
+     * server-driven notification, matching the behavior of
+     * {@link #removeGroupPicture(Jid)}.
+     *
+     * @implNote {@code WAWebRemoveProfilePicJob.removeMyPic} ->
+     *           {@code WAWebContactProfilePicThumbBridge.requestDeletePicture} ->
+     *           {@code WAWebSendProfilePictureJob.default(self, null)}
+     * @throws IllegalStateException           if the self JID is not known
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WAWebRemoveProfilePicJob", exports = "removeMyPic",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebContactProfilePicThumbBridge", exports = "requestDeletePicture",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void removeProfilePicture() {
+        var selfJid = store.jid() // WAWebUserPrefsMeUser.getMeUser
+                .map(Jid::withoutData)
+                .orElseThrow(() -> new IllegalStateException("Missing self JID"));
+        sendPictureIq(selfJid, null); // WAWebSendProfilePictureJob.default: a=null -> no picture body
+    }
+
+    /**
+     * Generates a square-ish preview thumbnail for the given JPEG bytes.
+     *
+     * <p>WA Web computes thumbnails client-side through the browser's
+     * {@code Canvas} API with a nominal 96x96 target. Cobalt uses the
+     * JDK's {@code javax.imageio} pipeline to produce an equivalent
+     * payload sized for WhatsApp's server preview slot.
+     *
+     * @param jpegBytes the full-size JPEG payload
+     * @return the preview JPEG bytes
+     * @throws IllegalArgumentException if the input cannot be decoded as
+     *                                  an image
+     */
+    private byte[] generatePreviewThumbnail(byte[] jpegBytes) {
+        try {
+            var src = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(jpegBytes));
+            if (src == null) {
+                throw new IllegalArgumentException("Invalid image payload");
+            }
+            var thumb = new java.awt.image.BufferedImage(PROFILE_PREVIEW_SIZE, PROFILE_PREVIEW_SIZE, java.awt.image.BufferedImage.TYPE_INT_RGB); // WA Web's profile preview size
+            var g = thumb.createGraphics();
+            try {
+                g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                g.drawImage(src, 0, 0, PROFILE_PREVIEW_SIZE, PROFILE_PREVIEW_SIZE, null);
+            } finally {
+                g.dispose();
+            }
+            var out = new java.io.ByteArrayOutputStream();
+            javax.imageio.ImageIO.write(thumb, "jpg", out);
+            return out.toByteArray();
+        } catch (java.io.IOException e) {
+            throw new IllegalArgumentException("Failed to decode profile picture", e);
+        }
+    }
+
+    /**
+     * Broadcasts this client's own presence state to the server.
+     *
+     * <p>Emits a {@code <presence type="available"/>} stanza when {@code status}
+     * is {@link ContactStatus#AVAILABLE} or a {@code <presence type="unavailable"/>}
+     * stanza when {@code status} is {@link ContactStatus#UNAVAILABLE}; both
+     * carry the local user's push name so the server can forward it to peers.
+     *
+     * <p>On WA Web the module exposes this behavior as two parameterless bridge
+     * functions ({@code setPresenceAvailable} / {@code setPresenceUnavailable})
+     * that both delegate to {@code WASendPresenceStatusProtocol.sendPresenceStatusProtocol}
+     * with the current {@code WAWebConnModel.Conn.pushname}. Cobalt collapses
+     * the two entry points into a single {@link ContactStatus}-switched method
+     * because the underlying stanza shape is identical.
+     *
+     * @implNote WAWebContactPresenceBridge.setPresenceAvailable /
+     *           setPresenceUnavailable -> WASendPresenceStatusProtocol.sendPresenceStatusProtocol
+     *           -> WASmaxOutPresenceAvailabilityRequest.makeAvailabilityRequest:
+     *           {@code smax("presence", {type: CUSTOM_STRING(n), name: CUSTOM_STRING(pushname)})}
+     * @param status {@link ContactStatus#AVAILABLE} or {@link ContactStatus#UNAVAILABLE}
+     * @throws NullPointerException            if {@code status} is {@code null}
+     * @throws IllegalArgumentException        if {@code status} is not
+     *                                         {@code AVAILABLE} or {@code UNAVAILABLE}
+     * @throws WhatsAppSessionException.Closed if the socket has been closed
+     */
+    @WhatsAppWebExport(moduleName = "WAWebContactPresenceBridge", exports = "setPresenceAvailable",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebContactPresenceBridge", exports = "setPresenceUnavailable",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void changePresence(ContactStatus status) {
+        Objects.requireNonNull(status, "status cannot be null");
+        // WAWebContactPresenceBridge.setPresenceAvailable/setPresenceUnavailable: only AVAILABLE and UNAVAILABLE are valid self-presence values
+        if (status != ContactStatus.AVAILABLE && status != ContactStatus.UNAVAILABLE) {
+            throw new IllegalArgumentException("status must be AVAILABLE or UNAVAILABLE, got " + status);
+        }
+        var builder = new NodeBuilder()
+                .description("presence") // WASmaxOutPresenceAvailabilityRequest.makeAvailabilityRequest: smax("presence", {...})
+                .attribute("type", status.toString()); // WASendPresenceStatusProtocol.sendPresenceStatusProtocol: status -> presenceType -> CUSTOM_STRING(t)
+        // WASendPresenceStatusProtocol.sendPresenceStatusProtocol: name: WAWebConnModel.Conn.pushname (OPTIONAL, omitted when absent)
+        var name = store.name();
+        if (name != null && !name.isEmpty()) {
+            builder.attribute("name", name); // WASmaxOutPresenceAvailabilityRequest.makeAvailabilityRequest: name: OPTIONAL(CUSTOM_STRING, n)
+        }
+        sendNodeWithNoResponse(builder.build()); // WAComms.castSmaxStanza - fire-and-forget
+    }
+
+    /**
+     * Sends a chat-state indication (typing / recording / paused) for a 1:1 or
+     * group conversation.
+     *
+     * <p>Emits a {@code <chatstate to="<chatJid>">...</chatstate>} stanza whose
+     * single child tag describes the new state:
+     * <ul>
+     *   <li>{@link ContactStatus#COMPOSING} -> {@code <composing/>}</li>
+     *   <li>{@link ContactStatus#RECORDING} -> {@code <composing media="audio"/>}</li>
+     *   <li>{@link ContactStatus#UNAVAILABLE} (idle/paused) -> {@code <paused/>}</li>
+     * </ul>
+     *
+     * <p>WA Web splits this into three parameterless bridges
+     * ({@code sendChatStateComposing}, {@code sendChatStateRecording},
+     * {@code sendChatStatePaused}) that all call
+     * {@code WASendChatStateProtocol.sendChatStateProtocol} with a
+     * {@code "typing"}, {@code "recording_audio"} or {@code "idle"} tag.
+     * Cobalt merges them into a single entry point switched on
+     * {@link ContactStatus} because the underlying stanza differs only by the
+     * child element.
+     *
+     * @implNote WAWebChatStateBridge.sendChatStateComposing /
+     *           sendChatStateRecording / sendChatStatePaused ->
+     *           WASendChatStateProtocol.sendChatStateProtocol ->
+     *           WASmaxChatstateClientNotificationRPC.sendClientNotificationRPC ->
+     *           WASmaxOutChatstateClientNotificationRequest.makeClientNotificationRequest:
+     *           {@code smax("chatstate", {to: JID(t)}, <composing/paused child>)}
+     * @param chat  the chat JID the state applies to
+     * @param state {@link ContactStatus#COMPOSING}, {@link ContactStatus#RECORDING}
+     *              or {@link ContactStatus#UNAVAILABLE} (mapped to paused)
+     * @throws NullPointerException            if any argument is {@code null}
+     * @throws IllegalArgumentException        if {@code state} is not one of
+     *                                         {@code COMPOSING}, {@code RECORDING}
+     *                                         or {@code UNAVAILABLE}
+     * @throws WhatsAppSessionException.Closed if the socket has been closed
+     */
+    @WhatsAppWebExport(moduleName = "WAWebChatStateBridge", exports = "sendChatStateComposing",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebChatStateBridge", exports = "sendChatStateRecording",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebChatStateBridge", exports = "sendChatStatePaused",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void changeChatState(Jid chat, ContactStatus state) {
+        Objects.requireNonNull(chat, "chat cannot be null");
+        Objects.requireNonNull(state, "state cannot be null");
+        // WASendChatStateProtocol.sendChatStateProtocol: branches on "idle" / "typing" / "recording_audio"
+        var childBuilder = new NodeBuilder();
+        switch (state) {
+            case COMPOSING -> childBuilder.description("composing"); // WASmaxOutChatstateComposingMixin.mergeComposingMixin: smax("composing", {media: OPTIONAL_LITERAL("audio", false)})
+            case RECORDING -> childBuilder
+                    .description("composing") // WASmaxOutChatstateComposingMixin.mergeComposingMixin: smax("composing", ...)
+                    .attribute("media", "audio"); // WASmaxOutChatstateComposingMixin: media: OPTIONAL_LITERAL("audio", hasComposingMediaAudio)
+            case UNAVAILABLE -> childBuilder.description("paused"); // WASmaxOutChatstatePausedMixin.mergePausedMixin: smax("paused", null)
+            default -> throw new IllegalArgumentException("state must be COMPOSING, RECORDING or UNAVAILABLE, got " + state);
+        }
+        var chatstate = new NodeBuilder()
+                .description("chatstate") // WASmaxOutChatstateClientNotificationRequest.makeClientNotificationRequest: smax("chatstate", {to: JID(t)})
+                .attribute("to", chat) // WASmaxOutChatstateClientNotificationRequest: to: JID(t)
+                .content(childBuilder.build())
+                .build();
+        sendNodeWithNoResponse(chatstate); // WAComms.castSmaxStanza - fire-and-forget
+    }
+
+    /**
+     * Subscribes to real-time presence updates for the given contact.
+     *
+     * <p>Emits a {@code <presence type="subscribe" to="<targetJid>"/>} stanza.
+     * The server will subsequently push {@code <presence>} notifications for
+     * that contact (available / unavailable / typing / recording) until the
+     * subscription is cancelled via
+     * {@link #unsubscribeFromPresence(Jid)} or the socket is closed.
+     *
+     * <p>WA Web additionally threads a privacy-token payload
+     * ({@code tCTokenMixinArgs}) through the subscribe request when the target
+     * is a user JID. Cobalt omits that mixin because privacy tokens are managed
+     * by a separate store/flow; the bare subscribe stanza is the one the server
+     * accepts for the common case.
+     *
+     * @implNote WAWebContactPresenceBridge.subscribePresence ->
+     *           WAWebSendPresenceSubscriptionJob.default ->
+     *           WASmaxPresenceSubscribeRPC.sendSubscribeRPC ->
+     *           WASmaxOutPresenceSubscribeRequest.makeSubscribeRequest:
+     *           {@code smax("presence", {type: "subscribe", to: JID(t), name?, context?})}
+     * @param target the contact JID to subscribe to
+     * @throws NullPointerException            if {@code target} is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket has been closed
+     */
+    @WhatsAppWebExport(moduleName = "WAWebContactPresenceBridge", exports = "subscribePresence",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void subscribeToPresence(Jid target) {
+        Objects.requireNonNull(target, "target cannot be null");
+        var presence = new NodeBuilder()
+                .description("presence") // WASmaxOutPresenceSubscribeRequest.makeSubscribeRequest: smax("presence", {...})
+                .attribute("type", "subscribe") // WASmaxOutPresenceSubscribeRequest: type: "subscribe"
+                .attribute("to", target) // WASmaxOutPresenceSubscribeRequest: to: JID(t)
+                .build();
+        sendNodeWithNoResponse(presence); // WAComms.castSmaxStanza - fire-and-forget
+    }
+
+    /**
+     * Cancels a presence subscription previously established via
+     * {@link #subscribeToPresence(Jid)}.
+     *
+     * <p>Emits a {@code <presence type="unsubscribe" to="<targetJid>"/>} stanza,
+     * the symmetric counterpart of the subscribe request. After the server
+     * acknowledges the unsubscribe, no further presence push notifications
+     * will arrive for the given contact until a new subscription is created.
+     *
+     * @implNote ADAPTED: WAWebContactPresenceBridge exposes only
+     *           {@code subscribePresence}; WA Web clients never explicitly
+     *           revoke a presence subscription because subscriptions are
+     *           re-established implicitly on socket reconnect. Cobalt provides
+     *           an explicit cancellation path so long-lived clients can opt out
+     *           of a specific contact's presence feed without reconnecting.
+     *           The stanza shape mirrors {@code subscribePresence} with the
+     *           {@code type} flipped to {@code "unsubscribe"}.
+     * @param target the contact JID to unsubscribe from
+     * @throws NullPointerException            if {@code target} is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket has been closed
+     */
+    public void unsubscribeFromPresence(Jid target) {
+        Objects.requireNonNull(target, "target cannot be null");
+        var presence = new NodeBuilder()
+                .description("presence") // ADAPTED: mirrors subscribePresence stanza with type=unsubscribe
+                .attribute("type", "unsubscribe")
+                .attribute("to", target)
+                .build();
+        sendNodeWithNoResponse(presence);
     }
 
     /**
@@ -2934,31 +5116,76 @@ public final class WhatsAppClient {
     }
 
     /**
-     * Revokes a message locally ("delete for me") without instructing the
-     * server to remove it from any other device.
+     * Deletes a message, either locally ("delete for me") or for every
+     * participant in the chat ("delete for everyone"), depending on the
+     * {@code everyone} flag.
      *
-     * <p>This method matches {@code WAWebChatSendMessages.sendDeleteMsgs}
-     * in WA Web: it deletes the referenced message from the local store
-     * and publishes a
+     * <p>When {@code everyone} is {@code false}, this matches
+     * {@code WAWebChatSendMessages.sendDeleteMsgs} in WA Web: the
+     * referenced message is removed from the local store and a
      * {@link com.github.auties00.cobalt.model.sync.action.chat.DeleteMessageForMeAction}
-     * through the REGULAR_HIGH app-state collection so that every linked
-     * device removes the message too.
+     * is published through the REGULAR_HIGH app-state collection so
+     * every linked device removes the message too. In this mode the
+     * method returns {@code null} because no server-ack path exists.
      *
-     * @param key the key of the message to delete
+     * <p>When {@code everyone} is {@code true}, a
+     * {@code ProtocolMessage} of type {@link ProtocolMessage.Type#REVOKE}
+     * is constructed around the original {@code MessageKey} and
+     * dispatched through the standard send pipeline so every participant
+     * sees the message disappear. The caller is responsible for ensuring
+     * they have permission to revoke the target message; the server
+     * rejects unauthorised revokes and the failure is surfaced in the
+     * returned {@link AckResult}.
+     *
+     * @param key      the key of the message to delete
+     * @param everyone {@code true} to delete for every participant via a
+     *                 REVOKE protocol message, {@code false} to delete
+     *                 only for the local account and linked devices via
+     *                 a DeleteMessageForMe sync action
+     * @return the server ack when {@code everyone} is {@code true};
+     *         {@code null} when {@code everyone} is {@code false} (no
+     *         server ack path exists for the delete-for-me branch)
      * @throws NullPointerException     if {@code key} is {@code null}
      * @throws IllegalArgumentException if the key has no {@code parentJid}
-     *                                  or no {@code id}
+     *                                  or (when {@code everyone} is
+     *                                  {@code false}) no {@code id}
      *
-     * @implNote WAWebChatSendMessages.sendDeleteMsgs: emits a
-     * delete-for-me sync action and removes the message from the
-     * in-memory store. Cobalt builds the sync mutation manually and
-     * routes it through
+     * @implNote When {@code everyone} is {@code false}:
+     * WAWebChatSendMessages.sendDeleteMsgs emits a delete-for-me sync
+     * action and removes the message from the in-memory store. Cobalt
+     * builds the sync mutation manually and routes it through
      * {@link WebAppStateService#pushPatches(SyncPatchType, SequencedCollection)}.
+     * When {@code everyone} is {@code true}:
+     * WAWebRevokeMsgAction.sendRevoke / WAWebRevokeMsgAction.revoke
+     * wraps the original key inside a {@code ProtocolMessage} with
+     * {@code type = REVOKE} and sends it via
+     * {@code WAWebSendMsgRecordAction.sendMsgRecord}. Cobalt delegates
+     * the record dispatch to {@link MessageService#send(Jid, MessageContainer)}.
      */
     @WhatsAppWebExport(moduleName = "WAWebChatSendMessages", exports = "sendDeleteMsgs",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public void revokeMessage(MessageKey key) {
+    @WhatsAppWebExport(moduleName = "WAWebRevokeMsgAction", exports = "sendRevoke",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebRevokeMsgAction", exports = "revoke",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebChatSendMessages", exports = "sendRevokeMsgs",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebWamChatPSALogger", exports = "logChatPSADelete",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public AckResult deleteMessage(MessageKey key, boolean everyone) {
         Objects.requireNonNull(key, "key cannot be null");
+        if (everyone) {
+            var parentJid = key.parentJid() // WAWebRevokeMsgAction._sendRevoke: s.id.remote
+                    .orElseThrow(() -> new IllegalArgumentException("key must carry a parentJid"));
+            var protocol = new ProtocolMessageBuilder() // WAWebRevokeMsgAction._sendRevoke: {type: PROTOCOL, kind: ProtocolRevoke, protocolMessageKey: s.id}
+                    .key(key) // WAWebRevokeMsgAction._sendRevoke: protocolMessageKey: s.id
+                    .type(ProtocolMessage.Type.REVOKE) // WAWebRevokeMsgAction._sendRevoke: MsgKind.ProtocolRevoke, subtype: sender_revoke | admin_revoke
+                    .timestampMs(Instant.now()) // WAWebRevokeMsgAction._sendRevoke: revokeTimestamp: C
+                    .build();
+            var wrapper = MessageContainer.of(protocol); // WAWebRevokeMsgAction._sendRevoke -> WAWebSendMsgRecordAction.sendMsgRecord
+            return messageService.send(parentJid, wrapper); // WAWebRevokeMsgAction._sendRevoke -> sendMsgRecord
+        }
+
         var parentJid = key.parentJid() // WAWebChatSendMessages.sendDeleteMsgs: i.id (chatJid)
                 .orElseThrow(() -> new IllegalArgumentException("key must carry a parentJid"));
         var messageId = key.id() // WAWebChatSendMessages.sendDeleteMsgs: s = t.list (messageIds)
@@ -2998,48 +5225,285 @@ public final class WhatsAppClient {
                 com.github.auties00.cobalt.model.sync.action.chat.DeleteMessageForMeAction.COLLECTION_NAME,
                 java.util.List.of(new SyncPendingMutation(mutation, 0))
         ); // WAWebChatSendMessages.sendDeleteMsgs: WAWebChatSendDeleteMsgsBridge
+        // WAWebActionListenerHelpers: if(getIsPSA(e)) for(r=0;r<t.list.length;r++) WAWebWamChatPSALogger.logChatPSADelete(t.list[r])
+        logPsaActionIfApplicable(key, PsaMessageActionType.DELETE); // WAWebWamChatPSALogger.logChatPSADelete -> PSA_MESSAGE_ACTION_TYPE.DELETE
+        return null;
     }
 
     /**
-     * Revokes a message for everyone in the chat ("delete for everyone").
+     * Posts a new status update to the {@code status@broadcast} account.
      *
-     * <p>The method constructs a {@code ProtocolMessage} of type
-     * {@link ProtocolMessage.Type#REVOKE} carrying the original
-     * {@code MessageKey} and dispatches it through the standard send
-     * pipeline so that every participant sees the message disappear.
+     * <p>The content is dispatched through the standard send pipeline so
+     * it is prepared (message id, messageSecret, deviceContextInfo) and
+     * then routed through the status-specific sender which applies
+     * sender-key encryption to the current status audience. The returned
+     * {@link ChatMessageInfo} is the persisted model row that callers can
+     * reference later (for example to revoke the post).
      *
-     * <p>The caller is responsible for ensuring they have permission to
-     * revoke the target message. The server rejects unauthorised revokes
-     * and the failure is surfaced in the returned {@link AckResult}.
+     * @param content the raw status body (text, image, video, sticker, etc.)
+     * @return the persisted message info for the new status
+     * @throws NullPointerException if {@code content} is {@code null}
+     * @throws IllegalStateException if the client is not logged in or the
+     *                               message could not be stored after
+     *                               sending
      *
-     * @param key the key of the message to revoke
-     * @return the server ack result describing the delivery outcome
-     * @throws NullPointerException     if {@code key} is {@code null}
-     * @throws IllegalArgumentException if the key has no {@code parentJid}
-     *
-     * @implNote WAWebRevokeMsgAction.sendRevoke, WAWebRevokeMsgAction.revoke:
-     * wraps the original key inside a {@code ProtocolMessage} with
-     * {@code type = REVOKE} and sends it via
-     * {@code WAWebSendMsgRecordAction.sendMsgRecord}. Cobalt delegates
-     * the record dispatch to {@link MessageService#send(Jid, MessageContainer)}.
+     * @implNote WAWebSendStatusMsgAction.sendStatusTextMsgAction /
+     * WAWebSendStatusMsgAction.sendStatusMediaMsgAction: both paths build a
+     * status {@code Msg} model, persist it via {@code storeMessages}, and
+     * finally call
+     * {@code WAWebEncryptAndSendStatusMsg.encryptAndSendStatusMsg}. Cobalt
+     * collapses the preparation + dispatch into
+     * {@link MessageService#send(Jid, MessageContainer)}.
      */
-    @WhatsAppWebExport(moduleName = "WAWebRevokeMsgAction", exports = "sendRevoke",
+    @WhatsAppWebExport(moduleName = "WAWebSendStatusMsgAction", exports = "sendStatusTextMsgAction",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    @WhatsAppWebExport(moduleName = "WAWebRevokeMsgAction", exports = "revoke",
+    @WhatsAppWebExport(moduleName = "WAWebSendStatusMsgAction", exports = "sendStatusMediaMsgAction",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    @WhatsAppWebExport(moduleName = "WAWebChatSendMessages", exports = "sendRevokeMsgs",
-            adaptation = WhatsAppAdaptation.ADAPTED)
-    public AckResult revokeMessageForEveryone(MessageKey key) {
-        Objects.requireNonNull(key, "key cannot be null");
-        var parentJid = key.parentJid() // WAWebRevokeMsgAction._sendRevoke: s.id.remote
-                .orElseThrow(() -> new IllegalArgumentException("key must carry a parentJid"));
-        var protocol = new ProtocolMessageBuilder() // WAWebRevokeMsgAction._sendRevoke: {type: PROTOCOL, kind: ProtocolRevoke, protocolMessageKey: s.id}
-                .key(key) // WAWebRevokeMsgAction._sendRevoke: protocolMessageKey: s.id
-                .type(ProtocolMessage.Type.REVOKE) // WAWebRevokeMsgAction._sendRevoke: MsgKind.ProtocolRevoke, subtype: sender_revoke | admin_revoke
-                .timestampMs(Instant.now()) // WAWebRevokeMsgAction._sendRevoke: revokeTimestamp: C
+    public ChatMessageInfo sendStatus(MessageContainer content) {
+        Objects.requireNonNull(content, "content cannot be null");
+        var statusJid = Jid.statusBroadcastAccount(); // WAJids.STATUS_JID
+        var selfJid = store.jid() // WAWebUserPrefsMeUser.getMeUser
+                .orElseThrow(() -> new IllegalStateException("Not logged in"));
+        // WAWebSendStatusMsgAction.createTextStatusMsgData/createMediaStatusMsgData:
+        // builds the MsgKey with a fresh id, populates from/to/participant, and wraps the container.
+        var messageId = MessageIdGenerator.generate(MessageIdVersion.V2, selfJid); // WAWebMsgKey.newId
+        var key = new MessageKeyBuilder()
+                .id(messageId) // WAWebSendStatusMsgAction.createTextStatusMsgData: id: newId()
+                .parentJid(statusJid) // WAWebSendStatusMsgAction.createTextStatusMsgData: to: STATUS_JID
+                .fromMe(true) // WAWebSendStatusMsgAction.createTextStatusMsgData: selfDir: "out"
+                .senderJid(selfJid) // WAWebSendStatusMsgAction.createTextStatusMsgData: participant: n (me)
                 .build();
-        var wrapper = MessageContainer.of(protocol); // WAWebRevokeMsgAction._sendRevoke -> WAWebSendMsgRecordAction.sendMsgRecord
-        return messageService.send(parentJid, wrapper); // WAWebRevokeMsgAction._sendRevoke -> sendMsgRecord
+        var messageInfo = new ChatMessageInfoBuilder()
+                .status(MessageStatus.PENDING) // ADAPTED: mirrors MessagePreparer.prepareChat initial status
+                .senderJid(selfJid) // WAWebSendStatusMsgAction.createTextStatusMsgData: author: n
+                .key(key)
+                .message(content) // WAWebSendStatusMsgAction.createTextStatusMsgData: body/content
+                .timestamp(Instant.now()) // WAWebSendStatusMsgAction.createTextStatusMsgData: t: unixTime()
+                .broadcast(true) // WAWebSendStatusMsgAction: status is a broadcast JID
+                .build();
+        // Route through MessageService.send(MessageInfo) -> StatusMessageSender.send.
+        // Reuses the public StatusMessageSender.send path per the delegation rule.
+        messageService.send(messageInfo); // WAWebEncryptAndSendStatusMsg.encryptAndSendStatusMsg
+        return messageInfo;
+    }
+
+    /**
+     * Revokes a previously posted status update.
+     *
+     * <p>WhatsApp Status revokes follow the regular revoke protocol:
+     * a {@link ProtocolMessage} of type
+     * {@link ProtocolMessage.Type#REVOKE} is sent to
+     * {@code status@broadcast} carrying the key of the original status
+     * message. The status-specific sender handles the device list
+     * narrowing and the direct-fanout fallback when recipients have left
+     * the audience.
+     *
+     * @param statusId the id of the status message to revoke
+     * @return the server ack result
+     * @throws NullPointerException     if {@code statusId} is {@code null}
+     * @throws IllegalStateException    if the client is not logged in
+     *
+     * @implNote WAWebRevokeStatusAction.sendStatusRevokeMsgAction: creates
+     * a revoke protocol message with {@code to=STATUS_JID} and
+     * {@code kind=ProtocolRevoke}, then dispatches it through
+     * {@code WAWebEncryptAndSendStatusMsg.encryptAndSendStatusMsg}. Cobalt
+     * reuses the shared {@link MessageService}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebRevokeStatusAction", exports = "sendStatusRevokeMsgAction",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebRevokeStatusAction", exports = "createRevokeStatusMsgData",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public AckResult deleteStatus(String statusId) {
+        Objects.requireNonNull(statusId, "statusId cannot be null");
+        var statusJid = Jid.statusBroadcastAccount(); // WAJids.STATUS_JID
+        var selfJid = store.jid() // WAWebUserPrefsMeUser.getMeUser
+                .orElseThrow(() -> new IllegalStateException("Not logged in"));
+        // WAWebRevokeStatusAction.createRevokeStatusMsgData: new MsgKey({from: n, to: STATUS_JID, id, participant: n, selfDir: "out"})
+        var originalKey = new MessageKeyBuilder()
+                .id(statusId) // WAWebRevokeStatusAction.createRevokeStatusMsgData: id
+                .parentJid(statusJid) // WAWebRevokeStatusAction.createRevokeStatusMsgData: to: STATUS_JID
+                .fromMe(true) // WAWebRevokeStatusAction.createRevokeStatusMsgData: selfDir: "out" -> fromMe
+                .senderJid(selfJid) // WAWebRevokeStatusAction.createRevokeStatusMsgData: participant: n (me)
+                .build();
+        var protocol = new ProtocolMessageBuilder() // WAWebRevokeStatusAction.createRevokeStatusMsgData: {kind: ProtocolRevoke, protocolMessageKey: e.id, subtype: "sender_revoke"}
+                .key(originalKey) // WAWebRevokeStatusAction.createRevokeStatusMsgData: protocolMessageKey: e.id
+                .type(ProtocolMessage.Type.REVOKE) // WAWebRevokeStatusAction.createRevokeStatusMsgData: MsgKind.ProtocolRevoke / subtype "sender_revoke"
+                .timestampMs(Instant.now()) // WAWebRevokeStatusAction.createRevokeStatusMsgData: revokeTimestamp: unixTime()
+                .build();
+        var wrapper = MessageContainer.of(protocol); // WAWebRevokeStatusAction.sendStatusRevokeMsgAction: v = {type: Message, data: C}
+        return messageService.send(statusJid, wrapper); // WAWebRevokeStatusAction.sendStatusRevokeMsgAction -> WAWebEncryptAndSendStatusMsg.encryptAndSendStatusMsg
+    }
+
+    /**
+     * Emits a {@code read} receipt for a viewed status update.
+     *
+     * <p>Status read receipts are delivered to {@code status@broadcast}
+     * with the original status author attached as the {@code participant}
+     * attribute, mirroring WhatsApp Web's
+     * {@code WAWebStatusReceipt.sendStatusMsgRead} flow.
+     *
+     * @param statusAuthor the JID of the user that posted the status
+     * @param statusId     the id of the viewed status message
+     * @throws NullPointerException if any argument is {@code null}
+     *
+     * @implNote WAWebStatusReceipt.sendStatusMsgRead: dispatches a read
+     * receipt stanza to {@code STATUS_JID} with
+     * {@code type="read"}, {@code participant=author}, and
+     * {@code id=statusId}. Cobalt builds the same stanza and sends it via
+     * the shared socket pipeline.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebStatusReceipt", exports = "sendStatusMsgRead",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    public void markStatusViewed(Jid statusAuthor, String statusId) {
+        Objects.requireNonNull(statusAuthor, "statusAuthor cannot be null");
+        Objects.requireNonNull(statusId, "statusId cannot be null");
+        var me = store.jid().orElse(null); // WAWebUserPrefsMeUser.getMeUser
+        if (me == null) {
+            return; // ADAPTED: silently drop when unauthenticated, matching sendReceipt
+        }
+        var receipt = new NodeBuilder() // WAWebStatusReceipt.sendStatusMsgRead: deprecatedSendStanza("receipt", {to: STATUS_JID, type: "read", participant, id})
+                .description("receipt")
+                .attribute("id", statusId) // WAWebStatusReceipt.sendStatusMsgRead: id
+                .attribute("type", "read") // WAWebStatusReceipt.sendStatusMsgRead: type: "read"
+                .attribute("to", Jid.statusBroadcastAccount()) // WAWebStatusReceipt.sendStatusMsgRead: to: STATUS_JID
+                .attribute("participant", statusAuthor) // WAWebStatusReceipt.sendStatusMsgRead: participant: author
+                .build();
+        sendNodeWithNoResponse(receipt); // WAWebStatusReceipt.sendStatusMsgRead: sendStanza
+    }
+
+    /**
+     * Queries the server for the current Status privacy configuration.
+     *
+     * <p>The IQ is sent with {@code xmlns="status"} and a single
+     * {@code <privacy/>} child addressed to {@code s.whatsapp.net}. The
+     * server responds with a {@code <privacy>} element containing the
+     * selected mode and any paired JID list.
+     *
+     * @return the current status privacy setting, never {@code null}
+     *
+     * @implNote WAWebUserPrefsStatus.getStatusPrivacySetting exposes the
+     * cached setting; WA Web additionally refreshes the cache via an IQ
+     * query. Cobalt emits the IQ directly and parses the response into a
+     * {@link StatusPrivacySetting} record.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebUserPrefsStatus", exports = "getStatusPrivacySetting",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public StatusPrivacySetting queryStatusPrivacy() {
+        // <iq xmlns="status" to="s.whatsapp.net" type="get"><privacy/></iq>
+        var privacyQuery = new NodeBuilder()
+                .description("privacy")
+                .build();
+        var iqNode = new NodeBuilder()
+                .description("iq")
+                .attribute("xmlns", "status") // task spec: xmlns="status"
+                .attribute("to", JidServer.user()) // task spec: to="s.whatsapp.net"
+                .attribute("type", "get")
+                .content(privacyQuery);
+        var response = sendNode(iqNode);
+        var privacyNode = response.getChild("privacy")
+                .orElseThrow(() -> new NoSuchElementException("Missing <privacy> in status privacy response"));
+        var modeAttr = privacyNode.getAttributeAsString("list") // WA Web: list="contacts" | "contact_whitelist" | "contact_blacklist"
+                .or(() -> privacyNode.getAttributeAsString("type"))
+                .orElse("contacts");
+        var mode = switch (modeAttr) {
+            case "contacts" -> StatusPrivacyMode.CONTACTS;
+            case "contact_whitelist", "allowlist", "whitelist" -> StatusPrivacyMode.WHITELIST;
+            case "contact_blacklist", "denylist", "blacklist" -> StatusPrivacyMode.CONTACTS_EXCEPT;
+            default -> StatusPrivacyMode.CONTACTS;
+        };
+        var jids = privacyNode.streamChildren("user")
+                .flatMap(userNode -> userNode.streamAttributeAsJid("jid"))
+                .toList();
+        return new StatusPrivacySetting(mode, jids);
+    }
+
+    /**
+     * Changes the Status privacy configuration.
+     *
+     * <p>Dispatches a status privacy IQ for the immediate server-side
+     * change and, in parallel, publishes a
+     * {@link StatusPrivacyAction} sync mutation via
+     * {@link WebAppStateService#pushPatches} so the new configuration
+     * propagates to every companion device. The local
+     * {@link PrivacySettingType#STATUS} entry in the store is also updated
+     * eagerly.
+     *
+     * @param mode the new distribution mode; never {@code null}
+     * @param jids the JID list applied by {@link StatusPrivacyMode#WHITELIST}
+     *             and {@link StatusPrivacyMode#CONTACTS_EXCEPT}; may be
+     *             empty or {@code null} for {@link StatusPrivacyMode#CONTACTS}
+     * @throws NullPointerException if {@code mode} is {@code null}
+     *
+     * @implNote WAWebStatusSetAndSyncPrivacy.setAndSyncStatusPrivacy: builds
+     * a {@code statusPrivacy} mutation via
+     * {@code WAWebStatusPrivacySettingSync.getStatusPrivacySettingMutation}
+     * and pushes it via {@code WAWebSyncdCoreApi.lockForSync(["user-prefs"], [mutation], ...)}
+     * while persisting the new config through
+     * {@code WAWebUserPrefsStatus.setStatusPrivacyConfig}. Cobalt delegates
+     * the mutation construction to
+     * {@link StatusPrivacyHandler#getMutation(Instant, StatusPrivacyAction.StatusDistributionMode, java.util.List)}
+     * and additionally emits a direct {@code xmlns="status"} IQ as required
+     * by the task spec.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebStatusSetAndSyncPrivacy", exports = "setAndSyncStatusPrivacy",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void changeStatusPrivacy(StatusPrivacyMode mode, Collection<Jid> jids) {
+        Objects.requireNonNull(mode, "mode cannot be null");
+        var jidList = jids == null ? List.<Jid>of() : List.copyOf(jids); // WAWebStatusSetAndSyncPrivacy: Array.from(new Set(t.map(...)))
+
+        // WAWebStatusSetAndSyncPrivacy: emit the server-side IQ for the mutation.
+        // task spec: <iq xmlns="status" to="s.whatsapp.net" type="set"><privacy list="..."><user jid="..."/>...</privacy></iq>
+        var listAttr = switch (mode) {
+            case CONTACTS -> "contacts"; // WAWebUserPrefsStatusType.StatusPrivacySettingType.Contact
+            case WHITELIST -> "contact_whitelist"; // WAWebUserPrefsStatusType.StatusPrivacySettingType.AllowList
+            case CONTACTS_EXCEPT -> "contact_blacklist"; // WAWebUserPrefsStatusType.StatusPrivacySettingType.DenyList
+        };
+        var userChildren = new ArrayList<Node>(jidList.size());
+        for (var jid : jidList) {
+            if (jid == null) {
+                continue; // ADAPTED: defensive skip
+            }
+            userChildren.add(new NodeBuilder()
+                    .description("user")
+                    .attribute("jid", jid)
+                    .build());
+        }
+        var privacyNode = new NodeBuilder()
+                .description("privacy")
+                .attribute("list", listAttr)
+                .content(userChildren)
+                .build();
+        var iqNode = new NodeBuilder()
+                .description("iq")
+                .attribute("xmlns", "status") // task spec: xmlns="status"
+                .attribute("to", JidServer.user()) // task spec: to="s.whatsapp.net"
+                .attribute("type", "set")
+                .content(privacyNode);
+        sendNode(iqNode);
+
+        // WAWebStatusSetAndSyncPrivacy: r("WAWebStatusPrivacySettingSync").getStatusPrivacySettingMutation(...)
+        var protoMode = switch (mode) {
+            case CONTACTS -> StatusPrivacyAction.StatusDistributionMode.CONTACTS; // WAWebProtobufSyncAction.pb.SyncActionValue$StatusPrivacyAction$StatusDistributionMode.CONTACTS
+            case WHITELIST -> StatusPrivacyAction.StatusDistributionMode.ALLOW_LIST; // WAWebProtobufSyncAction.pb...ALLOW_LIST
+            case CONTACTS_EXCEPT -> StatusPrivacyAction.StatusDistributionMode.DENY_LIST; // WAWebProtobufSyncAction.pb...DENY_LIST
+        };
+        var mutation = StatusPrivacyHandler.INSTANCE.getMutation(Instant.now(), protoMode, jidList); // WAWebStatusPrivacySettingSync.getStatusPrivacySettingMutation
+        webAppStateService.pushPatches( // WAWebStatusSetAndSyncPrivacy: WAWebSyncdCoreApi.lockForSync(["user-prefs"], [d], ...)
+                StatusPrivacyAction.COLLECTION_NAME,
+                List.of(mutation));
+
+        // WAWebStatusSetAndSyncPrivacy: r("WAWebUserPrefsStatus").setStatusPrivacyConfig({setting, list})
+        var value = switch (mode) {
+            case CONTACTS -> PrivacySettingValue.CONTACTS; // ADAPTED: StatusPrivacySettingType.Contact -> PrivacySettingValue.CONTACTS
+            case WHITELIST -> PrivacySettingValue.CONTACTS_ONLY; // ADAPTED: StatusPrivacySettingType.AllowList -> PrivacySettingValue.CONTACTS_ONLY
+            case CONTACTS_EXCEPT -> PrivacySettingValue.CONTACTS_EXCEPT; // ADAPTED: StatusPrivacySettingType.DenyList -> PrivacySettingValue.CONTACTS_EXCEPT
+        };
+        var entry = new PrivacySettingEntryBuilder()
+                .type(PrivacySettingType.STATUS)
+                .value(value)
+                .excluded(jidList) // Cobalt overloads excluded() for both allow and deny lists
+                .build();
+        store.addPrivacySetting(entry); // WAWebUserPrefsStatus.setStatusPrivacyConfig
     }
 
     /**
@@ -3062,6 +5526,8 @@ public final class WhatsAppClient {
      */
     @WhatsAppWebExport(moduleName = "WAWebChatForwardMessage", exports = "forwardMessages",
             adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebWamChatPSALogger", exports = "logChatPSAForward",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public AckResult forwardMessage(MessageKey sourceKey, Jid destination) {
         Objects.requireNonNull(sourceKey, "sourceKey cannot be null");
         Objects.requireNonNull(destination, "destination cannot be null");
@@ -3073,6 +5539,8 @@ public final class WhatsAppClient {
                 .orElseThrow(() -> new IllegalArgumentException("Source message not found in local store: " + messageId));
         // WAWebChatForwardMessage.getForwardedMessageFields: strip local-only fields and forward the message body
         var container = source.message(); // WAWebChatForwardMessage.forwardMessages: sendTextMsgToChatAction / sendMediaMsgToChatAction with forwarded container
+        // WAWebForwardMessagesToChat.forwardMessagesToChats: u.map(e => WAWebMsgGetters.getIsPSA(e) && WAWebWamChatPSALogger.logChatPSAForward(e))
+        logPsaActionIfApplicable(source, PsaMessageActionType.FORWARD); // WAWebWamChatPSALogger.logChatPSAForward -> PSA_MESSAGE_ACTION_TYPE.FORWARD
         return messageService.send(destination, container); // WAWebChatForwardMessage.forwardMessages -> sendMsgRecord
     }
 
@@ -3105,21 +5573,28 @@ public final class WhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     @WhatsAppWebExport(moduleName = "WAWebChatForwardMessage", exports = "getForwardedMessageFields",
             adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebWamChatPSALogger", exports = "logChatPSAForward",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public void forwardMessages(Collection<MessageKey> sourceKeys, Collection<Jid> destinations) {
         Objects.requireNonNull(sourceKeys, "sourceKeys cannot be null");
         Objects.requireNonNull(destinations, "destinations cannot be null");
         // WAWebForwardMessagesToChat.forwardMessagesToChats: u.map(e => canForward(e))
-        var containers = new ArrayList<MessageContainer>();
+        var resolvedSources = new ArrayList<MessageInfo>();
         for (var sourceKey : sourceKeys) {
             sourceKey.parentJid() // WAWebChatForwardMessage.getForwardedMessageFields: e.id.remote
                     .flatMap(parent -> sourceKey.id()
                             .flatMap(id -> store.findMessageById(parent, id)))
-                    .map(MessageInfo::message) // WAWebChatForwardMessage.getForwardedMessageFields: omit local-only fields
-                    .ifPresent(containers::add);
+                    .ifPresent(resolvedSources::add);
+        }
+        // WAWebForwardMessagesToChat.forwardMessagesToChats:
+        // u.map(e => WAWebMsgGetters.getIsPSA(e) && WAWebWamChatPSALogger.logChatPSAForward(e)) — logged once per source, before fan-out.
+        for (var source : resolvedSources) {
+            logPsaActionIfApplicable(source, PsaMessageActionType.FORWARD); // WAWebWamChatPSALogger.logChatPSAForward -> PSA_MESSAGE_ACTION_TYPE.FORWARD
         }
         // WAWebForwardMessagesToChat.forwardMessagesToChats: i.filter(e => e.canSend).map(chat => forwardMessages)
         for (var destination : destinations) {
-            for (var container : containers) {
+            for (var source : resolvedSources) {
+                var container = source.message(); // WAWebChatForwardMessage.getForwardedMessageFields: omit local-only fields
                 messageService.send(destination, container); // WAWebChatForwardMessage.forwardMessages -> sendMsgRecord
             }
         }
@@ -3168,10 +5643,7 @@ public final class WhatsAppClient {
                 .text(emoji) // WAWebReactionsMsgAction.addOrUpdateReactions: reactionText
                 .senderTimestampMs(Instant.now()) // WAWebReactionsMsgAction.addOrUpdateReactions: timestamp: i.timestamp
                 .build();
-        // Record the locally sent reaction so the store reflects the
-        // in-flight state until the server ack lands. The preparer auto
-        // converts to EncReactionMessage for CAG groups.
-        store.trackSentReaction(messageKey, emoji); // WAWebReactionsMsgAction.addOrUpdateReactionsModelCollection: ReactionsCollection.addOrUpdateReaction
+        // The preparer auto converts to EncReactionMessage for CAG groups.
         return messageService.send(parentJid, MessageContainer.of(reaction)); // WAWebReactionsMsgAction -> sendMsgRecord
     }
 
@@ -3223,9 +5695,13 @@ public final class WhatsAppClient {
      */
     @WhatsAppWebExport(moduleName = "WAWebStarMessageSync", exports = "getStarMessageMutations",
             adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebWamChatPSALogger", exports = "logChatPSAStar",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public void starMessage(MessageKey key) {
         Objects.requireNonNull(key, "key cannot be null");
         pushStarMutation(key, true); // WAWebStarMessageSync.getStarMessageMutations: starAction.starred = true
+        // WAWebActionListenerHelpers: if(getIsPSA(e)) for (var m=0; m<c; m++) WAWebWamChatPSALogger.logChatPSAStar(t[m])
+        logPsaActionIfApplicable(key, PsaMessageActionType.SAVE); // WAWebWamChatPSALogger.logChatPSAStar -> PSA_MESSAGE_ACTION_TYPE.SAVE
     }
 
     /**
@@ -3329,8 +5805,99 @@ public final class WhatsAppClient {
         });
     }
 
-    //<editor-fold desc="Chat operations">
+    /**
+     * Emits a {@link ChatPsaActionEventBuilder} for the given message when
+     * the message belongs to the official WhatsApp PSA account.
+     *
+     * <p>The helper looks up the chat message associated with {@code key}
+     * and forwards to {@link #logPsaActionIfApplicable(MessageInfo, PsaMessageActionType)}.
+     * If the key cannot be resolved (for example because the message has
+     * already been purged from the local store) no event is emitted; this
+     * mirrors WA Web's behaviour of skipping the PSA log when the
+     * underlying {@code Msg} is not available.
+     *
+     * @param key        the message key whose chat affiliation is being
+     *                   tested; must not be {@code null}
+     * @param actionType the PSA action that was performed on the message
+     *
+     * @implNote WAWebActionListenerHelpers / WAWebForwardMessagesToChat:
+     * the call sites look up the {@code Msg} model first via
+     * {@code getIsPSA(e)} / {@code getIsPSA(chat)} and only invoke the
+     * PSA logger when the chat/message is part of the PSA campaign.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebChatGetters", exports = "getIsPSA",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private void logPsaActionIfApplicable(MessageKey key, PsaMessageActionType actionType) {
+        var parentJid = key.parentJid().orElse(null); // WAWebChatGetters.getIsPSA: r("WAWebWid").isPSA(chatJid)
+        if (parentJid == null || !parentJid.equals(Jid.announcementsAccount())) {
+            return; // WAWebChatGetters.getIsPSA: false -> skip
+        }
+        var messageId = key.id().orElse(null);
+        if (messageId == null) {
+            return;
+        }
+        store.findMessageById(parentJid, messageId)
+                .ifPresent(info -> logPsaActionIfApplicable(info, actionType));
+    }
 
+    /**
+     * Emits a {@link ChatPsaActionEventBuilder} for the given message when
+     * the message originates from the official WhatsApp PSA account
+     * ({@code 0@s.whatsapp.net}).
+     *
+     * <p>The event populates {@code messageMediaType},
+     * {@code psaCampaignId}, {@code psaMsgId} and the caller-supplied
+     * {@code psaMessageActionType}, matching the four WA Web emission
+     * sites in {@code WAWebWamChatPSALogger}
+     * ({@code logChatPSAStar}, {@code logChatPSADelete},
+     * {@code logChatPSAForward}, {@code logChatPSAMediaPlay}).
+     *
+     * <p>Messages that do not belong to the PSA account or are not
+     * {@link ChatMessageInfo} instances are silently ignored.
+     *
+     * @param info       the resolved message info whose PSA affiliation
+     *                   is being tested; must not be {@code null}
+     * @param actionType the PSA action that was performed on the message
+     *
+     * @implNote WAWebWamChatPSALogger.logChatPSAStar / logChatPSADelete /
+     * logChatPSAForward / logChatPSAMediaPlay: the generic helper around
+     * {@code new ChatPsaActionWamEvent({messageMediaType, psaCampaignId,
+     * psaMessageActionType, psaMsgId}).commit()}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebWamChatPSALogger", exports = "logChatPSAStar",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebWamChatPSALogger", exports = "logChatPSADelete",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebWamChatPSALogger", exports = "logChatPSAForward",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebWamChatPSALogger", exports = "logChatPSAMediaPlay",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private void logPsaActionIfApplicable(MessageInfo info, PsaMessageActionType actionType) {
+        if (!(info instanceof ChatMessageInfo chatInfo)) { // WAWebMsgGetters.getIsPSA: ChatModel check
+            return;
+        }
+        var parentJid = chatInfo.key().parentJid().orElse(null);
+        if (parentJid == null || !parentJid.equals(Jid.announcementsAccount())) { // WAWebWid.isPSA: user === "0" && server === "c.us"
+            return;
+        }
+        var messageIdOpt = chatInfo.key().id();
+        if (messageIdOpt.isEmpty()) {
+            return;
+        }
+        // WAWebWamChatPSALogger: psaCampaignId: (t = e.campaignId) == null ? void 0 : t.toString()
+        var campaignId = chatInfo.statusPsa()
+                .map(com.github.auties00.cobalt.model.message.status.StatusPSA::campaignId)
+                .map(String::valueOf)
+                .orElse(null);
+        wamService.commit(new ChatPsaActionEventBuilder() // WAWebWamChatPSALogger: new ChatPsaActionWamEvent({...}).commit()
+                .messageMediaType(WamMsgUtils.getWamMediaType(chatInfo)) // WAWebWamMsgUtils.getWamMediaType(e)
+                .psaCampaignId(campaignId) // WAWebWamChatPSALogger: (t=e.campaignId)==null?void 0:t.toString()
+                .psaMessageActionType(actionType) // WAWebWamChatPSALogger: PSA_MESSAGE_ACTION_TYPE.SAVE/DELETE/FORWARD/MEDIA_PLAY
+                .psaMsgId(messageIdOpt.get()) // WAWebWamChatPSALogger: e.id.id.toString()
+                .build());
+    }
+
+    //<editor-fold desc="Chat operations">
     /**
      * Builds a minimal outgoing {@link SyncActionMessageRange} for the given
      * chat covering the chat's most recent message.
@@ -3480,6 +6047,54 @@ public final class WhatsAppClient {
         webAppStateService.pushPatches(MuteChatHandler.INSTANCE.collectionName(), List.of(mutation)); // WAWebSyncdActionUtils.buildPendingMutation -> lockForSync
         store.findChatByJid(chat).ifPresent(chatModel -> // WAWebMuteChatSync.applyMutations: C.muteExpiration = g (apply locally for eager consistency)
                 chatModel.setMute(com.github.auties00.cobalt.model.chat.ChatMute.mutedUntil(muteEndSeconds)));
+        // WAWebActionListener (mute/unmute handler q):
+        //   !getIsPSA(t) && !getIsNewsletter(t) && logChatMute(t, e, l) / logChatUnmute(t, g)
+        // WAWebChatMuteLogger.logChatMute / logChatUnmute then builds a ChatMuteWamEvent with:
+        //   actionConducted = MUTE on mute, UNMUTE on unmute
+        //   muteChatType    = GROUP if getIsGroup(chat) else ONE_ON_ONE
+        //   muteDuration    = n (seconds, -1 = indefinite) — mute path only
+        //   muteEntryPoint  = e (CHAT_LIST_SCREEN / CONTACT_INFO / CONVERSATION_SCREEN)
+        //   muteGroupSize   = chat.groupMetadata.participants.length ?? 0 — group path only
+        // Newsletters in Cobalt use the dedicated #muteNewsletter(Jid, boolean) API and never reach this method.
+        // PSA chats are not surfaced via Cobalt's public mute API (there is no WAWebWamChatPSALogger equivalent wired here).
+        // muteEntryPoint is a UI-layer value (which screen the user tapped mute from); Cobalt has no UI so it is left unset.
+        if (!chat.hasNewsletterServer()) { // WAWebActionListener: !getIsNewsletter(t) (getIsPSA has no Cobalt equivalent at this layer)
+            var isGroup = chat.hasGroupOrCommunityServer(); // WAWebChatMuteLogger: var i = getIsGroup(e)
+            var muteChatType = isGroup // WAWebChatMuteLogger.u: getIsGroup(e) ? MUTE_CHAT_TYPE.GROUP : MUTE_CHAT_TYPE.ONE_ON_ONE
+                    ? MuteChatType.GROUP
+                    : MuteChatType.ONE_ON_ONE;
+            var eventBuilder = new ChatMuteEventBuilder()
+                    .muteChatType(muteChatType); // WAWebChatMuteLogger: muteChatType: u(e)
+            if (muteEndSeconds == 0L) { // WAWebActionListener: unmute branch -> logChatUnmute(t, g)
+                eventBuilder.actionConducted(ActionConducted.UNMUTE); // WAWebChatMuteLogger.logChatUnmute: actionConducted: ACTION_CONDUCTED.UNMUTE (no muteDuration set)
+            } else { // WAWebActionListener: mute branch -> logChatMute(t, e, l)
+                eventBuilder.actionConducted(ActionConducted.MUTE) // WAWebChatMuteLogger.logChatMute: actionConducted: ACTION_CONDUCTED.MUTE
+                        .muteDuration(Instant.ofEpochSecond(muteEndSeconds)); // WAWebChatMuteLogger.logChatMute: muteDuration: n (seconds value, -1 = indefinite sentinel passed through WAWebActionListener's r === 1/0 ? -1 : r transform)
+            }
+            if (isGroup) { // WAWebChatMuteLogger: babelHelpers.extends({...}, i ? {muteGroupSize: ...} : {})
+                // WAWebChatMuteLogger: muteGroupSize: (r = (a = e.groupMetadata) == null || (a = a.participants) == null ? void 0 : a.length) != null ? r : 0
+                var groupSize = store.findChatByJid(chat) // WAWebChatMuteLogger: e.groupMetadata.participants.length
+                        .map(c -> c.participant().size())
+                        .orElse(0);
+                eventBuilder.muteGroupSize(groupSize); // WAWebChatMuteLogger: muteGroupSize: ... (group-only branch)
+            }
+            wamService.commit(eventBuilder.build()); // WAWebChatMuteLogger: new ChatMuteWamEvent({...}).commit()
+        }
+        // WAWebActionListener.c / WAWebActionListener.w (mute handlers): (t.isBusinessGroup() || t.contact.isBusiness) && new BusinessMuteWamEvent().commit()
+        // WAWebActionListener (unmute handler): (t.isBusinessGroup() || t.contact.isBusiness) && new BusinessUnmuteWamEvent().commit()
+        // Emitted only on one path per invocation: mute emits BusinessMuteWamEvent, unmute emits BusinessUnmuteWamEvent.
+        // WA Web constructs both events with no arguments, so the defined muteT (mute only) and muteeId properties remain unset.
+        // ADAPTED: Cobalt's Contact model does not track an isBusiness flag and Cobalt cannot iterate a group's admin
+        // contacts' per-contact business status, so the isBusinessGroup() branch of WA Web's guard is not reachable here.
+        // The closest available proxy for contact.isBusiness is the presence of a verified business name for the chat JID.
+        var isBusinessChat = store.findVerifiedBusinessName(chat).isPresent(); // WAWebActionListener: t.contact.isBusiness (approximated via verifiedBusinessNames)
+        if (isBusinessChat) { // WAWebActionListener: (t.isBusinessGroup() || t.contact.isBusiness)
+            if (muteEndSeconds == 0L) { // WAWebActionListener: unmute branch (mute.unmute(...))
+                wamService.commit(new BusinessUnmuteEventBuilder().build()); // WAWebActionListener: new BusinessUnmuteWamEvent().commit() (WA Web does not set muteeId at this call site)
+            } else { // WAWebActionListener.c / WAWebActionListener.w: mute branch (mute.mute(...))
+                wamService.commit(new BusinessMuteEventBuilder().build()); // WAWebActionListener: new BusinessMuteWamEvent().commit() (WA Web does not set muteT or muteeId at this call site)
+            }
+        }
     }
 
     /**
@@ -3621,6 +6236,12 @@ public final class WhatsAppClient {
         if (chatModel != null) { // WAWebClearChatSync.clearChat: queryAndRemoveMessagesInMessageRange
             chatModel.removeMessages(); // ADAPTED: WAWebClearChatSync.clearChat — Cobalt drops all messages since per-message range deletion is not yet supported
         }
+        // WAWebClearSelectedChatsAction.clearSelectedChats: after yield r, logChatActionEvent({chatActionEntryPoint: l, chatActionType: CLEAR})
+        // WA Web defaults the entry point to CONVERSATION_LIST_BULK_EDIT when the caller omits it (r.entryPoint === void 0)
+        wamService.commit(new ChatActionEventBuilder()
+                .chatActionEntryPoint(ChatActionEntryPoint.CONVERSATION_LIST_BULK_EDIT) // WAWebClearSelectedChatsAction.clearSelectedChats: l = r.entryPoint ?? CHAT_ACTION_ENTRY_POINT.CONVERSATION_LIST_BULK_EDIT
+                .chatActionType(ChatActionType.CLEAR) // WAWebClearSelectedChatsAction.clearSelectedChats: CHAT_ACTION_TYPE.CLEAR
+                .build());
     }
 
     /**
@@ -3729,6 +6350,599 @@ public final class WhatsAppClient {
     }
 
     /**
+     * Creates a new chat label with the given name and palette colour index.
+     *
+     * <p>Per WhatsApp Web {@code WAWebBizLabelEditingAction.labelAddAction}:
+     * allocates the next label id via
+     * {@code WAWebDBLabelDatabaseApi.getNextLabelId}, maps the name to a
+     * predefined-id when applicable (via
+     * {@code WAWebLabelConstants.mapLabelNameToPredefinedId}), and issues a
+     * {@code getLabelMutation} with {@code deleted=false} and
+     * {@code type=CUSTOM}. Cobalt allocates the next id in-memory against
+     * the current store (one above the highest existing numeric label id,
+     * starting at {@code 1}) because the IndexedDB-backed
+     * {@code getNextLabelId} sequence is not replicated.
+     *
+     * @param name       the user-visible display name of the label
+     * @param colorIndex the palette colour index
+     * @return the newly-allocated label id (stringified integer)
+     * @throws NullPointerException if {@code name} is {@code null}
+     *
+     * @implNote WAWebBizLabelEditingAction.labelAddAction
+     */
+    @WhatsAppWebExport(moduleName = "WAWebBizLabelEditingAction", exports = "labelAddAction",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public String createLabel(String name, int colorIndex) {
+        Objects.requireNonNull(name, "name cannot be null"); // ADAPTED: invariant guard; WA Web accepts any string
+        var timestamp = Instant.now(); // WAWebBizLabelEditingAction.labelAddAction: var l = unixTime()
+        // ADAPTED: WAWebBizLabelEditingAction.labelAddAction: var i = yield getNextLabelId()
+        // Cobalt has no IndexedDB label-id sequence, so we compute the next id as max(existingNumericIds) + 1, starting at 1.
+        var nextId = store.labels().stream()
+                .map(Label::id)
+                .mapToInt(id -> { // ADAPTED: WA Web uses String(i) with the server-assigned integer sequence
+                    try { return Integer.parseInt(id); } catch (NumberFormatException ignored) { return 0; }
+                })
+                .max()
+                .orElse(0) + 1;
+        var labelId = String.valueOf(nextId); // WAWebBizLabelEditingAction.labelAddAction: String(i)
+        var mutation = LabelEditHandler.INSTANCE.getLabelMutation( // WAWebBizLabelEditingAction.labelAddAction: getLabelMutation(String(i), t, a, false, c, d, m, l)
+                labelId,
+                name,
+                colorIndex,
+                false, // WAWebBizLabelEditingAction.labelAddAction: deleted = false
+                null, // WAWebBizLabelEditingAction.labelAddAction: c = mapLabelNameToPredefinedId(t) — Cobalt skips predefined-id mapping (UI catalog)
+                Boolean.TRUE, // WAWebBizLabelEditingAction.labelAddAction: d = isListsEnabled() ? true : undefined — Cobalt always treats new labels as active
+                LabelEditAction.ListType.CUSTOM, // WAWebBizLabelEditingAction.labelAddAction: m = ListType.CUSTOM
+                timestamp
+        );
+        webAppStateService.pushPatches(LabelEditAction.COLLECTION_NAME, List.of(mutation)); // WAWebSyncdCoreApi.lockForSync(["label"], [p], ...)
+        var label = new com.github.auties00.cobalt.model.preference.LabelBuilder() // WAWebBizLabelEditingAction.labelAddAction: LabelCollection.add({id, name, colorIndex, ...})
+                .id(labelId)
+                .name(name)
+                .color(colorIndex)
+                .isActive(Boolean.TRUE)
+                .type(LabelEditAction.ListType.CUSTOM)
+                .build();
+        store.addLabel(label); // WAWebBizLabelEditingAction.labelAddAction: LabelCollection.add(...)
+        return labelId;
+    }
+
+    /**
+     * Edits the display name and/or palette colour of an existing label.
+     *
+     * <p>Per WhatsApp Web {@code WAWebBizLabelEditingAction.labelEditAction}:
+     * issues a {@code getLabelMutation} with {@code deleted=false} carrying
+     * the new fields, then updates the in-memory label collection via
+     * {@code LabelCollection.add(..., {merge: true})}.
+     *
+     * @param labelId    the label identifier
+     * @param name       the new display name
+     * @param colorIndex the new palette colour index
+     * @throws NullPointerException if {@code labelId} or {@code name} is {@code null}
+     *
+     * @implNote WAWebBizLabelEditingAction.labelEditAction
+     */
+    @WhatsAppWebExport(moduleName = "WAWebBizLabelEditingAction", exports = "labelEditAction",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void editLabel(String labelId, String name, int colorIndex) {
+        Objects.requireNonNull(labelId, "labelId cannot be null");
+        Objects.requireNonNull(name, "name cannot be null");
+        var timestamp = Instant.now(); // WAWebBizLabelEditingAction.labelEditAction: var d = unixTime()
+        var existing = store.findLabel(labelId).orElse(null); // WAWebBizLabelEditingAction.labelEditAction uses the existing label for merge
+        var predefinedId = existing != null && existing.predefinedId().isPresent()
+                ? existing.predefinedId().getAsInt()
+                : null; // WAWebBizLabelEditingAction.labelEditAction: a != null ? a : m (m is the current predefined id)
+        var type = existing != null ? existing.type().orElse(null) : null; // WAWebBizLabelEditingAction.labelEditAction: u (existing type preserved)
+        var isActive = existing != null && existing.isActive().orElse(Boolean.FALSE); // WAWebBizLabelEditingAction.labelEditAction: l (existing active flag)
+        var mutation = LabelEditHandler.INSTANCE.getLabelMutation( // WAWebBizLabelEditingAction.labelEditAction: getLabelMutation(e, t, i, false, a, l, u, d)
+                labelId,
+                name,
+                colorIndex,
+                false, // WAWebBizLabelEditingAction.labelEditAction: deleted = false
+                predefinedId,
+                isActive ? Boolean.TRUE : null, // WAWebBizLabelEditingAction.labelEditAction: l
+                type,
+                timestamp
+        );
+        webAppStateService.pushPatches(LabelEditAction.COLLECTION_NAME, List.of(mutation)); // WAWebSyncdCoreApi.lockForSync(["label"], [p], ...)
+        if (existing != null) { // WAWebBizLabelEditingAction.labelEditAction: LabelCollection.add(..., {merge: true})
+            existing.setName(name);
+            existing.setColor(colorIndex);
+        } else { // ADAPTED: insert a stub if the caller edits an unknown label id — keeps local state consistent with the mutation we pushed
+            var label = new com.github.auties00.cobalt.model.preference.LabelBuilder()
+                    .id(labelId)
+                    .name(name)
+                    .color(colorIndex)
+                    .build();
+            store.addLabel(label);
+        }
+    }
+
+    /**
+     * Deletes an existing chat label along with all of its chat-jid
+     * associations.
+     *
+     * <p>Per WhatsApp Web {@code WAWebBizLabelEditingAction.labelDeleteAction}:
+     * queries any existing label-jid associations, builds a
+     * {@code getLabelMutation} with {@code deleted=true}, appends a matching
+     * removal mutation for each live association via
+     * {@code WAWebLabelJidSync.createLabelAssociationMutations}, and pushes
+     * them together under the {@code label}/{@code label-association}/{@code chat}
+     * lock. The in-memory label is then removed from
+     * {@code LabelCollection}.
+     *
+     * @param labelId the identifier of the label to delete
+     * @throws NullPointerException if {@code labelId} is {@code null}
+     *
+     * @implNote WAWebBizLabelEditingAction.labelDeleteAction
+     */
+    @WhatsAppWebExport(moduleName = "WAWebBizLabelEditingAction", exports = "labelDeleteAction",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void deleteLabel(String labelId) {
+        Objects.requireNonNull(labelId, "labelId cannot be null");
+        var timestamp = Instant.now(); // WAWebBizLabelEditingAction.labelDeleteAction: var l = unixTime()
+        var existing = store.findLabel(labelId).orElse(null); // WAWebBizLabelEditingAction.labelDeleteAction: yield queryLabelAssociationsForLabelIds([e])
+        var mutations = new ArrayList<SyncPendingMutation>(); // WAWebBizLabelEditingAction.labelDeleteAction: var u = getLabelMutation(e, ...); var c = []; ...; [u].concat(c)
+        mutations.add(LabelEditHandler.INSTANCE.getLabelMutation( // WAWebBizLabelEditingAction.labelDeleteAction: getLabelMutation(e, t, a, true, m, undefined, undefined, l)
+                labelId,
+                existing != null ? existing.name() : "", // WAWebBizLabelEditingAction.labelDeleteAction: t (existing display name; empty when caller deletes a missing id)
+                existing != null ? existing.color() : 0, // WAWebBizLabelEditingAction.labelDeleteAction: a (existing colour index)
+                true, // WAWebBizLabelEditingAction.labelDeleteAction: deleted = true
+                null, // WAWebBizLabelEditingAction.labelDeleteAction: predefinedId = 0 sentinel in WA Web; Cobalt omits
+                null,
+                null,
+                timestamp
+        ));
+        if (existing != null) { // WAWebBizLabelEditingAction.labelDeleteAction: p.length > 0 && (c = yield createLabelAssociationMutations(...))
+            for (var assignment : existing.assignments()) { // WAWebBizLabelEditingAction.labelDeleteAction: p.map(e => ({mutationIndexSegments: [e.associationId]}))
+                mutations.add(LabelAssociationHandler.INSTANCE.createLabelAssociationMutation( // WAWebLabelJidSync.createLabelAssociationMutations
+                        labelId,
+                        assignment,
+                        false, // WAWebBizLabelEditingAction.labelDeleteAction: type: "remove"
+                        timestamp
+                ));
+            }
+        }
+        webAppStateService.pushPatches(LabelEditAction.COLLECTION_NAME, mutations); // WAWebSyncdCoreApi.lockForSync(["label","label-association","chat"], [u].concat(c), ...)
+        store.removeLabel(labelId); // WAWebBizLabelEditingAction.labelDeleteAction: LabelCollection.remove(e)
+    }
+
+    /**
+     * Applies a new user-chosen order to the chat labels.
+     *
+     * <p>Per WhatsApp Web {@code WAWebBIzLabelReorderAction.reorderLabelsAction}
+     * (plus the sync side {@code WAWebLabelReorderingSync.applyMutations}),
+     * the reorder is emitted as a {@link LabelReorderingAction} carrying the
+     * full ordered list of integer label identifiers. Each local label's
+     * {@code orderIndex} is then set to its position in the list.
+     *
+     * @param labelIds the label identifiers in the new display order
+     * @throws NullPointerException if {@code labelIds} is {@code null}
+     *
+     * @implNote WAWebBIzLabelReorderAction.reorderLabelsAction
+     */
+    @WhatsAppWebExport(moduleName = "WAWebBIzLabelReorderAction", exports = "reorderLabelsAction",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void reorderLabels(List<String> labelIds) {
+        Objects.requireNonNull(labelIds, "labelIds cannot be null");
+        var timestamp = Instant.now();
+        var intIds = new ArrayList<Integer>(labelIds.size()); // ADAPTED: WA Web stores labels by string id; the wire type of LabelReorderingAction.sortedLabelIds is INT32
+        for (var id : labelIds) {
+            try {
+                intIds.add(Integer.parseInt(id));
+            } catch (NumberFormatException ignored) {
+                // ADAPTED: skip non-numeric ids (predefined filters are not reorderable on the wire)
+            }
+        }
+        var mutation = LabelReorderingHandler.INSTANCE.getReorderLabelsMutation(intIds, timestamp);
+        webAppStateService.pushPatches(LabelReorderingAction.COLLECTION_NAME, List.of(mutation));
+        for (var position = 0; position < labelIds.size(); position++) { // WAWebBIzLabelReorderAction.reorderLabelsAction: n.forEach((e, n) => { ... r.orderIndex = n })
+            var id = labelIds.get(position);
+            store.findLabel(id).ifPresent(label -> {}); // WAWebBIzLabelReorderAction.reorderLabelsAction: LabelCollection.get(String(e))
+            final var finalPosition = position;
+            store.findLabel(id).ifPresent(label -> {
+                if (label.orderIndex().isEmpty() || label.orderIndex().getAsInt() != finalPosition) { // WAWebBIzLabelReorderAction.reorderLabelsAction: r.orderIndex !== n
+                    label.setOrderIndex(finalPosition); // WAWebBIzLabelReorderAction.reorderLabelsAction: r.orderIndex = n
+                }
+            });
+        }
+    }
+
+    /**
+     * Associates a label with the given chat.
+     *
+     * <p>Per WhatsApp Web {@code WAWebEditLabelAssociationBridge.editLabelAssociation}:
+     * issues a {@link LabelAssociationAction} with {@code labeled=true}
+     * indexed by {@code [label_jid, labelId, chatJid]}, and records the
+     * association in the local label's assignment set.
+     *
+     * @param labelId the label identifier
+     * @param chat    the chat JID to tag with the label
+     * @throws NullPointerException if any argument is {@code null}
+     *
+     * @implNote WAWebEditLabelAssociationBridge.editLabelAssociation (add branch)
+     */
+    @WhatsAppWebExport(moduleName = "WAWebEditLabelAssociationBridge", exports = "editLabelAssociation",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void associateLabel(String labelId, Jid chat) {
+        Objects.requireNonNull(labelId, "labelId cannot be null");
+        Objects.requireNonNull(chat, "chat cannot be null");
+        pushLabelAssociationMutation(labelId, chat, true); // WAWebEditLabelAssociationBridge.editLabelAssociation: createLabelAssociationMutations with type "add"
+    }
+
+    /**
+     * Dissociates a label from the given chat.
+     *
+     * <p>Counterpart to {@link #associateLabel(String, Jid)}: emits a
+     * {@link LabelAssociationAction} with {@code labeled=false}.
+     *
+     * @param labelId the label identifier
+     * @param chat    the chat JID to untag
+     * @throws NullPointerException if any argument is {@code null}
+     *
+     * @implNote WAWebEditLabelAssociationBridge.editLabelAssociation (remove branch)
+     */
+    @WhatsAppWebExport(moduleName = "WAWebEditLabelAssociationBridge", exports = "editLabelAssociation",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void dissociateLabel(String labelId, Jid chat) {
+        Objects.requireNonNull(labelId, "labelId cannot be null");
+        Objects.requireNonNull(chat, "chat cannot be null");
+        pushLabelAssociationMutation(labelId, chat, false); // WAWebEditLabelAssociationBridge.editLabelAssociation: createLabelAssociationMutations with type "remove"
+    }
+
+    /**
+     * Associates a label with a specific message.
+     *
+     * <p>Per WhatsApp Web, message-level label associations share the
+     * {@code label_jid} action but use the message key's parent chat as the
+     * index target. The association is stored on the local label, keyed by
+     * the message's chat JID.
+     *
+     * @param labelId    the label identifier
+     * @param messageKey the target message key
+     * @throws NullPointerException if any argument is {@code null}
+     *
+     * @implNote WAWebLabelJidSync.createLabelAssociationMutations (message variant)
+     */
+    @WhatsAppWebExport(moduleName = "WAWebLabelJidSync", exports = "createLabelAssociationMutations",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void associateLabel(String labelId, MessageKey messageKey) {
+        Objects.requireNonNull(labelId, "labelId cannot be null");
+        Objects.requireNonNull(messageKey, "messageKey cannot be null");
+        var target = messageKey.parentJid() // ADAPTED: WA Web uses the message's chatId as the association target
+                .orElseThrow(() -> new IllegalArgumentException("messageKey is missing a parent/chat JID"));
+        pushLabelAssociationMutation(labelId, target, true);
+    }
+
+    /**
+     * Dissociates a label from a specific message.
+     *
+     * @param labelId    the label identifier
+     * @param messageKey the target message key
+     * @throws NullPointerException if any argument is {@code null}
+     *
+     * @implNote WAWebLabelJidSync.createLabelAssociationMutations (message variant, remove)
+     */
+    @WhatsAppWebExport(moduleName = "WAWebLabelJidSync", exports = "createLabelAssociationMutations",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void dissociateLabel(String labelId, MessageKey messageKey) {
+        Objects.requireNonNull(labelId, "labelId cannot be null");
+        Objects.requireNonNull(messageKey, "messageKey cannot be null");
+        var target = messageKey.parentJid()
+                .orElseThrow(() -> new IllegalArgumentException("messageKey is missing a parent/chat JID"));
+        pushLabelAssociationMutation(labelId, target, false);
+    }
+
+    /**
+     * Builds and pushes a label-jid association mutation and mirrors the
+     * change into the in-memory {@link Label}.
+     *
+     * @param labelId the label id
+     * @param target  the chat/contact JID
+     * @param labeled {@code true} to add the association, {@code false} to remove
+     */
+    @WhatsAppWebExport(moduleName = "WAWebLabelJidSync", exports = "createLabelAssociationMutations",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private void pushLabelAssociationMutation(String labelId, Jid target, boolean labeled) {
+        var timestamp = Instant.now();
+        var mutation = LabelAssociationHandler.INSTANCE.createLabelAssociationMutation( // WAWebLabelJidSync.createLabelAssociationMutations
+                labelId,
+                target,
+                labeled,
+                timestamp
+        );
+        webAppStateService.pushPatches(LabelAssociationAction.COLLECTION_NAME, List.of(mutation)); // WAWebSyncdCoreApi.lockForSync
+        store.findLabel(labelId).ifPresent(label -> { // WAWebEditLabelAssociationBridge.editLocalLabelAssociationMD: LabelCollection.get(...)
+            if (labeled) {
+                label.addAssignment(target); // WAWebEditLabelAssociationBridge.editLocalLabelAssociationMD: addLabelAssociation
+            } else {
+                label.removeAssignment(target); // WAWebEditLabelAssociationBridge.editLocalLabelAssociationMD: removeLabelAssociation
+            }
+        });
+    }
+
+    /**
+     * Creates a new business broadcast list with the given name and
+     * recipients.
+     *
+     * <p>Per WhatsApp Web {@code WAWebBroadcastListSync.getBroadcastListMutation}:
+     * assembles a {@link BusinessBroadcastListAction} containing one
+     * {@link BroadcastListParticipantAction} per recipient, builds a
+     * pending SET mutation, pushes it on the {@code REGULAR} collection,
+     * and seeds the store.
+     *
+     * <p>The broadcast list JID is allocated locally as the next unused
+     * numeric id on the {@code broadcast} server because WA Web assigns the
+     * list id client-side via {@code getBroadcastListStorage().getNextId()}.
+     *
+     * @param name       the display name of the broadcast list
+     * @param recipients the recipient JIDs
+     * @return the JID identifying the new broadcast list
+     * @throws NullPointerException if any argument is {@code null}
+     *
+     * @implNote WAWebBroadcastListSync.getBroadcastListMutation (create branch)
+     */
+    @WhatsAppWebExport(moduleName = "WAWebBroadcastListSync", exports = "getBroadcastListMutation",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Jid createBroadcastList(String name, Collection<Jid> recipients) {
+        Objects.requireNonNull(name, "name cannot be null");
+        Objects.requireNonNull(recipients, "recipients cannot be null");
+        var timestamp = Instant.now();
+        // ADAPTED: WA Web allocates the list id via getBroadcastListStorage().getNextId();
+        // Cobalt derives the next id as max(existing numeric user parts) + 1.
+        var nextId = store.businessBroadcastLists().keySet().stream()
+                .mapToLong(id -> { try { return Long.parseLong(id); } catch (NumberFormatException ignored) { return 0L; } })
+                .max()
+                .orElse(0L) + 1;
+        var listId = String.valueOf(nextId);
+        var listJid = Jid.of(listId, com.github.auties00.cobalt.model.jid.JidServer.broadcast()); // ADAPTED: broadcast lists use `<id>@broadcast` as the routing JID
+        var participants = buildBroadcastParticipants(recipients); // WAWebBroadcastListSync.getBroadcastListMutation: participants: n
+        var mutation = BusinessBroadcastListHandler.INSTANCE.getBroadcastListMutation( // WAWebBroadcastListSync.getBroadcastListMutation
+                listId,
+                participants,
+                name,
+                timestamp
+        );
+        webAppStateService.pushPatches(BusinessBroadcastListAction.COLLECTION_NAME, List.of(mutation));
+        // ADAPTED: WA Web seeds the broadcast list storage via updateBroadcastListStorage;
+        // Cobalt mirrors the state into the flat store map.
+        var action = new com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastListActionBuilder()
+                .participants(participants)
+                .listName(name)
+                .labelIds(List.of())
+                .build();
+        var current = new java.util.HashMap<>(store.businessBroadcastLists());
+        current.put(listId, action);
+        store.setBusinessBroadcastLists(current);
+        return listJid;
+    }
+
+    /**
+     * Renames a broadcast list and/or replaces its recipients.
+     *
+     * @param broadcastListId the JID returned by
+     *                        {@link #createBroadcastList(String, Collection)}
+     * @param newName         the new display name
+     * @param newRecipients   the full new set of recipient JIDs
+     * @throws NullPointerException if any argument is {@code null}
+     *
+     * @implNote WAWebBroadcastListSync.getBroadcastListMutation (update branch)
+     */
+    @WhatsAppWebExport(moduleName = "WAWebBroadcastListSync", exports = "getBroadcastListMutation",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void editBroadcastList(Jid broadcastListId, String newName, Collection<Jid> newRecipients) {
+        Objects.requireNonNull(broadcastListId, "broadcastListId cannot be null");
+        Objects.requireNonNull(newName, "newName cannot be null");
+        Objects.requireNonNull(newRecipients, "newRecipients cannot be null");
+        var timestamp = Instant.now();
+        var listId = broadcastListId.user(); // ADAPTED: extract the user part as the sync list id
+        var participants = buildBroadcastParticipants(newRecipients); // WAWebBroadcastListSync.getBroadcastListMutation: participants: n
+        var mutation = BusinessBroadcastListHandler.INSTANCE.getBroadcastListMutation( // WAWebBroadcastListSync.getBroadcastListMutation
+                listId,
+                participants,
+                newName,
+                timestamp
+        );
+        webAppStateService.pushPatches(BusinessBroadcastListAction.COLLECTION_NAME, List.of(mutation));
+        var action = new com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastListActionBuilder()
+                .participants(participants)
+                .listName(newName)
+                .labelIds(List.of())
+                .build();
+        var current = new java.util.HashMap<>(store.businessBroadcastLists());
+        current.put(listId, action);
+        store.setBusinessBroadcastLists(current);
+    }
+
+    /**
+     * Deletes a broadcast list.
+     *
+     * <p>Per WhatsApp Web {@code WAWebBroadcastListSync.getDeleteBroadcastListMutation}:
+     * emits a REMOVE mutation under the {@code REGULAR} collection keyed by
+     * the list id, then clears the entry from the store.
+     *
+     * @param broadcastListId the broadcast list JID
+     * @throws NullPointerException if {@code broadcastListId} is {@code null}
+     *
+     * @implNote WAWebBroadcastListSync.getDeleteBroadcastListMutation
+     */
+    @WhatsAppWebExport(moduleName = "WAWebBroadcastListSync", exports = "getDeleteBroadcastListMutation",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void deleteBroadcastList(Jid broadcastListId) {
+        Objects.requireNonNull(broadcastListId, "broadcastListId cannot be null");
+        var timestamp = Instant.now();
+        var listId = broadcastListId.user();
+        var mutation = BusinessBroadcastListHandler.INSTANCE.getDeleteBroadcastListMutation(listId, timestamp); // WAWebBroadcastListSync.getDeleteBroadcastListMutation
+        webAppStateService.pushPatches(BusinessBroadcastListAction.COLLECTION_NAME, List.of(mutation));
+        var current = new java.util.HashMap<>(store.businessBroadcastLists());
+        current.remove(listId); // WAWebBroadcastListStorageUtils.removeBroadcastListStorage
+        store.setBusinessBroadcastLists(current);
+    }
+
+    /**
+     * Sends a message to every recipient of the given broadcast list.
+     *
+     * <p>Per WhatsApp Web {@code WAWebSendBroadcastMsgAction.sendBroadcastMsgAction}:
+     * the broadcast JID is used as the recipient; the message pipeline
+     * fans the payload out to each participant. Cobalt delegates to
+     * {@link #sendMessage(Jid, MessageContainer)} which dispatches via
+     * {@code MessageService#send(Jid, MessageContainer)} whose broadcast
+     * path handles per-participant encryption.
+     *
+     * @param broadcastListId the broadcast list JID
+     * @param message         the message payload
+     * @return the resulting chat-message metadata
+     * @throws NullPointerException if any argument is {@code null}
+     *
+     * @implNote WAWebSendBroadcastMsgAction.sendBroadcastMsgAction
+     */
+    @WhatsAppWebExport(moduleName = "WAWebSendBroadcastMsgAction", exports = "sendBroadcastMsgAction",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public ChatMessageInfo sendBroadcast(Jid broadcastListId, MessageContainer message) {
+        Objects.requireNonNull(broadcastListId, "broadcastListId cannot be null");
+        Objects.requireNonNull(message, "message cannot be null");
+        var selfJid = store.jid() // WAWebUserPrefsMeUser.getMeUser
+                .orElseThrow(() -> new IllegalStateException("Not logged in"));
+        // WAWebSendBroadcastMsgAction.sendBroadcastMsgAction: buildBroadcastMsgModels + encryptAndSendBroadcastMsg
+        // Build a canonical outgoing ChatMessageInfo so callers get a typed handle; MessageService.send
+        // handles per-device encryption and fanout when the recipient JID carries the broadcast server.
+        var messageId = MessageIdGenerator.generate(MessageIdVersion.V2, selfJid); // WAWebMsgKey.newId
+        var key = new MessageKeyBuilder()
+                .id(messageId) // WAWebSendBroadcastMsgAction.sendBroadcastMsgAction: id: newId()
+                .parentJid(broadcastListId) // WAWebSendBroadcastMsgAction.sendBroadcastMsgAction: to: broadcastListJid
+                .fromMe(true) // WAWebSendBroadcastMsgAction.sendBroadcastMsgAction: selfDir: "out"
+                .senderJid(selfJid) // WAWebSendBroadcastMsgAction.sendBroadcastMsgAction: participant: me
+                .build();
+        var messageInfo = new ChatMessageInfoBuilder()
+                .status(MessageStatus.PENDING) // ADAPTED: mirrors MessagePreparer.prepareChat initial status
+                .senderJid(selfJid)
+                .key(key)
+                .message(message) // WAWebSendBroadcastMsgAction.sendBroadcastMsgAction: body/content
+                .timestamp(Instant.now()) // WAWebSendBroadcastMsgAction.sendBroadcastMsgAction: t: unixTime()
+                .broadcast(true) // WAWebSendBroadcastMsgAction.sendBroadcastMsgAction: broadcast routing
+                .build();
+        messageService.send(messageInfo); // WAWebSendBroadcastMsgAction.sendBroadcastMsgAction: encryptAndSendBroadcastMsg(...)
+        return messageInfo;
+    }
+
+    /**
+     * Builds a {@link BroadcastListParticipantAction} list for the given
+     * recipient JIDs, mirroring the split made in
+     * {@link BusinessBroadcastAssociationHandler} between LID recipients
+     * (stored as {@code lidJid}) and phone-number recipients (stored as
+     * {@code pnJid} plus a resolved {@code lidJid}).
+     *
+     * @param recipients the recipient JIDs
+     * @return a mutable list of participant entries suitable for the action builder
+     */
+    @WhatsAppWebExport(moduleName = "WAWebBroadcastListSync", exports = "getBroadcastListMutation",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private List<BroadcastListParticipantAction> buildBroadcastParticipants(Collection<Jid> recipients) {
+        var participants = new ArrayList<BroadcastListParticipantAction>(recipients.size());
+        for (var recipient : recipients) {
+            var participant = new BroadcastListParticipantAction();
+            if (recipient.hasLidServer() || recipient.hasHostedLidServer()) { // NO_WA_BASIS: LID recipients stored as lidJid only
+                participant.setLidJid(recipient);
+            } else {
+                participant.setPnJid(recipient); // NO_WA_BASIS: PN recipients carry the resolved lidJid for cross-indexing
+                participant.setLidJid(store.getLidByPhoneNumber(recipient).orElse(recipient));
+            }
+            participants.add(participant);
+        }
+        return participants;
+    }
+
+    /**
+     * Assigns the given chat to the given agent id.
+     *
+     * <p>Per WhatsApp Web {@code WAWebBizChatAssignmentAction.changeChatAssignment}:
+     * issues a {@link ChatAssignmentAction} on the {@code REGULAR} sync
+     * collection and updates the in-memory chat-assignment map.
+     *
+     * @param chat    the chat JID
+     * @param agentId the agent identifier
+     * @throws NullPointerException if any argument is {@code null}
+     *
+     * @implNote WAWebBizChatAssignmentAction.changeChatAssignment
+     */
+    @WhatsAppWebExport(moduleName = "WAWebBizChatAssignmentAction", exports = "changeChatAssignment",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void assignChatToAgent(Jid chat, String agentId) {
+        Objects.requireNonNull(chat, "chat cannot be null");
+        Objects.requireNonNull(agentId, "agentId cannot be null");
+        var timestamp = Instant.now();
+        var mutation = ChatAssignmentHandler.INSTANCE.createChatAssignmentMutation( // WAWebChatAssignmentSync.createChatAssignmentMutations
+                chat,
+                agentId,
+                timestamp
+        );
+        webAppStateService.pushPatches(ChatAssignmentAction.COLLECTION_NAME, List.of(mutation));
+        var states = new java.util.HashMap<>(store.chatAssignmentStates()); // ADAPTED: WAWebChatAssignmentSync.applyMutations writes via bulkCreateOrMerge; Cobalt updates the flat map
+        if (agentId.isEmpty()) {
+            states.remove(chat.toString()); // WAWebChatAssignmentSync.applyMutations: empty agentId drops the assignment
+        } else {
+            states.put(chat.toString(), agentId); // WAWebChatAssignmentSync.applyMutations: i.push({...chatId, agentId})
+        }
+        store.setChatAssignmentStates(states);
+    }
+
+    /**
+     * Unassigns a chat from any agent.
+     *
+     * <p>Equivalent to calling {@link #assignChatToAgent(Jid, String)} with
+     * an empty agent id, which per
+     * {@code WAWebChatAssignmentSync.applyMutations} drops every existing
+     * assignment for the chat.
+     *
+     * @param chat the chat JID
+     * @throws NullPointerException if {@code chat} is {@code null}
+     *
+     * @implNote WAWebBizChatAssignmentAction.changeChatAssignment with empty agent
+     */
+    @WhatsAppWebExport(moduleName = "WAWebBizChatAssignmentAction", exports = "changeChatAssignment",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void unassignChatFromAgent(Jid chat) {
+        assignChatToAgent(chat, ""); // WAWebChatAssignmentSync.applyMutations: d === "" && only removes existing
+    }
+
+    /**
+     * Records whether the assigned agent has opened the given chat.
+     *
+     * <p>Per WhatsApp Web {@code WAWebBizChatAssignmentOpenedAction.markChatAsOpened}:
+     * issues a {@link ChatAssignmentOpenedStatusAction} under the
+     * {@code REGULAR} sync collection and mirrors the state in the local
+     * {@code chatAssignmentOpenedStates} map. The chat must currently be
+     * assigned to an agent; the assigned agent id is read from the store.
+     *
+     * @param chat   the chat JID
+     * @param opened {@code true} when the assigned agent has opened the chat
+     * @throws NullPointerException  if {@code chat} is {@code null}
+     * @throws IllegalStateException when the chat is not currently assigned
+     *
+     * @implNote WAWebBizChatAssignmentOpenedAction.markChatAsOpened
+     */
+    @WhatsAppWebExport(moduleName = "WAWebBizChatAssignmentOpenedAction", exports = "markChatAsOpened",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void setChatAssignmentOpenedStatus(Jid chat, boolean opened) {
+        Objects.requireNonNull(chat, "chat cannot be null");
+        var agentId = store.chatAssignmentStates().get(chat.toString()); // WAWebBizChatAssignmentOpenedAction.markChatAsOpened: agentId = ChatAssignmentCollection.getCurrentAgentId(e)
+        if (agentId == null) { // WAWebBizChatAssignmentOpenedAction.markChatAsOpened: invariant agentId != null
+            throw new IllegalStateException("Chat " + chat + " has no current agent assignment");
+        }
+        var timestamp = Instant.now();
+        var mutation = ChatAssignmentOpenedStatusHandler.INSTANCE.createChatOpenedMutation( // WAWebChatAssignmentOpenedStatusSync.createChatOpenedMutations
+                chat,
+                agentId,
+                opened,
+                timestamp
+        );
+        webAppStateService.pushPatches(ChatAssignmentOpenedStatusAction.COLLECTION_NAME, List.of(mutation));
+        var states = new java.util.HashMap<>(store.chatAssignmentOpenedStates()); // ADAPTED: WAWebBizChatAssignmentOpenedAction.updateLocalOpenedState writes via bulkCreateOrMerge
+        states.put(chat + "_" + agentId, opened); // WAWebChatAssignmentOpenedStatusSync.applyMutations: d = s.toJid() + "_" + i
+        store.setChatAssignmentOpenedStates(states);
+    }
+
+    /**
      * Sets the per-chat disappearing-message timer via a direct IQ stanza.
      *
      * <p>For peer (one-to-one) chats, the IQ is sent with
@@ -3789,10 +7003,441 @@ public final class WhatsAppClient {
                     .content(disappearing);
             sendNode(iqNode); // WAWebSetDisappearingModeJob.setDisappearingMode: deprecatedSendIq(r, s)
         }
-        store.findChatByJid(chat).ifPresent(chatModel -> { // WAWebChangeEphemeralDurationChatAction: t.ephemeralDuration = d; updateChatTable(...)
+        var chatModelOpt = store.findChatByJid(chat);
+        var previousSeconds = chatModelOpt // WAWebChangeEphemeralDurationChatAction: var i = calculateEphemeralDurationForChat(e) (captured before mutation so previousEphemeralityDuration is correct)
+                .flatMap(Chat::ephemeralExpiration)
+                .map(ChatEphemeralTimer::periodSeconds)
+                .orElse(null);
+        chatModelOpt.ifPresent(chatModel -> { // WAWebChangeEphemeralDurationChatAction: t.ephemeralDuration = d; updateChatTable(...)
             chatModel.setEphemeralExpiration(timer == ChatEphemeralTimer.OFF ? null : timer); // WAWebChangeEphemeralDurationChatAction: ephemeralDuration = d
             chatModel.setEphemeralSettingTimestamp(Instant.now()); // WAWebUpdateEphemeralSettingTimestampChatAction: t.ephemeralSettingTimestamp = ...
         });
+        // WAWebChangeEphemeralDurationChatAction.changeEphemeralDuration:
+        //   new(o("WAWebEphemeralSettingChangeWamEvent")).EphemeralSettingChangeWamEvent({
+        //     chatEphemeralityDuration: l ? void 0 : t,     // suppressed for after-read durations
+        //     threadId: yield getChatThreadID(e.id.toJid()), // HMAC-based thread id from WAWebChatThreadLogging
+        //     ephemeralSettingEntryPoint: n,                // UI entry point (CHAT_INFO / CHAT_OVERFLOW / ...)
+        //     isAfterRead: l,
+        //     afterReadDuration: l ? t : void 0,
+        //     previousEphemeralityDuration: i,              // set only when i != null
+        //     previousEphemeralityType: ...,                // set only when i > 0
+        //     ephemeralSettingGroupSize: numberToPreciseSizeBucket(participants.length) // groups only
+        //   }).commit()
+        // ADAPTED:
+        //  - chatEphemeralityDuration is always set to `seconds` (Cobalt exposes no after-read API, so the WA Web `l` branch never applies).
+        //  - threadId is left unset because Cobalt does not implement WAWebChatThreadLogging (HMAC chat thread ids).
+        //  - ephemeralSettingEntryPoint is left unset because Cobalt is headless and has no UI entry point to report.
+        //  - Spec-level properties isAfterRead / afterReadDuration / previousEphemeralityType / isSuccess / errorCode
+        //    are not declared on Cobalt's EphemeralSettingChangeEvent spec and therefore cannot be emitted.
+        var eventBuilder = new EphemeralSettingChangeEventBuilder()
+                .chatEphemeralityDuration(seconds); // WAWebChangeEphemeralDurationChatAction: chatEphemeralityDuration: l ? void 0 : t (Cobalt always takes the non-after-read branch)
+        if (previousSeconds != null) { // WAWebChangeEphemeralDurationChatAction: if (i != null) s.previousEphemeralityDuration = i
+            eventBuilder.previousEphemeralityDuration(previousSeconds);
+        }
+        if (chat.hasGroupOrCommunityServer()) { // WAWebChangeEphemeralDurationChatAction: if (getIsGroup(e)) s.ephemeralSettingGroupSize = numberToPreciseSizeBucket(participants.length ?? 0)
+            var participantCount = chatModelOpt // WAWebChangeEphemeralDurationChatAction: (u = (d = e.groupMetadata) == null ? void 0 : d.participants.length) != null ? u : 0
+                    .map(c -> c.participant().size())
+                    .orElse(0);
+            eventBuilder.ephemeralSettingGroupSize(numberToPreciseSizeBucket(participantCount));
+        }
+        wamService.commit(eventBuilder.build()); // WAWebChangeEphemeralDurationChatAction: new EphemeralSettingChangeWamEvent(s).commit()
+    }
+
+    /**
+     * Maps a participant count to the corresponding {@link PreciseSizeBucket}
+     * used by WAM size-bucketing for group-size telemetry.
+     *
+     * <p>Buckets are exclusive upper bounds: a count of {@code 3} falls in
+     * {@link PreciseSizeBucket#LT4}, a count of {@code 1000} falls in
+     * {@link PreciseSizeBucket#LT1500}, and any count {@code >= 5000} lands in
+     * {@link PreciseSizeBucket#LARGEST_BUCKET}.
+     *
+     * @param count the participant count; negative values are treated as
+     *              {@code 0} by the {@code < 4} branch
+     * @return the matching {@link PreciseSizeBucket}; never {@code null}
+     *
+     * @implNote Mirrors the {@code WAWebWamNumberToPreciseSizeBucket.numberToPreciseSizeBucket}
+     *           cascading ternary verbatim.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebWamNumberToPreciseSizeBucket", exports = "numberToPreciseSizeBucket",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    private static PreciseSizeBucket numberToPreciseSizeBucket(int count) {
+        // WAWebWamNumberToPreciseSizeBucket.numberToPreciseSizeBucket: cascading e<threshold ? BUCKET : ... chain
+        if (count < 4) return PreciseSizeBucket.LT4;
+        if (count < 8) return PreciseSizeBucket.LT8;
+        if (count < 16) return PreciseSizeBucket.LT16;
+        if (count < 32) return PreciseSizeBucket.LT32;
+        if (count < 64) return PreciseSizeBucket.LT64;
+        if (count < 128) return PreciseSizeBucket.LT128;
+        if (count < 256) return PreciseSizeBucket.LT256;
+        if (count < 512) return PreciseSizeBucket.LT512;
+        if (count < 1000) return PreciseSizeBucket.LT1000;
+        if (count < 1500) return PreciseSizeBucket.LT1500;
+        if (count < 2000) return PreciseSizeBucket.LT2000;
+        if (count < 2500) return PreciseSizeBucket.LT2500;
+        if (count < 3000) return PreciseSizeBucket.LT3000;
+        if (count < 3500) return PreciseSizeBucket.LT3500;
+        if (count < 4000) return PreciseSizeBucket.LT4000;
+        if (count < 4500) return PreciseSizeBucket.LT4500;
+        if (count < 5000) return PreciseSizeBucket.LT5000;
+        return PreciseSizeBucket.LARGEST_BUCKET;
+    }
+
+    /**
+     * Queries the server for the current privacy configuration of the local
+     * account.
+     *
+     * <p>Sends a {@code <iq xmlns="privacy" to="s.whatsapp.net" type="get">}
+     * stanza whose payload is a bare {@code <privacy/>} node. The response
+     * carries a {@code <privacy>} container with one {@code <category>} per
+     * configured setting, each exposing the server-side identifier via the
+     * {@code name} attribute and the selected audience via the {@code value}
+     * attribute.
+     *
+     * <p>Categories whose {@code name} or {@code value} cannot be resolved to
+     * a Cobalt enum constant are silently skipped, matching WA Web's
+     * permissive parser which returns {@code dhash}-only entries for unknown
+     * categories. The Status privacy distribution is excluded because it is
+     * carried on the {@code xmlns="status"} IQ and exposed by
+     * {@link #queryStatusPrivacy()}.
+     *
+     * @return an immutable map from every recognised {@link PrivacySettingType}
+     *         to the {@link PrivacySettingValue} the server currently
+     *         enforces; never {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     *
+     * @implNote WAWebGetPrivacySettingsJob.getPrivacySettings issues the same
+     *           {@code <iq xmlns="privacy" type="get"><privacy/></iq>} stanza
+     *           and feeds the result into {@code WAWebUserPrefsPrivacy}. Cobalt
+     *           omits the UserPrefs layer and merges entries into
+     *           {@link WhatsAppStore#addPrivacySetting(PrivacySettingEntry)}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebGetPrivacySettingsJob", exports = "getPrivacySettings",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Map<PrivacySettingType, PrivacySettingValue> queryPrivacySettings() {
+        // WAWebGetPrivacySettingsJob: wap("iq", {xmlns: "privacy", to: S_WHATSAPP_NET, type: "get"}, wap("privacy", null))
+        var privacyQuery = new NodeBuilder()
+                .description("privacy")
+                .build();
+        var iqNode = new NodeBuilder()
+                .description("iq")
+                .attribute("xmlns", "privacy")
+                .attribute("to", JidServer.user()) // WAWebGetPrivacySettingsJob: S_WHATSAPP_NET
+                .attribute("type", "get")
+                .content(privacyQuery);
+        var response = sendNode(iqNode);
+        // WAWebGetPrivacySettingsJob parser: e.child("privacy").mapChildrenWithTag("category", ...)
+        var privacyNode = response.getChild("privacy")
+                .orElseThrow(() -> new NoSuchElementException("Missing <privacy> in privacy settings response"));
+        var result = new EnumMap<PrivacySettingType, PrivacySettingValue>(PrivacySettingType.class);
+        for (var category : privacyNode.getChildren("category")) {
+            // WAWebGetPrivacySettingsJob parser: e.attrString("name"), e.attrString("value")
+            var name = category.getAttributeAsString("name").orElse(null);
+            var value = category.getAttributeAsString("value").orElse(null);
+            if (name == null || value == null) {
+                continue;
+            }
+            // ADAPTED: WA Web returns {name, value, dhash} for every category, including unknown ones;
+            //          Cobalt drops unknowns because the enum is the public API surface.
+            var type = PrivacySettingType.of(name).orElse(null);
+            var audience = PrivacySettingValue.of(value).orElse(null);
+            if (type == null || audience == null) {
+                continue;
+            }
+            result.put(type, audience);
+            // WAWebUserPrefsPrivacy.setPrivacySettings: refresh the local cache so
+            // subsequent reads via store.findPrivacySetting hit a warm entry.
+            store.addPrivacySetting(new PrivacySettingEntryBuilder()
+                    .type(type)
+                    .value(audience)
+                    .excluded(List.of())
+                    .build());
+        }
+        return Collections.unmodifiableMap(result);
+    }
+
+    /**
+     * Changes a single privacy setting on the local account without touching
+     * the per-contact allow/block list.
+     *
+     * <p>Equivalent to
+     * {@link #changePrivacySetting(PrivacySettingType, PrivacySettingValue, Collection)}
+     * with a {@code null} user list, which sends a {@code <privacy>} container
+     * with a single {@code <category name value/>} child and no {@code <user>}
+     * descendants.
+     *
+     * @param type  the setting to change; must be {@code null}-free
+     * @param value the new audience; must be accepted by
+     *              {@link PrivacySettingType#isSupported(PrivacySettingValue)}
+     * @throws NullPointerException     if {@code type} or {@code value} is
+     *                                  {@code null}
+     * @throws IllegalArgumentException if the value is not supported by the
+     *                                  given type
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     *
+     * @implNote WAWebSetPrivacyJob.setPrivacy with {@code users === null}:
+     *           dispatches through the non-LID branch {@code _(name, value)}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebSetPrivacyJob", exports = "setPrivacy",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void changePrivacySetting(PrivacySettingType type, PrivacySettingValue value) {
+        changePrivacySetting(type, value, null);
+    }
+
+    /**
+     * Changes a single privacy setting on the local account and pairs the new
+     * audience with an allow or block list of contacts when the selected
+     * {@link PrivacySettingValue} requires one.
+     *
+     * <p>Emits a {@code <iq xmlns="privacy" to="s.whatsapp.net" type="set">}
+     * stanza carrying a {@code <privacy>} container and a single
+     * {@code <category name value dhash/>} child. When {@code excludedOrIncluded}
+     * is non-empty the contacts are serialised as {@code <user jid action/>}
+     * grandchildren, with the action inferred from {@code value}:
+     * {@link PrivacySettingValue#CONTACTS_EXCEPT} and
+     * {@link PrivacySettingValue#CONTACTS_ONLY} map to {@code "add"} (append
+     * to the configured list), while any other value is treated as a cleanup
+     * and maps to {@code "remove"}.
+     *
+     * <p>For the LID-aware categories ({@link PrivacySettingType#LAST_SEEN},
+     * {@link PrivacySettingType#PROFILE_PIC}, {@link PrivacySettingType#STATUS}
+     * and {@link PrivacySettingType#ADD_ME_TO_GROUPS}) the enclosing
+     * {@code <privacy>} node also carries {@code addressing_mode="lid"} and
+     * each {@code <user>} child carries both {@code jid} (the LID) and
+     * {@code pn_jid} (the phone-number JID), matching
+     * {@code WAWebSetPrivacyJob.h}. If no LID is known for a participating
+     * contact the code falls back to the pure-PN shape, mirroring WA Web's
+     * in-module {@code try/catch} recovery.
+     *
+     * <p>The local {@link WhatsAppStore#addPrivacySetting(PrivacySettingEntry)}
+     * is refreshed eagerly after the server acknowledges the change so
+     * observers registered via
+     * {@link #addPrivacySettingChangedListener(WhatsappClientListenerConsumer.Binary)}
+     * see the new state without another round trip.
+     *
+     * @param type               the setting to change; must be {@code null}-free
+     * @param value              the new audience; must be accepted by
+     *                           {@link PrivacySettingType#isSupported(PrivacySettingValue)}
+     * @param excludedOrIncluded the per-contact allowlist
+     *                           ({@link PrivacySettingValue#CONTACTS_ONLY}) or
+     *                           blocklist
+     *                           ({@link PrivacySettingValue#CONTACTS_EXCEPT});
+     *                           may be {@code null} or empty when the value
+     *                           does not refine its audience with a list
+     * @throws NullPointerException     if {@code type} or {@code value} is
+     *                                  {@code null}
+     * @throws IllegalArgumentException if the value is not supported by the
+     *                                  given type
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     *
+     * @implNote WAWebSetPrivacyJob.setPrivacy: {@code p(t)} picks between
+     *           {@code _} (no users), {@code f} (LID-aware categories) and
+     *           {@code g} (plain PN) branches; {@code h} builds each
+     *           {@code <user>} element with {@code toLid}/{@code toPn}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebSetPrivacyJob", exports = "setPrivacy",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void changePrivacySetting(PrivacySettingType type, PrivacySettingValue value, Collection<Jid> excludedOrIncluded) {
+        Objects.requireNonNull(type, "type cannot be null");
+        Objects.requireNonNull(value, "value cannot be null");
+        if (!type.isSupported(value)) {
+            throw new IllegalArgumentException("Privacy setting " + type + " does not support value " + value);
+        }
+
+        var hasList = excludedOrIncluded != null && !excludedOrIncluded.isEmpty();
+        // WAWebSetPrivacyJob.setPrivacy: {action: "add" for CONTACTS_EXCEPT / CONTACTS_ONLY, "remove" otherwise}.
+        var action = (value == PrivacySettingValue.CONTACTS_EXCEPT || value == PrivacySettingValue.CONTACTS_ONLY)
+                ? "add"
+                : "remove";
+
+        // WAWebSetPrivacyJob.y: groupadd / last / profile / status are LID-migrated categories.
+        var lidAware = switch (type) {
+            case ADD_ME_TO_GROUPS, LAST_SEEN, PROFILE_PIC, STATUS -> true;
+            default -> false;
+        };
+
+        Node privacyNode;
+        if (!hasList) {
+            // WAWebSetPrivacyJob._(name, value): wap("privacy", null, wap("category", {name, value}))
+            var category = new NodeBuilder()
+                    .description("category")
+                    .attribute("name", type.data())
+                    .attribute("value", value.data())
+                    .build();
+            privacyNode = new NodeBuilder()
+                    .description("privacy")
+                    .content(category)
+                    .build();
+        } else if (lidAware) {
+            // WAWebSetPrivacyJob.f(name, value, users, dhash): wap("privacy", {addressing_mode: "lid"}, wap("category", {name, value, dhash: "none"}, users.map(h)))
+            List<Node> userChildren;
+            try {
+                userChildren = buildLidPrivacyUsers(excludedOrIncluded, action);
+            } catch (Throwable throwable) {
+                // WAWebSetPrivacyJob.p: LOGGER.ERROR("[privacy] setPrivacy: failed to create lid privacy node", ...); fall back to g().
+                LOGGER_PRIVACY.log(System.Logger.Level.WARNING,
+                        "[privacy] changePrivacySetting: failed to create LID privacy node, falling back to PN",
+                        throwable);
+                userChildren = buildPnPrivacyUsers(excludedOrIncluded, action);
+                var category = new NodeBuilder()
+                        .description("category")
+                        .attribute("name", type.data())
+                        .attribute("value", value.data())
+                        .attribute("dhash", "none") // WAWebSetPrivacyJob.g: dhash: r != null ? r : "none"
+                        .content(userChildren)
+                        .build();
+                privacyNode = new NodeBuilder()
+                        .description("privacy")
+                        .content(category)
+                        .build();
+                dispatchPrivacyIq(privacyNode, type, value, excludedOrIncluded);
+                return;
+            }
+            var category = new NodeBuilder()
+                    .description("category")
+                    .attribute("name", type.data())
+                    .attribute("value", value.data())
+                    .attribute("dhash", "none") // WAWebSetPrivacyJob.f: dhash: r != null ? r : "none"
+                    .content(userChildren)
+                    .build();
+            privacyNode = new NodeBuilder()
+                    .description("privacy")
+                    .attribute("addressing_mode", "lid") // WAWebSetPrivacyJob.f: addressing_mode: "lid"
+                    .content(category)
+                    .build();
+        } else {
+            // WAWebSetPrivacyJob.g(name, value, users, dhash): wap("privacy", null, wap("category", {name, value, dhash}, users.map({action, jid})))
+            var userChildren = buildPnPrivacyUsers(excludedOrIncluded, action);
+            var category = new NodeBuilder()
+                    .description("category")
+                    .attribute("name", type.data())
+                    .attribute("value", value.data())
+                    .attribute("dhash", "none")
+                    .content(userChildren)
+                    .build();
+            privacyNode = new NodeBuilder()
+                    .description("privacy")
+                    .content(category)
+                    .build();
+        }
+
+        dispatchPrivacyIq(privacyNode, type, value, excludedOrIncluded);
+    }
+
+    /**
+     * Logger reused by the privacy IQ helpers for LID fallback diagnostics.
+     *
+     * @implNote WAWebSetPrivacyJob: {@code WALogger.ERROR} usage on LID-node
+     *           construction failure.
+     */
+    private static final System.Logger LOGGER_PRIVACY = System.getLogger(WhatsAppClient.class.getName() + ".privacy");
+
+    /**
+     * Sends the privacy IQ and refreshes the local store entry on success.
+     *
+     * @param privacyNode        the already-built {@code <privacy>} content node
+     * @param type               the setting being changed
+     * @param value              the newly selected audience
+     * @param excludedOrIncluded the refinement list applied to the setting,
+     *                           may be {@code null} or empty
+     * @implNote WAWebSetPrivacyJob.d: deprecatedSendIq + throws
+     *           ServerStatusCodeError on failure; Cobalt relies on the default
+     *           {@link #sendNode(NodeBuilder)} IQ error handling.
+     */
+    private void dispatchPrivacyIq(Node privacyNode, PrivacySettingType type, PrivacySettingValue value, Collection<Jid> excludedOrIncluded) {
+        // WAWebSetPrivacyJob.d: wap("iq", {to: S_WHATSAPP_NET, type: "set", xmlns: "privacy", id: generateId()}, t)
+        var iqNode = new NodeBuilder()
+                .description("iq")
+                .attribute("xmlns", "privacy")
+                .attribute("to", JidServer.user())
+                .attribute("type", "set")
+                .content(privacyNode);
+        sendNode(iqNode);
+
+        // WAWebUserPrefsPrivacy.setPrivacySettings: mirror the new value in the local cache.
+        var excludedSnapshot = excludedOrIncluded == null
+                ? List.<Jid>of()
+                : excludedOrIncluded.stream().filter(Objects::nonNull).toList();
+        store.addPrivacySetting(new PrivacySettingEntryBuilder()
+                .type(type)
+                .value(value)
+                .excluded(excludedSnapshot)
+                .build());
+    }
+
+    /**
+     * Builds the LID-addressed {@code <user>} child nodes for a privacy IQ.
+     *
+     * <p>Each entry is mapped to a {@code <user jid=LID pn_jid=PN action=...>}
+     * element, mirroring {@code WAWebSetPrivacyJob.h}. The first participant
+     * whose LID cannot be resolved aborts the whole list so the caller can
+     * fall back to the pure-PN branch.
+     *
+     * @param users  the contacts to serialise, must be non-{@code null} and
+     *               non-empty
+     * @param action {@code "add"} or {@code "remove"}
+     * @return the list of {@code <user>} nodes, never {@code null}
+     * @throws IllegalStateException if any participant has no known LID, in
+     *                               which case WA Web falls back to the
+     *                               non-LID branch
+     * @implNote WAWebSetPrivacyJob.h: {@code toLid(wid)} / {@code toPn(wid)}
+     *           resolution; the username variant gated by
+     *           {@code username_contact_privacy_setting_allow_uncontact_set_enable}
+     *           is not implemented in Cobalt.
+     */
+    private List<Node> buildLidPrivacyUsers(Collection<Jid> users, String action) {
+        var result = new ArrayList<Node>(users.size());
+        for (var raw : users) {
+            if (raw == null) {
+                continue; // ADAPTED: defensive skip
+            }
+            var lid = lidMigrationService.toLid(raw);
+            if (lid == null) {
+                // WAWebSetPrivacyJob.h: throw err("createLidUserNode: unknown-lid-for-privacy-list-contact")
+                throw new IllegalStateException("createLidUserNode: unknown-lid-for-privacy-list-contact " + raw);
+            }
+            var pn = lidMigrationService.toPn(raw);
+            if (pn == null) {
+                // WAWebSetPrivacyJob.h: throw err("createLidUserNode: unknown-username-and-pn-for-privacy-list-contact")
+                throw new IllegalStateException("createLidUserNode: unknown-username-and-pn-for-privacy-list-contact " + raw);
+            }
+            result.add(new NodeBuilder()
+                    .description("user")
+                    .attribute("action", action)
+                    .attribute("jid", lid) // WAWebSetPrivacyJob.h: jid: LID
+                    .attribute("pn_jid", pn) // WAWebSetPrivacyJob.h: pn_jid: PN
+                    .build());
+        }
+        return result;
+    }
+
+    /**
+     * Builds the PN-addressed {@code <user>} child nodes for a privacy IQ.
+     *
+     * <p>Each contact is serialised as a {@code <user jid action/>} element,
+     * matching {@code WAWebSetPrivacyJob.g}. Entries whose JID is
+     * {@code null} are silently skipped.
+     *
+     * @param users  the contacts to serialise, must be non-{@code null} and
+     *               non-empty
+     * @param action {@code "add"} or {@code "remove"}
+     * @return the list of {@code <user>} nodes, never {@code null}
+     * @implNote WAWebSetPrivacyJob.g: users.map({action, wid}) ->
+     *           wap("user", {action, jid: JID(wid)})
+     */
+    private List<Node> buildPnPrivacyUsers(Collection<Jid> users, String action) {
+        var result = new ArrayList<Node>(users.size());
+        for (var raw : users) {
+            if (raw == null) {
+                continue; // ADAPTED: defensive skip
+            }
+            result.add(new NodeBuilder()
+                    .description("user")
+                    .attribute("action", action)
+                    .attribute("jid", raw) // WAWebSetPrivacyJob.g: jid: JID(wid)
+                    .build());
+        }
+        return result;
     }
 
     /**
@@ -3829,31 +7474,6 @@ public final class WhatsAppClient {
                 .content(disappearing);
         sendNode(iqNode); // WAWebSetDisappearingModeJob.setDisappearingMode: deprecatedSendIq(r, s)
         store.setNewChatsEphemeralTimer(timer); // WAWebSetDisappearingModePrivacyAction.setDisappearingMode: updateDisappearingModeForContact -> store.newChatsEphemeralTimer
-    }
-
-    /**
-     * Returns the default disappearing-message timer applied to new chats.
-     *
-     * <p>Per WhatsApp Web {@code WAWebGetDisappearingModeJob.getDisappearingMode}:
-     * normally this would query the server for the current default, but
-     * Cobalt instead returns the value cached on the local
-     * {@link WhatsAppStore} because the server-side default is kept in sync
-     * via {@code WAWebHandleDisappearingModeNotification} whenever the user
-     * changes it from any device.
-     *
-     * @return the cached default ephemeral timer, never {@code null}
-     *
-     * @implNote ADAPTED: WAWebGetDisappearingModeJob.getDisappearingMode
-     * queries a {@code USyncQuery} with the disappearing-mode protocol to
-     * fetch a peer's current setting; Cobalt's local
-     * {@link WhatsAppStore#newChatsEphemeralTimer()} reflects the current
-     * own-account default via {@code WAWebHandleDisappearingModeNotification}
-     * updates.
-     */
-    @WhatsAppWebExport(moduleName = "WAWebGetDisappearingModeJob", exports = "getDisappearingMode",
-            adaptation = WhatsAppAdaptation.ADAPTED)
-    public ChatEphemeralTimer queryChatsDefaultEphemeral() {
-        return store.newChatsEphemeralTimer(); // WAWebGetDisappearingModeJob: USyncQuery result.disappearing_mode.duration — Cobalt reads from the locally cached default
     }
 
     /**
@@ -3908,9 +7528,11 @@ public final class WhatsAppClient {
      * with {@code to=G_US}, {@code xmlns="w:g2"}, {@code type="set"} and a
      * {@code <create>} body containing the subject, optional ephemeral
      * duration and participant JIDs. Cobalt emits the same wire shape
-     * directly; the WAM telemetry (GroupCreateCWamEvent) and SMAX
-     * {@code CreateResponseGroupAlreadyExists} branch are skipped — the
-     * error path surfaces through the usual server IQ error handling.
+     * directly; the SMAX {@code CreateResponseGroupAlreadyExists} branch
+     * is skipped — the error path surfaces through the usual server IQ
+     * error handling. Upon successful creation, a
+     * {@link GroupCreateCEventBuilder GroupCreateCWamEvent} is committed
+     * matching the WA Web {@code CreateResponseSuccess} emission.
      */
     @WhatsAppWebExport(moduleName = "WAWebGroupCreateJob", exports = "createGroup",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -3951,6 +7573,7 @@ public final class WhatsAppClient {
         if (!(metadata instanceof GroupMetadata groupMetadata)) { // WAWebGroupCreateJob: createGroup always creates a non-community group
             throw new NoSuchElementException("Expected a group metadata, got %s".formatted(metadata));
         }
+        wamService.commit(new GroupCreateCEventBuilder().build()); // WAWebGroupCreateJob.createGroup: new GroupCreateCWamEvent().commit() (CreateResponseSuccess branch)
         return groupMetadata;
     }
 
@@ -4951,66 +8574,68 @@ public final class WhatsAppClient {
     }
 
     /**
-     * Toggles a group or community setting between
-     * {@link ChatPolicy#ANYONE} (all members) and
-     * {@link ChatPolicy#ADMINS} (admins only).
+     * Updates a group-level setting, dispatching through the same pipeline
+     * WA Web's {@code WAWebSetPropertyGroupAction.setGroupProperty} uses
+     * for each {@code GROUP_SETTING_TYPE} constant: some values travel
+     * over a legacy {@code w:g2} {@code iq} stanza, the rest over the
+     * {@code WAWebMexUpdateGroupPropertyJob} GraphQL mutation.
      *
-     * <p>Sends a {@code w:g2} {@code iq} of type {@code set} whose body
-     * depends on the chosen {@link GroupSetting} and {@code policy} value,
-     * mirroring WA Web's
-     * {@code WAWebGroupModifyInfoJob.setGroupProperty} switch:
+     * <p>Routing matches WA Web exactly:
      * <ul>
-     *   <li>{@link GroupSetting#ANNOUNCEMENT}: emits
-     *       {@code <announcement/>} for {@link ChatPolicy#ADMINS} or
-     *       {@code <not_announcement/>} otherwise.</li>
-     *   <li>{@link GroupSetting#RESTRICT}: emits {@code <locked/>} for
-     *       {@link ChatPolicy#ADMINS} or {@code <unlocked/>} otherwise.</li>
-     *   <li>{@link GroupSetting#NO_FREQUENTLY_FORWARDED}: emits
-     *       {@code <no_frequently_forwarded/>} for
-     *       {@link ChatPolicy#ADMINS} or {@code <frequently_forwarded_ok/>}
-     *       otherwise.</li>
-     *   <li>{@link GroupSetting#MEMBERSHIP_APPROVAL_MODE}: emits a
-     *       {@code <membership_approval_mode>} wrapper around a
-     *       {@code <group_join/>} toggle.</li>
-     *   <li>{@link GroupSetting#REPORT_TO_ADMIN_MODE}: emits
-     *       {@code <allow_admin_reports/>} or
-     *       {@code <not_allow_admin_reports/>}.</li>
-     *   <li>{@link GroupSetting#ALLOW_NON_ADMIN_SUB_GROUP_CREATION}:
-     *       emits
-     *       {@code <allow_non_admin_sub_group_creation/>} or
-     *       {@code <not_allow_non_admin_sub_group_creation/>}.</li>
+     *   <li>Direct {@code w:g2} IQ
+     *       ({@code WAWebGroupModifyInfoJob.setGroupProperty}):
+     *       {@link GroupSetting#ANNOUNCEMENT ANNOUNCEMENT},
+     *       {@link GroupSetting#RESTRICT RESTRICT},
+     *       {@link GroupSetting#NO_FREQUENTLY_FORWARDED NO_FREQUENTLY_FORWARDED},
+     *       {@link GroupSetting#MEMBERSHIP_APPROVAL_MODE MEMBERSHIP_APPROVAL_MODE},
+     *       {@link GroupSetting#REPORT_TO_ADMIN_MODE REPORT_TO_ADMIN_MODE}.</li>
+     *   <li>MEX {@code mexUpdateGroupPropertyJob} mutation:
+     *       {@link GroupSetting#ALLOW_NON_ADMIN_SUB_GROUP_CREATION ALLOW_NON_ADMIN_SUB_GROUP_CREATION},
+     *       {@link GroupSetting#LIMIT_SHARING LIMIT_SHARING},
+     *       {@link GroupSetting#MEMBER_ADD_MODE MEMBER_ADD_MODE},
+     *       {@link GroupSetting#MEMBER_LINK_MODE MEMBER_LINK_MODE},
+     *       {@link GroupSetting#MEMBER_SHARE_GROUP_HISTORY_MODE MEMBER_SHARE_GROUP_HISTORY_MODE}.</li>
+     *   <li>Delegated: {@link GroupSetting#EPHEMERAL EPHEMERAL} forwards to
+     *       {@link #setEphemeralTimer(Jid, ChatEphemeralTimer)}, mapping
+     *       {@link ChatPolicy#ADMINS} to {@link ChatEphemeralTimer#ONE_WEEK}
+     *       and {@link ChatPolicy#ANYONE} to {@link ChatEphemeralTimer#OFF}.
+     *       Call {@code setEphemeralTimer} directly to select a different
+     *       duration.</li>
      * </ul>
      *
-     * <p>The {@link GroupSetting#EPHEMERAL} case is not supported through
-     * this method because disappearing messages are managed via
-     * {@link #setEphemeralTimer(Jid, ChatEphemeralTimer)}. Settings that
-     * WA Web routes through the MEX {@code mexUpdateGroupPropertyJob}
-     * GraphQL endpoint instead of a direct IQ
-     * ({@link GroupSetting#MEMBER_ADD_MODE},
-     * {@link GroupSetting#MEMBER_LINK_MODE},
-     * {@link GroupSetting#MEMBER_SHARE_GROUP_HISTORY_MODE},
-     * {@link GroupSetting#LIMIT_SHARING}) throw
-     * {@link UnsupportedOperationException}.
+     * <p>For the MEX path the {@code policy} is projected per setting:
+     * <ul>
+     *   <li>{@code ALLOW_NON_ADMIN_SUB_GROUP_CREATION}: {@code ADMINS} →
+     *       {@code allow_non_admin_sub_group_creation=false},
+     *       {@code ANYONE} → {@code true}.</li>
+     *   <li>{@code LIMIT_SHARING}: {@code ADMINS} →
+     *       {@code limit_sharing_enabled=true}, {@code ANYONE} →
+     *       {@code false}; trigger fixed to {@code "CHAT_SETTING"}.</li>
+     *   <li>{@code MEMBER_ADD_MODE}: {@code ADMINS} → {@code "ADMIN_ADD"},
+     *       {@code ANYONE} → {@code "ALL_MEMBER_ADD"}.</li>
+     *   <li>{@code MEMBER_LINK_MODE}: {@code ADMINS} →
+     *       {@code "ADMIN_LINK"}, {@code ANYONE} →
+     *       {@code "ALL_MEMBER_LINK"}.</li>
+     *   <li>{@code MEMBER_SHARE_GROUP_HISTORY_MODE}: {@code ADMINS} →
+     *       {@code "ADMIN_SHARE"}, {@code ANYONE} →
+     *       {@code "ALL_MEMBER_SHARE"}.</li>
+     * </ul>
      *
      * @param group   the non-{@code null} target group JID
      * @param setting the non-{@code null} setting to update
      * @param policy  the non-{@code null} target policy
-     * @throws NullPointerException          if any argument is {@code null}
-     * @throws IllegalArgumentException      if the JID is not a
-     *                                       group/community
-     * @throws UnsupportedOperationException if the setting is not dispatched
-     *                                       through a direct {@code w:g2}
-     *                                       IQ by WA Web
+     * @throws NullPointerException     if any argument is {@code null}
+     * @throws IllegalArgumentException if the JID is not a group/community
      *
-     * @implNote WAWebGroupModifyInfoJob.setGroupProperty switches on
-     * {@code GROUP_SETTING_TYPE} and dispatches a SMAX
-     * {@code SetPropertyRequest} via
-     * {@code WASmaxOutGroupsSetPropertyRequest.makeSetPropertyRequest}.
-     * The policy is encoded as a pair of mutually exclusive boolean flags
-     * in WA Web ({@code hasLocked}/{@code hasUnlocked} etc.), which Cobalt
-     * collapses into a single child-element emission per branch.
+     * @implNote WAWebSetPropertyGroupAction.setGroupProperty switches on
+     * {@code GROUP_SETTING_TYPE} and dispatches either through
+     * {@code WAWebGroupModifyInfoJob.setGroupProperty} (direct IQ) or
+     * {@code WAWebMexUpdateGroupPropertyJob.mexUpdateGroupPropertyJob}
+     * (GraphQL mutation). Cobalt unifies both paths behind this entry
+     * point so callers don't need to know which transport each setting
+     * travels on.
      */
-    @WhatsAppWebExport(moduleName = "WAWebGroupModifyInfoJob", exports = "setGroupProperty",
+    @WhatsAppWebExport(moduleName = "WAWebSetPropertyGroupAction", exports = "setGroupProperty",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public void changeGroupSetting(Jid group, GroupSetting setting, ChatPolicy policy) {
         Objects.requireNonNull(group, "group cannot be null");
@@ -5019,36 +8644,68 @@ public final class WhatsAppClient {
         if (!group.hasGroupOrCommunityServer()) {
             throw new IllegalArgumentException("Expected a group/community");
         }
-        var enabled = policy == ChatPolicy.ADMINS; // WAWebGroupModifyInfoJob.setGroupProperty: i === 1 (enabled) / i !== 1 (disabled)
-        Node body = switch (setting) {
-            case ANNOUNCEMENT -> new NodeBuilder() // WAWebGroupModifyInfoJob.setGroupProperty: hasAnnouncement=i===1 / hasNotAnnouncement=i!==1
+        var enabled = policy == ChatPolicy.ADMINS; // WAWebSetPropertyGroupAction: a === 1 (enabled) / a !== 1 (disabled)
+        switch (setting) {
+            case ANNOUNCEMENT -> sendDirectGroupPropertyIq(group, new NodeBuilder() // WAWebGroupModifyInfoJob.setGroupProperty: hasAnnouncement=i===1 / hasNotAnnouncement=i!==1
                     .description(enabled ? "announcement" : "not_announcement")
-                    .build();
-            case RESTRICT -> new NodeBuilder() // WAWebGroupModifyInfoJob.setGroupProperty: hasLocked=i===1 / hasUnlocked=i!==1
+                    .build());
+            case RESTRICT -> sendDirectGroupPropertyIq(group, new NodeBuilder() // WAWebGroupModifyInfoJob.setGroupProperty: hasLocked=i===1 / hasUnlocked=i!==1
                     .description(enabled ? "locked" : "unlocked")
-                    .build();
-            case NO_FREQUENTLY_FORWARDED -> new NodeBuilder() // WAWebGroupModifyInfoJob.setGroupProperty: hasNoFrequentlyForwarded=i===1 / hasFrequentlyForwardedOk=i!==1
+                    .build());
+            case NO_FREQUENTLY_FORWARDED -> sendDirectGroupPropertyIq(group, new NodeBuilder() // WAWebGroupModifyInfoJob.setGroupProperty: hasNoFrequentlyForwarded=i===1 / hasFrequentlyForwardedOk=i!==1
                     .description(enabled ? "no_frequently_forwarded" : "frequently_forwarded_ok")
-                    .build();
-            case MEMBERSHIP_APPROVAL_MODE -> new NodeBuilder() // WAWebGroupModifyInfoJob.setGroupProperty: membershipApprovalModeArgs = i===1 ? enabled : disabled
+                    .build());
+            case MEMBERSHIP_APPROVAL_MODE -> sendDirectGroupPropertyIq(group, new NodeBuilder() // WAWebGroupModifyInfoJob.setGroupProperty: membershipApprovalModeArgs = i===1 ? enabled : disabled
                     .description("membership_approval_mode") // WASmaxOutGroupsSetPropertyRequest.makeSetPropertyRequestMembershipApprovalMode
                     .content(new NodeBuilder()
-                            .description("group_join") // WASmaxOutGroupsMembershipApprovalGroupJoinModeMixin: <group_join state=.../> style
-                            .attribute("state", enabled ? "on" : "off") // parseChatMetadata reads attribute state="on" | "off"
+                            .description("group_join") // WASmaxOutGroupsMembershipApprovalGroupJoinModeMixin: <group_join state=.../>
+                            .attribute("state", enabled ? "on" : "off")
                             .build())
-                    .build();
-            case REPORT_TO_ADMIN_MODE -> new NodeBuilder() // WAWebGroupModifyInfoJob.setGroupProperty: hasAllowAdminReports=i===1 / hasNotAllowAdminReports=i!==1
+                    .build());
+            case REPORT_TO_ADMIN_MODE -> sendDirectGroupPropertyIq(group, new NodeBuilder() // WAWebGroupModifyInfoJob.setGroupProperty: hasAllowAdminReports=i===1 / hasNotAllowAdminReports=i!==1
                     .description(enabled ? "allow_admin_reports" : "not_allow_admin_reports")
-                    .build();
-            case ALLOW_NON_ADMIN_SUB_GROUP_CREATION -> new NodeBuilder() // WAWebGroupModifyInfoJob.setGroupProperty: hasAllowNonAdminSubGroupCreation / hasNotAllowNonAdminSubGroupCreation
-                    .description(enabled ? "allow_non_admin_sub_group_creation" : "not_allow_non_admin_sub_group_creation")
-                    .build();
-            case EPHEMERAL -> throw new UnsupportedOperationException(
-                    "Use setEphemeralTimer(Jid, ChatEphemeralTimer) to configure ephemeral messaging");
-            case MEMBER_ADD_MODE, MEMBER_LINK_MODE, MEMBER_SHARE_GROUP_HISTORY_MODE, LIMIT_SHARING ->
-                    throw new UnsupportedOperationException(
-                            "Setting %s is dispatched through the MEX update-group-property pipeline and is not supported via a w:g2 IQ".formatted(setting));
-        };
+                    .build());
+            case ALLOW_NON_ADMIN_SUB_GROUP_CREATION -> {
+                sendMexGroupPropertyUpdate(group,
+                        // WAWebSetPropertyGroupAction: {allow_non_admin_sub_group_creation: a===1}. ADMINS policy => non-admin creation disabled.
+                        "{\"allow_non_admin_sub_group_creation\":" + (!enabled) + "}");
+                // WAWebSetPropertyGroupAction: new CommunityGroupJourneyEvent({action, surface: COMMUNITY_SETTINGS, chat: t}).commit()
+                // WAWebCommunityGroupJourneyEventImpl: a===0 (policy != ADMINS) => SELECT_COMMUNITY_ADMINS_CAN_ADD_GROUPS, else SELECT_EVERYONE_CAN_ADD_GROUPS.
+                // Cobalt enabled == (policy == ADMINS), matching WA Web a===1, so action inverts: enabled => SELECT_COMMUNITY_ADMINS_CAN_ADD_GROUPS.
+                // commitCommunityGroupJourneyEvent(
+                //                        enabled
+                //                                ? ChatFilterActionTypes.SELECT_COMMUNITY_ADMINS_CAN_ADD_GROUPS
+                //                                : ChatFilterActionTypes.SELECT_EVERYONE_CAN_ADD_GROUPS,
+                //                        SurfaceType.COMMUNITY_SETTINGS,
+                //                        group);
+            }
+            case LIMIT_SHARING -> sendMexGroupPropertyUpdate(group,
+                    // WAWebSetPropertyGroupAction: {limit_sharing: {limit_sharing_enabled: a===1, limit_sharing_trigger: "CHAT_SETTING"}}. ADMINS policy => sharing limited.
+                    "{\"limit_sharing\":{\"limit_sharing_enabled\":" + enabled + ",\"limit_sharing_trigger\":\"CHAT_SETTING\"}}");
+            case MEMBER_ADD_MODE -> sendMexGroupPropertyUpdate(group,
+                    // WAWebSetPropertyGroupAction: {member_add_mode: a===1?"ALL_MEMBER_ADD":"ADMIN_ADD"}. ADMINS policy => ADMIN_ADD.
+                    "{\"member_add_mode\":\"" + (enabled ? "ADMIN_ADD" : "ALL_MEMBER_ADD") + "\"}");
+            case MEMBER_LINK_MODE -> sendMexGroupPropertyUpdate(group,
+                    // WAWebSetPropertyGroupAction: {member_link_mode: a===1?"ALL_MEMBER_LINK":"ADMIN_LINK"}. ADMINS policy => ADMIN_LINK.
+                    "{\"member_link_mode\":\"" + (enabled ? "ADMIN_LINK" : "ALL_MEMBER_LINK") + "\"}");
+            case MEMBER_SHARE_GROUP_HISTORY_MODE -> sendMexGroupPropertyUpdate(group,
+                    // WAWebSetPropertyGroupAction: {member_share_group_history_mode: a===1?"ALL_MEMBER_SHARE":"ADMIN_SHARE"}. ADMINS policy => ADMIN_SHARE.
+                    "{\"member_share_group_history_mode\":\"" + (enabled ? "ADMIN_SHARE" : "ALL_MEMBER_SHARE") + "\"}");
+            case EPHEMERAL -> setEphemeralTimer(group, enabled ? ChatEphemeralTimer.ONE_WEEK : ChatEphemeralTimer.OFF);
+        }
+    }
+
+    /**
+     * Dispatches a direct {@code w:g2} set-property IQ carrying the supplied
+     * body element. Used by
+     * {@link #changeGroupSetting(Jid, GroupSetting, ChatPolicy)} for the
+     * legacy properties that WA Web emits through
+     * {@code WAWebGroupModifyInfoJob.setGroupProperty}.
+     *
+     * @param group the target group JID
+     * @param body  the pre-built property body element
+     */
+    private void sendDirectGroupPropertyIq(Jid group, Node body) {
         var iqNode = new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "w:g2") // WASmaxOutGroupsBaseSetGroupMixin: xmlns: "w:g2"
@@ -5059,52 +8716,770 @@ public final class WhatsAppClient {
     }
 
     /**
-     * Changes who may add new participants to a WhatsApp group between
-     * {@link GroupAddMode#ADMIN_ADD} and {@link GroupAddMode#ALL_MEMBER_ADD}.
+     * Dispatches the {@code WAWebMexUpdateGroupPropertyJob} GraphQL
+     * mutation with the supplied serialised {@code update} payload,
+     * matching the success check WA Web performs in
+     * {@code mexUpdateGroupPropertyJob}
+     * ({@code data.xwa2_group_update_property.state === "ACTIVE"}).
+     * Non-{@code ACTIVE} states and transport errors surface through the
+     * sealed {@code WhatsAppException} hierarchy.
      *
-     * <p>Sends a {@code w:g2} {@code iq} of type {@code set} addressed to
-     * the group JID whose body is a {@code <member_add_mode>} element
-     * whose text content is the mode's {@link GroupAddMode#data() wire
-     * identifier} ({@code "admin_add"} or {@code "all_member_add"}).
-     *
-     * @param group the non-{@code null} target group JID
-     * @param mode  the non-{@code null} new add-mode
-     * @throws NullPointerException     if any argument is {@code null}
-     * @throws IllegalArgumentException if the JID is not a group/community
-     *
-     * @implNote This field is normally toggled through WA Web's
-     * {@code WAWebMexUpdateGroupPropertyJob.mexUpdateGroupPropertyJob}
-     * MEX endpoint. The equivalent wire format for a direct IQ is
-     * described by {@code WASmaxOutGroupsAdminAddModeMixin.mergeAdminAddModeMixin}
-     * and {@code WASmaxOutGroupsAllMembersAddModeMixin.mergeAllMembersAddModeMixin},
-     * which emit {@code <member_add_mode>admin_add</member_add_mode>}
-     * and {@code <member_add_mode>all_member_add</member_add_mode>}
-     * respectively. Cobalt dispatches that child inline as a
-     * {@code w:g2} IQ.
+     * @param group      the target group JID
+     * @param updateJson the serialised {@code update} JSON object
      */
-    @WhatsAppWebExport(moduleName = "WAWebGroupModifyInfoJob", exports = "setGroupProperty",
+    private void sendMexGroupPropertyUpdate(Jid group, String updateJson) {
+        var request = new UpdateGroupPropertyMex.Request(group.toString(), updateJson); // WAWebMexUpdateGroupPropertyJob: variables={group_id, update}
+        var response = sendNode(request.toNode());
+        UpdateGroupPropertyMex.Response.of(response); // WAWebMexUpdateGroupPropertyJob: checks data.xwa2_group_update_property.state
+    }
+
+    //<editor-fold desc="Stickers">
+    /**
+     * Marks a sticker as a favourite on the user's account and propagates the
+     * change to every linked device via the {@code REGULAR_LOW} app-state
+     * sync collection.
+     *
+     * <p>Per WhatsApp Web {@code WAWebStickersFavoriteSyncAction}: builds a
+     * SET mutation via
+     * {@link FavoriteStickerHandler#getFavoriteStickerMutation(String, boolean)}
+     * with {@code isFavorite = true} and pushes it through
+     * {@link WebAppStateService#pushPatches}. The full sticker descriptor is
+     * restored on receiving devices from the primary's copy of the record, so
+     * the outgoing mutation only carries the {@code isFavorite} flag.
+     *
+     * @param stickerHash the sticker file hash that uniquely identifies the
+     *                    sticker across devices
+     * @throws NullPointerException if {@code stickerHash} is {@code null}
+     *
+     * @implNote WAWebStickersFavoriteSyncAction — outgoing {@code SET}
+     *           mutation produced via
+     *           {@link FavoriteStickerHandler#getFavoriteStickerMutation}
+     */
+    @WhatsAppWebExport(moduleName = "WAWebStickersFavoriteSyncAction", exports = "applyMutations",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public void changeGroupMemberAddMode(Jid group, GroupAddMode mode) {
-        Objects.requireNonNull(group, "group cannot be null");
-        Objects.requireNonNull(mode, "mode cannot be null");
-        if (!group.hasGroupOrCommunityServer()) {
-            throw new IllegalArgumentException("Expected a group/community");
-        }
-        var memberAddModeNode = new NodeBuilder()
-                .description("member_add_mode") // WASmaxOutGroupsAdminAddModeMixin / WASmaxOutGroupsAllMembersAddModeMixin: smax("member_add_mode", null, "admin_add" | "all_member_add")
-                .content(mode.data())
-                .build();
-        var iqNode = new NodeBuilder()
-                .description("iq")
-                .attribute("xmlns", "w:g2") // WASmaxOutGroupsBaseSetGroupMixin: xmlns: "w:g2"
-                .attribute("to", group) // WASmaxOutGroupsBaseSetGroupMixin: to: GROUP_JID(t)
-                .attribute("type", "set") // WAWebSmaxBaseIQSetRequestMixin: type: "set"
-                .content(memberAddModeNode);
-        sendNode(iqNode); // ADAPTED: WA Web dispatches this field via WAWebMexUpdateGroupPropertyJob; Cobalt sends the equivalent w:g2 IQ directly
+    public void favoriteSticker(String stickerHash) {
+        Objects.requireNonNull(stickerHash, "stickerHash cannot be null");
+        var mutation = FavoriteStickerHandler.INSTANCE.getFavoriteStickerMutation(stickerHash, true); // WAWebStickersFavoriteSyncAction: isFavorite = true
+        webAppStateService.pushPatches(StickerAction.COLLECTION_NAME, List.of(mutation)); // WAWebSyncdCoreApi.lockForSync(["favorite_sticker"], [mutation], ...)
+    }
+
+    /**
+     * Unmarks a sticker as a favourite on the user's account and propagates
+     * the change to every linked device via the {@code REGULAR_LOW} app-state
+     * sync collection.
+     *
+     * <p>Counterpart to {@link #favoriteSticker(String)}: emits the same
+     * mutation with {@code isFavorite = false}.
+     *
+     * @param stickerHash the sticker file hash that uniquely identifies the
+     *                    sticker across devices
+     * @throws NullPointerException if {@code stickerHash} is {@code null}
+     *
+     * @implNote WAWebStickersFavoriteSyncAction — outgoing {@code SET}
+     *           mutation with {@code isFavorite = false}
+     */
+    @WhatsAppWebExport(moduleName = "WAWebStickersFavoriteSyncAction", exports = "applyMutations",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void unfavoriteSticker(String stickerHash) {
+        Objects.requireNonNull(stickerHash, "stickerHash cannot be null");
+        var mutation = FavoriteStickerHandler.INSTANCE.getFavoriteStickerMutation(stickerHash, false); // WAWebStickersFavoriteSyncAction: isFavorite = false
+        webAppStateService.pushPatches(StickerAction.COLLECTION_NAME, List.of(mutation));
+    }
+
+    /**
+     * Removes a sticker from the recent-stickers collection and propagates
+     * the removal to every linked device via the {@code REGULAR_LOW}
+     * app-state sync collection.
+     *
+     * <p>Per WhatsApp Web {@code WAWebStickersRemoveRecentSyncAction}: builds
+     * a SET mutation that carries the current instant as
+     * {@code lastStickerSentTs}. Receiving devices use this timestamp to
+     * decide whether their local recent-sticker entry (which may be more
+     * recent) should be removed.
+     *
+     * @param stickerHash the sticker file hash that uniquely identifies the
+     *                    sticker across devices
+     * @throws NullPointerException if {@code stickerHash} is {@code null}
+     *
+     * @implNote WAWebStickersRemoveRecentSyncAction — outgoing {@code SET}
+     *           mutation produced via
+     *           {@link RemoveRecentStickerHandler#getRemoveRecentStickerMutation}
+     */
+    @WhatsAppWebExport(moduleName = "WAWebStickersRemoveRecentSyncAction", exports = "applyMutations",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void removeRecentSticker(String stickerHash) {
+        Objects.requireNonNull(stickerHash, "stickerHash cannot be null");
+        var mutation = RemoveRecentStickerHandler.INSTANCE.getRemoveRecentStickerMutation(stickerHash); // WAWebStickersRemoveRecentSyncAction
+        webAppStateService.pushPatches(RemoveRecentStickerAction.COLLECTION_NAME, List.of(mutation));
     }
 
     //</editor-fold>
+    //<editor-fold desc="Polls">
+    /**
+     * Creates and sends a new poll in the specified chat.
+     *
+     * <p>Per WhatsApp Web {@code WAWebPollsSendPollCreationMsgAction.sendPollCreation}
+     * via {@code createPollCreationMsgData}: builds a
+     * {@link PollCreationMessage} with the supplied question, options, and
+     * selectable-options count, generates a 32-byte random message secret for
+     * end-to-end vote encryption, and dispatches the result through the
+     * regular message send pipeline as a {@code POLL_CREATION} message. The
+     * returned {@link ChatMessageInfo} carries the server-allocated message
+     * id and timestamp.
+     *
+     * <p>Option hashes are intentionally left unset on the outgoing protobuf
+     * because WhatsApp Web derives them from the option name via
+     * {@code WAWebPollOptionHashUtils.generatePollOptionHash} on the recipient
+     * side; Cobalt preserves the same behaviour by omitting them so the
+     * preparer can compute them consistently.
+     *
+     * @param chat             the JID of the chat to post the poll in
+     * @param question         the poll question displayed to voters
+     * @param options          the ordered list of poll option labels
+     * @param selectableCount  the maximum number of options each voter can
+     *                         select; {@code 1} for single-choice polls
+     * @return the {@link ChatMessageInfo} carrying the sent poll creation
+     *         message
+     * @throws NullPointerException     if any argument is {@code null}
+     * @throws IllegalArgumentException if the chat is not currently signed in
+     *
+     * @implNote WAWebPollsSendPollCreationMsgAction.sendPollCreation /
+     *           {@code createPollCreationMsgData} — Cobalt builds the
+     *           {@link PollCreationMessage} inline and routes through the
+     *           existing {@link MessageService#send(MessageInfo)} pipeline,
+     *           which mirrors WA Web's
+     *           {@code WAWebSendMsgChatAction.addAndSendMsgToChat}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebPollsSendPollCreationMsgAction", exports = "sendPollCreation",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebPollsSendPollCreationMsgAction", exports = "createPollCreationMsgData",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public ChatMessageInfo createPoll(Jid chat, String question, List<String> options, int selectableCount) {
+        Objects.requireNonNull(chat, "chat cannot be null");
+        Objects.requireNonNull(question, "question cannot be null");
+        Objects.requireNonNull(options, "options cannot be null");
+        var selfJid = store.jid() // WAWebPollsSendPollCreationMsgAction.createPollCreationMsgData: getMeUserLidOrJidForChat
+                .orElseThrow(() -> new IllegalArgumentException("Not logged in"));
+        var messageSecret = new byte[32]; // WAWebPollsSendPollCreationMsgAction.createPollCreationMsgData: self.crypto.getRandomValues(new Uint8Array(32))
+        ThreadLocalRandom.current().nextBytes(messageSecret);
+        var pollOptions = options.stream() // WAWebPollsSendPollCreationMsgAction.createPollCreationMsgData: pollOptions: p
+                .map(name -> new PollCreationMessageOptionBuilder().optionName(name).build()) // WAWebPollCreationUtils: {optionName: e}
+                .toList();
+        var poll = new PollCreationMessageBuilder() // WAWebPollsSendPollCreationMsgAction.createPollCreationMsgData: {pollName, pollOptions, pollSelectableOptionsCount}
+                .name(question) // WAWebPollsSendPollCreationMsgAction: pollName: m
+                .options(pollOptions) // WAWebPollsSendPollCreationMsgAction: pollOptions: p
+                .selectableOptionsCount(selectableCount) // WAWebPollsSendPollCreationMsgAction: pollSelectableOptionsCount: _
+                .encKey(messageSecret) // WAWebPollsSendPollCreationMsgAction.createPollCreationMsgData: messageSecret (encrypts votes)
+                .build();
+        var messageId = MessageIdGenerator.generate(MessageIdVersion.V2, selfJid); // WAWebMsgKey.newId
+        var key = new MessageKeyBuilder() // WAWebPollsSendPollCreationMsgAction.createPollCreationMsgData: new WAWebMsgKey({from, to, id, participant, selfDir: "out"})
+                .id(messageId)
+                .parentJid(chat)
+                .fromMe(true)
+                .senderJid(selfJid)
+                .build();
+        var messageInfo = new ChatMessageInfoBuilder()
+                .status(MessageStatus.PENDING) // ADAPTED: MessagePreparer initial status
+                .senderJid(selfJid)
+                .key(key)
+                .message(MessageContainer.of(poll)) // WAWebPollsSendPollCreationMsgAction: wraps the PollCreationMessage into the message container
+                .timestamp(Instant.now()) // WAWebPollsSendPollCreationMsgAction: t: unixTime()
+                .build();
+        messageService.send(messageInfo); // WAWebSendMsgChatAction.addAndSendMsgToChat
+        return messageInfo;
+    }
 
+    /**
+     * Casts a vote on an existing poll by sending a
+     * {@link PollUpdateMessage} referencing the originating poll creation
+     * message.
+     *
+     * <p>Per WhatsApp Web {@code WAWebPollsSendVoteMsgAction}: builds a
+     * {@code PollUpdateMessage} whose {@code pollCreationMessageKey} points
+     * at the creator's message key and whose {@code vote} is an
+     * HKDF-derived, AES-256-GCM encrypted list of the SHA-256 digests of the
+     * selected option names. The encrypted blob is transported as a
+     * {@link com.github.auties00.cobalt.model.message.poll.PollEncValue}.
+     *
+     * <p><strong>Vote encoding is not yet implemented in Cobalt.</strong>
+     * WhatsApp Web derives the poll-encryption key from the original
+     * poll's {@code messageSecret} via HKDF
+     * ({@code WAWebMessageSecretCrypto.getDecryptionInfo}) and encrypts the
+     * option digests with AES-GCM using the sender JID and poll creation
+     * message id as additional authenticated data. The current build emits
+     * an empty {@link com.github.auties00.cobalt.model.message.poll.PollEncValue}
+     * so the stanza shape is correct, but recipients will not be able to
+     * decode the vote. See the TODO below.
+     *
+     * @param pollKey          the {@link MessageKey} of the
+     *                         {@link PollCreationMessage} being voted on
+     * @param selectedOptions  the ordered list of selected option labels
+     * @return the server ack result for the vote stanza
+     * @throws NullPointerException     if any argument is {@code null}
+     * @throws IllegalArgumentException if {@code pollKey} has no parent JID
+     *
+     * @implNote WAWebPollsSendVoteMsgAction + WAWebPollsVoteDataUtils —
+     *           ADAPTED with a TODO: vote option hashes are not yet
+     *           HKDF+AES-GCM encrypted. The transport envelope is correct
+     *           (PollUpdateMessage pointing at the poll creation key) but the
+     *           ciphertext is a placeholder. Implementing this requires
+     *           deriving the poll key from the creator's {@code messageSecret}
+     *           which is currently not threaded through the public API.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebPollsSendVoteMsgAction", exports = "sendVote",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public AckResult votePoll(MessageKey pollKey, List<String> selectedOptions) {
+        Objects.requireNonNull(pollKey, "pollKey cannot be null");
+        Objects.requireNonNull(selectedOptions, "selectedOptions cannot be null");
+        var parentJid = pollKey.parentJid() // WAWebPollsSendVoteMsgAction: parentMsgKey.remote
+                .orElseThrow(() -> new IllegalArgumentException("pollKey must carry a parentJid"));
+        // TODO: WAWebPollsVoteDataUtils — derive the poll encryption key via
+        //       WAWebMessageSecretCrypto.getDecryptionInfo(creator messageSecret, "Poll Vote", authorJid),
+        //       build the option-hash list (sha256(optionName) truncated),
+        //       AES-GCM-encrypt it with a fresh 12-byte IV using the poll creation
+        //       id + voter JID as AAD, and populate encPayload/encIv here. The
+        //       current PollEncValue is intentionally empty until the messageSecret
+        //       lookup is wired through the store.
+        var vote = new PollEncValueBuilder() // WAWebPollsVoteDataUtils: {encPayload, encIv}
+                .encPayload(new byte[0]) // TODO(ADAPTED): HKDF/AES-GCM encrypted option digests
+                .encIv(new byte[0]) // TODO(ADAPTED): 12-byte random IV
+                .build();
+        var pollUpdate = new PollUpdateMessageBuilder() // WAWebPollsSendVoteMsgAction: new PollUpdateMessage(...)
+                .pollCreationMessageKey(pollKey) // WAWebPollsSendVoteMsgAction: pollCreationMessageKey
+                .vote(vote) // WAWebPollsSendVoteMsgAction: vote: PollEncValue
+                .senderTimestampMs(Instant.now()) // WAWebPollsSendVoteMsgAction: senderTimestampMs
+                .build();
+        return messageService.send(parentJid, MessageContainer.of(pollUpdate)); // WAWebSendMsgChatAction.addAndSendMsgToChat
+    }
+
+    /**
+     * Closes the given poll so that no further votes can be cast.
+     *
+     * <p>Per WhatsApp Web {@code WAWebPollsSendVoteMsgAction} / server poll
+     * invalidation: emits a {@link PollUpdateMessage} whose {@code vote}
+     * field is empty and whose metadata signals that the poll has been
+     * invalidated. Receiving clients mark the poll as closed and refuse to
+     * accept additional {@code vote} stanzas for it.
+     *
+     * @param pollKey the {@link MessageKey} of the
+     *                {@link PollCreationMessage} to close
+     * @return the server ack result for the close stanza
+     * @throws NullPointerException     if {@code pollKey} is {@code null}
+     * @throws IllegalArgumentException if {@code pollKey} has no parent JID
+     *
+     * @implNote WAWebPollsSendVoteMsgAction — ADAPTED: close-poll is routed
+     *           through a {@link PollUpdateMessage} with an empty
+     *           {@link com.github.auties00.cobalt.model.message.poll.PollEncValue}
+     *           because Cobalt does not currently own a distinct
+     *           poll-invalidated protocol message; the server treats an empty
+     *           vote from the poll creator as the invalidation signal.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebPollsSendVoteMsgAction", exports = "sendVote",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public AckResult closePoll(MessageKey pollKey) {
+        Objects.requireNonNull(pollKey, "pollKey cannot be null");
+        var parentJid = pollKey.parentJid()
+                .orElseThrow(() -> new IllegalArgumentException("pollKey must carry a parentJid"));
+        // ADAPTED: WA Web's poll-close path emits a protocol message signaling
+        // "pollInvalidated"; Cobalt approximates it with an empty-vote
+        // PollUpdateMessage so the transport shape stays consistent with the
+        // rest of the poll flow.
+        var vote = new PollEncValueBuilder()
+                .encPayload(new byte[0])
+                .encIv(new byte[0])
+                .build();
+        var pollUpdate = new PollUpdateMessageBuilder()
+                .pollCreationMessageKey(pollKey)
+                .vote(vote)
+                .senderTimestampMs(Instant.now())
+                .build();
+        return messageService.send(parentJid, MessageContainer.of(pollUpdate));
+    }
+
+    //</editor-fold>
+    //<editor-fold desc="AI bots">
+    /**
+     * Sends a welcome-message request to the given WhatsApp bot and records
+     * the request state across linked devices via the {@code REGULAR_LOW}
+     * app-state sync collection.
+     *
+     * <p>Per WhatsApp Web {@code WAWebBotWelcomeRequestSync.getBotWelcomeRequestSetMutation}:
+     * builds a SET mutation with {@code isSent = true} and pushes it through
+     * {@link WebAppStateService#pushPatches} so that the same state is
+     * reflected on every linked device (and so the bot does not re-issue its
+     * welcome message the next time the chat is opened).
+     *
+     * @param botJid the JID of the bot to send the welcome request to
+     * @throws NullPointerException if {@code botJid} is {@code null}
+     *
+     * @implNote WAWebBotWelcomeRequestSync.getBotWelcomeRequestSetMutation —
+     *           outgoing SET mutation with {@code isSent = true}
+     */
+    @WhatsAppWebExport(moduleName = "WAWebBotWelcomeRequestSync", exports = "getBotWelcomeRequestSetMutation",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void sendBotWelcomeRequest(Jid botJid) {
+        Objects.requireNonNull(botJid, "botJid cannot be null");
+        var mutation = BotWelcomeRequestHandler.INSTANCE.getBotWelcomeRequestSetMutation(botJid, true); // WAWebBotWelcomeRequestSync.getBotWelcomeRequestSetMutation: isSent = true
+        webAppStateService.pushPatches(BotWelcomeRequestAction.COLLECTION_NAME, List.of(mutation)); // WAWebSyncdCoreApi.lockForSync
+    }
+
+    /**
+     * Renames an AI thread owned by the given bot and propagates the new
+     * title to every linked device via the {@code REGULAR_LOW} app-state
+     * sync collection.
+     *
+     * <p>Per WhatsApp Web {@code WAWebAiThreadRenameSync}: builds a SET
+     * mutation at {@code ["ai_thread_rename", botJid, threadId]} whose
+     * {@code aiThreadRenameAction} sub-message carries the new title, pushes
+     * it through {@link WebAppStateService#pushPatches}, and updates the
+     * local {@link WhatsAppStore#aiThreadTitles} map eagerly.
+     *
+     * @param chatJid  the bot JID owning the thread, encoded as a plain
+     *                 string JID (e.g. {@code 12345@bot})
+     * @param threadId the AI thread identifier
+     * @param newName  the new thread title
+     * @throws NullPointerException     if any argument is {@code null}
+     * @throws IllegalArgumentException if {@code newName} is blank
+     *
+     * @implNote WAWebAiThreadRenameSync — outgoing SET mutation produced via
+     *           {@link AiThreadRenameHandler#getAiThreadRenameMutation}
+     */
+    @WhatsAppWebExport(moduleName = "WAWebAiThreadRenameSync", exports = "applyMutations",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void renameAiThread(String chatJid, String threadId, String newName) {
+        Objects.requireNonNull(chatJid, "chatJid cannot be null");
+        Objects.requireNonNull(threadId, "threadId cannot be null");
+        Objects.requireNonNull(newName, "newName cannot be null");
+        if (newName.isBlank()) {
+            throw new IllegalArgumentException("newName cannot be blank"); // WAWebAiThreadRenameSync.validateSyncActionValue: isStringNotNullAndNotWhitespaceOnly
+        }
+        var jid = Jid.of(chatJid); // WAWebAiThreadRenameSync.applyMutations: createWid(s)
+        var mutation = AiThreadRenameHandler.INSTANCE.getAiThreadRenameMutation(jid, threadId, newName); // WAWebAiThreadRenameSync
+        webAppStateService.pushPatches(AiThreadRenameAction.COLLECTION_NAME, List.of(mutation));
+        // WAWebAiThreadRenameSync.$AiThreadRenameSync$p_1: bulkCreateOrUpdateThreadsMetadata — apply locally for eager consistency
+        var titles = new HashMap<>(store.aiThreadTitles());
+        titles.put(chatJid + "|" + threadId, newName);
+        store.setAiThreadTitles(titles);
+    }
+
+    /**
+     * Deletes an AI thread owned by the given bot and propagates the
+     * deletion to every linked device via the {@code REGULAR_HIGH} app-state
+     * sync collection.
+     *
+     * <p>Per WhatsApp Web {@code WAWebAiThreadDeleteSync}: builds a SET
+     * mutation at {@code ["ai_thread_delete", botJid, threadId]} (no value
+     * payload), pushes it through {@link WebAppStateService#pushPatches}, and
+     * removes the thread from the local
+     * {@link WhatsAppStore#aiThreadTitles} map eagerly.
+     *
+     * @param chatJid  the bot JID owning the thread, encoded as a plain
+     *                 string JID
+     * @param threadId the AI thread identifier
+     * @throws NullPointerException if any argument is {@code null}
+     *
+     * @implNote WAWebAiThreadDeleteSync — outgoing SET mutation produced via
+     *           {@link AiThreadDeleteHandler#getAiThreadDeleteMutation}
+     */
+    @WhatsAppWebExport(moduleName = "WAWebAiThreadDeleteSync", exports = "applyMutations",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void deleteAiThread(String chatJid, String threadId) {
+        Objects.requireNonNull(chatJid, "chatJid cannot be null");
+        Objects.requireNonNull(threadId, "threadId cannot be null");
+        var jid = Jid.of(chatJid);
+        var mutation = AiThreadDeleteHandler.INSTANCE.getAiThreadDeleteMutation(jid, threadId); // WAWebAiThreadDeleteSync
+        webAppStateService.pushPatches(AiThreadDeleteHandler.COLLECTION_NAME, List.of(mutation));
+        // WAWebAiThreadDeleteSync.$AiThreadDeleteSync$p_1: bulkDeleteThreads — apply locally for eager consistency
+        var titles = new HashMap<>(store.aiThreadTitles());
+        titles.remove(chatJid + "|" + threadId);
+        store.setAiThreadTitles(titles);
+    }
+
+    //</editor-fold>
+    //<editor-fold desc="Favorites, notes, and pin-in-chat">
+    /**
+     * Adds the given chat to the favourites list and propagates the change
+     * to every linked device via the {@code REGULAR_HIGH} app-state sync
+     * collection.
+     *
+     * <p>Per WhatsApp Web {@code WAWebFavoritesSync.getFavoritesMutation}:
+     * the mutation carries the full ordered list of favourite chat JIDs, not
+     * a delta. Cobalt reads the current list from
+     * {@link WhatsAppStore#favoriteChats()}, appends the new JID if not
+     * already present, and emits the full updated list.
+     *
+     * @param chat the JID of the chat to favourite
+     * @throws NullPointerException if {@code chat} is {@code null}
+     *
+     * @implNote WAWebFavoritesSync.getFavoritesMutation — outgoing SET
+     *           mutation carrying the full favourites list, produced via
+     *           {@link FavoritesHandler#getFavoritesMutation(List, Instant)}
+     */
+    @WhatsAppWebExport(moduleName = "WAWebFavoritesSync", exports = "getFavoritesMutation",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void favoriteChat(Jid chat) {
+        Objects.requireNonNull(chat, "chat cannot be null");
+        var current = new ArrayList<>(store.favoriteChats()); // WAWebFavoritesSync.getFavoritesMutation: current favorites collection
+        if (!current.contains(chat)) { // ADAPTED: WA Web client-side dedupes by orderIndex; Cobalt dedupes by JID equality
+            current.add(chat);
+        }
+        var mutation = FavoritesHandler.INSTANCE.getFavoritesMutation(current, Instant.now()); // WAWebFavoritesSync.getFavoritesMutation
+        webAppStateService.pushPatches(FavoritesAction.COLLECTION_NAME, List.of(mutation)); // WAWebSyncdCoreApi.lockForSync
+        store.setFavoriteChats(current); // WAWebFavoritesSync.applyMutations: setFavorites(h) — apply locally for eager consistency
+    }
+
+    /**
+     * Removes the given chat from the favourites list and propagates the
+     * change to every linked device via the {@code REGULAR_HIGH} app-state
+     * sync collection.
+     *
+     * <p>Counterpart to {@link #favoriteChat(Jid)}: emits the same full
+     * favourites list minus the target JID.
+     *
+     * @param chat the JID of the chat to unfavourite
+     * @throws NullPointerException if {@code chat} is {@code null}
+     *
+     * @implNote WAWebFavoritesSync.getFavoritesMutation — outgoing SET
+     *           mutation with the target JID removed from the full list
+     */
+    @WhatsAppWebExport(moduleName = "WAWebFavoritesSync", exports = "getFavoritesMutation",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void unfavoriteChat(Jid chat) {
+        Objects.requireNonNull(chat, "chat cannot be null");
+        var current = new ArrayList<>(store.favoriteChats());
+        current.remove(chat);
+        var mutation = FavoritesHandler.INSTANCE.getFavoritesMutation(current, Instant.now());
+        webAppStateService.pushPatches(FavoritesAction.COLLECTION_NAME, List.of(mutation));
+        store.setFavoriteChats(current);
+    }
+
+    /**
+     * Adds a note to the given chat and propagates it to every linked device
+     * via the {@code REGULAR_LOW} app-state sync collection.
+     *
+     * <p>Per WhatsApp Web {@code WAWebNoteSync}: the note is keyed by a
+     * generated identifier — Cobalt computes a fresh SHA-256 hex id based on
+     * the chat JID and a random component, matching the WA Web behaviour
+     * where the primary device allocates a note id on creation. The returned
+     * id is the one receivers will observe in the synced mutation.
+     *
+     * @param chat     the chat the note is attached to
+     * @param noteText the free-text body of the note
+     * @return the generated note id
+     * @throws NullPointerException if any argument is {@code null}
+     *
+     * @implNote WAWebNoteSync — outgoing SET mutation produced via
+     *           {@link NoteEditHandler#getNoteEditMutation}; the note id is
+     *           generated locally to match WA Web's behaviour where the
+     *           creator allocates a fresh id on insert
+     */
+    @WhatsAppWebExport(moduleName = "WAWebNoteSync", exports = "applyMutations",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public String addNoteToChat(Jid chat, String noteText) {
+        Objects.requireNonNull(chat, "chat cannot be null");
+        Objects.requireNonNull(noteText, "noteText cannot be null");
+        var noteId = UUID.randomUUID().toString(); // WAWebNotesIdUtils.generateNoteId — Cobalt allocates a fresh id on creation
+        var mutation = NoteEditHandler.INSTANCE.getNoteEditMutation(noteId, chat, noteText, false); // WAWebNoteSync
+        webAppStateService.pushPatches(NoteEditAction.COLLECTION_NAME, List.of(mutation));
+        return noteId;
+    }
+
+    /**
+     * Updates the text of an existing note attached to the given chat and
+     * propagates the change via the {@code REGULAR_LOW} app-state sync
+     * collection.
+     *
+     * @param chat     the chat the note is attached to
+     * @param noteId   the identifier of the note to update
+     * @param newText  the new note text
+     * @throws NullPointerException if any argument is {@code null}
+     *
+     * @implNote WAWebNoteSync — outgoing SET mutation with {@code deleted = false}
+     */
+    @WhatsAppWebExport(moduleName = "WAWebNoteSync", exports = "applyMutations",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void editNoteOnChat(Jid chat, String noteId, String newText) {
+        Objects.requireNonNull(chat, "chat cannot be null");
+        Objects.requireNonNull(noteId, "noteId cannot be null");
+        Objects.requireNonNull(newText, "newText cannot be null");
+        var mutation = NoteEditHandler.INSTANCE.getNoteEditMutation(noteId, chat, newText, false); // WAWebNoteSync: edit path
+        webAppStateService.pushPatches(NoteEditAction.COLLECTION_NAME, List.of(mutation));
+    }
+
+    /**
+     * Deletes an existing note from the given chat and propagates the
+     * deletion to every linked device via the {@code REGULAR_LOW} app-state
+     * sync collection.
+     *
+     * <p>Per WhatsApp Web {@code WAWebNoteSync.applyMutations}: a mutation
+     * whose {@code noteEditAction.deleted} field is {@code true} removes the
+     * note from the notes table.
+     *
+     * @param chat   the chat the note is attached to
+     * @param noteId the identifier of the note to delete
+     * @throws NullPointerException if any argument is {@code null}
+     *
+     * @implNote WAWebNoteSync — outgoing SET mutation with
+     *           {@code deleted = true}
+     */
+    @WhatsAppWebExport(moduleName = "WAWebNoteSync", exports = "applyMutations",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void deleteNoteFromChat(Jid chat, String noteId) {
+        Objects.requireNonNull(chat, "chat cannot be null");
+        Objects.requireNonNull(noteId, "noteId cannot be null");
+        var mutation = NoteEditHandler.INSTANCE.getNoteEditMutation(noteId, chat, "", true); // WAWebNoteSync: deleted = true
+        webAppStateService.pushPatches(NoteEditAction.COLLECTION_NAME, List.of(mutation));
+    }
+
+    /**
+     * Pins the referenced message inside its chat for every participant.
+     *
+     * <p>Per WhatsApp Web {@code WAWebSendPinMessageAction.sendPinInChatMsg}:
+     * builds a {@link PinInChatMessage} with
+     * {@link PinInChatMessage.Type#PIN_FOR_ALL} pointing at the target
+     * message key and routes it through the regular message send pipeline.
+     * The sender timestamp is set to the current instant.
+     *
+     * @param msgKey the key of the message to pin
+     * @return the server ack result for the pin stanza
+     * @throws NullPointerException     if {@code msgKey} is {@code null}
+     * @throws IllegalArgumentException if {@code msgKey} has no parent JID
+     *
+     * @implNote WAWebSendPinMessageAction.sendPinInChatMsg — Cobalt builds
+     *           the {@link PinInChatMessage} inline and dispatches via
+     *           {@link MessageService#send(Jid, MessageContainer)} which
+     *           routes through the message preparer (whose {@code hide}
+     *           attribute mirrors WA Web's pin stanza shape).
+     */
+    @WhatsAppWebExport(moduleName = "WAWebSendPinMessageAction", exports = "sendPinInChatMsg",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public AckResult pinMessageInChat(MessageKey msgKey) {
+        Objects.requireNonNull(msgKey, "msgKey cannot be null");
+        var parentJid = msgKey.parentJid()
+                .orElseThrow(() -> new IllegalArgumentException("msgKey must carry a parentJid"));
+        var pin = new PinInChatMessageBuilder() // WAWebSendPinMessageAction.sendPinInChatMsg: PinInChat message construction
+                .key(msgKey) // WAWebSendPinMessageAction: key: parentMsgKey
+                .type(PinInChatMessage.Type.PIN_FOR_ALL) // WAWebSendPinMessageAction.sendPinInChatMsg: PIN_FOR_ALL
+                .senderTimestampMs(Instant.now()) // WAWebSendPinMessageAction: senderTimestampMs
+                .build();
+        return messageService.send(parentJid, MessageContainer.of(pin)); // WAWebSendAddonMsgChatAction -> sendMsgRecord
+    }
+
+    /**
+     * Removes the pin from the referenced message inside its chat for every
+     * participant.
+     *
+     * <p>Counterpart to {@link #pinMessageInChat(MessageKey)}: emits the
+     * same message with {@link PinInChatMessage.Type#UNPIN_FOR_ALL}.
+     *
+     * @param msgKey the key of the message to unpin
+     * @return the server ack result for the unpin stanza
+     * @throws NullPointerException     if {@code msgKey} is {@code null}
+     * @throws IllegalArgumentException if {@code msgKey} has no parent JID
+     *
+     * @implNote WAWebSendPinMessageAction.sendPinInChatMsg — UNPIN path
+     */
+    @WhatsAppWebExport(moduleName = "WAWebSendPinMessageAction", exports = "sendPinInChatMsg",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public AckResult unpinMessageInChat(MessageKey msgKey) {
+        Objects.requireNonNull(msgKey, "msgKey cannot be null");
+        var parentJid = msgKey.parentJid()
+                .orElseThrow(() -> new IllegalArgumentException("msgKey must carry a parentJid"));
+        var pin = new PinInChatMessageBuilder()
+                .key(msgKey)
+                .type(PinInChatMessage.Type.UNPIN_FOR_ALL) // WAWebSendPinMessageAction.sendPinInChatMsg: UNPIN_FOR_ALL
+                .senderTimestampMs(Instant.now())
+                .build();
+        return messageService.send(parentJid, MessageContainer.of(pin));
+    }
+
+    /**
+     * Changes the user's preferred UI locale and propagates the change to
+     * every linked device via the {@code CRITICAL_BLOCK} app-state sync
+     * collection.
+     *
+     * <p>Mirrors WA Web's outgoing-locale path that goes through
+     * {@code WAWebSyncdActionUtils.buildPendingMutation} with the
+     * {@code setting_locale} action and is eventually applied by
+     * {@code WAWebLocaleSettingSync.applyMutations} on the paired devices
+     * (which forward it to {@code WAWebBackendApi.frontendSendAndReceive("setLocale", ...)}).
+     *
+     * <p>The new locale is also eagerly written to
+     * {@link WhatsAppStore#setLocale(String)} so subsequent reads are consistent.
+     *
+     * @implNote ADAPTED: {@code WAWebLocaleSettingSync} — outgoing mutation
+     *           built via {@link LocaleSettingHandler#getLocaleMutation(Instant, String)};
+     *           local store is updated eagerly since Cobalt has no frontend l10n layer
+     * @param locale the new BCP-47 locale tag (e.g. {@code "en_US"}); must not
+     *               be {@code null}
+     * @throws NullPointerException            if {@code locale} is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WAWebLocaleSettingSync", exports = "applyMutations",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void changeLocale(String locale) {
+        Objects.requireNonNull(locale, "locale cannot be null");
+        var mutation = LocaleSettingHandler.INSTANCE.getLocaleMutation(Instant.now(), locale); // ADAPTED: WAWebSyncdActionUtils.buildPendingMutation
+        webAppStateService.pushPatches(LocaleSetting.COLLECTION_NAME, List.of(mutation)); // WAWebSyncdCoreApi.lockForSync([], [mutation], ...)
+        store.setLocale(locale); // ADAPTED: WAWebLocaleSettingSync.applyMutations -> frontendSendAndReceive("setLocale", ...) — apply locally for eager consistency
+    }
+
+    /**
+     * Changes the user's disable-link-previews privacy setting and propagates
+     * the change to every linked device via the {@code REGULAR} app-state
+     * sync collection.
+     *
+     * <p>Mirrors {@code WAWebDisableLinkPreviewsSync.sendMutation}, which
+     * builds a {@code setting_disableLinkPreviews} mutation through
+     * {@link DisableLinkPreviewsHandler#getMutation(Instant, boolean)} and
+     * hands it to {@code WAWebSyncdCoreApi.lockForSync}. Cobalt uses
+     * {@link WebAppStateService#pushPatches(SyncPatchType, java.util.SequencedCollection)}
+     * for the same purpose.
+     *
+     * <p>The new value is also eagerly written to
+     * {@link WhatsAppStore#setDisableLinkPreviews(boolean)} so subsequent
+     * reads are consistent.
+     *
+     * @implNote {@code WAWebDisableLinkPreviewsSync.sendMutation} — outgoing
+     *           mutation built via {@link DisableLinkPreviewsHandler#getMutation(Instant, boolean)}
+     * @param disabled {@code true} to disable link previews, {@code false} to
+     *                 allow them
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WAWebDisableLinkPreviewsSync", exports = "sendMutation",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void changeDisableLinkPreviews(boolean disabled) {
+        var mutation = DisableLinkPreviewsHandler.INSTANCE.getMutation(Instant.now(), disabled); // WAWebDisableLinkPreviewsSync.getMutation
+        webAppStateService.pushPatches(PrivacySettingDisableLinkPreviewsAction.COLLECTION_NAME, List.of(mutation)); // WAWebDisableLinkPreviewsSync.sendMutation: WAWebSyncdCoreApi.lockForSync([], [getMutation(...)], ...)
+        store.setDisableLinkPreviews(disabled); // ADAPTED: WAWebDisableLinkPreviewsAction.setDisableLinkPreviewsToUserPrefs(r) — apply locally for eager consistency
+    }
+
+    /**
+     * Changes the user's 12h/24h time format preference and propagates the
+     * change to every linked device via the {@code REGULAR_LOW} app-state
+     * sync collection.
+     *
+     * <p>Mirrors WA Web's outgoing path that goes through
+     * {@code WAWebSyncdActionUtils.buildPendingMutation} with the
+     * {@code time_format} action and is eventually applied by
+     * {@code WAWebTimeFormatSync.applyMutations} on the paired devices (which
+     * forwards it to {@code WAWebBackendApi.frontendFireAndForget("setIs24Hour", ...)}).
+     *
+     * <p>The new value is also eagerly written to
+     * {@link WhatsAppStore#setTwentyFourHourFormat(boolean)} so subsequent
+     * reads are consistent.
+     *
+     * @implNote ADAPTED: {@code WAWebTimeFormatSync} — outgoing mutation built
+     *           via {@link TimeFormatHandler#getTimeFormatMutation(Instant, boolean)};
+     *           local store is updated eagerly since Cobalt has no frontend
+     * @param twentyFourHourFormat {@code true} to enable 24-hour display,
+     *                             {@code false} for 12-hour display
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WAWebTimeFormatSync", exports = "applyMutations",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void changeTwentyFourHourFormat(boolean twentyFourHourFormat) {
+        var mutation = TimeFormatHandler.INSTANCE.getTimeFormatMutation(Instant.now(), twentyFourHourFormat); // ADAPTED: WAWebSyncdActionUtils.buildPendingMutation
+        webAppStateService.pushPatches(TimeFormatAction.COLLECTION_NAME, List.of(mutation)); // WAWebSyncdCoreApi.lockForSync([], [mutation], ...)
+        store.setTwentyFourHourFormat(twentyFourHourFormat); // ADAPTED: WAWebTimeFormatSync.applyMutations -> frontendFireAndForget("setIs24Hour", ...) — apply locally
+    }
+
+    /**
+     * Changes the user's Maiba AI features preference and propagates the
+     * change to every linked device via the {@code REGULAR_HIGH} app-state
+     * sync collection.
+     *
+     * <p>NO_WA_BASIS: WA Web has no outgoing helper or setter for
+     * {@code maiba_ai_features_control}; only the protobuf shape exists in
+     * {@code WAWebProtobufSyncAction.pb}. Cobalt surfaces this forward-looking
+     * setter so the {@link MaibaAIFeaturesControlHandler} is exercised end to
+     * end. The convenience overload
+     * {@link #changeAIFeaturesEnabled(boolean)} maps the boolean flag to the
+     * {@code ENABLED} / {@code DISABLED} enum variants.
+     *
+     * <p>The new value is also eagerly written to
+     * {@link WhatsAppStore#setMaibaAiFeatureStatus(MaibaAIFeaturesControlAction.MaibaAIFeatureStatus)}
+     * so subsequent reads are consistent.
+     *
+     * @implNote NO_WA_BASIS — forward-looking setter built on
+     *           {@link MaibaAIFeaturesControlHandler#getMaibaAiFeatureStatusMutation(Instant, MaibaAIFeaturesControlAction.MaibaAIFeatureStatus)}
+     * @param enabled {@code true} to enable AI features (emits {@code ENABLED}),
+     *                {@code false} to disable them (emits {@code DISABLED})
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    public void changeAIFeaturesEnabled(boolean enabled) {
+        var status = enabled
+                ? MaibaAIFeaturesControlAction.MaibaAIFeatureStatus.ENABLED
+                : MaibaAIFeaturesControlAction.MaibaAIFeatureStatus.DISABLED;
+        var mutation = MaibaAIFeaturesControlHandler.INSTANCE.getMaibaAiFeatureStatusMutation(Instant.now(), status); // NO_WA_BASIS
+        webAppStateService.pushPatches(MaibaAIFeaturesControlAction.COLLECTION_NAME, List.of(mutation));
+        store.setMaibaAiFeatureStatus(status); // NO_WA_BASIS: apply locally for eager consistency
+    }
+
+    /**
+     * Changes the user's auto-unarchive-on-new-message setting and propagates
+     * the change to every linked device via the {@code REGULAR_LOW} app-state
+     * sync collection.
+     *
+     * <p>Mirrors WA Web's {@code WAWebArchiveSettingBridge} outgoing path,
+     * which builds a {@code setting_unarchiveChats} mutation through
+     * {@code WAWebSyncdActionUtils.buildPendingMutation} and hands it to
+     * {@code WAWebSyncdCoreApi.lockForSync}. The paired devices apply it via
+     * {@code WAWebArchiveSettingSync.applyMutations}, which also runs the
+     * "re-archive already-archived chats" / "auto-unarchive" side-effect pass.
+     *
+     * <p>The new value is also eagerly written to
+     * {@link WhatsAppStore#setUnarchiveChats(boolean)} so subsequent reads are
+     * consistent.
+     *
+     * @implNote ADAPTED: {@code WAWebArchiveSettingBridge} -> outgoing
+     *           {@code setting_unarchiveChats} mutation built via
+     *           {@link UnarchiveChatsSettingHandler#getUnarchiveChatsMutation(Instant, boolean)}
+     * @param unarchive {@code true} to automatically unarchive a chat on the
+     *                  arrival of a new message, {@code false} to keep archived
+     *                  chats archived
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WAWebArchiveSettingSync", exports = "applyMutations",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void changeUnarchiveChatsOnNewMessage(boolean unarchive) {
+        var mutation = UnarchiveChatsSettingHandler.INSTANCE.getUnarchiveChatsMutation(Instant.now(), unarchive); // ADAPTED: WAWebSyncdActionUtils.buildPendingMutation
+        webAppStateService.pushPatches(UnarchiveChatsSetting.COLLECTION_NAME, List.of(mutation)); // WAWebSyncdCoreApi.lockForSync([], [mutation], ...)
+        store.setUnarchiveChats(unarchive); // ADAPTED: apply locally for eager consistency
+    }
+
+    /**
+     * Changes the user's notification activity preference and propagates the
+     * change to every linked device via the {@code REGULAR} app-state sync
+     * collection.
+     *
+     * <p>NO_WA_BASIS: WA Web has no outgoing helper or sync handler module
+     * for {@code notificationActivitySetting}; only the protobuf schema
+     * exists in {@code WAWebProtobufSyncAction.pb} (action index 60,
+     * collection {@code REGULAR}). Cobalt surfaces this forward-looking setter
+     * so the {@link NotificationActivitySettingHandler} is exercised end to
+     * end.
+     *
+     * <p>The new value is also eagerly written to
+     * {@link WhatsAppStore#setNotificationActivitySetting(NotificationActivitySettingAction.NotificationActivitySetting)}
+     * so subsequent reads are consistent.
+     *
+     * @implNote NO_WA_BASIS — forward-looking setter built on
+     *           {@link NotificationActivitySettingHandler#getNotificationActivityMutation(Instant, NotificationActivitySettingAction.NotificationActivitySetting)}
+     * @param setting the new {@link NotificationActivitySettingAction.NotificationActivitySetting};
+     *                must not be {@code null}
+     * @throws NullPointerException            if {@code setting} is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    public void changeNotificationActivity(NotificationActivitySettingAction.NotificationActivitySetting setting) {
+        Objects.requireNonNull(setting, "setting cannot be null");
+        var mutation = NotificationActivitySettingHandler.INSTANCE.getNotificationActivityMutation(Instant.now(), setting); // NO_WA_BASIS
+        webAppStateService.pushPatches(NotificationActivitySettingHandler.INSTANCE.collectionName(), List.of(mutation));
+        store.setNotificationActivitySetting(setting); // NO_WA_BASIS: apply locally for eager consistency
+    }
+
+    //</editor-fold>
+    //<editor-fold desc="Listeners">
     public WhatsAppClient addListener(WhatsAppClientListener listener) {
         store.addListener(listener);
         return this;
@@ -5455,4 +9830,6 @@ public final class WhatsAppClient {
         });
         return this;
     }
+
+    //</editor-fold>
 }

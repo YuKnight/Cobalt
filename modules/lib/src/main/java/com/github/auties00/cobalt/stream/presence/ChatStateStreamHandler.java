@@ -36,14 +36,14 @@ public final class ChatStateStreamHandler implements SocketStream.Handler {
     /**
      * The logger for diagnostic messages related to chatstate handling.
      *
-     * @implNote WAWebHandleChatState -- WALogger usage in error paths
+     * @implNote WAWebHandleChatState, WALogger usage in error paths
      */
     private static final System.Logger LOGGER = System.getLogger(ChatStateStreamHandler.class.getName());
 
     /**
      * The WhatsApp client instance used to access the store and notify listeners.
      *
-     * @implNote WAWebHandleChatState -- constructor DI replaces module-level imports of
+     * @implNote WAWebHandleChatState, constructor DI replaces module-level imports of
      *           WAWebPresenceCollection, WAWebChatCollection, and WAWebApiContact
      */
     private final WhatsAppClient whatsapp;
@@ -52,7 +52,7 @@ public final class ChatStateStreamHandler implements SocketStream.Handler {
      * Constructs a new chatstate stream handler with the given WhatsApp client.
      *
      * @param whatsapp the non-{@code null} WhatsApp client instance
-     * @implNote WACreateHandleChatState.createHandleChatState -- module-level handler
+     * @implNote WACreateHandleChatState.createHandleChatState, module-level handler
      *           creation; the factory receives individualMessage and groupMessage
      *           handlers and returns a unified function
      */
@@ -81,7 +81,7 @@ public final class ChatStateStreamHandler implements SocketStream.Handler {
      * parsing inline using the stanza's XML structure directly.
      *
      * @param node the non-{@code null} chatstate stanza node
-     * @implNote WACreateHandleChatState.createHandleChatState -- the returned function
+     * @implNote WACreateHandleChatState.createHandleChatState, the returned function
      *           that routes to handleIndividualChatState or handleGroupChatState
      */
     @Override
@@ -137,7 +137,7 @@ public final class ChatStateStreamHandler implements SocketStream.Handler {
         // Skip self-chatstates for individual chats
         var meJid = whatsapp.store().jid().orElse(null);
         if (meJid != null && isSelf(from, meJid)) {
-            return; // WAWebChangePresenceHandlerAction.default -- skip self-chatstate
+            return; // WAWebChangePresenceHandlerAction.default, skip self-chatstate
         }
 
         // WAWebHandleChatState.handleIndividualChatState: var a = userJidToUserWid(jid)
@@ -151,7 +151,7 @@ public final class ChatStateStreamHandler implements SocketStream.Handler {
         // WAWebChangePresenceHandlerAction.default -> m(presence, {id, type})
         contact.setLastKnownPresence(state);
         whatsapp.store().addContact(contact); // ADAPTED: WAWebPresenceCollection.set operations
-        notifyPresence(contact.toJid(), contact.toJid()); // WAWebChangePresenceHandlerAction -- non-group path
+        notifyPresence(contact.toJid(), contact.toJid()); // WAWebChangePresenceHandlerAction, non-group path
     }
 
     /**
@@ -178,7 +178,7 @@ public final class ChatStateStreamHandler implements SocketStream.Handler {
      * @param participant the JID of the group participant who is composing
      * @param state       the resolved composing state
      * @implNote WAWebHandleChatState.handleGroupChatState,
-     *           WAWebChangePresenceHandlerAction.default -- group path in m(e, t)
+     *           WAWebChangePresenceHandlerAction.default, group path in m(e, t)
      */
     private void handleGroupChatState(Jid from, Jid participant, ContactStatus state) {
         // WAWebHandleChatState.handleGroupChatState: var i = chatJidToChatWid(jid), var l = userJidToUserWid(participant)
@@ -191,7 +191,7 @@ public final class ChatStateStreamHandler implements SocketStream.Handler {
         // WAWebChangePresenceHandlerAction.m: group path sets chatstate on participant sub-entry
         contact.setLastKnownPresence(state);
         whatsapp.store().addContact(contact); // ADAPTED: WAWebPresenceCollection chatstate set
-        notifyPresence(from, contact.toJid()); // WAWebChangePresenceHandlerAction -- group path: id=group, participant=user
+        notifyPresence(from, contact.toJid()); // WAWebChangePresenceHandlerAction, group path: id=group, participant=user
     }
 
     /**
@@ -261,7 +261,7 @@ public final class ChatStateStreamHandler implements SocketStream.Handler {
      * @param from  the JID from the chatstate stanza
      * @param meJid the current user's device JID
      * @return {@code true} if the chatstate is for the current user's own account
-     * @implNote WAWebUserPrefsMeUser.isMeAccount -- function $(e)
+     * @implNote WAWebUserPrefsMeUser.isMeAccount, function $(e)
      */
     private boolean isSelf(Jid from, Jid meJid) {
         var fromUser = from.toUserJid();
@@ -291,17 +291,17 @@ public final class ChatStateStreamHandler implements SocketStream.Handler {
      *
      * @param jid the JID from the chatstate stanza
      * @return the resolved contact, or {@code null} if the JID cannot be resolved
-     * @implNote ADAPTED: WAWebHandleChatState.handleIndividualChatState -- LID migration
+     * @implNote ADAPTED: WAWebHandleChatState.handleIndividualChatState, LID migration
      *           logic via WAWebLid1X1MigrationGating.isLidMigrated,
      *           WAWebLidMigrationUtils.toUserLid, WAWebApiChat.getChatRecordByAccountLid;
      *           Cobalt collapses all LID resolution into findPhoneByLid
      */
     private Contact getOrCreateContact(Jid jid) {
         if (jid == null) {
-            return null; // NO_WA_BASIS -- defensive null check
+            return null; // NO_WA_BASIS, defensive null check
         }
 
-        // ADAPTED: WAWebHandleChatState -- userJidToUserWid + LID migration resolution
+        // ADAPTED: WAWebHandleChatState, userJidToUserWid + LID migration resolution
         var canonical = jid.toUserJid().hasLidServer()
                 ? whatsapp.store().findPhoneByLid(jid.toUserJid()).orElse(jid.toUserJid())
                 : jid.toUserJid();
@@ -320,7 +320,7 @@ public final class ChatStateStreamHandler implements SocketStream.Handler {
      * @param conversation the JID of the conversation where the presence changed
      *                     (same as participant for 1:1 chats, group JID for groups)
      * @param participant  the JID of the participant whose presence changed
-     * @implNote ADAPTED: WAWebChangePresenceHandlerAction.default -- in WA Web, presence
+     * @implNote ADAPTED: WAWebChangePresenceHandlerAction.default, in WA Web, presence
      *           changes propagate through model observation on the PresenceCollection;
      *           Cobalt uses explicit listener notification instead
      */

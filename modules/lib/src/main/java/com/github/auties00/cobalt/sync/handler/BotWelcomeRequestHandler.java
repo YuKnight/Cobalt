@@ -2,6 +2,9 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
@@ -32,6 +35,7 @@ import java.util.List;
  *
  * @implNote WAWebBotWelcomeRequestSync — singleton instance exported as {@code default}
  */
+@WhatsAppWebModule(moduleName = "WAWebBotWelcomeRequestSync")
 public final class BotWelcomeRequestHandler implements WebAppStateActionHandler {
     /**
      * Singleton instance of the bot welcome request handler.
@@ -41,6 +45,7 @@ public final class BotWelcomeRequestHandler implements WebAppStateActionHandler 
      *
      * @implNote WAWebBotWelcomeRequestSync.default — module-level singleton
      */
+    @WhatsAppWebExport(moduleName = "WAWebBotWelcomeRequestSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final BotWelcomeRequestHandler INSTANCE = new BotWelcomeRequestHandler();
 
     /**
@@ -49,6 +54,7 @@ public final class BotWelcomeRequestHandler implements WebAppStateActionHandler 
      * @implNote WAWebBotWelcomeRequestSync — class {@code c} constructor
      *           ({@code chatJidIndex = 1, collectionName = RegularLow})
      */
+    @WhatsAppWebExport(moduleName = "WAWebBotWelcomeRequestSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private BotWelcomeRequestHandler() {
 
     }
@@ -61,6 +67,7 @@ public final class BotWelcomeRequestHandler implements WebAppStateActionHandler 
      * @return the action name {@code "bot_welcome_request"}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebBotWelcomeRequestSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
         return BotWelcomeRequestAction.ACTION_NAME; // WAWebBotWelcomeRequestSync.getAction -> WASyncdConst.Actions.BotWelcomeRequest
     }
@@ -76,6 +83,7 @@ public final class BotWelcomeRequestHandler implements WebAppStateActionHandler 
      * @return {@link SyncPatchType#REGULAR_LOW}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebBotWelcomeRequestSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
         return BotWelcomeRequestAction.COLLECTION_NAME; // WAWebBotWelcomeRequestSync.collectionName = WASyncdConst.CollectionName.RegularLow
     }
@@ -87,6 +95,7 @@ public final class BotWelcomeRequestHandler implements WebAppStateActionHandler 
      * @return the version number {@code 2}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebBotWelcomeRequestSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return BotWelcomeRequestAction.ACTION_VERSION; // WAWebBotWelcomeRequestSync.getVersion -> 2
     }
@@ -104,6 +113,7 @@ public final class BotWelcomeRequestHandler implements WebAppStateActionHandler 
      * @return {@code true} if the mutation was applied successfully
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebBotWelcomeRequestSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS; // WAWebBotWelcomeRequestSync.applyMutations
     }
@@ -132,6 +142,7 @@ public final class BotWelcomeRequestHandler implements WebAppStateActionHandler 
      * @return the detailed application result
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebBotWelcomeRequestSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         // WAWebBotWelcomeRequestSync.applyMutations: match on operation
         if (mutation.operation() == SyncdOperation.REMOVE) { // WAWebBotWelcomeRequestSync.applyMutations: e.operation === "remove" -> i++, {actionState: Unsupported}
@@ -158,7 +169,6 @@ public final class BotWelcomeRequestHandler implements WebAppStateActionHandler 
             // BotWelcomeRequestAction.isSent() coalesces null to false per project convention
             // (nullable Boolean accessors return primitive boolean). The raw Boolean field is
             // package-private and inaccessible from this package. See Issues in Context Files.
-
             var chatJid = Jid.of(chatJidString); // WAWebBotWelcomeRequestSync.applyMutations: createWid(u)
             var chat = client.store().findChatByJid(chatJid); // WAWebBotWelcomeRequestSync.applyMutations: yield resolveChatForMutationIndex(createWid(u))
             if (chat.isEmpty()) { // WAWebBotWelcomeRequestSync.applyMutations: if (!d.success) return {actionState: Orphan, orphanModel: d.orphanModel}
@@ -198,6 +208,7 @@ public final class BotWelcomeRequestHandler implements WebAppStateActionHandler 
      * @param isSent  whether the welcome message has been sent
      * @return the pending mutation for the bot welcome request action
      */
+    @WhatsAppWebExport(moduleName = "WAWebBotWelcomeRequestSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncPendingMutation getBotWelcomeRequestSetMutation(Jid chatJid, boolean isSent) {
         var action = new BotWelcomeRequestActionBuilder() // WAWebBotWelcomeRequestSync.getBotWelcomeRequestSetMutation: {botWelcomeRequestAction: {isSent: t}}
                 .isSent(isSent) // WAWebBotWelcomeRequestSync.getBotWelcomeRequestSetMutation: isSent: t

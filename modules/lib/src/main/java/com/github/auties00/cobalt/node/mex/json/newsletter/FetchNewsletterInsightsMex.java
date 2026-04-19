@@ -74,18 +74,15 @@ public sealed interface FetchNewsletterInsightsMex extends MexJsonOperation perm
         public NodeBuilder toNode() {
             // WAWebMexFetchNewsletterInsightsJob.mexFetchNewsletterInsights
             // Opens a UTF-8 JSON writer that will serialise the GraphQL variables envelope
-
             try (var writer = JSONWriter.ofUTF8()) {
                 // WAWebMexFetchNewsletterInsightsJob.mexFetchNewsletterInsights
                 // Begins the outer envelope and the nested "variables" object consumed by WAWebMexClient.fetchQuery
-
                 writer.startObject();
                 writer.writeName("variables");
                 writer.writeColon();
                 writer.startObject();
                 // WAWebMexFetchNewsletterInsightsJob.mexFetchNewsletterInsights
                 // Emits the input variable when present
-
                 if (input != null) {
                     writer.writeName("input");
                     writer.writeColon();
@@ -96,7 +93,6 @@ public sealed interface FetchNewsletterInsightsMex extends MexJsonOperation perm
 
                 // ADAPTED: WAWebMexFetchNewsletterInsightsJob.mexFetchNewsletterInsights
                 // Flushes the JSON buffer into a StringWriter and wraps it in the shared MEX IQ envelope
-
                 try (var output = new StringWriter()) {
                     writer.flushTo(output);
                     return MexJsonOperation.createMexNode(QUERY_ID, output.toString());
@@ -412,7 +408,6 @@ public sealed interface FetchNewsletterInsightsMex extends MexJsonOperation perm
         private static Optional<Response> of(byte[] json) {
             // WAWebMexFetchNewsletterInsightsJob.mexFetchNewsletterInsights
             // Parses the raw JSON payload, bailing out if fastjson2 returns null
-
             var jsonObject = JSON.parseObject(json);
             if (jsonObject == null) {
                 return Optional.empty();
@@ -420,7 +415,6 @@ public sealed interface FetchNewsletterInsightsMex extends MexJsonOperation perm
 
             // WAWebMexFetchNewsletterInsightsJob.mexFetchNewsletterInsights
             // Descends into the standard GraphQL "data" envelope
-
             var data = jsonObject.getJSONObject("data");
             if (data == null) {
                 return Optional.empty();
@@ -428,7 +422,6 @@ public sealed interface FetchNewsletterInsightsMex extends MexJsonOperation perm
 
             // WAWebMexFetchNewsletterInsightsJob.mexFetchNewsletterInsights
             // Extracts the operation-specific root keyed by xwa2_newsletter_admin_insights
-
             var root = data.getJSONObject("xwa2_newsletter_admin_insights");
             if (root == null) {
                 return Optional.empty();

@@ -35,7 +35,7 @@ public final class StreamErrorStreamHandler implements SocketStream.Handler {
     /**
      * Logger for diagnostic output related to stream error handling.
      *
-     * @implNote WAWebHandleStreamError.default -- logging via WALogger
+     * @implNote WAWebHandleStreamError.default, logging via WALogger
      */
     private static final System.Logger LOGGER = System.getLogger(StreamErrorStreamHandler.class.getName());
 
@@ -58,7 +58,7 @@ public final class StreamErrorStreamHandler implements SocketStream.Handler {
     /**
      * The WhatsApp client instance used to dispatch failure exceptions.
      *
-     * @implNote WAWebHandleStreamError.default -- dependency injection replaces module-level imports
+     * @implNote WAWebHandleStreamError.default, dependency injection replaces module-level imports
      */
     private final WhatsAppClient whatsapp;
 
@@ -95,7 +95,6 @@ public final class StreamErrorStreamHandler implements SocketStream.Handler {
     public void handle(Node node) {
         // WAWebHandleStreamError.streamErrorParser: t.assertTag("stream:error")
         // (already enforced by SocketStream tag-routing)
-
         // WAWebHandleStreamError.streamErrorParser: if (t.hasChild("conflict"))
         var conflict = node.getChild("conflict").orElse(null);
         if (conflict != null) {
@@ -149,16 +148,16 @@ public final class StreamErrorStreamHandler implements SocketStream.Handler {
      * which maps to a {@link WhatsAppSessionException.LoggedOut}.
      *
      * @param type the conflict type attribute value, or {@code null} if absent
-     * @implNote WAWebHandleStreamError.default -- streamErrorParser conflict branch
+     * @implNote WAWebHandleStreamError.default, streamErrorParser conflict branch
      */
     private void handleConflict(String type) {
         if ("replaced".equals(type)) {
-            // WAWebHandleStreamError.default -- replaced: stopComms, resolve NO_ACK
+            // WAWebHandleStreamError.default, replaced: stopComms, resolve NO_ACK
             whatsapp.handleFailure(new WhatsAppSessionException.Conflict("Stream replaced by another active session"));
             return;
         }
 
-        // WAWebHandleStreamError.default -- device_removed/default: clearCredentialsAndStoredData, triggerLogout
+        // WAWebHandleStreamError.default, device_removed/default: clearCredentialsAndStoredData, triggerLogout
         whatsapp.handleFailure(new WhatsAppSessionException.LoggedOut("Server removed or invalidated this device"));
     }
 
@@ -174,30 +173,30 @@ public final class StreamErrorStreamHandler implements SocketStream.Handler {
      * Codes outside the 500-599 range close the socket.
      *
      * @param code the error code from the {@code stream:error} stanza
-     * @implNote WAWebHandleStreamError.default -- code branch
+     * @implNote WAWebHandleStreamError.default, code branch
      */
     private void handleCode(int code) {
         LOGGER.log(System.Logger.Level.WARNING, "Received stream:error code={0}", code);
         if (code >= 500 && code < 600) {
-            // WAWebHandleStreamError.default -- 5xx range
+            // WAWebHandleStreamError.default, 5xx range
             if (code == STREAM_ERROR_RESTART_LOGIN) {
-                // WAWebHandleStreamError.default -- 515: stopComms, startLogin, resolve NO_ACK
+                // WAWebHandleStreamError.default, 515: stopComms, startLogin, resolve NO_ACK
                 whatsapp.handleFailure(new WhatsAppSessionException.Reconnect("Server requested reconnect"));
                 return;
             }
 
             if (code == STREAM_ERROR_LOGOUT) {
-                // WAWebHandleStreamError.default -- 516: stopComms, startLogout, resolve NO_ACK
+                // WAWebHandleStreamError.default, 516: stopComms, startLogout, resolve NO_ACK
                 whatsapp.handleFailure(new WhatsAppSessionException.LoggedOut("Server requested logout"));
                 return;
             }
 
-            // WAWebHandleStreamError.default -- other 5xx: onStreamErrorReceived (cancel retry), CLOSE_SOCKET
+            // WAWebHandleStreamError.default, other 5xx: onStreamErrorReceived (cancel retry), CLOSE_SOCKET
             whatsapp.handleFailure(new WhatsAppSessionException.Closed("Server stream error " + code));
             return;
         }
 
-        // WAWebHandleStreamError.default -- non-5xx codes fall through to CLOSE_SOCKET
+        // WAWebHandleStreamError.default, non-5xx codes fall through to CLOSE_SOCKET
         whatsapp.handleFailure(new WhatsAppSessionException.Closed("Server stream error code " + code));
     }
 }

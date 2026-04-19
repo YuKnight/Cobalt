@@ -2,11 +2,17 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
+import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.device.AgentAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.util.HashMap;
 
 /**
  * Handles agent sync actions for managing business account agents (device agents).
@@ -26,20 +32,29 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  * @implNote WAWebAgentSync.default — singleton instance of the agent sync handler
  *           extending {@code WAWebSyncdAction.AccountSyncdActionBase}
  */
+@WhatsAppWebModule(moduleName = "WAWebAgentSync")
 public final class AgentActionHandler implements WebAppStateActionHandler {
     /**
      * The singleton instance of {@code AgentActionHandler}.
      *
      * @implNote WAWebAgentSync.default — {@code var c = new u(); l.default = c}
      */
+    @WhatsAppWebExport(moduleName = "WAWebAgentSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final AgentActionHandler INSTANCE = new AgentActionHandler();
 
     /**
      * Creates the singleton agent action handler.
      *
+     * <p>Per WhatsApp Web, the constructor of class {@code u} extends
+     * {@code AccountSyncdActionBase} and sets
+     * {@code this.collectionName = WASyncdConst.CollectionName.Regular}. The
+     * {@code collectionName} assignment is surfaced in Cobalt via
+     * {@link #collectionName()} rather than as an instance field.
+     *
      * @implNote WAWebAgentSync — constructor of class {@code u} extending
      *           {@code AccountSyncdActionBase}
      */
+    @WhatsAppWebExport(moduleName = "WAWebAgentSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private AgentActionHandler() {
 
     }
@@ -51,6 +66,7 @@ public final class AgentActionHandler implements WebAppStateActionHandler {
      *           (value: {@code "deviceAgent"})
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebAgentSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
         return AgentAction.ACTION_NAME; // WAWebAgentSync.getAction -> WASyncdConst.Actions.Agent = "deviceAgent"
     }
@@ -62,6 +78,7 @@ public final class AgentActionHandler implements WebAppStateActionHandler {
      *           (value: {@code "regular"})
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebAgentSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
         return AgentAction.COLLECTION_NAME; // WAWebAgentSync.collectionName = WASyncdConst.CollectionName.Regular = "regular"
     }
@@ -72,6 +89,7 @@ public final class AgentActionHandler implements WebAppStateActionHandler {
      * @implNote WAWebAgentSync.getVersion — returns {@code 7}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebAgentSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return AgentAction.ACTION_VERSION; // WAWebAgentSync.getVersion -> 7
     }
@@ -90,8 +108,9 @@ public final class AgentActionHandler implements WebAppStateActionHandler {
      * @return {@code true} if the mutation was applied successfully, {@code false} otherwise
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebAgentSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS; // WAWebAgentSync.applyMutations -> SyncActionState.Success
+        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebAgentSync.applyMutations -> SyncActionState.Success
     }
 
     /**
@@ -105,10 +124,20 @@ public final class AgentActionHandler implements WebAppStateActionHandler {
      *       (including {@code isDeleted}), regardless of the deleted flag</li>
      * </ul>
      *
-     * <p>After all mutations in a batch, WA Web also reconciles unattributed messages
-     * with the agent collection via a post-processing step. That reconciliation is
-     * intentionally omitted in Cobalt because unattributed message tracking is not
-     * implemented.
+     * <p>After all mutations in a batch, WA Web also reconciles unattributed
+     * messages with the agent collection via a post-processing step that
+     * iterates {@code UnattributedMessageCollection.getModelsArray()}, looks up
+     * each message, and if its {@code deviceId} maps to an agent, sets
+     * {@code msg.agentId} and removes the message from the unattributed
+     * collection. That reconciliation is intentionally omitted in Cobalt
+     * because unattributed message tracking is not implemented.
+     *
+     * <p>Additionally, WA Web formats the display name via
+     * {@code WAWebAgentModelUtils.getFormattedAgentName} (which returns a
+     * localized {@code "{business-name} (Admin)"} string when {@code deviceId}
+     * is the primary device id {@code 0}). Cobalt stores the raw
+     * {@link AgentAction} protobuf with its original {@code name()} and
+     * {@code deviceID()} accessors, deferring display formatting to UI layers.
      *
      * @implNote WAWebAgentSync.applyMutations — per-mutation logic within
      *           {@code withValidatedContent} callback, using
@@ -121,6 +150,7 @@ public final class AgentActionHandler implements WebAppStateActionHandler {
      * @return the detailed application result
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebAgentSync", exports = {"applyMutations", "getValidatedContentSet", "getValidatedContentRemove"}, adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         var indexArray = JSON.parseArray(mutation.index()); // WAWebAgentSync.getValidatedContentSet/getValidatedContentRemove — indexParts
         var agentId = indexArray.getString(1); // WAWebAgentSync — var n = t[1]
@@ -128,9 +158,9 @@ public final class AgentActionHandler implements WebAppStateActionHandler {
             return malformedActionIndex(); // WAWebAgentSync.getValidatedContentSet/getValidatedContentRemove -> {result: "malformed_index"}
         }
 
-        var states = new java.util.HashMap<>(client.store().agentStates()); // ADAPTED: WAWebAgentCollection/WAWebSchemaAgent — Cobalt uses ConcurrentHashMap store
+        var states = new HashMap<>(client.store().agentStates()); // ADAPTED: WAWebAgentCollection/WAWebSchemaAgent — Cobalt uses ConcurrentHashMap store
         if (mutation.operation() == SyncdOperation.REMOVE) { // WAWebAgentSync.applyMutations — n.operation === "remove"
-            states.remove(agentId); // WAWebAgentSync.applyMutations — i.push(t) -> AgentCollection.remove(i)
+            states.remove(agentId); // WAWebAgentSync.applyMutations — i.push(t) -> AgentCollection.remove(i) + bulkRemove(i)
             client.store().setAgentStates(states);
             return MutationApplicationResult.success(); // WAWebAgentSync.applyMutations — {actionState: SyncActionState.Success}
         }
@@ -143,7 +173,7 @@ public final class AgentActionHandler implements WebAppStateActionHandler {
             return malformedActionValue(); // WAWebAgentSync.getValidatedContentSet -> {result: "malformed_value"}
         }
 
-        states.put(agentId, action); // WAWebAgentSync.applyMutations — a.push({id:t, name:c, deviceId:..., isDeleted:!!u.isDeleted}) -> AgentCollection.add(a, {merge: true})
+        states.put(agentId, action); // WAWebAgentSync.applyMutations — a.push({id:t, name:c, deviceId:..., isDeleted:!!u.isDeleted}) -> AgentCollection.add(a, {merge: true}) + bulkCreateOrMerge(a)
         client.store().setAgentStates(states);
         return MutationApplicationResult.success(); // WAWebAgentSync.applyMutations — {actionState: SyncActionState.Success}
     }

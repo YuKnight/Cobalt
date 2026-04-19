@@ -2,6 +2,9 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.MessageKey;
 import com.github.auties00.cobalt.model.sync.*;
@@ -32,6 +35,7 @@ import java.util.List;
  *           {@code collectionName = RegularHigh}, {@code chatJidIndex = 1},
  *           {@code getVersion() = 3}, {@code getAction() = DeleteMessageForMe}
  */
+@WhatsAppWebModule(moduleName = "WAWebDeleteMessageForMeSync")
 public final class DeleteMessageForMeHandler implements WebAppStateActionHandler {
     /**
      * Singleton instance of the delete message for me handler.
@@ -41,6 +45,7 @@ public final class DeleteMessageForMeHandler implements WebAppStateActionHandler
      *
      * @implNote WAWebDeleteMessageForMeSync.default — module-level singleton
      */
+    @WhatsAppWebExport(moduleName = "WAWebDeleteMessageForMeSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final DeleteMessageForMeHandler INSTANCE = new DeleteMessageForMeHandler();
 
     /**
@@ -49,6 +54,7 @@ public final class DeleteMessageForMeHandler implements WebAppStateActionHandler
      * @implNote WAWebDeleteMessageForMeSync — class constructor sets
      *           {@code collectionName = RegularHigh}, {@code chatJidIndex = 1}
      */
+    @WhatsAppWebExport(moduleName = "WAWebDeleteMessageForMeSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private DeleteMessageForMeHandler() {
 
     }
@@ -61,6 +67,7 @@ public final class DeleteMessageForMeHandler implements WebAppStateActionHandler
      * @return the action name {@code "deleteMessageForMe"}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebDeleteMessageForMeSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
         return DeleteMessageForMeAction.ACTION_NAME; // WAWebDeleteMessageForMeSync.getAction
     }
@@ -73,6 +80,7 @@ public final class DeleteMessageForMeHandler implements WebAppStateActionHandler
      * @return {@link SyncPatchType#REGULAR_HIGH}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebDeleteMessageForMeSync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
         return DeleteMessageForMeAction.COLLECTION_NAME; // WAWebDeleteMessageForMeSync: collectionName = RegularHigh
     }
@@ -84,6 +92,7 @@ public final class DeleteMessageForMeHandler implements WebAppStateActionHandler
      * @return {@code 3}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebDeleteMessageForMeSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return DeleteMessageForMeAction.ACTION_VERSION; // WAWebDeleteMessageForMeSync.getVersion
     }
@@ -99,6 +108,7 @@ public final class DeleteMessageForMeHandler implements WebAppStateActionHandler
      * @return {@code true} if the mutation was applied successfully, {@code false} otherwise
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebDeleteMessageForMeSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebDeleteMessageForMeSync.applyMutations
     }
@@ -125,6 +135,7 @@ public final class DeleteMessageForMeHandler implements WebAppStateActionHandler
      * @return the detailed application result
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebDeleteMessageForMeSync", exports = {"applyMutations", "getMessageKey"}, adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         // WAWebDeleteMessageForMeSync.applyMutations: if (e.operation === "set") { ... } else { return Unsupported }
         if (mutation.operation() != SyncdOperation.SET) {
@@ -213,6 +224,7 @@ public final class DeleteMessageForMeHandler implements WebAppStateActionHandler
      * @return the conflict resolution indicating which mutation to keep
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebDeleteMessageForMeSync", exports = "resolveConflicts", adaptation = WhatsAppAdaptation.DIRECT)
     public ConflictResolution resolveConflicts(DecryptedMutation.Trusted localMutation, DecryptedMutation.Trusted remoteMutation) {
         // WAWebDeleteMessageForMeSync.resolveConflicts: u = WANullthrows(l.deleteMessageForMeAction?.deleteMedia)
         var localDeleteMedia = localMutation.value().action()
@@ -252,6 +264,7 @@ public final class DeleteMessageForMeHandler implements WebAppStateActionHandler
      * @param participant      the participant JID for group messages, or {@code null}
      * @return the pending mutation for the delete-for-me action
      */
+    @WhatsAppWebExport(moduleName = "WAWebDeleteMessageForMeSync", exports = "buildDeleteForMeMutation", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncPendingMutation buildDeleteForMeMutation(
             Instant timestamp,
             boolean deleteMedia,
@@ -319,6 +332,7 @@ public final class DeleteMessageForMeHandler implements WebAppStateActionHandler
      * @param isGroupMessages whether each message is a group message, parallel to {@code keys}
      * @return the list of pending mutations for all messages
      */
+    @WhatsAppWebExport(moduleName = "WAWebDeleteMessageForMeSync", exports = "getDeleteForMeMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public List<SyncPendingMutation> getDeleteForMeMutations(
             List<MessageKey> keys,
             boolean deleteMedia,

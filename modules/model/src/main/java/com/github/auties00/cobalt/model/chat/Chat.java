@@ -55,7 +55,6 @@ public non-sealed abstract class Chat implements JidProvider {
     // Messages are not deserialized by defualt because it's up to the implementation class to decide how to do so
     // @ProtobufProperty(index = 2, type = ProtobufType.MESSAGE)
     // private ... messages;
-
     /**
      * The new JID assigned to this chat after a JID migration (for example,
      * when a contact changes their phone number). If present, messages should

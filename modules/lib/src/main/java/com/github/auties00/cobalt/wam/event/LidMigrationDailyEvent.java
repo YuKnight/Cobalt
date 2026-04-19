@@ -38,6 +38,9 @@ public interface LidMigrationDailyEvent extends WamEventSpec {
     @WamProperty(index = 13, type = WamType.INTEGER)
     OptionalInt numberOfPnGroups();
 
+    @WamProperty(index = 14, type = WamType.INTEGER)
+    OptionalInt numberOfRegularPnChats();
+
     @WamProperty(index = 2, type = WamType.INTEGER)
     OptionalInt numberOfPnhCtwaThreadsKnownMapping();
 

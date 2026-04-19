@@ -2,6 +2,9 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncActionState;
@@ -38,6 +41,7 @@ import java.util.List;
  *
  * @implNote WAWebLockChatSync — singleton instance exported as {@code default}
  */
+@WhatsAppWebModule(moduleName = "WAWebLockChatSync")
 public final class LockChatHandler implements WebAppStateActionHandler {
     /**
      * Singleton instance of the lock chat handler.
@@ -47,6 +51,7 @@ public final class LockChatHandler implements WebAppStateActionHandler {
      *
      * @implNote WAWebLockChatSync.default — module-level singleton
      */
+    @WhatsAppWebExport(moduleName = "WAWebLockChatSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final LockChatHandler INSTANCE = new LockChatHandler();
 
     /**
@@ -60,6 +65,7 @@ public final class LockChatHandler implements WebAppStateActionHandler {
      *
      * @implNote WAWebLockChatSync — class {@code m} constructor (no-op beyond base init)
      */
+    @WhatsAppWebExport(moduleName = "WAWebLockChatSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private LockChatHandler() {
 
     }
@@ -72,6 +78,7 @@ public final class LockChatHandler implements WebAppStateActionHandler {
      * @return the action name {@code "lock"}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebLockChatSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
         return LockChatAction.ACTION_NAME; // WAWebLockChatSync.getAction -> WASyncdConst.Actions.LockChat
     }
@@ -87,6 +94,7 @@ public final class LockChatHandler implements WebAppStateActionHandler {
      * @return {@link SyncPatchType#REGULAR_LOW}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebLockChatSync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
         return LockChatAction.COLLECTION_NAME; // WAWebLockChatSync.collectionName = WASyncdConst.CollectionName.RegularLow
     }
@@ -98,6 +106,7 @@ public final class LockChatHandler implements WebAppStateActionHandler {
      * @return the version number {@code 7}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebLockChatSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return LockChatAction.ACTION_VERSION; // WAWebLockChatSync.getVersion -> 7
     }
@@ -115,6 +124,7 @@ public final class LockChatHandler implements WebAppStateActionHandler {
      * @return {@code true} if the mutation was applied successfully
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebLockChatSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebLockChatSync.applyMutations
     }
@@ -163,6 +173,7 @@ public final class LockChatHandler implements WebAppStateActionHandler {
      * @return the detailed application result
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebLockChatSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) { // WAWebLockChatSync.applyMutations: if (e.operation !== "set") return {actionState: Unsupported}
             return MutationApplicationResult.unsupported(); // WAWebLockChatSync.applyMutations: l++, {actionState: SyncActionState.Unsupported}
@@ -234,6 +245,7 @@ public final class LockChatHandler implements WebAppStateActionHandler {
      * @param chatJid   the JID of the chat to lock or unlock
      * @return the pending mutation for the lock action
      */
+    @WhatsAppWebExport(moduleName = "WAWebLockChatSync", exports = "getChatLockMutation", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncPendingMutation getChatLockMutation(Instant timestamp, boolean locked, Jid chatJid) {
         var action = new LockChatActionBuilder() // WAWebLockChatSync.getChatLockMutation: value: {lockChatAction: {locked: t}}
                 .locked(locked) // WAWebLockChatSync.getChatLockMutation: locked: t
@@ -284,12 +296,6 @@ public final class LockChatHandler implements WebAppStateActionHandler {
      * matches how other callers of {@link ArchiveChatHandler#getArchiveChatMutation}
      * behave when the range is unavailable.
      *
-     * <p>The pin mutation is intentionally omitted until
-     * {@code PinChatHandler.getPinMutation} is exposed; the archive mutation
-     * alone is sufficient to break the sticky-state invariant between archive
-     * and lock. This mirrors the comment left in
-     * {@link ArchiveChatHandler#getMutationsForArchive}.
-     *
      * @implNote WAWebLockChatSync.sendLockMutation — mutation assembly only;
      *           {@code lockForSync} commit is handled by the outgoing sync
      *           pipeline in Cobalt, not inline in this handler
@@ -302,6 +308,7 @@ public final class LockChatHandler implements WebAppStateActionHandler {
      * @return the list of pending mutations for the lock operation, in the
      *         order WA Web would submit them
      */
+    @WhatsAppWebExport(moduleName = "WAWebLockChatSync", exports = "sendLockMutation", adaptation = WhatsAppAdaptation.ADAPTED)
     public List<SyncPendingMutation> getMutationsForLock(
             Instant timestamp,
             boolean locked,
@@ -311,10 +318,7 @@ public final class LockChatHandler implements WebAppStateActionHandler {
         var mutations = new ArrayList<SyncPendingMutation>(); // WAWebLockChatSync.sendLockMutation: var l = []
         if (locked) { // WAWebLockChatSync.sendLockMutation: if (a) l.push(...)
             mutations.add(ArchiveChatHandler.INSTANCE.getArchiveChatMutation(timestamp, false, chatJid, messageRange)); // WAWebLockChatSync.sendLockMutation: WAWebArchiveChatSync.getArchiveChatMutation(i, false, e)
-            // WAWebLockChatSync.sendLockMutation: PinChatSync.getPinMutation(i, false, e)
-            // PinChatHandler does not yet expose a public getPinMutation method; callers that need
-            // to break the sticky-state invariant between pin and lock should queue a pin-off
-            // mutation separately once that helper becomes available.
+            mutations.add(PinChatHandler.INSTANCE.getPinMutation(timestamp, false, chatJid)); // WAWebLockChatSync.sendLockMutation: WAWebPinChatSync.PinChatSync.getPinMutation(i, false, e)
         }
         mutations.add(getChatLockMutation(timestamp, locked, chatJid)); // WAWebLockChatSync.sendLockMutation: l.push(this.getChatLockMutation(i, a, e))
         return mutations; // ADAPTED: WA Web yields Promise.all(l) and hands the result to lockForSync; Cobalt returns the list so the caller controls the commit step

@@ -1,6 +1,9 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
@@ -33,6 +36,7 @@ import java.util.logging.Logger;
  *           {@code applyMutations(t)} which processes each mutation via
  *           {@code Promise.all(t.map(...))} and tallies REMOVE operations
  */
+@WhatsAppWebModule(moduleName = "WAWebSubscriptionsSyncV2Sync")
 public final class SubscriptionHandler implements WebAppStateActionHandler {
     /**
      * Canonical WhatsApp Web action name for this handler.
@@ -71,6 +75,7 @@ public final class SubscriptionHandler implements WebAppStateActionHandler {
      * @implNote WAWebSubscriptionsSyncV2Sync — module-level {@code c = new u()} singleton,
      *           exported as {@code l.default = c}
      */
+    @WhatsAppWebExport(moduleName = "WAWebSubscriptionsSyncV2Sync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final SubscriptionHandler INSTANCE = new SubscriptionHandler(); // WAWebSubscriptionsSyncV2Sync: var c = new u()
 
     /**
@@ -79,6 +84,7 @@ public final class SubscriptionHandler implements WebAppStateActionHandler {
      * @implNote WAWebSubscriptionsSyncV2Sync — class {@code u} constructor sets
      *           {@code e.collectionName = o("WASyncdConst").CollectionName.Regular}
      */
+    @WhatsAppWebExport(moduleName = "WAWebSubscriptionsSyncV2Sync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private SubscriptionHandler() {
 
     }
@@ -91,6 +97,7 @@ public final class SubscriptionHandler implements WebAppStateActionHandler {
      *           {@code "subscriptions_sync_v2"}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebSubscriptionsSyncV2Sync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
         return ACTION_NAME; // WAWebSubscriptionsSyncV2Sync.getAction
     }
@@ -102,6 +109,7 @@ public final class SubscriptionHandler implements WebAppStateActionHandler {
      *           {@code this.collectionName = o("WASyncdConst").CollectionName.Regular}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebSubscriptionsSyncV2Sync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
         return COLLECTION_NAME; // WAWebSubscriptionsSyncV2Sync: collectionName = Regular
     }
@@ -112,6 +120,7 @@ public final class SubscriptionHandler implements WebAppStateActionHandler {
      * @implNote WAWebSubscriptionsSyncV2Sync.getVersion — returns {@code 1}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebSubscriptionsSyncV2Sync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return ACTION_VERSION; // WAWebSubscriptionsSyncV2Sync.getVersion
     }
@@ -130,6 +139,7 @@ public final class SubscriptionHandler implements WebAppStateActionHandler {
      * @return {@code true} if the mutation was applied successfully, {@code false} otherwise
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebSubscriptionsSyncV2Sync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebSubscriptionsSyncV2Sync.applyMutations
     }
@@ -182,6 +192,7 @@ public final class SubscriptionHandler implements WebAppStateActionHandler {
      * @return the detailed application result
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebSubscriptionsSyncV2Sync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         try { // WAWebSubscriptionsSyncV2Sync.applyMutations: try { e: { ... } } catch(e) { return {actionState: Failed} }
             if (mutation.operation() == SyncdOperation.SET) { // WAWebSubscriptionsSyncV2Sync.applyMutations: t.operation === "set" && "value" in t
@@ -262,6 +273,7 @@ public final class SubscriptionHandler implements WebAppStateActionHandler {
      * @return a list of results parallel to the input
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebSubscriptionsSyncV2Sync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public List<MutationApplicationResult> applyMutationBatchResults(WhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
         var removeCount = 0; // WAWebSubscriptionsSyncV2Sync.applyMutations: var i = 0
         var results = new ArrayList<MutationApplicationResult>(mutations.size()); // WAWebSubscriptionsSyncV2Sync.applyMutations: var l = yield Promise.all(...)
@@ -295,6 +307,7 @@ public final class SubscriptionHandler implements WebAppStateActionHandler {
      * @return a list of booleans parallel to the input
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebSubscriptionsSyncV2Sync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public List<Boolean> applyMutationBatch(WhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
         var detailed = applyMutationBatchResults(client, mutations); // ADAPTED: delegate to detailed-result override so REMOVE counter logging runs once per batch
         var results = new ArrayList<Boolean>(detailed.size());

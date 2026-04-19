@@ -49,10 +49,8 @@ public sealed interface FetchNewsletterSubscribersMex extends MexJsonOperation p
         public NodeBuilder toNode() {
             // Builds the JSON variables envelope
             // Opens a UTF-8 JSON writer to serialise the GraphQL variables map
-
             try (var writer = JSONWriter.ofUTF8()) {
                 // Begins the outer envelope and the nested "variables" object expected by the relay
-
                 writer.startObject();
                 writer.writeName("variables");
                 writer.writeColon();
@@ -324,7 +322,6 @@ public sealed interface FetchNewsletterSubscribersMex extends MexJsonOperation p
          */
         private static Optional<Response> of(byte[] json) {
             // Parses the raw JSON payload and bails out if fastjson2 returns null
-
             var jsonObject = JSON.parseObject(json);
             if (jsonObject == null) {
                 return Optional.empty();

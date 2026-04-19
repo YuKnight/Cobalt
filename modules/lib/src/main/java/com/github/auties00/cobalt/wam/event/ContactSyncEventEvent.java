@@ -36,8 +36,23 @@ public interface ContactSyncEventEvent extends WamEventSpec {
     @WamProperty(index = 16, type = WamType.INTEGER)
     OptionalInt contactSyncFailureProtocol();
 
+    @WamProperty(index = 33, type = WamType.BOOLEAN)
+    Optional<Boolean> contactSyncIsMultiIq();
+
     @WamProperty(index = 17, type = WamType.INTEGER)
     OptionalInt contactSyncLatency();
+
+    @WamProperty(index = 34, type = WamType.INTEGER)
+    OptionalInt contactSyncMultiIqCompletedPages();
+
+    @WamProperty(index = 35, type = WamType.INTEGER)
+    OptionalInt contactSyncMultiIqFailedPageIndex();
+
+    @WamProperty(index = 36, type = WamType.INTEGER)
+    OptionalInt contactSyncMultiIqSessionDurationMs();
+
+    @WamProperty(index = 37, type = WamType.INTEGER)
+    OptionalInt contactSyncMultiIqTotalPages();
 
     @WamProperty(index = 12, type = WamType.BOOLEAN)
     Optional<Boolean> contactSyncNoop();

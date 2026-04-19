@@ -64,12 +64,10 @@ public final class SenderKeyNameFactory {
     public static SignalSenderKeyName create(Jid groupJid, Jid senderJid) {
         // WAWebSignalCommonUtils.createSignalLikeSenderKeyName
         // Builds the Signal protocol address from the sender's user and device components
-
         var senderAddress = new SignalProtocolAddress(senderJid.user(), senderJid.device());
 
         // WAWebSignalCommonUtils.createSignalLikeSenderKeyName
         // Combines the group JID string with the sender address to form the sender key name
-
         return new SignalSenderKeyName(groupJid.toString(), senderAddress);
     }
 

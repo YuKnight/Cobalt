@@ -77,7 +77,6 @@ public final class MessageReceiveStanzaParser {
 
         // WAWebHandleMsgParser.incomingMsgParser
         // Extracts the required core attributes identifying the stanza
-
         var id = node.getRequiredAttributeAsString("id");
         var timestampSeconds = node.getRequiredAttributeAsLong("t");
         var timestamp = Instant.ofEpochSecond(timestampSeconds);
@@ -92,12 +91,10 @@ public final class MessageReceiveStanzaParser {
 
         // WAWebHandleMsgParser.incomingMsgParser
         // Reads the optional participant attribute for group/broadcast/status messages
-
         var participant = node.getAttributeAsJid("participant", null);
 
         // WAWebHandleMsgParser.incomingMsgParser
         // Reads the LID/PN migration attributes attached at stanza level
-
         var senderPn = node.getAttributeAsJid("sender_pn", null);
         var senderLid = node.getAttributeAsJid("sender_lid", null);
         var recipientPn = node.getAttributeAsJid("recipient_pn", null);
@@ -115,39 +112,32 @@ public final class MessageReceiveStanzaParser {
 
         // WAWebHandleMsgParser.incomingMsgParser
         // Reads the optional count attribute
-
         var count = node.getAttributeAsInt("count", null);
 
         // WAWebHandleMsgParser.incomingMsgParser
         // Detects a highly structured message by checking for the hsm child
-
         var isHsm = node.getChild("hsm").isPresent();
 
         // WAWebHandleMsgParser function y()
         // Resolves the actual device sender from the from/participant pair
-
         var senderJid = resolveSender(fromJid, participant);
 
         // WAWebHandleMsgParser.incomingMsgParser
         // Parses every enc child into a structured encrypted payload
-
         var encs = parseEncryptedPayloads(node);
 
         // WAWebHandleMsgParser function C()
         // Classifies the message type based on addressing and self-identity
-
         var messageType = resolveMessageType(fromJid, participant, selfJid, encs, category);
 
         // WAWebHandleMsgParser.incomingMsgParser
         // Reads the device identity bytes used for ADV validation of companion senders
-
         var deviceIdentity = node.getChild("device-identity")
                 .flatMap(Node::toContentBytes)
                 .orElse(null);
 
         // WAWebHandleMsgParser function b()
         // Detects an unavailable fanout placeholder and classifies its kind
-
         var unavailableNode = node.getChild("unavailable", null);
         var unavailable = unavailableNode != null;
         var hostedUnavailable = unavailable
@@ -157,7 +147,6 @@ public final class MessageReceiveStanzaParser {
 
         // WAWebHandleMsgParser.incomingMsgParser
         // Extracts the structured metadata from the optional meta child
-
         var metaNode = node.getChild("meta", null);
         String pollType = null;
         String eventType = null;
@@ -177,14 +166,12 @@ public final class MessageReceiveStanzaParser {
         if (metaNode != null) {
             // WAWebHandleMsgParser function C()
             // Populates pollType only when the stanza type is poll
-
             if ("poll".equals(stanzaType)) {
                 pollType = metaNode.getAttributeAsString("polltype", null);
             }
 
             // WAWebHandleMsgParser function C()
             // Populates eventType only when the stanza type is event
-
             if ("event".equals(stanzaType)) {
                 eventType = metaNode.getAttributeAsString("event_type", null);
             }
@@ -207,50 +194,41 @@ public final class MessageReceiveStanzaParser {
 
         // WAWebHandleMsgParser.incomingMsgParser
         // Detects the presence of url_number and url_text children
-
         var urlNumber = node.getChild("url_number").isPresent();
         var urlText = node.getChild("url_text").isPresent();
 
         // WAWebHandleMsgParser function b()
         // Parses the bot child into bot info
-
         var botInfo = parseBotInfo(node);
 
         // WAWebHandleMsgParser function v()
         // Parses the biz child and verified name attributes into biz info
-
         var bizInfo = parseBizInfo(node);
 
         // WAWebHandleMsgParser function k()
         // Parses the reporting child into reporting info
-
         var reportingInfo = parseReportingInfo(node);
 
         // WAWebHandleMsgParser function y()
         // Parses the participants child into the broadcast contact list
-
         var bclParticipants = parseBroadcastParticipants(node);
 
         // WAWebHandleMsgParser function R()
         // Parses pay and transaction children into payment info
-
         var paymentInfo = parsePaymentInfo(node);
 
         // WAWebHandleMsgParser.incomingMsgParser
         // Reads the stanza-level ephemeral setting for OTHER_BROADCAST
-
         var ephSetting = node.getAttributeAsString("eph_setting", null);
 
         // WAWebHandleMsgParser.incomingMsgParser
         // Extracts the optional rcat content bytes for content-binding verification
-
         var rcat = node.getChild("rcat")
                 .flatMap(Node::toContentBytes)
                 .orElse(null);
 
         // WAWebHandleMsgParser function R()
         // Reads the optional tag and category from the hsm child
-
         var hsmNode = node.getChild("hsm", null);
         String hsmTag = null;
         String hsmCategory = null;
@@ -261,7 +239,6 @@ public final class MessageReceiveStanzaParser {
 
         // WAWebHandleMsgParser.incomingMsgParser
         // Assembles the parsed fields into the composite result record
-
         return new MessageReceiveStanza(
                 id,
                 timestamp,
@@ -347,7 +324,6 @@ public final class MessageReceiveStanzaParser {
     private static Jid resolveSender(Jid fromJid, Jid participant) {
         // WAWebHandleMsgParser function y()
         // Selects participant for group/broadcast messages and from otherwise
-
         if (fromJid.hasGroupOrCommunityServer() || fromJid.hasBroadcastServer()) {
             if (participant == null) {
                 throw new IllegalArgumentException(
@@ -392,7 +368,6 @@ public final class MessageReceiveStanzaParser {
             String category) {
         // WAWebHandleMsgParser function C()
         // Classifies user/LID/bot senders as CHAT, or PEER_CHAT when category is peer
-
         if (fromJid.hasUserServer() || fromJid.hasLidServer() || fromJid.hasBotServer()) {
             if("peer".equals(category)) {
                 return MessageType.PEER_CHAT;
@@ -403,14 +378,12 @@ public final class MessageReceiveStanzaParser {
 
         // WAWebHandleMsgParser function C()
         // Classifies group/community senders as GROUP
-
         if (fromJid.hasGroupOrCommunityServer()) {
             return MessageType.GROUP;
         }
 
         // WAWebHandleMsgParser function C()
         // Disambiguates broadcast types based on self-identity and status vs regular broadcast
-
         if (fromJid.hasBroadcastServer()) {
             var isStatus = fromJid.isStatusBroadcastAccount();
             var isSelf = isMeAccount(participant, selfJid);
@@ -420,7 +393,6 @@ public final class MessageReceiveStanzaParser {
 
             // WAWebHandleMsgParser function C()
             // Direct-peer status requires a self-originated broadcast with all enc payloads non-SKMSG
-
             var isDirect = encs.stream().noneMatch(enc ->
                     enc.e2eType().isSenderKeyMessage());
             if (isSelf && isDirect) {
@@ -453,7 +425,6 @@ public final class MessageReceiveStanzaParser {
     private static boolean isMeAccount(Jid participant, Jid selfJid) {
         // WAWebHandleMsgParser function y()
         // Returns true when both JIDs are non-null and share the same user-level identity
-
         return selfJid != null
                 && participant != null
                 && participant.toUserJid().equals(selfJid.toUserJid());
@@ -479,7 +450,6 @@ public final class MessageReceiveStanzaParser {
     private static List<MessageReceiveEncryptedPayload> parseEncryptedPayloads(Node node) {
         // WAWebHandleMsgParser.incomingMsgParser
         // Iterates every enc child and decodes its attributes and content
-
         var encNodes = node.getChildren("enc");
         var payloads = new ArrayList<MessageReceiveEncryptedPayload>(encNodes.size());
         for (var encNode : encNodes) {
@@ -490,7 +460,6 @@ public final class MessageReceiveStanzaParser {
 
             // WAWebHandleMsgParser.incomingMsgParser
             // Skips encs with no content bytes to avoid producing empty payloads
-
             if (ciphertext == null || ciphertext.length == 0) {
                 continue;
             }
@@ -524,7 +493,6 @@ public final class MessageReceiveStanzaParser {
     private static MessageReceiveBotInfo parseBotInfo(Node node) {
         // WAWebHandleMsgParser function b()
         // Returns null when no bot child is present
-
         var botNode = node.getChild("bot", null);
         if (botNode == null) {
             return null;
@@ -532,7 +500,6 @@ public final class MessageReceiveStanzaParser {
 
         // WAWebHandleMsgParser function b()
         // Extracts the bot metadata attributes
-
         var senderTimestampMs = botNode.getAttributeAsString("sender_timestamp_ms", null);
         var editTargetId = botNode.getAttributeAsString("edit_target_id", null);
         var editType = botNode.getAttributeAsString("edit", null);
@@ -574,7 +541,6 @@ public final class MessageReceiveStanzaParser {
     private static MessageReceiveBizInfo parseBizInfo(Node node) {
         // WAWebHandleMsgParser function v()
         // Reads the stanza-level verified_name attributes and the verified_name child
-
         var verifiedNameSerial = node.getAttributeAsInt("verified_name", null);
         var verifiedLevel = node.getAttributeAsString("verified_level", null);
         var verifiedNameCert = node.getChild("verified_name")
@@ -583,7 +549,6 @@ public final class MessageReceiveStanzaParser {
 
         // WAWebHandleMsgParser function v()
         // Returns null when no verified-name or biz data is present at all
-
         var bizNode = node.getChild("biz", null);
         if (verifiedNameSerial == null && verifiedLevel == null
                 && verifiedNameCert == null && bizNode == null) {
@@ -592,7 +557,6 @@ public final class MessageReceiveStanzaParser {
 
         // WAWebHandleMsgParser function v()
         // Extracts the biz node attributes when the child is present
-
         Integer actualActors = null;
         Integer hostStorage = null;
         Integer privacyModeTs = null;
@@ -613,13 +577,11 @@ public final class MessageReceiveStanzaParser {
 
             // WAWebHandleMsgParser function v()
             // hsm envelope presence is detected on the message node itself, not the biz node
-
             verifiedHsmEnvelope = node.getChild("hsm").isPresent();
         }
 
         // WAWebHandleMsgParser function v()
         // Assembles the parsed biz info with -1 as the default serial when absent
-
         return new MessageReceiveBizInfo(
                 verifiedNameCert,
                 verifiedNameSerial != null ? verifiedNameSerial : -1,
@@ -655,7 +617,6 @@ public final class MessageReceiveStanzaParser {
     private static String resolveNativeFlowName(Node bizNode) {
         // WAWebHandleMsgParser function v()
         // Prefers the nested interactive.native_flow name when available
-
         var interactiveNode = bizNode.getChild("interactive", null);
         if (interactiveNode != null) {
             var nativeFlowNode = interactiveNode.getChild("native_flow", null);
@@ -669,7 +630,6 @@ public final class MessageReceiveStanzaParser {
 
         // WAWebHandleMsgParser function v()
         // Falls back to the direct native_flow_name attribute on the biz node
-
         return bizNode.getAttributeAsString("native_flow_name", null);
     }
 
@@ -694,7 +654,6 @@ public final class MessageReceiveStanzaParser {
     private static MessageReceiveReportingInfo parseReportingInfo(Node node) {
         // WAWebHandleMsgParser function k()
         // Returns null when the reporting child is absent
-
         var reportingNode = node.getChild("reporting", null);
         if (reportingNode == null) {
             return null;
@@ -702,12 +661,10 @@ public final class MessageReceiveStanzaParser {
 
         // WAWebHandleMsgParser function k()
         // Preserves the parent stanza timestamp alongside the reporting token
-
         var stanzaTs = Instant.ofEpochSecond(node.getRequiredAttributeAsLong("t"));
 
         // WAWebHandleMsgParser function k()
         // Extracts the reporting token bytes and version from the reporting_token child
-
         var tokenNode = reportingNode.getChild("reporting_token", null);
         byte[] reportingToken = null;
         var version = 0;
@@ -718,7 +675,6 @@ public final class MessageReceiveStanzaParser {
 
         // WAWebHandleMsgParser function k()
         // Extracts the reporting tag bytes from the reporting_tag child
-
         var reportingTag = reportingNode.getChild("reporting_tag")
                 .flatMap(Node::toContentBytes)
                 .orElse(null);
@@ -754,7 +710,6 @@ public final class MessageReceiveStanzaParser {
     private static MessageReceivePaymentInfo parsePaymentInfo(Node node) {
         // WAWebHandleMsgParser function R()
         // Retrieves the sibling pay and transaction children
-
         var payNode = node.getChild("pay", null);
         var transactionNode = node.getChild("transaction", null);
 
@@ -764,7 +719,6 @@ public final class MessageReceiveStanzaParser {
 
         // WAWebHandleMsgParser function R()
         // When the transaction child is present it carries the authoritative payment fields
-
         if (transactionNode != null) {
             var currency = transactionNode.getAttributeAsString("currency", null);
             var amount1000 = transactionNode.getAttributeAsLong("amount_1000", null);
@@ -783,7 +737,6 @@ public final class MessageReceiveStanzaParser {
 
         // WAWebHandleMsgParser function R()
         // Falls back to the pay child, branching on the pay type attribute
-
         var payType = payNode.getAttributeAsString("type", null);
         if ("send".equals(payType)) {
             var currency = payNode.getAttributeAsString("currency", null);
@@ -805,7 +758,6 @@ public final class MessageReceiveStanzaParser {
 
         // WAWebHandleMsgParser function R()
         // Request and invite pay types have no usable payment data
-
         return null;
     }
 
@@ -830,7 +782,6 @@ public final class MessageReceiveStanzaParser {
     private static List<MessageReceiveBroadcastParticipant> parseBroadcastParticipants(Node node) {
         // WAWebHandleMsgParser function y()
         // Returns an empty list when the participants child is absent
-
         var participantsNode = node.getChild("participants", null);
         if (participantsNode == null) {
             return List.of();
@@ -838,7 +789,6 @@ public final class MessageReceiveStanzaParser {
 
         // WAWebHandleMsgParser function y()
         // Iterates each to child and extracts its recipient and mapping attributes
-
         var toNodes = participantsNode.getChildren("to");
         var participants = new ArrayList<MessageReceiveBroadcastParticipant>(toNodes.size());
         for (var toNode : toNodes) {

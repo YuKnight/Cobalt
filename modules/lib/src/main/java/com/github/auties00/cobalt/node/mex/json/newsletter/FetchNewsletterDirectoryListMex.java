@@ -75,18 +75,15 @@ public sealed interface FetchNewsletterDirectoryListMex extends MexJsonOperation
         public NodeBuilder toNode() {
             // WAWebMexFetchNewsletterDirectoryListJob.mexFetchNewsletterDirectoryList
             // Opens a UTF-8 JSON writer that will serialise the GraphQL variables envelope
-
             try (var writer = JSONWriter.ofUTF8()) {
                 // WAWebMexFetchNewsletterDirectoryListJob.mexFetchNewsletterDirectoryList
                 // Begins the outer envelope and the nested "variables" object consumed by WAWebMexClient.fetchQuery
-
                 writer.startObject();
                 writer.writeName("variables");
                 writer.writeColon();
                 writer.startObject();
                 // WAWebMexFetchNewsletterDirectoryListJob.mexFetchNewsletterDirectoryList
                 // Emits the input variable when present
-
                 if (input != null) {
                     writer.writeName("input");
                     writer.writeColon();
@@ -97,7 +94,6 @@ public sealed interface FetchNewsletterDirectoryListMex extends MexJsonOperation
 
                 // ADAPTED: WAWebMexFetchNewsletterDirectoryListJob.mexFetchNewsletterDirectoryList
                 // Flushes the JSON buffer into a StringWriter and wraps it in the shared MEX IQ envelope
-
                 try (var output = new StringWriter()) {
                     writer.flushTo(output);
                     return MexJsonOperation.createMexNode(QUERY_ID, output.toString());
@@ -695,7 +691,6 @@ public sealed interface FetchNewsletterDirectoryListMex extends MexJsonOperation
         private static Optional<Response> of(byte[] json) {
             // WAWebMexFetchNewsletterDirectoryListJob.mexFetchNewsletterDirectoryList
             // Parses the raw JSON payload, bailing out if fastjson2 returns null
-
             var jsonObject = JSON.parseObject(json);
             if (jsonObject == null) {
                 return Optional.empty();
@@ -703,7 +698,6 @@ public sealed interface FetchNewsletterDirectoryListMex extends MexJsonOperation
 
             // WAWebMexFetchNewsletterDirectoryListJob.mexFetchNewsletterDirectoryList
             // Descends into the standard GraphQL "data" envelope
-
             var data = jsonObject.getJSONObject("data");
             if (data == null) {
                 return Optional.empty();
@@ -711,7 +705,6 @@ public sealed interface FetchNewsletterDirectoryListMex extends MexJsonOperation
 
             // WAWebMexFetchNewsletterDirectoryListJob.mexFetchNewsletterDirectoryList
             // Extracts the operation-specific root keyed by xwa2_newsletters_directory_list
-
             var root = data.getJSONObject("xwa2_newsletters_directory_list");
             if (root == null) {
                 return Optional.empty();

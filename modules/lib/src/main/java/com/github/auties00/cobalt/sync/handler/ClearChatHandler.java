@@ -2,6 +2,9 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.sync.ConflictResolution;
 import com.github.auties00.cobalt.model.sync.ConflictResolutionState;
@@ -37,6 +40,7 @@ import java.util.List;
  *           {@code collectionName = RegularHigh}, {@code chatJidIndex = 1},
  *           {@code getVersion() = 6}, {@code getAction() = "clearChat"}
  */
+@WhatsAppWebModule(moduleName = "WAWebClearChatSync")
 public final class ClearChatHandler implements WebAppStateActionHandler {
 
     /**
@@ -47,6 +51,7 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
      *
      * @implNote WAWebClearChatSync.default — module-level singleton
      */
+    @WhatsAppWebExport(moduleName = "WAWebClearChatSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final ClearChatHandler INSTANCE = new ClearChatHandler();
 
     /**
@@ -55,6 +60,7 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
      * @implNote WAWebClearChatSync — class constructor sets
      *           {@code collectionName = RegularHigh}, {@code chatJidIndex = 1}
      */
+    @WhatsAppWebExport(moduleName = "WAWebClearChatSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private ClearChatHandler() {
     }
 
@@ -66,6 +72,7 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
      * @return the action name {@code "clearChat"}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebClearChatSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
         return ClearChatAction.ACTION_NAME; // WAWebClearChatSync.getAction -> WASyncdConst.Actions.ClearChat
     }
@@ -81,6 +88,7 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
      * @return {@link SyncPatchType#REGULAR_HIGH}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebClearChatSync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
         return ClearChatAction.COLLECTION_NAME; // WAWebClearChatSync.collectionName = WASyncdConst.CollectionName.RegularHigh
     }
@@ -92,6 +100,7 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
      * @return the version number {@code 6}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebClearChatSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return ClearChatAction.ACTION_VERSION; // WAWebClearChatSync.getVersion -> 6
     }
@@ -109,6 +118,7 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
      * @return {@code true} if the mutation was applied successfully
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebClearChatSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebClearChatSync.applyMutations
     }
@@ -143,6 +153,7 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
      * @return the detailed application result
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebClearChatSync", exports = {"applyMutations", "getMessageRange"}, adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) { // WAWebClearChatSync.applyMutations: e.operation === "set" check, else return Unsupported
             return MutationApplicationResult.unsupported(); // WAWebClearChatSync.applyMutations: c++, {actionState: Unsupported}
@@ -195,7 +206,6 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
             // $ClearChatSync$p_2: addActiveMessageRange, clearChat(chatId, messageRange, deleteStarred, starredKeys)
             // clearChat: queryAndRemoveMessagesInMessageRange(chatId, messageRange, {skipStarred: !deleteStarred, skipMessages: starredKeys, deleteAutomatedGreetingMessages: true})
             //            deleteAllThreadsForChat, deleteMessages, maybeClearGroupStatus
-
             // ADAPTED: WAWebClearChatSync.$ClearChatSync$p_2 performs granular message deletion
             // with starred message skipping, active message range tracking, thread deletion,
             // add-on cleanup, and group status clearing. Cobalt simplifies to Chat.removeMessages()
@@ -241,6 +251,7 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
      * @return the conflict resolution indicating which mutation to keep
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebClearChatSync", exports = "resolveConflicts", adaptation = WhatsAppAdaptation.ADAPTED)
     public ConflictResolution resolveConflicts(DecryptedMutation.Trusted localMutation, DecryptedMutation.Trusted remoteMutation) {
         var localAction = localMutation.value().action() // WAWebClearChatSync.resolveConflicts: var c = nullthrows(i.clearChatAction) — i decoded from e.binarySyncAction
                 .filter(a -> a instanceof ClearChatAction)
@@ -343,6 +354,7 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
      *                      may be {@code null}
      * @return the pending mutation for the clear-chat action
      */
+    @WhatsAppWebExport(moduleName = "WAWebClearChatSync", exports = {"getClearChatMutation", "$ClearChatSync$p_3"}, adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncPendingMutation getClearChatMutation(
             Instant timestamp,
             Jid chatJid,

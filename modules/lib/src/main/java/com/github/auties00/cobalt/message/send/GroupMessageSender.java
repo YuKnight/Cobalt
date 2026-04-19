@@ -33,6 +33,9 @@ import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
+import com.github.auties00.cobalt.wam.event.AddressingModeMismatchEventBuilder;
+import com.github.auties00.cobalt.wam.type.AddressingMode;
+import com.github.auties00.cobalt.wam.type.MismatchOriginType;
 
 import java.security.GeneralSecurityException;
 import java.util.*;
@@ -333,8 +336,24 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
                     skmsgCiphertext = null;
                 } else {
                     var plaintext = MessageContainerSpec.encode(container);
-                    skmsgCiphertext = encryption.encryptForGroup(groupJid, senderJid, plaintext)
-                            .ciphertext();
+                    try {
+                        skmsgCiphertext = encryption.encryptForGroup(groupJid, senderJid, plaintext)
+                                .ciphertext();
+                        // WAWebEncryptMsgProtobuf.encryptMsgSenderKey: emit E2eMessageSend (id 476)
+                        // with e2eSuccessful=true from the finally-committed event.
+                        emitE2eMessageSendSenderKeyEvent(
+                                groupJid, container,
+                                com.github.auties00.cobalt.wam.type.E2eDestination.GROUP,
+                                isLidAddressingMode, true);
+                    } catch (RuntimeException skmsgError) {
+                        // WAWebEncryptMsgProtobuf.encryptMsgSenderKey: on failure flips
+                        // e2eSuccessful=false and sets weight=1 before the finally commit.
+                        emitE2eMessageSendSenderKeyEvent(
+                                groupJid, container,
+                                com.github.auties00.cobalt.wam.type.E2eDestination.GROUP,
+                                isLidAddressingMode, false);
+                        throw skmsgError;
+                    }
                 }
 
                 // WAWebSendGroupSkmsgJob: build participants node
@@ -458,6 +477,15 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
                         LOGGER.log(System.Logger.Level.INFO,
                                 "Addressing mode mismatch for {0}: local={1}, server={2}, migrating",
                                 groupJid, addressingMode, serverMode);
+                        // WAWebWamAddressingModeMismatchReporter.logAddressingModeMismatch:
+                        // emit AddressingModeMismatch (id 4750) before migrating so that
+                        // mismatches observed on outgoing group SKMSG acks are reported
+                        // with MISMATCH_ORIGIN_TYPE.ACK_OUTGOING_MESSAGE.
+                        client.wamService().commit(new AddressingModeMismatchEventBuilder()
+                                .localAddressingMode(wamAddressingMode(addressingMode))
+                                .serverAddressingMode(wamAddressingMode(serverMode))
+                                .mismatchOrigin(MismatchOriginType.ACK_OUTGOING_MESSAGE)
+                                .build());
                         migrateAddressingMode(groupJid, "lid".equals(serverMode));
                     }
                 });
@@ -898,5 +926,29 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
         } else {
             return jid.hasUserServer() ? jid : store.findPhoneByLid(jid).orElse(null);
         }
+    }
+
+    /**
+     * Converts the stanza addressing-mode string ({@code "lid"} or {@code "pn"})
+     * to the WAM {@link AddressingMode} enum used by
+     * {@link AddressingModeMismatchEventBuilder}.
+     *
+     * @param mode the stanza addressing mode string
+     * @return the corresponding {@link AddressingMode}, or {@code null} if
+     *         {@code mode} is {@code null} or unknown
+     *
+     * @apiNote WAWebWamAddressingModeUtils.getWamAddressingModeFromString:
+     *          maps {@code STANZA_MSG_ADDRESSING_MODE.lid} to
+     *          {@code ADDRESSING_MODE.LID}, everything else to
+     *          {@code ADDRESSING_MODE.PN}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebWamAddressingModeUtils",
+            exports = "getWamAddressingModeFromString",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    private static AddressingMode wamAddressingMode(String mode) {
+        if (mode == null) {
+            return null;
+        }
+        return "lid".equals(mode) ? AddressingMode.LID : AddressingMode.PN;
     }
 }

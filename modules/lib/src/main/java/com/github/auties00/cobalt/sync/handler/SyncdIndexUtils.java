@@ -30,10 +30,21 @@ import java.util.logging.Logger;
  * used by every sync action and for assembling the message-key tuple
  * embedded in message-oriented mutation indices.
  *
- * @implNote WAWebSyncdIndexUtils, WAWebSyncdActionUtils
+ * <p>The helpers {@link #syncKeyToMsgKey} and
+ * {@link #msgKeyToDbIdWithoutFromMeParticipant} are also consumed by
+ * {@code WAWebSyncdResolveMessages.resolveMessagesForMutations}, whose
+ * batch orchestration Cobalt inlines into individual mutation handlers
+ * (see e.g. {@code InteractiveMessageHandler}) rather than running as a
+ * pre-pass; the AB-prop driven async-chunked vs. sync branch and the
+ * {@code WAWebSchemaMessage.getMessageTable().startsWithAnyOf(["id"], ...)}
+ * DB query are not replicated because Cobalt resolves chats directly via
+ * {@code WhatsAppStore.findChatByJid} without a message-existence probe.
+ *
+ * @implNote WAWebSyncdIndexUtils, WAWebSyncdActionUtils, WAWebSyncdResolveMessages
  */
 @WhatsAppWebModule(moduleName = "WAWebSyncdIndexUtils")
 @WhatsAppWebModule(moduleName = "WAWebSyncdActionUtils")
+@WhatsAppWebModule(moduleName = "WAWebSyncdResolveMessages")
 public final class SyncdIndexUtils {
     /**
      * Position of the action name within a parsed sync action index array.

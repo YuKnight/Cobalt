@@ -2,6 +2,9 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.sync.ConflictResolution;
 import com.github.auties00.cobalt.model.sync.ConflictResolutionState;
@@ -36,6 +39,7 @@ import java.util.List;
  *
  * @implNote WAWebMarkChatAsReadSync — singleton instance exported as {@code default}
  */
+@WhatsAppWebModule(moduleName = "WAWebMarkChatAsReadSync")
 public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
     /**
      * Singleton instance of the mark chat as read handler.
@@ -45,6 +49,7 @@ public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
      *
      * @implNote WAWebMarkChatAsReadSync.default — module-level singleton
      */
+    @WhatsAppWebExport(moduleName = "WAWebMarkChatAsReadSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final MarkChatAsReadHandler INSTANCE = new MarkChatAsReadHandler();
 
     /**
@@ -54,6 +59,7 @@ public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
      *           {@code chatJidIndex = 1} and {@code collectionName = RegularLow},
      *           both of which are compile-time constants in Cobalt)
      */
+    @WhatsAppWebExport(moduleName = "WAWebMarkChatAsReadSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private MarkChatAsReadHandler() {
 
     }
@@ -66,6 +72,7 @@ public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
      * @return the action name {@code "markChatAsRead"}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebMarkChatAsReadSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
         return MarkChatAsReadAction.ACTION_NAME; // WAWebMarkChatAsReadSync.getAction -> WASyncdConst.Actions.MarkChatAsRead
     }
@@ -81,6 +88,7 @@ public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
      * @return {@link SyncPatchType#REGULAR_LOW}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebMarkChatAsReadSync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
         return MarkChatAsReadAction.COLLECTION_NAME; // WAWebMarkChatAsReadSync.collectionName = WASyncdConst.CollectionName.RegularLow
     }
@@ -92,6 +100,7 @@ public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
      * @return the version number {@code 3}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebMarkChatAsReadSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return MarkChatAsReadAction.ACTION_VERSION; // WAWebMarkChatAsReadSync.getVersion -> 3
     }
@@ -110,6 +119,7 @@ public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
      * @return {@code true} if the mutation was applied successfully
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebMarkChatAsReadSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS; // WAWebMarkChatAsReadSync.applyMutations
     }
@@ -154,6 +164,7 @@ public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
      * @return the detailed application result
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebMarkChatAsReadSync", exports = {"applyMutations", "validateSyncActionValue", "$MarkChatAsReadSync$p_3", "$MarkChatAsReadSync$p_1", "$MarkChatAsReadSync$p_2", "getMessageRange"}, adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) { // WAWebMarkChatAsReadSync.applyMutations: e.operation === "set" check, else l++ and return Unsupported
             return MutationApplicationResult.unsupported(); // WAWebMarkChatAsReadSync.applyMutations: {actionState: SyncActionState.Unsupported}
@@ -185,7 +196,6 @@ public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
             // validation is skipped because Cobalt does not maintain active message ranges
             // (browser-specific IndexedDB concern). See $MarkChatAsReadSync$p_3 — the core
             // read-state change is always applied.
-
             // WAWebMarkChatAsReadSync.$MarkChatAsReadSync$p_1: frontendSendAndReceive("updateChatReadStatus", {id: e, read: t})
             // ADAPTED: Cobalt applies the read-state change directly on the local chat, matching
             // the backend behavior that $p_1 would have triggered (unreadCount=0 / markedAsUnread=false
@@ -240,6 +250,7 @@ public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
      *         optionally a merged mutation
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebMarkChatAsReadSync", exports = "resolveConflicts", adaptation = WhatsAppAdaptation.ADAPTED)
     public ConflictResolution resolveConflicts(DecryptedMutation.Trusted localMutation, DecryptedMutation.Trusted remoteMutation) {
         var localAction = localMutation.value().action() // WAWebMarkChatAsReadSync.resolveConflicts: var c = WANullthrows(i.markChatAsReadAction)
                 .filter(a -> a instanceof MarkChatAsReadAction)
@@ -278,7 +289,7 @@ public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
                         .read(read) // WAWebMarkChatAsReadSync.resolveConflicts: read: h
                         .messageRange(mergedRange) // WAWebMarkChatAsReadSync.resolveConflicts: messageRange: y
                         .build();
-                var mergedValue = new SyncActionValueBuilder() // WAWebMarkChatAsReadSync.resolveConflicts: extends({}, l, {markChatAsReadAction: C}) -- l is the remote SyncActionDataSpec value
+                var mergedValue = new SyncActionValueBuilder() // WAWebMarkChatAsReadSync.resolveConflicts: extends({}, l, {markChatAsReadAction: C}), l is the remote SyncActionDataSpec value
                         .timestamp(remoteMutation.timestamp()) // ADAPTED: WA Web spreads all of l; in practice only timestamp and markChatAsReadAction are meaningful for this handler's collection
                         .markChatAsReadAction(mergedAction) // WAWebMarkChatAsReadSync.resolveConflicts: markChatAsReadAction: C
                         .build();
@@ -325,6 +336,7 @@ public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
      * @param messageRange the outgoing message range for this action
      * @return the pending mutation for the mark-chat-as-read operation
      */
+    @WhatsAppWebExport(moduleName = "WAWebMarkChatAsReadSync", exports = "getMarkChatAsReadMutation", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncPendingMutation getMarkChatAsReadMutation(
             Instant timestamp,
             boolean read,

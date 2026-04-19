@@ -1,6 +1,9 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.call.CallLog;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
@@ -37,6 +40,7 @@ import java.util.List;
  *
  * @implNote WAWebCallLogSync — singleton instance exported as {@code default}
  */
+@WhatsAppWebModule(moduleName = "WAWebCallLogSync")
 public final class CallLogHandler implements WebAppStateActionHandler {
     /**
      * The singleton instance of {@code CallLogHandler}.
@@ -46,6 +50,7 @@ public final class CallLogHandler implements WebAppStateActionHandler {
      *
      * @implNote WAWebCallLogSync.default — module-level singleton
      */
+    @WhatsAppWebExport(moduleName = "WAWebCallLogSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final CallLogHandler INSTANCE = new CallLogHandler();
 
     /**
@@ -55,6 +60,7 @@ public final class CallLogHandler implements WebAppStateActionHandler {
      *           {@code AccountSyncdActionBase}, sets
      *           {@code collectionName = WASyncdConst.CollectionName.Regular})
      */
+    @WhatsAppWebExport(moduleName = "WAWebCallLogSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private CallLogHandler() {
 
     }
@@ -67,6 +73,7 @@ public final class CallLogHandler implements WebAppStateActionHandler {
      * @return the action name {@code "call_log"}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebCallLogSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
         return CallLogAction.ACTION_NAME; // WAWebCallLogSync.getAction -> WASyncdConst.Actions.CallLog
     }
@@ -82,6 +89,7 @@ public final class CallLogHandler implements WebAppStateActionHandler {
      * @return {@link SyncPatchType#REGULAR}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebCallLogSync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
         return CallLogAction.COLLECTION_NAME; // WAWebCallLogSync.collectionName = WASyncdConst.CollectionName.Regular
     }
@@ -93,6 +101,7 @@ public final class CallLogHandler implements WebAppStateActionHandler {
      * @return the version number {@code 1}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebCallLogSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return CallLogAction.ACTION_VERSION; // WAWebCallLogSync.getVersion -> 1
     }
@@ -110,6 +119,7 @@ public final class CallLogHandler implements WebAppStateActionHandler {
      * @return {@code true} if the mutation was applied successfully
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebCallLogSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebCallLogSync.applyMutations
     }
@@ -151,6 +161,7 @@ public final class CallLogHandler implements WebAppStateActionHandler {
      * @return the detailed application result
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebCallLogSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         try { // WAWebCallLogSync.applyMutations: try/catch wrapping per-mutation logic
             if (mutation.operation() == SyncdOperation.SET) { // WAWebCallLogSync.applyMutations: if (e.operation === "set")
@@ -166,7 +177,6 @@ public final class CallLogHandler implements WebAppStateActionHandler {
                 // ADAPTED: WA Web checks pairingTimestamp and happenedWithin(timestamp, MINUTE_SECONDS)
                 // before calling generateCallLogFromCallSyncRecord. These checks control browser UI
                 // behavior (shouldHideInConversation). In Cobalt, we store the log unconditionally.
-
                 // ADAPTED: WA Web calls generateCallLogFromCallSyncRecord to write a VoIP call log
                 // message to a chat. Cobalt stores the record in callLogStates keyed by index parts.
                 var indexArray = JSON.parseArray(mutation.index()); // ADAPTED: extract index parts for store key
@@ -237,6 +247,7 @@ public final class CallLogHandler implements WebAppStateActionHandler {
      * @param log       the call log record to sync
      * @return the pending mutation for the call log action
      */
+    @WhatsAppWebExport(moduleName = "WAWebCallLogSync", exports = "getCallLogMutation", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncPendingMutation getCallLogMutation(
             Instant timestamp,
             Jid callerJid,

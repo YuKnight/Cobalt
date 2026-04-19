@@ -2,6 +2,9 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.privacy.PrivacySettingEntry;
 import com.github.auties00.cobalt.model.privacy.PrivacySettingEntryBuilder;
@@ -64,6 +67,7 @@ import java.util.List;
  *           {@code WASyncdConst.Actions.StatusPrivacy} ({@code "status_privacy"}),
  *           and version {@code 7}
  */
+@WhatsAppWebModule(moduleName = "WAWebStatusPrivacySettingSync")
 public final class StatusPrivacyHandler implements WebAppStateActionHandler {
     /**
      * The singleton instance of {@code StatusPrivacyHandler}.
@@ -71,6 +75,7 @@ public final class StatusPrivacyHandler implements WebAppStateActionHandler {
      * @implNote WAWebStatusPrivacySettingSync.default — WA Web exports a single
      *           pre-instantiated handler ({@code d = new c; l.default = d})
      */
+    @WhatsAppWebExport(moduleName = "WAWebStatusPrivacySettingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final StatusPrivacyHandler INSTANCE = new StatusPrivacyHandler();
 
     /**
@@ -80,6 +85,7 @@ public final class StatusPrivacyHandler implements WebAppStateActionHandler {
      *           once via {@code new c()} which sets
      *           {@code this.collectionName = WASyncdConst.CollectionName.RegularHigh}
      */
+    @WhatsAppWebExport(moduleName = "WAWebStatusPrivacySettingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private StatusPrivacyHandler() {
 
     }
@@ -92,6 +98,7 @@ public final class StatusPrivacyHandler implements WebAppStateActionHandler {
      *           {@code "status_privacy"}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebStatusPrivacySettingSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
         return StatusPrivacyAction.ACTION_NAME; // WAWebStatusPrivacySettingSync.getAction
     }
@@ -103,6 +110,7 @@ public final class StatusPrivacyHandler implements WebAppStateActionHandler {
      *           {@code this.collectionName = WASyncdConst.CollectionName.RegularHigh}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebStatusPrivacySettingSync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
         return StatusPrivacyAction.COLLECTION_NAME; // WAWebStatusPrivacySettingSync constructor: e.collectionName = RegularHigh
     }
@@ -114,6 +122,7 @@ public final class StatusPrivacyHandler implements WebAppStateActionHandler {
      *           {@code 7}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebStatusPrivacySettingSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return StatusPrivacyAction.ACTION_VERSION; // WAWebStatusPrivacySettingSync.getVersion: return 7
     }
@@ -137,6 +146,7 @@ public final class StatusPrivacyHandler implements WebAppStateActionHandler {
      * @return {@code true} if applied successfully, {@code false} otherwise
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebStatusPrivacySettingSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: single-path adapter for batch-only WA Web entry
     }
@@ -169,6 +179,7 @@ public final class StatusPrivacyHandler implements WebAppStateActionHandler {
      * @return a list of results parallel to the input
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebStatusPrivacySettingSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public List<MutationApplicationResult> applyMutationBatchResults(WhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
         if (mutations.size() != 1) { // WAWebStatusPrivacySettingSync.applyMutations: if (t.length !== 1)
             // WAWebStatusPrivacySettingSync.applyMutations: WALogger.ERROR("[syncd] unexpected mutation count %s for status privacy sync", t.length) — telemetry skipped
@@ -228,6 +239,7 @@ public final class StatusPrivacyHandler implements WebAppStateActionHandler {
      * @return the detailed application result
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebStatusPrivacySettingSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) { // WAWebStatusPrivacySettingSync.applyMutations: if (a.operation === "set") { ... } return [{actionState: Unsupported}]
             return MutationApplicationResult.unsupported(); // WAWebStatusPrivacySettingSync.applyMutations: return [{actionState: SyncActionState.Unsupported}]
@@ -255,6 +267,7 @@ public final class StatusPrivacyHandler implements WebAppStateActionHandler {
      * @param mutation the SET mutation to apply
      * @return the detailed application result
      */
+    @WhatsAppWebExport(moduleName = "WAWebStatusPrivacySettingSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     private MutationApplicationResult applySetMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (!(mutation.value().action().orElse(null) instanceof StatusPrivacyAction action)) { // WAWebStatusPrivacySettingSync.applyMutations: var i = a.value, l = i.statusPrivacy; if (!l) return [malformedActionValue(this.collectionName)]
             return malformedActionValue(); // WAWebStatusPrivacySettingSync.applyMutations: return [WAWebSyncdIndexUtils.malformedActionValue(this.collectionName)]
@@ -342,6 +355,7 @@ public final class StatusPrivacyHandler implements WebAppStateActionHandler {
      * @return an unmodifiable list containing only user-server JIDs in the
      *         original order
      */
+    @WhatsAppWebExport(moduleName = "WAWebWid", exports = "isUser", adaptation = WhatsAppAdaptation.ADAPTED)
     private static List<Jid> filterUserJids(List<Jid> jids) {
         if (jids == null || jids.isEmpty()) { // WAWebWidFactory.createWid: jids may be empty
             return List.of();
@@ -368,6 +382,7 @@ public final class StatusPrivacyHandler implements WebAppStateActionHandler {
      * @param jid the JID to test
      * @return {@code true} if the JID's server is a user-server domain
      */
+    @WhatsAppWebExport(moduleName = "WAWebWid", exports = "isUser", adaptation = WhatsAppAdaptation.DIRECT)
     private static boolean isUserWid(Jid jid) {
         var type = jid.server().type(); // WAWebWid.Wid.prototype.isUser: this.server
         return type == com.github.auties00.cobalt.model.jid.JidServer.Type.USER // WAWebWid.Wid.prototype.isUser: includes "s.whatsapp.net" via WA_USER_JID_SUFFIX in static t.isUser
@@ -411,6 +426,7 @@ public final class StatusPrivacyHandler implements WebAppStateActionHandler {
      *                  be empty for {@code CONTACTS} or {@code CLOSE_FRIENDS})
      * @return the pending mutation ready for sync upload
      */
+    @WhatsAppWebExport(moduleName = "WAWebStatusPrivacySettingSync", exports = "getStatusPrivacySettingMutation", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncPendingMutation getMutation(Instant timestamp, StatusPrivacyAction.StatusDistributionMode mode, List<Jid> userJids) {
         var statusPrivacy = new StatusPrivacyActionBuilder() // WAWebStatusPrivacySettingSync.getStatusPrivacySettingMutation: {statusPrivacy: {mode: e, userJid: n, ...}}
                 .mode(mode) // WAWebStatusPrivacySettingSync.getStatusPrivacySettingMutation: mode: e

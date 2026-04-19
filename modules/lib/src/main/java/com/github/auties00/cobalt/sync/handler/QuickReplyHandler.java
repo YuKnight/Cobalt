@@ -2,6 +2,9 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.preference.QuickReplyBuilder;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncActionState;
@@ -45,6 +48,7 @@ import java.util.Objects;
  *           ({@code var c = (function(t){...})(o("WAWebSyncdAction").AccountSyncdActionBase),
  *           d = new c; l.default = d})
  */
+@WhatsAppWebModule(moduleName = "WAWebQuickRepliesSync")
 public final class QuickReplyHandler implements WebAppStateActionHandler {
     /**
      * The singleton instance of {@code QuickReplyHandler}.
@@ -54,6 +58,7 @@ public final class QuickReplyHandler implements WebAppStateActionHandler {
      *
      * @implNote WAWebQuickRepliesSync.default — module-level singleton
      */
+    @WhatsAppWebExport(moduleName = "WAWebQuickRepliesSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final QuickReplyHandler INSTANCE = new QuickReplyHandler();
 
     /**
@@ -63,6 +68,7 @@ public final class QuickReplyHandler implements WebAppStateActionHandler {
      *           {@code AccountSyncdActionBase} that assigns
      *           {@code this.collectionName = WASyncdConst.CollectionName.Regular}
      */
+    @WhatsAppWebExport(moduleName = "WAWebQuickRepliesSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private QuickReplyHandler() {
 
     }
@@ -75,6 +81,7 @@ public final class QuickReplyHandler implements WebAppStateActionHandler {
      * @return the action name {@code "quick_reply"}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebQuickRepliesSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
         return QuickReplyAction.ACTION_NAME; // WAWebQuickRepliesSync.getAction -> WASyncdConst.Actions.QuickReply
     }
@@ -87,6 +94,7 @@ public final class QuickReplyHandler implements WebAppStateActionHandler {
      * @return {@link SyncPatchType#REGULAR}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebQuickRepliesSync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
         return QuickReplyAction.COLLECTION_NAME; // WAWebQuickRepliesSync.collectionName = WASyncdConst.CollectionName.Regular
     }
@@ -98,6 +106,7 @@ public final class QuickReplyHandler implements WebAppStateActionHandler {
      * @return the version number {@code 2}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebQuickRepliesSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return QuickReplyAction.ACTION_VERSION; // WAWebQuickRepliesSync.getVersion -> 2
     }
@@ -118,6 +127,7 @@ public final class QuickReplyHandler implements WebAppStateActionHandler {
      *         {@code false} otherwise
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebQuickRepliesSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebQuickRepliesSync.applyMutations
     }
@@ -182,6 +192,7 @@ public final class QuickReplyHandler implements WebAppStateActionHandler {
      * @return the detailed application result
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebQuickRepliesSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) { // WAWebQuickRepliesSync.applyMutations: if (e.operation === "set") {...} return i++, {actionState: Unsupported}
             return MutationApplicationResult.unsupported(); // WAWebQuickRepliesSync.applyMutations: i++, {actionState: SyncActionState.Unsupported}
@@ -255,6 +266,7 @@ public final class QuickReplyHandler implements WebAppStateActionHandler {
      * @param timestamp    the mutation timestamp
      * @return the pending mutation that removes the quick reply on the server side
      */
+    @WhatsAppWebExport(moduleName = "WAWebQuickRepliesSync", exports = "getQuickReplyDeleteMutation", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncPendingMutation getQuickReplyDeleteMutation(String quickReplyId, Instant timestamp) {
         Objects.requireNonNull(quickReplyId, "quickReplyId cannot be null"); // ADAPTED: defensive null check not present in WA Web
         Objects.requireNonNull(timestamp, "timestamp cannot be null"); // ADAPTED: defensive null check not present in WA Web
@@ -307,6 +319,7 @@ public final class QuickReplyHandler implements WebAppStateActionHandler {
      * @param timestamp    the mutation timestamp
      * @return the pending mutation that creates or updates the quick reply on the server side
      */
+    @WhatsAppWebExport(moduleName = "WAWebQuickRepliesSync", exports = "getQuickReplyAddOrEditMutation", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncPendingMutation getQuickReplyAddOrEditMutation(
             String quickReplyId,
             String shortcut,

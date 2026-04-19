@@ -155,7 +155,7 @@ final class InMemoryStoreFactory implements WhatsAppStoreFactory {
     @Override
     public WhatsAppStore create(WhatsAppClientType clientType, UUID uuid) throws IOException {
         var device = switch (clientType) {
-            case WEB -> WhatsAppDevice.web();
+            case WEB -> WhatsAppDevice.desktop();
             case MOBILE -> WhatsAppDevice.ios(false);
         };
         var directory = StorePathUtils.getSessionDirectory(clientType, this.directory, uuid.toString());
@@ -180,7 +180,7 @@ final class InMemoryStoreFactory implements WhatsAppStoreFactory {
     @Override
     public WhatsAppStore create(WhatsAppClientType clientType, long phoneNumber) throws IOException {
         var device = switch (clientType) {
-            case WEB -> WhatsAppDevice.web();
+            case WEB -> WhatsAppDevice.desktop();
             case MOBILE -> WhatsAppDevice.ios(false);
         };
         var directory = StorePathUtils.getSessionDirectory(clientType, this.directory, String.valueOf(phoneNumber));

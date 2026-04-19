@@ -73,7 +73,11 @@ public final class NoteEditAction implements SyncAction<NoteEditActionArgs> {
     Jid chatJid;
 
     /**
-     * The epoch-second timestamp at which the note was created.
+     * The epoch-millisecond timestamp at which the note was created.
+     *
+     * @implNote WAWebNoteEditSync carries this value as an {@code INT64}
+     *           epoch-millisecond on the wire; Cobalt preserves the raw
+     *           millisecond value to round-trip against WA Web.
      */
     @ProtobufProperty(index = 3, type = ProtobufType.INT64)
     Long createdAt;
@@ -98,7 +102,7 @@ public final class NoteEditAction implements SyncAction<NoteEditActionArgs> {
      *
      * @param type                the structural category of the note
      * @param chatJid             the chat the note is attached to
-     * @param createdAt           the epoch-second creation timestamp
+     * @param createdAt           the epoch-millisecond creation timestamp
      * @param deleted             whether the action deletes the note
      * @param unstructuredContent the free-text body for unstructured notes
      */
@@ -129,7 +133,7 @@ public final class NoteEditAction implements SyncAction<NoteEditActionArgs> {
     }
 
     /**
-     * Returns the epoch-second timestamp at which the note was created.
+     * Returns the epoch-millisecond timestamp at which the note was created.
      *
      * @return the creation timestamp, or {@link OptionalLong#empty()} if unset
      */
@@ -174,7 +178,7 @@ public final class NoteEditAction implements SyncAction<NoteEditActionArgs> {
     }
 
     /**
-     * Sets the epoch-second timestamp at which the note was created.
+     * Sets the epoch-millisecond timestamp at which the note was created.
      *
      * @param createdAt the new creation timestamp, or {@code null} to clear it
      */

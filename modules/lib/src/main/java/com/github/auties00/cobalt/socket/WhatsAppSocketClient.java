@@ -880,6 +880,13 @@ public sealed abstract class WhatsAppSocketClient {
         }
 
         /**
+         * Returns the {@code ClientPlatformType} this client advertises.
+         *
+         * @return the platform for this client
+         */
+        abstract ClientPlatformType getPlatform();
+
+        /**
          * Returns the {@code WebSubPlatform} this client advertises in
          * the webInfo block of the handshake payload.  For a browser
          * this is {@code WEB_BROWSER}; for a native desktop app it's
@@ -975,7 +982,7 @@ public sealed abstract class WhatsAppSocketClient {
          */
         private UserAgent getUserAgent() {
             return new ClientPayloadUserAgentBuilder()
-                    .platform(store.device().platform())
+                    .platform(getPlatform())
                     .appVersion(store.clientVersion())
                     .mcc("000")
                     .mnc("000")
@@ -1139,6 +1146,11 @@ public sealed abstract class WhatsAppSocketClient {
         }
 
         @Override
+        ClientPlatformType getPlatform() {
+            return ClientPlatformType.WEB;
+        }
+
+        @Override
         ClientPayload.WebInfo.WebSubPlatform getWebSubPlatform() {
             return ClientPayload.WebInfo.WebSubPlatform.WEB_BROWSER;
         }
@@ -1180,9 +1192,19 @@ public sealed abstract class WhatsAppSocketClient {
         }
 
         @Override
+        ClientPlatformType getPlatform() {
+            return switch (store.device().platform()) {
+                case WINDOWS -> ClientPlatformType.WEB;
+                case MACOS -> ClientPlatformType.MACOS;
+                default -> throw new IllegalStateException(
+                        "Desktop client does not support platform: " + store.device().platform());
+            };
+        }
+
+        @Override
         ClientPayload.WebInfo.WebSubPlatform getWebSubPlatform() {
             return switch (store.device().platform()) {
-                case WINDOWS -> ClientPayload.WebInfo.WebSubPlatform.WIN32;
+                case WINDOWS -> ClientPayload.WebInfo.WebSubPlatform.WIN_HYBRID;
                 case MACOS -> ClientPayload.WebInfo.WebSubPlatform.DARWIN;
                 default -> throw new IllegalStateException(
                         "Desktop client does not support platform: " + store.device().platform());

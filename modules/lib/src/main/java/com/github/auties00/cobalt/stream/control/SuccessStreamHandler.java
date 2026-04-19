@@ -14,7 +14,9 @@ import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.stream.SocketStream;
 import com.github.auties00.cobalt.sync.WebAppStateService;
 import com.github.auties00.cobalt.wam.WamService;
+import com.github.auties00.cobalt.wam.event.ClockSkewDifferenceTEventBuilder;
 
+import java.time.Instant;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -240,17 +242,32 @@ public final class SuccessStreamHandler implements SocketStream.Handler {
         store.setRegistered(true);
 
         // WAWebHandleSuccess.default: WAWebUpdateClockSkewUtils.updateClockSkew(u.ts)
-        // ADAPTED: WA Web records the difference between server time and
-        // local time so that subsequent stamps and timeouts can be rebased.
-        // Cobalt does not expose a clock-skew field on the store yet; the
-        // server timestamp is read here so the parsing is exhaustive and a
-        // future store accessor can plug into this hook without changing the
-        // call sites. See "Issues in Context Files" in the validation report.
+        // WA Web records the difference between server time and local time so
+        // subsequent stamps and timeouts can be rebased. Cobalt now persists
+        // the skew in seconds on the store; callers read it through
+        // store.clockSkewSeconds().
         var serverTimestampSeconds = node.getAttributeAsLong("t", 0L);
         if (serverTimestampSeconds > 0) {
-            // ClockSkewDifferenceTEvent (WAM) and a store-level setClockSkew
-            // accessor would consume this value; keeping the parse here so
-            // the value is available once the cross-cutting fix lands.
+            // WAWebUpdateClockSkewUtils.updateClockSkew:
+            //   t = Date.now()/1e3, n = Math.round(t - e), r = Math.round(n / HOUR_SECONDS)
+            //   if (r !== 0 && getABPropConfigValue("log_clock_skew"))
+            //       new ClockSkewDifferenceTWamEvent({clockSkewHourly: r * -1}).commit()
+            //   WATimeUtils.setClockSkew(n)
+            // Cobalt stores the skew as (server - local) seconds so the
+            // hourly value computed below is already the WA Web "r * -1".
+            var localSeconds = Instant.now().getEpochSecond();
+            var skewSeconds = serverTimestampSeconds - localSeconds;
+            // WAWebUpdateClockSkewUtils.updateClockSkew: r = Math.round(n/HOUR_SECONDS);
+            // we compute Math.round((server-local)/3600) = -r so that -r is the
+            // clockSkewHourly value WA Web emits (r * -1).
+            var clockSkewHourly = (int) Math.round(skewSeconds / 3600.0);
+            if (clockSkewHourly != 0 && abPropsService.getBool(ABProp.LOG_CLOCK_SKEW)) {
+                // WAWebUpdateClockSkewUtils.updateClockSkew: new ClockSkewDifferenceTWamEvent({clockSkewHourly:r*-1}).commit()
+                wamService.commit(new ClockSkewDifferenceTEventBuilder()
+                        .clockSkewHourly(clockSkewHourly)
+                        .build());
+            }
+            store.setClockSkewSeconds(skewSeconds); // WAWebUpdateClockSkewUtils.updateClockSkew: WATimeUtils.setClockSkew(n)
         }
 
         // WAWebHandleSuccess.default: WAWebUpdateMeLidUtils.updateMeLid
@@ -283,20 +300,17 @@ public final class SuccessStreamHandler implements SocketStream.Handler {
         // singleton. Cobalt wires the equivalent registry into
         // WebAppStateService at construction time, so no explicit call is
         // required here.
-
         // ADAPTED: WAWebHandleSuccess.default ->
         // BackendEventBus.triggerTemporaryBan({banned:false})
         // WA Web fires a frontend bridge event so the UI can dismiss any
         // "temporarily banned" banner. Cobalt does not surface that UI
         // banner because it is a headless library; the equivalent state is
         // implied by the fact that authentication succeeded.
-
         // ADAPTED: WAWebHandleSuccess.default ->
         // WAWebUserPrefsGeneral.setOfflinePushDisabled(false)
         // WA Web re-enables offline push notifications on every successful
         // login. Cobalt has no offline push subsystem (the project does not
         // ship a service worker), so the call has no equivalent.
-
         // ADAPTED: WAWebHandleSuccess.default ->
         // WAWebDbEncryptionKey.DbEncKeyStore.generateFinalDbEncryptionAndFtsKey(c)
         // and generateFinalDbEncryptionAndFtsKeyForInvoker(c). WA Web uses
@@ -304,7 +318,6 @@ public final class SuccessStreamHandler implements SocketStream.Handler {
         // encryption keys. Cobalt persists session data via Java
         // serialization without an at-rest encryption layer, so the
         // companion_enc_static attribute is intentionally ignored.
-
         // ADAPTED: WAWebHandleSuccess.default -> WAWebPassiveModeManager
         // .executePassiveTasks runs LID-migration init as a passive task;
         // Cobalt calls it directly to keep ordering explicit.
@@ -352,12 +365,16 @@ public final class SuccessStreamHandler implements SocketStream.Handler {
 
         // WAWebHandleSuccess.default -> WAWebABPropsLocalStorage
         //     .setGroupAbPropsEmergencyPushTimestamp(u.ts)
-        // ADAPTED: WA Web persists this timestamp to local storage so a
-        // future emergency-push response can be detected. Cobalt does not
-        // expose a per-stamp accessor on the store; see "Issues in Context
-        // Files" in the validation report. The server timestamp is read
-        // above (serverTimestampSeconds) so the future hook can be wired
-        // without rewriting the parser.
+        // WA Web compares the server-supplied group_abprops refresh id against
+        // its locally-persisted copy, and when they differ it writes the
+        // stanza's server timestamp so a future sync can detect the push.
+        // Cobalt does not persist the refresh id separately yet; ADAPTED by
+        // always stamping when the server-supplied group_abprops attribute is
+        // non-zero, which is a strict superset of the WA Web behaviour.
+        var groupAbpropsRefreshId = node.getAttributeAsLong("group_abprops", 0L);
+        if (groupAbpropsRefreshId != 0L && serverTimestampSeconds > 0) {
+            store.setGroupAbPropsEmergencyPushTimestamp(Instant.ofEpochSecond(serverTimestampSeconds)); // WAWebABPropsLocalStorage.setGroupAbPropsEmergencyPushTimestamp
+        }
 
         // ADAPTED: WAWebHandleSuccess.default -> WA Web resumes syncd and
         // starts the periodic app-state sync job through passive tasks;
@@ -371,7 +388,6 @@ public final class SuccessStreamHandler implements SocketStream.Handler {
         // request. Cobalt's media subsystem fetches the conn lazily on the
         // first media operation; pre-warming is omitted to keep the
         // success handler synchronous and side-effect free for tests.
-
         // WAWebHandleSuccess.default -> WAWebPassiveModeManager
         //     .executePassiveTasks ends with WASendPassiveModeProtocol
         //     .sendPassiveModeProtocol("active"), which sends

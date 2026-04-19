@@ -34,6 +34,7 @@ import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.stream.SocketStream;
 import com.github.auties00.cobalt.sync.SnapshotRecoveryService;
 import com.github.auties00.cobalt.sync.WebAppStateService;
+import com.github.auties00.cobalt.sync.WebHistorySyncService;
 import com.github.auties00.cobalt.sync.key.SyncKeyRotationService;
 import it.auties.protobuf.stream.ProtobufInputStream;
 
@@ -61,8 +62,8 @@ import java.util.zip.GZIPInputStream;
  *
  * <p>After successful processing, the handler stores the message, handles
  * protocol messages (key shares, key requests, snapshot recovery, LID
- * migration), resolves orphan payment notifications, and notifies
- * registered listeners.
+ * migration, history sync), resolves orphan payment notifications, and
+ * notifies registered listeners.
  *
  * @implNote WAWebHandleMsg.default: the main entry point for incoming
  * message stanzas.  WAWebCommsHandleWorkerCompatibleStanza: routes
@@ -144,6 +145,20 @@ public final class MessageStreamHandler implements SocketStream.Handler {
     private final LidMigrationService lidMigrationService;
 
     /**
+     * The history sync service that downloads, decrypts and decodes
+     * {@link com.github.auties00.cobalt.model.message.system.history.HistorySyncNotification}
+     * payloads carried by protocol messages and fans the decoded
+     * {@link com.github.auties00.cobalt.model.sync.history.HistorySync}
+     * chunks out to the registered listeners.
+     *
+     * @implNote WAWebHandleHistorySyncNotification.default: in WA Web this
+     * dispatch is performed as a sibling branch of the protocol message
+     * processor. Cobalt routes it through an injected service to keep the
+     * download/decode pipeline off the stanza dispatch thread.
+     */
+    private final WebHistorySyncService webHistorySyncService;
+
+    /**
      * Constructs a new message stream handler with the specified
      * dependencies.
      *
@@ -171,6 +186,7 @@ public final class MessageStreamHandler implements SocketStream.Handler {
         this.snapshotRecoveryService = Objects.requireNonNull(snapshotRecoveryService, "snapshotRecoveryService cannot be null");
         this.syncKeyRotationService = Objects.requireNonNull(webAppStateService, "webAppStateService cannot be null").syncKeyRotationService();
         this.lidMigrationService = Objects.requireNonNull(lidMigrationService, "lidMigrationService cannot be null");
+        this.webHistorySyncService = new WebHistorySyncService(whatsapp, lidMigrationService);
     }
 
     /**
@@ -820,6 +836,9 @@ public final class MessageStreamHandler implements SocketStream.Handler {
                 case "WITHDRAWAL_ACTIVE" -> PaymentMessageStatus.WITHDRAWAL_ACTIVE;
                 default -> PaymentMessageStatus.STATUS_UNSET;
             };
+            // WAWebPaymentStatusUtils: unmapped transaction types fall through to STATUS_UNSET
+            case TYPE_UNSET, TYPE_P2P_GRP, TYPE_P2P_NO_INFO, TYPE_FUTURE, TYPE_P2P_REQ_GRP, TYPE_MISSING_DETAILS ->
+                    PaymentMessageStatus.STATUS_UNSET;
         };
     }
 
@@ -858,13 +877,15 @@ public final class MessageStreamHandler implements SocketStream.Handler {
      *   <li>Peer data operation request/response (snapshot recovery)</li>
      *   <li>App state sync key share</li>
      *   <li>App state sync key request</li>
+     *   <li>History sync notification (download, decrypt and fan-out)</li>
      * </ul>
      *
      * @param info the chat message info containing a protocol message
      * @implNote WAWebHandleMsg.default: after successful decryption,
      * protocol messages are dispatched to their respective handlers.
      * WAWebNonMessageDataRequestHandler.handlePeerDataOperationRequestResponse,
-     * WAWebKeyManagementHandleKeyShareApi, WAWebSyncdHandleKeyShare.
+     * WAWebKeyManagementHandleKeyShareApi, WAWebSyncdHandleKeyShare,
+     * WAWebHandleHistorySyncNotification.
      */
     private void handleProtocolMessage(ChatMessageInfo info) {
         var content = info.message().content();
@@ -895,6 +916,13 @@ public final class MessageStreamHandler implements SocketStream.Handler {
 
         protocolMessage.appStateSyncKeyRequest()
                 .ifPresent(request -> processAppStateSyncKeyRequest(info, request));
+
+        // WAWebHandleHistorySyncNotification.default: the primary device
+        // announces each history chunk with a HistorySyncNotification inside
+        // a ProtocolMessage. The service downloads and decodes the chunk on a
+        // dedicated virtual thread so the dispatch loop keeps draining.
+        protocolMessage.historySyncNotification()
+                .ifPresent(webHistorySyncService::process);
     }
 
     /**

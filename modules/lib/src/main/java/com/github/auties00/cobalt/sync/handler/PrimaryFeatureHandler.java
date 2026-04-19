@@ -1,6 +1,9 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
@@ -27,6 +30,7 @@ import java.util.List;
  *           with {@code collectionName = Regular}, {@code getAction()} returning
  *           {@code "primary_feature"}, and {@code getVersion()} returning {@code 7}
  */
+@WhatsAppWebModule(moduleName = "WAWebPrimaryFeatureSync")
 public final class PrimaryFeatureHandler implements WebAppStateActionHandler {
     /**
      * The singleton instance of {@code PrimaryFeatureHandler}.
@@ -34,6 +38,7 @@ public final class PrimaryFeatureHandler implements WebAppStateActionHandler {
      * @implNote WAWebPrimaryFeatureSync.default — WA Web exports a single
      *           pre-instantiated handler ({@code c = new u; l.default = c})
      */
+    @WhatsAppWebExport(moduleName = "WAWebPrimaryFeatureSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final PrimaryFeatureHandler INSTANCE = new PrimaryFeatureHandler();
 
     /**
@@ -42,6 +47,7 @@ public final class PrimaryFeatureHandler implements WebAppStateActionHandler {
      * @implNote WAWebPrimaryFeatureSync — WA Web instantiates the handler once
      *           via {@code new u()} and exports it as the module default
      */
+    @WhatsAppWebExport(moduleName = "WAWebPrimaryFeatureSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private PrimaryFeatureHandler() {
 
     }
@@ -54,6 +60,7 @@ public final class PrimaryFeatureHandler implements WebAppStateActionHandler {
      *           {@code "primary_feature"}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebPrimaryFeatureSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
         return PrimaryFeatureAction.ACTION_NAME; // WAWebPrimaryFeatureSync.getAction
     }
@@ -65,6 +72,7 @@ public final class PrimaryFeatureHandler implements WebAppStateActionHandler {
      *           in the constructor
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebPrimaryFeatureSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
         return PrimaryFeatureAction.COLLECTION_NAME; // WAWebPrimaryFeatureSync constructor: this.collectionName = Regular
     }
@@ -75,6 +83,7 @@ public final class PrimaryFeatureHandler implements WebAppStateActionHandler {
      * @implNote WAWebPrimaryFeatureSync.getVersion — returns the literal {@code 7}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebPrimaryFeatureSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return PrimaryFeatureAction.ACTION_VERSION; // WAWebPrimaryFeatureSync.getVersion: return 7
     }
@@ -91,6 +100,7 @@ public final class PrimaryFeatureHandler implements WebAppStateActionHandler {
      *           is a Cobalt interface adaptation
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebPrimaryFeatureSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: single-path adapter for batch-only WA Web entry
     }
@@ -114,6 +124,7 @@ public final class PrimaryFeatureHandler implements WebAppStateActionHandler {
      * @implNote WAWebPrimaryFeatureSync.applyMutations
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebPrimaryFeatureSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.DIRECT)
     public List<MutationApplicationResult> applyMutationBatchResults(WhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
         DecryptedMutation.Trusted latest = null; // WAWebPrimaryFeatureSync.applyMutations: var a
         var results = new ArrayList<MutationApplicationResult>(mutations.size()); // WAWebPrimaryFeatureSync.applyMutations: var u = t.map(...)
@@ -124,7 +135,7 @@ public final class PrimaryFeatureHandler implements WebAppStateActionHandler {
             }
 
             var action = mutation.value().action().orElse(null); // WAWebPrimaryFeatureSync.applyMutations: var r = (t = e.value.primaryFeature) == null ? void 0 : t.flags
-            if (!(action instanceof PrimaryFeatureAction)) { // WAWebPrimaryFeatureSync.applyMutations: if (r == null) -- in protobuf, an absent primaryFeature sub-action is the only way r becomes null
+            if (!(action instanceof PrimaryFeatureAction)) { // WAWebPrimaryFeatureSync.applyMutations: if (r == null), in protobuf, an absent primaryFeature sub-action is the only way r becomes null
                 results.add(malformedActionValue()); // WAWebPrimaryFeatureSync.applyMutations: return WAWebSyncdIndexUtils.malformedActionValue(n.collectionName)
                 continue;
             }
@@ -134,8 +145,7 @@ public final class PrimaryFeatureHandler implements WebAppStateActionHandler {
             }
             results.add(MutationApplicationResult.success()); // WAWebPrimaryFeatureSync.applyMutations: return {actionState: Success}
         }
-        // WAWebPrimaryFeatureSync.applyMutations: WARN("primary feature sync: i operations not supported") and WARN("primary feature sync: l malformed mutations") -- skipped, telemetry/logging
-
+        // WAWebPrimaryFeatureSync.applyMutations: WARN("primary feature sync: i operations not supported") and WARN("primary feature sync: l malformed mutations"), skipped, telemetry/logging
         if (latest != null) { // WAWebPrimaryFeatureSync.applyMutations: if (a != null)
             // WAWebPrimaryFeatureSync.applyMutations: var d = WANullthrows((c = a.value.primaryFeature) == null ? void 0 : c.flags)
             var pfa = (PrimaryFeatureAction) latest.value().action().orElseThrow();
@@ -160,6 +170,7 @@ public final class PrimaryFeatureHandler implements WebAppStateActionHandler {
      *           the same per-mutation logic with no batch-level latest selection
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebPrimaryFeatureSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) { // WAWebPrimaryFeatureSync.applyMutations: if (e.operation !== "set")
             return MutationApplicationResult.unsupported(); // WAWebPrimaryFeatureSync.applyMutations: return {actionState: Unsupported}

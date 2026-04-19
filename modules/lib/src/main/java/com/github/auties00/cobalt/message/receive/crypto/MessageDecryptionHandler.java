@@ -112,14 +112,12 @@ public final class MessageDecryptionHandler {
     public boolean canDecryptNext(MessageReceiveEncryptedPayload enc) {
         // WAWebMsgProcessingDecryptionHandler.canDecryptNext
         // Blocks further attempts when a previous non-SKMSG error was retryable
-
         if (pkOrMsgFailure != null && RETRYABLE_BLOCKERS.contains(pkOrMsgFailure.errorType)) {
             return false;
         }
 
         // WAWebMsgProcessingDecryptionHandler.canDecryptNext
         // Records the enc type in accessedEncs so getResult can discriminate partial success
-
         accessedEncs.add(enc.e2eType());
         return true;
     }
@@ -148,13 +146,11 @@ public final class MessageDecryptionHandler {
     ) {
         // WAWebMsgProcessingDecryptionHandler.handleError
         // Classifies the raw exception into a DecryptionErrorType category
-
         var errorType = classifyError(error);
         var failure = new EncFailure(enc, error, errorType);
 
         // WAWebMsgProcessingDecryptionHandler.handleError
         // Routes the failure record to the SKMSG slot or the PKMSG/MSG slot based on enc type
-
         if (enc.e2eType().isSenderKeyMessage()) {
             skMsgFailure = failure;
         } else {
@@ -195,19 +191,16 @@ public final class MessageDecryptionHandler {
     public MessageDecryptionResult getResult() {
         // WAWebMsgProcessingDecryptionHandler.getResult
         // Selects the dominant failure (SKMSG preferred when both failed)
-
         var dominant = skMsgFailure != null ? skMsgFailure : pkOrMsgFailure;
 
         // WAWebMsgProcessingDecryptionHandler.getResult
         // Returns SUCCESS when no failure occurred at all
-
         if (dominant == null) {
             return MessageDecryptionResult.SUCCESS;
         }
 
         // WAWebMsgProcessingDecryptionHandler.getResult
         // Returns SUCCESS when SKMSG was accessed and succeeded even if the other slot failed
-
         var skMsgAccessed = accessedEncs.contains(MessageEncryptionType.SKMSG);
         if (skMsgAccessed && skMsgFailure == null) {
             return MessageDecryptionResult.SUCCESS;
@@ -215,7 +208,6 @@ public final class MessageDecryptionHandler {
 
         // WAWebMsgProcessingDecryptionHandler.getResult
         // Maps the dominant failure's error type to the final result code
-
         return mapErrorToResult(dominant);
     }
 
@@ -235,7 +227,6 @@ public final class MessageDecryptionHandler {
     public Optional<MessageReceiveEncryptedPayload> failedEnc() {
         // WAWebMsgProcessingDecryptionHandler.getResult
         // Exposes the dominant failure's enc payload via an Optional
-
         var dominant = skMsgFailure != null ? skMsgFailure : pkOrMsgFailure;
         return dominant != null ? Optional.of(dominant.enc) : Optional.empty();
     }
@@ -257,7 +248,6 @@ public final class MessageDecryptionHandler {
     public Optional<WhatsAppMessageException.Receive> failedError() {
         // WAWebMsgProcessingDecryptionHandler.getResult
         // Exposes the dominant failure's exception via an Optional
-
         var dominant = skMsgFailure != null ? skMsgFailure : pkOrMsgFailure;
         return dominant != null ? Optional.of(dominant.error) : Optional.empty();
     }
@@ -284,7 +274,6 @@ public final class MessageDecryptionHandler {
     private static DecryptionErrorType classifyError(WhatsAppMessageException.Receive error) {
         // WAWebMsgProcessingDecryptionHandler function v()
         // Pattern-matches the exception subtype to produce a DecryptionErrorType
-
         return switch (error) {
             case WhatsAppMessageException.Receive.UnknownDevice _ ->
                     DecryptionErrorType.UNKNOWN_DEVICE;
@@ -331,7 +320,6 @@ public final class MessageDecryptionHandler {
     private static MessageDecryptionResult mapErrorToResult(EncFailure failure) {
         // WAWebMsgProcessingDecryptionHandler.getResult
         // Maps the DecryptionErrorType directly to the public MessageDecryptionResult
-
         return switch (failure.errorType) {
             case SIGNAL_RETRYABLE, UNKNOWN_DEVICE, BROADCAST_EPH_SETTINGS ->
                     MessageDecryptionResult.RETRY;

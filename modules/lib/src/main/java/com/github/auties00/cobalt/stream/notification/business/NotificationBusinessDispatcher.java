@@ -16,12 +16,15 @@ import com.github.auties00.cobalt.stream.SocketStream;
  * handler and forwards each incoming node to the matching handler. Stanzas
  * with an unrecognised {@code type} are silently ignored.
  *
- * @implNote Adapts the WhatsApp Web dispatch that routes business
- *     notifications to {@code WAWebHandleBusinessNotification},
+ * @implNote Adapts the notification-type switch inside
+ *     {@code WAWebCommsHandleLoggedInStanza.handleLoggedInStanza} that
+ *     fans out to {@code WAWebHandleBusinessNotification},
+ *     {@code WAWebHandleDigitalCommerceSubscriptionNotification},
+ *     {@code WAWebHandleBotProfileNotification},
  *     {@code WAWebHandleMexNotification} and
- *     {@code WAWebHandlePaymentNotification}.
+ *     {@code WAWebPaymentNotificationHandler}.
  */
-@WhatsAppWebModule(moduleName = "WAWebHandleNotification")
+@WhatsAppWebModule(moduleName = "WAWebCommsHandleLoggedInStanza")
 public final class NotificationBusinessDispatcher implements SocketStream.Handler {
     /**
      * Handler for {@code business}, {@code digital_commerce_subscription}
@@ -57,11 +60,16 @@ public final class NotificationBusinessDispatcher implements SocketStream.Handle
      * handler based on the stanza's {@code type} attribute.
      *
      * @param node the incoming notification stanza
-     * @implNote Mirrors the {@code type}-based switch in
-     *     {@code WAWebHandleNotification.handleNotification} for the
-     *     business category.
+     * @implNote Mirrors the business-category arms of the
+     *     {@code case "notification":} switch on {@code n.type} inside
+     *     {@code WAWebCommsHandleLoggedInStanza.handleLoggedInStanza}.
+     *     Unrecognised {@code type} values fall through silently: in WA
+     *     Web the unmatched default is handled by the surrounding
+     *     {@code handleLoggedInStanza} NACK logic, which is orchestrated
+     *     by Cobalt's outer stream pipeline rather than by this
+     *     dispatcher.
      */
-    @WhatsAppWebExport(moduleName = "WAWebHandleNotification", exports = "handleNotification", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebCommsHandleLoggedInStanza", exports = "handleLoggedInStanza", adaptation = WhatsAppAdaptation.ADAPTED)
     @Override
     public void handle(Node node) {
         var type = node.getAttributeAsString("type", null);
@@ -70,10 +78,21 @@ public final class NotificationBusinessDispatcher implements SocketStream.Handle
         }
 
         switch (type) {
+            // WAWebCommsHandleLoggedInStanza.handleLoggedInStanza: case "business"
+            // -> WAWebHandleBusinessNotification.handleBusinessNotificationJob
+            // case "digital_commerce_subscription"
+            // -> WAWebHandleDigitalCommerceSubscriptionNotification.handleDigitalCommerceSubscriptionNotificationJob
+            // case "fb:update"
+            // -> WAWebHandleBotProfileNotification.handleBotProfileNotification
             case "business", "digital_commerce_subscription", "fb:update" -> businessHandler.handle(node);
+            // WAWebCommsHandleLoggedInStanza.handleLoggedInStanza: case "mex"
+            // -> WAWebHandleMexNotification.handleMexNotification
             case "mex" -> mexHandler.handle(node);
+            // WAWebCommsHandleLoggedInStanza.handleLoggedInStanza: case "pay"
+            // -> WAWebPaymentNotificationHandler.handlePaymentNotification
             case "pay" -> paymentHandler.handle(node);
             default -> {
+                // NO_WA_BASIS: outer stream pipeline handles the NACK for unmatched notification types
             }
         }
     }

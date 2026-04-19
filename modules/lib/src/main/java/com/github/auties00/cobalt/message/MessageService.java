@@ -119,7 +119,6 @@ public final class MessageService {
      */
     public AckResult send(Jid chatJid, MessageContainer container) {
         // Delegates to the sending service that owns the outbound pipeline
-
         return sendingService.send(chatJid, container);
     }
 
@@ -141,7 +140,6 @@ public final class MessageService {
      */
     public AckResult send(MessageInfo messageInfo) {
         // Delegates to the sending service for already-prepared outgoing messages
-
         return sendingService.send(messageInfo);
     }
 
@@ -160,7 +158,6 @@ public final class MessageService {
      */
     public AckResult sendPeer(Jid targetDevice, ChatMessageInfo messageInfo) {
         // Delegates to the sending service for peer (self-device) messages
-
         return sendingService.sendPeer(targetDevice, messageInfo);
     }
 
@@ -184,7 +181,6 @@ public final class MessageService {
      */
     public MessageInfo process(Node node) {
         // Delegates to the receiving service for inbound stanza decoding
-
         return receivingService.process(node);
     }
 
@@ -200,7 +196,6 @@ public final class MessageService {
      */
     public void clearPendingMessages() {
         // Resets the receiving-side dedup cache when offline delivery ends
-
         receivingService.clearPendingMessages();
     }
 }

@@ -91,13 +91,11 @@ public final class EncMessageFactory {
 
         // WAWebAddonEncryption.encryptAddOn
         // Resolves the 32-byte messageSecret from the parent message, required for HKDF derivation
-
         var parentSecret = parentMessage.messageSecret()
                 .orElseThrow(() -> new IllegalArgumentException("Parent message has no messageSecret"));
 
         // WAWebAddonEncryption.encryptAddOn
         // Reads the parent message key, which carries the stanza id and original sender info
-
         var parentKey = parentMessage.key();
         var parentKeyId = parentKey.id()
                 .orElseThrow(() -> new IllegalArgumentException("Parent key has no keyId"));
@@ -107,21 +105,18 @@ public final class EncMessageFactory {
         // WAWebAddonEncryption.encryptAddOn
         // Picks the original sender JID used in key derivation: the sender wid if present,
         // otherwise the self JID when the parent was authored by the current user, else the parent JID
-
         var originalSender = parentKey.senderJid()
                 .orElse(parentKey.fromMe() ? selfJid : parentKeyJid)
                 .toUserJid();
 
         // WAWebAddonEncryption.encryptAddOn
         // Serialises the inner MessageContainer via encodeProtobuf(MessageSpec, comment.message)
-
         var commentContent = comment.message()
                 .orElseThrow(() -> new IllegalArgumentException("Comment has no message content"));
         var plaintext = MessageContainerSpec.encode(commentContent);
 
         // WAWebAddonEncryption.encryptAddOn
         // Delegates the HKDF derivation and AES-GCM encryption to the shared addon helper
-
         var encrypted = MessageAddonEncryption.encrypt(
                 plaintext, parentSecret, parentKeyId,
                 originalSender, selfJid.toUserJid(),
@@ -129,7 +124,6 @@ public final class EncMessageFactory {
 
         // WAWebAddonEncryption.encryptAddOn
         // Packs the ciphertext and IV into the EncCommentMessage protobuf wrapper
-
         return new EncCommentMessageBuilder()
                 .targetMessageKey(comment.targetMessageKey().orElse(null))
                 .encPayload(encrypted.ciphertext())
@@ -174,13 +168,11 @@ public final class EncMessageFactory {
 
         // WAWebAddonEncryption.encryptAddOn
         // Resolves the 32-byte messageSecret from the parent message, required for HKDF derivation
-
         var parentSecret = parentMessage.messageSecret()
                 .orElseThrow(() -> new IllegalArgumentException("Parent message has no messageSecret"));
 
         // WAWebAddonEncryption.encryptAddOn
         // Reads the parent message key, which carries the stanza id and original sender info
-
         var parentKey = parentMessage.key();
         var parentKeyId = parentKey.id()
                 .orElseThrow(() -> new IllegalArgumentException("Parent key has no keyId"));
@@ -190,19 +182,16 @@ public final class EncMessageFactory {
         // WAWebAddonEncryption.encryptAddOn
         // Picks the original sender JID used in key derivation: the sender wid if present,
         // otherwise the self JID when the parent was authored by the current user, else the parent JID
-
         var originalSender = parentKey.senderJid()
                 .orElse(parentKey.fromMe() ? selfJid : parentKeyJid)
                 .toUserJid();
 
         // WAWebAddonEncryption.encryptAddOn
         // Serialises the reaction protobuf via encodeProtobuf(ReactionMessageSpec, reaction)
-
         var plaintext = ReactionMessageSpec.encode(reaction);
 
         // WAWebAddonEncryption.encryptAddOn
         // Delegates the HKDF derivation and AES-GCM encryption to the shared addon helper
-
         var encrypted = MessageAddonEncryption.encrypt(
                 plaintext, parentSecret, parentKeyId,
                 originalSender, selfJid.toUserJid(),
@@ -210,7 +199,6 @@ public final class EncMessageFactory {
 
         // WAWebAddonEncryption.encryptAddOn
         // Packs the ciphertext and IV into the EncReactionMessage protobuf wrapper
-
         return new EncReactionMessageBuilder()
                 .targetMessageKey(reaction.key().orElse(null))
                 .encPayload(encrypted.ciphertext())

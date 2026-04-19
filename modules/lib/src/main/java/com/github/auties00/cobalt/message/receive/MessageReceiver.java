@@ -130,7 +130,6 @@ abstract sealed class MessageReceiver<T extends MessageInfo>
     MessageContainer decodeProtobuf(String messageId, byte[] plaintext) {
         // WAWebHandleMsgProcess.processDecryptedMessageProto
         // Decodes the plaintext as a MessageContainer and logs a warning on failure
-
         try {
             return MessageContainerSpec.decode(plaintext);
         } catch (Exception e) {
@@ -177,7 +176,6 @@ abstract sealed class MessageReceiver<T extends MessageInfo>
     boolean isFromMe(Jid senderJid) {
         // WAWebMsgProcessingApiUtils.isMeAccount
         // Compares the sender's user-level JID to the logged-in self JID
-
         var selfJid = store.jid().orElse(null);
         if (selfJid == null) {
             return false;

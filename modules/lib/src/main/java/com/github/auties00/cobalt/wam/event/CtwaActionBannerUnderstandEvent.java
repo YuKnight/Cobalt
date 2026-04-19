@@ -40,4 +40,7 @@ public interface CtwaActionBannerUnderstandEvent extends WamEventSpec {
 
     @WamProperty(index = 10, type = WamType.BOOLEAN)
     Optional<Boolean> validNotification();
+
+    @WamProperty(index = 11, type = WamType.STRING)
+    Optional<String> notificationLogId();
 }

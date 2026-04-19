@@ -2,6 +2,9 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.contact.OutContactBuilder;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
@@ -38,12 +41,14 @@ import java.util.logging.Logger;
  *           class constructor sets
  *           {@code collectionName = WASyncdConst.CollectionName.RegularLow}
  */
+@WhatsAppWebModule(moduleName = "WAWebOutContactSync")
 public final class OutContactHandler implements WebAppStateActionHandler {
     /**
      * The singleton instance of this handler.
      *
      * @implNote WAWebOutContactSync — module-level singleton {@code _ = new d()}
      */
+    @WhatsAppWebExport(moduleName = "WAWebOutContactSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final OutContactHandler INSTANCE = new OutContactHandler();
 
     /**
@@ -69,6 +74,7 @@ public final class OutContactHandler implements WebAppStateActionHandler {
      * @implNote WAWebOutContactSync — class {@code d} constructor sets
      *           {@code collectionName = RegularLow}
      */
+    @WhatsAppWebExport(moduleName = "WAWebOutContactSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private OutContactHandler() {
 
     }
@@ -81,6 +87,7 @@ public final class OutContactHandler implements WebAppStateActionHandler {
      * @return the action name string
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebOutContactSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
         return OutContactAction.ACTION_NAME; // WAWebOutContactSync.getAction
     }
@@ -93,6 +100,7 @@ public final class OutContactHandler implements WebAppStateActionHandler {
      * @return the sync patch type
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebOutContactSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
         return OutContactAction.COLLECTION_NAME; // WAWebOutContactSync.collectionName
     }
@@ -104,6 +112,7 @@ public final class OutContactHandler implements WebAppStateActionHandler {
      * @return the version number
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebOutContactSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return OutContactAction.ACTION_VERSION; // WAWebOutContactSync.getVersion
     }
@@ -119,6 +128,7 @@ public final class OutContactHandler implements WebAppStateActionHandler {
      * @return {@code true} if the mutation was applied successfully
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebOutContactSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebOutContactSync.applyMutations
     }
@@ -171,6 +181,7 @@ public final class OutContactHandler implements WebAppStateActionHandler {
      * @return the detailed application result
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebOutContactSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         // WAWebOutContactSync.applyMutations: if (!o("WAWebOutContactInviteGating").isOutContactInviteEnabled())
         //     return t.map(function() { return {actionState: Unsupported} })
@@ -235,7 +246,6 @@ public final class OutContactHandler implements WebAppStateActionHandler {
                 // the macOS UI can refresh the invite-by-contact list. Cobalt has no such
                 // frontend bridge and the contact mutation above is sufficient to keep the
                 // in-memory store consistent.
-
                 yield MutationApplicationResult.success(); // WAWebOutContactSync.applyMutations: i.push({actionState: Success})
             }
             case REMOVE -> { // WAWebOutContactSync.applyMutations: else if (l.operation === "remove")
@@ -251,7 +261,6 @@ public final class OutContactHandler implements WebAppStateActionHandler {
 
                 // WAWebOutContactSync.applyMutations: o("WAWebBackendApi").frontendFireAndForget("bulkRemoveOutContacts", {ids: a})
                 // SKIPPED: Electron-frontend IPC notification; no Cobalt equivalent.
-
                 yield MutationApplicationResult.success(); // WAWebOutContactSync.applyMutations: i.push({actionState: Success})
             }
             default -> { // WAWebOutContactSync.applyMutations: else { n++; i.push(malformedActionValue(...)) }

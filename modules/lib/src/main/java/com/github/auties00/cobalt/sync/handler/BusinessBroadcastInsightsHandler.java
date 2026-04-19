@@ -2,6 +2,9 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
@@ -30,6 +33,7 @@ import java.util.logging.Logger;
  *           {@code collectionName = Regular}, {@code getVersion() = 1},
  *           {@code getAction() = "business_broadcast_insights_sync"}
  */
+@WhatsAppWebModule(moduleName = "WAWebBusinessBroadcastInsightsSync")
 public final class BusinessBroadcastInsightsHandler implements WebAppStateActionHandler {
     /**
      * Logger for broadcast insights sync operations.
@@ -44,6 +48,7 @@ public final class BusinessBroadcastInsightsHandler implements WebAppStateAction
      * @implNote WAWebBusinessBroadcastInsightsSync — module-level {@code m = new d()} singleton,
      *           exported as {@code l.default = m}
      */
+    @WhatsAppWebExport(moduleName = "WAWebBusinessBroadcastInsightsSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final BusinessBroadcastInsightsHandler INSTANCE = new BusinessBroadcastInsightsHandler();
 
     /**
@@ -52,6 +57,7 @@ public final class BusinessBroadcastInsightsHandler implements WebAppStateAction
      * @implNote WAWebBusinessBroadcastInsightsSync — class {@code d} constructor sets
      *           {@code this.collectionName = o("WASyncdConst").CollectionName.Regular}
      */
+    @WhatsAppWebExport(moduleName = "WAWebBusinessBroadcastInsightsSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private BusinessBroadcastInsightsHandler() {
 
     }
@@ -64,6 +70,7 @@ public final class BusinessBroadcastInsightsHandler implements WebAppStateAction
      *           which is {@code "business_broadcast_insights_sync"}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebBusinessBroadcastInsightsSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
         return BusinessBroadcastInsightsAction.ACTION_NAME; // WAWebBusinessBroadcastInsightsSync.getAction
     }
@@ -75,6 +82,7 @@ public final class BusinessBroadcastInsightsHandler implements WebAppStateAction
      *           {@code this.collectionName = o("WASyncdConst").CollectionName.Regular}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebBusinessBroadcastInsightsSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
         return BusinessBroadcastInsightsAction.COLLECTION_NAME; // WAWebBusinessBroadcastInsightsSync: collectionName = Regular
     }
@@ -85,6 +93,7 @@ public final class BusinessBroadcastInsightsHandler implements WebAppStateAction
      * @implNote WAWebBusinessBroadcastInsightsSync.getVersion — returns {@code 1}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebBusinessBroadcastInsightsSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return BusinessBroadcastInsightsAction.ACTION_VERSION; // WAWebBusinessBroadcastInsightsSync.getVersion
     }
@@ -103,6 +112,7 @@ public final class BusinessBroadcastInsightsHandler implements WebAppStateAction
      * @return {@code true} if the mutation was applied successfully, {@code false} otherwise
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebBusinessBroadcastInsightsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebBusinessBroadcastInsightsSync.applyMutations
     }
@@ -132,6 +142,7 @@ public final class BusinessBroadcastInsightsHandler implements WebAppStateAction
      * @return the detailed application result
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebBusinessBroadcastInsightsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         try { // WAWebBusinessBroadcastInsightsSync.applyMutations: try { ... } catch(e) { return {actionState: Failed} }
             var indexArray = JSON.parseArray(mutation.index()); // ADAPTED: WAWebBusinessBroadcastInsightsSync uses e.indexParts (pre-parsed); Cobalt parses from JSON string
@@ -187,6 +198,7 @@ public final class BusinessBroadcastInsightsHandler implements WebAppStateAction
      * @return a list of results parallel to the input
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebBusinessBroadcastInsightsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public List<Boolean> applyMutationBatch(WhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
         // ADAPTED: WAWebBusinessBroadcastInsightsSync.applyMutations checks isBizBroadcastSendWebEnabledNoExposure()
         // and returns all Unsupported if false — Cobalt omits AB prop gating
@@ -196,13 +208,16 @@ public final class BusinessBroadcastInsightsHandler implements WebAppStateAction
         var results = new ArrayList<Boolean>(mutations.size());
         for (var mutation : mutations) { // ADAPTED: WAWebBusinessBroadcastInsightsSync.applyMutations uses Promise.all(t.map(...))
             var result = applyMutationResult(client, mutation);
-            if (result.actionState() == SyncActionState.MALFORMED) { // WAWebBusinessBroadcastInsightsSync.applyMutations: a++ on malformed
+            // WAWebBusinessBroadcastInsightsSync.applyMutations: `a` is incremented ONLY inside the SET branch
+            // when `p` (businessBroadcastInsightsAction) is missing — i.e. malformedActionValue path.
+            // The malformedActionIndex path (missing indexParts[1]) returns without bumping `a`.
+            if (result.actionState() == SyncActionState.MALFORMED && mutation.operation() == SyncdOperation.SET) { // WAWebBusinessBroadcastInsightsSync.applyMutations: a++ on malformedActionValue in SET branch
                 malformedCount++;
             }
-            if (result.actionState() == SyncActionState.SUCCESS && mutation.operation() == SyncdOperation.SET) { // WAWebBusinessBroadcastInsightsSync.applyMutations: i++ on SET
+            if (result.actionState() == SyncActionState.SUCCESS && mutation.operation() == SyncdOperation.SET) { // WAWebBusinessBroadcastInsightsSync.applyMutations: i++ on SET success
                 setCount++;
             }
-            if (result.actionState() == SyncActionState.SUCCESS && mutation.operation() == SyncdOperation.REMOVE) { // WAWebBusinessBroadcastInsightsSync.applyMutations: d++ on REMOVE
+            if (result.actionState() == SyncActionState.SUCCESS && mutation.operation() == SyncdOperation.REMOVE) { // WAWebBusinessBroadcastInsightsSync.applyMutations: d++ on REMOVE success
                 removeCount++;
             }
             results.add(result.actionState() == SyncActionState.SUCCESS);

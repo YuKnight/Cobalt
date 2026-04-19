@@ -170,10 +170,14 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
      * payment info fields and notifying listeners.
      *
      * <p>This method also handles the linked payment request message: if the resolved
-     * message has a {@code paymentRequestMessageKey}, the request message is looked up
-     * and its payment status is updated with the fulfilled status.
+     * message has a {@code requestMessageKey}, the original request message is looked
+     * up and its payment status is updated, with {@code txnStatus} coerced through
+     * {@link #determinePaymentRequestFulfilledStatus(PaymentInfo.TxnStatus)} so that
+     * a successful payment transitions the request to its fulfilled state.
      *
-     * @implNote WAWebPaymentNotificationHandler (inner functions y and g/h)
+     * @implNote WAWebPaymentNotificationHandler inner functions {@code y} (field
+     *           assignment) and {@code h}/{@code g} (bulk update with request message
+     *           propagation and orphan removal).
      * @param chatMessageInfo the resolved chat message to update
      * @param transaction     the transaction child node with payment data
      * @param fromMe          whether the current user is the sender
@@ -193,13 +197,70 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
         paymentInfo.setTxnStatus(mapTxnStatus(type, status, fromMe));
         chatMessageInfo.setPaymentInfo(paymentInfo);
 
+        // WAWebPaymentNotificationHandler function h: if the payment references an
+        // originating request message, propagate the resolved status onto it and
+        // coerce the txnStatus through determinePaymentRequestFulfilledStatus.
+        paymentInfo.requestMessageKey().ifPresent(requestKey -> {
+            var requestIdOpt = requestKey.id();
+            var requestRemoteOpt = requestKey.parentJid();
+            if (requestIdOpt.isEmpty() || requestRemoteOpt.isEmpty()) {
+                return;
+            }
+            // ADAPTED: store().findMessageByKey / findMessageById return Optional<? extends MessageInfo>;
+            // materialise each branch via .map(Function.identity()) pattern to avoid wildcard capture issues in .or().
+            MessageInfo requestMessage = whatsapp.store().findMessageByKey(requestKey).orElse(null);
+            if (requestMessage == null) {
+                requestMessage = whatsapp.store().findMessageById(requestRemoteOpt.get(), requestIdOpt.get()).orElse(null);
+            }
+            if (!(requestMessage instanceof ChatMessageInfo requestChat)) {
+                return;
+            }
+            var requestPaymentInfo = requestChat.paymentInfo().orElseGet(this::newPaymentInfo);
+            // WAWebPaymentNotificationHandler: s.paymentStatus = e.paymentStatus
+            requestPaymentInfo.setStatus(paymentInfo.status().orElse(PaymentInfo.Status.UNKNOWN_STATUS));
+            // WAWebPaymentNotificationHandler: s.paymentTxnStatus =
+            //   determinePaymentRequestFulfilledStatus(e.paymentTxnStatus)
+            requestPaymentInfo.setTxnStatus(determinePaymentRequestFulfilledStatus(
+                    paymentInfo.txnStatus().orElse(PaymentInfo.TxnStatus.UNKNOWN)));
+            requestChat.setPaymentInfo(requestPaymentInfo);
+            for (var listener : whatsapp.store().listeners()) {
+                Thread.startVirtualThread(() -> listener.onMessageStatus(whatsapp, requestChat));
+            }
+        });
+
         // WAWebPaymentNotificationHandler: notify listeners
         for (var listener : whatsapp.store().listeners()) {
             Thread.startVirtualThread(() -> listener.onMessageStatus(whatsapp, chatMessageInfo));
         }
 
-        // WAWebPaymentNotificationHandler: remove orphan after successful processing
+        // WAWebPaymentNotificationHandler function h: bulkRemove orphan after
+        // successful processing (only the primary message's id is pushed to n).
         chatMessageInfo.key().id().ifPresent(whatsapp.store()::removeOrphanPaymentNotification);
+    }
+
+    /**
+     * Coerces a payment transaction status into its fulfilled variant for
+     * propagation onto the originating payment request message.
+     *
+     * <p>When the transaction has completed successfully (i.e. the status is
+     * {@link PaymentInfo.TxnStatus#COMPLETED} or {@link PaymentInfo.TxnStatus#SUCCESS}),
+     * the value is returned unchanged so the request reflects the completion.
+     * Otherwise the request status is reset to
+     * {@link PaymentInfo.TxnStatus#COLLECT_INIT}, signalling that the request is
+     * still awaiting a fulfilling payment.
+     *
+     * @implNote WAWebPaymentStatusUtils.determinePaymentRequestFulfilledStatus
+     * @param txnStatus the transaction status from the fulfilling payment message
+     * @return the coerced status to apply to the originating request message
+     */
+    private PaymentInfo.TxnStatus determinePaymentRequestFulfilledStatus(PaymentInfo.TxnStatus txnStatus) {
+        // WAWebPaymentStatusUtils function g + h:
+        // isPaymentRequestFulfilled(e) returns e===COMPLETED || e===SUCCESS;
+        // h returns isFulfilled ? e : COLLECT_INIT
+        if (txnStatus == PaymentInfo.TxnStatus.COMPLETED || txnStatus == PaymentInfo.TxnStatus.SUCCESS) {
+            return txnStatus;
+        }
+        return PaymentInfo.TxnStatus.COLLECT_INIT;
     }
 
     /**
@@ -407,6 +468,9 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
                 case "WITHDRAWAL_ACTIVE" -> PaymentMessageStatus.WITHDRAWAL_ACTIVE;
                 default -> PaymentMessageStatus.STATUS_UNSET;
             };
+            // WAWebPaymentStatusUtils: unmapped transaction types fall through to STATUS_UNSET
+            case TYPE_UNSET, TYPE_P2P_GRP, TYPE_P2P_NO_INFO, TYPE_FUTURE, TYPE_P2P_REQ_GRP, TYPE_MISSING_DETAILS ->
+                    PaymentMessageStatus.STATUS_UNSET;
         };
     }
 

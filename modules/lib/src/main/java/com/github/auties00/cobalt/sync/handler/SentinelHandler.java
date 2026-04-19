@@ -2,6 +2,9 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
@@ -35,6 +38,7 @@ import java.util.logging.Logger;
  *
  * @implNote WAWebSentinelMutationSync (default export singleton)
  */
+@WhatsAppWebModule(moduleName = "WAWebSentinelMutationSync")
 public final class SentinelHandler implements WebAppStateActionHandler {
     /**
      * Logger for sentinel mutation sync operations.
@@ -51,6 +55,7 @@ public final class SentinelHandler implements WebAppStateActionHandler {
      *
      * @implNote WAWebSentinelMutationSync: var f = new _; Object.freeze(f); l.default = f
      */
+    @WhatsAppWebExport(moduleName = "WAWebSentinelMutationSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final SentinelHandler INSTANCE = new SentinelHandler();
 
     /**
@@ -58,6 +63,7 @@ public final class SentinelHandler implements WebAppStateActionHandler {
      *
      * @implNote WAWebSentinelMutationSync: constructor sets collectionName = CollectionName.RegularLow
      */
+    @WhatsAppWebExport(moduleName = "WAWebSentinelMutationSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private SentinelHandler() {
 
     }
@@ -72,6 +78,7 @@ public final class SentinelHandler implements WebAppStateActionHandler {
      * @return the sentinel action name {@code "sentinel"}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebSentinelMutationSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
         return KeyExpirationAction.ACTION_NAME; // WAWebSentinelMutationSync.getAction: WASyncdConst.Actions.Sentinel = "sentinel"
     }
@@ -87,6 +94,7 @@ public final class SentinelHandler implements WebAppStateActionHandler {
      * @return the sync patch type {@link SyncPatchType#REGULAR_LOW}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebSentinelMutationSync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
         return KeyExpirationAction.COLLECTION_NAME; // WAWebSentinelMutationSync: collectionName = CollectionName.RegularLow = "regular_low"
     }
@@ -100,6 +108,7 @@ public final class SentinelHandler implements WebAppStateActionHandler {
      * @return the version number {@code 3}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebSentinelMutationSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return KeyExpirationAction.ACTION_VERSION; // WAWebSentinelMutationSync.getVersion: return 3
     }
@@ -118,6 +127,7 @@ public final class SentinelHandler implements WebAppStateActionHandler {
      * @return {@code true} if the mutation was applied successfully
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebSentinelMutationSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebSentinelMutationSync.applyMutations: per-mutation processing
     }
@@ -144,6 +154,7 @@ public final class SentinelHandler implements WebAppStateActionHandler {
      * @return the mutation application result
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebSentinelMutationSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.DIRECT)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) { // WAWebSentinelMutationSync.applyMutations: if (e.operation === "set") ... else { i++, return {actionState: Unsupported} }
             return MutationApplicationResult.unsupported();
@@ -184,6 +195,7 @@ public final class SentinelHandler implements WebAppStateActionHandler {
      * @return a list of pending mutations, one per collection type, or an empty
      *         list if no sync key pairs exist
      */
+    @WhatsAppWebExport(moduleName = "WAWebSentinelMutationSync", exports = "getSentinelMutations", adaptation = WhatsAppAdaptation.DIRECT)
     public List<SyncPendingMutation> getSentinelMutations(WhatsAppClient client) {
         LOGGER.fine("preparing mutations..."); // WAWebSentinelMutationSync.getSentinelMutations: p.LOG("preparing mutations...")
 

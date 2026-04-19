@@ -2,6 +2,9 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
@@ -30,12 +33,14 @@ import java.util.List;
  * @implNote WAWebVoipRelayAllCallsSettingSync.default (singleton instance of the
  *           VoipRelayAllCallsSettingSync class extending AccountSyncdActionBase)
  */
+@WhatsAppWebModule(moduleName = "WAWebVoipRelayAllCallsSettingSync")
 public final class VoipRelayAllCallsHandler implements WebAppStateActionHandler {
     /**
      * The singleton instance of {@code VoipRelayAllCallsHandler}.
      *
      * @implNote WAWebVoipRelayAllCallsSettingSync.default — {@code var m = new d; l.default = m}
      */
+    @WhatsAppWebExport(moduleName = "WAWebVoipRelayAllCallsSettingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final VoipRelayAllCallsHandler INSTANCE = new VoipRelayAllCallsHandler();
 
     /**
@@ -44,6 +49,7 @@ public final class VoipRelayAllCallsHandler implements WebAppStateActionHandler 
      * @implNote WAWebVoipRelayAllCallsSettingSync — constructor sets
      *           {@code this.collectionName = WASyncdConst.CollectionName.Regular}
      */
+    @WhatsAppWebExport(moduleName = "WAWebVoipRelayAllCallsSettingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private VoipRelayAllCallsHandler() {
 
     }
@@ -56,6 +62,7 @@ public final class VoipRelayAllCallsHandler implements WebAppStateActionHandler 
      *           {@code "setting_relayAllCalls"}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebVoipRelayAllCallsSettingSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
         return PrivacySettingRelayAllCalls.ACTION_NAME; // WAWebVoipRelayAllCallsSettingSync.getAction
     }
@@ -68,6 +75,7 @@ public final class VoipRelayAllCallsHandler implements WebAppStateActionHandler 
      *           which is {@code "regular"}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebVoipRelayAllCallsSettingSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
         return PrivacySettingRelayAllCalls.COLLECTION_NAME; // WAWebVoipRelayAllCallsSettingSync.collectionName
     }
@@ -78,6 +86,7 @@ public final class VoipRelayAllCallsHandler implements WebAppStateActionHandler 
      * @implNote WAWebVoipRelayAllCallsSettingSync.getVersion — returns {@code 1}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebVoipRelayAllCallsSettingSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return PrivacySettingRelayAllCalls.ACTION_VERSION; // WAWebVoipRelayAllCallsSettingSync.getVersion
     }
@@ -96,6 +105,7 @@ public final class VoipRelayAllCallsHandler implements WebAppStateActionHandler 
      * @return {@code true} if applied successfully, {@code false} otherwise
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebVoipRelayAllCallsSettingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: WAWebVoipRelayAllCallsSettingSync.applyMutations
     }
@@ -131,6 +141,7 @@ public final class VoipRelayAllCallsHandler implements WebAppStateActionHandler 
      * @return the detailed application result
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebVoipRelayAllCallsSettingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) { // WAWebVoipRelayAllCallsSettingSync.applyMutations: if (e.operation === "set") ... else l++, return {actionState: Unsupported}
             return MutationApplicationResult.unsupported(); // WAWebVoipRelayAllCallsSettingSync.applyMutations: {actionState: SyncActionState.Unsupported}
@@ -140,6 +151,12 @@ public final class VoipRelayAllCallsHandler implements WebAppStateActionHandler 
             return MutationApplicationResult.malformed(); // WAWebVoipRelayAllCallsSettingSync.applyMutations: malformedActionValue(t.collectionName)
         }
 
+        // MISMATCH (NULL-SKIP): WA Web tests {@code s == null} where {@code s = r.isEnabled}: when null, it increments
+        // {@code i++} and SKIPS the {@code setRelayAllCallsToUserPrefs} call entirely (still returning Success).
+        // Cobalt's {@link PrivacySettingRelayAllCalls#isEnabled()} coalesces null -> false, so a mutation with
+        // {@code privacySettingRelayAllCalls: {isEnabled: null}} is silently written as "relay disabled" to the store
+        // instead of being a no-op. Per the project-wide "nullable boolean coalesces to false" convention
+        // (see {@code feedback_nullable_bool_accessors.md}), this divergence is accepted.
         client.store().setRelayAllCalls(action.isEnabled()); // ADAPTED: WAWebBackendApi.frontendSendAndReceive("setRelayAllCallsToUserPrefs", {disallowAllP2p: s}) -> direct store call
         return MutationApplicationResult.success(); // WAWebVoipRelayAllCallsSettingSync.applyMutations: {actionState: SyncActionState.Success}
     }
@@ -162,6 +179,7 @@ public final class VoipRelayAllCallsHandler implements WebAppStateActionHandler 
      * @param isEnabled whether VoIP relay-all-calls should be enabled
      * @return the pending mutation ready for sync upload
      */
+    @WhatsAppWebExport(moduleName = "WAWebVoipRelayAllCallsSettingSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPendingMutation getMutation(Instant timestamp, boolean isEnabled) {
         var action = new PrivacySettingRelayAllCallsBuilder() // WAWebVoipRelayAllCallsSettingSync.getMutation: {privacySettingRelayAllCalls: {isEnabled: n}}
                 .isEnabled(isEnabled) // WAWebVoipRelayAllCallsSettingSync.getMutation: isEnabled: n

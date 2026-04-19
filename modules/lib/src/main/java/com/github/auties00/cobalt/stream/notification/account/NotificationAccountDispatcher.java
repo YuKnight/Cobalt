@@ -16,15 +16,17 @@ import com.github.auties00.cobalt.stream.SocketStream;
  * handler and forwards each incoming node to the matching handler. Stanzas
  * with an unrecognised {@code type} are silently ignored.
  *
- * @implNote Adapts the WhatsApp Web notification dispatch that fans out
- *     account notifications to module-specific consumers such as
+ * @implNote Adapts the {@code notification} branch of the {@code tag}-switch in
+ *     {@code WAWebCommsHandleLoggedInStanza.handleLoggedInStanza} that fans out
+ *     account-related notification types to module-specific consumers such as
  *     {@code WAWebHandleAccountSyncNotification},
  *     {@code WAWebHandleContactNotification},
  *     {@code WAWebHandleDisappearingModeNotification},
- *     {@code WAWebHandlePrivacyTokenNotification} and
- *     {@code WAWebHandlePictureNotification}.
+ *     {@code WAWebHandlePrivacyTokensNotification},
+ *     {@code WAWebHandleProfilePicNotification} and
+ *     {@code WAWebHandleAboutNotification}.
  */
-@WhatsAppWebModule(moduleName = "WAWebHandleNotification")
+@WhatsAppWebModule(moduleName = "WAWebCommsHandleLoggedInStanza")
 public final class NotificationAccountDispatcher implements SocketStream.Handler {
     /**
      * Handler for {@code type="account_sync"} notifications.
@@ -71,11 +73,16 @@ public final class NotificationAccountDispatcher implements SocketStream.Handler
      * handler based on the stanza's {@code type} attribute.
      *
      * @param node the incoming notification stanza
-     * @implNote Mirrors the {@code type}-based switch in
-     *     {@code WAWebHandleNotification.handleNotification} for the
-     *     account category.
+     * @implNote Mirrors the account-related cases of the inner
+     *     {@code switch(n.type)} inside the {@code case "notification"}
+     *     branch of {@code WAWebCommsHandleLoggedInStanza.handleLoggedInStanza}:
+     *     {@code account_sync}, {@code contacts}, {@code disappearing_mode},
+     *     {@code picture}, {@code privacy_token} and {@code status}. Stanzas
+     *     with a {@code null} or unrecognised {@code type} are ignored because
+     *     the remaining notification types are dispatched by sibling
+     *     category dispatchers.
      */
-    @WhatsAppWebExport(moduleName = "WAWebHandleNotification", exports = "handleNotification", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebCommsHandleLoggedInStanza", exports = "handleLoggedInStanza", adaptation = WhatsAppAdaptation.ADAPTED)
     @Override
     public void handle(Node node) {
         var type = node.getAttributeAsString("type", null);

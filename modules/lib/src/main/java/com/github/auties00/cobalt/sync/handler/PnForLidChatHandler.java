@@ -2,6 +2,9 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncActionState;
@@ -31,6 +34,7 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  *
  * @implNote WAWebPnForLidChatSync
  */
+@WhatsAppWebModule(moduleName = "WAWebPnForLidChatSync")
 public final class PnForLidChatHandler implements WebAppStateActionHandler {
     /**
      * Canonical stateless instance of this handler.
@@ -41,6 +45,7 @@ public final class PnForLidChatHandler implements WebAppStateActionHandler {
      *
      * @implNote WAWebPnForLidChatSync: {@code m=new d;l.default=m}
      */
+    @WhatsAppWebExport(moduleName = "WAWebPnForLidChatSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final PnForLidChatHandler INSTANCE = new PnForLidChatHandler();
 
     /**
@@ -52,6 +57,7 @@ public final class PnForLidChatHandler implements WebAppStateActionHandler {
      *           {@code new d} instance; Cobalt mirrors this by exposing only
      *           {@link #INSTANCE} and disallowing external construction.
      */
+    @WhatsAppWebExport(moduleName = "WAWebPnForLidChatSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private PnForLidChatHandler() {
 
     }
@@ -64,6 +70,7 @@ public final class PnForLidChatHandler implements WebAppStateActionHandler {
      * @return the action identifier {@code "pnForLidChat"}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebPnForLidChatSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
         return PnForLidChatAction.ACTION_NAME; // WAWebPnForLidChatSync.getAction -> WASyncdConst.Actions.PnForLidChat
     }
@@ -75,6 +82,7 @@ public final class PnForLidChatHandler implements WebAppStateActionHandler {
      * @return {@link SyncPatchType#REGULAR}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebPnForLidChatSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
         return PnForLidChatAction.COLLECTION_NAME; // WAWebPnForLidChatSync: collectionName = WASyncdConst.CollectionName.Regular
     }
@@ -86,6 +94,7 @@ public final class PnForLidChatHandler implements WebAppStateActionHandler {
      * @return {@code 8}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebPnForLidChatSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return PnForLidChatAction.ACTION_VERSION; // WAWebPnForLidChatSync.getVersion: return 8
     }
@@ -105,6 +114,7 @@ public final class PnForLidChatHandler implements WebAppStateActionHandler {
      *         for unsupported or malformed mutations
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebPnForLidChatSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebPnForLidChatSync.applyMutations: {actionState: SyncActionState.Success}
     }
@@ -147,6 +157,7 @@ public final class PnForLidChatHandler implements WebAppStateActionHandler {
      * @return the detailed {@link MutationApplicationResult}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebPnForLidChatSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         // WAWebPnForLidChatSync.applyMutations: if (getABPropConfigValue("pnh_pn_for_lid_chat_sync") !== true) return all Unsupported
         if (!client.abPropsService().getBool(ABProp.PNH_PN_FOR_LID_CHAT_SYNC)) {

@@ -153,17 +153,14 @@ public final class MessageAddonEncryption {
         try {
             // WAUseCaseSecret.createUseCaseSecret
             // Derives a 32-byte addon key from the parent message secret using HKDF-SHA256
-
             var useCaseSecret = deriveUseCaseSecret(messageSecret, stanzaId, originalSender, addonSender, useCaseType);
 
             // WAWebAddonEncryption.encryptAddOn
             // Samples a fresh 12-byte IV for this AES-GCM invocation
-
             var iv = DataUtils.randomByteArray(AES_GCM_IV_SIZE);
 
             // WAWebAddonEncryption.encryptAddOn
             // Initialises the AES-GCM cipher in encrypt mode with the derived key and fresh IV
-
             var cipher = Cipher.getInstance(AES_GCM_ALGORITHM);
             var keySpec = new SecretKeySpec(useCaseSecret, "AES");
             var gcmSpec = new GCMParameterSpec(AES_GCM_TAG_SIZE, iv);
@@ -172,7 +169,6 @@ public final class MessageAddonEncryption {
             // WAWebAddonEncryption.d / WAWebAddonEncryption.encryptAddOn
             // For PollVote and EventResponse the stanzaId and addon sender are mixed into the AAD
             // to prevent cross-user rebinding of encrypted votes or responses
-
             if (useCaseType.usesAad()) {
                 var aad = buildAad(stanzaId, addonSender);
                 cipher.updateAAD(aad);
@@ -180,7 +176,6 @@ public final class MessageAddonEncryption {
 
             // WACryptoAesGcm.gcmEncrypt
             // Finalises encryption and appends the 16-byte GCM auth tag to the ciphertext
-
             var ciphertext = cipher.doFinal(plaintext);
 
             return new MessageEncryptedAddon(ciphertext, iv);
@@ -189,7 +184,6 @@ public final class MessageAddonEncryption {
             // ADAPTED: WAWebAddonEncryption.encryptAddOn
             // WA Web throws DualEncryptionValidationError with ENCRYPTION_ERROR; Cobalt rethrows as RuntimeException
             // because the crypto backend is JCA rather than the Web Crypto API
-
             throw new RuntimeException("Failed to encrypt add-on", e);
         }
     }
@@ -245,12 +239,10 @@ public final class MessageAddonEncryption {
         try {
             // WAUseCaseSecret.createUseCaseSecret
             // Recomputes the 32-byte addon key using the same HKDF derivation as the sender
-
             var useCaseSecret = deriveUseCaseSecret(messageSecret, stanzaId, originalSender, addonSender, useCaseType);
 
             // WAWebAddonEncryption.decryptAddOn
             // Initialises the AES-GCM cipher in decrypt mode with the derived key and stored IV
-
             var cipher = Cipher.getInstance(AES_GCM_ALGORITHM);
             var keySpec = new SecretKeySpec(useCaseSecret, "AES");
             var gcmSpec = new GCMParameterSpec(AES_GCM_TAG_SIZE, encryptedAddon.iv());
@@ -259,7 +251,6 @@ public final class MessageAddonEncryption {
             // WAWebAddonEncryption.d / WAWebAddonEncryption.decryptAddOn
             // Replays the stanzaId plus addon sender AAD for PollVote and EventResponse types,
             // ensuring the ciphertext has not been rebound to a different sender
-
             if (useCaseType.usesAad()) {
                 var aad = buildAad(stanzaId, addonSender);
                 cipher.updateAAD(aad);
@@ -267,13 +258,11 @@ public final class MessageAddonEncryption {
 
             // WACryptoAesGcm.gcmDecrypt
             // Finalises decryption, validates the auth tag, and returns the recovered plaintext
-
             return cipher.doFinal(encryptedAddon.ciphertext());
 
         } catch (GeneralSecurityException e) {
             // ADAPTED: WAWebAddonEncryption.decryptAddOn
             // WA Web throws DualEncryptionValidationError with DECRYPTION_ERROR; Cobalt rethrows as RuntimeException
-
             throw new RuntimeException("Failed to decrypt add-on", e);
         }
     }
@@ -316,12 +305,10 @@ public final class MessageAddonEncryption {
     ) throws NoSuchAlgorithmException, InvalidAlgorithmParameterException {
         // WAUseCaseSecret.createUseCaseSecret
         // Builds the HKDF info by concatenating the stanzaId, original sender, addon sender, and use-case label
-
         var info = buildUseCaseInfo(stanzaId, originalSender, addonSender, useCaseType);
 
         // WACryptoHkdf.extractAndExpand
         // Runs HKDF-SHA256 extract with a null salt and expand with the info parameter to produce 32 bytes
-
         var kdf = KDF.getInstance(HKDF_ALGORITHM);
         var params = HKDFParameterSpec.ofExtract()
                 .addIKM(messageSecret)
@@ -358,7 +345,6 @@ public final class MessageAddonEncryption {
     ) {
         // WAUseCaseSecret.createUseCaseSecret
         // Encodes each info component as UTF-8 bytes
-
         var stanzaIdBytes = stanzaId.getBytes(StandardCharsets.UTF_8);
         var originalSenderBytes = originalSender.toString().getBytes(StandardCharsets.UTF_8);
         var addonSenderBytes = addonSender.toString().getBytes(StandardCharsets.UTF_8);
@@ -366,31 +352,26 @@ public final class MessageAddonEncryption {
 
         // WAUseCaseSecret.createUseCaseSecret
         // Preallocates the output buffer sized to the sum of the four UTF-8 segments
-
         var info = new byte[stanzaIdBytes.length + originalSenderBytes.length + addonSenderBytes.length + useCaseBytes.length];
         var offset = 0;
 
         // WAUseCaseSecret.createUseCaseSecret
         // Writes stanzaId first, matching the Binary.build(stanzaId, ...) argument order
-
         System.arraycopy(stanzaIdBytes, 0, info, offset, stanzaIdBytes.length);
         offset += stanzaIdBytes.length;
 
         // WAUseCaseSecret.createUseCaseSecret
         // Writes the parent original sender as the second segment
-
         System.arraycopy(originalSenderBytes, 0, info, offset, originalSenderBytes.length);
         offset += originalSenderBytes.length;
 
         // WAUseCaseSecret.createUseCaseSecret
         // Writes the addon sender as the third segment
-
         System.arraycopy(addonSenderBytes, 0, info, offset, addonSenderBytes.length);
         offset += addonSenderBytes.length;
 
         // WAUseCaseSecret.createUseCaseSecret
         // Writes the use-case label as the fourth and final segment
-
         System.arraycopy(useCaseBytes, 0, info, offset, useCaseBytes.length);
 
         return info;
@@ -418,31 +399,26 @@ public final class MessageAddonEncryption {
     private static byte[] buildAad(String stanzaId, Jid addonSender) {
         // WAWebAddonEncryption.d
         // Encodes the stanzaId and addon sender JID as UTF-8 before concatenation
-
         var stanzaIdBytes = stanzaId.getBytes(StandardCharsets.UTF_8);
         var senderBytes = addonSender.toString().getBytes(StandardCharsets.UTF_8);
 
         // WAWebAddonEncryption.d
         // Allocates room for stanzaId, the single zero-byte separator, and the sender segment
-
         var aad = new byte[stanzaIdBytes.length + 1 + senderBytes.length];
         var offset = 0;
 
         // WAWebAddonEncryption.d
         // Writes the stanzaId segment first
-
         System.arraycopy(stanzaIdBytes, 0, aad, offset, stanzaIdBytes.length);
         offset += stanzaIdBytes.length;
 
         // WAWebAddonEncryption.d
         // Emits the literal "\0" separator that matches the JS template string
-
         aad[offset] = 0x00;
         offset++;
 
         // WAWebAddonEncryption.d
         // Writes the addon sender JID as the final segment
-
         System.arraycopy(senderBytes, 0, aad, offset, senderBytes.length);
 
         return aad;

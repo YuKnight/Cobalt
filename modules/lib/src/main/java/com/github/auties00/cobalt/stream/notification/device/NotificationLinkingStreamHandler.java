@@ -10,6 +10,7 @@ import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.model.sync.action.device.WaffleAccountLinkStateAction;
 import com.github.auties00.cobalt.stream.SocketStream;
 import com.github.auties00.cobalt.util.DataUtils;
+import com.github.auties00.cobalt.wam.event.ChatMessageCountsEventBuilder;
 
 import java.util.Set;
 
@@ -18,14 +19,21 @@ import java.util.Set;
  * {@link NotificationDeviceDispatcher}.
  * <p>
  * Each {@code handle*} method corresponds to one or more WA Web notification
- * handler modules: companion registration refresh, waffle account linking,
- * hosted coexistence, growth invite, PSA campaign, and newsletter live updates.
+ * handler modules: companion registration refresh, alt device linking,
+ * waffle account linking, hosted coexistence, growth invite, PSA campaign
+ * (with QP-surfaces, QP-prefetch-timestamp and wa_chat sub-cases), and
+ * newsletter live updates.
  *
  * @implNote WAWebHandleCompanionReqRefreshNotification,
+ *     WAWebAltDeviceLinkingHandleNotification,
  *     WAWebAccountLinkingNotificationHandler,
+ *     WAWebAccountLinkingConstants,
  *     WAWebHandleHostedNotification,
  *     WAWebHandleGrowthNotification,
  *     WAWebHandlePsa,
+ *     WAWebHandleQPSurfacesNotification,
+ *     WAWebHandleQPPrefetchTimestampNotification,
+ *     WAWebHandleWaChat,
  *     WAWebHandleNewsletterNotification
  */
 final class NotificationLinkingStreamHandler implements SocketStream.Handler {
@@ -179,7 +187,7 @@ final class NotificationLinkingStreamHandler implements SocketStream.Handler {
      */
     private void handleLinkCodeRefresh(Node node) {
         if (node.hasAttribute("type", "companion_reg_refresh")) { // WAWebHandleCompanionReqRefreshNotification
-            whatsapp.store().setAdvSecretKey(DataUtils.randomByteArray(32)); // WAWebAdvSignatureApi.generateADVSecretKey -- ADAPTED: WA Web stores base64, Cobalt stores raw bytes
+            whatsapp.store().setAdvSecretKey(DataUtils.randomByteArray(32)); // WAWebAdvSignatureApi.generateADVSecretKey, ADAPTED: WA Web stores base64, Cobalt stores raw bytes
             return;
         }
 
@@ -357,6 +365,9 @@ final class NotificationLinkingStreamHandler implements SocketStream.Handler {
         var contact = whatsapp.store()
                 .findContactByJid(receiver)
                 .orElseGet(() -> whatsapp.store().addNewContact(receiver));
+        // WAWebHandleGrowthNotification: gates the ChatMessageCounts emission on whether the chat
+        // did not previously exist (i.e. findLocal returns null before createChat).
+        var chatCreated = whatsapp.store().findChatByJid(receiver).isEmpty();
         whatsapp.store()
                 .findChatByJid(receiver)
                 .orElseGet(() -> whatsapp.store().addNewChat(receiver));
@@ -374,22 +385,78 @@ final class NotificationLinkingStreamHandler implements SocketStream.Handler {
         if (!existed) {
             fireListeners(listener -> listener.onNewContact(whatsapp, contact));
         }
+
+        // WAWebHandleGrowthNotification: new ChatMessageCountsWamEvent({isInviteCreatedThread:true}).commit()
+        // emitted after the fresh invite chat is created.
+        if (chatCreated) {
+            whatsapp.wamService().commit(new ChatMessageCountsEventBuilder()
+                    .isInviteCreatedThread(true)
+                    .build());
+        }
     }
 
     /**
      * Handles {@code psa} (public service announcement) notification stanzas.
      * <p>
-     * The WA Web handler parses campaign metadata (participant, campaign ID,
-     * duration, messages) but only returns an acknowledgment without performing
-     * any behavioral action. Cobalt mirrors this by logging the notification
-     * and relying on the ack sent in the {@code finally} block of
+     * When the stanza's {@code from} attribute is the announcements
+     * ({@code PSA_JID}) account, the first child's tag selects a sub-handler:
+     * <ul>
+     *   <li>{@code surfaces} - quick promotion surfaces update
+     *       ({@code WAWebHandleQPSurfacesNotification}).</li>
+     *   <li>{@code reset_smb_last_qp_prefetch_timestamp} - SMB quick
+     *       promotion prefetch timestamp reset
+     *       ({@code WAWebHandleQPPrefetchTimestampNotification}).</li>
+     *   <li>any other first child - routed to {@code WAWebHandleWaChat} when
+     *       the A/B prop {@code enable_client_chat_psa} is enabled, otherwise
+     *       handled by {@code WAWebHandlePsa}.</li>
+     * </ul>
+     * When the {@code from} attribute is {@code STATUS_JID}, the stanza is
+     * handled directly by {@code WAWebHandlePsa}, which only returns an ack.
+     * <p>
+     * Cobalt does not have local quick-promotion or in-app PSA campaign
+     * infrastructure; these sub-cases are therefore logged and the caller
+     * acknowledges the stanza via the {@code finally} block of
      * {@link #handle(Node)}.
      *
      * @param node the notification stanza node
-     * @implNote WAWebHandlePsa.default
+     * @implNote WAWebHandlePsa.default,
+     *     WAWebHandleQPSurfacesNotification.handleQPSurfacesNotification,
+     *     WAWebHandleQPPrefetchTimestampNotification.handleQPPrefetchTimestampNotification,
+     *     WAWebHandleWaChat.default
      */
     private void handlePsa(Node node) {
-        // WAWebHandlePsa: parses but only returns ack, no behavioral action
+        // WAWebCommsHandleLoggedInStanza.handleLoggedInStanza: if (from === PSA_JID) dispatch on first child tag
+        var from = node.getAttributeAsJid("from").orElse(null);
+        if (from != null && from.equals(Jid.announcementsAccount())) {
+            var firstChild = node.getChild().orElse(null);
+            var firstChildTag = firstChild == null ? null : firstChild.description();
+            if ("surfaces".equals(firstChildTag)) {
+                // WAWebHandleQPSurfacesNotification.handleQPSurfacesNotification: updateQPSurfacesFromNotification
+                // NO_WA_BASIS: Cobalt has no local quick-promotion infrastructure; skip with log.
+                LOGGER.log(System.Logger.Level.DEBUG,
+                        "Ignoring QP surfaces psa notification: {0}",
+                        node.getAttributeAsString("id", "<missing>"));
+                return;
+            }
+            if ("reset_smb_last_qp_prefetch_timestamp".equals(firstChildTag)) {
+                // WAWebHandleQPPrefetchTimestampNotification.handleQPPrefetchTimestampNotification:
+                //     qpGraphQLEnabledSMB() && fireAndForget("fetchQuickPromotionsNow")
+                // NO_WA_BASIS: Cobalt has no local quick-promotion infrastructure; skip with log.
+                LOGGER.log(System.Logger.Level.DEBUG,
+                        "Ignoring QP prefetch timestamp psa notification: {0}",
+                        node.getAttributeAsString("id", "<missing>"));
+                return;
+            }
+            // WAWebCommsHandleLoggedInStanza: if (enable_client_chat_psa AB prop) WAWebHandleWaChat(e) else WAWebHandlePsa(e)
+            // WAWebHandleWaChat parses a chat message from PSA_JID and pushes it through processDecryptedMessageProto.
+            // NO_WA_BASIS: Cobalt has no in-app PSA campaign / wa_chat message pipeline; skip with log.
+            LOGGER.log(System.Logger.Level.DEBUG,
+                    "Ignoring wa_chat/psa notification from PSA_JID: {0}",
+                    firstChildTag);
+            return;
+        }
+
+        // WAWebHandlePsa: parses campaign metadata but only returns ack, no behavioral action
         LOGGER.log(System.Logger.Level.DEBUG,
                 "Ignoring psa notification: {0}",
                 firstChildDescription(node));

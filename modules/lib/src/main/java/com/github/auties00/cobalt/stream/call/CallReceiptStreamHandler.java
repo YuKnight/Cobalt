@@ -4,6 +4,7 @@ import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
+import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.stream.SocketStream;
@@ -100,15 +101,17 @@ public final class CallReceiptStreamHandler implements SocketStream.Handler {
         }
 
         // WAWebHandleVoipCallReceipt: VoIP stack signaling and TC token fetching omitted (no VoIP media runtime in Cobalt)
-
         var stanzaId = node.getAttributeAsString("id", null); // WAWebHandleVoipCallReceipt: a.stanzaId = attrString("id")
         var type = node.getAttributeAsString("type", null); // WAWebHandleVoipCallReceipt: a.type = maybeAttrString("type")
         var selfDevice = whatsapp.store().jid().orElse(null);
         if (stanzaId == null || selfDevice == null) {
             return;
         }
-        // WAWebHandleVoipCallReceipt: JID(getMePnUserOrThrow_DO_NOT_USE()) where getMePnUserOrThrow_DO_NOT_USE() = asUserWidOrThrow(meDevicePn) — strip the device/agent to get the user-level PN.
-        var meJid = selfDevice.toUserJid();
+        // WAWebHandleVoipCallReceipt selects from: e.isLid() ? getMeDeviceLidOrThrow() : getMePnUserOrThrow_DO_NOT_USE()
+        // For LID peers WA Web preserves the device-suffixed LID; for PN peers it strips device to the user-level PN.
+        // ADAPTED: Cobalt stores only a single meLid which may or may not carry a device suffix, so the LID branch
+        // falls through to whatsapp.store().lid() which mirrors WAWebUserPrefsMeUser.getMeDeviceLidOrThrow semantics.
+        var meJid = resolveFrom(from, selfDevice); // WAWebHandleVoipCallReceipt: from = e.isLid() ? getMeDeviceLidOrThrow() : getMePnUserOrThrow_DO_NOT_USE()
 
         var ack = new NodeBuilder() // WAWebHandleVoipCallReceipt: WAWap.wap("ack", {...})
                 .description("ack") // WAWebHandleVoipCallReceipt: "ack"
@@ -119,6 +122,32 @@ public final class CallReceiptStreamHandler implements SocketStream.Handler {
                 .attribute("type", type) // WAWebHandleVoipCallReceipt: type: MAYBE_CUSTOM_STRING(c)
                 .build();
         whatsapp.sendNodeWithNoResponse(ack); // ADAPTED: WAWebHandleVoipCallReceipt returns the ack stanza as response
+    }
+
+    /**
+     * Resolves the {@code from} JID for an outgoing call-receipt ack based on
+     * the peer's address type.
+     *
+     * <p>When the peer JID is a LID, WA Web attaches the device-suffixed LID
+     * via {@code getMeDeviceLidOrThrow}; otherwise it attaches the device-less
+     * user PN via {@code getMePnUserOrThrow_DO_NOT_USE}.
+     *
+     * @param peer       the peer JID taken from the {@code from} attribute of
+     *                   the incoming receipt
+     * @param selfDevice the local device JID obtained from
+     *                   {@link com.github.auties00.cobalt.store.WhatsAppStore#jid()}
+     * @return the JID to use on the outgoing ack's {@code from} attribute
+     * @implNote WAWebHandleVoipCallReceipt:
+     *           {@code from: e.isLid() ? getMeDeviceLidOrThrow() : getMePnUserOrThrow_DO_NOT_USE()}.
+     *           ADAPTED: Cobalt tracks a single {@code meLid} whose device
+     *           suffix is preserved exactly as the server sent it, so
+     *           {@code store.lid()} replaces {@code getMeDeviceLidOrThrow}.
+     */
+    private Jid resolveFrom(Jid peer, Jid selfDevice) {
+        if (peer.hasLidServer()) { // WAWebHandleVoipCallReceipt: e.isLid()
+            return whatsapp.store().lid().orElse(selfDevice); // WAWebUserPrefsMeUser.getMeDeviceLidOrThrow
+        }
+        return selfDevice.toUserJid(); // WAWebUserPrefsMeUser.getMePnUserOrThrow_DO_NOT_USE = asUserWidOrThrow(meDevicePn)
     }
 
     /**

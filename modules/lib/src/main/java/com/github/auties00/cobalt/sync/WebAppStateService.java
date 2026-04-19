@@ -6,6 +6,9 @@ import com.github.auties00.cobalt.exception.WhatsAppMediaException;
 import com.github.auties00.cobalt.exception.WhatsAppWebAppStateSyncException;
 import com.github.auties00.cobalt.message.send.id.MessageIdGenerator;
 import com.github.auties00.cobalt.message.send.id.MessageIdVersion;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfoBuilder;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.media.ExternalBlobReference;
@@ -60,8 +63,64 @@ import java.util.logging.Logger;
  *     to {@code SyncPatchType.isCritical()}),
  *     WAWebSyncdOrphan (orphan mutation retry), WAWebSyncdResolveConflict (conflict resolution),
  *     WAWebSyncdFatal (fatal error handling), WAWebSyncdDisabled (isSyncdDisabled — always
- *     {@code false} in Cobalt since it is never a Web Worker)
+ *     {@code false} in Cobalt since it is never a Web Worker).
+ *     WAWebSyncdCollectionHandlerTypesConverter (type-shape converters between encrypted upload
+ *     mutations, stored sync actions, and decrypted mutations) — all four exports are absorbed
+ *     into inline conversions because Cobalt carries decoded {@code SyncActionValue} objects in
+ *     {@code SyncActionEntry.actionValue()} and {@code UploadedMutationInfo.actionValue()} instead
+ *     of WA Web's re-serialized {@code binarySyncData} byte buffers. Specifically:
+ *     {@code syncActionToSyncData} (decode {@code SyncActionValue} → wrap in {@code SyncActionData} →
+ *     re-encode) is ADAPTED-away — Cobalt never produces a {@code binarySyncData} blob because
+ *     downstream consumers use the decoded object directly;
+ *     {@code encryptedUploadMutationsToSyncActions} and {@code setMutationToSyncAction} are inlined
+ *     in {@link #processUploadSuccess} where {@code UploadedMutationInfo} is converted to
+ *     {@code SyncActionEntry} via {@code SyncActionEntryBuilder};
+ *     {@code syncActionsToDecryptedMutation} is inlined in {@link #processRecoveredSnapshot} where
+ *     recovered records are materialized as {@code DecryptedMutation.Trusted} with a forced
+ *     {@code SyncdOperation.SET}.
+ *     <p>WAWebSyncdBridgeApi (worker-to-frontend facade exposing {@code SyncdBridgeApi}):
+ *     {@code checkOrphanMutations} is mapped to {@link #checkOrphanMutations};
+ *     {@code getDeviceFingerprint} is mapped to
+ *     {@code SyncKeyRotationService.getCurrentDeviceFingerprint} (owned by that service);
+ *     {@code handleSyncdFatal} is ADAPTED — Cobalt throws a {@link WhatsAppWebAppStateSyncException}
+ *     subtype (fatal flag) instead of invoking a fatal callback, per the Cobalt error model;
+ *     {@code triggerAppStateSyncCompletedFromBridge} is N/A — Cobalt runs in a single process and
+ *     has no cross-frame bridge (guarded by {@code WAWebSyncdDisabled.isSyncdDisabled} which is
+ *     always {@code false} here).
+ *     <p>WAWebSyncdDbCallbacksApi (DB-callback facade wired into the collection handler):
+ *     {@code handleSyncBeforeApplyPatch} is absorbed into
+ *     {@link com.github.auties00.cobalt.sync.handler.AndroidUnsupportedActionsHandler} which
+ *     applies {@code updatePrimaryAllowsAllMutationsFlag} on the {@code deviceIndex === 0} path;
+ *     {@code handleSyncCompleted} is N/A — Cobalt has no {@code BackendEventBus} and exposes sync
+ *     completion through return of the public sync entry points;
+ *     {@code handleSyncDelayApplyingPatchUntilUIUnblocks} is N/A — Cobalt has no UI blocking,
+ *     {@code waitForOfflineDeliveryEnd} is awaited directly at call sites (see
+ *     {@link com.github.auties00.cobalt.store.WhatsAppStore#waitForOfflineDeliveryEnd});
+ *     {@code handleSyncdFatal} is handled by {@link #handleSyncError} (fatal branch);
+ *     {@code writeSyncdLog}/{@code printSyncdLog} are pass-throughs to {@code WAWebSyncdLogs}
+ *     and are folded into {@link Logger} calls at relevant sites (see
+ *     {@code MutationLTHash}/{@code MutationIntegrityVerifier} diagnostics);
+ *     {@code bulkGetAccountLid} is ADAPTED — Cobalt does not perform the LID-account resolution
+ *     step before per-chat orphan retry, see {@link #checkOrphanMutations} {@code "Account"} call;
+ *     {@code getAdditionalHistoryChatIds}, {@code getAdditionalLidMsgKeys}, and
+ *     {@code getAdditionalHistoryChatIdMsgKeys} are ADAPTED — LID 1:1 migration key rewriting is
+ *     handled by the store layer rather than enriched into orphan retry key lists, see
+ *     {@link #checkOrphanMessages} and {@link #checkOrphanChats}.
  */
+@WhatsAppWebModule(moduleName = "WAWebSyncd")
+@WhatsAppWebModule(moduleName = "WAWebSyncdCollectionHandlerTypesConverter")
+@WhatsAppWebModule(moduleName = "WAWebSyncdCollectionUtils")
+@WhatsAppWebModule(moduleName = "WAWebSyncdDbCallbacksApi")
+@WhatsAppWebModule(moduleName = "WAWebSyncdMMSDownload")
+@WhatsAppWebModule(moduleName = "WAWebSyncdNetCallbacksApi")
+@WhatsAppWebModule(moduleName = "WAWebGetCollectionVersion")
+@WhatsAppWebModule(moduleName = "WAWebGetSyncAction")
+@WhatsAppWebModule(moduleName = "WAWebSyncdBridgeApi")
+@WhatsAppWebModule(moduleName = "WAWebSyncdCollectionsStateMachine")
+@WhatsAppWebModule(moduleName = "WAWebSyncdDisabled")
+@WhatsAppWebModule(moduleName = "WAWebSyncdFatal")
+@WhatsAppWebModule(moduleName = "WAWebSyncdFatalExceptionNotificationApi")
+@WhatsAppWebModule(moduleName = "WAWebSyncdServerSync")
 public final class WebAppStateService {
     private static final Logger LOGGER = Logger.getLogger(WebAppStateService.class.getName());
 
@@ -103,7 +162,7 @@ public final class WebAppStateService {
         // missingSyncKeyTimeoutScheduler.scheduleTimeoutCheck() inline,
         // mirroring WAWebSyncdStoreMissingKeys.addMissingKeys.
         this.missingSyncKeyRequestService.setTimeoutScheduler(missingSyncKeyTimeoutScheduler);
-        this.syncKeyRotationService = new SyncKeyRotationService(whatsapp, abPropsService);
+        this.syncKeyRotationService = new SyncKeyRotationService(whatsapp, this, abPropsService);
         this.snapshotRecoveryService = snapshotRecoveryService;
     }
 
@@ -115,6 +174,7 @@ public final class WebAppStateService {
      * @param patchType the collection type to sync
      * @param patches the patches to push
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncd", exports = "markCollectionsForSync", adaptation = WhatsAppAdaptation.ADAPTED)
     public void pushPatches(SyncPatchType patchType, SequencedCollection<SyncPendingMutation> patches) {
         syncKeyRotationService.ensureActiveKey(true); // WAWebSyncdKeyManagement.getActiveKey
 
@@ -132,6 +192,7 @@ public final class WebAppStateService {
      * @implNote WAWebSyncd.markCollectionsForSync (pull path), WAWebSyncd.V
      * @param patchTypes the collection types to sync
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncd", exports = "markCollectionsForSync", adaptation = WhatsAppAdaptation.ADAPTED)
     public void pullPatches(SyncPatchType... patchTypes) {
         var allCollections = new LinkedHashSet<SyncPatchType>(); // ADAPTED: WAWebSyncd.V: n = t != null ? yield H(e,t) : e (no server version filter in pull path)
         Collections.addAll(allCollections, patchTypes); // WAWebSyncd.V: collections list
@@ -169,6 +230,7 @@ public final class WebAppStateService {
      *
      * @implNote WAWebSyncd.syncBlockedCollections (J)
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncd", exports = "syncBlockedCollections", adaptation = WhatsAppAdaptation.DIRECT)
     public void syncBlockedCollections() {
         var blockedCollections = new ArrayList<SyncPatchType>(); // WAWebSyncd.J: var t = getCollectionsInStateBlocked()
         for (var patchType : SyncPatchType.values()) { // WAWebSyncd.J: iterates blocked collections
@@ -193,6 +255,7 @@ public final class WebAppStateService {
      * @implNote WAWebSyncd.getInFlightCollections (me)
      * @return an unmodifiable set of in-flight collection types
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncd", exports = "getInFlightCollections", adaptation = WhatsAppAdaptation.ADAPTED)
     public Set<SyncPatchType> getInFlightCollections() {
         var result = new LinkedHashSet<SyncPatchType>(); // WAWebSyncd.me: return A
         for (var patchType : SyncPatchType.values()) { // ADAPTED: WAWebSyncd uses module-level Set A; Cobalt derives from store state
@@ -214,6 +277,7 @@ public final class WebAppStateService {
      * @implNote WAWebSyncd.getPendingCollections (pe)
      * @return an unmodifiable set of pending collection types
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncd", exports = "getPendingCollections", adaptation = WhatsAppAdaptation.ADAPTED)
     public Set<SyncPatchType> getPendingCollections() {
         var result = new LinkedHashSet<SyncPatchType>(); // WAWebSyncd.pe: return F
         for (var patchType : SyncPatchType.values()) { // ADAPTED: WAWebSyncd uses module-level Set F; Cobalt derives from store state
@@ -240,6 +304,7 @@ public final class WebAppStateService {
      *           WAWebSyncdServerSync.L (buildAndSendIq)
      * @param patchTypes the non-critical collection types to sync
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdServerSync", exports = "serverSync", adaptation = WhatsAppAdaptation.ADAPTED)
     private void syncCollectionsBatched(Set<SyncPatchType> patchTypes) {
         // WAWebSyncdServerSync.L: collectionsToSkip + collectionWithPendingMutationsIds
         var collectionPatches = new LinkedHashMap<SyncPatchType, SequencedCollection<SyncPendingMutation>>();
@@ -343,8 +408,15 @@ public final class WebAppStateService {
      * all orphan mutations are retried across every collection. This is used on
      * app resume to resolve any orphans accumulated while the app was suspended.
      *
-     * @implNote WAWebSyncdOrphan.applyAllOrphansAndUnsupported
+     * @implNote WAWebSyncdOrphan.applyAllOrphansAndUnsupported — ADAPTED: Cobalt splits the
+     *     underlying {@code getSyncActionsByActionStatesInTransaction([Orphan, Unsupported])}
+     *     scan into a dedicated orphan table ({@link WhatsAppStore#findOrphanMutations}) plus
+     *     a filter pass over {@link WhatsAppStore#getSyncActionEntries} keyed on
+     *     {@link SyncActionState#UNSUPPORTED}. The per-patch-type loop below subsumes WA Web's
+     *     single cross-collection action-state query.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdOrphan", exports = "applyAllOrphansAndUnsupported", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebGetSyncAction", exports = "getSyncActionsByActionStatesInTransaction", adaptation = WhatsAppAdaptation.ADAPTED)
     public void retryAllOrphanMutations() {
         for (var patchType : SyncPatchType.values()) { // WAWebSyncdOrphan.applyAllOrphansAndUnsupported: getSyncActionsByActionStatesInTransaction([Orphan, Unsupported])
             retryOrphanMutations(patchType); // WAWebSyncdOrphan.applyAllOrphansAndUnsupported -> applyIndividualMutations (orphan portion)
@@ -352,21 +424,33 @@ public final class WebAppStateService {
     }
 
     /**
-     * Retries orphan mutations matching the specified message and chat identifiers.
+     * Retries orphan mutations matching the specified message, chat, and thread identifiers.
      *
      * <p>Per WhatsApp Web {@code WAWebSyncdOrphan.checkOrphanMutations}: when new messages
      * or chats become available (e.g. from history sync or incoming messages), orphans matching
      * those specific entity IDs are retried. Delegates to {@link #checkOrphanMessages},
-     * {@link #checkOrphanChats}, and account-level orphan retry in parallel.
+     * {@link #checkOrphanChats}, account-level orphan retry, and {@link #checkOrphanThreads}
+     * (when {@code threadIds} is non-empty) in parallel.
      *
-     * @implNote WAWebSyncdOrphan.checkOrphanMutations
-     * @param msgIds  the message identifiers to match for {@code Msg}-type orphans
-     * @param chatIds the chat identifiers to match for {@code Chat}-type and {@code Account}-type orphans
+     * <p>This method is also exposed as {@code SyncdBridgeApi.checkOrphanMutations} via the
+     * {@code WAWebSyncdBridgeApi} facade, which destructures a {@code {chatIds, msgIds, threadIds}}
+     * descriptor before delegating to {@code WAWebSyncdOrphan.checkOrphanMutations}.
+     *
+     * @implNote WAWebSyncdOrphan.checkOrphanMutations; also WAWebSyncdBridgeApi.SyncdBridgeApi.checkOrphanMutations
+     *           (pass-through facade over the orphan module)
+     * @param msgIds    the message identifiers to match for {@code Msg}-type orphans
+     * @param chatIds   the chat identifiers to match for {@code Chat}-type and {@code Account}-type orphans
+     * @param threadIds the thread identifiers to match for {@code Thread}-type orphans; {@code null} or empty skips threads
      */
-    public void checkOrphanMutations(Collection<String> msgIds, Collection<String> chatIds) {
+    @WhatsAppWebExport(moduleName = "WAWebSyncdOrphan", exports = "checkOrphanMutations", adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WAWebSyncdBridgeApi", exports = "SyncdBridgeApi", adaptation = WhatsAppAdaptation.ADAPTED)
+    public void checkOrphanMutations(Collection<String> msgIds, Collection<String> chatIds, Collection<String> threadIds) {
         checkOrphanMessages(msgIds); // WAWebSyncdOrphan.checkOrphanMutations: C(e)
         checkOrphanChats(chatIds); // WAWebSyncdOrphan.checkOrphanMutations: v(t)
         retryOrphanMutationsByModelIds(chatIds, "Account"); // WAWebSyncdOrphan.checkOrphanMutations: bulkGetAccountLid(t).then(R) — ADAPTED: Cobalt uses chatIds directly, WA Web resolves LID accounts first
+        if (threadIds != null && !threadIds.isEmpty()) { // WAWebSyncdOrphan.checkOrphanMutations: r != null && r.length > 0 ? D(r) : void 0
+            checkOrphanThreads(threadIds); // WAWebSyncdOrphan.checkOrphanMutations: D(r)
+        }
     }
 
     /**
@@ -379,6 +463,7 @@ public final class WebAppStateService {
      * @implNote WAWebSyncdOrphan.checkOrphanMessages
      * @param msgIds the message identifiers to check
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdOrphan", exports = "checkOrphanMessages", adaptation = WhatsAppAdaptation.ADAPTED)
     public void checkOrphanMessages(Collection<String> msgIds) {
         if (msgIds == null || msgIds.isEmpty()) { // ADAPTED: defensive null check
             return;
@@ -396,11 +481,29 @@ public final class WebAppStateService {
      * @implNote WAWebSyncdOrphan.checkOrphanChats
      * @param chatIds the chat identifiers to check
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdOrphan", exports = "checkOrphanChats", adaptation = WhatsAppAdaptation.ADAPTED)
     public void checkOrphanChats(Collection<String> chatIds) {
         if (chatIds == null || chatIds.isEmpty()) { // ADAPTED: defensive null check
             return;
         }
         retryOrphanMutationsByModelIds(chatIds, "Chat"); // WAWebSyncdOrphan.checkOrphanChats -> E(keys, SyncModelType.Chat) — ADAPTED: Cobalt skips getAdditionalHistoryChatIds enrichment (LID resolution handled by store)
+    }
+
+    /**
+     * Retries orphan mutations of model type {@code Thread} matching the specified thread identifiers.
+     *
+     * <p>Per WhatsApp Web {@code WAWebSyncdOrphan.checkOrphanThreads}: delegates directly to the
+     * private helper {@code E} with {@code SyncModelType.Thread}.
+     *
+     * @implNote WAWebSyncdOrphan.checkOrphanThreads
+     * @param threadIds the thread identifiers to check
+     */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdOrphan", exports = "checkOrphanThreads", adaptation = WhatsAppAdaptation.DIRECT)
+    public void checkOrphanThreads(Collection<String> threadIds) {
+        if (threadIds == null || threadIds.isEmpty()) { // ADAPTED: defensive null check
+            return;
+        }
+        retryOrphanMutationsByModelIds(threadIds, "Thread"); // WAWebSyncdOrphan.checkOrphanThreads -> E(e, SyncModelType.Thread)
     }
 
     /**
@@ -412,6 +515,7 @@ public final class WebAppStateService {
      * @implNote WAWebSyncdOrphan.checkOrphanAgents
      * @param agentIds the agent identifiers to check
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdOrphan", exports = "checkOrphanAgents", adaptation = WhatsAppAdaptation.DIRECT)
     public void checkOrphanAgents(Collection<String> agentIds) {
         retryOrphanMutationsByModelIds(agentIds, "Agent"); // WAWebSyncdOrphan.checkOrphanAgents -> E(e, SyncModelType.Agent)
     }
@@ -425,6 +529,7 @@ public final class WebAppStateService {
      * @implNote WAWebSyncdOrphan.checkOrphanChatAssignments
      * @param assignmentIds the chat assignment identifiers to check
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdOrphan", exports = "checkOrphanChatAssignments", adaptation = WhatsAppAdaptation.DIRECT)
     public void checkOrphanChatAssignments(Collection<String> assignmentIds) {
         retryOrphanMutationsByModelIds(assignmentIds, "ChatAssignment"); // WAWebSyncdOrphan.checkOrphanChatAssignments -> E(e, SyncModelType.ChatAssignment)
     }
@@ -438,6 +543,7 @@ public final class WebAppStateService {
      * @implNote WAWebSyncdOrphan.checkOrphanUserStatusMutes
      * @param contactIds the contact identifiers to check
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdOrphan", exports = "checkOrphanUserStatusMutes", adaptation = WhatsAppAdaptation.DIRECT)
     public void checkOrphanUserStatusMutes(Collection<String> contactIds) {
         retryOrphanMutationsByModelIds(contactIds, "UserStatusMute"); // WAWebSyncdOrphan.checkOrphanUserStatusMutes -> E(e, SyncModelType.UserStatusMute)
     }
@@ -449,10 +555,15 @@ public final class WebAppStateService {
      * matching both the entity key and the model type, then applies them via individual mutation
      * retry. This is the core helper that all type-specific orphan check methods delegate to.
      *
-     * @implNote WAWebSyncdOrphan.E
+     * @implNote WAWebSyncdOrphan.E — calls {@code getSyncActionsByModelInfosInTransaction}
+     *     with {@code (modelType, keys)} tuples. Cobalt queries its orphan table per patch type
+     *     (see {@link WhatsAppStore#findOrphanMutations}) and filters in-memory by
+     *     {@code modelType} and {@code modelId} membership, since Cobalt keeps only orphan-state
+     *     entries in the dedicated orphan table rather than a generic sync-action table.
      * @param modelIds  the entity identifiers to match
      * @param modelType the model type to filter by (e.g. {@code "Msg"}, {@code "Chat"})
      */
+    @WhatsAppWebExport(moduleName = "WAWebGetSyncAction", exports = "getSyncActionsByModelInfosInTransaction", adaptation = WhatsAppAdaptation.ADAPTED)
     private void retryOrphanMutationsByModelIds(Collection<String> modelIds, String modelType) {
         if (modelIds == null || modelIds.isEmpty()) { // ADAPTED: defensive null check
             return;
@@ -487,6 +598,7 @@ public final class WebAppStateService {
      *
      * @implNote WAWebSyncdOrphan.checkOrphanFavoriteStickers, WAWebSyncdOrphan.w
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdOrphan", exports = "checkOrphanFavoriteStickers", adaptation = WhatsAppAdaptation.DIRECT)
     public void checkOrphanFavoriteStickers() {
         if (!store.primaryFeatures().contains("favorite_sticker")) { // WAWebSyncdOrphan.checkOrphanFavoriteStickers: isFavoriteStickersEnabled
             return; // WAWebSyncdOrphan.checkOrphanFavoriteStickers: not enabled, early return
@@ -503,10 +615,16 @@ public final class WebAppStateService {
      * the specified {@code modelType}, and if the optional {@code condition} evaluates to
      * {@code true} (or is {@code null}), applies them via individual mutation retry.
      *
-     * @implNote WAWebSyncdOrphan.w
+     * @implNote WAWebSyncdOrphan.w — ADAPTED: calls
+     *     {@code getOrphanSyncActionsByModelTypeInTransaction(modelType)} which filters the
+     *     generic sync-action table down to {@code SyncActionState.Orphan} entries whose
+     *     {@code modelType} casts to the requested type. Cobalt achieves the same result by
+     *     iterating the dedicated orphan table ({@link WhatsAppStore#findOrphanMutations}) per
+     *     patch type and matching {@code modelType} string equality.
      * @param modelType the model type string to filter orphans by (e.g. {@code "favoriteSticker"})
      * @param condition an optional gate; if non-null and returns {@code false}, mutations are not applied
      */
+    @WhatsAppWebExport(moduleName = "WAWebGetSyncAction", exports = "getOrphanSyncActionsByModelTypeInTransaction", adaptation = WhatsAppAdaptation.ADAPTED)
     private void retryOrphanMutationsByModelType(String modelType, BooleanSupplier condition) {
         var allMatching = new ArrayList<Map.Entry<SyncPatchType, List<OrphanMutationEntry>>>(); // WAWebSyncdOrphan.w: getOrphanSyncActionsByModelTypeInTransaction
         for (var patchType : SyncPatchType.values()) {
@@ -556,6 +674,8 @@ public final class WebAppStateService {
      * @implNote WAWebSyncd.initializeStateMachine (ue), WAWebSyncd.processOnAppResume (ce/de),
      *           WAWebSyncd.ae (state machine tick), WAWebSyncd.le/se (syncPendingMutationsAndBlockedCollections)
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncd", exports = "initializeStateMachine", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebSyncd", exports = "processOnAppResume", adaptation = WhatsAppAdaptation.ADAPTED)
     public void resumeAfterRestart() {
         // ADAPTED: WAWebSyncd.ue: loadStatesFromDb() -> Cobalt stores state in-memory
         var collectionsToSync = new LinkedHashSet<SyncPatchType>();
@@ -656,9 +776,17 @@ public final class WebAppStateService {
      *
      * @implNote WAWebSyncd.scheduleSyncCollections (Z/ee),
      *           WAWebSyncdServerSync.serverSync (outer retry loop: C=500 iteration cap),
-     *           WAWebSyncdServerSync.S (syncRound), WAWebSyncdServerSync.L (buildAndSendIq)
+     *           WAWebSyncdServerSync.S (syncRound), WAWebSyncdServerSync.L (buildAndSendIq).
+     *           <p>ADAPTED: WA Web's {@code serverSync} has a dual cap
+     *           {@code l < y || (i.length > 0 && l < C)} with {@code y=5} acting as a minimum
+     *           iteration floor before early exit on an empty refetch queue. Cobalt loops while
+     *           the collection state is not {@code UP_TO_DATE} and caps at {@code C=500}; the
+     *           {@code y=5} floor is not modeled because Cobalt exits exactly when WA Web's refetch
+     *           queue would be empty (state becomes {@code UP_TO_DATE}), so the extra floor has no
+     *           observable effect here.
      * @param patchType the collection type to sync
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdServerSync", exports = "serverSync", adaptation = WhatsAppAdaptation.ADAPTED)
     private void syncCollection(SyncPatchType patchType) {
         var iterations = 0; // WAWebSyncdServerSync.serverSync: l (single iteration counter, caps at C=500)
         while(store.findWebAppState(patchType).state() != SyncCollectionState.UP_TO_DATE) {
@@ -766,6 +894,7 @@ public final class WebAppStateService {
      *     WAWebSyncdValidateMutations (duplicate index/version validation)
      * @param syncResponse the parsed sync response for a single collection
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdCollectionHandler", exports = "applyAppStateSyncResponse", adaptation = WhatsAppAdaptation.ADAPTED)
     private void handleSyncResponse(MutationSyncResponse syncResponse) {
         var collectionName = syncResponse.collectionName();
         // WAWebSyncdCollectionHandler.applyAppStateSyncResponse: capture pre-sync state
@@ -932,13 +1061,13 @@ public final class WebAppStateService {
             // function G). Hoisting the check here avoids the per-patch valueMacs list allocation
             // and the HMAC setup performed inside verifyPatchIntegrity. The internal guard inside
             // MutationIntegrityVerifier.verifyPatchIntegrity is retained as defense in depth.
-            if (!store.findWebAppState(collectionName).macMismatch()) {
+            if (!store.findWebAppState(collectionName).macMismatch()) { // WAWebGetCollectionVersion.getIsCollectionInMacMismatchFatalInTransaction: n.get(e).then(e => e?.isCollectionInMacMismatchFatal)
                 var patchValueMacs = untrusted.stream()
                         .map(DecryptedMutation.Untrusted::valueMac)
                         .toList();
                 var snapshotMacValid = integrityVerifier.verifyPatchIntegrity(collectionName, patch, newHash.newHash(), patchValueMacs);
                 if (!snapshotMacValid) {
-                    store.markWebAppStateMacMismatch(collectionName);
+                    store.markWebAppStateMacMismatch(collectionName); // WAWebGetCollectionVersion.updateIsCollectionInMacMismatchFatalInTransaction: n.update(e, {isCollectionInMacMismatchFatal: !0})
                     LOGGER.warning("Patch snapshot MAC mismatch for " + collectionName + " at version " + patchVersion + ", marking mac-mismatch");
                 }
             }
@@ -978,9 +1107,32 @@ public final class WebAppStateService {
      * mutations to sync actions, removes REMOVE mutation entries, and atomically
      * updates the collection state.
      *
-     * @implNote WAWebSyncdCollectionHandler.$e (_uploadSuccessful — post-upload persistence)
+     * @implNote WAWebSyncdCollectionHandler.$e (_uploadSuccessful — post-upload persistence).
+     *     ADAPTED: WAWebSyncdCollectionHandlerTypesConverter.encryptedUploadMutationsToSyncActions —
+     *     WA Web maps each encrypted upload mutation (fields: {@code index}, {@code action},
+     *     {@code binarySyncAction}, {@code version}, {@code keyId}, {@code indexMac},
+     *     {@code valueMac}, {@code collection}, {@code timestamp}) into a sync action entry
+     *     (fields: {@code index}, {@code action}, {@code binarySyncData}, {@code actionState},
+     *     {@code version}, {@code keyId}, {@code indexMac}, {@code valueMac}, {@code collection},
+     *     {@code timestamp}) via a {@code .map(...)} that also calls {@code syncActionToSyncData}
+     *     to re-serialize the value blob. In Cobalt the mutation loop below performs the same
+     *     conversion inline on {@link SyncRequest.UploadedMutationInfo} → {@code SyncActionEntry}
+     *     via {@code SyncActionEntryBuilder}; {@code binarySyncData} is absorbed because Cobalt
+     *     carries the decoded {@code SyncActionValue} object directly in {@code actionValue()},
+     *     {@code collection} is implicit (the enclosing {@code patchType}), {@code timestamp} is
+     *     stored inside {@code actionValue.timestamp()}, and {@code actionState} is hardcoded to
+     *     {@code SyncActionState.SUCCESS} matching WA Web's {@code $e} caller which passes
+     *     {@code CollectionState.Success} as the {@code actionState} argument.
+     *     ADAPTED: WAWebSyncdCollectionHandlerTypesConverter.setMutationToSyncAction — WA Web's
+     *     per-SET helper that combines the mutation with {@code actionState}, {@code action},
+     *     {@code modelId}, {@code modelType} is inlined in the SET branch below where
+     *     {@code resolveActionNameSafe} derives {@code modelType} and {@code extractModelId}
+     *     derives {@code modelId} from the plaintext index string.
      * @param uploadInfo the upload metadata captured during request building
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdCollectionHandlerTypesConverter", exports = "encryptedUploadMutationsToSyncActions", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebSyncdCollectionHandlerTypesConverter", exports = "setMutationToSyncAction", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebSyncdCollectionHandlerTypesConverter", exports = "syncActionToSyncData", adaptation = WhatsAppAdaptation.ADAPTED)
     private void processUploadSuccess(SyncRequest.UploadedPatchInfo uploadInfo) {
         var patchType = uploadInfo.patchType();
         var expectedVersion = uploadInfo.newVersion();
@@ -1001,26 +1153,40 @@ public final class WebAppStateService {
 
         // Per WA Web $e: persist sync action entries for SET mutations and
         // remove prior entries for acknowledged REMOVE mutations.
+        // WAWebSyncdCollectionHandlerTypesConverter.encryptedUploadMutationsToSyncActions —
+        // t.map(t => {index, action, binarySyncData: syncActionToSyncData(t.binarySyncAction),
+        //   actionState: n, version, keyId, indexMac, valueMac, collection, timestamp})
         for (var mutation : uploadInfo.mutations()) {
             if (mutation.operation() == SyncdOperation.SET) {
+                // WAWebSyncdCollectionHandlerTypesConverter.setMutationToSyncAction —
+                // (e, t=Success, n=action, r=modelId, o=modelType) => {...e, action: n, actionState: t,
+                //   modelId: r, modelType: o ?? void 0}. Inlined here as builder population.
                 store.putSyncActionEntry(patchType, mutation.indexMac(), new SyncActionEntryBuilder()
-                        .indexMac(mutation.indexMac())
-                        .valueMac(mutation.valueMac())
-                        .keyId(mutation.keyId())
-                        .actionIndex(mutation.actionIndex())
-                        .actionValue(mutation.actionValue())
-                        .actionVersion(mutation.actionVersion())
-                        .actionState(SyncActionState.SUCCESS)
-                        .modelType(resolveActionNameSafe(new DecryptedMutation.Trusted( // WAWebSyncdCollectionHandler.$e: getMutationNameFromIndex (safe)
+                        .indexMac(mutation.indexMac()) // WAWebSyncdCollectionHandlerTypesConverter.encryptedUploadMutationsToSyncActions: indexMac: t.indexMac
+                        .valueMac(mutation.valueMac()) // WAWebSyncdCollectionHandlerTypesConverter.encryptedUploadMutationsToSyncActions: valueMac: t.valueMac
+                        .keyId(mutation.keyId()) // WAWebSyncdCollectionHandlerTypesConverter.encryptedUploadMutationsToSyncActions: keyId: t.keyId
+                        .actionIndex(mutation.actionIndex()) // WAWebSyncdCollectionHandlerTypesConverter.encryptedUploadMutationsToSyncActions: index: t.index
+                        .actionValue(mutation.actionValue()) // ADAPTED: WAWebSyncdCollectionHandlerTypesConverter.syncActionToSyncData — WA Web re-serializes to binarySyncData bytes; Cobalt keeps the decoded SyncActionValue object
+                        .actionVersion(mutation.actionVersion()) // WAWebSyncdCollectionHandlerTypesConverter.encryptedUploadMutationsToSyncActions: version: t.version
+                        .actionState(SyncActionState.SUCCESS) // WAWebSyncdCollectionHandlerTypesConverter.encryptedUploadMutationsToSyncActions: actionState: n (caller passes CollectionState.Success)
+                        .modelType(resolveActionNameSafe(new DecryptedMutation.Trusted( // WAWebSyncdCollectionHandler.$e: getMutationNameFromIndex (safe); WAWebSyncdCollectionHandlerTypesConverter.setMutationToSyncAction: modelType: o
                                 mutation.actionIndex(),
                                 mutation.actionValue(),
                                 mutation.operation(),
                                 mutation.actionValue().timestamp().orElse(Instant.EPOCH),
                                 mutation.actionVersion()
                         )))
-                        .modelId(extractModelId(mutation.actionIndex()))
+                        .modelId(extractModelId(mutation.actionIndex())) // WAWebSyncdCollectionHandlerTypesConverter.setMutationToSyncAction: modelId: r
+                        // NO_WA_BASIS: collection field omitted — stored implicitly via the patchType map key in the Cobalt store
+                        // NO_WA_BASIS: timestamp field omitted — Cobalt reads timestamp from actionValue.timestamp() on demand
+                        // NO_WA_BASIS: action field omitted — Cobalt derives the action object from actionValue at read sites, not stored separately
                         .build());
             } else {
+                // ADAPTED: WAWebSyncdCollectionHandlerTypesConverter.encryptedUploadMutationsToSyncActions —
+                // WA Web converts REMOVE mutations to SyncAction entries the same way as SET (differing only
+                // by the action payload), but WAWebSyncdCollectionHandler.$e's REMOVE branch explicitly
+                // deletes the prior entry via removeSyncActionInTransaction instead of writing one back,
+                // so Cobalt mirrors the $e behaviour here rather than the converter's .map(...) shape.
                 store.removeSyncActionEntry(patchType, mutation.indexMac());
             }
         }
@@ -1134,10 +1300,21 @@ public final class WebAppStateService {
     /**
      * Returns the current version for the specified collection.
      *
-     * @implNote WAWebGetCollectionVersion.getCollectionVersionInTransaction
+     * <p>ADAPTED: WA Web exposes {@code getCollectionVersionInTransaction} (single) and
+     * {@code bulkGetCollectionVersionsInTransaction} / {@code getAllCollectionVersionsInTransaction}
+     * (batched). Cobalt flattens the per-collection IDB store into the in-memory
+     * {@code webAppStateCollections} map on the store,
+     * so bulk lookups are inlined as per-item calls to {@link com.github.auties00.cobalt.store.WhatsAppStore#findWebAppState}
+     * by the consumers (e.g. {@link #resumeAfterRestart} iterates {@code SyncPatchType.values()}).
+     *
+     * @implNote WAWebGetCollectionVersion.getCollectionVersionInTransaction — the
+     *     {@code .version} projection of the CollectionVersionStore entry
      * @param patchType the collection to query
      * @return the current version number
      */
+    @WhatsAppWebExport(moduleName = "WAWebGetCollectionVersion", exports = "getCollectionVersionInTransaction", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebGetCollectionVersion", exports = "bulkGetCollectionVersionsInTransaction", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebGetCollectionVersion", exports = "getAllCollectionVersionsInTransaction", adaptation = WhatsAppAdaptation.ADAPTED)
     private long getCurrentVersion(SyncPatchType patchType) {
         return store.findWebAppState(patchType).version();
     }
@@ -1145,12 +1322,17 @@ public final class WebAppStateService {
     /**
      * Returns the current LT-Hash for the specified collection.
      *
-     * <p>Falls back to {@link MutationLTHash#EMPTY_HASH} if no hash state exists.
+     * <p>Falls back to {@link MutationLTHash#EMPTY_HASH} if no hash state exists, matching
+     * WA Web's {@code getCollectionVersionLtHashInTransaction} which substitutes an empty
+     * {@code ArrayBuffer(KEY_LENGTH_BYTES)} when the stored entry is missing or has a
+     * {@code null} {@code ltHash} field.
      *
-     * @implNote WAWebSyncdAntiTampering (hash state lookup for LT-Hash computation)
+     * @implNote WAWebGetCollectionVersion.getCollectionVersionLtHashInTransaction,
+     *           WAWebSyncdAntiTampering (hash state lookup for LT-Hash computation)
      * @param patchType the collection to query
      * @return the current LT-Hash bytes
      */
+    @WhatsAppWebExport(moduleName = "WAWebGetCollectionVersion", exports = "getCollectionVersionLtHashInTransaction", adaptation = WhatsAppAdaptation.ADAPTED)
     private byte[] getCurrentLTHash(SyncPatchType patchType) {
         var currentHashState = whatsapp.store().findWebAppHashStateByName(patchType)
                 .orElseGet(() -> new SyncHashValue(patchType));
@@ -1168,12 +1350,31 @@ public final class WebAppStateService {
      * @implNote WAWebSyncdMMSDownload.downloadSnapshot (download + decode),
      *           WAWebSyncdNetCallbacksApi.downloadSyncBlob (blob download),
      *           WAWebSyncdDecode.decodeSyncdSnapshot (protobuf decoding),
-     *           WAWebSyncdValidateServerSyncProtobuf.validateExternalBlobReference (pre-download validation)
+     *           WAWebSyncdValidateServerSyncProtobuf.validateExternalBlobReference (pre-download validation).
+     *           ADAPTED: WA Web's {@code downloadSnapshot(collectionName, blobRef)} performs three
+     *           steps — {@code downloadSyncBlob(blobRef, "snapshot", collectionName)} →
+     *           {@code decodeSyncdSnapshot(collectionName, payload)} →
+     *           {@code validateSnapshotProtobuf(collectionName, snapshot)}. In Cobalt the third
+     *           step (required-field validation on {@code SyncdSnapshot.version},
+     *           {@code mac}, {@code keyId}, and each {@code SyncdRecord}'s {@code index}/{@code value}/
+     *           {@code keyId}) is absorbed by the protobuf library's required-field enforcement
+     *           during {@link SyncdSnapshotSpec#decode(it.auties.protobuf.stream.ProtobufInputStream)};
+     *           the snapshot-level {@code version} presence check is performed by the caller
+     *           ({@link #handleSyncResponse}) and the snapshot MAC verification (which WA Web does
+     *           outside of {@code downloadSnapshot} as well) is performed by
+     *           {@link MutationIntegrityVerifier#verifySnapshotMac}. The plaintext/ciphertext file
+     *           hash verification implicit in WA Web's {@code downloadAndMaybeDecrypt} is performed
+     *           by the Cobalt media download pipeline ({@code MediaDownloadInputStream} verifies the
+     *           {@code fileSha256} and {@code fileEncSha256} against the ones carried on the
+     *           {@link ExternalBlobReference}).
      * @param snapshotRef the external blob reference for the snapshot
      * @return the decoded snapshot
      * @throws WhatsAppWebAppStateSyncException.UnexpectedError if the blob reference is invalid or decoding fails
      * @throws WhatsAppWebAppStateSyncException.ExternalDownloadFailed if the download fails
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdMMSDownload", exports = "downloadSnapshot", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebSyncdNetCallbacksApi", exports = "downloadSyncBlob", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebSyncdDecode", exports = "decodeSyncdSnapshot", adaptation = WhatsAppAdaptation.ADAPTED)
     private SyncdSnapshot downloadAndDecodeSnapshot(ExternalBlobReference snapshotRef) {
         validateExternalBlobReference(snapshotRef); // ADAPTED: WAWebSyncdValidateServerSyncProtobuf.validateExternalBlobReference — validated pre-download
 
@@ -1233,10 +1434,21 @@ public final class WebAppStateService {
      * For each record, the companion re-derives the index MAC using the referenced
      * sync key, then uses the primary's value MAC and LT-Hash directly.
      *
+     * @implNote WAWebSyncdCollectionHandlerTypesConverter.syncActionsToDecryptedMutation —
+     *     WA Web maps sync actions (fields: {@code collection}, {@code index}, {@code indexMac},
+     *     {@code keyId}, {@code binarySyncData}, {@code valueMac}, {@code version}) into decrypted
+     *     mutations (same fields plus {@code operation: SyncdOperation.SET}) via a {@code .map(...)}
+     *     that forces {@code SET} on every entry. Cobalt's equivalent flow is the per-record loop
+     *     below: each {@code SyncdRecord} yields a {@link DecryptedMutation.Trusted} with
+     *     {@link SyncdOperation#SET} hardcoded; {@code binarySyncData} is replaced by the decoded
+     *     {@code SyncActionValue} object, {@code collection} is implicit via {@code collectionName},
+     *     and {@code indexMac} is re-derived rather than read from storage because recovery records
+     *     carry only the plaintext index.
      * @param collectionName    the collection being recovered
      * @param recoveredSnapshot the decoded recovery snapshot from the primary device
      * @return the trusted mutations extracted from the recovery data
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdCollectionHandlerTypesConverter", exports = "syncActionsToDecryptedMutation", adaptation = WhatsAppAdaptation.ADAPTED)
     private SequencedCollection<DecryptedMutation.Trusted> processRecoveredSnapshot(
             SyncPatchType collectionName,
             SyncdSnapshotRecovery recoveredSnapshot
@@ -1292,12 +1504,17 @@ public final class WebAppStateService {
                         .actionVersion(actionVersion)
                         .build());
 
+                // WAWebSyncdCollectionHandlerTypesConverter.syncActionsToDecryptedMutation —
+                // e.map(e => {collection, index, indexMac, keyId, operation: SET, binarySyncData, valueMac, version})
+                // In Cobalt: collection is implicit (collectionName), indexMac/keyId/valueMac are
+                // persisted into the store above rather than copied onto the mutation, binarySyncData
+                // is replaced by the decoded SyncActionValue (actionValue).
                 trusted.add(new DecryptedMutation.Trusted(
-                        indexString,
-                        actionValue,
-                        SyncdOperation.SET,
-                        timestamp,
-                        actionVersion
+                        indexString, // WAWebSyncdCollectionHandlerTypesConverter.syncActionsToDecryptedMutation: index: e.index
+                        actionValue, // ADAPTED: WAWebSyncdCollectionHandlerTypesConverter.syncActionsToDecryptedMutation: binarySyncData — Cobalt carries the decoded SyncActionValue
+                        SyncdOperation.SET, // WAWebSyncdCollectionHandlerTypesConverter.syncActionsToDecryptedMutation: operation: SyncdMutation$SyncdOperation.SET
+                        timestamp, // NO_WA_BASIS: Cobalt extracts timestamp eagerly for the Trusted record; WA Web keeps it inside binarySyncData
+                        actionVersion // WAWebSyncdCollectionHandlerTypesConverter.syncActionsToDecryptedMutation: version: e.version
                 ));
             } catch (java.security.GeneralSecurityException e) {
                 throw new WhatsAppWebAppStateSyncException.DecryptionFailed(e);
@@ -1332,11 +1549,23 @@ public final class WebAppStateService {
      * Per-mutation field validation is deferred to {@link #decryptMutations}.
      *
      * @implNote WAWebSyncdMMSDownload.downloadExternalPatch (external path),
-     *           WAWebSyncdValidateServerSyncProtobuf.validatePatchProtobuf (both-inline-and-external check)
+     *           WAWebSyncdValidateServerSyncProtobuf.validatePatchProtobuf (both-inline-and-external check).
+     *           ADAPTED: WA Web's {@code downloadExternalPatch(collectionName, blobRef)} performs three
+     *           steps — {@code downloadSyncBlob(blobRef, "patch", collectionName)} →
+     *           {@code decodeSyncdMutations(collectionName, payload).mutations} →
+     *           {@code mutations.map(t => validateMutationProtobuf(collectionName, t))}. In Cobalt the
+     *           per-mutation required-field validation (on {@code operation}, {@code record.index.blob},
+     *           {@code record.value.blob}, {@code record.keyId}) is absorbed by the protobuf library
+     *           during {@link SyncdMutationsSpec#decode(it.auties.protobuf.stream.ProtobufInputStream)},
+     *           and additional semantic checks are performed downstream by {@link #decryptMutations}.
+     *           The {@code downloadSyncBlob} and {@code decodeSyncdMutations} steps are split across
+     *           the helpers {@link #downloadExternalMutation} and {@link #decodeExternalMutation};
+     *           this method orchestrates them and selects between the inline and external branches.
      * @param patch the decoded patch
      * @return the mutations from this patch (inline or external)
      * @throws WhatsAppWebAppStateSyncException.UnexpectedError if the patch has both inline and external mutations
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdMMSDownload", exports = "downloadExternalPatch", adaptation = WhatsAppAdaptation.ADAPTED)
     private SequencedCollection<SyncdMutation> getMutationsFromPatch(SyncdPatch patch) {
         var hasInline = patch.mutations() != null && !patch.mutations().isEmpty(); // WAWebSyncdValidateServerSyncProtobuf.validatePatchProtobuf — u && u.length > 0
         var hasExternal = patch.externalMutations().isPresent(); // WAWebSyncdValidateServerSyncProtobuf.validatePatchProtobuf — l (externalMutations)
@@ -1369,6 +1598,7 @@ public final class WebAppStateService {
      * @return the downloaded data stream
      * @throws WhatsAppWebAppStateSyncException.ExternalDownloadFailed if the download fails
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdNetCallbacksApi", exports = "downloadSyncBlob", adaptation = WhatsAppAdaptation.ADAPTED)
     private InputStream downloadExternalMutation(ExternalBlobReference externalRef) {
         validateExternalBlobReference(externalRef); // ADAPTED: WAWebSyncdValidateServerSyncProtobuf.validateExternalBlobReference — validated pre-download
 
@@ -1470,6 +1700,7 @@ public final class WebAppStateService {
      * @return the decoded mutations container
      * @throws WhatsAppWebAppStateSyncException.UnexpectedError if protobuf decoding fails
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdDecode", exports = "decodeSyncdMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     private SyncdMutations decodeExternalMutation(InputStream downloadedData) {
         try (var protobufStream = ProtobufInputStream.fromStream(downloadedData)) {
             return SyncdMutationsSpec.decode(protobufStream); // WAWebSyncdDecode.decodeSyncdMutations
@@ -1725,8 +1956,14 @@ public final class WebAppStateService {
      * @param collectionName the collection these orphans belong to
      * @param orphans        the orphan entries to retry
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdCollectionHandler", exports = "applyIndividualMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     private void retryOrphanEntries(SyncPatchType collectionName, List<OrphanMutationEntry> orphans) {
-        for (var orphan : orphans) {
+        // WAWebSyncdCollectionHandler.applyIndividualMutations (Ee/ke):
+        //   var r = e.sort(function(e,t){return e.timestamp-t.timestamp})
+        // Apply oldest-first so later orphans targeting the same index overwrite earlier ones.
+        var sortedOrphans = new ArrayList<>(orphans);
+        sortedOrphans.sort(Comparator.comparing(OrphanMutationEntry::timestamp));
+        for (var orphan : sortedOrphans) {
             var mutation = new DecryptedMutation.Trusted(
                     orphan.index(),
                     orphan.value(),
@@ -1903,12 +2140,18 @@ public final class WebAppStateService {
      * ID are updated on the corresponding sync action entry. Only SET mutations are
      * recorded; REMOVE mutations have no entry to update.
      *
-     * @implNote WAWebSyncdCollectionHandler._applySetMutations (Xe — action state recording)
+     * @implNote WAWebSyncdCollectionHandler._applySetMutations (Xe — action state recording).
+     *     WA Web locates the entry via {@code getSyncActionInTransaction(indexString)} (plaintext-index
+     *     lookup); Cobalt scans the per-collection view via {@link WhatsAppStore#getSyncActionEntries}
+     *     (semantically {@code getSyncActionsByCollectionsInTransaction}) and filters by
+     *     {@code actionIndex} plus {@code actionVersion}.
      * @param collectionName the collection the mutation belongs to
      * @param mutation       the trusted mutation that was applied
      * @param actionName     the resolved action name, or {@code null} if unknown
      * @param result         the application result from the handler
      */
+    @WhatsAppWebExport(moduleName = "WAWebGetSyncAction", exports = "getSyncActionsByCollectionsInTransaction", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebGetSyncAction", exports = "getSyncActionInTransaction", adaptation = WhatsAppAdaptation.ADAPTED)
     private void recordMutationState(
             SyncPatchType collectionName,
             DecryptedMutation.Trusted mutation,
@@ -1955,9 +2198,15 @@ public final class WebAppStateService {
      * if a matching handler is now available.
      *
      * @implNote WAWebSyncdOrphan.applyAllOrphansAndUnsupported,
-     *           WAWebSyncdCollectionHandler.applyIndividualMutations
+     *           WAWebSyncdCollectionHandler.applyIndividualMutations — ADAPTED: WA Web fetches
+     *           unsupported entries via {@code getSyncActionsByActionStatesInTransaction([Unsupported])};
+     *           Cobalt filters {@link WhatsAppStore#getSyncActionEntries} (i.e. the per-collection
+     *           sync-action view, semantically {@code getSyncActionsByCollectionsInTransaction}) by
+     *           {@link SyncActionState#UNSUPPORTED} in-memory.
      * @param collectionName the collection whose unsupported entries to retry
      */
+    @WhatsAppWebExport(moduleName = "WAWebGetSyncAction", exports = "getSyncActionsByActionStatesInTransaction", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebGetSyncAction", exports = "getSyncActionsByCollectionsInTransaction", adaptation = WhatsAppAdaptation.ADAPTED)
     private void retryUnsupportedMutations(SyncPatchType collectionName) {
         var unsupportedEntries = store.getSyncActionEntries(collectionName).stream()
                 .filter(entry -> entry.actionState() == SyncActionState.UNSUPPORTED)
@@ -2007,11 +2256,15 @@ public final class WebAppStateService {
      * After resolution, runs a cross-index conflict check to drop mutations that
      * are obsoleted by pending mutations at different indices.
      *
-     * @implNote WAWebSyncdResolveConflict.resolveConflict
+     * @implNote WA Web returns {@code {remoteMutationsToApply, pendingSetMutationsToDrop}} to the
+     *     caller; Cobalt performs the pending-store cleanup (and merged-mutation insertion) inline
+     *     here for the same net effect. Action handlers are resolved via the registry keyed by
+     *     action name rather than a per-mutation {@code actionHandler} field.
      * @param remoteMutations the incoming remote mutations to resolve
      * @param collectionName  the sync collection being processed
      * @return the filtered list of remote mutations to apply
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdResolveConflict", exports = "resolveConflict", adaptation = WhatsAppAdaptation.ADAPTED)
     private SequencedCollection<DecryptedMutation.Trusted> resolveConflicts(SequencedCollection<DecryptedMutation.Trusted> remoteMutations, SyncPatchType collectionName) {
         // WAWebSyncdResolveConflict.resolveConflict: getSyncPendingMutationsByCollectionInTransaction(e)
         var pendingMutations = whatsapp.store().findPendingMutations(collectionName);
@@ -2103,12 +2356,15 @@ public final class WebAppStateService {
      * mutations, removes the existing value MAC. Returns both the new hash and the sync
      * action entry updates to be applied if the version guard passes.
      *
-     * @implNote WAWebSyncdAntiTampering.computeLtHash (Y/J)
+     * @implNote WAWebSyncdAntiTampering.computeLtHash (Y/J) — WA Web looks up existing
+     *     entries via {@code getSyncActionsByCollectionAndIndexesInTransaction(collection, [indexMac])};
+     *     Cobalt calls {@link WhatsAppStore#findSyncActionEntry} per index MAC directly.
      * @param patchType the collection being processed
      * @param baseHash  the starting LT-Hash
      * @param mutations the mutations to apply to the hash
      * @return the computed hash and the sync action entry updates
      */
+    @WhatsAppWebExport(moduleName = "WAWebGetSyncAction", exports = "getSyncActionsByCollectionAndIndexesInTransaction", adaptation = WhatsAppAdaptation.ADAPTED)
     private LtHashComputation computeNewLTHash(SyncPatchType patchType, byte[] baseHash, SequencedCollection<DecryptedMutation.Untrusted> mutations) {
         var currentHash = baseHash != null ? baseHash : MutationLTHash.EMPTY_HASH;
         var toAdd = new ArrayList<byte[]>();
@@ -2185,12 +2441,21 @@ public final class WebAppStateService {
      * newer than the currently persisted version, the entire update (including sync action
      * entry writes) is skipped.
      *
-     * @implNote WAWebSyncdCollectionHandler.ot (version guard in transaction)
+     * <p>ADAPTED: WA Web also exposes {@code bulkUpdateCollectionVersionInTransaction} used by
+     * {@code WAWebSyncdCollectionsStateMachine.persistToDb} to flush the state-machine snapshot.
+     * Cobalt's state machine persists per-collection via {@code store.mark*} calls on
+     * the store, so bulk updates are
+     * inlined as repeated per-item calls and no dedicated bulk API is introduced.
+     *
+     * @implNote WAWebGetCollectionVersion.updateCollectionVersionAndLtHashInTransaction,
+     *           WAWebSyncdCollectionHandler.ot (version guard in transaction)
      * @param collectionName the collection to update
      * @param version        the new version
      * @param ltHash         the new LT-Hash
      * @return {@code true} if the update was applied, {@code false} if skipped (stale version)
      */
+    @WhatsAppWebExport(moduleName = "WAWebGetCollectionVersion", exports = "updateCollectionVersionAndLtHashInTransaction", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebGetCollectionVersion", exports = "bulkUpdateCollectionVersionInTransaction", adaptation = WhatsAppAdaptation.ADAPTED)
     private boolean updateCollectionState(SyncPatchType collectionName, long version, byte[] ltHash) {
         // Per WA Web ot: guard against applying state updates with an older version
         var currentVersion = getCurrentVersion(collectionName);
@@ -2215,6 +2480,7 @@ public final class WebAppStateService {
      * @param error          the error that occurred during sync
      * @param collectionName the collection that failed
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdFatal", exports = "handleFatalError", adaptation = WhatsAppAdaptation.ADAPTED)
     private void handleSyncError(Throwable error, SyncPatchType collectionName) {
         if (collectionName == null) {
             return;
@@ -2286,6 +2552,7 @@ public final class WebAppStateService {
      * @implNote WAWebSyncdFatalExceptionNotificationApi.sendAppStateFatalExceptionNotification
      * @param collectionNames the collections that triggered the fatal error
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdFatalExceptionNotificationApi", exports = "sendAppStateFatalExceptionNotification", adaptation = WhatsAppAdaptation.ADAPTED)
     private void sendAppStateFatalExceptionNotification(List<String> collectionNames) {
         var myJid = whatsapp.store().jid().orElse(null); // ADAPTED: WAWebSyncdFatalExceptionNotificationApi: getMePnUserOrThrow() / getMeDevicePnOrThrow()
         if (myJid == null) {

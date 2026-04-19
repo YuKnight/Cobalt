@@ -90,28 +90,23 @@ final class NewsletterMessageReceiver extends MessageReceiver<NewsletterMessageI
     NewsletterMessageInfo receive(Node node, Jid fromJid) {
         // WAWebNewsletterMsgParser.default
         // Extracts the stanza identifier attribute
-
         var id = node.getRequiredAttributeAsString("id");
 
         // WAWebNewsletterMsgParser.default
         // Extracts and converts the timestamp from the t attribute
-
         var timestampSeconds = node.getRequiredAttributeAsLong("t");
         var timestamp = Instant.ofEpochSecond(timestampSeconds);
 
         // WAWebNewsletterMsgParser.default
         // Extracts the server-assigned newsletter message id
-
         var serverId = node.getRequiredAttributeAsInt("server_id");
 
         // WAWebNewsletterMsgParser.default
         // Detects whether the current user authored this post via the is_sender attribute
-
         var isSender = "true".equals(node.getAttributeAsString("is_sender", null));
 
         // WAWebNewsletterMsgUtils.mapMsgStanzaToMsgData
         // Retrieves the plaintext protobuf payload from the plaintext child
-
         var plaintext = node.getChild("plaintext")
                 .flatMap(Node::toContentBytes)
                 .orElse(null);
@@ -123,7 +118,6 @@ final class NewsletterMessageReceiver extends MessageReceiver<NewsletterMessageI
 
         // WAWebNewsletterMsgUtils.mapMsgStanzaToMsgData
         // Decodes the plaintext as a MessageContainer protobuf
-
         var container = decodeProtobuf(id, plaintext);
         if (container == null) {
             return null;
@@ -131,7 +125,6 @@ final class NewsletterMessageReceiver extends MessageReceiver<NewsletterMessageI
 
         // WAWebNewsletterMsgUtils.mapMsgStanzaToMsgData
         // Constructs the message key with the newsletter JID as parent
-
         var key = new MessageKeyBuilder()
                 .id(id)
                 .parentJid(fromJid)
@@ -140,7 +133,6 @@ final class NewsletterMessageReceiver extends MessageReceiver<NewsletterMessageI
 
         // WAWebNewsletterMsgUtils.mapMsgStanzaToMsgData
         // Assembles the newsletter message info with DELIVERED status
-
         var info = new NewsletterMessageInfoBuilder()
                 .key(key)
                 .serverId(serverId)

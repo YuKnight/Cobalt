@@ -2,14 +2,23 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.preference.Label;
 import com.github.auties00.cobalt.model.preference.LabelBuilder;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncActionState;
+import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.contact.LabelEditAction;
+import com.github.auties00.cobalt.model.sync.action.contact.LabelEditActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.time.Instant;
+import java.util.List;
 
 /**
  * Handles the {@code label_edit} sync action by creating, editing, or deleting
@@ -47,6 +56,7 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  *           {@code getAction() = LabelEdit}, and {@code applyMutations()} as the
  *           per-mutation apply logic
  */
+@WhatsAppWebModule(moduleName = "WAWebLabelSync")
 public final class LabelEditHandler implements WebAppStateActionHandler {
     /**
      * The singleton instance of {@code LabelEditHandler}.
@@ -54,6 +64,7 @@ public final class LabelEditHandler implements WebAppStateActionHandler {
      * @implNote WAWebLabelSync.default — WA Web exports a single module instance
      *           {@code f = new _()}; Cobalt mirrors this with a singleton
      */
+    @WhatsAppWebExport(moduleName = "WAWebLabelSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final LabelEditHandler INSTANCE = new LabelEditHandler();
 
     /**
@@ -64,6 +75,7 @@ public final class LabelEditHandler implements WebAppStateActionHandler {
      *           collection is returned via {@link #collectionName()} from the
      *           action's static {@code COLLECTION_NAME} constant
      */
+    @WhatsAppWebExport(moduleName = "WAWebLabelSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private LabelEditHandler() {
 
     }
@@ -76,6 +88,7 @@ public final class LabelEditHandler implements WebAppStateActionHandler {
      * @return the action name string
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebLabelSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
         return LabelEditAction.ACTION_NAME; // WAWebLabelSync.default.getAction
     }
@@ -88,6 +101,7 @@ public final class LabelEditHandler implements WebAppStateActionHandler {
      * @return the regular sync collection
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebLabelSync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
         return LabelEditAction.COLLECTION_NAME; // WAWebLabelSync.default constructor: collectionName = Regular
     }
@@ -99,6 +113,7 @@ public final class LabelEditHandler implements WebAppStateActionHandler {
      * @return the version number {@code 3}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebLabelSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return LabelEditAction.ACTION_VERSION; // WAWebLabelSync.default.getVersion -> 3
     }
@@ -116,6 +131,7 @@ public final class LabelEditHandler implements WebAppStateActionHandler {
      *         {@code false} otherwise
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebLabelSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: WAWebLabelSync.default.applyMutations
     }
@@ -155,6 +171,7 @@ public final class LabelEditHandler implements WebAppStateActionHandler {
      * @return the detailed application result
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebLabelSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) { // WAWebLabelSync.default.applyMutations: if (e.operation === "set") { ... } return f++, {actionState: Unsupported}
             return MutationApplicationResult.unsupported(); // WAWebLabelSync.default.applyMutations: return {actionState: WASyncdConst.SyncActionState.Unsupported}
@@ -171,7 +188,7 @@ public final class LabelEditHandler implements WebAppStateActionHandler {
         }
 
         if (action.deleted()) { // WAWebLabelSync.default.applyMutations: if (d.deleted === true)
-            // ADAPTED: WAWebLabelSync.default.applyMutations -- yield o("WAWebSchemaLabel").getLabelTable().remove(c); o("WAWebLabelCollection").LabelCollection.remove(c);
+            // ADAPTED: WAWebLabelSync.default.applyMutations, yield o("WAWebSchemaLabel").getLabelTable().remove(c); o("WAWebLabelCollection").LabelCollection.remove(c);
             // Cobalt's single removeLabel call replaces both the IndexedDB table remove and the in-memory collection remove because the store is flat.
             client.store().removeLabel(labelId); // WAWebLabelSync.default.applyMutations: LabelCollection.remove(c) + getLabelTable().remove(c)
             return MutationApplicationResult.success(); // WAWebLabelSync.default.applyMutations: return {actionState: WASyncdConst.SyncActionState.Success}
@@ -184,7 +201,6 @@ public final class LabelEditHandler implements WebAppStateActionHandler {
         var name = action.name().orElse(""); // WAWebLabelSync.default.applyMutations: S = (r = d.name) != null ? r : ""
         // NOTE: WAWebLabelSync emits a WALogger WARN for S === "" and (when
         // isSMB() && h == null) another WARN; Cobalt omits WAM/logging counters.
-
         // ADAPTED: WA Web's Label.colorIndex is nullable; Cobalt's Label.color is a
         // primitive int with default 0. Null/absent color is mapped to 0 because the
         // underlying model cannot express absence for this field.
@@ -240,7 +256,7 @@ public final class LabelEditHandler implements WebAppStateActionHandler {
         } else {
             // Insert path: build a new Label from the action fields. Assignments
             // default to an empty set via the generated builder.
-            var label = new LabelBuilder() // WAWebLabelSync.default.applyMutations: LabelCollection.add({...R}, {merge: true}) -- insert branch
+            var label = new LabelBuilder() // WAWebLabelSync.default.applyMutations: LabelCollection.add({...R}, {merge: true}), insert branch
                     .id(labelId) // WAWebLabelSync.default.applyMutations: R.id = c
                     .name(name) // WAWebLabelSync.default.applyMutations: R.name = S
                     .color(color) // WAWebLabelSync.default.applyMutations: R.colorIndex = h
@@ -251,7 +267,7 @@ public final class LabelEditHandler implements WebAppStateActionHandler {
                     .isActive(action.isActive() ? Boolean.TRUE : null) // WAWebLabelSync.default.applyMutations: if (y != null) R.isActive = y
                     .isImmutable(action.isImmutable() ? Boolean.TRUE : null) // WAWebLabelSync.default.applyMutations: if (C != null) R.isImmutable = C
                     .build();
-            client.store().addLabel(label); // WAWebLabelSync.default.applyMutations: LabelCollection.add(label, {merge: true}) -- insert branch
+            client.store().addLabel(label); // WAWebLabelSync.default.applyMutations: LabelCollection.add(label, {merge: true}), insert branch
         }
 
         // ADAPTED: WAWebLabelSync.default.applyMutations --
@@ -264,10 +280,65 @@ public final class LabelEditHandler implements WebAppStateActionHandler {
         // directly inside the Label's assignments set by LabelAssociationHandler
         // and never leave memory, so there is no cache to rehydrate. The block
         // is therefore intentionally omitted.
-
         // WAWebLabelSync.default.applyMutations: WAWebWamLabelSyncTrackingReporter.generateLabelEditHash(c).then(...logLabelSyncEvent)
         // SKIPPED: WAM telemetry is intentionally omitted in Cobalt.
-
         return MutationApplicationResult.success(); // WAWebLabelSync.default.applyMutations: return {actionState: WASyncdConst.SyncActionState.Success}
+    }
+
+    /**
+     * Builds a pending SET mutation for creating or editing a chat label.
+     *
+     * <p>Per WhatsApp Web {@code WAWebLabelSync.default.getLabelMutation},
+     * assembles a {@link LabelEditAction} with the supplied fields (null
+     * values are preserved so that deleted flags, missing colour, missing
+     * type and so on round-trip correctly) and wraps it in a
+     * {@link SyncPendingMutation} with the canonical index
+     * {@code ["label_edit", labelId]}. WAM telemetry
+     * ({@code WAWebWamLabelSyncTrackingReporter}) is intentionally omitted.
+     *
+     * @implNote WAWebLabelSync.default.getLabelMutation
+     * @param labelId      the label identifier (index arg, stringified by the caller)
+     * @param name         the display name, may be {@code null}
+     * @param color        the palette colour index, or {@code null} when unchanged
+     * @param deleted      whether the label is being deleted
+     * @param predefinedId the predefined list identifier, or {@code null}
+     * @param isActive     the active flag, or {@code null} when unchanged
+     * @param type         the list type, or {@code null} when unchanged
+     * @param timestamp    the mutation timestamp
+     * @return the pending mutation for the label edit
+     */
+    @WhatsAppWebExport(moduleName = "WAWebLabelSync", exports = "getLabelMutation", adaptation = WhatsAppAdaptation.ADAPTED)
+    public SyncPendingMutation getLabelMutation(
+            String labelId,
+            String name,
+            Integer color,
+            boolean deleted,
+            Integer predefinedId,
+            Boolean isActive,
+            LabelEditAction.ListType type,
+            Instant timestamp
+    ) {
+        var action = new LabelEditActionBuilder() // WAWebLabelSync.default.getLabelMutation: var e = {name: n, deleted: a}; r != null && (e.color = r); i != null && (e.predefinedId = i); l != null && (e.isActive = l); s != null && type cast
+                .name(name) // WAWebLabelSync.default.getLabelMutation: name: n
+                .deleted(deleted) // WAWebLabelSync.default.getLabelMutation: deleted: a
+                .color(color) // WAWebLabelSync.default.getLabelMutation: r != null && (e.color = r)
+                .predefinedId(predefinedId) // WAWebLabelSync.default.getLabelMutation: i != null && (e.predefinedId = i)
+                .isActive(isActive) // WAWebLabelSync.default.getLabelMutation: l != null && (e.isActive = l)
+                .type(type) // WAWebLabelSync.default.getLabelMutation: s != null && (e.type = cast(s))
+                .build();
+        // WAWebSyncdActionUtils.buildPendingMutation: encodeProtobuf(SyncActionValueSpec, {...value, timestamp: i})
+        var value = new SyncActionValueBuilder()
+                .timestamp(timestamp) // WAWebSyncdActionUtils.buildPendingMutation: timestamp
+                .labelEditAction(action) // WAWebLabelSync.default.getLabelMutation: value: {labelEditAction: e}
+                .build();
+        var index = JSON.toJSONString(List.of(actionName(), labelId)); // WAWebSyncdActionUtils.buildIndex: JSON.stringify([action].concat(indexArgs)); indexArgs = [labelId]
+        var mutation = new DecryptedMutation.Trusted(
+                index,
+                value,
+                SyncdOperation.SET, // WAWebLabelSync.default.getLabelMutation: operation: SET
+                timestamp,
+                version()
+        );
+        return new SyncPendingMutation(mutation, 0); // ADAPTED: WA Web returns the raw pending mutation; Cobalt wraps it in SyncPendingMutation for the outgoing queue
     }
 }

@@ -2,6 +2,9 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
@@ -41,6 +44,7 @@ import java.util.HashMap;
  *           {@code getVersion() = 7} and
  *           {@code getAction() = WASyncdConst.Actions.MarketingMessage}
  */
+@WhatsAppWebModule(moduleName = "WAWebPremiumMessageSync")
 public final class MarketingMessageHandler implements WebAppStateActionHandler {
     /**
      * The singleton instance of {@code MarketingMessageHandler}.
@@ -48,6 +52,7 @@ public final class MarketingMessageHandler implements WebAppStateActionHandler {
      * @implNote WAWebPremiumMessageSync — module-level
      *           {@code s = new e} singleton exported as {@code default}
      */
+    @WhatsAppWebExport(moduleName = "WAWebPremiumMessageSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final MarketingMessageHandler INSTANCE = new MarketingMessageHandler();
 
     /**
@@ -56,6 +61,7 @@ public final class MarketingMessageHandler implements WebAppStateActionHandler {
      * @implNote WAWebPremiumMessageSync — class constructor that initializes
      *           {@code this.collectionName = WASyncdConst.CollectionName.Regular}
      */
+    @WhatsAppWebExport(moduleName = "WAWebPremiumMessageSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private MarketingMessageHandler() {
 
     }
@@ -68,6 +74,7 @@ public final class MarketingMessageHandler implements WebAppStateActionHandler {
      *           to the literal {@code "marketingMessage"}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebPremiumMessageSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
         return MarketingMessageAction.ACTION_NAME; // WAWebPremiumMessageSync.getAction
     }
@@ -79,6 +86,7 @@ public final class MarketingMessageHandler implements WebAppStateActionHandler {
      *           {@code this.collectionName = WASyncdConst.CollectionName.Regular}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebPremiumMessageSync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
         return MarketingMessageAction.COLLECTION_NAME; // WAWebPremiumMessageSync constructor: collectionName = Regular
     }
@@ -90,6 +98,7 @@ public final class MarketingMessageHandler implements WebAppStateActionHandler {
      *           {@code 7}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebPremiumMessageSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return MarketingMessageAction.ACTION_VERSION; // WAWebPremiumMessageSync.getVersion: return 7
     }
@@ -113,6 +122,7 @@ public final class MarketingMessageHandler implements WebAppStateActionHandler {
      *         {@code false} otherwise
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebPremiumMessageSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: WAWebPremiumMessageSync.applyMutations
     }
@@ -178,6 +188,7 @@ public final class MarketingMessageHandler implements WebAppStateActionHandler {
      * @return the detailed application result
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebPremiumMessageSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         var indexArray = JSON.parseArray(mutation.index()); // WAWebPremiumMessageSync.applyMutations: var l = e.indexParts
         var messageId = indexArray.getString(1); // WAWebPremiumMessageSync.applyMutations: s = l[1]

@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.stream.notification.device;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.WhatsAppClientListener;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.media.MediaProvider;
 import com.github.auties00.cobalt.model.media.MediaRetryNotificationSpec;
@@ -15,9 +16,11 @@ import javax.crypto.KDF;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.HKDFParameterSpec;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 /**
  * Handles server-side cryptographic and device-related notifications received
@@ -33,7 +36,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * @implNote WAWebHandlePreKeyLow.default, WAWebHandleIdentityChange.handleE2eIdentityChange,
  *           WAWebHandleMediaRetryNotification.default, WAWebHandleServerNotification.handleServerNotification,
- *           WAWebHandleDeviceSwitchingNotification.default
+ *           WAWebHandleDeviceSwitchingNotification.default, WAWebHandleDigestKey.default
  */
 final class NotificationServerCryptoStreamHandler implements SocketStream.Handler {
     /**
@@ -366,7 +369,7 @@ final class NotificationServerCryptoStreamHandler implements SocketStream.Handle
 
         var code = registration.getAttributeAsString("code", null); // WAWebHandleDeviceSwitchingNotification.default - r.attrString("code")
         var expiry = registration.getAttributeAsLong("expiry_t", (Long) null); // WAWebHandleDeviceSwitchingNotification.default - r.attrTime("expiry_t")
-        var now = java.time.Instant.now().getEpochSecond(); // WAWebHandleDeviceSwitchingNotification.default - o("WATimeUtils").unixTime()
+        var now = Instant.now().getEpochSecond(); // WAWebHandleDeviceSwitchingNotification.default - o("WATimeUtils").unixTime()
         if (code == null || expiry == null || now > expiry) { // WAWebHandleDeviceSwitchingNotification.default - l > i
             return;
         }
@@ -388,9 +391,9 @@ final class NotificationServerCryptoStreamHandler implements SocketStream.Handle
      * @param consumer the listener callback to invoke
      * @implNote WAWebBackendApi.frontendFireAndForget
      */
-    private void fireListeners(java.util.function.Consumer<com.github.auties00.cobalt.client.WhatsAppClientListener> consumer) {
+    private void fireListeners(Consumer<WhatsAppClientListener> consumer) {
         for (var listener : whatsapp.store().listeners()) {
-            Thread.startVirtualThread(() -> consumer.accept(listener)); // NO_WA_BASIS
+            Thread.startVirtualThread(() -> consumer.accept(listener)); // ADAPTED: WAWebBackendApi.frontendFireAndForget
         }
     }
 

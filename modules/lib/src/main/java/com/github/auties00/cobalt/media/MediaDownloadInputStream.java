@@ -267,7 +267,6 @@ final class MediaDownloadInputStream extends MediaInputStream {
         // ADAPTED: WAWebMmsMediaTypes.MEDIA_TYPES
         // Allocates an inflater only for inflatable media types such as
         // md-app-state and md-msg-hist
-
         this.inflater = provider.mediaPath().inflatable() ? new Inflater() : null;
 
         this.buffer = new byte[BUFFER_LENGTH];
@@ -276,7 +275,6 @@ final class MediaDownloadInputStream extends MediaInputStream {
         // WAMediaCrypto.hmacAndDecrypt
         // Enables plaintextHash verification when the provider carries the
         // expected fileSha256 value
-
         this.expectedPlaintextSha256 = provider.mediaSha256().orElse(null);
         this.plaintextDigest = expectedPlaintextSha256 != null ? newHash() : null;
 
@@ -289,7 +287,6 @@ final class MediaDownloadInputStream extends MediaInputStream {
             // WAWebCryptoDecryptMedia.default
             // Enables encFilehash verification when the expected encrypted
             // SHA-256 is available
-
             this.expectedCiphertextSha256 = provider.mediaEncryptedSha256().orElse(null);
             this.ciphertextDigest = expectedCiphertextSha256 != null ? newHash() : null;
 
@@ -301,7 +298,6 @@ final class MediaDownloadInputStream extends MediaInputStream {
             // WAMediaCrypto.computeMediaKeys
             // HKDF-expands the 32-byte media key into 112 bytes and slices
             // it into IV (0..16), cipher key (16..48), and HMAC key (48..80)
-
             var expanded = deriveMediaKeyData(mediaKey, keyName);
             var iv = new IvParameterSpec(expanded, 0, IV_LENGTH);
             var cipherKey = new SecretKeySpec(expanded, IV_LENGTH, KEY_LENGTH, "AES");
@@ -310,20 +306,17 @@ final class MediaDownloadInputStream extends MediaInputStream {
             // WAMediaCrypto.hmacAndDecrypt
             // Initializes the AES-CBC decrypt cipher and the HMAC-SHA256
             // instance used to verify the authentication tag
-
             this.cipher = newCipher(Cipher.DECRYPT_MODE, cipherKey, iv);
             this.mac = newMac(macKey);
 
             // WAWebCryptoDecryptMedia.default
             // Primes the HMAC with the IV bytes so that the authentication
             // tag is computed over concat(iv, ciphertext)
-
             this.mac.update(expanded, 0, IV_LENGTH);
 
             // WAWebCryptoDecryptMedia.default
             // Reserves space for the trailing MAC bytes and records how
             // many ciphertext bytes precede them
-
             this.remainingText = payloadLength - MAC_LENGTH;
             this.macBuffer = new byte[MAC_LENGTH];
         } else {
@@ -445,7 +438,6 @@ final class MediaDownloadInputStream extends MediaInputStream {
                                 // WAMediaCrypto.hmacAndDecrypt
                                 // Reads the next ciphertext chunk from the
                                 // raw stream, bounded by the buffer size
-
                                 var toRead = (int) Math.min(buffer.length, remainingText);
                                 var read = rawInputStream.read(buffer, 0, toRead);
                                 if (read == -1) {
@@ -458,20 +450,17 @@ final class MediaDownloadInputStream extends MediaInputStream {
                                         // WAWebCryptoDecryptMedia.default
                                         // Extends the encFilehash digest
                                         // with the newly read ciphertext
-
                                         ciphertextDigest.update(buffer, 0, read);
                                     }
 
                                     // WAMediaCrypto.hmacAndDecrypt
                                     // Feeds the ciphertext chunk into the
                                     // HMAC over iv + ciphertext
-
                                     mac.update(buffer, 0, read);
 
                                     // WAMediaCrypto.hmacAndDecrypt
                                     // Decrypts in place producing the next
                                     // batch of plaintext bytes
-
                                     bufferOffset = 0;
                                     bufferLimit = cipher.update(buffer, 0, read, buffer, 0);
                                 } else {
@@ -483,7 +472,6 @@ final class MediaDownloadInputStream extends MediaInputStream {
                                     // WAMediaCrypto.hmacAndDecrypt
                                     // Extends the plaintext SHA-256 digest
                                     // over the decrypted bytes
-
                                     plaintextDigest.update(buffer, 0, bufferLimit);
                                 }
 
@@ -491,7 +479,6 @@ final class MediaDownloadInputStream extends MediaInputStream {
                                     // ADAPTED: WAWebMmsMediaTypes.MEDIA_TYPES
                                     // Feeds the decrypted bytes to the zlib
                                     // inflater for inflatable media types
-
                                     inflater.setInput(buffer, 0, bufferLimit);
 
                                     inflatedOffset = 0;
@@ -502,7 +489,6 @@ final class MediaDownloadInputStream extends MediaInputStream {
                                     // WAMediaCrypto.hmacAndDecrypt
                                     // Finalises the cipher and drains the
                                     // last padded plaintext block
-
                                     bufferOffset = 0;
                                     bufferLimit = cipher.doFinal(buffer, 0);
 
@@ -530,7 +516,6 @@ final class MediaDownloadInputStream extends MediaInputStream {
                             // WAMediaCrypto.hmacAndDecrypt
                             // Extracts the 10-byte MAC trailer from the
                             // downloaded payload, accumulating across reads
-
                             var toRead = MAC_LENGTH - macBufferOffset;
                             if (toRead > 0) {
                                 var read = rawInputStream.read(macBuffer, macBufferOffset, toRead);
@@ -545,7 +530,6 @@ final class MediaDownloadInputStream extends MediaInputStream {
                                     // WAWebCryptoDecryptMedia.default
                                     // encFilehash covers ciphertext + the
                                     // 10-byte HMAC trailer
-
                                     ciphertextDigest.update(macBuffer);
                                 }
 
@@ -562,7 +546,6 @@ final class MediaDownloadInputStream extends MediaInputStream {
                                     // Compares the running encFilehash
                                     // against the expected value in
                                     // constant time
-
                                     var actualCiphertextSha256 = ciphertextDigest.digest();
                                     if (!MessageDigest.isEqual(expectedCiphertextSha256, actualCiphertextSha256)) {
                                         throw new WhatsAppMediaException.Download("Ciphertext SHA256 hash doesn't match the expected value");
@@ -573,7 +556,6 @@ final class MediaDownloadInputStream extends MediaInputStream {
                                 // Finalises the HMAC and compares its first
                                 // 10 bytes against the trailer in constant
                                 // time (N function in the WA Web source)
-
                                 var actualCiphertextMac = mac.doFinal();
                                 if (!MessageDigest.isEqual(
                                         Arrays.copyOf(macBuffer, MAC_LENGTH),
@@ -586,7 +568,6 @@ final class MediaDownloadInputStream extends MediaInputStream {
                                 // WAMediaCrypto.hmacAndDecrypt
                                 // Verifies the plaintext hash so that the
                                 // decrypted bytes match the sender's copy
-
                                 var actualPlaintextSha256 = plaintextDigest.digest();
                                 if (!MessageDigest.isEqual(expectedPlaintextSha256, actualPlaintextSha256)) {
                                     throw new WhatsAppMediaException.Download("Plaintext SHA256 hash doesn't match the expected value");

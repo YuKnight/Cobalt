@@ -1,6 +1,9 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
@@ -26,6 +29,7 @@ import java.util.logging.Logger;
  *           ({@code var _ = new p(); l.default = _}) of a class extending
  *           {@code WAWebSyncdAction.AccountSyncdActionBase}
  */
+@WhatsAppWebModule(moduleName = "WAWebNctSaltSync")
 public final class NctSaltSyncHandler implements WebAppStateActionHandler {
     /**
      * Logger for this handler.
@@ -43,6 +47,7 @@ public final class NctSaltSyncHandler implements WebAppStateActionHandler {
      *
      * @implNote WAWebNctSaltSync — {@code var _ = new p(); l.default = _}
      */
+    @WhatsAppWebExport(moduleName = "WAWebNctSaltSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final NctSaltSyncHandler INSTANCE = new NctSaltSyncHandler();
 
     /**
@@ -53,6 +58,7 @@ public final class NctSaltSyncHandler implements WebAppStateActionHandler {
      *           on {@code AccountSyncdActionBase}, which Cobalt exposes via
      *           {@link #collectionName()} instead of a constructor side effect
      */
+    @WhatsAppWebExport(moduleName = "WAWebNctSaltSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private NctSaltSyncHandler() {
 
     }
@@ -65,6 +71,7 @@ public final class NctSaltSyncHandler implements WebAppStateActionHandler {
      * @return the action type name
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebNctSaltSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
         return NctSaltSyncAction.ACTION_NAME; // WAWebNctSaltSync.getAction: o("WASyncdConst").Actions.NctSaltSync
     }
@@ -77,6 +84,7 @@ public final class NctSaltSyncHandler implements WebAppStateActionHandler {
      * @return the sync patch type / collection name
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebNctSaltSync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
         return NctSaltSyncAction.COLLECTION_NAME; // WAWebNctSaltSync: e.collectionName = CollectionName.RegularHigh
     }
@@ -88,6 +96,7 @@ public final class NctSaltSyncHandler implements WebAppStateActionHandler {
      * @return the handler's supported mutation version
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebNctSaltSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return NctSaltSyncAction.ACTION_VERSION; // WAWebNctSaltSync.getVersion: return 1
     }
@@ -106,6 +115,7 @@ public final class NctSaltSyncHandler implements WebAppStateActionHandler {
      * @return {@code true} if the mutation was applied successfully, {@code false} otherwise
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebNctSaltSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebNctSaltSync.applyMutations: countWhere(i, e => e.actionState === Success)
     }
@@ -140,6 +150,7 @@ public final class NctSaltSyncHandler implements WebAppStateActionHandler {
      * @return the detailed application result
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebNctSaltSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.DIRECT)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         // WAWebNctSaltSync.$NctSaltSync$p_1: if (e.operation === "remove")
         if (mutation.operation() == SyncdOperation.REMOVE) {

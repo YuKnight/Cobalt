@@ -29,4 +29,7 @@ public interface CtwaConsumerDisclosureEvent extends WamEventSpec {
 
     @WamProperty(index = 2, type = WamType.ENUM)
     Optional<DisclosureType> disclosureType();
+
+    @WamProperty(index = 6, type = WamType.STRING)
+    Optional<String> threadIdHmac();
 }

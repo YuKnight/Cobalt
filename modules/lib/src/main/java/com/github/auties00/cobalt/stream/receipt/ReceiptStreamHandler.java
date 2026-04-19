@@ -9,27 +9,58 @@ import com.github.auties00.cobalt.stream.call.CallReceiptStreamHandler;
 
 /**
  * Dispatches incoming {@code <receipt>} stanzas to the appropriate specialised
- * handler based on the child tag they carry.
+ * handler based on the child tag they carry and the stanza {@code type}.
  *
- * <p>WhatsApp multiplexes two distinct receipt flows onto the same stanza tag:
+ * <p>WhatsApp multiplexes three distinct receipt flows onto the same stanza tag:
  * <ul>
  *   <li>Call receipts: carry an {@code <offer>}, {@code <accept>}, or
  *       {@code <reject>} child and acknowledge the state of a VoIP call
  *       signalling message</li>
+ *   <li>Retry receipts: have {@code type="retry"} or
+ *       {@code type="enc_rekey_retry"} and request a re-send of a previously
+ *       failed-to-decrypt message</li>
  *   <li>Message receipts: acknowledge delivery, read, and play states for
- *       individual or group messages</li>
+ *       individual or group messages (every other receipt)</li>
  * </ul>
  *
  * <p>This handler inspects the first child of the incoming stanza, routes
  * call receipts to the {@link CallReceiptStreamHandler}, and forwards
- * everything else to the {@link MessageReceiptStreamHandler}.
+ * everything else (both retry and regular message receipts) to the
+ * {@link MessageReceiptStreamHandler}, which performs the secondary
+ * {@code retry}/{@code enc_rekey_retry} split internally.
  *
- * @implNote WA Web dispatches the same two paths inline inside its
- * {@code WAWebHandleReceipt} module using {@code hasChild} checks on
- * {@code offer}/{@code accept}/{@code reject}. Cobalt splits the two paths
- * into dedicated handler classes for testability.
+ * @implNote WA Web splits this dispatch across three sibling modules:
+ * <ul>
+ *   <li>{@code WAWebCommsHandleMessagingStanza.handleMessagingStanza}
+ *       handles the non-call, non-retry receipt branch by calling
+ *       {@code WAWebHandleMsgReceipt(e)} when
+ *       {@code !isCallReceipt(e) && attrs.type !== "retry"}</li>
+ *   <li>{@code WAWebCommsHandleWorkerCompatibleStanza.handleWorkerCompatibleStanza}
+ *       handles call receipts by calling
+ *       {@code WAWebHandleVoipCallReceipt.handleCallReceipt(t)} when
+ *       {@code WAWebCommsHandleStanzaUtils.isCallReceipt(t)} returns
+ *       {@code true}. Its {@code isCallReceipt} implementation checks
+ *       {@code content[0].tag} against the literals
+ *       {@code "offer"}, {@code "accept"}, and {@code "reject"}</li>
+ *   <li>{@code WAWebCommsHandleLoggedInStanza.handleLoggedInStanza}
+ *       handles retry receipts by calling
+ *       {@code WAWebHandleMessageRetryRequest.handleMessageRetryRequest(e)}
+ *       when {@code attrs.type === "retry" || attrs.type === "enc_rekey_retry"},
+ *       otherwise it emits a {@code WALogger.WARN} "Unhandled receipt stanza"
+ *       log line</li>
+ * </ul>
+ * Cobalt collapses these three entry points into a single dispatch class
+ * that performs the call-receipt branch inline and delegates the remaining
+ * branch (retry vs. regular) to {@link MessageReceiptStreamHandler}. The
+ * WA Web parse-failure recovery (nack with
+ * {@code NackReason.ParsingError}/{@code UnhandledError}) is replaced by
+ * Cobalt's configurable {@code WhatsAppClientErrorHandler} pipeline and
+ * lives outside this class.
  */
-@WhatsAppWebModule(moduleName = "WAWebHandleReceipt")
+@WhatsAppWebModule(moduleName = "WAWebCommsHandleWorkerCompatibleStanza")
+@WhatsAppWebModule(moduleName = "WAWebCommsHandleLoggedInStanza")
+@WhatsAppWebModule(moduleName = "WAWebCommsHandleMessagingStanza")
+@WhatsAppWebModule(moduleName = "WAWebCommsHandleStanzaUtils")
 public final class ReceiptStreamHandler implements SocketStream.Handler {
     /**
      * Handler for VoIP call receipts carrying {@code <offer>},
@@ -58,17 +89,39 @@ public final class ReceiptStreamHandler implements SocketStream.Handler {
 
     /**
      * Routes an incoming {@code <receipt>} stanza to the appropriate
-     * specialised handler based on its first child.
+     * specialised handler.
+     *
+     * <p>Call receipts (first child is {@code <offer>}, {@code <accept>}, or
+     * {@code <reject>}) are forwarded to the {@link CallReceiptStreamHandler}.
+     * All other receipts — both {@code retry}/{@code enc_rekey_retry} and
+     * regular delivery/read/played — are forwarded to the
+     * {@link MessageReceiptStreamHandler}, which performs the retry vs.
+     * message-receipt split internally.
      *
      * @param node the incoming {@code <receipt>} stanza
+     * @implNote Combines the three WA Web dispatch paths:
+     *           {@code WAWebCommsHandleWorkerCompatibleStanza.handleWorkerCompatibleStanza}
+     *           (call receipts),
+     *           {@code WAWebCommsHandleMessagingStanza.handleMessagingStanza}
+     *           (non-call, non-retry receipts), and
+     *           {@code WAWebCommsHandleLoggedInStanza.handleLoggedInStanza}
+     *           (retry receipts).
      */
     @Override
     public void handle(Node node) {
+        // WAWebCommsHandleWorkerCompatibleStanza.handleWorkerCompatibleStanza:
+        //     if (isCallReceipt(t)) return WAWebHandleVoipCallReceipt.handleCallReceipt(t)
         if (isCallReceipt(node)) {
             callReceiptHandler.handle(node);
             return;
         }
 
+        // WAWebCommsHandleMessagingStanza.handleMessagingStanza:
+        //     if (!isCallReceipt(e) && t.type !== "retry") return WAWebHandleMsgReceipt(e)
+        // WAWebCommsHandleLoggedInStanza.handleLoggedInStanza:
+        //     if (n.type === "retry" || n.type === "enc_rekey_retry") return handleMessageRetryRequest(e)
+        // Both branches land in MessageReceiptStreamHandler, which internally
+        // splits retry vs. regular via isRetryReceipt().
         messageReceiptHandler.handle(node);
     }
 
@@ -89,11 +142,18 @@ public final class ReceiptStreamHandler implements SocketStream.Handler {
      * @param node the {@code <receipt>} stanza to classify
      * @return {@code true} if the first child is {@code <offer>},
      *         {@code <accept>}, or {@code <reject>}; {@code false} otherwise
-     * @implNote WA Web performs the same classification inline using
-     * {@code hasChild} on the three call signalling tags.
+     * @implNote Mirrors
+     * {@code WAWebCommsHandleStanzaUtils.isCallReceipt}, which checks
+     * {@code Array.isArray(e.content) && e.content.length > 0} and then
+     * matches {@code e.content[0].tag} against the literals
+     * {@code "offer"}, {@code "accept"}, and {@code "reject"}.
      */
     private boolean isCallReceipt(Node node) {
+        // WAWebCommsHandleStanzaUtils.isCallReceipt:
+        //     Array.isArray(e.content) && e.content.length > 0
         var child = node.getChild().orElse(null);
+        // WAWebCommsHandleStanzaUtils.isCallReceipt:
+        //     t === "offer" || t === "accept" || t === "reject"
         return child != null && switch (child.description()) {
             case "offer", "accept", "reject" -> true;
             default -> false;

@@ -94,12 +94,10 @@ public final class MessageDedup {
 
         // WAWebMessageDedupUtils.addPendingMessage
         // Increments the reference count for this key atomically, inserting 1 for a new entry
-
         var newCount = pending.merge(key, 1, Integer::sum);
 
         // WAWebMessageDedupUtils.addPendingMessage
         // Logs the add event mirroring the JS tagged-template log message
-
         LOGGER.log(System.Logger.Level.DEBUG,
                 "[message-dedup] add message: {0}, total: {1}", key, newCount);
 
@@ -128,7 +126,6 @@ public final class MessageDedup {
 
         // WAWebMessageDedupUtils.hasPendingMessage
         // Looks up the reference count for this key, returning false when absent
-
         var count = pending.get(key);
         if (count == null) {
             return false;
@@ -136,7 +133,6 @@ public final class MessageDedup {
 
         // WAWebMessageDedupUtils.hasPendingMessage
         // Logs the pending hit mirroring the JS tagged-template log message
-
         LOGGER.log(System.Logger.Level.DEBUG,
                 "[message-dedup] message {0} is pending, total: {1}", key, count);
         return true;
@@ -163,12 +159,10 @@ public final class MessageDedup {
     public void maybeClear(int count) {
         // WAWebMessageDedupUtils.maybeClearPendingMessages
         // Clears the cache only when the offline-delivery counter has reached zero
-
         if (count == 0) {
             if (!pending.isEmpty()) {
                 // WAWebMessageDedupUtils.maybeClearPendingMessages
                 // Logs the clear event with the pre-clear size, matching the JS format
-
                 LOGGER.log(System.Logger.Level.DEBUG,
                         "[message-dedup] message cache cleared, total: {0}", pending.size());
             }
@@ -186,7 +180,6 @@ public final class MessageDedup {
      */
     public void clear() {
         // Convenience helper that reuses maybeClear with a zero counter
-
         maybeClear(0);
     }
 
@@ -206,7 +199,6 @@ public final class MessageDedup {
         Objects.requireNonNull(key, "key");
 
         // Atomically decrements the counter; removes the entry when the counter reaches zero
-
         pending.compute(key, (_, count) -> {
             if (count == null) {
                 return null;

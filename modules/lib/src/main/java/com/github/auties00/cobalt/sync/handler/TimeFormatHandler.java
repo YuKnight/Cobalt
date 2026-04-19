@@ -1,12 +1,23 @@
 package com.github.auties00.cobalt.sync.handler;
 
+import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncActionState;
+import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.device.TimeFormatAction;
+import com.github.auties00.cobalt.model.sync.action.device.TimeFormatActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Objects;
 
 /**
  * Applies {@code time_format} mutations decoded from app state sync.
@@ -30,6 +41,7 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  *           {@code applyMutations()} implementing the per-mutation time
  *           format apply.
  */
+@WhatsAppWebModule(moduleName = "WAWebTimeFormatSync")
 public final class TimeFormatHandler implements WebAppStateActionHandler {
     /**
      * Singleton instance of this handler.
@@ -40,6 +52,7 @@ public final class TimeFormatHandler implements WebAppStateActionHandler {
      *
      * @implNote WAWebTimeFormatSync — {@code var u = new s; l.default = u}
      */
+    @WhatsAppWebExport(moduleName = "WAWebTimeFormatSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final TimeFormatHandler INSTANCE = new TimeFormatHandler();
 
     /**
@@ -51,6 +64,7 @@ public final class TimeFormatHandler implements WebAppStateActionHandler {
      * @implNote WAWebTimeFormatSync — hidden {@code function r()} constructor
      *           that only initializes {@code this.collectionName = RegularLow}
      */
+    @WhatsAppWebExport(moduleName = "WAWebTimeFormatSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private TimeFormatHandler() {
 
     }
@@ -64,6 +78,7 @@ public final class TimeFormatHandler implements WebAppStateActionHandler {
      * @return the constant {@link TimeFormatAction#ACTION_NAME}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebTimeFormatSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
         return TimeFormatAction.ACTION_NAME; // WAWebTimeFormatSync.getAction -> Actions.TimeFormat
     }
@@ -79,6 +94,7 @@ public final class TimeFormatHandler implements WebAppStateActionHandler {
      *         {@link SyncPatchType#REGULAR_LOW}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebTimeFormatSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
         return TimeFormatAction.COLLECTION_NAME; // WAWebTimeFormatSync -> CollectionName.RegularLow
     }
@@ -90,6 +106,7 @@ public final class TimeFormatHandler implements WebAppStateActionHandler {
      * @return the constant {@link TimeFormatAction#ACTION_VERSION}, always {@code 7}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebTimeFormatSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return TimeFormatAction.ACTION_VERSION; // WAWebTimeFormatSync.getVersion -> 7
     }
@@ -111,6 +128,7 @@ public final class TimeFormatHandler implements WebAppStateActionHandler {
      * @return {@code true} if the apply succeeded, {@code false} otherwise
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebTimeFormatSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: WAWebTimeFormatSync.applyMutations
     }
@@ -166,6 +184,7 @@ public final class TimeFormatHandler implements WebAppStateActionHandler {
      *         {@link MutationApplicationResult#success()} otherwise
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebTimeFormatSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         // WAWebTimeFormatSync.applyMutations: if (e.operation !== "set") return r++, {actionState: Unsupported}
         if (mutation.operation() != SyncdOperation.SET) {
@@ -187,8 +206,49 @@ public final class TimeFormatHandler implements WebAppStateActionHandler {
         // NO_WA_BASIS: the WA Web "r" unsupported counter and the trailing
         // WALogger.WARN("time format sync: %s operations not supported", r)
         // are intentionally dropped as telemetry-only logging.
-
         // WAWebTimeFormatSync.applyMutations: return {actionState: Success}
         return MutationApplicationResult.success();
+    }
+
+    /**
+     * Builds a pending {@code time_format} mutation that broadcasts the
+     * given 12h/24h preference to every linked device.
+     *
+     * <p>WA Web does not expose a dedicated {@code getTimeFormatMutation} on
+     * {@code WAWebTimeFormatSync}; outgoing time-format changes reuse
+     * {@code WAWebSyncdActionUtils.buildPendingMutation} directly. Cobalt
+     * surfaces the typed helper — mirroring sibling handlers — so the public
+     * {@code WhatsAppClient.changeTwentyFourHourFormat} setter can build a single
+     * mutation without hand-rolling the protobuf wrapping.
+     *
+     * @implNote ADAPTED: WAWebSyncdActionUtils.buildPendingMutation — shaped
+     *           after {@code WAWebDisableLinkPreviewsSync.getMutation} (same
+     *           {@code collection / indexArgs=[] / value / version / operation=SET
+     *           / timestamp / action} payload).
+     * @param timestamp               the mutation timestamp
+     * @param twentyFourHourFormat    {@code true} to enable 24-hour display,
+     *                                {@code false} for 12-hour display
+     * @return a pending mutation carrying the {@code time_format} action
+     * @throws NullPointerException if {@code timestamp} is {@code null}
+     */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdActionUtils", exports = "buildPendingMutation", adaptation = WhatsAppAdaptation.ADAPTED)
+    public SyncPendingMutation getTimeFormatMutation(Instant timestamp, boolean twentyFourHourFormat) {
+        Objects.requireNonNull(timestamp, "timestamp cannot be null");
+        var action = new TimeFormatActionBuilder() // ADAPTED: WAWebSyncdActionUtils.buildPendingMutation value shape: {timeFormatAction: {isTwentyFourHourFormatEnabled: t}}
+                .isTwentyFourHourFormatEnabled(twentyFourHourFormat)
+                .build();
+        var value = new SyncActionValueBuilder()
+                .timestamp(timestamp)
+                .timeFormatAction(action)
+                .build();
+        var index = JSON.toJSONString(List.of(actionName())); // ADAPTED: WAWebSyncdActionUtils.buildPendingMutation: index = JSON.stringify([action]) with indexArgs = []
+        var pending = new DecryptedMutation.Trusted(
+                index,
+                value,
+                SyncdOperation.SET, // ADAPTED: WAWebSyncdActionUtils.buildPendingMutation: operation: SyncdOperation.SET
+                timestamp,
+                version()
+        );
+        return new SyncPendingMutation(pending, 0);
     }
 }

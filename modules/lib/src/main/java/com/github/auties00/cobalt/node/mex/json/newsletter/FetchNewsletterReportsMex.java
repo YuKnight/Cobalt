@@ -72,11 +72,9 @@ public sealed interface FetchNewsletterReportsMex extends MexJsonOperation permi
         public NodeBuilder toNode() {
             // WAWebMexFetchNewsletterReportsJob.mexFetchNewsletterReports
             // Opens a UTF-8 JSON writer that will serialise the GraphQL variables envelope
-
             try (var writer = JSONWriter.ofUTF8()) {
                 // WAWebMexFetchNewsletterReportsJob.mexFetchNewsletterReports
                 // Begins the outer envelope and the nested "variables" object consumed by WAWebMexClient.fetchQuery
-
                 writer.startObject();
                 writer.writeName("variables");
                 writer.writeColon();
@@ -409,7 +407,6 @@ public sealed interface FetchNewsletterReportsMex extends MexJsonOperation permi
         private static Optional<Response> of(byte[] json) {
             // WAWebMexFetchNewsletterReportsJob.mexFetchNewsletterReports
             // Parses the raw JSON payload, bailing out if fastjson2 returns null
-
             var jsonObject = JSON.parseObject(json);
             if (jsonObject == null) {
                 return Optional.empty();
@@ -417,7 +414,6 @@ public sealed interface FetchNewsletterReportsMex extends MexJsonOperation permi
 
             // WAWebMexFetchNewsletterReportsJob.mexFetchNewsletterReports
             // Descends into the standard GraphQL "data" envelope
-
             var data = jsonObject.getJSONObject("data");
             if (data == null) {
                 return Optional.empty();
@@ -425,7 +421,6 @@ public sealed interface FetchNewsletterReportsMex extends MexJsonOperation permi
 
             // WAWebMexFetchNewsletterReportsJob.mexFetchNewsletterReports
             // Extracts the operation-specific root keyed by xwa2_channels_reports
-
             var root = data.getJSONObject("xwa2_channels_reports");
             if (root == null) {
                 return Optional.empty();

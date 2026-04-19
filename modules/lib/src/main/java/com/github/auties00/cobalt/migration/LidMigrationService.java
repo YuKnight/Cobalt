@@ -394,7 +394,6 @@ public final class LidMigrationService {
 
             // WAWebLid1x1MigrationTimeoutUtils.shouldScheduleTimeoutForMissingPeerMessage
             // Reads the peer-sync timeout from AB props; a value of 0 disables the logout scheduling
-
             var timeoutSeconds = abPropsService.getInt(ABProp.LID_ONE_ON_ONE_MIGRATION_PEER_SYNC_TIMEOUT_IN_SECONDS);
             if (timeoutSeconds == 0) {
                 LOGGER.log(System.Logger.Level.INFO, "LID migration peer sync timeout disabled by AB prop");
@@ -403,7 +402,6 @@ public final class LidMigrationService {
 
             // WAWebLid1x1MigrationTimeout.scheduleLogoutIfNeeded
             // Arms a delayed task that fails the migration if mappings have not arrived when it fires
-
             mappingTimeoutFuture = SchedulerUtils.scheduleDelayed(
                     Duration.ofSeconds(timeoutSeconds),
                     () -> {
@@ -466,7 +464,6 @@ public final class LidMigrationService {
     public void processProtocolMessage(LIDMigrationMappingSyncPayload payload) {
         // WAWebLid1X1ThreadAccountMigrations.setLidMigrationMappings
         // A null payload means the peer message could not be decoded, which forces a logout in WA Web
-
         if (payload == null) {
             handleError(new WhatsAppLidMigrationException.FailedToParseMappings("null payload"));
             return;
@@ -474,7 +471,6 @@ public final class LidMigrationService {
 
         // WAWebLid1X1ThreadAccountMigrations.setLidMigrationMappings
         // Ignores mappings that arrive outside the WAITING_PROP/WAITING_MAPPINGS window
-
         var currentState = state.get();
         if (currentState != LidMigrationState.WAITING_MAPPINGS && currentState != LidMigrationState.WAITING_PROP) {
             LOGGER.log(System.Logger.Level.DEBUG, "Ignoring mappings in state: {0}", currentState);
@@ -484,7 +480,6 @@ public final class LidMigrationService {
         try {
             // WAWebLid1x1MigrationTimeout.scheduleLogoutIfNeeded
             // Cancels the peer-sync timeout now that mappings have arrived
-
             var timeout = mappingTimeoutFuture;
             if (timeout != null) {
                 timeout.cancel(false);
@@ -493,17 +488,14 @@ public final class LidMigrationService {
 
             // ADAPTED: WAWebLid1X1ThreadAccountMigrations.setLidMigrationMappings
             // Records the receive timestamp to serve as a fallback when no primary migration timestamp is reported
-
             this.receiveTimestamp = Instant.now();
 
             // WAWebLid1x1MigrationMsgParser.parseLidMigrationMappingSyncMsg
             // Extracts the mapping list; the parser tolerates an empty list and returns {mappings: [], primaryMigrationTsSec: null}
-
             var mappings = payload.pnToLidMappings();
 
             // WAWebLid1x1MigrationPrimaryCache.lidPnMigrationPrimaryCache
             // Mirrors the primaryMigrationTsSec assignment: null for empty mappings, payload value otherwise
-
             if (mappings.isEmpty()) {
                 this.chatDbMigrationTimestamp = null;
             } else {
@@ -515,21 +507,18 @@ public final class LidMigrationService {
 
             // WAWebLid1x1MigrationPrimaryCache.lidPnMigrationPrimaryCache
             // Walks every mapping entry and populates the assigned/latest LID caches plus known contacts
-
             for (var mapping : mappings) {
                 processSingleMapping(mapping);
             }
 
             // WAWebLid1X1ThreadAccountMigrations.setLidMigrationMappings
             // Transitions the machine to READY once the caches have been loaded
-
             state.set(LidMigrationState.READY);
             LOGGER.log(System.Logger.Level.INFO, "LID migration ready with {0} assigned mappings, {1} latest mappings",
                     primaryPnToAssignedLidCache.size(), primaryPnToLatestLidCache.size());
 
             // WAWebLid1x1MigrationManager.executeMigrationIfNeeded
             // Triggers the chat sweep immediately so the UI observes a consistent addressing mode
-
             if (shouldAutoStartMigration()) {
                 executeMigration();
             }
@@ -537,7 +526,6 @@ public final class LidMigrationService {
         } catch (Throwable throwable) {
             // WAWebLid1x1MigrationMsgParser.parseLidMigrationMappingSyncMsg
             // Any unexpected parse failure becomes a logout-worthy error in WA Web and a fatal exception in Cobalt
-
             handleError(new WhatsAppLidMigrationException.FailedToParseMappings("error processing mappings", throwable));
         }
     }
@@ -660,7 +648,6 @@ public final class LidMigrationService {
 
         // WAWebLid1X1ThreadAccountMigrations
         // Registers the bidirectional mapping in the store and mirrors it onto an existing contact when present
-
         store.registerLidMapping(pnJid, lidJid);
         store.findContactByJid(pnJid).ifPresent(contact -> contact.setLid(lidJid));
 
@@ -690,7 +677,6 @@ public final class LidMigrationService {
 
         // WAWebLid1X1ThreadAccountMigrations
         // Restricts processing to 1:1 chats; groups and broadcast JIDs are not part of LID migration
-
         if (!chatJid.hasUserServer() && !chatJid.hasLidServer()) {
             return false;
         }
@@ -700,7 +686,6 @@ public final class LidMigrationService {
 
         // WAWebLid1X1ThreadAccountMigrations
         // Picks the paired JID from either phoneNumberJid (LID chat) or lid (PN chat)
-
         if (chatJid.hasLidServer()) {
             phoneJid = conversation.phoneNumberJid().orElse(null);
             lidJid = chatJid;
@@ -718,7 +703,6 @@ public final class LidMigrationService {
 
         // WAWebLid1X1ThreadAccountMigrations
         // Persists the mapping in the store and propagates it to the contact and chat objects
-
         store.registerLidMapping(phoneJid, lidJid);
         store.findContactByJid(phoneJid).ifPresent(contact -> contact.setLid(lidJid));
         conversation.setLid(lidJid);
@@ -754,26 +738,22 @@ public final class LidMigrationService {
 
         // WAWebLid1x1MigrationMsgParser.parseLidMigrationMappingSyncMsg
         // Normalises the PN entry to a user-level JID via asUserWidOrThrow
-
         var jid = mapping.pn();
         var user = jid.user();
 
         // WAWebLid1x1MigrationPrimaryCache.lidPnMigrationPrimaryCache
         // Writes the assigned LID into the $2 table keyed by the PN user part
-
         var assignedLid = mapping.assignedLid();
         primaryPnToAssignedLidCache.put(user, assignedLid);
 
         // WAWebLid1x1MigrationPrimaryCache.lidPnMigrationPrimaryCache
         // Optionally writes the latest LID into the $3 table when the mapping reports one
-
         mapping.latestLid().ifPresent(latest ->
                 primaryPnToLatestLidCache.put(user, latest)
         );
 
         // ADAPTED: WAWebLid1x1MigrationPrimaryCache.lidPnMigrationPrimaryCache
         // WA Web defers contact and store updates to learnMappingsInBulk; Cobalt updates eagerly for known contacts
-
         store.findContactByJid(jid).ifPresent(contact -> {
             contact.setLid(assignedLid);
             store.registerLidMapping(jid, assignedLid);
@@ -1067,7 +1047,6 @@ public final class LidMigrationService {
         // ADAPTED: ne() (contactInfoCard) check is omitted because Cobalt's protobuf-based
         // ChatMessageInfo model does not expose the message subtype field needed to identify
         // ContactInfoCard messages. WA Web's subtype is an internal DB field, not protobuf.
-
         // ADAPTED: WAWebLid1X1ThreadAccountMigrations.K: !a && e.createdLocally !== true
         // Cobalt's Chat model does not track the createdLocally field.
         // WA Web blocks deletion when !a AND !createdLocally.
@@ -1077,7 +1056,6 @@ public final class LidMigrationService {
         // non-broadcast and non-createdLocally, but the message content check
         // (allSafeStubs || allStubsOrCallLog || broadcastExempt) at the end
         // provides the primary safety net.
-
         // Ephemeral settings check — NOT deletable unless exempted
         // WAWebLid1X1ThreadAccountMigrations.K: (e.ephemeralDuration != null || e.ephemeralSettingTimestamp != null) && !re(e, r)
         if (hasEphemeralSettings(chat) && !isEphemeralExempt(chat, messages)) {
@@ -1170,7 +1148,6 @@ public final class LidMigrationService {
     private boolean allMessagesAreSafeStubsOrBroadcast(Collection<ChatMessageInfo> messages) {
         // WAWebLid1X1ThreadAccountMigrations.te
         // Tracks whether at least one broadcast message was observed because the predicate requires both conditions
-
         var hasBroadcast = false;
         for (var msg : messages) {
             if (isMigrationSafeStub(msg)) {
@@ -1225,7 +1202,6 @@ public final class LidMigrationService {
     private boolean isPairingTimestampAtOrBefore(Instant messageTimestamp) {
         // WAWebUserPrefsMultiDevice.getPairingTimestamp
         // Reads the pairing timestamp stored when the client linked to the primary device
-
         var pairingTs = store.pairingTimestamp().orElse(null);
         if (pairingTs == null) {
             return false;
@@ -1233,7 +1209,6 @@ public final class LidMigrationService {
 
         // WAWebLid1X1ThreadAccountMigrations.H
         // Equivalent to H(...) === "false": pairingTimestamp != null and messageTimestamp >= pairingTimestamp
-
         return !messageTimestamp.isBefore(pairingTs);
     }
 
@@ -1360,7 +1335,6 @@ public final class LidMigrationService {
 
         // WAWebLid1X1ThreadAccountMigrations.migrate1x1Chats
         // Looks up the chat object; missing chats simply skip this resolution with a warning
-
         var chat = store.findChatByJid(originalJid).orElse(null);
         if (chat == null) {
             LOGGER.log(System.Logger.Level.WARNING, "Chat not found for migration: {0}", originalJid);
@@ -1369,13 +1343,11 @@ public final class LidMigrationService {
 
         // WAWebLid1X1ThreadAccountMigrations.migrate1x1Chats
         // Rewrites the chat key to the target LID while preserving the original PN as metadata
-
         chat.setLid(targetLid);
         chat.setPhoneNumberJid(originalJid);
 
         // WAWebLid1X1ThreadAccountMigrations.migrate1x1Chats
         // Registers the mapping bidirectionally and mirrors it onto the associated contact
-
         store.registerLidMapping(originalJid, targetLid);
         store.findContactByJid(originalJid).ifPresent(contact -> contact.setLid(targetLid));
 
@@ -1398,7 +1370,6 @@ public final class LidMigrationService {
 
         // WAWebLid1X1ThreadAccountMigrations.migrate1x1Chats
         // Removes the chat from the store; downstream consumers receive the removal as a normal store event
-
         var removed = store.removeChat(originalJid);
         if (removed.isPresent()) {
             LOGGER.log(System.Logger.Level.DEBUG, "Deleted chat {0}: {1}", originalJid, delete.reason());
@@ -1423,7 +1394,6 @@ public final class LidMigrationService {
 
         // WAWebLid1x1MigrationPrimaryCache.lidPnMigrationPrimaryCache
         // Overwrites both the assigned and latest LID caches with the new value
-
         if (phoneJid.user() != null) {
             primaryPnToAssignedLidCache.put(phoneJid.user(), newLid);
             primaryPnToLatestLidCache.put(phoneJid.user(), newLid);
@@ -1431,7 +1401,6 @@ public final class LidMigrationService {
 
         // WAWebLid1X1ThreadAccountMigrations
         // Propagates the change through the store, the contact record, and the chat if one exists
-
         store.registerLidMapping(phoneJid, newLid);
         store.findContactByJid(phoneJid).ifPresent(contact -> contact.setLid(newLid));
         store.findChatByJid(phoneJid).ifPresent(chat -> {
@@ -1591,7 +1560,6 @@ public final class LidMigrationService {
     public void reset() {
         // WAWebLid1x1MigrationTimeout.scheduleLogoutIfNeeded
         // Cancels any armed logout timer so the reconnect path can re-arm it from a clean slate
-
         var timeout = mappingTimeoutFuture;
         if (timeout != null) {
             timeout.cancel(false);
@@ -1600,7 +1568,6 @@ public final class LidMigrationService {
 
         // Cobalt state machine reset
         // Leaves terminal states (COMPLETE, FAILED, DISABLED) intact so a session bounce does not reopen the migration
-
         var currentState = state.get();
         if (!currentState.isTerminal()) {
             state.set(LidMigrationState.NOT_STARTED);
@@ -1629,7 +1596,6 @@ public final class LidMigrationService {
 
         // WAWebLid1x1MigrationPrimaryCache.lidPnMigrationPrimaryCache
         // Checks the primary assigned-LID cache populated from the mapping sync message
-
         var cached = primaryPnToAssignedLidCache.get(phoneJid.user());
         if (cached != null) {
             return Optional.of(cached);
@@ -1637,7 +1603,6 @@ public final class LidMigrationService {
 
         // Cobalt extension to WAWebLid1x1MigrationPrimaryCache.getLidForPn
         // Falls back to the persistent store mapping for LIDs learned through history sync and other channels
-
         return store.findLidByPhone(phoneJid);
     }
 
@@ -1700,7 +1665,6 @@ public final class LidMigrationService {
 
         // WAWebLidMigrationUtils.shouldHaveAccountLid
         // Combines the migration-complete flag with the regular-user predicate
-
         return isLidMigrated() && isRegularUser(jid);
     }
 
@@ -1717,10 +1681,9 @@ public final class LidMigrationService {
      */
     @WhatsAppWebExport(moduleName = "WAWebWid", exports = "isRegularUser",
             adaptation = WhatsAppAdaptation.DIRECT)
-    private static boolean isRegularUser(Jid jid) {
+    public static boolean isRegularUser(Jid jid) { // WAWebWid.isRegularUser - promoted to public so stream handlers can reuse it instead of inlining the predicate
         // WAWebWid.isUser
         // Fails fast for any JID whose server is not one of the user-like servers
-
         if (!jid.hasUserServer() && !jid.hasLidServer() && !jid.hasBotServer()
                 && !jid.hasHostedServer() && !jid.hasHostedLidServer()) {
             return false;
@@ -1728,14 +1691,12 @@ public final class LidMigrationService {
 
         // WAWebWid.isPSA
         // Excludes the special announcements account 0@s.whatsapp.net
-
         if (jid.equals(Jid.announcementsAccount())) {
             return false;
         }
 
         // WAWebWid.isBot
         // Excludes PN bots and FBID bots
-
         if (jid.isBot()) {
             return false;
         }
@@ -1770,14 +1731,12 @@ public final class LidMigrationService {
 
         // WAWebLidMigrationUtils.toPn
         // Returns the JID unchanged when it is not a LID; there is nothing to translate
-
         if (!jid.hasLidServer()) {
             return jid;
         }
 
         // WAWebLidMigrationUtils.toPn
         // Delegates to the store's LID to phone-number lookup
-
         return store.findPhoneByLid(jid).orElse(null);
     }
 
@@ -1810,14 +1769,12 @@ public final class LidMigrationService {
 
         // WAWebLidMigrationUtils.toLid
         // Returns the JID unchanged when it is already on the LID server
-
         if (jid.hasLidServer()) {
             return jid;
         }
 
         // WAWebLidMigrationUtils.toLid
         // Normalises the JID via asUserWidOrThrow and looks up the LID via the store
-
         var userJid = jid.toUserJid();
         return store.findLidByPhone(userJid).orElse(null);
     }
@@ -1848,12 +1805,10 @@ public final class LidMigrationService {
 
         // WAWebWidFactory.asUserWidOrThrow
         // Strips device and agent information to obtain a user-level JID
-
         var userJid = jid.toUserJid();
 
         // WAWebLidMigrationUtils.toUserLid
         // Returns the user JID when it is already on the LID server; otherwise looks up the mapping
-
         if (userJid.hasLidServer()) {
             return userJid;
         }
@@ -1880,7 +1835,6 @@ public final class LidMigrationService {
     public Jid toUserLidOrThrow(Jid jid) {
         // WAWebLidMigrationUtils.toUserLidOrThrow
         // Wraps toUserLid with an error when no LID can be resolved for the given user
-
         var result = toUserLid(jid);
         if (result == null) {
             throw new IllegalStateException("No LID for user");
@@ -1907,7 +1861,6 @@ public final class LidMigrationService {
     public Jid toPnOrThrow(Jid jid) {
         // WAWebLidMigrationUtils.toPnOrThrow
         // Wraps toPn with an error when no phone number can be resolved
-
         var result = toPn(jid);
         if (result == null) {
             throw new IllegalStateException("No PN for user");
@@ -1938,7 +1891,6 @@ public final class LidMigrationService {
     public Function<Jid, Jid> toAddressingModeFactory(boolean isLid) {
         // WAWebLidMigrationUtils.toAddressingModeFactory
         // Picks the method reference matching the requested addressing mode
-
         return isLid ? this::toLid : this::toPn;
     }
 
@@ -1967,14 +1919,12 @@ public final class LidMigrationService {
     public Jid[] toCommonAddressingMode(Jid first, Jid second) {
         // WAWebLidMigrationUtils.toCommonAddressingMode
         // Only acts when both sides are user JIDs on different addressing modes
-
         if (first != null && second != null
                 && isUserWid(first) && isUserWid(second)
                 && first.hasLidServer() != second.hasLidServer()) {
 
             // WAWebLidMigrationUtils.toCommonAddressingMode
             // Tries to resolve the first JID to match the second; returns on success
-
             var alternateFirst = getAlternateUserWid(first.toUserJid());
             if (alternateFirst != null) {
                 return new Jid[]{alternateFirst, second};
@@ -1982,7 +1932,6 @@ public final class LidMigrationService {
 
             // WAWebLidMigrationUtils.toCommonAddressingMode
             // Falls back to resolving the second JID to match the first
-
             var alternateSecond = getAlternateUserWid(second.toUserJid());
             if (alternateSecond != null) {
                 return new Jid[]{first, alternateSecond};
@@ -2026,14 +1975,12 @@ public final class LidMigrationService {
 
         // WAWebLidMigrationUtils.getAlternateMsgKey
         // Dispatches to the group/status/broadcast path when the remote is a group or broadcast JID
-
         if (remote.hasGroupOrCommunityServer() || remote.hasBroadcastServer()) {
             return getAlternateMsgKeyForGroup(msgKey);
         }
 
         // WAWebLidMigrationUtils.getAlternateMsgKey
         // Dispatches to the 1:1 path when the remote is a user JID
-
         if (isUserWid(remote)) {
             return getAlternateMsgKeyForUser(msgKey);
         }
@@ -2058,7 +2005,6 @@ public final class LidMigrationService {
     private MessageKey getAlternateMsgKeyForGroup(MessageKey msgKey) {
         // WAWebLidMigrationUtils.S
         // Requires a raw participant; a null participant short-circuits the lookup
-
         var participant = getRawParticipant(msgKey);
         if (participant == null) {
             return null;
@@ -2066,7 +2012,6 @@ public final class LidMigrationService {
 
         // WAWebLidMigrationUtils.S
         // Looks up the alternate participant JID via getAlternateUserWid
-
         var alternateParticipant = getAlternateUserWid(participant.toUserJid());
         if (alternateParticipant == null) {
             return null;
@@ -2074,7 +2019,6 @@ public final class LidMigrationService {
 
         // WAWebLidMigrationUtils.S
         // Reconstructs the message key around the alternate participant
-
         var remote = msgKey.parentJid().orElse(null);
         var id = msgKey.id().orElse(null);
         return new MessageKeyBuilder()
@@ -2106,7 +2050,6 @@ public final class LidMigrationService {
 
         // WAWebLidMigrationUtils.R
         // Looks up the alternate remote JID via getAlternateUserWid
-
         var alternateRemote = getAlternateUserWid(remote.toUserJid());
         if (alternateRemote == null) {
             return null;
@@ -2114,7 +2057,6 @@ public final class LidMigrationService {
 
         // WAWebLidMigrationUtils.R
         // Reconstructs the message key around the alternate remote while keeping the raw participant
-
         var id = msgKey.id().orElse(null);
         var participant = getRawParticipant(msgKey);
         return new MessageKeyBuilder()
@@ -2142,7 +2084,6 @@ public final class LidMigrationService {
     private static Jid getRawParticipant(MessageKey msgKey) {
         // ADAPTED: WAWebMsgKey.participant
         // Reads the sender; senderJid() returns the parent when the raw participant was null
-
         var sender = msgKey.senderJid().orElse(null);
         var parent = msgKey.parentJid().orElse(null);
         if (sender != null && sender.equals(parent)) {
@@ -2219,13 +2160,11 @@ public final class LidMigrationService {
     public Jid getMeUserLidOrJidForChat(Chat chat, TranslateMsgKeyType translateType) {
         // WAWebLidMigrationUtils.getMeUserLidOrJidForChat
         // Captures the chat JID and whether it is itself on the LID server
-
         var chatJid = chat.jid();
         var isLid = chatJid.hasLidServer();
 
         // WAWebChatGetters.getIsGroup
         // Identifies Community Announcement Groups by group server and default-subgroup metadata
-
         var chatMetadata = store.findChatMetadata(chatJid).orElse(null);
         var isGroup = chatJid.hasGroupOrCommunityServer();
         var isCAG = isGroup && chatMetadata instanceof com.github.auties00.cobalt.model.chat.group.GroupMetadata gm
@@ -2233,14 +2172,12 @@ public final class LidMigrationService {
 
         // WAWebLidMigrationUtils.getMeUserLidOrJidForChat
         // Detects whether the group has flipped to LID addressing mode server-side
-
         var isLidAddressingMode = isGroup
                 && chatMetadata != null
                 && chatMetadata.isLidAddressingMode();
 
         // WAWebLidMigrationUtils.getMeUserLidOrJidForChat
         // Applies the LID/PN selection table: addon and message/edit follow slightly different CAG rules
-
         return switch (translateType) {
             case ADDON -> {
                 if (isLid || isCAG || isLidAddressingMode) {
@@ -2294,7 +2231,6 @@ public final class LidMigrationService {
 
         // WAWebLidMigrationUtils.getPnAndLidToUpdate
         // LID path: pairs the LID with its resolved PN
-
         if (jid.hasLidServer()) {
             var pn = toPn(jid);
             if (pn != null) {
@@ -2303,7 +2239,6 @@ public final class LidMigrationService {
         } else {
             // WAWebLidMigrationUtils.getPnAndLidToUpdate
             // PN path: pairs the PN with its resolved LID
-
             var lid = toLid(jid);
             if (lid != null) {
                 return List.of(jid, lid);
@@ -2337,14 +2272,12 @@ public final class LidMigrationService {
 
         // WAWebLidMigrationUtils.chatIsLid
         // Short-circuits for chats already on the LID server
-
         if (chatJid.hasLidServer()) {
             return true;
         }
 
         // WAWebLidMigrationUtils.chatIsLid
         // For group chats, checks the groupMetadata.isLidAddressingMode flag
-
         if (chatJid.hasGroupOrCommunityServer()) {
             var chatMetadata = store.findChatMetadata(chatJid).orElse(null);
             return chatMetadata != null && chatMetadata.isLidAddressingMode();
@@ -2383,11 +2316,9 @@ public final class LidMigrationService {
 
         // WAWebApiContact.getAlternateUserWid
         // Dispatches to the LID path when the input is already a LID
-
         if (userJid.hasLidServer()) {
             // WAWebApiContact.getPhoneNumber
             // Me-user fast path: map the current user's LID back to their PN without a store lookup
-
             var meLid = store.lid().map(Jid::toUserJid).orElse(null);
             var mePn = store.jid().map(Jid::toUserJid).orElse(null);
             if (mePn != null && meLid != null && userJid.equals(meLid)) {
@@ -2397,7 +2328,6 @@ public final class LidMigrationService {
         } else {
             // WAWebApiContact.getCurrentLid
             // Me-user fast path: map the current user's PN back to their LID without a store lookup
-
             var mePn = store.jid().map(Jid::toUserJid).orElse(null);
             var meLid = store.lid().map(Jid::toUserJid).orElse(null);
             if (meLid != null && mePn != null && userJid.equals(mePn)) {
@@ -2423,7 +2353,6 @@ public final class LidMigrationService {
     private Jid getMeLidUserOrThrow() {
         // WAWebUserPrefsMeUser.getMeLidUserOrThrow
         // Reads the current user's LID from the store and strips it down to user level
-
         return store.lid()
                 .map(Jid::toUserJid)
                 .orElseThrow(() -> new IllegalStateException("No LID for current user"));
@@ -2445,7 +2374,6 @@ public final class LidMigrationService {
     private Jid getMePnUserOrThrow() {
         // WAWebUserPrefsMeUser.getMePnUserOrThrow_DO_NOT_USE
         // Reads the current user's PN JID from the store and strips it down to user level
-
         return store.jid()
                 .map(Jid::toUserJid)
                 .orElseThrow(() -> new IllegalStateException("No PN for current user"));
@@ -2469,7 +2397,6 @@ public final class LidMigrationService {
     private static boolean isUserWid(Jid jid) {
         // WAWebWid.isUser
         // Matches the union of user-like servers: c.us, lid, bot, hosted, hosted.lid
-
         return jid.hasUserServer()
                 || jid.hasLidServer()
                 || jid.hasBotServer()

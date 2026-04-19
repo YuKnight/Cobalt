@@ -1,16 +1,24 @@
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.client.WhatsAppClientVerificationHandler;
+import com.github.auties00.cobalt.client.WhatsAppDevice;
 import com.github.auties00.cobalt.client.WhatsAppWebClientHistory;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.model.message.MessageContainer;
 import com.github.auties00.cobalt.store.WhatsAppStoreFactory;
 
 void main() throws IOException {
     WhatsAppClient.builder()
             .webClient(WhatsAppStoreFactory.inMemory())
             .createConnection()
+            .device(WhatsAppDevice.desktop())
             .historySetting(WhatsAppWebClientHistory.extended(true))
-            .unregistered(393495089819L, WhatsAppClientVerificationHandler.Web.PairingCode.toTerminal())
-            .addLoggedInListener(api -> System.out.printf("Connected: %s%n", api.store().privacySettings()))
+            .unregistered(WhatsAppClientVerificationHandler.Web.QrCode.toTerminal())
+            .addLoggedInListener(api -> {
+                System.out.printf("Connected: %s%n", api.store().privacySettings());
+                api.sendMessage(Jid.of(393495089819L), MessageContainer.of("Hello, world!"));
+                System.out.println("Sent");
+            })
             .addWebAppPrimaryFeaturesListener((_, features) -> System.out.printf("Received features: %s%n", features))
             .addNewMessageListener((_, message) -> System.out.println(message))
             .addContactsListener((_, contacts) -> System.out.printf("Contacts: %s%n", contacts.size()))

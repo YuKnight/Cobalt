@@ -72,18 +72,15 @@ public sealed interface CreateNewsletterAdminInviteMex extends MexJsonOperation 
         public NodeBuilder toNode() {
             // WAWebMexCreateNewsletterAdminInviteJob.createNewsletterAdminInvite
             // Opens a UTF-8 JSON writer that will serialise the GraphQL variables envelope
-
             try (var writer = JSONWriter.ofUTF8()) {
                 // WAWebMexCreateNewsletterAdminInviteJob.createNewsletterAdminInvite
                 // Begins the outer envelope and the nested "variables" object consumed by WAWebMexClient.fetchQuery
-
                 writer.startObject();
                 writer.writeName("variables");
                 writer.writeColon();
                 writer.startObject();
                 // WAWebMexCreateNewsletterAdminInviteJob.createNewsletterAdminInvite
                 // Emits the newsletter_id variable when present
-
                 if (newsletterId != null) {
                     writer.writeName("newsletter_id");
                     writer.writeColon();
@@ -92,7 +89,6 @@ public sealed interface CreateNewsletterAdminInviteMex extends MexJsonOperation 
 
                 // WAWebMexCreateNewsletterAdminInviteJob.createNewsletterAdminInvite
                 // Emits the user_id variable when present
-
                 if (userId != null) {
                     writer.writeName("user_id");
                     writer.writeColon();
@@ -103,7 +99,6 @@ public sealed interface CreateNewsletterAdminInviteMex extends MexJsonOperation 
 
                 // ADAPTED: WAWebMexCreateNewsletterAdminInviteJob.createNewsletterAdminInvite
                 // Flushes the JSON buffer into a StringWriter and wraps it in the shared MEX IQ envelope
-
                 try (var output = new StringWriter()) {
                     writer.flushTo(output);
                     return MexJsonOperation.createMexNode(QUERY_ID, output.toString());
@@ -179,7 +174,6 @@ public sealed interface CreateNewsletterAdminInviteMex extends MexJsonOperation 
         private static Optional<Response> of(byte[] json) {
             // WAWebMexCreateNewsletterAdminInviteJob.createNewsletterAdminInvite
             // Parses the raw JSON payload, bailing out if fastjson2 returns null
-
             var jsonObject = JSON.parseObject(json);
             if (jsonObject == null) {
                 return Optional.empty();
@@ -187,7 +181,6 @@ public sealed interface CreateNewsletterAdminInviteMex extends MexJsonOperation 
 
             // WAWebMexCreateNewsletterAdminInviteJob.createNewsletterAdminInvite
             // Descends into the standard GraphQL "data" envelope
-
             var data = jsonObject.getJSONObject("data");
             if (data == null) {
                 return Optional.empty();
@@ -195,7 +188,6 @@ public sealed interface CreateNewsletterAdminInviteMex extends MexJsonOperation 
 
             // WAWebMexCreateNewsletterAdminInviteJob.createNewsletterAdminInvite
             // Extracts the operation-specific root keyed by xwa2_newsletter_admin_invite_create
-
             var root = data.getJSONObject("xwa2_newsletter_admin_invite_create");
             if (root == null) {
                 return Optional.empty();

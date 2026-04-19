@@ -2,6 +2,9 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
@@ -50,6 +53,7 @@ import java.util.List;
  *           {@code getAction() = Actions.SettingPushName} and
  *           {@code applyMutations()} implementing the per-mutation pushname apply.
  */
+@WhatsAppWebModule(moduleName = "WAWebPushNameSync")
 public final class PushNameSettingHandler implements WebAppStateActionHandler {
     /**
      * Singleton instance of this handler.
@@ -60,6 +64,7 @@ public final class PushNameSettingHandler implements WebAppStateActionHandler {
      *
      * @implNote WAWebPushNameSync — {@code var y = new h; l.default = y}
      */
+    @WhatsAppWebExport(moduleName = "WAWebPushNameSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final PushNameSettingHandler INSTANCE = new PushNameSettingHandler();
 
     /**
@@ -71,6 +76,7 @@ public final class PushNameSettingHandler implements WebAppStateActionHandler {
      * @implNote WAWebPushNameSync — hidden {@code function a()} constructor
      *           that only initializes {@code this.collectionName = CriticalBlock}
      */
+    @WhatsAppWebExport(moduleName = "WAWebPushNameSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private PushNameSettingHandler() {
 
     }
@@ -84,6 +90,7 @@ public final class PushNameSettingHandler implements WebAppStateActionHandler {
      * @return the constant {@link PushNameSetting#ACTION_NAME}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebPushNameSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
         return PushNameSetting.ACTION_NAME; // WAWebPushNameSync.getAction -> Actions.SettingPushName
     }
@@ -99,6 +106,7 @@ public final class PushNameSettingHandler implements WebAppStateActionHandler {
      *         {@link SyncPatchType#CRITICAL_BLOCK}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebPushNameSync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
         return PushNameSetting.COLLECTION_NAME; // WAWebPushNameSync -> CollectionName.CriticalBlock
     }
@@ -110,6 +118,7 @@ public final class PushNameSettingHandler implements WebAppStateActionHandler {
      * @return the constant {@link PushNameSetting#ACTION_VERSION}, always {@code 1}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebPushNameSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return PushNameSetting.ACTION_VERSION; // WAWebPushNameSync.getVersion -> 1
     }
@@ -131,6 +140,7 @@ public final class PushNameSettingHandler implements WebAppStateActionHandler {
      * @return {@code true} if the apply succeeded, {@code false} otherwise
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebPushNameSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: WAWebPushNameSync.applyMutations
     }
@@ -219,6 +229,7 @@ public final class PushNameSettingHandler implements WebAppStateActionHandler {
      *         operations; {@link MutationApplicationResult#success()} otherwise
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebPushNameSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         // WAWebPushNameSync.applyMutations: if (e.operation === "set") { ... } i++; return {actionState: Unsupported}
         if (mutation.operation() != SyncdOperation.SET) {
@@ -266,7 +277,6 @@ public final class PushNameSettingHandler implements WebAppStateActionHandler {
         //   - a/i counters and the trailing WALogger.LOG/WARN calls
         //   - WAWebSyncdCriticalBootstrapProcessingApi.logCriticalBootstrapStageIfNecessary(PUSHNAME_INVALID)
         //   - WAWebSyncdCriticalBootstrapProcessingApi.logCriticalBootstrapStageIfNecessary(PUSHNAME_APPLIED)
-
         // ADAPTED: WAWebPushNameSync.applyMutations:
         //   if (WAWebSyncBootstrap.isSyncDCriticalDataSyncInProcess()) {
         //     yield WAWebSyncBootstrap.setSyncDCriticalSynced();
@@ -276,7 +286,6 @@ public final class PushNameSettingHandler implements WebAppStateActionHandler {
         // (SyncCollectionMetadata.bootstrapped) and is flipped by
         // WebAppStateService/MutationRequestBuilder, not by individual
         // setting handlers. There is no global syncdCritical flag to flip here.
-
         // WAWebPushNameSync.applyMutations: return {actionState: Success}
         return MutationApplicationResult.success();
     }
@@ -305,6 +314,7 @@ public final class PushNameSettingHandler implements WebAppStateActionHandler {
      *                  empty to clear the pushname
      * @return a pending mutation carrying the {@code setting_pushName} action
      */
+    @WhatsAppWebExport(moduleName = "WAWebPushNameSync", exports = "getPushnameMutation", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPendingMutation getPushnameMutation(Instant timestamp, String name) {
         var setting = new PushNameSettingBuilder() // WAWebPushNameSync.getPushnameMutation: var e = {pushNameSetting: {name: n}}
                 .name(name) // WAWebPushNameSync.getPushnameMutation: name: n

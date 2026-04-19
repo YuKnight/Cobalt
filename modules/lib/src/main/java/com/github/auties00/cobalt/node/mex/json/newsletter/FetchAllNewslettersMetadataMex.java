@@ -74,18 +74,15 @@ public sealed interface FetchAllNewslettersMetadataMex extends MexJsonOperation 
         public NodeBuilder toNode() {
             // WAWebMexFetchAllNewslettersMetadataJob.mexFetchAllNewsletters
             // Opens a UTF-8 JSON writer that will serialise the GraphQL variables envelope
-
             try (var writer = JSONWriter.ofUTF8()) {
                 // WAWebMexFetchAllNewslettersMetadataJob.mexFetchAllNewsletters
                 // Begins the outer envelope and the nested "variables" object consumed by WAWebMexClient.fetchQuery
-
                 writer.startObject();
                 writer.writeName("variables");
                 writer.writeColon();
                 writer.startObject();
                 // WAWebMexFetchAllNewslettersMetadataJob.mexFetchAllNewsletters
                 // Emits the fetch_wamo_sub boolean variable when present
-
                 if (fetchWamoSub != null) {
                     writer.writeName("fetch_wamo_sub");
                     writer.writeColon();
@@ -1069,7 +1066,6 @@ public sealed interface FetchAllNewslettersMetadataMex extends MexJsonOperation 
         private static Optional<Response> of(byte[] json) {
             // WAWebMexFetchAllNewslettersMetadataJob.mexFetchAllNewsletters
             // Parses the raw JSON payload, bailing out if fastjson2 returns null
-
             var jsonObject = JSON.parseObject(json);
             if (jsonObject == null) {
                 return Optional.empty();
@@ -1077,7 +1073,6 @@ public sealed interface FetchAllNewslettersMetadataMex extends MexJsonOperation 
 
             // WAWebMexFetchAllNewslettersMetadataJob.mexFetchAllNewsletters
             // Descends into the standard GraphQL "data" envelope
-
             var data = jsonObject.getJSONObject("data");
             if (data == null) {
                 return Optional.empty();
@@ -1085,7 +1080,6 @@ public sealed interface FetchAllNewslettersMetadataMex extends MexJsonOperation 
 
             // WAWebMexFetchAllNewslettersMetadataJob.mexFetchAllNewsletters
             // Extracts the xwa2_newsletter_subscribed JSON array and parses every newsletter entry through Item.ofArray
-
             var rootArr = data.getJSONArray("xwa2_newsletter_subscribed");
             var items = Item.ofArray(rootArr);
 

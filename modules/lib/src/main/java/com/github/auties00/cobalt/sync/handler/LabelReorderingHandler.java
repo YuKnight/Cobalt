@@ -1,13 +1,23 @@
 package com.github.auties00.cobalt.sync.handler;
 
+import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.preference.Label;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncActionState;
+import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.contact.LabelReorderingAction;
+import com.github.auties00.cobalt.model.sync.action.contact.LabelReorderingActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.time.Instant;
+import java.util.List;
 
 /**
  * Handles the {@code label_reordering} sync action by applying the new label
@@ -31,6 +41,7 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  *           {@code getVersion() = 3}, {@code getAction() = LabelReordering}, and
  *           {@code applyMutations()} as the per-mutation apply logic
  */
+@WhatsAppWebModule(moduleName = "WAWebLabelReorderingSync")
 public final class LabelReorderingHandler implements WebAppStateActionHandler {
     /**
      * The singleton instance of {@code LabelReorderingHandler}.
@@ -38,6 +49,7 @@ public final class LabelReorderingHandler implements WebAppStateActionHandler {
      * @implNote WAWebLabelReorderingSync.default — WA Web exports a single module
      *           instance {@code m = new d()}; Cobalt mirrors this with a singleton
      */
+    @WhatsAppWebExport(moduleName = "WAWebLabelReorderingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final LabelReorderingHandler INSTANCE = new LabelReorderingHandler();
 
     /**
@@ -48,6 +60,7 @@ public final class LabelReorderingHandler implements WebAppStateActionHandler {
      *           collection is returned via {@link #collectionName()} from the
      *           action's static {@code COLLECTION_NAME} constant
      */
+    @WhatsAppWebExport(moduleName = "WAWebLabelReorderingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private LabelReorderingHandler() {
 
     }
@@ -60,6 +73,7 @@ public final class LabelReorderingHandler implements WebAppStateActionHandler {
      *           {@code "label_reordering"} action constant
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebLabelReorderingSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
         return LabelReorderingAction.ACTION_NAME; // WAWebLabelReorderingSync.default.getAction
     }
@@ -71,6 +85,7 @@ public final class LabelReorderingHandler implements WebAppStateActionHandler {
      *           constructor to {@code CollectionName.Regular}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebLabelReorderingSync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
         return LabelReorderingAction.COLLECTION_NAME; // WAWebLabelReorderingSync.default constructor: collectionName = Regular
     }
@@ -81,6 +96,7 @@ public final class LabelReorderingHandler implements WebAppStateActionHandler {
      * @implNote WAWebLabelReorderingSync.default.getVersion — returns {@code 3}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebLabelReorderingSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return LabelReorderingAction.ACTION_VERSION; // WAWebLabelReorderingSync.default.getVersion -> 3
     }
@@ -94,6 +110,7 @@ public final class LabelReorderingHandler implements WebAppStateActionHandler {
      *           {@code true}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebLabelReorderingSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: WAWebLabelReorderingSync.default.applyMutations
     }
@@ -120,6 +137,7 @@ public final class LabelReorderingHandler implements WebAppStateActionHandler {
      *           notification are intentionally omitted in Cobalt.
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebLabelReorderingSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) { // WAWebLabelReorderingSync.default.applyMutations: if (n.operation === "set")
             return MutationApplicationResult.unsupported(); // WAWebLabelReorderingSync.default.applyMutations: WARN("operation not supported"); return { actionState: Unsupported }
@@ -149,5 +167,50 @@ public final class LabelReorderingHandler implements WebAppStateActionHandler {
         }
 
         return MutationApplicationResult.success(); // WAWebLabelReorderingSync.default.applyMutations: return { actionState: Success }
+    }
+
+    /**
+     * Builds a pending SET mutation for reordering the user's chat labels.
+     *
+     * <p>The mutation carries the full ordered list of integer label
+     * identifiers (matching the on-wire {@code INT32} type of
+     * {@link LabelReorderingAction#sortedLabelIds()}). Per WhatsApp Web the
+     * reorder action uses an empty index (Cobalt still prefixes the action
+     * name as the canonical first element to stay consistent with every
+     * other handler's index layout).
+     *
+     * @implNote ADAPTED: WA Web ships no public "getMutation" for
+     *           {@code WAWebLabelReorderingSync}; Cobalt materialises the
+     *           mutation here so that {@code reorderLabels} can be exposed on
+     *           {@link WhatsAppClient}. The shape follows the sibling
+     *           {@code WAWebLabelSync.default.getLabelMutation} pattern:
+     *           build a {@link LabelReorderingAction}, wrap it in a
+     *           {@link SyncActionValueBuilder}, emit index {@code [actionName]}
+     *           and wrap the raw mutation in a {@link SyncPendingMutation}.
+     * @param sortedLabelIds the full ordered list of integer label identifiers
+     * @param timestamp      the mutation timestamp
+     * @return the pending mutation for the reorder operation
+     */
+    @WhatsAppWebExport(moduleName = "WAWebLabelReorderingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
+    public SyncPendingMutation getReorderLabelsMutation(
+            List<Integer> sortedLabelIds,
+            Instant timestamp
+    ) {
+        var action = new LabelReorderingActionBuilder() // ADAPTED: WAWebLabelReorderingSync has no public getter; Cobalt mirrors the sibling WAWebLabelSync.default.getLabelMutation shape
+                .sortedLabelIds(sortedLabelIds) // WAWebLabelReorderingSync.default.applyMutations: a.sortedLabelIds
+                .build();
+        var value = new SyncActionValueBuilder()
+                .timestamp(timestamp) // WAWebSyncdActionUtils.buildPendingMutation: timestamp
+                .labelReorderingAction(action) // WAWebLabelReorderingSync.default.applyMutations: value.labelReorderingAction
+                .build();
+        var index = JSON.toJSONString(List.of(actionName())); // WAWebSyncdActionUtils.buildIndex: JSON.stringify([action]); empty indexArgs
+        var mutation = new DecryptedMutation.Trusted(
+                index,
+                value,
+                SyncdOperation.SET,
+                timestamp,
+                version()
+        );
+        return new SyncPendingMutation(mutation, 0);
     }
 }

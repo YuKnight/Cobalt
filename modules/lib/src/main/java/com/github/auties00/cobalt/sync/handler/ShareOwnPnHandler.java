@@ -2,6 +2,9 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncActionState;
@@ -54,6 +57,7 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  * @implNote WAWebShareOwnPnSync.default — singleton instance {@code d = new c()}
  *           where {@code c} extends {@code WAWebSyncdAction.AccountSyncdActionBase}
  */
+@WhatsAppWebModule(moduleName = "WAWebShareOwnPnSync")
 public final class ShareOwnPnHandler implements WebAppStateActionHandler {
     /**
      * The singleton instance of this handler.
@@ -65,6 +69,7 @@ public final class ShareOwnPnHandler implements WebAppStateActionHandler {
      *
      * @implNote WAWebShareOwnPnSync: {@code d = new c; l.default = d}
      */
+    @WhatsAppWebExport(moduleName = "WAWebShareOwnPnSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final ShareOwnPnHandler INSTANCE = new ShareOwnPnHandler();
 
     /**
@@ -77,6 +82,7 @@ public final class ShareOwnPnHandler implements WebAppStateActionHandler {
      *           Cobalt encodes this as a constant returned by
      *           {@link #collectionName()}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebShareOwnPnSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private ShareOwnPnHandler() {
 
     }
@@ -89,6 +95,7 @@ public final class ShareOwnPnHandler implements WebAppStateActionHandler {
      * @return the action identifier {@code "shareOwnPn"}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebShareOwnPnSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
         return "shareOwnPn"; // WAWebShareOwnPnSync.getAction -> WASyncdConst.Actions.ShareOwnPn
     }
@@ -100,6 +107,7 @@ public final class ShareOwnPnHandler implements WebAppStateActionHandler {
      * @return {@link SyncPatchType#REGULAR}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebShareOwnPnSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
         return SyncPatchType.REGULAR; // WAWebShareOwnPnSync: collectionName = WASyncdConst.CollectionName.Regular
     }
@@ -111,6 +119,7 @@ public final class ShareOwnPnHandler implements WebAppStateActionHandler {
      * @return {@code 8}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebShareOwnPnSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return 8; // WAWebShareOwnPnSync.getVersion: return 8
     }
@@ -131,6 +140,7 @@ public final class ShareOwnPnHandler implements WebAppStateActionHandler {
      *         {@code false} for unsupported or malformed mutations
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebShareOwnPnSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebShareOwnPnSync.applyMutations: {actionState: SyncActionState.Success}
     }
@@ -176,6 +186,7 @@ public final class ShareOwnPnHandler implements WebAppStateActionHandler {
      * @return the detailed {@link MutationApplicationResult}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebShareOwnPnSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         // WAWebShareOwnPnSync.applyMutations: if (getABPropConfigValue("share_own_pn_sync") !== true) return t.map(() => ({actionState: Unsupported}))
         if (!client.abPropsService().getBool(ABProp.SHARE_OWN_PN_SYNC)) {

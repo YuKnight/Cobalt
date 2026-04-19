@@ -75,6 +75,7 @@ public final class MutationResponseParser {
      * @throws WhatsAppWebAppStateSyncException.Conflict if the server returns a 409 error
      * @throws WhatsAppWebAppStateSyncException.UnexpectedError if the server returns a fatal error
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdResponseParser", exports = "syncResponseParser", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationSyncResponse parseSyncResponse(Node responseNode) {
         // ADAPTED: WAParseIqResponse.parseIqResponse + WAWebSyncdServerSync.k
         var iqType = responseNode.getAttributeAsString("type");
@@ -152,6 +153,7 @@ public final class MutationResponseParser {
      * @throws WhatsAppWebAppStateSyncException.Conflict if any collection returns a 409 error
      * @throws WhatsAppWebAppStateSyncException.UnexpectedError if the server returns a fatal error
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdResponseParser", exports = "syncResponseParser", adaptation = WhatsAppAdaptation.DIRECT)
     public List<MutationSyncResponse> parseBatchedSyncResponse(Node responseNode) {
         // ADAPTED: WAParseIqResponse.parseIqResponse + WAWebSyncdServerSync.k
         var iqType = responseNode.getAttributeAsString("type");
@@ -195,6 +197,7 @@ public final class MutationResponseParser {
      * @param collectionNode the collection node to parse
      * @return the parsed sync response, with error captured in {@link MutationSyncResponse#collectionError()} if applicable
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdResponseParser", exports = "syncResponseParser", adaptation = WhatsAppAdaptation.DIRECT)
     private MutationSyncResponse parseCollectionNode(Node collectionNode) {
         // WAWebSyncdResponseParser.syncResponseParser — CollectionName.cast(e.attrString("name"))
         var collectionName = collectionNode.getAttributeAsString("name")

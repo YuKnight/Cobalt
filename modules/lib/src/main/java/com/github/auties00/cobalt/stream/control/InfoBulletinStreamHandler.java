@@ -9,6 +9,7 @@ import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.stream.SocketStream;
+import com.github.auties00.cobalt.sync.WebAppStateService;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -207,10 +208,21 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
     private final WhatsAppClient whatsapp;
 
     /**
-     * Constructs a new info bulletin stream handler bound to the supplied
-     * client.
+     * Reference to the web app-state service, used to retry orphan
+     * app-state mutations whenever a bulletin signals that previously
+     * missing referents may now exist.
      *
-     * @param whatsapp the WhatsApp client instance, must not be {@code null}
+     * @implNote WAWebSyncdOrphan.applyAllOrphansAndUnsupported
+     */
+    private final WebAppStateService webAppStateService;
+
+    /**
+     * Constructs a new info bulletin stream handler bound to the supplied
+     * client and web app-state service.
+     *
+     * @param whatsapp           the WhatsApp client instance, must not be {@code null}
+     * @param webAppStateService the web app-state service used for orphan
+     *                           mutation retries, must not be {@code null}
      * @implNote WAWebHandleInfoBulletin.default: the handler is registered
      * by {@code WADeprecatedWapParser("infoBulletinParser", ...)}; Cobalt
      * registers handlers as {@link SocketStream.Handler} implementations
@@ -218,8 +230,9 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleInfoBulletin", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public InfoBulletinStreamHandler(WhatsAppClient whatsapp) {
+    public InfoBulletinStreamHandler(WhatsAppClient whatsapp, WebAppStateService webAppStateService) {
         this.whatsapp = whatsapp;
+        this.webAppStateService = webAppStateService;
     }
 
     /**
@@ -440,7 +453,7 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
         }
 
         clearDirtyBits(allDirtyEntries); // WAWebHandleDirtyBits.handleDirtyBits: return WAWebClearDirtyBitsJob.clearDirtyBits(d)
-        whatsapp.retryOrphanMutations(); // ADAPTED: Cobalt retries orphan app-state mutations after a dirty batch; no direct WA Web equivalent
+        webAppStateService.retryAllOrphanMutations(); // ADAPTED: Cobalt retries orphan app-state mutations after a dirty batch; no direct WA Web equivalent
     }
 
     /**
@@ -570,7 +583,7 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
         LOGGER.log(System.Logger.Level.DEBUG,
                 "Received offline bulletin with count={0}", count);
         if (count == 0) { // WAWebMessageDedupUtils.maybeClearPendingMessages: if (count === 0) clear the pending cache
-            whatsapp.retryOrphanMutations(); // ADAPTED: Cobalt retries orphan mutations when the backlog is empty; WA Web only clears the dedup cache
+            webAppStateService.retryAllOrphanMutations(); // ADAPTED: Cobalt retries orphan mutations when the backlog is empty; WA Web only clears the dedup cache
         }
     }
 
@@ -623,7 +636,7 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
     private void handleOfflinePriorityComplete() {
         LOGGER.log(System.Logger.Level.DEBUG, // WAWebHandleInfoBulletin.default dispatch: no switch case, just NO_ACK
                 "Received priority_offline_complete bulletin");
-        whatsapp.retryOrphanMutations(); // ADAPTED: Cobalt retries orphan app-state mutations when priority offline delivery ends
+        webAppStateService.retryAllOrphanMutations(); // ADAPTED: Cobalt retries orphan app-state mutations when priority offline delivery ends
     }
 
     /**
@@ -753,7 +766,6 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
         // WAWebHandleServerClientExpiration.handleServerClientExpiration:
         // if (e >= t) return; (t = WAWebUpdaterHardExpireTime)
         // ADAPTED: Cobalt has no WAWebUpdaterHardExpireTime equivalent so the hard cap is skipped.
-
         // WAWebHandleServerClientExpiration.handleServerClientExpiration:
         // var i = futureUnixTime(3 * DAY_SECONDS)
         var minFloor = Instant.now().plusSeconds(CLIENT_EXPIRATION_MIN_FLOOR_SECONDS);

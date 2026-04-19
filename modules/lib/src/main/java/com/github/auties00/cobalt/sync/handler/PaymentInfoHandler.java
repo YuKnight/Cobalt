@@ -1,6 +1,9 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncActionState;
@@ -30,6 +33,7 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  *           {@code m = new d()} exported as {@code l.default = m} where
  *           {@code d} extends {@code AccountSyncdActionBase}
  */
+@WhatsAppWebModule(moduleName = "WAWebPaymentInfoSync")
 public final class PaymentInfoHandler implements WebAppStateActionHandler {
     /**
      * The singleton instance of {@code PaymentInfoHandler}.
@@ -37,6 +41,7 @@ public final class PaymentInfoHandler implements WebAppStateActionHandler {
      * @implNote WAWebPaymentInfoSync — module-level
      *           {@code m = new d(); l.default = m}
      */
+    @WhatsAppWebExport(moduleName = "WAWebPaymentInfoSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final PaymentInfoHandler INSTANCE = new PaymentInfoHandler();
 
     /**
@@ -45,6 +50,7 @@ public final class PaymentInfoHandler implements WebAppStateActionHandler {
      * @implNote WAWebPaymentInfoSync.d — constructor sets
      *           {@code this.collectionName = WASyncdConst.CollectionName.RegularLow}
      */
+    @WhatsAppWebExport(moduleName = "WAWebPaymentInfoSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private PaymentInfoHandler() {
 
     }
@@ -58,6 +64,7 @@ public final class PaymentInfoHandler implements WebAppStateActionHandler {
      * @return the action name {@code "payment_info"}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebPaymentInfoSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
         return PaymentInfoAction.ACTION_NAME; // WAWebPaymentInfoSync.getAction
     }
@@ -70,6 +77,7 @@ public final class PaymentInfoHandler implements WebAppStateActionHandler {
      * @return {@link SyncPatchType#REGULAR_LOW}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebPaymentInfoSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
         return PaymentInfoAction.COLLECTION_NAME; // WAWebPaymentInfoSync: collectionName = WASyncdConst.CollectionName.RegularLow
     }
@@ -81,6 +89,7 @@ public final class PaymentInfoHandler implements WebAppStateActionHandler {
      * @return {@code 7}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebPaymentInfoSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return PaymentInfoAction.ACTION_VERSION; // WAWebPaymentInfoSync.getVersion
     }
@@ -99,6 +108,7 @@ public final class PaymentInfoHandler implements WebAppStateActionHandler {
      * @return {@code true} if applied successfully, {@code false} otherwise
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebPaymentInfoSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: WAWebPaymentInfoSync.applyMutations
     }
@@ -147,6 +157,7 @@ public final class PaymentInfoHandler implements WebAppStateActionHandler {
      * @return the detailed application result
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebPaymentInfoSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         // WAWebPaymentInfoSync.applyMutations: if (WAWebMobilePlatforms.isSMB() !== true) return ... Unsupported
         var platform = client.store().device().platform(); // ADAPTED: WAWebMobilePlatforms.isSMB — checks c === u.SMBA || c === u.SMBI where SMBA = "smba" (ANDROID_BUSINESS) and SMBI = "smbi" (IOS_BUSINESS)

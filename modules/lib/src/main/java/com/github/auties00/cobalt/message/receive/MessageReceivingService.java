@@ -148,7 +148,6 @@ public final class MessageReceivingService {
 
         // WAWebCommsHandleMessagingStanza.handleMessagingStanza
         // Routes newsletter messages (WAWebWid.isNewsletter) to the newsletter receiver
-
         var fromJid = node.getRequiredAttributeAsJid("from");
         if (fromJid.hasNewsletterServer()) {
             return newsletterReceiver.receive(node, fromJid);
@@ -156,7 +155,6 @@ public final class MessageReceivingService {
 
         // WAWebHandleMsg and WAWebMessageDedupUtils.addPendingMessage
         // Builds a simplified dedup key and skips already-pending messages to avoid double processing
-
         var id = node.getRequiredAttributeAsString("id");
         var dedupKey = fromJid + ":" + id;
         if (dedup.isPending(dedupKey)) {
@@ -168,7 +166,6 @@ public final class MessageReceivingService {
 
         // WAWebHandleMsg
         // Delegates to the chat receiver and guarantees dedup cleanup in a finally block
-
         try {
             return chatReceiver.receive(node, fromJid);
         } finally {
@@ -191,7 +188,6 @@ public final class MessageReceivingService {
     public void clearPendingMessages() {
         // WAWebMessageDedupUtils.maybeClearPendingMessages
         // Clears the pending-message cache to let newly arriving messages be processed fresh
-
         dedup.clear();
     }
 }

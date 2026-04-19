@@ -74,18 +74,15 @@ public sealed interface FetchNewsletterPollVotersMex extends MexJsonOperation pe
         public NodeBuilder toNode() {
             // WAWebMexFetchNewsletterPollVotersJob.default
             // Opens a UTF-8 JSON writer that will serialise the GraphQL variables envelope
-
             try (var writer = JSONWriter.ofUTF8()) {
                 // WAWebMexFetchNewsletterPollVotersJob.default
                 // Begins the outer envelope and the nested "variables" object consumed by WAWebMexClient.fetchQuery
-
                 writer.startObject();
                 writer.writeName("variables");
                 writer.writeColon();
                 writer.startObject();
                 // WAWebMexFetchNewsletterPollVotersJob.default
                 // Emits the input variable when present
-
                 if (input != null) {
                     writer.writeName("input");
                     writer.writeColon();
@@ -96,7 +93,6 @@ public sealed interface FetchNewsletterPollVotersMex extends MexJsonOperation pe
 
                 // ADAPTED: WAWebMexFetchNewsletterPollVotersJob.default
                 // Flushes the JSON buffer into a StringWriter and wraps it in the shared MEX IQ envelope
-
                 try (var output = new StringWriter()) {
                     writer.flushTo(output);
                     return MexJsonOperation.createMexNode(QUERY_ID, output.toString());
@@ -397,7 +393,6 @@ public sealed interface FetchNewsletterPollVotersMex extends MexJsonOperation pe
         private static Optional<Response> of(byte[] json) {
             // WAWebMexFetchNewsletterPollVotersJob.default
             // Parses the raw JSON payload, bailing out if fastjson2 returns null
-
             var jsonObject = JSON.parseObject(json);
             if (jsonObject == null) {
                 return Optional.empty();
@@ -405,7 +400,6 @@ public sealed interface FetchNewsletterPollVotersMex extends MexJsonOperation pe
 
             // WAWebMexFetchNewsletterPollVotersJob.default
             // Descends into the standard GraphQL "data" envelope
-
             var data = jsonObject.getJSONObject("data");
             if (data == null) {
                 return Optional.empty();
@@ -413,7 +407,6 @@ public sealed interface FetchNewsletterPollVotersMex extends MexJsonOperation pe
 
             // WAWebMexFetchNewsletterPollVotersJob.default
             // Extracts the operation-specific root keyed by voter_list
-
             var root = data.getJSONObject("voter_list");
             if (root == null) {
                 return Optional.empty();

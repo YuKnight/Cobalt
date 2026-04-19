@@ -165,34 +165,28 @@ public final class MessageReceiptHandler {
     public void sendDeliveryReceipt(MessageReceiveStanza stanza, MessageInfo info, boolean hasInactiveMsg) {
         // WAWebMsgProcessingApiUtils.getFrom
         // Resolves the from JID used for every receipt addressing decision
-
         var from = resolveFrom(stanza);
 
         // WAWebHandleMsgSendReceipt.sendReceipt
         // Resolves the participant attribute from the stanza for non-CHAT receipts
-
         var participant = resolveReceiptParticipant(stanza);
 
         // WAWebSendDeliveryReceiptJob.sendDeliveryReceiptsAfterDecryption
         // Determines whether this is a sender receipt for our own companion device
-
         var isSender = isSenderReceipt(from, participant);
 
         // WAWebSendDeliveryReceiptJob.sendDeliveryReceiptsAfterDecryption
         // Picks the concrete receipt type based on peer/sender/inactive status
-
         var receiptType = resolveDeliveryReceiptType(stanza, isSender, hasInactiveMsg);
 
         // WAWebSendDeliveryReceiptJob.sendDeliveryReceiptsAfterDecryption
         // Resolves the optional recipient attribute only for non-peer self-sent CHAT receipts
-
         var isPeer = stanza.isPeer();
         var recipientJid = resolveRecipientForReceipt(stanza);
         var shouldSetRecipient = !isPeer && isSender && recipientJid != null;
 
         // WAWebSendDeliveryReceiptJob.sendDeliveryReceiptsAfterDecryption
         // Builds the receipt stanza with to/type/participant/recipient attributes
-
         var toJid = from.toUserJid();
         var receipt = new NodeBuilder()
                 .description("receipt")
@@ -241,7 +235,6 @@ public final class MessageReceiptHandler {
     ) {
         // WAWebSendRetryReceiptJob.sendRetryReceipt
         // Skips retry when we are talking to a bot via a non-bot chat (no useful retry semantics)
-
         var from = resolveFrom(stanza);
         var participant = resolveReceiptParticipant(stanza);
         if (!from.hasBotServer() && participant != null && participant.hasBotServer()) {
@@ -250,7 +243,6 @@ public final class MessageReceiptHandler {
 
         // WAWebSendRetryReceiptJob.sendRetryReceipt
         // Builds the inner retry node with protocol version, count, id, timestamp, and error reason
-
         var retryNode = new NodeBuilder()
                 .description("retry")
                 .attribute("v", "1")
@@ -262,7 +254,6 @@ public final class MessageReceiptHandler {
 
         // WAWebSendRetryReceiptJob.sendRetryReceipt
         // Builds the registration node carrying our 32-bit registrationId encoded as 4 bytes
-
         var registrationNode = new NodeBuilder()
                 .description("registration")
                 .content(DataUtils.intToBytes(store.registrationId(), 4))
@@ -270,14 +261,12 @@ public final class MessageReceiptHandler {
 
         // WAWebSendRetryReceiptJob.sendRetryReceipt
         // Builds the optional key bundle node when the retry count crosses the threshold
-
         var keysNode = retryCount >= RETRY_KEY_BUNDLE_THRESHOLD
                 ? buildKeyBundleNode()
                 : null;
 
         // WAWebSendRetryReceiptJob.sendRetryReceipt
         // Resolves to/participant/recipient/category attributes based on whether we are the sender
-
         Jid toJid;
         Jid participantAttr = null;
         Jid recipientAttr = null;
@@ -286,13 +275,11 @@ public final class MessageReceiptHandler {
         if (from.hasUserServer() || from.hasLidServer()) {
             // WAWebSendRetryReceiptJob.sendRetryReceipt user branch
             // For 1:1 messages we address the sender device directly
-
             toJid = from;
             var selfJid = store.jid().orElse(null);
             if (selfJid != null && from.toUserJid().equals(selfJid.toUserJid())) {
                 // WAWebSendRetryReceiptJob.sendRetryReceipt
                 // Self-sent messages receive a peer category or a recipient attribute based on isPeer
-
                 if (stanza.isPeer()) {
                     categoryAttr = "peer";
                 } else {
@@ -305,7 +292,6 @@ public final class MessageReceiptHandler {
         } else {
             // WAWebSendRetryReceiptJob.sendRetryReceipt group/broadcast branch
             // Addresses the chat and carries the participant attribute
-
             toJid = from.toUserJid();
             if (participant != null) {
                 participantAttr = participant;
@@ -314,7 +300,6 @@ public final class MessageReceiptHandler {
 
         // WAWebSendRetryReceiptJob.sendRetryReceipt
         // Assembles the outer receipt stanza with the retry/registration/keys children
-
         var receipt = new NodeBuilder()
                 .description("receipt")
                 .attribute("id", stanza.id())
@@ -359,15 +344,12 @@ public final class MessageReceiptHandler {
 
         // WAWebHandleMsgSendReceipt.sendReceipt
         // Discriminates CHAT vs group/broadcast addressing for the bot ack
-
         if (!chatJid.hasGroupOrCommunityServer() && !chatJid.hasBroadcastServer()) {
             // CHAT type: to = author (sender), recipient = chat
-
             to = stanza.senderJid();
             recipient = chatJid.toUserJid();
         } else {
             // Non-CHAT type: to = chat, participant = author
-
             to = chatJid;
             participantJid = stanza.participant()
                     .map(Jid::toUserJid)
@@ -376,7 +358,6 @@ public final class MessageReceiptHandler {
 
         // WAWebSendReceiptJobCommon.sendBotInvokeResponseAcks
         // Builds the ack node with class="message" and type="text"
-
         var ack = new NodeBuilder()
                 .description("ack")
                 .attribute("id", stanza.id())
@@ -403,7 +384,6 @@ public final class MessageReceiptHandler {
     public boolean isBotSender(MessageReceiveStanza stanza) {
         // WAWebHandleMsgSendReceipt.sendReceipt
         // Returns true when the chat is not itself a bot but the author is
-
         return !stanza.chatJid().hasBotServer()
                 && stanza.senderJid().hasBotServer();
     }
@@ -453,7 +433,6 @@ public final class MessageReceiptHandler {
     public void sendNackReceipt(MessageReceiveStanza stanza, int errorCode, Integer failureReason) {
         // WAWebHandleMsgSendAck.sendNack
         // Builds the optional meta child for InvalidProtobuf errors carrying a failure_reason
-
         Node metaNode = null;
         if (errorCode == 491 && failureReason != null) {
             metaNode = new NodeBuilder()
@@ -464,7 +443,6 @@ public final class MessageReceiptHandler {
 
         // WAWebHandleMsgSendAck.sendNack
         // Builds the ack stanza with the error code and optional meta child
-
         var ack = new NodeBuilder()
                 .description("ack")
                 .attribute("id", stanza.id())
@@ -493,7 +471,6 @@ public final class MessageReceiptHandler {
     public void sendAck(MessageReceiveStanza stanza) {
         // WAWebHandleMsgSendAck.sendAck
         // Builds the plain ack stanza with class/type/to/participant attributes
-
         var ack = new NodeBuilder()
                 .description("ack")
                 .attribute("id", stanza.id())
@@ -523,7 +500,6 @@ public final class MessageReceiptHandler {
         try {
             // WAWebSendRetryReceiptJob.getOrGenSinglePreKey
             // Uses an existing prekey if available, otherwise generates one on the fly
-
             var preKey = store.hasPreKeys()
                     ? store.preKeys().getFirst()
                     : SignalPreKeyPair.random(1);
@@ -533,7 +509,6 @@ public final class MessageReceiptHandler {
 
             // WAWebSendRetryReceiptJob
             // Builds the type node carrying the curve type byte
-
             var typeNode = new NodeBuilder()
                     .description("type")
                     .content(new byte[]{SignalIdentityPublicKey.type()})
@@ -541,7 +516,6 @@ public final class MessageReceiptHandler {
 
             // WAWebSendRetryReceiptJob
             // Builds the identity node carrying our long-term identity public key
-
             var identityNode = new NodeBuilder()
                     .description("identity")
                     .content(store.identityKeyPair().publicKey().toEncodedPoint())
@@ -549,7 +523,6 @@ public final class MessageReceiptHandler {
 
             // WAWebSendRetryReceiptJob.xmppPreKey
             // Builds the prekey node with id and value children
-
             var preKeyIdNode = new NodeBuilder()
                     .description("id")
                     .content(DataUtils.intToBytes(preKey.id(), 3))
@@ -565,7 +538,6 @@ public final class MessageReceiptHandler {
 
             // WAWebSendRetryReceiptJob.xmppSignedPreKey
             // Builds the signed prekey node with id, value, and signature children
-
             var signedKeyPair = store.signedKeyPair();
             var skeyIdNode = new NodeBuilder()
                     .description("id")
@@ -586,7 +558,6 @@ public final class MessageReceiptHandler {
 
             // WAWebSendRetryReceiptJob
             // Builds the device-identity node carrying the ADV-signed identity proof
-
             var deviceIdentityNode = store.signedDeviceIdentity()
                     .map(id -> new NodeBuilder()
                             .description("device-identity")
@@ -596,7 +567,6 @@ public final class MessageReceiptHandler {
 
             // WAWebSendRetryReceiptJob
             // Assembles the keys node containing type, identity, prekey, skey, and device-identity
-
             return new NodeBuilder()
                     .description("keys")
                     .content(typeNode, identityNode, preKeyNode, skeyNode, deviceIdentityNode)
@@ -626,7 +596,6 @@ public final class MessageReceiptHandler {
     private Jid resolveFrom(MessageReceiveStanza stanza) {
         // WAWebMsgProcessingApiUtils.getFrom
         // Returns the sender JID for CHAT messages
-
         var chatJid = stanza.chatJid();
         if (!chatJid.hasGroupOrCommunityServer()
                 && !chatJid.hasBroadcastServer()
@@ -636,7 +605,6 @@ public final class MessageReceiptHandler {
 
         // WAWebMsgProcessingApiUtils.getFrom
         // Returns the chat JID for GROUP/BROADCAST/STATUS messages
-
         return chatJid;
     }
 
@@ -660,7 +628,6 @@ public final class MessageReceiptHandler {
     private Jid resolveReceiptParticipant(MessageReceiveStanza stanza) {
         // WAWebHandleMsgSendReceipt.sendReceipt
         // Returns the stanza's participant for group/broadcast/status messages, null otherwise
-
         var chatJid = stanza.chatJid();
         if (chatJid.hasGroupOrCommunityServer()
                 || chatJid.hasBroadcastServer()
@@ -690,7 +657,6 @@ public final class MessageReceiptHandler {
     private Jid resolveRecipientForReceipt(MessageReceiveStanza stanza) {
         // WAWebHandleMsgSendReceipt.sendReceipt
         // Recipient is only applicable to CHAT messages
-
         var chatJid = stanza.chatJid();
         if (chatJid.hasGroupOrCommunityServer()
                 || chatJid.hasBroadcastServer()
@@ -700,7 +666,6 @@ public final class MessageReceiptHandler {
 
         // WAWebHandleMsgSendReceipt.sendReceipt
         // Requires a logged-in self JID to compare against
-
         var selfJid = store.jid().orElse(null);
         if (selfJid == null) {
             return null;
@@ -708,14 +673,12 @@ public final class MessageReceiptHandler {
 
         // WAWebHandleMsgSendReceipt.sendReceipt
         // Only populated when the author is our own account
-
         if (!stanza.senderJid().toUserJid().equals(selfJid.toUserJid())) {
             return null;
         }
 
         // WAWebHandleMsgSendReceipt.sendReceipt
         // Returns the chat JID since we do not track originalBotRecipient/preMatChat
-
         return chatJid;
     }
 
@@ -739,7 +702,6 @@ public final class MessageReceiptHandler {
     private boolean isSenderReceipt(Jid from, Jid participant) {
         // WAWebSendDeliveryReceiptJob
         // Requires a logged-in self JID
-
         var selfJid = store.jid().orElse(null);
         if (selfJid == null) {
             return false;
@@ -749,7 +711,6 @@ public final class MessageReceiptHandler {
 
         // WAWebSendDeliveryReceiptJob
         // Sender receipt when from is a user JID matching us
-
         if ((from.hasUserServer() || from.hasLidServer())
                 && from.toUserJid().equals(selfUser)) {
             return true;
@@ -757,7 +718,6 @@ public final class MessageReceiptHandler {
 
         // WAWebSendDeliveryReceiptJob
         // Sender receipt when a participant is present and matches us (group/broadcast from ourself)
-
         if (participant != null && participant.toUserJid().equals(selfUser)) {
             return true;
         }
@@ -788,28 +748,24 @@ public final class MessageReceiptHandler {
     ) {
         // WAWebSendDeliveryReceiptJob
         // Peer category maps to the PEER type (protocol value peer_msg)
-
         if (stanza.isPeer()) {
             return MessageReceiptType.PEER;
         }
 
         // WAWebSendDeliveryReceiptJob
         // Self-origin maps to the SENDER type
-
         if (isSender) {
             return MessageReceiptType.SENDER;
         }
 
         // WAWebSendDeliveryReceiptJob
         // Inactive messages from remote senders map to the INACTIVE type
-
         if (hasInactiveMsg) {
             return MessageReceiptType.INACTIVE;
         }
 
         // WAWebSendDeliveryReceiptJob
         // Active delivery drops the type attribute via the DELIVERY null protocol value
-
         return MessageReceiptType.DELIVERY;
     }
 }

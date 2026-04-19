@@ -3,7 +3,9 @@ package com.github.auties00.cobalt.store;
 
 import com.github.auties00.cobalt.client.*;
 import com.github.auties00.cobalt.media.MediaConnection;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.business.BusinessVerifiedName;
 import com.github.auties00.cobalt.model.business.profile.BusinessCategory;
 import com.github.auties00.cobalt.model.call.CallOffer;
@@ -90,6 +92,13 @@ import java.util.*;
 @WhatsAppWebModule(moduleName = "WAWebCollections")
 @WhatsAppWebModule(moduleName = "WAWebSignalStorage")
 @WhatsAppWebModule(moduleName = "WAWebUserPrefsBase")
+@WhatsAppWebModule(moduleName = "WAWebGetSyncKey")
+@WhatsAppWebModule(moduleName = "WAWebGetSyncAction")
+@WhatsAppWebModule(moduleName = "WAWebGetCollectionVersion")
+@WhatsAppWebModule(moduleName = "WAWebGetMissingKey")
+@WhatsAppWebModule(moduleName = "WAWebSyncdOrphan")
+@WhatsAppWebModule(moduleName = "WAWebSyncdStoreMissingKeys")
+@WhatsAppWebModule(moduleName = "WAWebSyncdCollectionsStateMachine")
 @SuppressWarnings({"unused", "UnusedReturnValue"})
 public interface WhatsAppStore extends SignalProtocolStore {
     /**
@@ -1163,40 +1172,6 @@ public interface WhatsAppStore extends SignalProtocolStore {
     Optional<? extends MessageInfo> findQuotedMessage(MessageInfo info);
 
     /**
-     * Records a reaction (or reaction withdrawal) that the current account
-     * has just sent to the given target message.
-     *
-     * <p>An empty {@code emoji} records a withdrawal matching WA Web's
-     * {@code WAWebReactionsBEUtils.REVOKED_REACTION_TEXT}. This is
-     * invoked eagerly during
-     * {@link com.github.auties00.cobalt.client.WhatsAppClient#addReaction}
-     * so local views reflect the in-flight state without waiting for the
-     * server ack.
-     *
-     * @param targetKey the key of the message being reacted to
-     * @param emoji     the reaction emoji, empty string to remove
-     * @throws NullPointerException if any argument is {@code null}
-     *
-     * @implNote WAWebReactionsCollection.addOrUpdateReaction: writes the
-     *           sender's current reaction into the in-memory reactions
-     *           collection so the UI reflects the change instantly.
-     */
-    void trackSentReaction(MessageKey targetKey, String emoji);
-
-    /**
-     * Returns the reaction emoji the current account is currently showing
-     * on the given target message, if any.
-     *
-     * @param targetKey the key of the message whose reaction is queried
-     * @return an {@link Optional} containing the emoji, or empty if the
-     *         account has not reacted to this message
-     *
-     * @implNote WAWebReactionsCollection.getExistingSenderModelFromReactionDetails:
-     *           looks up the sender's current reaction on a message.
-     */
-    Optional<String> findSentReaction(MessageKey targetKey);
-
-    /**
      * Returns all status updates stored in this session.
      *
      * @return an unmodifiable collection of status updates
@@ -1386,6 +1361,22 @@ public interface WhatsAppStore extends SignalProtocolStore {
     Optional<QuickReply> removeQuickReply(String id);
 
     /**
+     * Returns an unmodifiable snapshot of every quick reply currently held
+     * in the store.
+     *
+     * <p>WhatsApp Web queries the full list through
+     * {@code WAWebSchemaQuickReply.getQuickReplyTable().getAll()}, which
+     * returns the whole contents of the {@code quick-reply} IndexedDB table.
+     * Cobalt collapses that table into a {@link java.util.concurrent.ConcurrentMap}
+     * in {@link AbstractWhatsAppStore} and exposes the same listing through
+     * this accessor.
+     *
+     * @return the quick replies, in no particular order
+     * @implNote WAWebSchemaQuickReply.getQuickReplyTable().getAll()
+     */
+    List<QuickReply> quickReplies();
+
+    /**
      * Finds a label by its ID.
      *
      * @param labelId the label ID
@@ -1420,6 +1411,11 @@ public interface WhatsAppStore extends SignalProtocolStore {
      *
      * @return an unmodifiable sequenced collection of sync keys
      */
+    @WhatsAppWebExport(
+            moduleName = "WAWebGetSyncKey",
+            exports = "getAllSyncKeysInTransaction",
+            adaptation = WhatsAppAdaptation.ADAPTED
+    )
     SequencedCollection<AppStateSyncKey> appStateKeys();
 
     /**
@@ -1428,6 +1424,11 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * @param id the key ID, must not be {@code null}
      * @return an {@code Optional} containing the key if found
      */
+    @WhatsAppWebExport(
+            moduleName = "WAWebGetSyncKey",
+            exports = "getSyncKeyInTransaction_DO_NOT_USE",
+            adaptation = WhatsAppAdaptation.ADAPTED
+    )
     Optional<AppStateSyncKey> findWebAppStateKeyById(byte[] id);
 
     /**
@@ -1435,6 +1436,11 @@ public interface WhatsAppStore extends SignalProtocolStore {
      *
      * @param keys the collection of keys to add, must not be {@code null}
      */
+    @WhatsAppWebExport(
+            moduleName = "WAWebGetSyncKey",
+            exports = "setSyncKeyInTransaction",
+            adaptation = WhatsAppAdaptation.ADAPTED
+    )
     void addWebAppStateKeys(Collection<AppStateSyncKey> keys);
 
     /**
@@ -1454,6 +1460,11 @@ public interface WhatsAppStore extends SignalProtocolStore {
      *
      * @param epoch the sync key epoch to expire
      */
+    @WhatsAppWebExport(
+            moduleName = "WAWebGetSyncKey",
+            exports = "expireSyncKeyInTransaction",
+            adaptation = WhatsAppAdaptation.ADAPTED
+    )
     void expireAppStateKeysByEpoch(int epoch);
 
     /**
@@ -1462,6 +1473,11 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * @param patchType the patch type to query
      * @return an {@code Optional} containing the hash state if found
      */
+    @WhatsAppWebExport(
+            moduleName = "WAWebGetCollectionVersion",
+            exports = "getCollectionVersionLtHashInTransaction",
+            adaptation = WhatsAppAdaptation.ADAPTED
+    )
     Optional<SyncHashValue> findWebAppHashStateByName(SyncPatchType patchType);
 
     /**
@@ -1478,6 +1494,11 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * @param indexMac  the index MAC identifying the entry
      * @return an {@code Optional} containing the entry if found
      */
+    @WhatsAppWebExport(
+            moduleName = "WAWebGetSyncAction",
+            exports = "getSyncActionsByIndexMacsInTransaction",
+            adaptation = WhatsAppAdaptation.ADAPTED
+    )
     Optional<SyncActionEntry> findSyncActionEntry(SyncPatchType patchType, byte[] indexMac);
 
     /**
@@ -1493,6 +1514,11 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * @param actionIndex  the plaintext action index string
      * @return an {@code Optional} containing the entry if found
      */
+    @WhatsAppWebExport(
+            moduleName = "WAWebGetSyncAction",
+            exports = "getSyncActionInTransaction",
+            adaptation = WhatsAppAdaptation.ADAPTED
+    )
     Optional<SyncActionEntry> findSyncActionEntryByActionIndex(SyncPatchType patchType, String actionIndex);
 
     /**
@@ -1502,6 +1528,11 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * @param indexMac  the index MAC identifying the entry
      * @param entry     the entry to store
      */
+    @WhatsAppWebExport(
+            moduleName = "WAWebGetSyncAction",
+            exports = "getSyncActionsByCollectionAndIndexesInTransaction",
+            adaptation = WhatsAppAdaptation.ADAPTED
+    )
     void putSyncActionEntry(SyncPatchType patchType, byte[] indexMac, SyncActionEntry entry);
 
     /**
@@ -1511,6 +1542,11 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * @param indexMac  the index MAC identifying the entry to remove
      * @return an {@code Optional} containing the removed entry if it existed
      */
+    @WhatsAppWebExport(
+            moduleName = "WAWebGetSyncAction",
+            exports = "getSyncActionsByIndexMacsInTransaction",
+            adaptation = WhatsAppAdaptation.ADAPTED
+    )
     Optional<SyncActionEntry> removeSyncActionEntry(SyncPatchType patchType, byte[] indexMac);
 
     /**
@@ -1520,6 +1556,11 @@ public interface WhatsAppStore extends SignalProtocolStore {
      *
      * @param patchType the collection type
      */
+    @WhatsAppWebExport(
+            moduleName = "WAWebGetSyncAction",
+            exports = "getSyncActionsByCollectionsInTransaction",
+            adaptation = WhatsAppAdaptation.ADAPTED
+    )
     void clearSyncActionEntries(SyncPatchType patchType);
 
     /**
@@ -1528,6 +1569,11 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * @param patchType the collection type
      * @return an unmodifiable collection of entries, or an empty collection if none exist
      */
+    @WhatsAppWebExport(
+            moduleName = "WAWebGetSyncAction",
+            exports = "getSyncActionsByCollectionsInTransaction",
+            adaptation = WhatsAppAdaptation.ADAPTED
+    )
     Collection<SyncActionEntry> getSyncActionEntries(SyncPatchType patchType);
 
     /**
@@ -1535,6 +1581,11 @@ public interface WhatsAppStore extends SignalProtocolStore {
      *
      * @return an unmodifiable collection of missing sync keys
      */
+    @WhatsAppWebExport(
+            moduleName = "WAWebGetMissingKey",
+            exports = "getAllMissingKeysInTransaction",
+            adaptation = WhatsAppAdaptation.ADAPTED
+    )
     Collection<MissingDeviceSyncKey> missingSyncKeys();
 
     /**
@@ -1543,6 +1594,11 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * @param keyId the key ID
      * @return an {@code Optional} containing the missing key entry if found
      */
+    @WhatsAppWebExport(
+            moduleName = "WAWebGetMissingKey",
+            exports = "bulkGetMissingKeysInTransaction",
+            adaptation = WhatsAppAdaptation.ADAPTED
+    )
     Optional<MissingDeviceSyncKey> findMissingSyncKey(byte[] keyId);
 
     /**
@@ -1550,6 +1606,11 @@ public interface WhatsAppStore extends SignalProtocolStore {
      *
      * @param missingKey the missing key entry to add
      */
+    @WhatsAppWebExport(
+            moduleName = "WAWebSyncdStoreMissingKeys",
+            exports = "addMissingKeys",
+            adaptation = WhatsAppAdaptation.ADAPTED
+    )
     void addMissingSyncKey(MissingDeviceSyncKey missingKey);
 
     /**
@@ -1582,6 +1643,11 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * @param collectionName the collection name
      * @return the collection metadata
      */
+    @WhatsAppWebExport(
+            moduleName = "WAWebSyncdCollectionsStateMachine",
+            exports = "default",
+            adaptation = WhatsAppAdaptation.ADAPTED
+    ) // WAWebSyncdCollectionsStateMachine.getCollectionState
     SyncCollectionMetadata findWebAppState(SyncPatchType collectionName);
 
     /**
@@ -1591,6 +1657,11 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * @param newVersion     the new version
      * @param newLtHash      the new LT-Hash
      */
+    @WhatsAppWebExport(
+            moduleName = "WAWebGetCollectionVersion",
+            exports = "updateCollectionVersionAndLtHashInTransaction",
+            adaptation = WhatsAppAdaptation.ADAPTED
+    )
     void updateWebAppStateVersion(SyncPatchType collectionName, long newVersion, byte[] newLtHash);
 
     /**
@@ -1651,6 +1722,11 @@ public interface WhatsAppStore extends SignalProtocolStore {
      *
      * @param collectionName the collection name
      */
+    @WhatsAppWebExport(
+            moduleName = "WAWebGetCollectionVersion",
+            exports = "updateIsCollectionInMacMismatchFatalInTransaction",
+            adaptation = WhatsAppAdaptation.ADAPTED
+    )
     void markWebAppStateMacMismatch(SyncPatchType collectionName);
 
     /**
@@ -1700,6 +1776,11 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * @param collectionName the collection name
      * @param mutation       the orphan mutation entry
      */
+    @WhatsAppWebExport(
+            moduleName = "WAWebSyncdOrphan",
+            exports = "checkOrphanMutations",
+            adaptation = WhatsAppAdaptation.ADAPTED
+    )
     void addOrphanMutation(SyncPatchType collectionName, OrphanMutationEntry mutation);
 
     /**
@@ -1708,6 +1789,11 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * @param collectionName the collection name
      * @return the list of orphan mutation entries, never {@code null}
      */
+    @WhatsAppWebExport(
+            moduleName = "WAWebGetSyncAction",
+            exports = "getOrphanSyncActionsByModelTypeInTransaction",
+            adaptation = WhatsAppAdaptation.ADAPTED
+    )
     List<OrphanMutationEntry> findOrphanMutations(SyncPatchType collectionName);
 
     /**
@@ -1727,6 +1813,11 @@ public interface WhatsAppStore extends SignalProtocolStore {
      *
      * @param collectionName the collection name
      */
+    @WhatsAppWebExport(
+            moduleName = "WAWebSyncdOrphan",
+            exports = "applyAllOrphansAndUnsupported",
+            adaptation = WhatsAppAdaptation.ADAPTED
+    )
     void removeOrphanMutations(SyncPatchType collectionName);
 
     /**
@@ -1735,6 +1826,11 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * @param collectionName the collection name
      * @param entries        the entries to remove
      */
+    @WhatsAppWebExport(
+            moduleName = "WAWebSyncdOrphan",
+            exports = "applyAllOrphansAndUnsupported",
+            adaptation = WhatsAppAdaptation.ADAPTED
+    )
     void removeOrphanMutations(SyncPatchType collectionName, Collection<OrphanMutationEntry> entries);
 
     /**
@@ -2016,6 +2112,35 @@ public interface WhatsAppStore extends SignalProtocolStore {
     void clearCoexHostedVerificationCache();
 
     /**
+     * Returns the set of contacts currently blocked by this account.
+     *
+     * @return an unmodifiable view of the blocked-contact set
+     */
+    Set<Jid> blockedContacts();
+
+    /**
+     * Marks the given contact as blocked. The JID is normalized to its
+     * user JID form so duplicate device variants do not accumulate.
+     *
+     * @param contact the contact to block; {@code null} is ignored
+     */
+    void addBlockedContact(Jid contact);
+
+    /**
+     * Removes the given contact from the block list.
+     *
+     * @param contact the contact to unblock; {@code null} is ignored
+     */
+    void removeBlockedContact(Jid contact);
+
+    /**
+     * Replaces the entire block list with the given collection.
+     *
+     * @param contacts the new block list; {@code null} clears it
+     */
+    void setBlockedContacts(Collection<Jid> contacts);
+
+    /**
      * Finds the verified business name record for the given JID.
      *
      * @param jid the user JID
@@ -2280,6 +2405,21 @@ public interface WhatsAppStore extends SignalProtocolStore {
 
     WhatsAppStore setBusinessBroadcastLists(Map<String, BusinessBroadcastListAction> lists);
 
+    /**
+     * Returns the JIDs of every stored business broadcast list.
+     *
+     * <p>The stored broadcast list identifiers are projected into
+     * JIDs on the broadcast server so callers can address the broadcast
+     * targets directly.
+     *
+     * @return a snapshot collection of broadcast list JIDs, in the
+     *         insertion order of the underlying map; empty if no
+     *         broadcast lists are known
+     *
+     * @implNote WAWebBroadcastListStorageUtils.getAllBroadcastLists
+     */
+    SequencedCollection<Jid> broadcasts();
+
     Map<String, BusinessBroadcastCampaignAction> businessBroadcastCampaigns();
 
     WhatsAppStore setBusinessBroadcastCampaigns(Map<String, BusinessBroadcastCampaignAction> campaigns);
@@ -2462,6 +2602,58 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * @return this store instance for method chaining
      */
     WhatsAppStore setPairingTimestamp(Instant pairingTimestamp);
+
+    /**
+     * Returns the clock skew between the server and the local clock, in
+     * seconds.
+     *
+     * <p>WhatsApp Web computes this as the difference between the server
+     * timestamp carried by the {@code <success>} stanza's {@code t} attribute
+     * and the local epoch seconds, then persists it so every timestamp-aware
+     * module can rebase {@code Date} comparisons against server time.
+     *
+     * @implNote WAWebUpdateClockSkewUtils.updateClockSkew writes the value via
+     *           {@code WATimeUtils.setClockSkew(n)} and forwards it to the
+     *           frontend via {@code frontendFireAndForget("setWebClockSkew", ...)}.
+     * @return the stored clock skew in seconds ({@code 0} if never set)
+     */
+    long clockSkewSeconds(); // WAWebUpdateClockSkewUtils.updateClockSkew
+
+    /**
+     * Sets the clock skew between server and local time, expressed in
+     * seconds.
+     *
+     * @implNote WAWebUpdateClockSkewUtils.updateClockSkew
+     * @param clockSkewSeconds the difference in seconds between the server
+     *                         timestamp and the local clock, positive when
+     *                         the server is ahead
+     * @return this store instance for method chaining
+     */
+    WhatsAppStore setClockSkewSeconds(long clockSkewSeconds); // WAWebUpdateClockSkewUtils.updateClockSkew
+
+    /**
+     * Returns the timestamp of the last group AB-props emergency push the
+     * server signalled via the {@code <success>} stanza's
+     * {@code group_abprops} attribute.
+     *
+     * <p>WhatsApp Web persists this timestamp in {@code localStorage} and
+     * reads it back on subsequent AB-props syncs to detect whether a delta
+     * push has already been applied, avoiding redundant full syncs.
+     *
+     * @implNote WAWebABPropsLocalStorage.setGroupAbPropsEmergencyPushTimestamp
+     * @return an {@link Optional} containing the last emergency push
+     *         timestamp, or empty if none has been recorded yet
+     */
+    Optional<Instant> groupAbPropsEmergencyPushTimestamp(); // WAWebABPropsLocalStorage.setGroupAbPropsEmergencyPushTimestamp
+
+    /**
+     * Sets the timestamp of the last group AB-props emergency push.
+     *
+     * @implNote WAWebABPropsLocalStorage.setGroupAbPropsEmergencyPushTimestamp
+     * @param timestamp the emergency push timestamp, or {@code null} to clear
+     * @return this store instance for method chaining
+     */
+    WhatsAppStore setGroupAbPropsEmergencyPushTimestamp(Instant timestamp); // WAWebABPropsLocalStorage.setGroupAbPropsEmergencyPushTimestamp
 
     /**
      * Removes every recent sticker that is flagged as an avatar sticker and

@@ -110,11 +110,9 @@ public sealed interface AcceptNewsletterAdminInviteMex extends MexJsonOperation 
         public NodeBuilder toNode() {
             // WAWebMexAcceptNewsletterAdminInviteJob.acceptNewsletterAdminInvite
             // Opens a UTF-8 JSON writer that will serialise the GraphQL variables envelope
-
             try (var writer = JSONWriter.ofUTF8()) {
                 // WAWebMexAcceptNewsletterAdminInviteJob.acceptNewsletterAdminInvite
                 // Begins the outer envelope and the nested "variables" object required by WAWebMexClient.fetchQuery
-
                 writer.startObject();
                 writer.writeName("variables");
                 writer.writeColon();
@@ -122,7 +120,6 @@ public sealed interface AcceptNewsletterAdminInviteMex extends MexJsonOperation 
 
                 // WAWebMexAcceptNewsletterAdminInviteJob.acceptNewsletterAdminInvite
                 // Emits the newsletter_id variable when present, skipping it otherwise so the server schema defaults apply
-
                 if (newsletterId != null) {
                     writer.writeName("newsletter_id");
                     writer.writeColon();
@@ -133,7 +130,6 @@ public sealed interface AcceptNewsletterAdminInviteMex extends MexJsonOperation 
 
                 // ADAPTED: WAWebMexAcceptNewsletterAdminInviteJob.acceptNewsletterAdminInvite
                 // Flushes the JSON into a StringWriter and wraps it in the shared MEX IQ envelope
-
                 try (var output = new StringWriter()) {
                     writer.flushTo(output);
                     return MexJsonOperation.createMexNode(QUERY_ID, output.toString());
@@ -218,7 +214,6 @@ public sealed interface AcceptNewsletterAdminInviteMex extends MexJsonOperation 
         private static Optional<Response> of(byte[] json) {
             // WAWebMexAcceptNewsletterAdminInviteJob.acceptNewsletterAdminInvite
             // Parses the raw JSON payload into a fastjson2 JSONObject and returns empty if the parser yields null
-
             var jsonObject = JSON.parseObject(json);
             if (jsonObject == null) {
                 return Optional.empty();
@@ -226,7 +221,6 @@ public sealed interface AcceptNewsletterAdminInviteMex extends MexJsonOperation 
 
             // WAWebMexAcceptNewsletterAdminInviteJob.acceptNewsletterAdminInvite
             // Descends into the standard GraphQL "data" envelope, returning empty when the server reported only errors
-
             var data = jsonObject.getJSONObject("data");
             if (data == null) {
                 return Optional.empty();
@@ -234,7 +228,6 @@ public sealed interface AcceptNewsletterAdminInviteMex extends MexJsonOperation 
 
             // WAWebMexAcceptNewsletterAdminInviteJob.acceptNewsletterAdminInvite
             // Extracts the mutation-specific root object, which the server keys by xwa2_newsletter_admin_invite_accept
-
             var root = data.getJSONObject("xwa2_newsletter_admin_invite_accept");
             if (root == null) {
                 return Optional.empty();

@@ -27,9 +27,10 @@ import java.util.Objects;
  * picked by the caller or by the provided factories.
  *
  * <p>Pre-built profiles are available via {@link #web()},
- * {@link #ios(boolean)}, and {@link #android(boolean)}; the mobile
- * factories randomise the model/version tuple from a curated list to
- * reduce fingerprintability.
+ * {@link #desktop()}, {@link #ios(boolean)}, and
+ * {@link #android(boolean)}; the mobile factories randomise the
+ * model/version tuple from a curated list to reduce
+ * fingerprintability.
  *
  * @see WhatsAppClientType
  * @see WhatsAppClientBuilder.Options#device(WhatsAppDevice)
@@ -366,20 +367,85 @@ public final class WhatsAppDevice {
     }
 
     /**
-     * Creates a {@code WhatsAppDevice} configured as a web companion device.
+     * Creates a {@code WhatsAppDevice} configured as a browser-based
+     * WhatsApp Web companion.
      *
+     * <p>Mirrors what WA Web transmits in {@code ClientPayload.UserAgent}
+     * from {@code WAWebClientPayload.C}: the wire platform is hardcoded to
+     * {@link ClientPlatformType#WEB}, the app version block carries the
+     * Chrome-derived {@code appVersion}, and the human-visible device
+     * identity is Chrome on Windows so the server routes through the
+     * WebSocket {@code /ws/chat} endpoint used by genuine browser
+     * sessions.
+     *
+     * @implNote WAWebClientPayload.y: {@code platform:
+     *           ClientPayload$UserAgent$Platform.WEB} for every browser
+     *           surface; Chrome-on-Windows is the most common combination
+     *           shipped in production logs, hence the chosen defaults.
      * @return a new web-configured device descriptor
      */
     public static WhatsAppDevice web() {
         return new WhatsAppDevice(
-                "Surface Pro 4",
-                "Microsoft",
-                ClientPlatformType.MACOS,
+                "Chrome",
+                "Google Inc.",
+                ClientPlatformType.WEB,
                 ClientAppVersion.of("10.0"),
                 null,
                 null,
                 WhatsAppClientType.WEB
         );
+    }
+
+    /**
+     * Creates a {@code WhatsAppDevice} configured as a WhatsApp Desktop
+     * companion, auto-detecting the host platform.
+     *
+     * <p>Picks {@link ClientPlatformType#MACOS} when the JVM reports a
+     * Darwin {@code os.name} and {@link ClientPlatformType#WINDOWS}
+     * otherwise (Linux hosts also default to Windows because that is the
+     * most common WA Desktop build in production and has no native
+     * Linux counterpart). WA Desktop ships as an Electron bundle but
+     * reuses the same {@code ClientPayload} shape as {@link #web()} over
+     * a raw TCP+TLS transport (see {@code WhatsAppSocketClient.Desktop}).
+     * Cobalt's socket layer selects that transport when the device
+     * platform is {@code MACOS} or {@code WINDOWS}.
+     *
+     * @implNote WAWebClientPayload.b: {@code "Desktop" -> DESKTOP}
+     *           DeviceProps platformType; {@code WAWebEnvironment.isWindows}
+     *           branches inside {@code WAWebClientPayload.y} set the
+     *           {@code UWP} variant and add the Windows build quaternary
+     *           on the {@code appVersion}. The {@code UserAgent.platform}
+     *           remains {@code WEB} on the wire for every desktop build;
+     *           the Cobalt enum stored here only drives local transport
+     *           selection ({@code WhatsAppSocketClient.newCipheredSocketClient}).
+     * @return a new desktop-configured device descriptor matching the
+     *         host platform, or a Windows descriptor when the host is
+     *         neither Windows nor macOS
+     */
+    public static WhatsAppDevice desktop() {
+        var osName = System.getProperty("os.name", "").toLowerCase();
+        var isMac = osName.contains("mac") || osName.contains("darwin");
+        if (isMac) {
+            return new WhatsAppDevice(
+                    "MacBook Pro",
+                    "Apple",
+                    ClientPlatformType.MACOS,
+                    ClientAppVersion.of("14.5"),
+                    null,
+                    null,
+                    WhatsAppClientType.WEB
+            );
+        } else {
+            return new WhatsAppDevice(
+                    "Desktop",
+                    "Microsoft",
+                    ClientPlatformType.WINDOWS,
+                    ClientAppVersion.of("10.0"),
+                    null,
+                    null,
+                    WhatsAppClientType.WEB
+            );
+        }
     }
 
     /**

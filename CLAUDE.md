@@ -53,12 +53,12 @@ Cobalt class names mirror WA Web modules but drop the `WA`/`WAWeb` prefix:
 ### Source Provenance Annotations (`cobalt-source-meta`)
 Cobalt tracks its relationship to WhatsApp source code via annotations in `com.github.auties00.cobalt.meta`, split into two families:
 
-**WhatsApp Web** (Web + Desktop — same JS codebase):
+**WhatsApp Web** (Web + Windows Desktop — same JS codebase; the Electron-era macOS desktop also shared this bundle):
 - `@WhatsAppWebModule(moduleName = "WAWebFoo")` on types — which JS module(s) the class adapts
 - `@WhatsAppWebExport(moduleName = "WAWebFoo", exports = "bar", adaptation = ...)` on methods/fields/constructors — which export is implemented
 - `WhatsAppWebPlatform` enum: `SHARED` (default), `WINDOWS`, `MAC_OS` — for desktop-specific divergences
 
-**WhatsApp Mobile** (iOS / Android — native codebases):
+**WhatsApp Mobile** (iOS / Android — native codebases; the macOS desktop app is a Mac Catalyst port of the iOS binary and uses `IOS`):
 - `@WhatsAppMobileClass(className = "WAFoo", platform = ...)` on types — which native class is adapted
 - `@WhatsAppMobileMethod(className = "WAFoo", methods = "-bar:", platform = ..., adaptation = ...)` on methods/fields/constructors
 - `WhatsAppMobilePlatform` enum: `IOS`, `ANDROID` — no default, must be specified

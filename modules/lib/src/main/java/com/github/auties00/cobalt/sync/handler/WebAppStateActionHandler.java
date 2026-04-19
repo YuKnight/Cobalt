@@ -1,6 +1,9 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.sync.ConflictResolution;
 import com.github.auties00.cobalt.model.sync.ConflictResolutionState;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
@@ -28,10 +31,24 @@ import java.util.List;
  *   <li>{@link #version()} — the mutation format version for version gating</li>
  * </ul>
  *
- * @implNote WAWeb*Sync (e.g., WAWebArchiveChatSync, WAWebPinChatSync, etc.) — each
- *           concrete handler extends the common base class pattern with {@code getAction()},
- *           {@code getVersion()}, {@code collectionName}, and {@code applyMutations()}
+ * <p>This interface flattens WA Web's five-class category hierarchy
+ * ({@code AccountSyncdActionBase}, {@code ChatSyncdActionBase},
+ * {@code ChatOrContactSyncdActionBase}, {@code MessageSyncdActionBase},
+ * {@code ChatMessageRangeSyncdActionBase}) plus their shared prototype root
+ * into a single interface, mirroring the Cobalt store flattening design.
+ * The {@code is*SyncdAction()} / {@code as*SyncdActionHandler()} discrimination
+ * pattern from WA Web is intentionally dropped because Cobalt handlers are
+ * dispatched directly by {@link #actionName()} without category casts.
+ *
+ * @implNote WAWebSyncdAction — the shared prototype root plus its five base
+ *           subclasses ({@code AccountSyncdActionBase}, {@code ChatSyncdActionBase},
+ *           {@code ChatOrContactSyncdActionBase}, {@code MessageSyncdActionBase},
+ *           {@code ChatMessageRangeSyncdActionBase}) are flattened into this
+ *           single interface. Concrete {@code WAWeb*Sync} handlers extend the
+ *           appropriate base with {@code getAction()}, {@code getVersion()},
+ *           {@code collectionName}, and {@code applyMutations()}
  */
+@WhatsAppWebModule(moduleName = "WAWebSyncdAction")
 public interface WebAppStateActionHandler {
     /**
      * Gets the action type name this handler processes.
@@ -81,6 +98,11 @@ public interface WebAppStateActionHandler {
      * @implNote WAWebSyncdAction.malformedActionIndex, WAWebSyncdIndexUtils.malformedActionIndex
      * @return a {@link MutationApplicationResult} with {@code MALFORMED} state
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdAction", exports = "AccountSyncdActionBase", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebSyncdAction", exports = "ChatSyncdActionBase", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebSyncdAction", exports = "ChatOrContactSyncdActionBase", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebSyncdAction", exports = "MessageSyncdActionBase", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebSyncdAction", exports = "ChatMessageRangeSyncdActionBase", adaptation = WhatsAppAdaptation.ADAPTED)
     default MutationApplicationResult malformedActionIndex() {
         return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName()); // WAWebSyncdAction.malformedActionIndex -> WAWebSyncdIndexUtils.malformedActionIndex(e.collectionName, e.getAction())
     }
@@ -205,6 +227,11 @@ public interface WebAppStateActionHandler {
      * @return the conflict resolution indicating which mutation to keep and
      *         optionally a merged mutation
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdAction", exports = "AccountSyncdActionBase", adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WAWebSyncdAction", exports = "ChatSyncdActionBase", adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WAWebSyncdAction", exports = "ChatOrContactSyncdActionBase", adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WAWebSyncdAction", exports = "MessageSyncdActionBase", adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WAWebSyncdAction", exports = "ChatMessageRangeSyncdActionBase", adaptation = WhatsAppAdaptation.DIRECT)
     default ConflictResolution resolveConflicts(DecryptedMutation.Trusted localMutation, DecryptedMutation.Trusted remoteMutation) {
         if (remoteMutation.timestamp().compareTo(localMutation.timestamp()) >= 0) {
             return ConflictResolution.of(ConflictResolutionState.APPLY_REMOTE_DROP_LOCAL);
@@ -223,6 +250,11 @@ public interface WebAppStateActionHandler {
      * @param pendingByIndex all pending mutations indexed by mutation index
      * @return whether the remote mutation should be dropped
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdAction", exports = "AccountSyncdActionBase", adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WAWebSyncdAction", exports = "ChatSyncdActionBase", adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WAWebSyncdAction", exports = "ChatOrContactSyncdActionBase", adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WAWebSyncdAction", exports = "MessageSyncdActionBase", adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WAWebSyncdAction", exports = "ChatMessageRangeSyncdActionBase", adaptation = WhatsAppAdaptation.DIRECT)
     default boolean dropMutationDueToCrossIndexConflict(
             DecryptedMutation.Trusted remoteMutation,
             java.util.Map<String, DecryptedMutation.Trusted> pendingByIndex

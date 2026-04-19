@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.model.sync.action.device;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.SyncActionEmptyArgs;
 import com.github.auties00.cobalt.model.sync.SyncAction;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
@@ -15,7 +18,12 @@ import it.auties.protobuf.model.ProtobufType;
  * replicated to every companion device so the user's preference is consistent
  * across all surfaces. The mutation is singleton, so the sync index is composed
  * solely of {@link #ACTION_NAME} with no trailing arguments.
+ *
+ * @implNote WAWebExternalWebBetaSync wraps the wire-level {@code ExternalWebBetaAction}
+ *           protobuf with {@code collectionName = Regular}, {@code getVersion = 3} and
+ *           a single-field mutation carrying {@code isOptIn}.
  */
+@WhatsAppWebModule(moduleName = "WAWebExternalWebBetaSync")
 @ProtobufMessage(name = "SyncActionValue.ExternalWebBetaAction")
 public final class ExternalWebBetaAction implements SyncAction<SyncActionEmptyArgs> {
     /**
@@ -61,6 +69,11 @@ public final class ExternalWebBetaAction implements SyncAction<SyncActionEmptyAr
      * Flag that records whether the user has opted into the WhatsApp Web beta
      * program.
      */
+    @WhatsAppWebExport(
+            moduleName = "WAWebExternalWebBetaSync",
+            exports = "default",
+            adaptation = WhatsAppAdaptation.ADAPTED
+    ) // WAWebExternalWebBetaSync: e.value.externalWebBetaAction.isOptIn
     @ProtobufProperty(index = 1, type = ProtobufType.BOOL)
     Boolean isOptIn;
 

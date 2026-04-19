@@ -145,7 +145,7 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
     @WhatsAppWebExport(moduleName = "WAWebEncryptAndSendStatusMsg", exports = "encryptAndSendStatusMsg",
             adaptation = WhatsAppAdaptation.DIRECT)
     @Override
-    AckResult send(Jid statusJid, ChatMessageInfo messageInfo) {
+    public AckResult send(Jid statusJid, ChatMessageInfo messageInfo) {
         waitForOfflineDelivery();
         var container = messageInfo.message();
         var selfJid = requireSelfJid();

@@ -69,18 +69,15 @@ public sealed interface LogNewsletterExposuresMex extends MexJsonOperation permi
         public NodeBuilder toNode() {
             // WAWebMexLogNewsletterExposuresJob.mexLogNewsletterExposures
             // Opens a UTF-8 JSON writer that will serialise the GraphQL variables envelope
-
             try (var writer = JSONWriter.ofUTF8()) {
                 // WAWebMexLogNewsletterExposuresJob.mexLogNewsletterExposures
                 // Begins the outer envelope and the nested "variables" object consumed by WAWebMexClient.fetchQuery
-
                 writer.startObject();
                 writer.writeName("variables");
                 writer.writeColon();
                 writer.startObject();
                 // WAWebMexLogNewsletterExposuresJob.mexLogNewsletterExposures
                 // Emits the input variable when present
-
                 if (input != null) {
                     writer.writeName("input");
                     writer.writeColon();
@@ -91,7 +88,6 @@ public sealed interface LogNewsletterExposuresMex extends MexJsonOperation permi
 
                 // ADAPTED: WAWebMexLogNewsletterExposuresJob.mexLogNewsletterExposures
                 // Flushes the JSON buffer into a StringWriter and wraps it in the shared MEX IQ envelope
-
                 try (var output = new StringWriter()) {
                     writer.flushTo(output);
                     return MexJsonOperation.createMexNode(QUERY_ID, output.toString());
@@ -145,7 +141,6 @@ public sealed interface LogNewsletterExposuresMex extends MexJsonOperation permi
         private static Optional<Response> of(byte[] json) {
             // WAWebMexLogNewsletterExposuresJob.mexLogNewsletterExposures
             // Parses the raw JSON payload, bailing out if fastjson2 returns null
-
             var jsonObject = JSON.parseObject(json);
             if (jsonObject == null) {
                 return Optional.empty();
@@ -153,7 +148,6 @@ public sealed interface LogNewsletterExposuresMex extends MexJsonOperation permi
 
             // WAWebMexLogNewsletterExposuresJob.mexLogNewsletterExposures
             // Descends into the standard GraphQL "data" envelope
-
             var data = jsonObject.getJSONObject("data");
             if (data == null) {
                 return Optional.empty();
@@ -161,7 +155,6 @@ public sealed interface LogNewsletterExposuresMex extends MexJsonOperation permi
 
             // WAWebMexLogNewsletterExposuresJob.mexLogNewsletterExposures
             // Probes for the xwa2_newsletter_log_exposures marker so callers can confirm the batch was accepted
-
             var root = data.get("xwa2_newsletter_log_exposures");
             if (root == null) {
                 return Optional.empty();

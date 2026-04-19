@@ -2,6 +2,9 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.OrphanMutationEntry;
@@ -35,12 +38,14 @@ import java.util.logging.Logger;
  *           class {@code f} constructor sets
  *           {@code collectionName = WASyncdConst.CollectionName.CriticalUnblockLow}
  */
+@WhatsAppWebModule(moduleName = "WAWebLidContactSync")
 public final class LidContactHandler implements WebAppStateActionHandler {
     /**
      * The singleton instance of this handler.
      *
      * @implNote WAWebLidContactSync — module-level singleton {@code g = new f()}
      */
+    @WhatsAppWebExport(moduleName = "WAWebLidContactSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final LidContactHandler INSTANCE = new LidContactHandler();
 
     /**
@@ -56,6 +61,7 @@ public final class LidContactHandler implements WebAppStateActionHandler {
      * @implNote WAWebLidContactSync — class {@code f} constructor sets
      *           {@code collectionName = CriticalUnblockLow}
      */
+    @WhatsAppWebExport(moduleName = "WAWebLidContactSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private LidContactHandler() {
 
     }
@@ -68,6 +74,7 @@ public final class LidContactHandler implements WebAppStateActionHandler {
      * @return the action name string
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebLidContactSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
         return LidContactAction.ACTION_NAME; // WAWebLidContactSync.getAction
     }
@@ -80,6 +87,7 @@ public final class LidContactHandler implements WebAppStateActionHandler {
      * @return the sync patch type
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebLidContactSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
         return LidContactAction.COLLECTION_NAME; // WAWebLidContactSync.collectionName
     }
@@ -91,6 +99,7 @@ public final class LidContactHandler implements WebAppStateActionHandler {
      * @return the version number
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebLidContactSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return LidContactAction.ACTION_VERSION; // WAWebLidContactSync.getVersion
     }
@@ -106,6 +115,7 @@ public final class LidContactHandler implements WebAppStateActionHandler {
      * @return {@code true} if the mutation was applied successfully
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebLidContactSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebLidContactSync.applyMutations
     }
@@ -156,6 +166,7 @@ public final class LidContactHandler implements WebAppStateActionHandler {
      * @return the detailed application result
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebLidContactSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (!client.abPropsService().getBool(ABProp.USERNAME_CONTACT_SYNCD_SUPPORT_ENABLE)) { // WAWebLidContactSync.applyMutations: var f = usernameContactSyncdEnabled(); if (!f) return ... Unsupported
             return MutationApplicationResult.unsupported(); // WAWebLidContactSync.applyMutations: {actionState: Unsupported}
@@ -208,7 +219,6 @@ public final class LidContactHandler implements WebAppStateActionHandler {
 
                 // WAWebLidContactSync.applyMutations: o("WAWebSyncContactsJob").syncNewContact(a)
                 // SKIPPED: debounced background contact sync refresh; not mirrored in Cobalt.
-
                 retryOrphanStatusMutes(client, lidJidString); // WAWebLidContactSync.applyMutations: o("WAWebSyncdOrphan").checkOrphanUserStatusMutes(h.map(e => e.id))
                 yield MutationApplicationResult.success(); // WAWebLidContactSync.applyMutations: {actionState: Success}
             }

@@ -159,7 +159,6 @@ public final class DevicePreKeyHandler {
 
         // WAWebManageE2ESessionsJob.ensureE2ESessions
         // Separates devices into those with in-flight requests and those needing new fetches
-
         var devicesNeedingFetch = new ArrayList<Jid>();
         var existingFutures = new HashMap<Jid, CompletableFuture<SignalPreKeyBundle>>();
 
@@ -174,7 +173,6 @@ public final class DevicePreKeyHandler {
 
         // WAWebManageE2ESessionsJob.ensureE2ESessions
         // Registers new futures for devices about to be fetched, handling race conditions
-
         var newFutures = new HashMap<Jid, CompletableFuture<SignalPreKeyBundle>>();
         for (var deviceJid : devicesNeedingFetch) {
             var future = new CompletableFuture<SignalPreKeyBundle>();
@@ -194,7 +192,6 @@ public final class DevicePreKeyHandler {
 
             // WAWebFetchPrekeysJob.fetchPrekeys
             // Fans out one virtual-thread subtask per batch to dispatch IQs in parallel
-
             try (var scope = StructuredTaskScope.open()) {
                 var subtasks = new ArrayList<Subtask<Map<Jid, SignalPreKeyBundle>>>();
                 for (var batch : batches) {
@@ -218,7 +215,6 @@ public final class DevicePreKeyHandler {
 
                 // WAWebFetchPrekeysJob.fetchPrekeys
                 // Completes any remaining futures with null when the server omitted the device
-
                 for (var entry : newFutures.entrySet()) {
                     if (!entry.getValue().isDone()) {
                         entry.getValue().complete(null);
@@ -239,7 +235,6 @@ public final class DevicePreKeyHandler {
 
         // WAWebManageE2ESessionsJob.ensureE2ESessions
         // Waits for previously in-flight requests to complete so deduplicated callers get the same bundle
-
         for (var entry : existingFutures.entrySet()) {
             try {
                 var bundle = entry.getValue().join();
@@ -253,7 +248,6 @@ public final class DevicePreKeyHandler {
 
         // WAWebProcessKeyBundle.processKeyBundle
         // Sorts bundles so primary devices are processed before companions to avoid races on shared state
-
         var sortedEntries = allBundles.entrySet().stream()
                 .sorted((a, b) -> {
                     var deviceA = a.getKey().device();
@@ -268,7 +262,6 @@ public final class DevicePreKeyHandler {
 
         // WAWebProcessKeyBundle.processKeyBundle
         // Installs each bundle into the Signal session store in sorted order
-
         for (var entry : sortedEntries) {
             var deviceJid = entry.getKey();
             var bundle = entry.getValue();
@@ -460,7 +453,6 @@ public final class DevicePreKeyHandler {
 
         // WAWebFetchPrekeysJob.fetchPrekeys
         // One-time pre-key is optional: when the server ran out, only skey is returned
-
         var preKeyNode = userNode.getChild("key");
         if (preKeyNode.isPresent()) {
             var preKeyId = preKeyNode.get().getChild("id")
@@ -520,7 +512,6 @@ public final class DevicePreKeyHandler {
     public void ensureSessions(Collection<Jid> deviceJids) {
         // WAWebManageE2ESessionsJob.ensureE2ESessions
         // Only fetches pre-keys for devices without an existing Signal session
-
         var devicesNeedingSessions = findDevicesNeedingSessions(deviceJids);
         if (devicesNeedingSessions.isEmpty()) {
             return;
@@ -558,7 +549,6 @@ public final class DevicePreKeyHandler {
 
         // WAWebGetIdentityKeysJob.getAndStoreIdentityKeys
         // Filters users whose primary device already has a session, skipping redundant fetches
-
         var usersNeedingKeys = new ArrayList<Jid>();
         for (var userJid : userJids) {
             var primaryDeviceJid = userJid.toUserJid().withDevice(0);
@@ -574,7 +564,6 @@ public final class DevicePreKeyHandler {
 
         // WAWebGetIdentityKeysJob.getAndStoreIdentityKeys
         // Batches users and fans out one virtual-thread subtask per batch
-
         var batches = batchUsers(usersNeedingKeys, MAX_DEVICES_PER_QUERY);
 
         try (var scope = StructuredTaskScope.open()) {

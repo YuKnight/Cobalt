@@ -141,8 +141,17 @@ public interface DailyEvent extends WamEventSpec {
     @WamProperty(index = 219, type = WamType.INTEGER)
     OptionalInt countLimitSharingGroupThreads();
 
+    @WamProperty(index = 247, type = WamType.INTEGER)
+    OptionalInt dailyPasskeyCount();
+
     @WamProperty(index = 206, type = WamType.INTEGER)
     OptionalInt dbAddressbookTableSize();
+
+    @WamProperty(index = 248, type = WamType.INTEGER)
+    OptionalInt defaultAfterReadDuration();
+
+    @WamProperty(index = 249, type = WamType.BOOLEAN)
+    Optional<Boolean> defaultAfterReadEnabled();
 
     @WamProperty(index = 140, type = WamType.INTEGER)
     OptionalInt defaultDisappearingDuration();
@@ -296,6 +305,9 @@ public interface DailyEvent extends WamEventSpec {
 
     @WamProperty(index = 180, type = WamType.INTEGER)
     OptionalInt numContactsWithTextstatusText24h();
+
+    @WamProperty(index = 250, type = WamType.INTEGER)
+    OptionalInt numberOfSim();
 
     @WamProperty(index = 4, type = WamType.STRING)
     Optional<String> osBuildNumber();

@@ -18,10 +18,21 @@ import java.util.List;
  * Processes notifications for both primary and secondary (LID/PN) user identities,
  * mirroring WA Web's dual-wid processing pattern.
  *
- * @implNote WAWebHandleDeviceNotification.handleDevicesNotification: main entry point for
- * device notification processing. Parses the notification stanza, builds an ack, registers
- * LID-PN mappings, and dispatches to WAWebAdvHandlerApi.handleADVDeviceNotification (for
- * add/remove) or WAWebSyncDeviceAdvDeviceListJob.syncDeviceListJob (for update).
+ * @implNote Adapts the following WA Web modules:
+ * <ul>
+ *   <li>{@code WAWebHandleDeviceNotification.handleDevicesNotification}: main entry point
+ *       for device notification processing. Parses the notification stanza, builds an ack,
+ *       registers LID-PN mappings, and dispatches each dual-wid entry to the ADV handler
+ *       or device sync job.</li>
+ *   <li>{@code WAWebAdvHandlerApi.handleADVDeviceNotification}: invoked indirectly through
+ *       {@link DeviceService#handleDeviceNotification} for add/remove actions.</li>
+ *   <li>{@code WAWebSyncDeviceAdvDeviceListJob.syncDeviceListJob}: invoked indirectly
+ *       through {@link DeviceService#getDeviceLists} with context {@code "notification"}
+ *       for update actions.</li>
+ * </ul>
+ * The WA Web {@code isResumeFromRestartComplete}/{@code isResumeOnSocketDisconnectInProgress}
+ * offline-mode gating and the "NO_ACK" deferred-ack path are intentionally not replicated:
+ * Cobalt sends the ack unconditionally and does not maintain an offline pending-device cache.
  */
 public final class NotificationDeviceStreamHandler implements SocketStream.Handler {
 
@@ -129,7 +140,8 @@ public final class NotificationDeviceStreamHandler implements SocketStream.Handl
 
         // WAWebHandleDeviceNotification.C: register LID-PN mappings
         // b = []; if (a.lidUser != null && a.user != null) b.push({lid: a.lidUser, pn: a.user})
-        if (lidUser != null && userJid != null) { // WAWebHandleDeviceNotification.C
+        // userJid is guaranteed non-null above; the WA Web a.user != null arm is thus always true here.
+        if (lidUser != null) { // WAWebHandleDeviceNotification.C: a.lidUser != null
             whatsapp.store().registerLidMapping(userJid, lidUser); // WAWebDBCreateLidPnMappings.createLidPnMappings({lid: a.lidUser, pn: a.user})
         }
 
@@ -180,10 +192,14 @@ public final class NotificationDeviceStreamHandler implements SocketStream.Handl
                 ); // WAWebAdvHandlerApi.handleADVDeviceNotification({wid, devices, type})
             }
             case "update" -> { // WAWebHandleDeviceNotification.C: if (a.type === g.update)
-                // WAWebHandleDeviceNotification.C: var s = getContactRecordByHash(nullthrows(n))
-                // Cobalt does not maintain a contact hash index; instead, we sync the device list
-                // directly for the user JID, which is functionally equivalent since the from
-                // attribute identifies the user whose devices changed.
+                // ADAPTED: WAWebHandleDeviceNotification.C performs
+                //   var s = yield getContactRecordByHash(nullthrows(n))
+                //   if (s == null) v++ else syncDeviceListJob([createWid(s.id)], "notification", null)
+                // Cobalt does not maintain a contact-by-hash index, so we sync the device list
+                // for the entry JID directly. The WA Web indirection exists because the server
+                // sends an opaque side-contact hash that must be resolved to a wid; when the
+                // notification is addressed to a specific user/lid, the entry JID already
+                // identifies that user and is equivalent to the hash lookup result.
                 if (hash == null) {
                     LOGGER.log(System.Logger.Level.WARNING,
                             "[devices] update notification missing hash for {0}", entryJid); // ADAPTED: nullthrows(n) in WA Web would throw
@@ -245,7 +261,7 @@ public final class NotificationDeviceStreamHandler implements SocketStream.Handl
      * @param userJid the user-level JID extracted from the {@code from} attribute
      * @implNote WAWebHandleDeviceNotification.C: builds ack as
      * wap("ack", {to: USER_JID(a.user), id: CUSTOM_STRING(a.stanzaId), class: "notification"}).
-     * Note: WA Web's ack only has to, id, and class -- no type or participant attributes.
+     * Note: WA Web's ack only has to, id, and class, no type or participant attributes.
      */
     private void sendNotificationAck(Node node, Jid userJid) { // WAWebHandleDeviceNotification.C
         var stanzaId = node.getAttributeAsString("id", null);

@@ -51,14 +51,49 @@ import java.util.*;
  * down, allowing per-handler state (for example, single-run bootstrap
  * guards) to be cleared before the next connection starts.
  *
+ * @implNote WA Web splits the top-level dispatch across three JS modules:
+ * {@code WAWebCommsHandleStanza.u} (offline-attr tracking plus the
+ * {@code iq} fast path), {@code WAWebCommsHandleWorkerCompatibleStanza.u}
+ * (stanzas that may be handled inside a Web Worker: newsletter
+ * {@code message}/{@code status}, group {@code notification w:gp2},
+ * identity-change {@code notification encrypt/identity}, and
+ * {@code receipt} call-receipts), and
+ * {@code WAWebCommsHandleLoggedInStanza._} (every remaining tag). Cobalt
+ * has no Web Worker, so the three-stage fall-through is flattened into a
+ * single {@code Map<String, Handler>} keyed by stanza tag; the
+ * sub-dispatch that WA Web performs inside each stage (for example the
+ * newsletter branch of {@code message}, or the {@code type="retry"}
+ * branch of {@code receipt}) is pushed down into the corresponding
+ * per-tag handler.
  * @implNote WA Web registers per-stanza parsers via
  * {@code WADeprecatedWapParser} inside the {@code WAWebCommsRouter} /
  * {@code WAWebSocketModel} boot sequence. Cobalt collapses the registration
  * into this class's constructor and uses a plain {@code Map<String, Handler>}
  * instead of the WA Web parser registry.
+ * @implNote WA Web's {@code WAWebCommsHandleStanza.u} also invokes
+ * {@code OfflineMessageHandler.newOfflineStanza(t, n, offline)} for every
+ * stanza that carries an {@code offline} attribute, driving the adaptive
+ * offline-resume batch manager ({@code WASmaxOfflineBatchRPC.sendBatchRPC})
+ * and the UI progress bar. Cobalt does not adapt this behaviour: there is
+ * no offline-resume UI and no client-driven batch sizing; the server-side
+ * offline backlog is drained as stanzas arrive. Completion state is still
+ * tracked through {@link com.github.auties00.cobalt.client.WhatsAppClientOfflineResumeState}
+ * and the {@code offline_preview}/{@code offline} info-bulletin handlers.
+ * @implNote WA Web's outer dispatch ({@code WAWebCommsHandleStanza.d})
+ * wraps each stanza in a try/catch that logs and returns {@code "NO_ACK"}
+ * on failure. Cobalt mirrors this through {@link #runHandler(Handler, Node)}
+ * which catches any {@link Throwable}, logs it, and prevents the failure
+ * from propagating out of the dispatch virtual thread. The WA Web NACK
+ * responses for parsing failures and unrecognised stanzas
+ * ({@code createNackFromStanza}) are replaced by Cobalt's pluggable
+ * {@code WhatsAppClientErrorHandler}; see the error-model note on
+ * {@link #handle(Node)}.
  */
 @WhatsAppWebModule(moduleName = "WAWebCommsRouter")
 @WhatsAppWebModule(moduleName = "WAWebSocketModel")
+@WhatsAppWebModule(moduleName = "WAWebCommsHandleStanza")
+@WhatsAppWebModule(moduleName = "WAWebCommsHandleLoggedInStanza")
+@WhatsAppWebModule(moduleName = "WAWebCommsHandleWorkerCompatibleStanza")
 public final class SocketStream {
     /**
      * Logger used to report handler failures that escape the per-handler
@@ -122,7 +157,7 @@ public final class SocketStream {
                 abPropsService,
                 deviceService
         ));
-        addHandler(result, "ib", new InfoBulletinStreamHandler(whatsapp));
+        addHandler(result, "ib", new InfoBulletinStreamHandler(whatsapp, webAppStateService));
         addHandler(result, "success", new SuccessStreamHandler(
                 whatsapp,
                 abPropsService,
@@ -164,10 +199,30 @@ public final class SocketStream {
      * <p>The handler is invoked on a freshly started virtual thread so that
      * a blocking or slow handler cannot back up the read loop of the
      * underlying socket. Stanzas whose tag is not registered are silently
-     * dropped, matching the WA Web behaviour where unknown stanzas are
-     * ignored.
+     * dropped.
      *
      * @param node the stanza to dispatch
+     * @implNote WA Web's {@code WAWebCommsHandleLoggedInStanza._} falls
+     * through to {@code createNackFromStanza(e, NackReason.UnrecognizedStanza)}
+     * for every stanza whose tag is not in its dispatch switch, sending a
+     * {@code NACK} response back to the server with a dedicated
+     * {@code DEV_XMPP} log line. Cobalt intentionally diverges: the ack
+     * decision is made by each per-tag handler (see for example
+     * {@code IqStreamHandler} which acknowledges IQs that reach the fallback
+     * arm of its switch), and stanzas whose top-level tag is not registered
+     * at all are treated as a protocol-level surprise that the server is not
+     * allowed to send on a logged-in session — the pluggable
+     * {@code WhatsAppClientErrorHandler} owns the recovery policy instead of
+     * an inline NACK. See the class-level error-model note.
+     * @implNote WA Web dispatches in the caller's own microtask
+     * ({@code WAWebCommsHandleStanza.d} returns a {@code Promise} that the
+     * noise layer awaits); Cobalt starts a fresh virtual thread per stanza
+     * so that a blocking handler (for example one waiting on a synchronous
+     * IQ round-trip or an SQL store write) cannot stall the socket read
+     * loop. Handler ordering across stanzas is therefore not guaranteed by
+     * this dispatcher — handlers that require ordering apply their own
+     * synchronisation, matching the WA Web model where Promises may
+     * interleave.
      */
     public void handle(Node node) {
         var handler = this.handlers.get(node.description());

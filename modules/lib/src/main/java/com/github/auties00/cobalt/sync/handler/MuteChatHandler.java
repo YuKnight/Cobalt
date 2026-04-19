@@ -2,6 +2,9 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.chat.ChatMute;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
@@ -37,6 +40,7 @@ import java.util.List;
  *
  * @implNote WAWebMuteChatSync — singleton instance exported as {@code default}
  */
+@WhatsAppWebModule(moduleName = "WAWebMuteChatSync")
 public final class MuteChatHandler implements WebAppStateActionHandler {
     /**
      * Singleton instance of the mute chat handler.
@@ -46,6 +50,7 @@ public final class MuteChatHandler implements WebAppStateActionHandler {
      *
      * @implNote WAWebMuteChatSync.default — module-level singleton
      */
+    @WhatsAppWebExport(moduleName = "WAWebMuteChatSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final MuteChatHandler INSTANCE = new MuteChatHandler();
 
     /**
@@ -55,6 +60,7 @@ public final class MuteChatHandler implements WebAppStateActionHandler {
      *           {@code ChatSyncdActionBase}); sets {@code chatJidIndex = 1} and
      *           {@code collectionName = CollectionName.RegularHigh}
      */
+    @WhatsAppWebExport(moduleName = "WAWebMuteChatSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private MuteChatHandler() {
 
     }
@@ -67,6 +73,7 @@ public final class MuteChatHandler implements WebAppStateActionHandler {
      * @return the action name {@code "mute"}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebMuteChatSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
         return MuteAction.ACTION_NAME; // WAWebMuteChatSync.getAction -> WASyncdConst.Actions.Mute
     }
@@ -82,6 +89,7 @@ public final class MuteChatHandler implements WebAppStateActionHandler {
      * @return {@link SyncPatchType#REGULAR_HIGH}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebMuteChatSync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
         return MuteAction.COLLECTION_NAME; // WAWebMuteChatSync: this.collectionName = CollectionName.RegularHigh
     }
@@ -93,6 +101,7 @@ public final class MuteChatHandler implements WebAppStateActionHandler {
      * @return the version number {@code 2}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebMuteChatSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return MuteAction.ACTION_VERSION; // WAWebMuteChatSync.getVersion -> 2
     }
@@ -110,6 +119,7 @@ public final class MuteChatHandler implements WebAppStateActionHandler {
      * @return {@code true} if the mutation was applied successfully
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebMuteChatSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebMuteChatSync.applyMutations
     }
@@ -156,6 +166,7 @@ public final class MuteChatHandler implements WebAppStateActionHandler {
      * @return the detailed application result
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebMuteChatSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) { // WAWebMuteChatSync.applyMutations: if (e.operation === "set") { ... } l++; return {actionState: Unsupported}
             return MutationApplicationResult.unsupported(); // WAWebMuteChatSync.applyMutations: {actionState: Unsupported}
@@ -222,7 +233,6 @@ public final class MuteChatHandler implements WebAppStateActionHandler {
 
             // WAWebMuteChatSync.applyMutations: frontendFireAndForget("muteCollectionAdd", {muteData: b})
             // SKIPPED: Cobalt has no frontend consumer for UI collection updates.
-
             return MutationApplicationResult.success(); // WAWebMuteChatSync.applyMutations: {actionState: SyncActionState.Success}
         } catch (Exception e) { // WAWebMuteChatSync.applyMutations: catch(e) { return {actionState: Failed} }
             return MutationApplicationResult.failed(); // WAWebMuteChatSync.applyMutations: {actionState: SyncActionState.Failed}
@@ -297,6 +307,7 @@ public final class MuteChatHandler implements WebAppStateActionHandler {
      *                          not wish to set a mention-everyone mute
      * @return the pending mutation for the mute action
      */
+    @WhatsAppWebExport(moduleName = "WAWebMuteChatSync", exports = "generateMuteMutation", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncPendingMutation generateMuteMutation(
             WhatsAppClient client,
             Jid chatJid,

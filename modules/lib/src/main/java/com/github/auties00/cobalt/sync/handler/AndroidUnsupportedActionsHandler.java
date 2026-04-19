@@ -1,6 +1,9 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.device.AndroidUnsupportedActions;
@@ -25,6 +28,7 @@ import java.util.logging.Logger;
  *           {@code collectionName = RegularLow}, {@code getVersion() = 4},
  *           {@code getAction() = "android_unsupported_actions"}
  */
+@WhatsAppWebModule(moduleName = "WAWebAndroidUnsupportedActionsSync")
 public final class AndroidUnsupportedActionsHandler implements WebAppStateActionHandler {
     /**
      * Logger for this handler.
@@ -38,6 +42,7 @@ public final class AndroidUnsupportedActionsHandler implements WebAppStateAction
      *
      * @implNote WAWebAndroidUnsupportedActionsSync — {@code m = new d} at module level
      */
+    @WhatsAppWebExport(moduleName = "WAWebAndroidUnsupportedActionsSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final AndroidUnsupportedActionsHandler INSTANCE = new AndroidUnsupportedActionsHandler();
 
     /**
@@ -46,6 +51,7 @@ public final class AndroidUnsupportedActionsHandler implements WebAppStateAction
      * @implNote WAWebAndroidUnsupportedActionsSync — constructor sets
      *           {@code this.collectionName = WASyncdConst.CollectionName.RegularLow}
      */
+    @WhatsAppWebExport(moduleName = "WAWebAndroidUnsupportedActionsSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private AndroidUnsupportedActionsHandler() {
 
     }
@@ -59,6 +65,7 @@ public final class AndroidUnsupportedActionsHandler implements WebAppStateAction
      * @return the action name string
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebAndroidUnsupportedActionsSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
         return AndroidUnsupportedActions.ACTION_NAME; // WAWebAndroidUnsupportedActionsSync.getAction -> WASyncdConst.Actions.AndroidUnsupportedActions
     }
@@ -72,6 +79,7 @@ public final class AndroidUnsupportedActionsHandler implements WebAppStateAction
      * @return the sync patch type
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebAndroidUnsupportedActionsSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
         return AndroidUnsupportedActions.COLLECTION_NAME; // WAWebAndroidUnsupportedActionsSync: this.collectionName = WASyncdConst.CollectionName.RegularLow
     }
@@ -83,6 +91,7 @@ public final class AndroidUnsupportedActionsHandler implements WebAppStateAction
      * @return the version number
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebAndroidUnsupportedActionsSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return AndroidUnsupportedActions.ACTION_VERSION; // WAWebAndroidUnsupportedActionsSync.getVersion: return 4
     }
@@ -101,6 +110,7 @@ public final class AndroidUnsupportedActionsHandler implements WebAppStateAction
      * @return {@code true} if the mutation was applied successfully, {@code false} otherwise
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebAndroidUnsupportedActionsSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS; // WAWebAndroidUnsupportedActionsSync.applyMutations: actionState === Success
     }
@@ -125,6 +135,7 @@ public final class AndroidUnsupportedActionsHandler implements WebAppStateAction
      * @return the detailed application result
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebAndroidUnsupportedActionsSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         try { // WAWebAndroidUnsupportedActionsSync.applyMutations: try { ... } catch(e) { return {actionState: Failed} }
             if (mutation.operation() != SyncdOperation.SET) { // WAWebAndroidUnsupportedActionsSync.applyMutations: if (e.operation==="set") ... else: return Unsupported
@@ -156,6 +167,7 @@ public final class AndroidUnsupportedActionsHandler implements WebAppStateAction
      * @implNote WAWebAndroidUnsupportedActionsSync.updatePrimaryAllowsAllMutationsFlag
      * @param client the WhatsApp client instance providing store access
      */
+    @WhatsAppWebExport(moduleName = "WAWebAndroidUnsupportedActionsSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     private void updatePrimaryAllowsAllMutationsFlag(WhatsAppClient client) {
         if (!client.store().primaryAllowsAllMutations()) { // WAWebAndroidUnsupportedActionsSync.updatePrimaryAllowsAllMutationsFlag: o("WAWebUserPrefsAppStateSync").getPrimaryAllowsAllMutations() || ...
             LOGGER.info("[syncd] primary allows all mutations flag set: allow_unsupported_mutation"); // WAWebAndroidUnsupportedActionsSync.updatePrimaryAllowsAllMutationsFlag: WALogger.LOG("[syncd] primary allows all mutations flag set: ", t)

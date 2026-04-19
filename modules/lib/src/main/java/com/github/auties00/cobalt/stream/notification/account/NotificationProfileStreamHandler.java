@@ -210,16 +210,17 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
      *           WAWebChangeProfilePicThumb.changeProfilePicThumb
      */
     private void handlePictureSetOrDelete(Jid targetJid, String actionType, Node node, Node actionNode) {
-        // WAWebChangeProfilePicThumb.changeProfilePicThumb: updates pic thumb for target
-        if ("delete".equals(actionType)) {
-            // WAWebChangeProfilePicThumb.c: ProfilePicCommand.Remove -> persistProfilePicToDB (clears thumb)
-            if (isSelf(targetJid)) {
+        // WAWebChangeProfilePicThumb.changeProfilePicThumb: updates pic thumb for target.
+        // ADAPTED: Cobalt only persists the picture URI for the local account; non-self
+        // contact and group pictures are fetched on demand via queryPicture(). Listeners
+        // still receive the change event below for all targets.
+        if (isSelf(targetJid)) {
+            if ("delete".equals(actionType)) {
+                // WAWebChangeProfilePicThumb.c: ProfilePicCommand.Remove -> persistProfilePicToDB (clears thumb)
                 whatsapp.store().setProfilePicture((URI) null);
-            }
-        } else {
-            // WAWebChangeProfilePicThumb.c: ProfilePicCommand.Set -> workerSafeSendAndReceive("setProfilePicThumb")
-            var picture = whatsapp.queryPicture(targetJid).orElse(null);
-            if (isSelf(targetJid)) {
+            } else {
+                // WAWebChangeProfilePicThumb.c: ProfilePicCommand.Set -> workerSafeSendAndReceive("setProfilePicThumb")
+                var picture = whatsapp.queryPicture(targetJid).orElse(null);
                 whatsapp.store().setProfilePicture(picture);
             }
         }

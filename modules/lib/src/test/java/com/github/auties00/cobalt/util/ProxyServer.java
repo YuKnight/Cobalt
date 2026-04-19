@@ -382,7 +382,6 @@ public sealed abstract class ProxyServer implements Closeable {
     }
 
     // ---- SOCKS5 ----
-
     private static final class Socks5Proxy extends ProxyServer {
         private Socks5Proxy(ServerSocket serverSocket) {
             super(serverSocket);

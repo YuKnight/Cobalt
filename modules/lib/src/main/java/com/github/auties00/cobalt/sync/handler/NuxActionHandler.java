@@ -2,6 +2,9 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
@@ -41,12 +44,14 @@ import java.util.Objects;
  *           ({@code var d = (function(t){...})(o("WAWebSyncdAction").AccountSyncdActionBase),
  *           m = new d; l.default = m})
  */
+@WhatsAppWebModule(moduleName = "WAWebNuxSync")
 public final class NuxActionHandler implements WebAppStateActionHandler {
     /**
      * The singleton instance of {@code NuxActionHandler}.
      *
      * @implNote WAWebNuxSync.default — {@code var m = new d; l.default = m}
      */
+    @WhatsAppWebExport(moduleName = "WAWebNuxSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final NuxActionHandler INSTANCE = new NuxActionHandler();
 
     /**
@@ -56,6 +61,7 @@ public final class NuxActionHandler implements WebAppStateActionHandler {
      *           {@code AccountSyncdActionBase} that assigns
      *           {@code this.collectionName = WASyncdConst.CollectionName.RegularLow}
      */
+    @WhatsAppWebExport(moduleName = "WAWebNuxSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private NuxActionHandler() {
 
     }
@@ -67,6 +73,7 @@ public final class NuxActionHandler implements WebAppStateActionHandler {
      *           {@code WASyncdConst.Actions.Nux} (value: {@code "nux"})
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebNuxSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
         return NuxAction.ACTION_NAME; // WAWebNuxSync.getAction -> WASyncdConst.Actions.Nux = "nux"
     }
@@ -78,6 +85,7 @@ public final class NuxActionHandler implements WebAppStateActionHandler {
      *           (value: {@code "regular_low"})
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebNuxSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
         return NuxAction.COLLECTION_NAME; // WAWebNuxSync.collectionName = WASyncdConst.CollectionName.RegularLow = "regular_low"
     }
@@ -88,6 +96,7 @@ public final class NuxActionHandler implements WebAppStateActionHandler {
      * @implNote WAWebNuxSync.getVersion — returns {@code 7}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebNuxSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return NuxAction.ACTION_VERSION; // WAWebNuxSync.getVersion -> 7
     }
@@ -108,6 +117,7 @@ public final class NuxActionHandler implements WebAppStateActionHandler {
      *         {@code false} otherwise
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebNuxSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebNuxSync.applyMutations -> SyncActionState.Success
     }
@@ -158,6 +168,7 @@ public final class NuxActionHandler implements WebAppStateActionHandler {
      * @return the detailed application result
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebNuxSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) { // WAWebNuxSync.applyMutations: if (e.operation !== "set") return {actionState: Unsupported}
             return MutationApplicationResult.unsupported(); // WAWebNuxSync.applyMutations: {actionState: SyncActionState.Unsupported}
@@ -208,6 +219,7 @@ public final class NuxActionHandler implements WebAppStateActionHandler {
      * @param acknowledged whether the NUX item is acknowledged
      * @return the pending mutation for the NUX action
      */
+    @WhatsAppWebExport(moduleName = "WAWebNuxSync", exports = "$NuxSync$p_1", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncPendingMutation getNuxMutation(String nuxKey, Instant timestamp, boolean acknowledged) {
         Objects.requireNonNull(nuxKey, "nuxKey cannot be null"); // ADAPTED: defensive null check not present in WA Web
         Objects.requireNonNull(timestamp, "timestamp cannot be null"); // ADAPTED: defensive null check not present in WA Web
@@ -262,6 +274,7 @@ public final class NuxActionHandler implements WebAppStateActionHandler {
      * @param nuxKey the NUX identifier to acknowledge
      * @return the pending mutation carrying the {@code acknowledged=true} update
      */
+    @WhatsAppWebExport(moduleName = "WAWebNuxSync", exports = "acknowledgeNux", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncPendingMutation acknowledgeNux(WhatsAppClient client, String nuxKey) {
         return updateNuxState(client, nuxKey, true); // WAWebNuxSync.acknowledgeNux: return this.$NuxSync$p_2(e, true)
     }
@@ -281,6 +294,7 @@ public final class NuxActionHandler implements WebAppStateActionHandler {
      * @param nuxKey the NUX identifier to unacknowledge
      * @return the pending mutation carrying the {@code acknowledged=false} update
      */
+    @WhatsAppWebExport(moduleName = "WAWebNuxSync", exports = "unAcknowledgeNux", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncPendingMutation unAcknowledgeNux(WhatsAppClient client, String nuxKey) {
         return updateNuxState(client, nuxKey, false); // WAWebNuxSync.unAcknowledgeNux: return this.$NuxSync$p_2(e, false)
     }
@@ -300,6 +314,7 @@ public final class NuxActionHandler implements WebAppStateActionHandler {
      * @param acknowledged whether the NUX item should be marked as acknowledged
      * @return the pending mutation carrying the requested update
      */
+    @WhatsAppWebExport(moduleName = "WAWebNuxSync", exports = "$NuxSync$p_2", adaptation = WhatsAppAdaptation.ADAPTED)
     private SyncPendingMutation updateNuxState(WhatsAppClient client, String nuxKey, boolean acknowledged) {
         Objects.requireNonNull(client, "client cannot be null"); // ADAPTED: defensive null check not present in WA Web
         Objects.requireNonNull(nuxKey, "nuxKey cannot be null"); // ADAPTED: defensive null check not present in WA Web

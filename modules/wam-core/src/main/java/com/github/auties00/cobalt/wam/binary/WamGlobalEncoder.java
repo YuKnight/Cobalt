@@ -79,7 +79,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- mnc (3, int) ----
-
     /**
      * Returns the number of bytes required to encode the mobile network
      * code global.
@@ -109,7 +108,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- mcc (5, int) ----
-
     /**
      * Returns the number of bytes required to encode the mobile country
      * code global.
@@ -139,7 +137,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- generic null global ----
-
     /**
      * Returns the number of bytes required to encode a null global
      * entry for the given field identifier.
@@ -169,7 +166,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- platform (11, int) ----
-
     /**
      * Returns the number of bytes required to encode the platform global.
      *
@@ -194,7 +190,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- deviceName (13, string) ----
-
     /**
      * Returns the number of bytes required to encode the device name
      * global.
@@ -219,7 +214,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- osVersion (15, string) ----
-
     /**
      * Returns the number of bytes required to encode the OS version
      * global.
@@ -244,7 +238,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- appVersion (17, string) ----
-
     /**
      * Returns the number of bytes required to encode the app version
      * global.
@@ -272,7 +265,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- appIsBetaRelease (21, bool as int) ----
-
     /**
      * Returns the number of bytes required to encode the app-is-beta
      * global.
@@ -297,7 +289,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- networkIsWifi (23, bool as int) ----
-
     /**
      * Returns the number of bytes required to encode the network-is-wifi
      * global.
@@ -322,7 +313,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- commitTime (47, int) ----
-
     /**
      * Returns the number of bytes required to encode the commit-time
      * global written before each event.
@@ -348,7 +338,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- browserVersion (295, string) ----
-
     /**
      * Returns the number of bytes required to encode the browser version
      * global.
@@ -373,7 +362,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- webcEnv (633, int enum) ----
-
     /**
      * Returns the number of bytes required to encode the web client
      * environment global.
@@ -399,7 +387,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- memClass (655, int) ----
-
     /**
      * Returns the number of bytes required to encode the memory class
      * global.
@@ -424,7 +411,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- yearClass (689, int) ----
-
     /**
      * Returns the number of bytes required to encode the year class
      * global.
@@ -454,7 +440,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- webcPhonePlatform (707, int enum) ----
-
     /**
      * Returns the number of bytes required to encode the phone platform
      * global.
@@ -482,7 +467,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- browser (779, string) ----
-
     /**
      * Returns the number of bytes required to encode the browser global.
      *
@@ -506,7 +490,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- webcPhoneCharging (783, bool as int) ----
-
     /**
      * Returns the number of bytes required to encode the phone-charging
      * global.
@@ -531,7 +514,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- webcPhoneDeviceManufacturer (829, string) ----
-
     /**
      * Returns the number of bytes required to encode the phone device
      * manufacturer global.
@@ -557,7 +539,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- webcPhoneDeviceModel (831, string) ----
-
     /**
      * Returns the number of bytes required to encode the phone device
      * model global.
@@ -583,7 +564,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- webcPhoneOsBuildNumber (833, string) ----
-
     /**
      * Returns the number of bytes required to encode the phone OS build
      * number global.
@@ -609,7 +589,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- webcPhoneOsVersion (835, string) ----
-
     /**
      * Returns the number of bytes required to encode the phone OS
      * version global.
@@ -635,7 +614,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- webcBucket (875, string) ----
-
     /**
      * Returns the number of bytes required to encode the web bucket
      * global.
@@ -660,7 +638,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- webcWebPlatform (899, int enum) ----
-
     /**
      * Returns the number of bytes required to encode the web platform
      * type global.
@@ -686,7 +663,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- webcPhoneAppVersion (1005, string) ----
-
     /**
      * Returns the number of bytes required to encode the phone app
      * version global.
@@ -715,7 +691,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- webcNativeBetaUpdates (1007, bool as int) ----
-
     /**
      * Returns the number of bytes required to encode the native beta
      * updates global.
@@ -742,7 +717,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- webcNativeAutolaunch (1009, bool as int) ----
-
     /**
      * Returns the number of bytes required to encode the native
      * autolaunch global.
@@ -769,7 +743,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- appBuild (1657, int enum) ----
-
     /**
      * Returns the number of bytes required to encode the app build type
      * global.
@@ -794,7 +767,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- yearClass2016 (2617, int) ----
-
     /**
      * Returns the number of bytes required to encode the year class 2016
      * global.
@@ -822,7 +794,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- datacenter (2795, string) ----
-
     /**
      * Returns the number of bytes required to encode the datacenter
      * global.
@@ -850,7 +821,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- beaconSessionId (3433, int) ----
-
     /**
      * Returns the number of bytes required to encode the beacon session
      * ID global written per-event when beaconing is active.
@@ -881,7 +851,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- streamId (3543, int) ----
-
     /**
      * Returns the number of bytes required to encode the stream ID
      * global.
@@ -906,7 +875,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- webcTabId (3727, string) ----
-
     /**
      * Returns the number of bytes required to encode the tab ID global.
      *
@@ -930,7 +898,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- abKey2 (4473, string) ----
-
     /**
      * Returns the number of bytes required to encode the AB key 2
      * global.
@@ -955,7 +922,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- deviceVersion (4505, string) ----
-
     /**
      * Returns the number of bytes required to encode the device version
      * global.
@@ -980,7 +946,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- expoKey (5029, string) ----
-
     /**
      * Returns the number of bytes required to encode the exposure key
      * global.
@@ -1008,7 +973,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- psId (6005, string) ----
-
     /**
      * Returns the number of bytes required to encode the private stats
      * identifier global.
@@ -1038,7 +1002,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- ocVersion (6251, int) ----
-
     /**
      * Returns the number of bytes required to encode the official client
      * version global.
@@ -1064,7 +1027,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- webcWebDeviceManufacturer (6599, string) ----
-
     /**
      * Returns the number of bytes required to encode the web device
      * manufacturer global.
@@ -1090,7 +1052,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- webcWebDeviceModel (6601, string) ----
-
     /**
      * Returns the number of bytes required to encode the web device
      * model global.
@@ -1116,7 +1077,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- webcWebOsReleaseNumber (6603, string) ----
-
     /**
      * Returns the number of bytes required to encode the web OS release
      * number global.
@@ -1142,7 +1102,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- webcWebArch (6605, string) ----
-
     /**
      * Returns the number of bytes required to encode the web
      * architecture global.
@@ -1168,7 +1127,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- psCountryCode (6833, string) ----
-
     /**
      * Returns the number of bytes required to encode the private stats
      * country code global.
@@ -1197,7 +1155,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- numCpu (10317, int) ----
-
     /**
      * Returns the number of bytes required to encode the CPU count
      * global.
@@ -1222,7 +1179,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- serviceImprovementOptOut (13293, bool as int) ----
-
     /**
      * Returns the number of bytes required to encode the service
      * improvement opt-out global.
@@ -1249,7 +1205,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- deviceClassification (14507, int) ----
-
     /**
      * Returns the number of bytes required to encode the device
      * classification global.
@@ -1276,7 +1231,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- wametaLoggerTestFilter (15881, string) ----
-
     /**
      * Returns the number of bytes required to encode the WAMeta logger
      * test filter global.
@@ -1302,7 +1256,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- webcRevision (18491, int) ----
-
     /**
      * Returns the number of bytes required to encode the web client
      * revision global.
@@ -1328,7 +1281,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- isInCohort (19129, bool as int) ----
-
     /**
      * Returns the number of bytes required to encode the is-in-cohort
      * global.
@@ -1353,7 +1305,6 @@ public final class WamGlobalEncoder {
     }
 
     // ---- dynamic dispatch for dirty-tracking ----
-
     /**
      * Returns the number of bytes required to encode a global attribute
      * whose type is determined at runtime from the value's class.

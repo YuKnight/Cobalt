@@ -169,15 +169,9 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
             return;
         }
 
-        // WAWebHandleMexNotification.y — n.data != null check
+        // WAWebHandleMexNotification.y — n.data != null check; null data throws XmppParsingFailure (no ack)
         var data = payload.get("data");
         if (data == null) {
-            // WAWebHandleMexNotification — MexNotificationEvent (function b/v) is a no-op handler
-            if ("MexNotificationEvent".equals(operationName)) {
-                // WAWebHandleMexNotification.b/v — empty async handler, still acks
-                sendNotificationAck(stanzaId, stanzaFrom);
-                return;
-            }
             LOGGER.log(System.Logger.Level.WARNING,
                     "[mex] null data in parsed json for operation {0}", operationName);
             return;

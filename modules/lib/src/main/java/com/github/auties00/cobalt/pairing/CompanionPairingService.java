@@ -263,6 +263,28 @@ public final class CompanionPairingService {
     }
 
     /**
+     * Returns the pairing code published by the most recent
+     * {@link #start()} invocation, or {@code null} when no pairing
+     * flow has been started (or the cached state has been cleared).
+     *
+     * <p>Callers that need to surface the code synchronously after
+     * calling {@link #start()} can read it here; the normal delivery
+     * path remains the verification handler supplied to the
+     * constructor.
+     *
+     * @return the eight-character pairing code, or {@code null} when
+     *         none is available
+     * @implNote Exposes the cached
+     *     {@code WAWebAltDeviceLinkingApi.PairingState.helloCached.linkCodePairingSecret}
+     *     for read-only access from {@link WhatsAppClient}.
+     */
+    public String pairingCode() {
+        synchronized (lock) {
+            return pairingCode;
+        }
+    }
+
+    /**
      * Returns whether this service should own the incoming pair-device
      * IQ. Returns {@code true} iff the verification handler is a
      * {@link WhatsAppClientVerificationHandler.Web.PairingCode} and the

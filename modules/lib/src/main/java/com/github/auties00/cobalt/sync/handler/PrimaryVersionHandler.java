@@ -2,6 +2,9 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
@@ -31,6 +34,7 @@ import java.util.List;
  *           ({@code "primary_version"}), and {@code getVersion()} returning
  *           the literal {@code 7}
  */
+@WhatsAppWebModule(moduleName = "WAWebPrimaryVersionSync")
 public final class PrimaryVersionHandler implements WebAppStateActionHandler {
     /**
      * Sub-index value identifying the {@code "current"} primary version
@@ -39,6 +43,7 @@ public final class PrimaryVersionHandler implements WebAppStateActionHandler {
      * @implNote WAWebPrimaryVersionSync — module-level constant
      *           {@code u.CURRENT = "current"}
      */
+    @WhatsAppWebExport(moduleName = "WAWebPrimaryVersionSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     private static final String INDEX_CURRENT = "current"; // WAWebPrimaryVersionSync: u.CURRENT = "current"
 
     /**
@@ -48,6 +53,7 @@ public final class PrimaryVersionHandler implements WebAppStateActionHandler {
      * @implNote WAWebPrimaryVersionSync — module-level constant
      *           {@code u.SESSION_START = "session_start"}
      */
+    @WhatsAppWebExport(moduleName = "WAWebPrimaryVersionSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     private static final String INDEX_SESSION_START = "session_start"; // WAWebPrimaryVersionSync: u.SESSION_START = "session_start"
 
     /**
@@ -56,6 +62,7 @@ public final class PrimaryVersionHandler implements WebAppStateActionHandler {
      * @implNote WAWebPrimaryVersionSync.default — WA Web exports a single
      *           pre-instantiated handler ({@code d = new c; l.default = d})
      */
+    @WhatsAppWebExport(moduleName = "WAWebPrimaryVersionSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final PrimaryVersionHandler INSTANCE = new PrimaryVersionHandler();
 
     /**
@@ -64,6 +71,7 @@ public final class PrimaryVersionHandler implements WebAppStateActionHandler {
      * @implNote WAWebPrimaryVersionSync — WA Web instantiates the handler once
      *           via {@code new c()} and exports it as the module default
      */
+    @WhatsAppWebExport(moduleName = "WAWebPrimaryVersionSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private PrimaryVersionHandler() {
 
     }
@@ -76,6 +84,7 @@ public final class PrimaryVersionHandler implements WebAppStateActionHandler {
      *           {@code "primary_version"}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebPrimaryVersionSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
         return PrimaryVersionAction.ACTION_NAME; // WAWebPrimaryVersionSync.getAction
     }
@@ -87,6 +96,7 @@ public final class PrimaryVersionHandler implements WebAppStateActionHandler {
      *           in the constructor
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebPrimaryVersionSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
         return PrimaryVersionAction.COLLECTION_NAME; // WAWebPrimaryVersionSync constructor: e.collectionName = RegularLow
     }
@@ -97,6 +107,7 @@ public final class PrimaryVersionHandler implements WebAppStateActionHandler {
      * @implNote WAWebPrimaryVersionSync.getVersion — returns the literal {@code 7}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebPrimaryVersionSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return PrimaryVersionAction.ACTION_VERSION; // WAWebPrimaryVersionSync.getVersion: return 7
     }
@@ -113,6 +124,7 @@ public final class PrimaryVersionHandler implements WebAppStateActionHandler {
      *           is a Cobalt interface adaptation
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebPrimaryVersionSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: single-path adapter for batch-only WA Web entry
     }
@@ -142,6 +154,7 @@ public final class PrimaryVersionHandler implements WebAppStateActionHandler {
      * @implNote WAWebPrimaryVersionSync.applyMutations
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebPrimaryVersionSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.DIRECT)
     public List<MutationApplicationResult> applyMutationBatchResults(WhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
         // WAWebPrimaryVersionSync.applyMutations: var n = this, r = 0, a = 0
         // r and a are local counters for the WALogger WARN telemetry, intentionally omitted in Cobalt
@@ -174,6 +187,7 @@ public final class PrimaryVersionHandler implements WebAppStateActionHandler {
      *           function inside the {@code t.map} callback
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebPrimaryVersionSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) { // WAWebPrimaryVersionSync.applyMutations: if (e.operation !== "set")
             return MutationApplicationResult.unsupported(); // WAWebPrimaryVersionSync.applyMutations: r++, return {actionState: Unsupported}

@@ -2,6 +2,9 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncActionState;
@@ -32,6 +35,7 @@ import java.util.Map;
  *           {@code collectionName = RegularLow}, {@code chatJidIndex = 1},
  *           {@code getVersion() = 1}, {@code getAction() = InteractiveMessageAction}
  */
+@WhatsAppWebModule(moduleName = "WAWebInteractiveMessageSync")
 public final class InteractiveMessageHandler implements WebAppStateActionHandler {
     /**
      * Singleton instance of the interactive message handler.
@@ -41,6 +45,7 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
      *
      * @implNote WAWebInteractiveMessageSync.default — module-level singleton
      */
+    @WhatsAppWebExport(moduleName = "WAWebInteractiveMessageSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final InteractiveMessageHandler INSTANCE = new InteractiveMessageHandler();
 
     /**
@@ -49,6 +54,7 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
      * @implNote WAWebInteractiveMessageSync — class constructor sets
      *           {@code collectionName = RegularLow}, {@code chatJidIndex = 1}
      */
+    @WhatsAppWebExport(moduleName = "WAWebInteractiveMessageSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private InteractiveMessageHandler() {
 
     }
@@ -62,6 +68,7 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
      * @return the action name {@code "interactive_message_action"}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebInteractiveMessageSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
         return InteractiveMessageAction.ACTION_NAME; // WAWebInteractiveMessageSync.getAction
     }
@@ -74,6 +81,7 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
      * @return {@link SyncPatchType#REGULAR_LOW}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebInteractiveMessageSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
         return InteractiveMessageAction.COLLECTION_NAME; // WAWebInteractiveMessageSync: collectionName = RegularLow
     }
@@ -85,6 +93,7 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
      * @return {@code 1}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebInteractiveMessageSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return InteractiveMessageAction.ACTION_VERSION; // WAWebInteractiveMessageSync.getVersion: return 1
     }
@@ -100,6 +109,7 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
      * @return {@code true} if the mutation was applied successfully, {@code false} otherwise
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebInteractiveMessageSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebInteractiveMessageSync.applyMutations
     }
@@ -150,6 +160,7 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
      * @return the detailed application result
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebInteractiveMessageSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         try {
             // WAWebInteractiveMessageSync.applyMutations: if (e.operation === "set") { ... } return b++, {actionState: Unsupported}
@@ -288,6 +299,7 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
      * @param agmId the optional Galaxy AGM identifier, or {@code null}
      * @return the action payload
      */
+    @WhatsAppWebExport(moduleName = "WAWebInteractiveMessageSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public InteractiveMessageAction buildDisableCTAAction(InteractiveMessageActionMode type, String agmId) {
         // WAWebInteractiveMessageSync.$InteractiveMessageSync$p_1: var l = extends({type: n}, a != null ? {agmId: a} : {})
         var builder = new InteractiveMessageActionBuilder().type(type); // WAWebInteractiveMessageSync.p_1: {type: n}

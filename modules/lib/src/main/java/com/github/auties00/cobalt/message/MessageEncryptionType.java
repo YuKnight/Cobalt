@@ -144,7 +144,6 @@ public enum MessageEncryptionType {
     public static MessageEncryptionType fromSignalCiphertext(SignalCiphertextMessage ciphertext) {
         // ADAPTED: WAWebBackendJobs.flow.CiphertextType
         // Maps the numeric Signal ciphertext type byte onto the matching wire variant
-
         return switch (ciphertext.type()) {
             case SignalCiphertextMessage.PRE_KEY_TYPE -> PKMSG;
             case SignalCiphertextMessage.WHISPER_TYPE -> MSG;
@@ -171,7 +170,6 @@ public enum MessageEncryptionType {
     public static MessageEncryptionType fromProtocolValue(String value) {
         // WAWebBackendJobs.flow.CiphertextType
         // Reverse lookup of the $InternalEnum string literal to the enum variant
-
         return switch (value) {
             case "pkmsg" -> PKMSG;
             case "msg" -> MSG;

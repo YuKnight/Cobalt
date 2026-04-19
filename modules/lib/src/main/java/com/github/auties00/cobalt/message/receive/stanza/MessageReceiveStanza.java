@@ -1204,7 +1204,6 @@ public final class MessageReceiveStanza {
     public OptionalInt retryCount() {
         // WAWebHandleMsg
         // Extracts the first enc's retry count and returns empty when no retries are recorded
-
         if (encs.isEmpty()) {
             return OptionalInt.empty();
         }
@@ -1225,7 +1224,6 @@ public final class MessageReceiveStanza {
     public boolean hasHideFailPayload() {
         // WAWebHandleMsg function v()
         // Returns true when any encrypted payload is flagged to hide decryption failures
-
         return encs.stream().anyMatch(MessageReceiveEncryptedPayload::hideFail);
     }
 
@@ -1240,7 +1238,6 @@ public final class MessageReceiveStanza {
     public boolean isOffline() {
         // WAWebHandleMsg
         // Returns true when the offline attribute was present on the stanza
-
         return offline != null;
     }
 
@@ -1255,7 +1252,6 @@ public final class MessageReceiveStanza {
     public boolean isPeer() {
         // WAWebHandleMsgCommon.MSG_CATEGORY
         // Compares the category attribute to the peer constant
-
         return "peer".equals(category);
     }
 
@@ -1270,7 +1266,6 @@ public final class MessageReceiveStanza {
     public boolean isDirect() {
         // WAWebHandleMsgParser
         // Returns true when no enc payload is a sender-key group message
-
         return encs.stream().noneMatch(enc ->
                 enc.e2eType().isSenderKeyMessage());
     }
@@ -1287,7 +1282,6 @@ public final class MessageReceiveStanza {
     public boolean isCompanionDevice() {
         // WAWebMsgProcessingDecryptApi
         // Returns true when the sender's device id indicates a companion rather than the primary device
-
         return senderJid.device() != 0;
     }
 
@@ -1302,7 +1296,6 @@ public final class MessageReceiveStanza {
     public boolean isRetry() {
         // WAWebHandleMsgParser
         // Returns true when at least one enc payload has a positive retry count
-
         return encs.stream().anyMatch(enc -> enc.retryCount() > 0);
     }
 }

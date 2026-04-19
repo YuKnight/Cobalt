@@ -1,6 +1,9 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
@@ -32,6 +35,7 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  *
  * @implNote WAWebStickersAvatarUpdatedSyncAction
  */
+@WhatsAppWebModule(moduleName = "WAWebStickersAvatarUpdatedSyncAction")
 public final class AvatarUpdatedHandler implements WebAppStateActionHandler {
     /**
      * Singleton instance shared by the {@code WebAppStateHandlerRegistry}.
@@ -39,6 +43,7 @@ public final class AvatarUpdatedHandler implements WebAppStateActionHandler {
      * @implNote WAWebStickersAvatarUpdatedSyncAction: {@code var m=new d}—the module exports
      *           a single instance of the handler class.
      */
+    @WhatsAppWebExport(moduleName = "WAWebStickersAvatarUpdatedSyncAction", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final AvatarUpdatedHandler INSTANCE = new AvatarUpdatedHandler();
 
     /**
@@ -47,6 +52,7 @@ public final class AvatarUpdatedHandler implements WebAppStateActionHandler {
      * @implNote WAWebStickersAvatarUpdatedSyncAction: the JS class is constructed once at
      *           module load time; Cobalt enforces this by exposing only {@link #INSTANCE}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebStickersAvatarUpdatedSyncAction", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private AvatarUpdatedHandler() {
 
     }
@@ -58,6 +64,7 @@ public final class AvatarUpdatedHandler implements WebAppStateActionHandler {
      * @return the canonical {@code "avatar_updated_action"} identifier
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebStickersAvatarUpdatedSyncAction", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
         return AvatarUpdatedAction.ACTION_NAME; // WAWebStickersAvatarUpdatedSyncAction.getAction
     }
@@ -70,6 +77,7 @@ public final class AvatarUpdatedHandler implements WebAppStateActionHandler {
      * @return {@link SyncPatchType#REGULAR}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebStickersAvatarUpdatedSyncAction", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
         return AvatarUpdatedAction.COLLECTION_NAME; // WAWebStickersAvatarUpdatedSyncAction: this.collectionName = Regular
     }
@@ -81,6 +89,7 @@ public final class AvatarUpdatedHandler implements WebAppStateActionHandler {
      * @return {@code 7}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebStickersAvatarUpdatedSyncAction", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return AvatarUpdatedAction.ACTION_VERSION; // WAWebStickersAvatarUpdatedSyncAction.getVersion: return 7
     }
@@ -102,6 +111,7 @@ public final class AvatarUpdatedHandler implements WebAppStateActionHandler {
      * @return {@code true} if the action state is {@code SUCCESS}, {@code false} otherwise
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebStickersAvatarUpdatedSyncAction", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: collapses Unsupported/Malformed/Skipped to false
     }
@@ -120,6 +130,7 @@ public final class AvatarUpdatedHandler implements WebAppStateActionHandler {
      * @return the detailed application result
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebStickersAvatarUpdatedSyncAction", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         // WAWebStickersAvatarUpdatedSyncAction.applyMutations:
         //   if (!WAWebAvatarGatingUtils.avatarsOnWebEnabled())
@@ -162,7 +173,6 @@ public final class AvatarUpdatedHandler implements WebAppStateActionHandler {
         // permissive default; the only behavioral gap is that mutations created strictly
         // before the local companion was paired are NOT skipped here.
         // See validation report: pairing-timestamp store accessor required in WhatsAppStore.
-
         // WAWebStickersAvatarUpdatedSyncAction.applyMutations switch (l):
         //   case CREATED: case UPDATED: WAWebHasAvatar.saveHasAvatarOnTempStorage(true); break
         //   case DELETED: WAWebHasAvatar.saveHasAvatarOnTempStorage(false); break
@@ -191,7 +201,6 @@ public final class AvatarUpdatedHandler implements WebAppStateActionHandler {
         // cannot be removed selectively. The behavioral gap is purely visual on the local
         // recent stickers tray and does not affect protocol correctness.
         // See validation report: Sticker.isAvatar field + WhatsAppStore.removeAllRecentAvatarStickers required.
-
         return MutationApplicationResult.success(); // WAWebStickersAvatarUpdatedSyncAction.applyMutations: {actionState: Success}
     }
 }

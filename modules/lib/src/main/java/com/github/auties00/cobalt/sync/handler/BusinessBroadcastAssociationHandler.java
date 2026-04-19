@@ -2,6 +2,9 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncActionState;
@@ -54,6 +57,7 @@ import java.util.HashMap;
  *           the surrounding model is {@code WAWebBroadcastListSync.applyMutations}
  *           which mutates the broadcast list participants in bulk.
  */
+@WhatsAppWebModule(moduleName = "WAWebBroadcastListSync")
 public final class BusinessBroadcastAssociationHandler implements WebAppStateActionHandler {
     /**
      * The singleton instance of {@code BusinessBroadcastAssociationHandler}.
@@ -63,6 +67,7 @@ public final class BusinessBroadcastAssociationHandler implements WebAppStateAct
      *           {@code l.default = new u()} pattern used by every other Cobalt
      *           sync handler.
      */
+    @WhatsAppWebExport(moduleName = "WAWebBroadcastListSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final BusinessBroadcastAssociationHandler INSTANCE = new BusinessBroadcastAssociationHandler();
 
     /**
@@ -71,6 +76,7 @@ public final class BusinessBroadcastAssociationHandler implements WebAppStateAct
      * @implNote NO_WA_BASIS: no WA Web counterpart constructor; mirrors the
      *           Cobalt handler convention.
      */
+    @WhatsAppWebExport(moduleName = "WAWebBroadcastListSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private BusinessBroadcastAssociationHandler() {
 
     }
@@ -83,6 +89,7 @@ public final class BusinessBroadcastAssociationHandler implements WebAppStateAct
      *           ({@code "broadcast_jid"}) declared in {@code WASyncdConst}.
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebBroadcastListSync", exports = "getAction", adaptation = WhatsAppAdaptation.ADAPTED)
     public String actionName() {
         return BusinessBroadcastAssociationAction.ACTION_NAME; // WASyncdConst.Actions.BroadcastJid
     }
@@ -97,6 +104,7 @@ public final class BusinessBroadcastAssociationHandler implements WebAppStateAct
      *           {@code WASyncdConst.CollectionName.Regular}.
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebBroadcastListSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncPatchType collectionName() {
         return BusinessBroadcastAssociationAction.COLLECTION_NAME; // ADAPTED: WAWebBroadcastListSync.collectionName = Regular
     }
@@ -109,6 +117,7 @@ public final class BusinessBroadcastAssociationHandler implements WebAppStateAct
      *           sync action handler.
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebBroadcastListSync", exports = "getVersion", adaptation = WhatsAppAdaptation.ADAPTED)
     public int version() {
         return BusinessBroadcastAssociationAction.ACTION_VERSION; // ADAPTED: WAWebBroadcastListSync.getVersion = 1
     }
@@ -129,6 +138,7 @@ public final class BusinessBroadcastAssociationHandler implements WebAppStateAct
      * @return {@code true} if the mutation was applied successfully, {@code false} otherwise
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebBroadcastListSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: WAWebBroadcastListSync.applyMutations
     }
@@ -180,6 +190,7 @@ public final class BusinessBroadcastAssociationHandler implements WebAppStateAct
      * @return the detailed application result
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebBroadcastListSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) { // NO_WA_BASIS: only SET makes sense for an additive participant action
             return MutationApplicationResult.unsupported();

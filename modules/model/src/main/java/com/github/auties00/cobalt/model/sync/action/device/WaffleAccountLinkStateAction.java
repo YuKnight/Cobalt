@@ -119,7 +119,14 @@ public final class WaffleAccountLinkStateAction implements SyncAction<SyncAction
          * The link has been dissolved and the WhatsApp account is no longer
          * associated with a Meta Accounts Center identity.
          */
-        UNLINKED(2);
+        UNLINKED(2),
+        /**
+         * The link state is unknown. Per WA Web {@code WAWebAccountLinkingConstants.AccountLinkState}
+         * (mirrored enum with {@code Active}, {@code Paused}, {@code Unlinked},
+         * {@code Unknown}): values outside the known range map to
+         * {@code Unknown} via {@code mapToAccountLinkState}.
+         */
+        UNKNOWN(3); // WAWebAccountLinkingConstants.AccountLinkState.Unknown
 
         /**
          * Constructs a new {@code AccountLinkState} with the given protobuf

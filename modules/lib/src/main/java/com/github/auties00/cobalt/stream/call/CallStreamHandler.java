@@ -573,10 +573,13 @@ public final class CallStreamHandler implements SocketStream.Handler {
      * @param remote the remote peer {@link Jid}
      * @return the local {@link Jid} to use as the {@code from} attribute, or
      *         {@code null} if the local JID is not available
-     * @implNote ADAPTED: Cobalt does not track the local device LID
-     *           separately, so for the LID branch it falls back to the
-     *           user-level LID from
-     *           {@link com.github.auties00.cobalt.store.WhatsAppStore#lid()}.
+     * @implNote ADAPTED: Cobalt persists the meLid exactly as the server sends
+     *           it in {@code <success lid="..."/>}; whether it carries a
+     *           device suffix depends on the server. {@code store.lid()}
+     *           therefore stands in for {@code getMeDeviceLidOrThrow}. The PN
+     *           branch always strips to user-level via
+     *           {@link Jid#toUserJid()} to mirror
+     *           {@code getMePnUserOrThrow_DO_NOT_USE}.
      */
     private Jid resolveReceiptFrom(Jid remote) {
         var self = whatsapp.store().jid().orElse(null);
@@ -584,13 +587,14 @@ public final class CallStreamHandler implements SocketStream.Handler {
             return null;
         }
 
-        if (remote.hasLidServer()) {
-            return whatsapp.store().lid()
-                    .map(Jid::toUserJid)
-                    .orElse(self.toUserJid());
+        if (remote.hasLidServer()) { // WAWebHandleVoipCall.S: e.isLid()
+            // WAWebUserPrefsMeUser.getMeDeviceLidOrThrow preserves the device suffix on outgoing LID receipts.
+            // Cobalt stores the meLid exactly as the server sends it in <success lid="...">, so store.lid()
+            // is the closest equivalent; the self-device PN fallback kicks in only when setLid was never called.
+            return whatsapp.store().lid().orElse(self.toUserJid()); // WAWebUserPrefsMeUser.getMeDeviceLidOrThrow
         }
 
-        return self.toUserJid();
+        return self.toUserJid(); // WAWebUserPrefsMeUser.getMePnUserOrThrow_DO_NOT_USE = asUserWidOrThrow(meDevicePn)
     }
 
     /**

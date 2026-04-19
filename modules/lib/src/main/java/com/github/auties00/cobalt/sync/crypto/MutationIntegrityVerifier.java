@@ -139,7 +139,7 @@ public final class MutationIntegrityVerifier {
      * and the snapshot MAC.
      *
      * <p>Per WhatsApp Web, patch MAC mismatch is fatal (throws), but snapshot MAC mismatch
-     * is non-fatal -- the collection is marked as mac-mismatch and processing continues.
+     * is non-fatal, the collection is marked as mac-mismatch and processing continues.
      *
      * <p>Per WA Web function G ({@code validateSnapshotMac}): when the collection is
      * already in mac-mismatch state ({@code isCollectionInMacMismatchFatal}), the

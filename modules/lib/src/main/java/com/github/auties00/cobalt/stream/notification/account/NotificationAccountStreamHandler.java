@@ -5,15 +5,18 @@ import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.model.chat.ChatEphemeralTimer;
 import com.github.auties00.cobalt.model.contact.ContactTextStatus;
 import com.github.auties00.cobalt.model.contact.ContactTextStatusBuilder;
+import com.github.auties00.cobalt.model.device.info.DeviceInfo;
+import com.github.auties00.cobalt.model.device.info.DeviceListBuilder;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.stream.SocketStream;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 
 /**
  * Handles incoming account-sync notifications for the authenticated user's own
@@ -82,9 +85,8 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
             handleNotification(node);
         } catch (Throwable throwable) {
             LOGGER.log(System.Logger.Level.WARNING,
-                    "Cannot handle account_sync notification {0}: {1}",
-                    node.getAttributeAsString("id", "<missing>"),
-                    throwable.getMessage());
+                    "Cannot handle account_sync notification " + node.getAttributeAsString("id", "<missing>"),
+                    throwable);
         } finally {
             sendNotificationAck(node); // WAWebHandleAccountSyncNotification.handleAccountSyncNotification (ack stanza)
         }
@@ -274,11 +276,36 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
             return;
         }
 
-        // ADAPTED: WAWebHandleAccountSyncNotification.handleAccountSyncNotification (DEVICES case)
-        // WA Web parses device list from stanza, calls y() for wid mapping, handleADVDeviceSyncResult,
-        // and cleanupCampaignsWithInvalidDevices. Cobalt performs a full device list sync instead.
-        // WA Web also has offline handler checks; Cobalt handles offline state at a higher level.
-        deviceService.getDeviceLists(Set.of(self), "account_sync_notification", null, true);
+        // ADAPTED: WAWebHandleAccountSyncNotification.handleAccountSyncNotification (DEVICES case).
+        // The notification already carries the full device list inline as <device jid=... key-index=.../>
+        // children of the <devices> child, along with the server-computed dhash. The earlier
+        // implementation kicked off a fresh USync device query for self, but the server does not
+        // respond to that redundant request (we already have the data), so the sendNode call
+        // blocked for 60s and timed out. Parse the inline list directly instead.
+        var devicesChild = node.getChild("devices").orElse(null);
+        if (devicesChild == null) {
+            return;
+        }
+
+        var parsed = new ArrayList<DeviceInfo>();
+        for (var deviceNode : devicesChild.getChildren("device")) {
+            var deviceJid = deviceNode.getAttributeAsJid("jid").orElse(null); // WAWebHandleAccountSyncNotification: e.attrUserJid("jid")
+            if (deviceJid == null) {
+                continue;
+            }
+            var keyIndex = deviceNode.getAttributeAsInt("key-index", 0); // WAWebHandleAccountSyncNotification: e.maybeAttrInt("key-index")
+            parsed.add(DeviceInfo.ofE2EE(deviceJid.device(), keyIndex));
+        }
+
+        var dhash = devicesChild.getAttributeAsString("dhash", null); // WAWebHandleAccountSyncNotification: devicesNode.attrs.dhash (used as rawId/phash hint)
+        var list = new DeviceListBuilder()
+                .userJid(self)
+                .devices(List.copyOf(parsed))
+                .timestamp(Instant.now())
+                .rawId(dhash)
+                .deleted(false)
+                .build();
+        whatsapp.store().addDeviceList(list);
     }
 
     /**

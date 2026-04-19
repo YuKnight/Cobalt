@@ -363,8 +363,14 @@ public final class SyncKeyUtils {
      *
      * @param keys the available sync keys
      * @return the newest key, or {@code null} if none exist
-     * @implNote WAWebSyncdKeyManagement.getNewestKeyPair
+     * @implNote WAWebSyncdKeyManagement.getNewestKeyPair (function h) —
+     *           helper extracted so both {@link com.github.auties00.cobalt.sync.key.SyncKeyRotationService#getNewestKeyPair()}
+     *           and the upload path ({@code MutationRequestBuilder.buildPatchProtobuf})
+     *           share identical max-epoch / min-deviceId selection semantics.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdKeyManagement",
+            exports = "getNewestKeyPair",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public static AppStateSyncKey findNewestKey(Collection<AppStateSyncKey> keys) {
         if (keys == null || keys.isEmpty()) { // ADAPTED: Java null-safety guard
             return null; // WAWebSyncdKeyManagement.getNewestKeyPair: if (e.length === 0) return null

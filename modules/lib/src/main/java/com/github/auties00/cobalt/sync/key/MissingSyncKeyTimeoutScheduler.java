@@ -2,6 +2,9 @@ package com.github.auties00.cobalt.sync.key;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.exception.WhatsAppWebAppStateSyncException;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.device.sync.MissingDeviceSyncKey;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.store.WhatsAppStore;
@@ -22,6 +25,8 @@ import java.util.concurrent.TimeUnit;
  *
  * @implNote WAWebSyncdStoreMissingKeys, WAWebSyncdRequestAllSyncdMissingKeysJob
  */
+@WhatsAppWebModule(moduleName = "WAWebSyncdStoreMissingKeys")
+@WhatsAppWebModule(moduleName = "WAWebSyncdRequestAllSyncdMissingKeysJob")
 public final class MissingSyncKeyTimeoutScheduler {
     /**
      * Logger for this scheduler.
@@ -250,29 +255,49 @@ public final class MissingSyncKeyTimeoutScheduler {
      * <p>Per WhatsApp Web {@code requestAllSyncdMissingKeysJob}: periodically
      * re-sends key requests for all tracked missing keys to handle cases
      * where the original request was lost or a new companion device joined.
+     * The job wraps {@code WAWebSyncdHandleMissingKeys.requestAllMissingKeys}
+     * in a NonPersistedJob with {@code BEST_EFFORT} priority and 30-second
+     * timeout, then schedules {@code setMissingKeyTimeoutInTransaction} after
+     * 20 seconds. {@code WAWebTasksDefinitions} drives the job every
+     * {@code HOUR_SECONDS * 6} (6 hours).
      *
-     * @implNote WAWebSyncdRequestAllSyncdMissingKeysJob.requestAllSyncdMissingKeysJob, WAWebSyncdHandleMissingKeys.requestAllMissingKeys
+     * @implNote WAWebSyncdRequestAllSyncdMissingKeysJob.requestAllSyncdMissingKeysJob,
+     *     WAWebSyncdHandleMissingKeys.requestAllMissingKeys,
+     *     WAWebTasksDefinitions (6-hour cadence).
+     *     ADAPTED: Cobalt uses {@link ScheduledExecutorService#scheduleAtFixedRate}
+     *     instead of {@code NonPersistedJob} + {@code WAWebTasksDefinitions}.
+     *     The {@code BEST_EFFORT} priority and {@code maxTimeoutMs: 30_000}
+     *     wrapper have no Cobalt equivalent — the job is executed directly
+     *     on a virtual thread.
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdRequestAllSyncdMissingKeysJob",
+            exports = "requestAllSyncdMissingKeysJob",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebSyncdHandleMissingKeys",
+            exports = "requestAllMissingKeys",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public synchronized void startPeriodicReRequestJob() {
-        if (reRequestJob != null && !reRequestJob.isDone()) {
+        if (reRequestJob != null && !reRequestJob.isDone()) { // ADAPTED: idempotent start guard (WA Web relies on WAWebTasksDefinitions single-registration)
             return;
         }
 
         reRequestJob = scheduler.scheduleAtFixedRate(() -> { // WAWebTasksDefinitions: HOUR_SECONDS * 6 interval
+            // WAWebSyncdHandleMissingKeys.requestAllMissingKeys: var e = yield getAllMissingKeysInTransaction()
             var missingKeys = store.missingSyncKeys();
-            if (missingKeys.isEmpty()) {
-                return;
-            }
-
-            var keyIds = missingKeys.stream()
+            var keyIds = missingKeys.stream() // WAWebSyncdHandleMissingKeys.requestAllMissingKeys: e.map(e => e.keyId)
                     .map(MissingDeviceSyncKey::keyId)
                     .toList();
-            LOGGER.log(System.Logger.Level.INFO, "Periodic re-request for {0} missing sync key(s)", keyIds.size());
-            Thread.startVirtualThread(() -> {
+            // WAWebSyncdHandleMissingKeys.requestAllMissingKeys: WALogger.LOG("syncd: requestAllMissingKeys: missing keys: [", keyHexes, "]")
+            LOGGER.log(System.Logger.Level.INFO, "syncd: requestAllMissingKeys: missing keys: [{0}]",
+                    missingKeys.stream().map(MissingDeviceSyncKey::keyId).map(SyncKeyUtils::syncKeyIdToHex).toList());
+            if (keyIds.isEmpty()) { // WAWebSyncdHandleMissingKeys.requestAllMissingKeys: e.length !== 0 && (yield sendSyncdKeyRequest(...))
+                return;
+            }
+            Thread.startVirtualThread(() -> { // ADAPTED: virtual thread replaces async generator + NonPersistedJob 30s timeout
                 requestService.reRequestMissingKeys(keyIds); // WAWebSyncdRequestAllSyncdMissingKeysJob: yield requestAllMissingKeys()
-                scheduler.schedule(() -> scheduleTimeoutCheck(), 20, TimeUnit.SECONDS); // WAWebSyncdRequestAllSyncdMissingKeysJob: setTimeout(setMissingKeyTimeoutInTransaction, 1000 * 20)
+                scheduler.schedule(this::scheduleTimeoutCheck, 20, TimeUnit.SECONDS); // WAWebSyncdRequestAllSyncdMissingKeysJob: self.setTimeout(setMissingKeyTimeoutInTransaction, 1e3*20)
             });
-        }, RE_REQUEST_INTERVAL_HOURS, RE_REQUEST_INTERVAL_HOURS, TimeUnit.HOURS);
+        }, RE_REQUEST_INTERVAL_HOURS, RE_REQUEST_INTERVAL_HOURS, TimeUnit.HOURS); // WAWebTasksDefinitions: HOUR_SECONDS*6
     }
 
     /**

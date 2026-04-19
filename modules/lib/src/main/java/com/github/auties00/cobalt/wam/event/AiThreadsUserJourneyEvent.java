@@ -38,4 +38,7 @@ public interface AiThreadsUserJourneyEvent extends WamEventSpec {
 
     @WamProperty(index = 8, type = WamType.ENUM)
     Optional<ThreadActionTypes> threadActionType();
+
+    @WamProperty(index = 10, type = WamType.BOOLEAN)
+    Optional<Boolean> isCanonicalThread();
 }

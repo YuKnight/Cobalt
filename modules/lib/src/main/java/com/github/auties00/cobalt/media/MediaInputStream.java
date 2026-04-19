@@ -153,7 +153,6 @@ abstract class MediaInputStream extends InputStream {
             // WAMediaCrypto.computeMediaKeys
             // Uses JDK's KDF API to perform HKDF-SHA256 extract then expand,
             // matching WACryptoHkdf.extractAndExpand(mediaKey, info, 112)
-
             var hkdf = KDF.getInstance("HKDF-SHA256");
             var params = HKDFParameterSpec.ofExtract()
                     .addIKM(mediaKey)

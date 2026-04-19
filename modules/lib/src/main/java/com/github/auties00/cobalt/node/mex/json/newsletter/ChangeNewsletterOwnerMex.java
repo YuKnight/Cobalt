@@ -112,11 +112,9 @@ public sealed interface ChangeNewsletterOwnerMex extends MexJsonOperation permit
         public NodeBuilder toNode() {
             // WAWebMexChangeNewsletterOwnerJob.mexChangeNewsletterOwner
             // Opens a UTF-8 JSON writer that will serialise the GraphQL variables envelope
-
             try (var writer = JSONWriter.ofUTF8()) {
                 // WAWebMexChangeNewsletterOwnerJob.mexChangeNewsletterOwner
                 // Begins the outer envelope and the nested "variables" object
-
                 writer.startObject();
                 writer.writeName("variables");
                 writer.writeColon();
@@ -124,7 +122,6 @@ public sealed interface ChangeNewsletterOwnerMex extends MexJsonOperation permit
 
                 // WAWebMexChangeNewsletterOwnerJob.mexChangeNewsletterOwner
                 // Emits the newsletter_id variable when present
-
                 if (newsletterId != null) {
                     writer.writeName("newsletter_id");
                     writer.writeColon();
@@ -133,7 +130,6 @@ public sealed interface ChangeNewsletterOwnerMex extends MexJsonOperation permit
 
                 // WAWebMexChangeNewsletterOwnerJob.mexChangeNewsletterOwner
                 // Emits the user_id variable when present, skipping it otherwise
-
                 if (userId != null) {
                     writer.writeName("user_id");
                     writer.writeColon();
@@ -144,7 +140,6 @@ public sealed interface ChangeNewsletterOwnerMex extends MexJsonOperation permit
 
                 // ADAPTED: WAWebMexChangeNewsletterOwnerJob.mexChangeNewsletterOwner
                 // Flushes the JSON buffer into a StringWriter and wraps it in the shared MEX IQ envelope
-
                 try (var output = new StringWriter()) {
                     writer.flushTo(output);
                     return MexJsonOperation.createMexNode(QUERY_ID, output.toString());
@@ -221,7 +216,6 @@ public sealed interface ChangeNewsletterOwnerMex extends MexJsonOperation permit
         private static Optional<Response> of(byte[] json) {
             // WAWebMexChangeNewsletterOwnerJob.mexChangeNewsletterOwner
             // Parses the raw JSON payload, bailing out if fastjson2 returns null
-
             var jsonObject = JSON.parseObject(json);
             if (jsonObject == null) {
                 return Optional.empty();
@@ -229,7 +223,6 @@ public sealed interface ChangeNewsletterOwnerMex extends MexJsonOperation permit
 
             // WAWebMexChangeNewsletterOwnerJob.mexChangeNewsletterOwner
             // Descends into the standard GraphQL "data" envelope
-
             var data = jsonObject.getJSONObject("data");
             if (data == null) {
                 return Optional.empty();
@@ -237,7 +230,6 @@ public sealed interface ChangeNewsletterOwnerMex extends MexJsonOperation permit
 
             // WAWebMexChangeNewsletterOwnerJob.mexChangeNewsletterOwner
             // Extracts the mutation-specific root keyed by xwa2_newsletter_change_owner
-
             var root = data.getJSONObject("xwa2_newsletter_change_owner");
             if (root == null) {
                 return Optional.empty();

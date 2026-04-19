@@ -148,7 +148,6 @@ public sealed interface MediaHost {
         // WAWebMediaHostsRouteSelection.routeSelection
         // Empty host list yields an empty RouteSelectionResult, matching
         // the null branch in the WA Web source
-
         if (hosts.isEmpty()) {
             return new RouteSelectionResult(Optional.empty(), Optional.empty());
         }
@@ -159,7 +158,6 @@ public sealed interface MediaHost {
             // Computes the bucket for deterministic host selection:
             // null encFileHash uses bucket 0; otherwise vcache aggregation
             // combined with maxBuckets yields base64Modulo(n, i) + 100
-
             Integer bucket;
             if (encFileHash == null) {
                 bucket = 0;
@@ -172,7 +170,6 @@ public sealed interface MediaHost {
             // WAWebMediaHostsRouteSelection.routeSelection
             // Builds the bucket -> host map once and then consults it for
             // the computed bucket; the bucket-0 host is used as a default
-
             var bucketMap = buildBucketMap(hosts);
             var bucketHost = bucket != null ? bucketMap.get(bucket) : null;
             var defaultHost = bucketMap.get(0);
@@ -187,7 +184,6 @@ public sealed interface MediaHost {
         // WAWebMediaHostsRouteSelection.routeSelection
         // Finds the first fallback-class host independently of the
         // selected host choice
-
         MediaHost fallback = null;
         for (var host : hosts) {
             if (host instanceof Fallback) {
@@ -199,7 +195,6 @@ public sealed interface MediaHost {
         // WAWebMediaHostsRouteSelection.routeSelection
         // Falls back to a linear scan when bucket routing did not find a
         // supporting host (or the operation is upload)
-
         if (selected == null) {
             for (var host : hosts) {
                 if (operation == Operation.UPLOAD
@@ -267,7 +262,6 @@ public sealed interface MediaHost {
         // WAWebMediaHostsRouteSelection.routeSelection
         // Iterates every host's bucket list and maps each bucket number to
         // the owning host; later assignments overwrite earlier ones
-
         var map = new HashMap<Integer, MediaHost>();
         for (var host : hosts) {
             for (var bucket : host.downloadBuckets()) {
@@ -297,7 +291,6 @@ public sealed interface MediaHost {
         // WABase64Modulo.default
         // Decodes the base64 string into raw bytes and processes each byte
         // as two 4-bit nibbles to mirror the JS BigInt-free implementation
-
         var decoded = Base64.getDecoder().decode(base64);
         var remainder = 0;
         for (var b : decoded) {
@@ -449,7 +442,6 @@ public sealed interface MediaHost {
         // WAWebMediaHost.MediaHost
         // Collapses PTV / newsletter-PTV to VIDEO and PRODUCT to IMAGE
         // before consulting the download-type set
-
         return switch (path) {
             case PTV, NEWSLETTER_PTV -> MediaPath.VIDEO;
             case PRODUCT -> MediaPath.IMAGE;
@@ -478,7 +470,6 @@ public sealed interface MediaHost {
         // WAWebMediaHost.MediaHost
         // Collapses PTV to VIDEO and PRODUCT_CATALOG_IMAGE to PRODUCT
         // before consulting the upload-type set
-
         return switch (path) {
             case PTV -> MediaPath.VIDEO;
             case PRODUCT_CATALOG_IMAGE -> MediaPath.PRODUCT;
@@ -532,7 +523,6 @@ public sealed interface MediaHost {
             Objects.requireNonNull(provider, "provider cannot be null");
             // WAWebMediaHost.MediaHost
             // supportsDownloadMediaType(t) = this.$1.has(d(t))
-
             return download.contains(normalizeDownloadMediaType(provider.mediaPath()));
         }
 
@@ -552,7 +542,6 @@ public sealed interface MediaHost {
             Objects.requireNonNull(provider, "provider cannot be null");
             // WAWebMediaHost.MediaHost
             // supportsUploadMediaType(t) = this.$2.has(m(t))
-
             return upload.contains(normalizeUploadMediaType(provider.mediaPath()));
         }
     }
@@ -598,7 +587,6 @@ public sealed interface MediaHost {
             Objects.requireNonNull(provider, "provider cannot be null");
             // WAWebMediaHost.MediaHost
             // supportsDownloadMediaType(t) = this.$1.has(d(t))
-
             return download.contains(normalizeDownloadMediaType(provider.mediaPath()));
         }
 
@@ -618,7 +606,6 @@ public sealed interface MediaHost {
             Objects.requireNonNull(provider, "provider cannot be null");
             // WAWebMediaHost.MediaHost
             // supportsUploadMediaType(t) = this.$2.has(m(t))
-
             return upload.contains(normalizeUploadMediaType(provider.mediaPath()));
         }
 

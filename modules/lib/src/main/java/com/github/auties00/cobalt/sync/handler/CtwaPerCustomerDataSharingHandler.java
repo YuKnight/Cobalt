@@ -2,8 +2,12 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
+import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
@@ -36,6 +40,7 @@ import java.util.List;
  *
  * @implNote WAWebCtwaPerCustomerDataSharingSync
  */
+@WhatsAppWebModule(moduleName = "WAWebCtwaPerCustomerDataSharingSync")
 public final class CtwaPerCustomerDataSharingHandler implements WebAppStateActionHandler {
     /**
      * The singleton instance of {@code CtwaPerCustomerDataSharingHandler}.
@@ -43,13 +48,17 @@ public final class CtwaPerCustomerDataSharingHandler implements WebAppStateActio
      * @implNote WAWebCtwaPerCustomerDataSharingSync — module-level singleton:
      *           {@code var p = new m(); l.default = p}
      */
+    @WhatsAppWebExport(moduleName = "WAWebCtwaPerCustomerDataSharingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final CtwaPerCustomerDataSharingHandler INSTANCE = new CtwaPerCustomerDataSharingHandler();
 
     /**
      * Creates the singleton handler instance.
      *
-     * @implNote WAWebCtwaPerCustomerDataSharingSync — singleton constructor
+     * @implNote WAWebCtwaPerCustomerDataSharingSync — singleton constructor sets
+     *           {@code this.collectionName = WASyncdConst.CollectionName.RegularHigh};
+     *           Cobalt surfaces that via {@link #collectionName()}.
      */
+    @WhatsAppWebExport(moduleName = "WAWebCtwaPerCustomerDataSharingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private CtwaPerCustomerDataSharingHandler() {
     }
 
@@ -62,6 +71,7 @@ public final class CtwaPerCustomerDataSharingHandler implements WebAppStateActio
      * @return the action name string
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebCtwaPerCustomerDataSharingSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
         return CtwaPerCustomerDataSharingAction.ACTION_NAME; // WAWebCtwaPerCustomerDataSharingSync.getAction
     }
@@ -75,6 +85,7 @@ public final class CtwaPerCustomerDataSharingHandler implements WebAppStateActio
      * @return the sync patch type
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebCtwaPerCustomerDataSharingSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
         return CtwaPerCustomerDataSharingAction.COLLECTION_NAME; // WAWebCtwaPerCustomerDataSharingSync.collectionName
     }
@@ -86,6 +97,7 @@ public final class CtwaPerCustomerDataSharingHandler implements WebAppStateActio
      * @return the version number
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebCtwaPerCustomerDataSharingSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return CtwaPerCustomerDataSharingAction.ACTION_VERSION; // WAWebCtwaPerCustomerDataSharingSync.getVersion
     }
@@ -103,8 +115,9 @@ public final class CtwaPerCustomerDataSharingHandler implements WebAppStateActio
      * @return {@code true} if the mutation was applied successfully
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebCtwaPerCustomerDataSharingSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS; // WAWebCtwaPerCustomerDataSharingSync.applyMutations
+        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebCtwaPerCustomerDataSharingSync.applyMutations
     }
 
     /**
@@ -135,45 +148,47 @@ public final class CtwaPerCustomerDataSharingHandler implements WebAppStateActio
      * @return the detailed application result
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebCtwaPerCustomerDataSharingSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         var indexArray = JSON.parseArray(mutation.index()); // WAWebCtwaPerCustomerDataSharingSync.applyMutations — indexParts
+        var accountLid = indexArray.getString(1); // WAWebCtwaPerCustomerDataSharingSync.applyMutations — u = n[1]
 
         switch (mutation.operation()) {
             case SET -> { // WAWebCtwaPerCustomerDataSharingSync.applyMutations — operation === "set"
-                var accountLid = indexArray.getString(1); // WAWebCtwaPerCustomerDataSharingSync.applyMutations — u = n[1]
                 if (accountLid == null) { // WAWebCtwaPerCustomerDataSharingSync.applyMutations — if (!u)
                     return malformedActionValue(); // WAWebCtwaPerCustomerDataSharingSync.applyMutations — malformedActionValue(r.collectionName)
                 }
 
-                if (!(mutation.value().action().orElse(null) instanceof CtwaPerCustomerDataSharingAction action)) { // WAWebCtwaPerCustomerDataSharingSync.applyMutations — var c = s.ctwaPerCustomerDataSharingAction; if (c == null)
+                // WAWebCtwaPerCustomerDataSharingSync.applyMutations —
+                // var c = s.ctwaPerCustomerDataSharingAction; if ((c == null ? void 0 : c.isCtwaPerCustomerDataSharingEnabled) == null) ...
+                // When the value or action payload is missing, WA Web falls through this branch and returns malformed.
+                if (!(mutation.value().action().orElse(null) instanceof CtwaPerCustomerDataSharingAction action)) {
                     return malformedActionValue(); // WAWebCtwaPerCustomerDataSharingSync.applyMutations — malformedActionValue(r.collectionName)
                 }
 
                 // ADAPTED: WA Web checks (c?.isCtwaPerCustomerDataSharingEnabled == null) and returns malformed.
-                // Cobalt's accessor coalesces null to false per nullable boolean accessor convention.
-                // The protobuf field is Boolean (nullable), but the accessor returns boolean.
+                // Cobalt's public accessor coalesces the nullable Boolean field to false per nullable boolean
+                // accessor convention; the raw field is package-private and outside this module's ownership,
+                // so null vs false cannot be distinguished here without mutating the model. The practical
+                // effect is that a deliberately null flag is treated as `false` rather than malformed.
                 var enabled = action.isCtwaPerCustomerDataSharingEnabled(); // WAWebCtwaPerCustomerDataSharingSync.applyMutations — var d = c.isCtwaPerCustomerDataSharingEnabled
 
                 // WAWebCtwaPerCustomerDataSharingSync.$CtwaPerCustomerDataSharingSync$p_1 —
                 // WA Web calls createOrReplace({lidRawString: u, dataSharing3pdEnabled: d}) on
                 // the data-sharing-3pd-lid-v2 IDB table and updateDataSharing3pdLidInCollection
                 // on the frontend. Cobalt mirrors the per-LID schema by writing into the per-LID
-                // map keyed by accountLid.
+                // map keyed by accountLid on the unified store.
                 client.store().setCtwaDataSharing(accountLid, enabled); // WAWebCtwaPerCustomerDataSharingSync.$CtwaPerCustomerDataSharingSync$p_1
 
                 // WAWebCtwaPerCustomerDataSharingSync.applyMutations — frontendFireAndForget("maybeGeneratePerCustomerDataSharingSystemMessage", ...) — skipped, frontend IPC
                 return MutationApplicationResult.success(); // WAWebCtwaPerCustomerDataSharingSync.applyMutations — {actionState: Success}
             }
             case REMOVE -> { // WAWebCtwaPerCustomerDataSharingSync.applyMutations — operation === "remove"
-                var accountLid = indexArray.getString(1); // WAWebCtwaPerCustomerDataSharingSync.applyMutations — u = n[1]
-                if (accountLid == null) { // WAWebCtwaPerCustomerDataSharingSync.applyMutations — if (!u)
-                    return malformedActionValue(); // WAWebCtwaPerCustomerDataSharingSync.applyMutations — malformedActionValue(r.collectionName)
-                }
-
                 // WAWebCtwaPerCustomerDataSharingSync.$CtwaPerCustomerDataSharingSync$p_2 —
                 // WA Web calls remove(t) on the data-sharing-3pd-lid-v2 table and
-                // removeDataSharing3pdLidFromCollection on the frontend. Cobalt mirrors the
-                // per-LID schema by deleting the entry keyed by accountLid.
+                // removeDataSharing3pdLidFromCollection on the frontend. WA Web does not validate
+                // accountLid on REMOVE — a null key is a no-op on IDB. Cobalt's store removal
+                // treats null as a no-op too, preserving Success semantics.
                 client.store().removeCtwaDataSharing(accountLid); // WAWebCtwaPerCustomerDataSharingSync.$CtwaPerCustomerDataSharingSync$p_2
 
                 return MutationApplicationResult.success(); // WAWebCtwaPerCustomerDataSharingSync.applyMutations — {actionState: Success}
@@ -199,6 +214,7 @@ public final class CtwaPerCustomerDataSharingHandler implements WebAppStateActio
      * @param isEnabled  whether per-customer data sharing is enabled
      * @return the pending mutation ready to be queued for sync
      */
+    @WhatsAppWebExport(moduleName = "WAWebCtwaPerCustomerDataSharingSync", exports = "getCtwaPerCustomerDataSharingMutation", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPendingMutation getCtwaPerCustomerDataSharingMutation(Jid accountLid, boolean isEnabled) {
         var timestamp = Instant.now(); // WAWebCtwaPerCustomerDataSharingSync.getCtwaPerCustomerDataSharingMutation — var r = o("WATimeUtils").unixTimeMs()
         var action = new CtwaPerCustomerDataSharingActionBuilder() // WAWebCtwaPerCustomerDataSharingSync.getCtwaPerCustomerDataSharingMutation — {ctwaPerCustomerDataSharingAction: {isCtwaPerCustomerDataSharingEnabled: n}}

@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.stream.notification.account;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
@@ -50,11 +51,16 @@ final class NotificationPrivacyStreamHandler implements SocketStream.Handler {
      *
      * <p>Parses the notification, processes each trusted-contact token by
      * updating the chat store and re-subscribing to presence, then sends
-     * an acknowledgement stanza. The ACK is always sent, even if processing
-     * fails.
+     * an acknowledgement stanza.
      *
      * @param node the incoming notification node
-     * @implNote WAWebHandlePrivacyTokensNotification.default (function f/g)
+     * @implNote WAWebHandlePrivacyTokensNotification.default: in WA Web the
+     *           parser function {@code f/g} throws on parse errors and returns
+     *           the constructed ACK stanza {@code i} on success. ADAPTED:
+     *           Cobalt logs the parse failure and still emits the ACK in a
+     *           {@code finally} block, matching Cobalt's project-wide
+     *           "always ACK" stanza-handler convention so the server does not
+     *           retransmit the notification on transient client errors.
      */
     @Override
     public void handle(Node node) {
@@ -65,13 +71,16 @@ final class NotificationPrivacyStreamHandler implements SocketStream.Handler {
         try {
             handleNotification(node);
         } catch (Throwable throwable) {
-            // WAWebHandlePrivacyTokensNotification.default: logs parse error and throws
+            // WAWebHandlePrivacyTokensNotification.g: LOG("error while parsing: ...", e.toString());
+            //                                         ERROR("Parsing Error: ...", t.error.toString())
             LOGGER.log(System.Logger.Level.WARNING,
                     "Cannot handle privacy_token notification {0}: {1}",
                     node.getAttributeAsString("id", "<missing>"),
                     throwable.getMessage());
         } finally {
-            sendNotificationAck(node); // WAWebHandlePrivacyTokensNotification.default: ACK is always returned
+            // ADAPTED: WAWebHandlePrivacyTokensNotification.g returns the ACK only on success;
+            // Cobalt ACKs unconditionally to avoid server-side retransmits after client crashes.
+            sendNotificationAck(node);
         }
     }
 
@@ -79,11 +88,12 @@ final class NotificationPrivacyStreamHandler implements SocketStream.Handler {
      * Parses the notification and processes each privacy token.
      *
      * <p>Extracts the sender's phone number JID and optional LID from the
-     * notification attributes, then iterates over the token children,
-     * dispatching each by type.
+     * notification attributes, waits for offline delivery to end, then
+     * iterates over the token children dispatching each by type.
      *
      * @param node the notification node
-     * @implNote WAWebHandlePrivacyTokensNotification.default (parser m + function g body)
+     * @implNote WAWebHandlePrivacyTokensNotification.default (parser m + function g body):
+     *           {@code yield waitForOfflineDeliveryEnd(); yield Promise.all(privacyTokens.map(...))}
      */
     private void handleNotification(Node node) {
         // WAWebHandlePrivacyTokensNotification: m.parse - attrUserJid("from")
@@ -102,14 +112,21 @@ final class NotificationPrivacyStreamHandler implements SocketStream.Handler {
             return;
         }
 
+        // WAWebHandlePrivacyTokensNotification.g: yield waitForOfflineDeliveryEnd()
+        // (guarded by !WAWebEnvironment.isGuest upstream; Cobalt is never a guest client)
+        whatsapp.store().waitForOfflineDeliveryEnd();
+
         // WAWebHandlePrivacyTokensNotification: m.parse - i.forEachChildWithTag("token", ...)
+        // ADAPTED: WAWebHandlePrivacyTokensNotification.g maps each token via Promise.all;
+        // on a virtual thread we just iterate and block inline.
         for (var tokenNode : tokensNode.getChildren("token")) {
             // WAWebHandlePrivacyTokensNotification: m.parse - t.attrString("type")
             var type = tokenNode.getAttributeAsString("type", "");
             switch (type) {
                 case "trusted_contact" -> handleTrustedContactToken(senderPn, senderLid, tokenNode);
+                // WAWebHandlePrivacyTokensNotification.m: LOG("receiving an unknown type: ...", n)
                 default -> LOGGER.log(System.Logger.Level.DEBUG,
-                        "Ignoring unsupported privacy token type {0}", type);
+                        "incomingPrivacyTokensParser - receiving an unknown type: {0}", type);
             }
         }
     }
@@ -130,10 +147,17 @@ final class NotificationPrivacyStreamHandler implements SocketStream.Handler {
      *           WAWebSetTcTokenChatAction.handleIncomingTcToken
      */
     private void handleTrustedContactToken(Jid senderPn, Jid senderLid, Node tokenNode) {
+        // WAWebSetTcTokenChatAction.handleIncomingTcToken: if (t.isRegularUser()) { ... }
+        // Tokens for PSAs / bots / non-user servers are silently dropped by WA Web.
+        if (!LidMigrationService.isRegularUser(senderPn)) { // WAWebWid.isRegularUser - shared helper
+            return;
+        }
+
         // WAWebHandlePrivacyTokensNotification: d(t) - t.contentBytes()
         var content = tokenNode.toContentBytes().orElse(null);
+        // WAWebSetTcTokenChatAction.handleIncomingTcToken: if (... && a != null)
         if (content == null || content.length == 0) {
-            return; // WAWebSetTcTokenChatAction.handleIncomingTcToken: if (a != null ...)
+            return;
         }
 
         // WAWebHandlePrivacyTokensNotification: d(t) - t.attrTime("t")
@@ -142,9 +166,10 @@ final class NotificationPrivacyStreamHandler implements SocketStream.Handler {
         // WAWebSetTcTokenChatAction.handleIncomingTcToken: update chat tc token
         updateChatTcToken(senderPn, senderLid, tokenTimestamp, content);
 
-        // WAWebHandlePrivacyTokensNotification._: reSubscribeWhenActive(r) where r = userWid (PN)
+        // WAWebHandlePrivacyTokensNotification._: yield reSubscribeWhenActive(r)
+        // where r = userJidToUserWid(e.from), i.e. the sender's PN.
         try {
-            whatsapp.subscribeToPresence(senderPn);
+            whatsapp.subscribeToPresence(senderPn); // WAWebPresenceCollection.reSubscribeWhenActive -> WAWebContactPresenceBridge.subscribePresence
         } catch (Throwable throwable) {
             LOGGER.log(System.Logger.Level.DEBUG,
                     "Cannot resubscribe to presence for tc token sender {0}: {1}",
@@ -157,28 +182,44 @@ final class NotificationPrivacyStreamHandler implements SocketStream.Handler {
      * Updates the trusted-contact token on the chat corresponding to the
      * sender.
      *
-     * <p>Looks up the chat first by the sender's phone number JID. If not
-     * found, creates a new chat entry. Skips the update if the existing
-     * token is identical and the existing timestamp is newer.
+     * <p>Looks up the chat first by the sender's LID JID (when provided),
+     * then by the sender's phone number JID. If no chat is found, a new
+     * chat entry is created on the phone number JID. Skips the update if
+     * the existing token equals the new content or if the existing
+     * timestamp is strictly newer than the incoming one.
      *
      * @param senderPn       the sender's phone number JID
      * @param senderLid      the sender's LID JID, or {@code null}
-     * @param tokenTimestamp  the timestamp from the token, or {@code null}
+     * @param tokenTimestamp the timestamp from the token, or {@code null}
      * @param tcTokenContent the raw trusted-contact token bytes
-     * @implNote WAWebSetTcTokenChatAction.handleIncomingTcToken
+     * @implNote WAWebSetTcTokenChatAction.handleIncomingTcToken: in WA Web the
+     *           lookup is {@code getChatByAccountLid(n ?? toLid(t))} followed
+     *           by {@code getExisting(t)}, and a missing chat defers to
+     *           {@code WAWebApiOrphanTcToken.createOrUpdateOrphanTcToken}.
+     *           Cobalt has no orphan-tc-token store, so the missing-chat branch
+     *           is ADAPTED to {@code addNewChat(senderPn)}. The skip condition
+     *           ({@code tcToken equals a || tcTokenTimestamp > r}) is preserved
+     *           via {@link Instant#isAfter(Instant)}, which models the JS
+     *           {@code >} operator on numeric timestamps.
      */
     private void updateChatTcToken(Jid senderPn, Jid senderLid, Instant tokenTimestamp, byte[] tcTokenContent) {
-        // WAWebSetTcTokenChatAction.handleIncomingTcToken: find chat by LID first, then by PN
+        // WAWebSetTcTokenChatAction.handleIncomingTcToken: getChatByAccountLid(n ?? toLid(t))
+        // ADAPTED: when senderLid is absent WA Web computes it from senderPn via toLid;
+        // Cobalt cannot reach LidMigrationService from this handler, so we fall back to PN
+        // (the most common real-world shape, since sender_lid is typically present).
         var chat = (senderLid != null
                 ? whatsapp.store().findChatByJid(senderLid).orElse(null)
                 : null);
         if (chat == null) {
+            // WAWebSetTcTokenChatAction.handleIncomingTcToken: fall back through getExisting(t)
+            // ADAPTED: getExisting is a bridge helper; Cobalt collapses it to findChatByJid(pn).
             chat = whatsapp.store().findChatByJid(senderPn)
                     .orElseGet(() -> whatsapp.store().addNewChat(senderPn));
         }
 
         // WAWebSetTcTokenChatAction.handleIncomingTcToken:
-        // skip if token already equals AND existing timestamp > new timestamp
+        // if (!(l.tcToken != null && arrayBuffersEqualUNSAFE(l.tcToken, a)
+        //      || l.tcTokenTimestamp != null && l.tcTokenTimestamp > r))
         var existingToken = chat.tcToken().orElse(null);
         var existingTimestamp = chat.tcTokenTimestamp().orElse(null);
         if (existingToken != null && Arrays.equals(existingToken, tcTokenContent)
@@ -189,6 +230,9 @@ final class NotificationPrivacyStreamHandler implements SocketStream.Handler {
         // WAWebSetTcTokenChatAction.handleIncomingTcToken: l.set({tcToken: a, tcTokenTimestamp: r})
         chat.setTcToken(tcTokenContent);
         chat.setTcTokenTimestamp(tokenTimestamp);
+        // NO_WA_BASIS: WA Web also merges into WAWebSchemaChat.getChatTable() and optionally
+        // kicks ProfilePicThumbCollection.find when the profile-pic IQ privacy-token AB prop is on.
+        // Cobalt has neither the chat-table IDB write nor the profile-pic-thumb collection.
     }
 
     /**

@@ -34,8 +34,8 @@ import java.util.concurrent.TimeUnit;
  *
  * <p>Routes IQ stanzas based on their {@code xmlns} attribute:
  * <ul>
- *   <li>{@code urn:xmpp:ping} -- responds with an IQ result</li>
- *   <li>{@code md} -- dispatches to pair-device or pair-success handlers</li>
+ *   <li>{@code urn:xmpp:ping}, responds with an IQ result</li>
+ *   <li>{@code md}, dispatches to pair-device or pair-success handlers</li>
  * </ul>
  *
  * @implNote WAWebHandleStanzaCommon.handleIq, WAWebHandlePairDevice.default, WAWebHandlePairSuccess.default
@@ -187,8 +187,8 @@ public final class IqStreamHandler implements SocketStream.Handler {
         }
 
         switch (child.description()) { // WAWebHandleStanzaCommon.handleIq: switch (a)
-            case "pair-device" -> handlePairDevice(node); // WAWebHandleStanzaCommon.handleIq: return r("WAWebHandlePairDevice")(e) -- passes full IQ
-            case "pair-success" -> handlePairSuccess(node); // WAWebHandleStanzaCommon.handleIq: return r("WAWebHandlePairSuccess")(e) -- passes full IQ
+            case "pair-device" -> handlePairDevice(node); // WAWebHandleStanzaCommon.handleIq: return r("WAWebHandlePairDevice")(e), passes full IQ
+            case "pair-success" -> handlePairSuccess(node); // WAWebHandleStanzaCommon.handleIq: return r("WAWebHandlePairSuccess")(e), passes full IQ
             default -> LOGGER.log(System.Logger.Level.DEBUG,
                     "Ignoring unsupported md iq child {0}", child.description());
         }
@@ -232,7 +232,7 @@ public final class IqStreamHandler implements SocketStream.Handler {
         }
 
         whatsapp.store().setAdvSecretKey(DataUtils.randomByteArray(32)); // WAWebHandlePairDevice.g: yield o("WAWebAdvSignatureApi").generateADVSecretKey()
-        sendPairDeviceAck(iqNode); // WAWebHandlePairDevice._: u() -- makeSetToCompanionResponseClientResponse
+        sendPairDeviceAck(iqNode); // WAWebHandlePairDevice._: u(), makeSetToCompanionResponseClientResponse
 
         if (deviceLinkingService.isEnabled()) { // WAWebAltDeviceLinkingApi.startAltLinkingFlow: issued client-side when pairing type is ALT_DEVICE_LINKING
             try {
@@ -249,7 +249,7 @@ public final class IqStreamHandler implements SocketStream.Handler {
             return;
         }
 
-        scheduleVerificationValues(refs); // WAWebHandlePairDevice.g: f(d) -- schedules timer rotation
+        scheduleVerificationValues(refs); // WAWebHandlePairDevice.g: f(d), schedules timer rotation
     }
 
     /**
@@ -273,7 +273,7 @@ public final class IqStreamHandler implements SocketStream.Handler {
         var response = new NodeBuilder() // WASmaxOutMdSetToCompanionResponseClientResponse: smax("iq", {id: STANZA_ID(t.value), to: DOMAIN_JID(n.value), type: "result"})
                 .description("iq")
                 .attribute("id", id) // WASmaxOutMdSetToCompanionResponseClientResponse: id: STANZA_ID(t.value)
-                .attribute("to", Jid.userServer()) // WASmaxOutMdSetToCompanionResponseClientResponse: to: DOMAIN_JID(n.value) -- domain JID is s.whatsapp.net
+                .attribute("to", Jid.userServer()) // WASmaxOutMdSetToCompanionResponseClientResponse: to: DOMAIN_JID(n.value), domain JID is s.whatsapp.net
                 .attribute("type", "result") // WASmaxOutMdSetToCompanionResponseClientResponse: type: "result"
                 .build();
         whatsapp.sendNodeWithNoResponse(response); // ADAPTED: WA Web returns node through WAComms.castStanza
@@ -335,7 +335,7 @@ public final class IqStreamHandler implements SocketStream.Handler {
         }
 
         var queue = new ArrayDeque<>(refs);
-        runRotationTick(queue); // WAWebHandlePairDevice.g: m.forceRunNow() -- first tick runs immediately
+        runRotationTick(queue); // WAWebHandlePairDevice.g: m.forceRunNow(), first tick runs immediately
     }
 
     /**
@@ -419,7 +419,7 @@ public final class IqStreamHandler implements SocketStream.Handler {
      */
     private String buildQrPayload(String ref) {
         var store = whatsapp.store();
-        var advSecret = store.advSecretKey().orElseGet(() -> { // WAWebHandlePairDevice.g: yield generateADVSecretKey() -- already generated
+        var advSecret = store.advSecretKey().orElseGet(() -> { // WAWebHandlePairDevice.g: yield generateADVSecretKey(), already generated
             var generated = DataUtils.randomByteArray(32); // NO_WA_BASIS: fallback generation
             store.setAdvSecretKey(generated);
             return generated;
@@ -494,7 +494,7 @@ public final class IqStreamHandler implements SocketStream.Handler {
 
         extractPairingProps(pairSuccess) // WAWebHandlePairSuccess: if (_ != null) yield C(_)
                 .ifPresent(props -> snapshotRecoveryService.updatePrimaryDeviceSupportsSyncdRecovery(props.isSyncdSnapshotRecoveryEnabled())); // WAWebHandlePairSuccess.C/b: updatePrimaryDeviceSupportsSyncdRecovery(i === true)
-        store.setRegistered(true); // WAWebHandlePairSuccess: setPairingTimestamp(a) -- marks as registered
+        store.setRegistered(true); // WAWebHandlePairSuccess: setPairingTimestamp(a), marks as registered
         store.setOnline(true); // ADAPTED: Cobalt sets online flag
         safeSave("pair-success"); // ADAPTED: Cobalt persists store
     }
@@ -543,7 +543,7 @@ public final class IqStreamHandler implements SocketStream.Handler {
                 .details(details)
                 .accountSignature(validatedIdentity.accountSignature().orElse(null)) // WAWebHandlePairSuccess: keeps accountSignature
                 .deviceSignature(validatedIdentity.deviceSignature().orElse(null)) // WAWebHandlePairSuccess: keeps deviceSignature (generated earlier)
-                // accountSignatureKey intentionally omitted -- WAWebHandlePairSuccess: $.accountSignatureKey = void 0
+                // accountSignatureKey intentionally omitted, WAWebHandlePairSuccess: $.accountSignatureKey = void 0
                 .build();
 
         var encodedIdentity = ADVSignedDeviceIdentitySpec.encode(identityForResponse); // WAWebHandlePairSuccess: encodeProtobuf(ADVSignedDeviceIdentitySpec, $).readByteArrayView()
@@ -583,39 +583,8 @@ public final class IqStreamHandler implements SocketStream.Handler {
      * @implNote WAWebHandlePairSuccess: p.pairSuccessDeviceJid (jid=false), p.pairSuccessDeviceLid (lid=true)
      */
     private Optional<Jid> resolvePairedJid(Node node, boolean lid) {
-        var attrNames = lid // WAWebHandlePairSuccess: pairSuccessDeviceLid vs pairSuccessDeviceJid
-                ? new String[]{"lid", "device_lid", "user_lid"}
-                : new String[]{"jid", "device_jid", "user_jid"};
-
-        var direct = findJidAttribute(node, attrNames).orElse(null);
-        if (direct != null) {
-            return Optional.of(direct);
-        }
-
-        for (var child : node.children()) {
-            var fromChild = findJidAttribute(child, attrNames).orElse(null);
-            if (fromChild != null) {
-                return Optional.of(fromChild);
-            }
-
-            var content = decodeContentAsString(child).orElse(null);
-            if (content == null || content.isBlank()) {
-                continue;
-            }
-
-            try {
-                var parsed = Jid.of(content);
-                var matches = lid
-                        ? parsed.hasLidServer() || parsed.hasHostedLidServer()
-                        : !parsed.hasLidServer() && !parsed.hasHostedLidServer();
-                if (matches) {
-                    return Optional.of(parsed);
-                }
-            } catch (RuntimeException ignored) {
-            }
-        }
-
-        return Optional.empty();
+        return node.getChild("device")
+                .flatMap(device -> device.getAttributeAsJid(lid ? "lid" : "jid"));
     }
 
     /**

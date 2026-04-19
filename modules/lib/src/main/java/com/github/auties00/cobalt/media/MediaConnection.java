@@ -239,7 +239,6 @@ public final class MediaConnection {
     public static NodeBuilder queryNode() {
         // WAWebQueryMediaConnsJob.queryMediaConn
         // Constructs the w:m IQ "set" stanza with an empty media_conn child
-
         var mediaConnChild = new NodeBuilder()
                 .description("media_conn");
         return new NodeBuilder()
@@ -277,34 +276,28 @@ public final class MediaConnection {
     public static MediaConnection of(Node response) {
         // WAMediaConnParser.mediaConnParser
         // Unwraps the required media_conn child before reading its attributes
-
         var mediaConn = response.getRequiredChild("media_conn");
 
         // WAMediaConnParser.mediaConnParser
         // Reads the mandatory CDN authentication token string
-
         var auth = mediaConn.getRequiredAttributeAsString("auth");
 
         // WAMediaConnParser.mediaConnParser
         // Reads the raw routes TTL; WA Web stores it as a future unix time and
         // later subtracts unixTime() to recover the seconds-to-live value
-
         var ttl = mediaConn.getAttributeAsInt("ttl", 0);
 
         // WAMediaConnParser.mediaConnParser
         // Reads the raw auth token TTL; WA Web uses the same future-time trick
         // before subtracting unixTime() in queryMediaConn
-
         var authTtl = mediaConn.getAttributeAsInt("auth_ttl", 0);
 
         // WAMediaConnParser.mediaConnParser
         // Reads the maximum bucket count for deterministic download routing
-
         var maxBuckets = mediaConn.getAttributeAsInt("max_buckets", 0);
 
         // WAMediaConnParser.mediaConnParser
         // Reads the clamped max_manual_retry attribute falling back to 3
-
         var maxManualRetry = clampOptionalInt(
                 mediaConn.getAttributeAsInt("max_manual_retry", (Integer) null),
                 0, 4, 3
@@ -312,7 +305,6 @@ public final class MediaConnection {
 
         // WAMediaConnParser.mediaConnParser
         // Reads the clamped max_auto_download_retry attribute falling back to 3
-
         var maxAutoDownloadRetry = clampOptionalInt(
                 mediaConn.getAttributeAsInt("max_auto_download_retry", (Integer) null),
                 0, 4, 3
@@ -320,7 +312,6 @@ public final class MediaConnection {
 
         // WAMediaConnParser.mediaConnParser
         // Maps each host child node into a MediaHost record via parseHost
-
         var hosts = mediaConn.streamChildren("host")
                 .map(MediaConnection::parseHost)
                 .toList();
@@ -328,7 +319,6 @@ public final class MediaConnection {
         // WAWebQueryMediaConnsJob.queryMediaConn
         // Records the parse time so the expiry checks can compute the
         // absolute deadlines from the TTL seconds
-
         var timestamp = Instant.now().getEpochSecond();
 
         return new MediaConnection(auth, ttl, authTtl, maxBuckets, maxManualRetry, maxAutoDownloadRetry, timestamp, hosts);
@@ -357,12 +347,10 @@ public final class MediaConnection {
     private static MediaHost parseHost(Node hostNode) {
         // WAMediaConnParser.mediaConnParser
         // Reads the mandatory hostname attribute of this host entry
-
         var hostname = hostNode.getRequiredAttributeAsString("hostname");
 
         // WAMediaConnParser.mediaConnParser
         // Collects the optional IPv4 and IPv6 advertised by the server
-
         var ips = new ArrayList<String>();
         hostNode.getAttributeAsString("ip4").ifPresent(ips::add);
         hostNode.getAttributeAsString("ip6").ifPresent(ips::add);
@@ -370,14 +358,12 @@ public final class MediaConnection {
         // WAMediaConnParser.mediaConnParser
         // Parses the download and upload media-type whitelists advertised
         // by the host, defaulting to the full SERVER_MEDIA set when absent
-
         var downloadTypes = parseMediaTypes(hostNode, "download");
         var uploadTypes = parseMediaTypes(hostNode, "upload");
 
         // WAMediaConnParser.mediaConnParser
         // Parses the download_buckets list whose children are integer
         // bucket identifiers tagged as their numeric value
-
         var downloadBuckets = hostNode.getChild("download_buckets")
                 .map(bucketsNode -> bucketsNode.streamChildren()
                         .map(Node::description)
@@ -395,7 +381,6 @@ public final class MediaConnection {
         // WAMediaConnParser.mediaConnParser
         // Determines whether this host is a fallback-class host; primary is
         // the default when the type attribute is missing
-
         var isFallback = hostNode.getAttributeAsString("type")
                 .map("fallback"::equals)
                 .orElse(false);
@@ -412,7 +397,6 @@ public final class MediaConnection {
             // WAMediaConnParser.mediaConnParser
             // Extracts the optional nested fallback hostname and IPs for a
             // primary host so that selectHost can rotate to them on failure
-
             var fallbackHostname = hostNode.getAttributeAsString("fallback_hostname");
             var fallbackIps = new ArrayList<String>();
             hostNode.getAttributeAsString("fallback_ip4").ifPresent(fallbackIps::add);
@@ -460,7 +444,6 @@ public final class MediaConnection {
         // WAMediaConnParser.mediaConnParser
         // Iterates the tagged children of the download/upload sub-node and
         // converts their tags into MediaPath constants
-
         return hostNode.getChild(description)
                 .map(typesNode -> {
                     var result = new LinkedHashSet<MediaPath>();
@@ -472,7 +455,6 @@ public final class MediaConnection {
                     // Mirrors the compactMap(types, castToServerMediaType)
                     // filter which drops "kyc-id", "novi-image", "novi-video",
                     // "thumbnail-gif", and "xma-image" from host routing
-
                     result.remove(MediaPath.KYC_ID);
                     result.remove(MediaPath.NOVI_IMAGE);
                     result.remove(MediaPath.NOVI_VIDEO);
@@ -484,7 +466,6 @@ public final class MediaConnection {
                     // WAMediaConnParser.mediaConnParser
                     // Defaults to the full SERVER_MEDIA set, minus the
                     // non-routable types that compactMap would drop
-
                     var allTypes = new LinkedHashSet<>(MediaPath.known());
                     allTypes.remove(MediaPath.KYC_ID);
                     allTypes.remove(MediaPath.NOVI_IMAGE);
@@ -583,28 +564,24 @@ public final class MediaConnection {
     ) {
         // WAWebMmsClientSelectHost.default
         // Resolves the candidate hostnames from the primary and fallback hosts
-
         var selectedHostname = selectedHost != null ? selectedHost.hostname() : null;
         var fallbackHostname = fallbackHost != null ? fallbackHost.hostname() : null;
 
         // WAWebMmsClientSelectHost.default
         // If the previous attempt made progress on some host, keep using it
         // because the connection is clearly working
-
         if (lastFetchMadeProgress && lastHostUsed != null) {
             return lastHostUsed;
         }
 
         // WAWebMmsClientSelectHost.default
         // On the first two attempts (n <= 1), use the initial selected host
-
         if (attemptCount <= 1) {
             return selectedHostname;
         }
 
         // WAWebMmsClientSelectHost.default
         // On the last attempt, try the fallback-class host if one is available
-
         if (attemptCount == MAX_ATTEMPT_COUNT - 1 && fallbackHostname != null) {
             return fallbackHostname;
         }
@@ -612,7 +589,6 @@ public final class MediaConnection {
         // WAWebMmsClientSelectHost.default
         // If the previous attempt went to the selected host and that host
         // advertised a nested fallback hostname, rotate to the nested fallback
-
         if (lastHostUsed != null
                 && lastHostUsed.equals(selectedHostname)
                 && selectedHost != null
@@ -622,7 +598,6 @@ public final class MediaConnection {
 
         // WAWebMmsClientSelectHost.default
         // Otherwise prefer the fallback host, defaulting to the selected one
-
         return fallbackHostname != null ? fallbackHostname : selectedHostname;
     }
 
@@ -685,7 +660,6 @@ public final class MediaConnection {
                 // WAWebMmsClient.upload
                 // Delegates to routeSelection to pick the initial primary and
                 // fallback hosts for the upload media type
-
                 var hostList = hosts instanceof List<? extends MediaHost> list ? list : List.copyOf(hosts);
                 var route = MediaHost.routeSelection(
                         Operation.UPLOAD,
@@ -699,14 +673,12 @@ public final class MediaConnection {
                 // WAWebMmsClient.upload
                 // Initialises the retry-loop state: h (last host used) and
                 // _ (last fetch made progress) both start unset
-
                 String lastHostUsed = null;
                 var lastFetchMadeProgress = false;
                 for (var attemptCount = 0; attemptCount < MAX_ATTEMPT_COUNT; attemptCount++) {
                     // WAWebMmsClientSelectHost.default
                     // Chooses the hostname to contact for this attempt based on
                     // route selection and the outcome of the previous attempt
-
                     var hostname = selectHost(
                             route.selectedHost().orElse(null),
                             route.fallbackHost().orElse(null),
@@ -723,13 +695,11 @@ public final class MediaConnection {
                         // WAWebMmsClientMmsUpload.default
                         // Sends the HTTP POST with the encrypted payload and
                         // returns the validated JSON response
-
                         var uploadResult = tryUpload(client, hostname, path.get(), provider.mediaPath(), fileEncSha256, fileSha256, tempFile);
 
                         // WAWebMmsClientMmsUpload.default
                         // Pulls directPath, url, and handle out of the JSON
                         // response after the standard validator has approved it
-
                         var directPath = uploadResult.getString("direct_path");
                         var url = uploadResult.getString("url");
                         var handle = uploadResult.getString("handle");
@@ -737,7 +707,6 @@ public final class MediaConnection {
                         // WAWebMmsClient.upload
                         // Stores the upload outcome on the provider so the
                         // caller can build the message protobuf
-
                         provider.setMediaSha256(fileSha256);
                         provider.setMediaEncryptedSha256(fileEncSha256);
                         provider.setMediaKey(mediaKey);
@@ -749,7 +718,6 @@ public final class MediaConnection {
                             // WAWebSyncdMMSUpload.buildExternalBlobReference
                             // Carries the server-assigned handle on the
                             // external blob reference used for app-state sync
-
                             externalBlobReference.setHandle(handle);
                         }
 
@@ -758,7 +726,6 @@ public final class MediaConnection {
                         // WAWebMmsClientIsErrorRetryable.isErrorRetryable
                         // Stops retrying on non-retryable errors (413, 415,
                         // 507, and most 4xx); 401, 408, and 5xx are retryable
-
                         if (!isRetryable(uploadException)) {
                             throw uploadException;
                         }
@@ -766,7 +733,6 @@ public final class MediaConnection {
                         // WAWebMmsClient.upload
                         // Resets lastFetchMadeProgress so selectHost rotates
                         // to a different host on the next attempt
-
                         lastFetchMadeProgress = false;
                     }
                 }
@@ -776,7 +742,6 @@ public final class MediaConnection {
                 // Deletes the temp file used to buffer the encrypted payload
                 // before POSTing it; this is a Java resource adaptation with
                 // no direct WA Web counterpart
-
                 Files.deleteIfExists(tempFile);
             }
         } catch (WhatsAppMediaException.Upload uploadException) {
@@ -841,32 +806,27 @@ public final class MediaConnection {
             // WAWebMmsClientFormatHashUrl.default
             // Encodes the encrypted hash (or the plaintext hash when
             // unavailable) as URL-safe base64 preserving padding characters
-
             var token = Base64.getUrlEncoder()
                     .encodeToString(Objects.requireNonNullElse(fileEncSha256, fileSha256));
 
             // WAWebMmsClientFormatHashUrl.default
             // Builds the path portion "https://<host>/<path>/<hash-token>"
-
             var basePath = "https://" + hostname + "/" + path + "/" + token;
 
             // WAWebMmsClientFormatUploadUrl.default
             // Assembles the upload query parameters in the same order as
             // WA Web: auth, token, media_id, optional server_transcode
-
             var queryParams = new LinkedHashMap<String, String>();
             queryParams.put("auth", this.auth);
             queryParams.put("token", token);
 
             // WAWebWamMediaMetricUtils.generateMediaEventId
             // Random media_id used to correlate metrics across retries
-
             queryParams.put("media_id", String.valueOf(generateMediaId()));
 
             // WAWebMmsClientFormatUploadUrl.default
             // Requests server-side transcoding for newsletter video uploads
             // to match the ChannelVideoServerTranscodeGating behaviour
-
             if (mediaPath == MediaPath.NEWSLETTER_VIDEO) {
                 queryParams.put("server_transcode", "1");
             }
@@ -874,7 +834,6 @@ public final class MediaConnection {
             // WAWebMmsClientFormatHashUrl.default
             // Serializes the query parameters exactly as URLSearchParams does,
             // filtering out any null values before encoding
-
             var queryString = encodeQueryString(queryParams);
             var uri = URI.create(basePath + queryString);
             var requestBuilder = HttpRequest.newBuilder()
@@ -889,7 +848,6 @@ public final class MediaConnection {
             // WAWebMmsClientMmsUpload.default
             // Maps each non-OK HTTP status code to the matching
             // WAWebMmsClientErrors class from the upstream module
-
             if (response.statusCode() != 200) {
                 var statusCode = response.statusCode();
                 var message = switch (statusCode) {
@@ -905,7 +863,6 @@ public final class MediaConnection {
             // WAWebMmsClientMmsUpload.default
             // Parses the JSON body and runs the standard validator which
             // rejects responses missing direct_path or url
-
             var jsonObject = JSON.parseObject(response.body());
             var directPath = jsonObject != null ? jsonObject.getString("direct_path") : null;
             var url = jsonObject != null ? jsonObject.getString("url") : null;
@@ -923,7 +880,6 @@ public final class MediaConnection {
             // WA Web treats TypeError (network failure) as retryable; Cobalt
             // wraps any I/O failure in Upload without a status code so that
             // isRetryable can classify it as retryable via httpStatusCode().isEmpty()
-
             throw new WhatsAppMediaException.Upload("mmsUpload: network error", exception);
         }
     }
@@ -947,7 +903,6 @@ public final class MediaConnection {
         // WAWebWamMediaMetricUtils.generateMediaEventId
         // Generates 1 + floor(MAX_SAFE_INTEGER * random()) where
         // MAX_SAFE_INTEGER is 9007199254740991
-
         return 1 + (long) Math.floor(9007199254740991.0 * Math.random());
     }
 
@@ -971,7 +926,6 @@ public final class MediaConnection {
         // WAWebMmsClientFormatHashUrl.default
         // Iterates the parameter map mimicking URLSearchParams toString():
         // skips null values and percent-encodes each key and value
-
         var sb = new StringBuilder();
         for (var entry : params.entrySet()) {
             if (entry.getValue() == null) {
@@ -1013,7 +967,6 @@ public final class MediaConnection {
         // WAWebMmsClientIsErrorRetryable.isErrorRetryable
         // Missing HTTP status means network-level failure (fetch TypeError)
         // and is treated as retryable
-
         var optStatus = exception.httpStatusCode();
         if (optStatus.isEmpty()) {
             return true;
@@ -1023,7 +976,6 @@ public final class MediaConnection {
         // WAWebMmsClientIsErrorRetryable.isRetriableStatusCode
         // 408 is an explicit retryable case, 507 (throttle) is always fatal,
         // any other 5xx is retryable
-
         if (status == 408) {
             return true;
         }
@@ -1037,7 +989,6 @@ public final class MediaConnection {
         // WAWebMmsClientIsErrorRetryable.isErrorRetryable
         // 401 (MMSUnauthorizedError) is retryable so that selectHost can
         // rotate to a fresh host for re-auth
-
         return status == 401;
     }
 
@@ -1071,7 +1022,6 @@ public final class MediaConnection {
         // WAWebMmsClient.download
         // Attempts the cached static URL first so that previously-issued
         // CDN URLs are reused when still fresh
-
         var defaultUploadUrl = provider.mediaUrl();
         if (defaultUploadUrl.isPresent()) {
             try {
@@ -1080,7 +1030,6 @@ public final class MediaConnection {
                 // WAWebMmsClient.download
                 // Non-retryable static-URL failures propagate; retryable ones
                 // fall through to the host-based download path below
-
                 if (!isDownloadRetryable(downloadException)) {
                     throw downloadException;
                 }
@@ -1090,7 +1039,6 @@ public final class MediaConnection {
         // WAWebMmsClientMmsDownload.mms4Download
         // Resolves the directPath and encrypted hash used to construct the
         // CDN URL from the provider metadata
-
         var defaultDirectPath = provider.mediaDirectPath()
                 .orElse(null);
         var encFileHash = provider.mediaEncryptedSha256()
@@ -1101,7 +1049,6 @@ public final class MediaConnection {
         // WAWebMmsClientMmsDownload.mms4Download
         // Rejects the download when neither directPath nor encFilehash is
         // available, since there is no valid URL to construct
-
         if ((defaultDirectPath == null || defaultDirectPath.isEmpty())
                 && (encFileHash == null || encFileHash.isEmpty())) {
             throw new WhatsAppMediaException.Download(
@@ -1111,7 +1058,6 @@ public final class MediaConnection {
         // WAWebMmsClient.download
         // Delegates to routeSelection to find the primary and fallback
         // hosts that support downloading this media type
-
         var hostList = hosts instanceof List<? extends MediaHost> list ? list : List.copyOf(hosts);
         var route = MediaHost.routeSelection(
                 Operation.DOWNLOAD,
@@ -1126,7 +1072,6 @@ public final class MediaConnection {
         // Computes the download bucket that WA Web would attach to the
         // selected host via setSelectedBucket(p); fallback hosts never
         // carry a bucket so only the selected host's bucket is stored
-
         var selectedBucket = computeSelectedBucket(encFileHash);
         var selectedHostname = route.selectedHost()
                 .map(MediaHost::hostname)
@@ -1135,14 +1080,12 @@ public final class MediaConnection {
         // WAWebMmsClient.download
         // Initialises the retry loop state: b (last host used) and h
         // (last fetch made progress) both start unset
-
         String lastHostUsed = null;
         var lastFetchMadeProgress = false;
         for (var attemptCount = 0; attemptCount < MAX_ATTEMPT_COUNT; attemptCount++) {
             // WAWebMmsClientSelectHost.default
             // Picks the host to contact for this attempt based on the
             // route result and the outcome of the previous attempt
-
             var hostname = selectHost(
                     route.selectedHost().orElse(null),
                     route.fallbackHost().orElse(null),
@@ -1158,13 +1101,11 @@ public final class MediaConnection {
             // WAWebMmsClientSelectHost
             // Bucket is only attached when the chosen hostname matches the
             // original selected host; fallback hosts never carry a bucket
-
             var hostBucket = hostname.equals(selectedHostname) ? selectedBucket : null;
 
             // WAWebMmsClientFormatDownloadUrl.default
             // Builds the full download URL from the host, directPath or
             // encFilehash, media type, and bucket
-
             var downloadUrl = formatDownloadUrl(
                     hostname, defaultDirectPath, encFileHash, mediaType, hostBucket
             );
@@ -1172,13 +1113,11 @@ public final class MediaConnection {
             try {
                 // WAWebMmsClientMmsDownload.mms4Download
                 // Issues the GET request and returns the streaming response
-
                 return tryDownload(provider, downloadUrl);
             } catch (WhatsAppMediaException.Download downloadException) {
                 // WAWebMmsClientIsErrorRetryable.isErrorRetryable
                 // Same retry rules as upload: 401/408/5xx and network errors
                 // are retryable, 404/410/413/415/507 are fatal
-
                 if (!isDownloadRetryable(downloadException)) {
                     throw downloadException;
                 }
@@ -1186,7 +1125,6 @@ public final class MediaConnection {
                 // WAWebMmsClient.download
                 // Clears lastFetchMadeProgress so selectHost rotates to a
                 // different host on the next attempt
-
                 lastFetchMadeProgress = false;
             }
         }
@@ -1229,13 +1167,11 @@ public final class MediaConnection {
         // WAWebMmsClientFormatDownloadUrl.default
         // Projects the server media type id so it can be attached as the
         // mms-type query parameter
-
         var mediaTypeId = mediaType.id().orElse(null);
         if (directPath != null && !directPath.isEmpty()) {
             // WAWebMmsClientFormatDownloadUrl.default
             // Direct-path branch: query carries mode, mms-type, and the
             // __wa-mms marker (WAWebSharedConstants)
-
             var query = new LinkedHashMap<String, String>();
             query.put("mode", "auto");
             query.put("mms-type", mediaTypeId);
@@ -1245,7 +1181,6 @@ public final class MediaConnection {
 
         // WAWebMmsClientFormatDownloadUrl.default
         // Hash-URL fallback requires at least the encrypted file hash
-
         if (encFileHash == null || encFileHash.isEmpty()) {
             throw new WhatsAppMediaException.Download(
                     "No direct path or encFilehash available for download, abort");
@@ -1253,7 +1188,6 @@ public final class MediaConnection {
 
         // WAWebMmsClientFormatDownloadUrl.default
         // Hash-URL query: only mode and the __wa-mms marker are attached
-
         var query = new LinkedHashMap<String, String>();
         query.put("mode", "auto");
         query.put("__wa-mms", "");
@@ -1299,13 +1233,11 @@ public final class MediaConnection {
         // WAWebMmsClientFormatDownloadUrl.default
         // Parses the directPath as a URL relative to "https://<hostname>" so
         // that any embedded query string is preserved
-
         var baseUri = URI.create("https://" + hostname).resolve(directPath);
 
         // WAWebMmsClientFormatDownloadUrl.default
         // Rejects the URL if the resolved host does not match the expected
         // hostname, guarding against a malicious directPath redirect
-
         if (!baseUri.getHost().equals(hostname)) {
             throw new WhatsAppMediaException.Download("malicious directPath");
         }
@@ -1314,7 +1246,6 @@ public final class MediaConnection {
         // WA Web uses URLSearchParams to parse the existing query; Cobalt
         // splits the raw query manually because java.net.URI does not
         // expose URLSearchParams semantics
-
         var params = new LinkedHashMap<String, String>();
         var existingQuery = baseUri.getRawQuery();
         if (existingQuery != null && !existingQuery.isEmpty()) {
@@ -1331,21 +1262,18 @@ public final class MediaConnection {
         // WAWebMmsClientFormatDownloadUrl.default
         // Attaches the URL-safe base64 encrypted hash as the "hash" query
         // parameter when present
-
         if (encFileHash != null && !encFileHash.isEmpty()) {
             params.put("hash", urlSafeBase64(encFileHash));
         }
 
         // WAWebMmsClientFormatDownloadUrl.default
         // Attaches the download bucket as the "_nc_cat" query parameter
-
         if (downloadBucket != null) {
             params.put("_nc_cat", downloadBucket.toString());
         }
 
         // WAWebMmsClientFormatDownloadUrl.default
         // Copies the caller-supplied extra query parameters, skipping nulls
-
         for (var entry : query.entrySet()) {
             if (entry.getValue() != null) {
                 params.put(entry.getKey(), entry.getValue());
@@ -1354,7 +1282,6 @@ public final class MediaConnection {
 
         // WAWebMmsClientFormatDownloadUrl.default
         // Reassembles the URL as scheme + host + path + encoded query
-
         return "https://" + baseUri.getHost() + baseUri.getRawPath()
                 + encodeQueryString(params);
     }
@@ -1388,7 +1315,6 @@ public final class MediaConnection {
         // WAWebMmsClientFormatHashUrl.default
         // Resolves the path segment for the media type; WA Web uses
         // nullthrows(u[mediaType]) here
-
         var pathSegment = mediaType.path()
                 .orElseThrow(() -> new WhatsAppMediaException.Download(
                         "No hash URL path for media type: " + mediaType));
@@ -1396,13 +1322,11 @@ public final class MediaConnection {
         // WAWebMmsClientFormatHashUrl.default
         // Builds "https://<host>/<path>/<urlSafeBase64(hash)>" as the base
         // URL without the query component
-
         var basePath = "https://" + hostname + "/" + pathSegment + "/" + urlSafeBase64(encFileHash);
 
         // WAWebMmsClientFormatHashUrl.default
         // Strips null values before appending the query string, matching
         // URLSearchParams behaviour
-
         var filteredQuery = new LinkedHashMap<String, String>();
         for (var entry : query.entrySet()) {
             if (entry.getValue() != null) {
@@ -1430,7 +1354,6 @@ public final class MediaConnection {
     private static String urlSafeBase64(String base64) {
         // WABase64UrlSafe.urlSafeBase64
         // Replaces the non-URL-safe characters while keeping = padding
-
         return base64.replace('/', '_').replace('+', '-');
     }
 
@@ -1457,7 +1380,6 @@ public final class MediaConnection {
         // WAWebMediaHostsRouteSelection.routeSelection
         // When there is no encFilehash the bucket is 0 unconditionally,
         // matching "n == null ? p = 0" in the WA Web source
-
         if (encFileHash == null) {
             return 0;
         }
@@ -1466,7 +1388,6 @@ public final class MediaConnection {
         // The bucketed branch (m && i != null) requires the vcache
         // aggregation AB prop which Cobalt does not currently honour, so
         // the method returns null to signal "no bucket"
-
         return null;
     }
 
@@ -1506,7 +1427,6 @@ public final class MediaConnection {
             // WAWebMmsClientMmsDownload.validateMmsResponse
             // Maps non-200 responses to the appropriate Download exception
             // subtype before propagating to the retry loop
-
             if (response.statusCode() != 200) {
                 client.close();
                 validateMmsResponse(response.statusCode(), downloadUrl);
@@ -1515,7 +1435,6 @@ public final class MediaConnection {
             // WAWebMmsClientMmsDownload.mms4Download
             // Content-Length must be present so the download stream knows
             // how many ciphertext bytes to consume before the HMAC trailer
-
             var payloadLength = response.headers()
                     .firstValueAsLong("Content-Length")
                     .orElseThrow(() -> {
@@ -1525,7 +1444,6 @@ public final class MediaConnection {
 
             // WAWebMmsClientMmsDownload.mms4Download
             // Wraps the response body in a decrypting, verifying stream
-
             var rawInputStream = response.body();
             return new MediaDownloadInputStream(client, rawInputStream, payloadLength, provider);
         } catch (WhatsAppMediaException.Download downloadException) {
@@ -1535,7 +1453,6 @@ public final class MediaConnection {
             // WA Web maps fetch TypeError to HttpNetworkError; Cobalt wraps
             // I/O and interruption errors in Download without a status code
             // so that isDownloadRetryable can classify them as retryable
-
             client.close();
             throw new WhatsAppMediaException.Download("mmsDownload: network error", exception);
         }
@@ -1577,7 +1494,6 @@ public final class MediaConnection {
     private static void validateMmsResponse(int statusCode, String url) throws WhatsAppMediaException.Download {
         // WAWebMmsClientMmsDownload.validateMmsResponse
         // 401 maps to MMSUnauthorizedError in the upstream error taxonomy
-
         if (statusCode == 401) {
             throw new WhatsAppMediaException.Download(WhatsAppMediaException.HTTP_UNAUTHORIZED,
                     "mmsDownload: unauthorized");
@@ -1588,7 +1504,6 @@ public final class MediaConnection {
             // Reads the "oe" query parameter which encodes the URL signature
             // expiry as a hexadecimal unix timestamp; if the URL is expired
             // the error is reclassified as MediaNotFoundError
-
             try {
                 var uri = URI.create(url);
                 var query = uri.getRawQuery();
@@ -1601,7 +1516,6 @@ public final class MediaConnection {
 
                             // WAWebMmsClientMmsDownload.validateMmsResponse
                             // Expired signature becomes MediaNotFoundError
-
                             if (Instant.now().getEpochSecond() >= expirationEpoch) {
                                 throw new WhatsAppMediaException.Download(WhatsAppMediaException.HTTP_NOT_FOUND,
                                         "mmsDownload: media not found (URL expired)");
@@ -1617,19 +1531,16 @@ public final class MediaConnection {
                 // On malformed URL or non-hex oe values WA Web returns null
                 // from parseCdnUrlParams; Cobalt falls through to
                 // MMSForbiddenError
-
             }
 
             // WAWebMmsClientMmsDownload.validateMmsResponse
             // Default 403 classification is MMSForbiddenError
-
             throw new WhatsAppMediaException.Download(WhatsAppMediaException.HTTP_FORBIDDEN,
                     "mmsDownload: forbidden");
         }
 
         // WAWebMmsClientMmsDownload.validateMmsResponse
         // 404 and 410 both map to MediaNotFoundError
-
         if (statusCode == 404 || statusCode == 410) {
             throw new WhatsAppMediaException.Download(WhatsAppMediaException.HTTP_NOT_FOUND,
                     "mmsDownload: media not found");
@@ -1637,7 +1548,6 @@ public final class MediaConnection {
 
         // WAWebMmsClientMmsDownload.validateMmsResponse
         // 507 maps to MMSThrottleError which is explicitly non-retryable
-
         if (statusCode == 507) {
             throw new WhatsAppMediaException.Download(WhatsAppMediaException.HTTP_THROTTLE,
                     "mmsDownload: throttled");
@@ -1646,7 +1556,6 @@ public final class MediaConnection {
         // WAWebMmsClientMmsDownload.validateMmsResponse
         // Anything else becomes a generic HttpStatusCodeError carrying the
         // original status code
-
         throw new WhatsAppMediaException.Download(statusCode,
                 "mmsDownload: HTTP " + statusCode);
     }
@@ -1676,7 +1585,6 @@ public final class MediaConnection {
     private static boolean isDownloadRetryable(WhatsAppMediaException.Download exception) {
         // WAWebMmsClientIsErrorRetryable.isErrorRetryable
         // Network-level failures have no status code and are retryable
-
         var optStatus = exception.httpStatusCode();
         if (optStatus.isEmpty()) {
             return true;
@@ -1685,7 +1593,6 @@ public final class MediaConnection {
 
         // WAWebMmsClientIsErrorRetryable.isRetriableStatusCode
         // 408 retryable, 507 fatal, other 5xx retryable
-
         if (status == 408) {
             return true;
         }
@@ -1698,7 +1605,6 @@ public final class MediaConnection {
 
         // WAWebMmsClientIsErrorRetryable.isErrorRetryable
         // 401 (MMSUnauthorizedError) is always retryable
-
         return status == 401;
     }
 
@@ -1731,7 +1637,6 @@ public final class MediaConnection {
         // WAWebMmsClientMmsDownload.mmsCheckExistence
         // Delegates to the shared HEAD helper; success is signalled by the
         // absence of a thrown exception
-
         sendHeadRequest(hostname, mediaType, directPath, encFileHash, "mmsCheckExistence");
     }
 
@@ -1764,13 +1669,11 @@ public final class MediaConnection {
         // WAWebMmsClientMmsDownload.mmsGetEncryptedMediaSize
         // Shares the HEAD helper with mmsCheckExistence and parses the
         // Content-Length header from the response
-
         var response = sendHeadRequest(hostname, mediaType, directPath, encFileHash, "mmsGetEncryptedMediaSize");
 
         // WAWebMmsClientMmsDownload.mmsGetEncryptedMediaSize
         // Missing Content-Length maps to UnableToGetContentLengthError in
         // WA Web's WAWebMiscErrors
-
         var contentLength = response.headers()
                 .firstValueAsLong("Content-Length")
                 .orElse(-1L);
@@ -1814,7 +1717,6 @@ public final class MediaConnection {
         // WAWebMmsClientMmsDownload.mmsCheckExistence
         // Builds the download URL with mode "auto" so the CDN returns the
         // HEAD metadata for the target media
-
         var url = formatDownloadUrl(hostname, directPath, encFileHash, mediaType, null);
 
         try (var client = HttpClient.newBuilder()
@@ -1829,7 +1731,6 @@ public final class MediaConnection {
             // WAWebMmsClientMmsDownload.mmsCheckExistence
             // Non-200 responses flow through the standard Download error
             // mapping before returning
-
             if (response.statusCode() != 200) {
                 validateMmsResponse(response.statusCode(), url);
             }
@@ -1842,7 +1743,6 @@ public final class MediaConnection {
             // WA Web propagates fetch errors as HttpNetworkError; Cobalt
             // wraps I/O and interruption errors in Download with the caller
             // name prefix for easier diagnosis
-
             throw new WhatsAppMediaException.Download(functionName + ": network error", exception);
         }
     }
@@ -1991,7 +1891,6 @@ public final class MediaConnection {
     public boolean isExpired() {
         // WAWebMediaHosts.mediaHosts
         // Mirrors _isExpiredOrMissing: now >= queryStartTime + authTTL
-
         return Instant.now().getEpochSecond() >= timestamp + authTtl;
     }
 
@@ -2015,13 +1914,11 @@ public final class MediaConnection {
         // WAWebMediaHosts.mediaHosts
         // Captures the current time once for both branches of the refresh
         // check to avoid observing the clock twice
-
         var now = Instant.now().getEpochSecond();
 
         // WAWebMediaHosts.mediaHosts
         // Refresh when the routes TTL has elapsed
         // (now >= hostsRefreshTime)
-
         if (now >= timestamp + ttl) {
             return true;
         }
@@ -2029,7 +1926,6 @@ public final class MediaConnection {
         // WAWebMediaHosts.mediaHosts
         // Refresh when 80% of the auth TTL has elapsed, defined as
         // floor(authTtl * 0.8) seconds after the query start time
-
         var authRefreshThreshold = (long) Math.floor(authTtl * 0.8);
         return now >= timestamp + authRefreshThreshold;
     }

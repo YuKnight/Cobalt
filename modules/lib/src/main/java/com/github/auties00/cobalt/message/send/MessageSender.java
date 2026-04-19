@@ -39,6 +39,14 @@ import com.github.auties00.cobalt.model.message.text.ReactionMessage;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.wam.event.E2eMessageSendEventBuilder;
+import com.github.auties00.cobalt.wam.type.AddressingMode;
+import com.github.auties00.cobalt.wam.type.AgentEngagementEnumType;
+import com.github.auties00.cobalt.wam.type.E2eCiphertextType;
+import com.github.auties00.cobalt.wam.type.E2eDestination;
+import com.github.auties00.cobalt.wam.type.EditType;
+import com.github.auties00.cobalt.wam.type.EncryptionTypeCode;
+import com.github.auties00.cobalt.wam.type.MediaType;
 
 import java.io.IOException;
 import java.util.*;
@@ -229,10 +237,17 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
                 } else {
                     devicePlaintext = MessageContainerSpec.encode(recipientContainer);
                 }
-                results.add(encryption.encryptForDevice(device, devicePlaintext));
+                var payload = encryption.encryptForDevice(device, devicePlaintext);
+                results.add(payload);
+                // WAWebEncryptMsgProtobuf -> WAWebPostE2eMessageSendMetric.postSuccessDirectE2eMessageSendMetric:
+                // emit E2eMessageSend (id 476) with the resolved ciphertext type on success.
+                emitE2eMessageSendEvent(device, container, true, payload.type(), 0);
             } catch (Exception e) {
                 LOGGER.log(System.Logger.Level.WARNING,
                         "Encryption fail for {0}: {1}", device, e.getMessage());
+                // WAWebEncryptMsgProtobuf -> WAWebPostE2eMessageSendMetric.postFailureDirectE2eMessageSendMetric:
+                // emit E2eMessageSend (id 476) with e2eSuccessful=false and weight=1 on failure.
+                emitE2eMessageSendEvent(device, container, false, null, 0);
             }
         }
 
@@ -492,5 +507,246 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
         return keep.key().isPresent()
                 && keep.key().get().fromMe()
                 && keep.keepType().orElse(null) == ChatKeepType.UNDO_KEEP_FOR_ALL;
+    }
+
+    /**
+     * Emits the {@code E2eMessageSendEvent} (id 476) for a direct (per-device)
+     * Signal encryption attempt.
+     *
+     * <p>Mirrors {@code WAWebPostE2eMessageSendMetric.postSuccessDirectE2eMessageSendMetric}
+     * and {@code postFailureDirectE2eMessageSendMetric}: both helpers build the
+     * same event shell keyed by the recipient device JID and message, then flip
+     * {@code e2eSuccessful} (and set {@code weight=1} on failure) before committing.
+     * Cobalt collapses the two code paths into a single helper invoked from the
+     * per-device encryption loop in {@link #encryptForDevices}.
+     *
+     * @param device     the recipient device JID
+     * @param container  the message container being encrypted, or {@code null}
+     *                   when the encryption carries no user-visible payload
+     *                   (for example sender-key distribution messages)
+     * @param success    {@code true} for a successful encryption,
+     *                   {@code false} for a failure
+     * @param ciphertextType the resolved Signal ciphertext type on success, or
+     *                   {@code null} on failure (matches WA Web leaving
+     *                   {@code e2eCiphertextType} unset when the type is unknown)
+     * @param retryCount the retry count passed through from the sender job;
+     *                   {@code 0} for a fresh send
+     *
+     * @implNote WAWebPostE2eMessageSendMetric: populates
+     * {@code e2eCiphertextVersion = CIPHERTEXT_VERSION}, {@code isLid = to.isLid()},
+     * {@code retryCount}, {@code editType} defaulting to {@code NOT_EDITED},
+     * {@code botType}, {@code e2eDestination}, {@code e2eReceiverDeviceType},
+     * {@code encryptionType = COEX} when the device is hosted,
+     * {@code e2eCiphertextType}, {@code messageMediaType}, and
+     * {@code agentEngagementType} when the device is a bot. Cobalt omits the
+     * optional fields that depend on WA-Web-only context (device record lookup
+     * for {@code e2eReceiverDeviceType}, bot-specific context for
+     * {@code botType}/{@code agentEngagementType}) and populates only the
+     * fields that are resolvable from the information available at the Cobalt
+     * encryption call site.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebPostE2eMessageSendMetric",
+            exports = {"postSuccessDirectE2eMessageSendMetric", "postFailureDirectE2eMessageSendMetric"},
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    void emitE2eMessageSendEvent(Jid device, MessageContainer container, boolean success,
+                                 com.github.auties00.cobalt.message.MessageEncryptionType ciphertextType,
+                                 int retryCount) {
+        var builder = new E2eMessageSendEventBuilder()
+                // WAWebPostE2eMessageSendMetric: e2eCiphertextVersion = CIPHERTEXT_VERSION
+                .e2eCiphertextVersion(com.github.auties00.cobalt.message.send.crypto.MessageEncryption.CIPHERTEXT_VERSION)
+                // WAWebPostE2eMessageSendMetric: isLid = to.isLid()
+                .isLid(device.hasLidServer())
+                // WAWebPostE2eMessageSendMetric: retryCount = n
+                .retryCount(retryCount)
+                // WAWebPostE2eMessageSendMetric: editType defaults to NOT_EDITED when undefined
+                .editType(EditType.NOT_EDITED)
+                // WAWebPostE2eMessageSendMetric: e2eDestination via getMetricE2eDestination;
+                // per-device direct encryption always targets an INDIVIDUAL recipient
+                .e2eDestination(E2eDestination.INDIVIDUAL)
+                // WAWebPostE2eMessageSendMetric: flipped to !success on failure, weight=1
+                .e2eSuccessful(success);
+        // WAWebPostE2eMessageSendMetric: t.isHosted() && (s.encryptionType = COEX)
+        if (device.hasServer(com.github.auties00.cobalt.model.jid.JidServer.hosted())) {
+            builder.encryptionType(EncryptionTypeCode.COEX);
+        }
+        // WAWebPostE2eMessageSendMetric: r != null && (s.e2eCiphertextType = getMetricE2eCiphertextType(r))
+        if (ciphertextType != null) {
+            builder.e2eCiphertextType(mapCiphertextType(ciphertextType));
+        }
+        // WAWebPostE2eMessageSendMetric: a && (s.messageMediaType = getWamMediaType(a), ...)
+        if (container != null) {
+            var mediaType = mapMediaType(container);
+            if (mediaType != null) {
+                builder.messageMediaType(mediaType);
+            }
+            // WAWebPostE2eMessageSendMetric: t.isBot() → DIRECT_CHAT or INVOKED based on
+            // a.id.remote.isBot(). Cobalt cannot resolve the remote key from a bare
+            // container at this call site, so the INVOKED vs DIRECT_CHAT distinction
+            // falls back to INVOKED when the recipient is a bot device.
+            if (device.isBot()) {
+                builder.agentEngagementType(AgentEngagementEnumType.INVOKED);
+            }
+        }
+        client.wamService().commit(builder.build());
+    }
+
+    /**
+     * Emits the {@code E2eMessageSendEvent} (id 476) for a sender-key (SKMSG)
+     * group or status encryption attempt.
+     *
+     * <p>Mirrors {@code WAWebEncryptMsgProtobuf.encryptMsgSenderKey}: the event
+     * is constructed with {@code e2eSuccessful=true} before the call, flipped
+     * to {@code false} (with {@code weight=1}) on exception, and committed in
+     * the {@code finally} block. Cobalt collapses the success and failure
+     * paths into a single helper invoked after the SKMSG encryption completes.
+     *
+     * @param groupOrStatusJid  the SKMSG target JID (group or status broadcast)
+     * @param container         the message container being encrypted
+     * @param destination       the semantic destination
+     *                          ({@link E2eDestination#GROUP} for groups,
+     *                          {@link E2eDestination#STATUS} for status)
+     * @param isLidAddressingMode whether the SKMSG fanout uses LID addressing
+     * @param success           {@code true} for a successful encryption,
+     *                          {@code false} for a failure
+     *
+     * @implNote WAWebEncryptMsgProtobuf.encryptMsgSenderKey: populates
+     * {@code e2eSuccessful=true}, {@code e2eCiphertextType = SENDER_KEY_MESSAGE},
+     * {@code e2eCiphertextVersion = CIPHERTEXT_VERSION},
+     * {@code e2eDestination = GROUP}, {@code messageMediaType} from the message,
+     * {@code retryCount=0}, {@code isLid} from {@code i.isLid || message.author?.isLid()},
+     * {@code typeOfGroup} from {@code i.wamTypeOfGroup}, {@code editType}
+     * from {@code getWamEditType(e)}, {@code localAddressingMode} from
+     * {@code getAddressingModeMetricsFromGroupMetadata(i)}. On failure
+     * flips {@code e2eSuccessful=false} and sets {@code weight=1}.
+     * Cobalt keeps only the fields that can be resolved from the send-path
+     * state; {@code typeOfGroup} requires group metadata that is not passed
+     * into this helper and is omitted.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebEncryptMsgProtobuf", exports = "encryptMsgSenderKey",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    void emitE2eMessageSendSenderKeyEvent(Jid groupOrStatusJid, MessageContainer container,
+                                          E2eDestination destination, boolean isLidAddressingMode,
+                                          boolean success) {
+        var builder = new E2eMessageSendEventBuilder()
+                .e2eSuccessful(success)
+                // WAWebEncryptMsgProtobuf.encryptMsgSenderKey: e2eCiphertextType = SENDER_KEY_MESSAGE
+                .e2eCiphertextType(E2eCiphertextType.SENDER_KEY_MESSAGE)
+                // WAWebEncryptMsgProtobuf.encryptMsgSenderKey: e2eCiphertextVersion = CIPHERTEXT_VERSION
+                .e2eCiphertextVersion(com.github.auties00.cobalt.message.send.crypto.MessageEncryption.CIPHERTEXT_VERSION)
+                // WAWebEncryptMsgProtobuf.encryptMsgSenderKey: e2eDestination hard-coded to GROUP,
+                // but the status fanout reuses the same encryption helper and maps to STATUS in Cobalt
+                .e2eDestination(destination)
+                // WAWebEncryptMsgProtobuf.encryptMsgSenderKey: retryCount=0 hard-coded
+                .retryCount(0)
+                // WAWebEncryptMsgProtobuf.encryptMsgSenderKey: isLid = !!i.isLid || message.author?.isLid()
+                .isLid(isLidAddressingMode)
+                // WAWebEncryptMsgProtobuf.encryptMsgSenderKey: editType = getWamEditType(message)
+                .editType(mapEditType(container))
+                // WAWebEncryptMsgProtobuf.encryptMsgSenderKey: localAddressingMode from group metadata
+                .localAddressingMode(isLidAddressingMode ? AddressingMode.LID : AddressingMode.PN);
+        if (container != null) {
+            var mediaType = mapMediaType(container);
+            if (mediaType != null) {
+                builder.messageMediaType(mediaType);
+            }
+        }
+        client.wamService().commit(builder.build());
+    }
+
+    /**
+     * Maps a {@link com.github.auties00.cobalt.message.MessageEncryptionType}
+     * to the corresponding WAM {@link E2eCiphertextType}.
+     *
+     * @param type the Signal ciphertext type
+     * @return the matching WAM enum constant
+     *
+     * @implNote WAWebBackendJobsCommon.getMetricE2eCiphertextType:
+     * maps {@code Skmsg→SENDER_KEY_MESSAGE}, {@code Pkmsg→PREKEY_MESSAGE},
+     * {@code Msg→MESSAGE}, {@code Msmsg→MESSAGE_SECRET_MESSAGE}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebBackendJobsCommon", exports = "getMetricE2eCiphertextType",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    private static E2eCiphertextType mapCiphertextType(com.github.auties00.cobalt.message.MessageEncryptionType type) {
+        return switch (type) {
+            case MSG -> E2eCiphertextType.MESSAGE;
+            case PKMSG -> E2eCiphertextType.PREKEY_MESSAGE;
+            case SKMSG -> E2eCiphertextType.SENDER_KEY_MESSAGE;
+            case MSMSG -> E2eCiphertextType.MESSAGE_SECRET_MESSAGE;
+        };
+    }
+
+    /**
+     * Maps the content of a {@link MessageContainer} to the corresponding WAM
+     * {@link MediaType} classification used by
+     * {@code WAWebPostE2eMessageSendMetric}.
+     *
+     * @param container the outbound message container
+     * @return the matching WAM media type, or {@code null} for messages that
+     *         do not carry a classifiable media payload
+     *
+     * @implNote WAWebWamMsgUtils.getWamMediaType / WAWebBackendJobsCommon.getMetricMediaType:
+     * walk the protobuf wrappers (deviceSent, ephemeral, viewOnce, etc.), then
+     * map each leaf message type to the matching MEDIA_TYPE constant. Cobalt
+     * pattern-matches on the sealed message types that already flow through
+     * {@link #resolveMediaType}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebWamMsgUtils", exports = "getWamMediaType",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private static MediaType mapMediaType(MessageContainer container) {
+        var message = container.content();
+        return switch (message) {
+            case ImageMessage _ -> MediaType.PHOTO;
+            case VideoMessage v -> v.gifPlayback() ? MediaType.GIF : MediaType.VIDEO;
+            case AudioMessage a -> a.ptt() ? MediaType.PTT : MediaType.AUDIO;
+            case DocumentMessage _ -> MediaType.DOCUMENT;
+            case StickerMessage _ -> MediaType.STICKER;
+            case LocationMessage l -> l.isLive() ? MediaType.LIVE_LOCATION : MediaType.LOCATION;
+            case LiveLocationMessage _ -> MediaType.LIVE_LOCATION;
+            case ContactMessage _ -> MediaType.CONTACT;
+            case ContactsArrayMessage _ -> MediaType.CONTACT_ARRAY;
+            case GroupInviteMessage _ -> MediaType.URL;
+            case ExtendedTextMessage t when t.matchedText().isPresent() -> MediaType.URL;
+            case ExtendedTextMessage _ -> MediaType.TEXT;
+            case ReactionMessage _ -> MediaType.REACTION;
+            case EncReactionMessage _ -> MediaType.REACTION;
+            case PollCreationMessage _ -> MediaType.POLL_CREATE;
+            case PollUpdateMessage _ -> MediaType.POLL_VOTE;
+            case PollResultSnapshotMessage _ -> MediaType.POLL_RESULT_SNAPSHOT;
+            case EventMessage _ -> MediaType.EVENT_CREATE;
+            case EncEventResponseMessage _ -> MediaType.EVENT_RESPOND;
+            case KeepInChatMessage _ -> MediaType.KEEP;
+            default -> null;
+        };
+    }
+
+    /**
+     * Maps the content of a {@link MessageContainer} to the corresponding WAM
+     * {@link EditType} classification.
+     *
+     * @param container the outbound message container
+     * @return the matching WAM edit type ({@link EditType#NOT_EDITED} when the
+     *         message is not an edit or revoke)
+     *
+     * @implNote WAWebMsgGetters.getWamEditType / WAWebBackendJobsCommon.getMetricEditTypeFromMsg:
+     * return {@code SENDER_REVOKE} or {@code ADMIN_REVOKE} for revoke messages,
+     * {@code EDITED} for message-edit messages, otherwise {@code NOT_EDITED}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebBackendJobsCommon", exports = "getMetricEditTypeFromMsg",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    private static EditType mapEditType(MessageContainer container) {
+        if (container == null) {
+            return EditType.NOT_EDITED;
+        }
+        var message = container.content();
+        if (message instanceof ProtocolMessage p) {
+            var type = p.type().orElse(null);
+            if (type == ProtocolMessage.Type.REVOKE) {
+                return EditType.SENDER_REVOKE;
+            }
+            if (type == ProtocolMessage.Type.MESSAGE_EDIT) {
+                return EditType.EDITED;
+            }
+        }
+        return EditType.NOT_EDITED;
     }
 }

@@ -154,7 +154,6 @@ public abstract sealed class MediaUploadInputStream extends MediaInputStream {
         // WAWebCryptoEncryptMedia.default
         // Selects the encrypted or plaintext variant based on whether the
         // media type carries an HKDF info string
-
         var keyName = provider.mediaPath()
                 .keyName();
         if (keyName.isPresent()) {
@@ -365,13 +364,11 @@ public abstract sealed class MediaUploadInputStream extends MediaInputStream {
             // WAWebCryptoEncryptMedia.default
             // Generates the random 32-byte media key that seeds the HKDF
             // derivation for the IV, cipher key, and HMAC key
-
             this.mediaKey = DataUtils.randomByteArray(32);
 
             // WAMediaCrypto.computeMediaKeys
             // Expands the media key into 112 bytes and slices the IV
             // (0..16), cipher key (16..48), and HMAC key (48..80)
-
             var expanded = deriveMediaKeyData(mediaKey, keyName);
             var iv = new IvParameterSpec(expanded, 0, IV_LENGTH);
             var cipherKey = new SecretKeySpec(expanded, IV_LENGTH, KEY_LENGTH, "AES");
@@ -380,14 +377,12 @@ public abstract sealed class MediaUploadInputStream extends MediaInputStream {
             // WAMediaCrypto.encryptAndHmac
             // Initialises the AES-CBC cipher in encrypt mode and the
             // HMAC-SHA256 instance used to authenticate the output
-
             this.cipher = newCipher(Cipher.ENCRYPT_MODE, cipherKey, iv);
             this.ciphertextMac = newMac(macKey);
 
             // WAMediaCrypto.encryptAndHmac
             // Feeds the IV bytes into the HMAC so that the authentication
             // tag is computed over iv + ciphertext
-
             ciphertextMac.update(expanded, 0, IV_LENGTH);
 
             this.plaintextBuffer = new byte[BUFFER_LENGTH];
@@ -395,7 +390,6 @@ public abstract sealed class MediaUploadInputStream extends MediaInputStream {
             // ADAPTED: WAMediaCrypto.CBC_BLOCK_SIZE
             // Reserves one extra AES block so doFinal's padded output
             // fits in the ciphertext buffer without reallocation
-
             this.ciphertextBuffer = new byte[BUFFER_LENGTH + cipher.getBlockSize()];
             this.outputBuffer = new byte[BUFFER_LENGTH];
             this.plaintextLength = 0;
@@ -487,7 +481,6 @@ public abstract sealed class MediaUploadInputStream extends MediaInputStream {
                         // WAMediaCrypto.encryptAndHmac
                         // Finalises the cipher (s.finalize) and consumes the
                         // last padded block through the normal chunk path
-
                         var finalCiphertextLen = cipher.doFinal(ciphertextBuffer, 0);
                         processChunk(finalCiphertextLen);
 
@@ -495,14 +488,12 @@ public abstract sealed class MediaUploadInputStream extends MediaInputStream {
                         // Computes the full 32-byte HMAC (sign(f, _)) and
                         // extends the encFilehash digest over the 10 bytes
                         // that will be written to the wire
-
                         var mac = ciphertextMac.doFinal();
                         ciphertextDigest.update(mac, 0, MAC_LENGTH);
 
                         // WAMediaCrypto.encryptAndHmac
                         // Appends the 10-byte truncated HMAC to the output
                         // (l.writeByteArray(new Uint8Array(g, 0, v)))
-
                         var macSpace = outputBuffer.length - outputLimit;
                         var macToCopy = Math.min(MAC_LENGTH, macSpace);
                         System.arraycopy(mac, 0, outputBuffer, outputLimit, macToCopy);
@@ -511,7 +502,6 @@ public abstract sealed class MediaUploadInputStream extends MediaInputStream {
                         // WAWebCryptoEncryptMedia.default
                         // Captures the final plaintext and encrypted hashes
                         // so the accessor methods can return them
-
                         plaintextHash = plaintextDigest.digest();
                         ciphertextHash = ciphertextDigest.digest();
 
@@ -522,14 +512,12 @@ public abstract sealed class MediaUploadInputStream extends MediaInputStream {
                     // WAWebCryptoEncryptMedia.default
                     // Extends the plaintext digest and the byte counter
                     // with the newly read chunk
-
                     plaintextDigest.update(plaintextBuffer, 0, plaintextRead);
                     plaintextLength += plaintextRead;
 
                     // WAMediaCrypto.encryptAndHmac
                     // Encrypts the chunk via cipher.update (s.append) and
                     // routes the output through processChunk
-
                     var ciphertextLen = cipher.update(plaintextBuffer, 0, plaintextRead, ciphertextBuffer, 0);
                     processChunk(ciphertextLen);
                 }
@@ -559,13 +547,11 @@ public abstract sealed class MediaUploadInputStream extends MediaInputStream {
             // WAMediaCrypto.encryptAndHmac
             // Extends SHA-256(ciphertext) and HMAC(iv + ciphertext) with
             // the newly produced ciphertext bytes
-
             ciphertextDigest.update(ciphertextBuffer, 0, length);
             ciphertextMac.update(ciphertextBuffer, 0, length);
 
             // WAMediaCrypto.encryptAndHmac
             // Copies the ciphertext into the caller-facing output buffer
-
             var toCopy = Math.min(length, outputBuffer.length);
             System.arraycopy(ciphertextBuffer, 0, outputBuffer, 0, toCopy);
             outputLimit = toCopy;

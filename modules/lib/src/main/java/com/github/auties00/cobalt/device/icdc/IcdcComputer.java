@@ -117,7 +117,6 @@ public final class IcdcComputer {
     public Optional<IcdcResult> compute(Jid userJid) {
         // WAWebIdentityIcdcApi.getICDCMeta
         // Looks up the cached device list for the user and delegates to the record-level computation
-
         return store.findDeviceList(userJid.toUserJid())
                 .filter(deviceList -> !deviceList.deleted())
                 .map(deviceList -> computeFromDeviceList(userJid, deviceList));

@@ -68,4 +68,7 @@ public interface ChannelOpenEvent extends WamEventSpec {
 
     @WamProperty(index = 17, type = WamType.INTEGER)
     OptionalInt updatesTabSessionId();
+
+    @WamProperty(index = 21, type = WamType.INTEGER)
+    OptionalInt traceIdInt();
 }

@@ -38,6 +38,10 @@ import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.sync.WebAppStateService;
+import com.github.auties00.cobalt.wam.event.CoexPrivacySysMsgEventBuilder;
+import com.github.auties00.cobalt.wam.event.ContactSyncEventEventBuilder;
+import com.github.auties00.cobalt.wam.type.CoexSysMsgStateTransitionAttempt;
 import com.github.auties00.libsignal.SignalSessionCipher;
 import com.github.auties00.libsignal.key.SignalIdentityPublicKey;
 
@@ -145,6 +149,16 @@ public final class DeviceService {
      * The WhatsApp client instance for sending requests and accessing configuration.
      */
     private final WhatsAppClient client;
+
+    /**
+     * Reference to the web app-state service used to schedule the
+     * all-devices-responded missing-key grace period check after a
+     * device removal has made every remaining device unable to
+     * produce a requested sync key.
+     *
+     * @implNote WAWebSyncdStoreMissingKeys.N
+     */
+    private final WebAppStateService webAppStateService;
 
     /**
      * The store for persisting and retrieving device lists, identities, and sessions.
@@ -277,8 +291,9 @@ public final class DeviceService {
     @WhatsAppWebExport(moduleName = "WAWebAdvSyncDeviceListApi",
             exports = "syncDeviceList",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public DeviceService(WhatsAppClient client, ABPropsService abPropsService, SignalSessionCipher sessionCipher) {
+    public DeviceService(WhatsAppClient client, WebAppStateService webAppStateService, ABPropsService abPropsService, SignalSessionCipher sessionCipher) {
         this.client = client;
+        this.webAppStateService = webAppStateService;
         this.store = client.store();
         this.preKeyHandler = new DevicePreKeyHandler(client, sessionCipher);
         this.abPropsService = abPropsService;
@@ -573,6 +588,11 @@ public final class DeviceService {
             futures.put(jid, future);
         }
 
+        // WAWebContactSyncLogger.contactSyncLogger.createEventContext: start timestamp for
+        // the ContactSyncEvent WAM emission at success/failure time.
+        var syncStartTimestamp = Instant.now();
+        int fetchedResponseCount = 0;
+
         try {
             // WAWebAdvSyncDeviceListApi.syncDeviceList (function h/y): compute device_hash using phashV2
             // on device WIDs formatted as user.0:device@s.whatsapp.net
@@ -610,6 +630,7 @@ public final class DeviceService {
             // WAWebUsync.USyncQuery.execute: batch fetch from server via deprecatedSendIq
             var batches = DeviceUSyncQueryBuilder.build(toFetch, context, hashInfos, includeUsernameProtocol);
             var fetchedResults = getDevicesFetchedResults(batches);
+            fetchedResponseCount = fetchedResults.size();
 
             // WAWebContactSyncUtils.backfillMissingDeviceSyncEntries: if PN was requested but
             // server returned LID entry only, duplicate LID result as PN
@@ -962,6 +983,14 @@ public final class DeviceService {
                 updateMissingKeyDevices();
             }
 
+            // WAWebContactSyncLogger.contactSyncLogger.logSuccess: emit ContactSyncEvent (id 1006)
+            // with contactSyncType/requestOrigin/counts/timestamps for the device-sync flow.
+            // WA Web calls createUpdateCounterWith({deviceChange:d.length}) where d is the
+            // filtered list of successful device entries, so deviceResponseNew tracks how many
+            // result rows Cobalt successfully ingested.
+            emitContactSyncSuccess(context, toFetch.size(), fetchedResponseCount, syncStartTimestamp,
+                    abPropsService.getBool(ABProp.USERNAME_USYNC), result.size());
+
             return result;
         } catch (Exception e) {
             // WAWebApiPendingDeviceSync.addUserToPendingDeviceSync: save for retry on reconnect
@@ -975,6 +1004,12 @@ public final class DeviceService {
                 }
             }
 
+            // WAWebContactSyncLogger.contactSyncLogger.logFailure: emit ContactSyncEvent (id 1006)
+            // with the USync error code and DEVICE_SYNC (1300) as the 429 fallback code.
+            emitContactSyncFailure(context, toFetch.size(), fetchedResponseCount, syncStartTimestamp,
+                    abPropsService.getBool(ABProp.USERNAME_USYNC), extractUsyncErrorCode(e),
+                    CONTACT_SYNC_ERROR_CODE_DEVICE_SYNC);
+
             throw new RuntimeException("Failed to fetch device lists", e);
         } finally {
             // WAWebAdvSyncDeviceListApi: _.delete(createDeviceListPK(e)) - clean up pending requests
@@ -982,6 +1017,153 @@ public final class DeviceService {
                 pendingFetches.remove(jid);
             }
         }
+    }
+
+    /**
+     * Bit position in the contact-sync protocol bitmask for the
+     * {@code devices} protocol, matching WAWebContactSyncLogger PROTOCOL_BIT.DEVICE.
+     */
+    private static final int CONTACT_SYNC_PROTOCOL_BIT_DEVICE = 5;
+
+    /**
+     * Bit position in the contact-sync protocol bitmask for the
+     * {@code username} protocol, matching WAWebContactSyncLogger PROTOCOL_BIT.USERNAME.
+     */
+    private static final int CONTACT_SYNC_PROTOCOL_BIT_USERNAME = 10;
+
+    /**
+     * Request origin for device-sync USync queries, matching
+     * WAWebContactSyncLogger SYNC_REQUEST_ORIGIN.DEVICE_REQUEST.
+     */
+    private static final int CONTACT_SYNC_REQUEST_ORIGIN_DEVICE_REQUEST = 48;
+
+    /**
+     * Error-protocol code used as the 429 fallback when a device-sync USync
+     * fails, matching WAWebContactSyncErrorCodes.DEVICE_SYNC.
+     */
+    private static final int CONTACT_SYNC_ERROR_CODE_DEVICE_SYNC = 1300;
+
+    /**
+     * Computes the WAM contact-sync protocol bitmask for the device-sync
+     * USync query, matching WAWebContactSyncLogger.computeProtocolBitmask
+     * ({@code p(t.protocols)}).
+     *
+     * @param includeUsernameProtocol whether the username protocol was included
+     * @return the protocol bitmask for the WAM request_protocol property
+     *
+     * @implNote WAWebContactSyncLogger.p: {@code for (var n of e) t |= 1<<m[n.getName()]}.
+     */
+    private static int contactSyncProtocolBitmask(boolean includeUsernameProtocol) {
+        var bitmask = 1 << CONTACT_SYNC_PROTOCOL_BIT_DEVICE;
+        if (includeUsernameProtocol) {
+            bitmask |= 1 << CONTACT_SYNC_PROTOCOL_BIT_USERNAME;
+        }
+        return bitmask;
+    }
+
+    /**
+     * Extracts the server-side USync error code from a caught exception,
+     * preferring the code carried on {@link WhatsAppDeviceSyncException}.
+     *
+     * @param throwable the exception thrown during the USync flow
+     * @return the error code, or {@code 0} when unavailable
+     *
+     * @implNote WAWebContactSyncLogger.logFailure: the second argument is
+     * {@code c.errorCode} from the USync response.
+     */
+    private static int extractUsyncErrorCode(Throwable throwable) {
+        if (throwable instanceof WhatsAppDeviceSyncException dse) {
+            return dse.errorCode();
+        }
+        var cause = throwable.getCause();
+        if (cause instanceof WhatsAppDeviceSyncException dse) {
+            return dse.errorCode();
+        }
+        return 0;
+    }
+
+    /**
+     * Emits the successful {@code ContactSyncEvent} (id 1006) for the
+     * device-sync USync flow.
+     *
+     * @param context                 the USync context string (for example
+     *                                {@code "interactive"}, {@code "background"})
+     * @param requestedCount          the number of JIDs originally requested
+     * @param responseCount           the number of entries returned by the server
+     * @param syncStartTimestamp      the instant at which the sync started
+     * @param includeUsernameProtocol whether the username protocol was added
+     * @param deviceResponseNew       the count of successful device results
+     *                                ingested during this sync
+     *
+     * @implNote WAWebContactSyncLogger.logSuccess: emits ContactSyncEvent with
+     * success=true, noop=(requestedCount===0), latency=now-start, and the
+     * request_protocol bitmask.
+     */
+    private void emitContactSyncSuccess(String context, int requestedCount, int responseCount,
+                                        Instant syncStartTimestamp, boolean includeUsernameProtocol,
+                                        int deviceResponseNew) {
+        var endTimestamp = Instant.now();
+        client.wamService().commit(new ContactSyncEventEventBuilder()
+                // WAWebContactSyncLogger.getSyncTypeString: (context + "_query").toUpperCase()
+                .contactSyncType((context + "_query").toUpperCase(Locale.ROOT))
+                // WAWebContactSyncLogger SYNC_REQUEST_ORIGIN.DEVICE_REQUEST
+                .contactSyncRequestOrigin(CONTACT_SYNC_REQUEST_ORIGIN_DEVICE_REQUEST)
+                .contactSyncSuccess(true)
+                // WAWebContactSyncLogger: noop = requestedCount === 0
+                .contactSyncNoop(requestedCount == 0)
+                .contactSyncStartTimestamp(syncStartTimestamp)
+                .contactSyncEndTimestamp(endTimestamp)
+                // WAWebContactSyncLogger: latency is raw millisecond diff (Date.now() - startTimestamp)
+                .contactSyncLatency((int) (endTimestamp.toEpochMilli() - syncStartTimestamp.toEpochMilli()))
+                .contactSyncRequestedCount(requestedCount)
+                .contactSyncResponseCount(responseCount)
+                .contactSyncRequestProtocol(contactSyncProtocolBitmask(includeUsernameProtocol))
+                // WAWebContactSyncLogger: failureProtocol is a bitmask of per-protocol errors;
+                // on full success it is zero.
+                .contactSyncFailureProtocol(0)
+                // WAWebContactSyncLogger createUpdateCounterWith({deviceChange:d.length}): number of
+                // successful device entries processed during this sync.
+                .contactSyncDeviceResponseNew(deviceResponseNew)
+                .build());
+    }
+
+    /**
+     * Emits the failing {@code ContactSyncEvent} (id 1006) for the
+     * device-sync USync flow.
+     *
+     * @param context                 the USync context string
+     * @param requestedCount          the number of JIDs originally requested
+     * @param responseCount           the number of entries returned by the server
+     *                                before the failure was observed, or {@code 0}
+     * @param syncStartTimestamp      the instant at which the sync started
+     * @param includeUsernameProtocol whether the username protocol was added
+     * @param serverErrorCode         the error code from the USync response
+     * @param fallbackErrorCode       the fallback error code used when the
+     *                                server code is {@code 429} (rate-limited)
+     *
+     * @implNote WAWebContactSyncLogger.logFailure: {@code s = n===429 && a!=null ? a : n}.
+     */
+    private void emitContactSyncFailure(String context, int requestedCount, int responseCount,
+                                        Instant syncStartTimestamp, boolean includeUsernameProtocol,
+                                        int serverErrorCode, int fallbackErrorCode) {
+        var endTimestamp = Instant.now();
+        var errorCode = serverErrorCode == 429 ? fallbackErrorCode : serverErrorCode;
+        client.wamService().commit(new ContactSyncEventEventBuilder()
+                .contactSyncType((context + "_query").toUpperCase(Locale.ROOT))
+                .contactSyncRequestOrigin(CONTACT_SYNC_REQUEST_ORIGIN_DEVICE_REQUEST)
+                .contactSyncSuccess(false)
+                .contactSyncNoop(false)
+                .contactSyncErrorCode(errorCode)
+                .contactSyncStartTimestamp(syncStartTimestamp)
+                .contactSyncEndTimestamp(endTimestamp)
+                .contactSyncLatency((int) (endTimestamp.toEpochMilli() - syncStartTimestamp.toEpochMilli()))
+                .contactSyncRequestedCount(requestedCount)
+                .contactSyncResponseCount(responseCount)
+                .contactSyncRequestProtocol(contactSyncProtocolBitmask(includeUsernameProtocol))
+                // WAWebContactSyncLogger: failureProtocol = _(r.error) bitmask of per-protocol errors;
+                // Cobalt does not track per-protocol sub-errors, so zero is emitted.
+                .contactSyncFailureProtocol(0)
+                .build());
     }
 
     /**
@@ -1000,7 +1182,6 @@ public final class DeviceService {
     private List<DeviceListResult> getDevicesFetchedResults(List<NodeBuilder> batches) {
         // WAWebUsync.USyncQuery.execute
         // Fans out one virtual-thread subtask per batch and collates their parsed results
-
         try (var scope = StructuredTaskScope.open(JOINER)) {
             for (var batch : batches) {
                 scope.fork(() -> {
@@ -1063,7 +1244,7 @@ public final class DeviceService {
         }
 
         // WAWebBizCoexUtils: create system message in chat
-        createAccountTypeChangeSystemMessage(userJid, newType);
+        createAccountTypeChangeSystemMessage(userJid, oldType, newType);
     }
 
     /**
@@ -1071,8 +1252,14 @@ public final class DeviceService {
      *
      * <p>Creates a stub message indicating whether messages with this contact are now
      * end-to-end encrypted (E2E_ENCRYPTED_NOW) or no longer encrypted (CIPHERTEXT).
+     * After the system message is inserted, this method also commits a
+     * {@code CoexPrivacySysMsg} WAM event mirroring
+     * {@code WAWebBizCoexUtils.sendWamCoexPrivacySysMsgInsertSuccess} so telemetry
+     * reports the insertion outcome, state transition, and whether the target is
+     * the current user.
      *
      * @param userJid the user JID whose account type changed
+     * @param oldType the previous account type (may be {@code null} if unknown)
      * @param newType the new account type
      *
      * @implNote WAWebBizCoexUtils: creates system messages for account type transitions.
@@ -1081,7 +1268,10 @@ public final class DeviceService {
     @WhatsAppWebExport(moduleName = "WAWebBizCoexUtils",
             exports = "shouldDedupInitialHostedSystemMsg",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    private void createAccountTypeChangeSystemMessage(Jid userJid, ADVEncryptionType newType) {
+    @WhatsAppWebExport(moduleName = "WAWebBizCoexUtils",
+            exports = "sendWamCoexPrivacySysMsgInsertSuccess",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private void createAccountTypeChangeSystemMessage(Jid userJid, ADVEncryptionType oldType, ADVEncryptionType newType) {
         var chat = store.findChatByJid(userJid).orElse(null);
         if (chat == null) {
             return;
@@ -1119,6 +1309,77 @@ public final class DeviceService {
         for (var listener : client.store().listeners()) {
             Thread.startVirtualThread(() -> listener.onNewMessage(client, message));
         }
+
+        // WAWebBizCoexUtils.sendWamCoexPrivacySysMsgInsertSuccess: commit a CoexPrivacySysMsg
+        // WAM event for the inserted system message. Mirrors the subtype -> property
+        // mapping in WAWebBizCoexUtils.C: state_transition is determined by (oldType,newType),
+        // isSelf reflects whether the transitioning user is the currently logged-in account,
+        // businessId is the numeric user-part of the transitioning JID, and multiDeviceId
+        // comes from the signed-in device (WAWebUserPrefsMeUser.getMaybeMeDevicePn.device).
+        emitCoexPrivacySysMsgWamEvent(userJid, oldType, newType);
+    }
+
+    /**
+     * Commits a {@code CoexPrivacySysMsg} WAM event describing an inserted account-type
+     * change system message.
+     *
+     * <p>Maps the (oldType, newType) pair to the state-transition enum used by WA Web's
+     * subtype routing: {@code E2EE->HOSTED} and {@code null->HOSTED} produce
+     * {@code E2EE_TO_HOSTED}, {@code HOSTED->E2EE} produces {@code HOSTED_TO_E2EE}, and
+     * {@code HOSTED->HOSTED} produces {@code HOSTED_TO_HOSTED}. The {@code coexSysMsgIsSelf}
+     * flag is set when the transitioning user equals the currently logged-in user, matching
+     * the {@code biz_me_account_type_is_hosted*} subtypes in WA Web.
+     *
+     * @param userJid the user JID whose account type changed
+     * @param oldType the previous account type, or {@code null} if unknown
+     * @param newType the new account type
+     *
+     * @implNote WAWebBizCoexUtils.C: constructs CoexPrivacySysMsgWamEvent with
+     * {@code coexSysMsgInsertionSuccess=true}, {@code coexSysMsgMultiDeviceId=meDevice.device},
+     * a subtype-dependent {@code coexSysMsgStateTransitionAttempt}, {@code coexSysMsgIsSelf}
+     * based on whether the target is the logged-in user, and {@code coexSysMsgBusinessId}
+     * populated from {@code t.remote.user} (the transitioning user's numeric id).
+     */
+    @WhatsAppWebExport(moduleName = "WAWebBizCoexUtils",
+            exports = "sendWamCoexPrivacySysMsgInsertSuccess",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private void emitCoexPrivacySysMsgWamEvent(Jid userJid, ADVEncryptionType oldType, ADVEncryptionType newType) {
+        // WAWebBizCoexUtils.C: determine state transition attempt enum from (old,new)
+        CoexSysMsgStateTransitionAttempt stateTransition;
+        if (newType == ADVEncryptionType.E2EE) {
+            // "encrypt" subtype -> HOSTED_TO_E2EE
+            stateTransition = CoexSysMsgStateTransitionAttempt.HOSTED_TO_E2EE;
+        } else if (oldType == ADVEncryptionType.HOSTED) {
+            // "biz_account_type_is_hosted" / "biz_me_account_type_is_hosted" -> HOSTED_TO_HOSTED
+            stateTransition = CoexSysMsgStateTransitionAttempt.HOSTED_TO_HOSTED;
+        } else {
+            // "biz_account_type_changed_to_hosted" / "biz_me_account_type_is_hosted_transition"
+            // -> E2EE_TO_HOSTED (also covers null -> HOSTED)
+            stateTransition = CoexSysMsgStateTransitionAttempt.E2EE_TO_HOSTED;
+        }
+
+        // WAWebBizCoexUtils.C: isSelf when the transitioning user is the current account
+        // (matches the "biz_me_account_type_is_hosted*" subtypes in WA Web).
+        var meJid = store.jid().orElse(null);
+        var isSelf = meJid != null && Objects.equals(meJid.user(), userJid.user());
+
+        // WAWebBizCoexUtils.C: coexSysMsgMultiDeviceId = getMaybeMeDevicePn().device ?? 0
+        var multiDeviceId = meJid != null ? meJid.device() : 0;
+
+        // WAWebBizCoexUtils.C: coexSysMsgBusinessId = t.remote.user (numeric user part of
+        // the transitioning user JID). For self transitions WA Web uses the me user's
+        // own numeric id, which for Cobalt is equivalent because userJid == meJid.user here.
+        var builder = new CoexPrivacySysMsgEventBuilder()
+                .coexSysMsgInsertionSuccess(Boolean.TRUE)
+                .coexSysMsgIsSelf(isSelf)
+                .coexSysMsgMultiDeviceId(multiDeviceId)
+                .coexSysMsgStateTransitionAttempt(stateTransition)
+                .coexSysMsgBusinessId(userJid.user());
+
+        // WAWebBizCoexUtils.C emission path: channel is left unset for the
+        // sendWamCoexPrivacySysMsgInsertSuccess (bulkApplyDeviceUpdate / clearDeviceRecord)
+        // call site; only the history-sync entrypoint populates HISTORY_SYNC.
+        client.wamService().commit(builder.build());
     }
 
     /**
@@ -1266,7 +1527,6 @@ public final class DeviceService {
         // WAWebHandleAdvNoListResetApi: for USync device sync, server sends authoritative list
         // Merge logic in WAWeb is for message-based ADV updates; here we detect changes for
         // session cleanup in WAWebIdentityUpdateDeviceTableApi.bulkApplyDeviceUpdate
-
         var changes = newList.mismatch(cachedList);
 
         if (!changes.addedDevices().isEmpty() || !changes.removedDevices().isEmpty()) {
@@ -1577,7 +1837,7 @@ public final class DeviceService {
                 if (missingKey.isMissingOnAllDevices()) {
                     LOGGER.log(System.Logger.Level.WARNING,
                             "All devices responded without missing sync key, scheduling grace period check");
-                    client.scheduleAllDevicesRespondedCheck();
+                    webAppStateService.scheduleAllDevicesRespondedCheck();
                 }
             }
         });

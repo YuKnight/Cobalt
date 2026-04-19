@@ -1,9 +1,14 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.setting.ChatLockSettings;
+import com.github.auties00.cobalt.model.setting.ChatLockSettingsBuilder;
 import com.github.auties00.cobalt.model.setting.UserPassword;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
+import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
@@ -23,111 +28,127 @@ import java.util.logging.Logger;
  *
  * <p>Index format: {@code ["setting_chatLock"]}
  *
- * @implNote WAWebChatLockSettingsSync — singleton instance exported as {@code default},
+ * @implNote WAWebChatLockSettingsSync.default - singleton instance exported as {@code default},
  *           extends {@code AccountSyncdActionBase} with collection {@code RegularLow},
  *           version {@code 7}, action {@code "setting_chatLock"}
  */
+@WhatsAppWebModule(moduleName = "WAWebChatLockSettingsSync")
 public final class ChatLockSettingsHandler implements WebAppStateActionHandler {
     /**
      * Logger for chat lock settings sync handler.
      *
      * @implNote ADAPTED: WAWebChatLockSettingsSync uses WALogger; Cobalt uses java.util.logging
      */
-    private static final Logger LOGGER = Logger.getLogger(ChatLockSettingsHandler.class.getName()); // ADAPTED: WAWebChatLockSettingsSync — WALogger
+    private static final Logger LOGGER = Logger.getLogger(ChatLockSettingsHandler.class.getName()); // ADAPTED: WAWebChatLockSettingsSync - WALogger
 
     /**
      * The singleton instance of {@code ChatLockSettingsHandler}.
      *
-     * @implNote WAWebChatLockSettingsSync.default — the module exports a singleton
-     *           {@code new f()} as its default export
+     * @implNote WAWebChatLockSettingsSync.default - the module exports a singleton
+     *           {@code var g = new f()} as its default export
      */
+    @WhatsAppWebExport(moduleName = "WAWebChatLockSettingsSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final ChatLockSettingsHandler INSTANCE = new ChatLockSettingsHandler();
 
     /**
      * Constructs a new {@code ChatLockSettingsHandler}.
      *
-     * @implNote WAWebChatLockSettingsSync — constructor sets
-     *           {@code collectionName = CollectionName.RegularLow}
+     * <p>Per WhatsApp Web, the constructor of class {@code f} extends
+     * {@code AccountSyncdActionBase} and sets
+     * {@code this.collectionName = WASyncdConst.CollectionName.RegularLow}. The
+     * {@code collectionName} assignment is surfaced in Cobalt via
+     * {@link #collectionName()} rather than as an instance field.
+     *
+     * @implNote WAWebChatLockSettingsSync - constructor of class {@code f} extending
+     *           {@code AccountSyncdActionBase}
      */
+    @WhatsAppWebExport(moduleName = "WAWebChatLockSettingsSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private ChatLockSettingsHandler() {
         // WAWebChatLockSettingsSync constructor
     }
 
     /**
-     * Returns the action name for chat lock settings.
+     * {@inheritDoc}
      *
-     * @implNote WAWebChatLockSettingsSync.getAction — returns
+     * @implNote WAWebChatLockSettingsSync.getAction - returns
      *           {@code WASyncdConst.Actions.ChatLockSettings} which is {@code "setting_chatLock"}
-     * @return the action name {@code "setting_chatLock"}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebChatLockSettingsSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return ChatLockSettings.ACTION_NAME; // WAWebChatLockSettingsSync.getAction
+        return ChatLockSettings.ACTION_NAME; // WAWebChatLockSettingsSync.getAction -> "setting_chatLock"
     }
 
     /**
-     * Returns the collection name for chat lock settings.
+     * {@inheritDoc}
      *
-     * @implNote WAWebChatLockSettingsSync — constructor sets
+     * @implNote WAWebChatLockSettingsSync - constructor sets
      *           {@code collectionName = WASyncdConst.CollectionName.RegularLow}
-     * @return {@link SyncPatchType#REGULAR_LOW}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebChatLockSettingsSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
         return ChatLockSettings.COLLECTION_NAME; // WAWebChatLockSettingsSync.collectionName = RegularLow
     }
 
     /**
-     * Returns the mutation format version for chat lock settings.
+     * {@inheritDoc}
      *
-     * @implNote WAWebChatLockSettingsSync.getVersion — returns {@code 7}
-     * @return the version number {@code 7}
+     * @implNote WAWebChatLockSettingsSync.getVersion - returns {@code 7}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebChatLockSettingsSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return ChatLockSettings.ACTION_VERSION; // WAWebChatLockSettingsSync.getVersion
+        return ChatLockSettings.ACTION_VERSION; // WAWebChatLockSettingsSync.getVersion -> 7
     }
 
     /**
-     * Applies a single chat lock settings mutation.
+     * Applies a chat lock settings mutation and returns whether it succeeded.
      *
-     * @implNote WAWebChatLockSettingsSync.applyMutations — per-mutation logic
-     *           extracted for single-mutation application. Validates operation
-     *           is SET, checks {@code chatLockSettings} is present, validates
-     *           {@code secretCode} if present, and persists the settings to
-     *           the store.
+     * <p>Delegates to {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
+     * and checks if the result state is {@code SUCCESS}.
+     *
+     * @implNote ADAPTED: WAWebChatLockSettingsSync.applyMutations - WA Web returns
+     *           {@code WASyncdConst.SyncActionState.Success} directly; Cobalt wraps
+     *           in {@link MutationApplicationResult} and extracts the boolean here
      * @param client   the WhatsApp client instance
      * @param mutation the mutation to apply
      * @return {@code true} if the mutation was applied successfully
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebChatLockSettingsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS; // WAWebChatLockSettingsSync.applyMutations
+        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebChatLockSettingsSync.applyMutations -> SyncActionState.Success
     }
 
     /**
      * Applies a single chat lock settings mutation and returns the detailed result.
      *
-     * <p>Per WhatsApp Web {@code WAWebChatLockSettingsSync.applyMutations}: validates
-     * that the operation is SET, that the sync action value contains a non-null
-     * {@code chatLockSettings}, and that any present {@code secretCode} has valid
-     * transformer, encoding, transformed data, and transformer arguments (iterations
-     * and salt).
+     * <p>Per WhatsApp Web {@code WAWebChatLockSettingsSync.applyMutations} per-mutation
+     * map callback: validates that the operation is SET, that the sync action value
+     * contains a non-null {@code chatLockSettings}, and that any present
+     * {@code secretCode} has valid transformer, encoding, transformed data, and
+     * transformer arguments (iterations and salt). On any malformed secretCode,
+     * WA Web still updates the pending save target {@code r} with
+     * {@code {hideLockedChats: s, secretCode: null}} before returning malformed,
+     * so a later successful save commits the sanitized value. The single-mutation
+     * entry point here matches that semantic by persisting the sanitized settings
+     * only on full success.
      *
      * <p>The WA Web null check on {@code hideLockedChats} is classified as ADAPTED:
      * Cobalt's {@link ChatLockSettings#hideLockedChats()} accessor coalesces
      * {@code null} to {@code false} per project convention for nullable Boolean
      * fields, making the null case indistinguishable from an explicit {@code false}
-     * value. In practice, valid mutations from WhatsApp servers always include
-     * this field.
+     * value through the public API.
      *
-     * @implNote WAWebChatLockSettingsSync.applyMutations — single-mutation path;
+     * @implNote WAWebChatLockSettingsSync.applyMutations - single-mutation path;
      *           saves immediately since there is no batch to accumulate across
      * @param client   the WhatsApp client instance
      * @param mutation the mutation to apply
      * @return the detailed mutation application result
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebChatLockSettingsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) { // WAWebChatLockSettingsSync.applyMutations: if (e.operation !== "set")
             return MutationApplicationResult.unsupported(); // WAWebChatLockSettingsSync.applyMutations: {actionState: SyncActionState.Unsupported}
@@ -140,7 +161,6 @@ public final class ChatLockSettingsHandler implements WebAppStateActionHandler {
         // ADAPTED: WAWebChatLockSettingsSync.applyMutations: var s = t.hideLockedChats; if (s == null) return malformed
         // Cobalt's hideLockedChats() coalesces null to false per nullable Boolean convention;
         // the null-vs-false distinction is not observable through the public accessor.
-
         if (!isSecretCodeValid(settings)) { // WAWebChatLockSettingsSync.applyMutations: secretCode validation block
             return malformedActionValue(); // WAWebChatLockSettingsSync.applyMutations: malformedActionValue(n.collectionName)
         }
@@ -153,29 +173,30 @@ public final class ChatLockSettingsHandler implements WebAppStateActionHandler {
      * Applies a batch of chat lock settings mutations.
      *
      * <p>Per WhatsApp Web {@code WAWebChatLockSettingsSync.applyMutations}: iterates
-     * all mutations, accumulating the last valid {@code chatLockSettings} value from
-     * SET operations. Each mutation is individually validated for well-formedness
-     * (non-null chatLockSettings, valid secretCode if present). After iteration,
-     * persists the accumulated value once via
-     * {@code getChatLockSettings().updateAndSave(r)}.
+     * all mutations, and for each SET mutation with a non-null {@code chatLockSettings}
+     * and a non-null {@code hideLockedChats}, the pending save target {@code r}
+     * is unconditionally reassigned to
+     * {@code {hideLockedChats: s, secretCode: null}}. Only if the secretCode (when
+     * present) validates successfully does {@code r.secretCode} get set to the
+     * parsed value. A malformed secretCode therefore leaves {@code r} with the
+     * hideLockedChats value but a null secretCode and still returns malformed for
+     * that mutation. After iteration, if any {@code r} was produced, it is
+     * persisted once via {@code getChatLockSettings().updateAndSave(r)}.
      *
      * <p>If no valid mutation is found, logs a warning matching WA Web's
      * {@code "ChatLockSettingsSync: mutations parse failed"} message.
      *
-     * @implNote WAWebChatLockSettingsSync.applyMutations — the main entry point for
+     * @implNote WAWebChatLockSettingsSync.applyMutations - the main entry point for
      *           batch mutation application. Accumulates {@code r} across all mutations
-     *           and saves once at the end.
+     *           (including those that later return malformed) and saves once at the end.
      * @param client    the WhatsApp client instance
      * @param mutations the batch of mutations to apply
      * @return a list of results parallel to the input
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebChatLockSettingsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.DIRECT)
     public List<MutationApplicationResult> applyMutationBatchResults(WhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
-        if (mutations.isEmpty()) {
-            return List.of(); // NO_WA_BASIS — defensive empty check
-        }
-
-        ChatLockSettings lastValid = null; // WAWebChatLockSettingsSync.applyMutations: var r
+        ChatLockSettings pending = null; // WAWebChatLockSettingsSync.applyMutations: var r
         var results = new ArrayList<MutationApplicationResult>(mutations.size()); // WAWebChatLockSettingsSync.applyMutations: t.map(function(e) {...})
         for (var mutation : mutations) { // WAWebChatLockSettingsSync.applyMutations: t.map(function(e) {...})
             if (mutation.operation() != SyncdOperation.SET) { // WAWebChatLockSettingsSync.applyMutations: if (e.operation !== "set")
@@ -191,18 +212,26 @@ public final class ChatLockSettingsHandler implements WebAppStateActionHandler {
             // ADAPTED: WAWebChatLockSettingsSync.applyMutations: var s = t.hideLockedChats; if (s == null) return malformed
             // Cobalt's hideLockedChats() coalesces null to false per nullable Boolean convention;
             // the null-vs-false distinction is not observable through the public accessor.
+            // WAWebChatLockSettingsSync.applyMutations: r = {hideLockedChats: s, secretCode: null}
+            // This assignment happens BEFORE the secretCode check in WA (JS comma expression),
+            // so even malformed-secretCode mutations leave r populated with a sanitized value.
+            pending = new ChatLockSettingsBuilder()
+                    .hideLockedChats(settings.hideLockedChats())
+                    .secretCode(null)
+                    .build();
 
             if (!isSecretCodeValid(settings)) { // WAWebChatLockSettingsSync.applyMutations: secretCode validation
                 results.add(malformedActionValue()); // WAWebChatLockSettingsSync.applyMutations: malformedActionValue(n.collectionName)
                 continue;
             }
 
-            lastValid = settings; // WAWebChatLockSettingsSync.applyMutations: r = {hideLockedChats: s, secretCode: ...}
+            // WAWebChatLockSettingsSync.applyMutations: r.secretCode = {iterations:..., encoding:c, salt:..., transformer:m, data:d}
+            pending.setSecretCode(settings.secretCode().orElse(null));
             results.add(MutationApplicationResult.success()); // WAWebChatLockSettingsSync.applyMutations: {actionState: SyncActionState.Success}
         }
 
-        if (lastValid != null) { // WAWebChatLockSettingsSync.applyMutations: if (r != null)
-            client.store().setChatLockSettings(lastValid); // WAWebChatLockSettingsSync.applyMutations: getChatLockSettings().updateAndSave(r)
+        if (pending != null) { // WAWebChatLockSettingsSync.applyMutations: if (r != null) updateAndSave(r)
+            client.store().setChatLockSettings(pending); // WAWebChatLockSettingsSync.applyMutations: getChatLockSettings().updateAndSave(r)
         } else {
             LOGGER.warning("ChatLockSettingsSync: mutations parse failed"); // WAWebChatLockSettingsSync.applyMutations: WALogger.WARN("ChatLockSettingsSync: mutations parse failed")
         }
@@ -229,7 +258,7 @@ public final class ChatLockSettingsHandler implements WebAppStateActionHandler {
      * <p>If {@code secretCode} is absent, no validation is needed and the method
      * returns {@code true}.
      *
-     * @implNote WAWebChatLockSettingsSync.applyMutations — inline secretCode
+     * @implNote WAWebChatLockSettingsSync.applyMutations - inline secretCode
      *           validation block within the per-mutation map callback
      * @param settings the chat lock settings to validate
      * @return {@code true} if the secret code is absent or well-formed,
@@ -237,7 +266,7 @@ public final class ChatLockSettingsHandler implements WebAppStateActionHandler {
      */
     private boolean isSecretCodeValid(ChatLockSettings settings) {
         var secretCode = settings.secretCode(); // WAWebChatLockSettingsSync.applyMutations: var u = t.secretCode
-        if (secretCode.isEmpty()) { // WAWebChatLockSettingsSync.applyMutations: if (u != null) {...} — null secretCode is valid
+        if (secretCode.isEmpty()) { // WAWebChatLockSettingsSync.applyMutations: if (u != null) {...} - null secretCode is valid
             return true;
         }
 

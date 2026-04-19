@@ -3,6 +3,9 @@ package com.github.auties00.cobalt.sync.key;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.message.send.id.MessageIdGenerator;
 import com.github.auties00.cobalt.message.send.id.MessageIdVersion;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfoBuilder;
 import com.github.auties00.cobalt.model.device.sync.MissingDeviceSyncKeyBuilder;
@@ -50,6 +53,10 @@ import java.util.*;
  *     WAWebSyncdRequestAllSyncdMissingKeysJob.requestAllSyncdMissingKeysJob,
  *     WAWebKeyManagementSendKeyRequestApi.sendAppStateSyncKeyRequest
  */
+@WhatsAppWebModule(moduleName = "WAWebSyncdHandleMissingKeys")
+@WhatsAppWebModule(moduleName = "WAWebSyncdRequestAllSyncdMissingKeysJob")
+@WhatsAppWebModule(moduleName = "WAWebKeyManagementSendKeyRequestApi")
+@WhatsAppWebModule(moduleName = "WAWebSyncdStoreMissingKeys")
 public final class MissingSyncKeyRequestService {
     /**
      * Logger for this service.
@@ -124,6 +131,9 @@ public final class MissingSyncKeyRequestService {
      * @implNote WAWebSyncdHandleMissingKeys.handleMissingKeys
      * @param keyIds the IDs of the missing keys
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdHandleMissingKeys",
+            exports = {"handleMissingKeysInSnapshot", "handleMissingKeysInPatches"},
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public void requestMissingKeys(Collection<byte[]> keyIds) {
         handleMissingKeys(keyIds);
     }
@@ -134,6 +144,9 @@ public final class MissingSyncKeyRequestService {
      * @implNote WAWebSyncdHandleMissingKeys.handleMissingKeys
      * @param keyId the ID of the missing key
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdHandleMissingKeys",
+            exports = "handleMissingKeys",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public void requestMissingKey(byte[] keyId) {
         requestMissingKeys(List.of(keyId));
     }
@@ -155,6 +168,12 @@ public final class MissingSyncKeyRequestService {
      *     WAWebSyncdRequestAllSyncdMissingKeysJob.requestAllSyncdMissingKeysJob
      * @param keyIds the IDs of the missing keys to re-request
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdHandleMissingKeys",
+            exports = "requestAllMissingKeys",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebSyncdRequestAllSyncdMissingKeysJob",
+            exports = "requestAllSyncdMissingKeysJob",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public void reRequestMissingKeys(Collection<byte[]> keyIds) {
         if (keyIds.isEmpty()) { // WAWebSyncdHandleMissingKeys.requestAllMissingKeys: e.length !== 0
             return;
@@ -184,6 +203,9 @@ public final class MissingSyncKeyRequestService {
      *
      * @implNote WAWebKeyManagementUtils.getPeerDevices
      */
+    @WhatsAppWebExport(moduleName = "WAWebKeyManagementUtils",
+            exports = "getPeerDevices",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private List<Jid> getCompanionDevices() {
         var myJid = store.jid() // ADAPTED: WAWebUserPrefsMeUser.getMeDevicePnOrThrow (store returns Optional)
                 .orElse(null);
@@ -219,6 +241,9 @@ public final class MissingSyncKeyRequestService {
      * @implNote WAWebSyncdHandleMissingKeys.handleMissingKeys
      * @param keyIds the IDs of the missing keys (as raw bytes)
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdHandleMissingKeys",
+            exports = "handleMissingKeys",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private void handleMissingKeys(Collection<byte[]> keyIds) {
         if (keyIds.isEmpty()) { // ADAPTED: defensive early return, no direct WA Web equivalent
             return;
@@ -261,6 +286,9 @@ public final class MissingSyncKeyRequestService {
      * @param keyRequest the key request to send
      * @return the set of device IDs that were successfully sent to
      */
+    @WhatsAppWebExport(moduleName = "WAWebKeyManagementSendKeyRequestApi",
+            exports = "sendAppStateSyncKeyRequest",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private Set<Integer> sendKeyRequestToAllDevices(AppStateSyncKeyRequest keyRequest) {
         var companionDevices = getCompanionDevices(); // WAWebKeyManagementUtils.getPeerDevices
 
@@ -335,6 +363,9 @@ public final class MissingSyncKeyRequestService {
      * @param keyRequest the key request payload
      * @return a map from device JID to the built message info
      */
+    @WhatsAppWebExport(moduleName = "WAWebKeyManagementSendKeyRequestApi",
+            exports = "sendAppStateSyncKeyRequest",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private LinkedHashMap<Jid, ChatMessageInfo> buildKeyRequestMessages(List<Jid> companionDevices, AppStateSyncKeyRequest keyRequest) {
         var self = store.jid().orElseThrow(() -> // WAWebUserPrefsMeUser.getMePnUserOrThrow
                 new IllegalStateException("syncd: sendAppStateSyncKeyRequest: no JID available"));
@@ -383,6 +414,9 @@ public final class MissingSyncKeyRequestService {
      * @param keyIds the IDs of the missing keys
      * @param successfulDeviceIds the set of device IDs that were successfully asked
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdStoreMissingKeys",
+            exports = "addMissingKeys",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private void trackMissingKeys(Collection<byte[]> keyIds, Set<Integer> successfulDeviceIds) {
         for (var keyId : keyIds) { // WAWebSyncdStoreMissingKeys.addMissingKeys: r = e.map(function(e){return{...}})
             var missingKey = new MissingDeviceSyncKeyBuilder() // WAWebSyncdStoreMissingKeys.addMissingKeys: { keyHex, keyId, timestamp, deviceResponses }
@@ -390,7 +424,7 @@ public final class MissingSyncKeyRequestService {
                     .timestamp(Instant.now()) // WAWebSyncdStoreMissingKeys.addMissingKeys: timestamp: o("WATimeUtils").unixTimeMs()
                     .askedDevices(Set.copyOf(successfulDeviceIds)) // ADAPTED: WAWebSyncdStoreMissingKeys.addMissingKeys: deviceResponses: n() — Map<deviceId, null> mapped to Set<Integer>
                     .build();
-            store.addMissingSyncKey(missingKey); // WAWebGetMissingKey.bulkUpdateMissingKeysInTransaction
+            store.addMissingSyncKey(missingKey); // ADAPTED: WAWebGetMissingKey.bulkUpdateMissingKeysInTransaction — per-entry upsert instead of bulk
         }
 
         // WAWebSyncdStoreMissingKeys.addMissingKeys — invokes setMissingKeyTimeoutInTransaction inline at end

@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.model.sync;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import it.auties.protobuf.annotation.ProtobufEnum;
 import it.auties.protobuf.annotation.ProtobufEnumIndex;
 
@@ -26,6 +29,8 @@ import java.util.stream.Collectors;
  * reuse on hot paths.
  */
 @ProtobufEnum
+@WhatsAppWebModule(moduleName = "WASyncdConst")
+@WhatsAppWebModule(moduleName = "WAWebSyncdCollectionUtils")
 public enum SyncPatchType {
     /**
      * Critical collection dedicated to block list related mutations, which
@@ -134,8 +139,15 @@ public enum SyncPatchType {
      * processed from server sync notifications so that privacy and safety
      * related mutations are applied before the rest of the app state.
      *
+     * @implNote WA Web's {@code isCriticalCollection} throws an
+     *           exhaustive-match error for unknown names; in Cobalt the
+     *           enum itself encodes the closed domain, so the wildcard
+     *           branch is unreachable and omitted.
      * @return {@code true} if this is a critical collection
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdCollectionUtils",
+            exports = "isCriticalCollection",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean isCritical() {
         return this == CRITICAL_BLOCK || this == CRITICAL_UNBLOCK_LOW;
     }

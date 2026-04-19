@@ -2,6 +2,9 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.sync.ConflictResolution;
 import com.github.auties00.cobalt.model.sync.ConflictResolutionState;
@@ -36,6 +39,7 @@ import java.util.List;
  *           {@code collectionName = RegularHigh}, {@code chatJidIndex = 1},
  *           {@code getVersion() = 6}, {@code getAction() = "deleteChat"}
  */
+@WhatsAppWebModule(moduleName = "WAWebDeleteChatSync")
 public final class DeleteChatHandler implements WebAppStateActionHandler {
 
     /**
@@ -46,6 +50,7 @@ public final class DeleteChatHandler implements WebAppStateActionHandler {
      *
      * @implNote WAWebDeleteChatSync.default — module-level singleton
      */
+    @WhatsAppWebExport(moduleName = "WAWebDeleteChatSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final DeleteChatHandler INSTANCE = new DeleteChatHandler();
 
     /**
@@ -54,6 +59,7 @@ public final class DeleteChatHandler implements WebAppStateActionHandler {
      * @implNote WAWebDeleteChatSync — class constructor sets
      *           {@code collectionName = RegularHigh}, {@code chatJidIndex = 1}
      */
+    @WhatsAppWebExport(moduleName = "WAWebDeleteChatSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private DeleteChatHandler() {
 
     }
@@ -66,6 +72,7 @@ public final class DeleteChatHandler implements WebAppStateActionHandler {
      * @return the action name {@code "deleteChat"}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebDeleteChatSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
         return DeleteChatAction.ACTION_NAME; // WAWebDeleteChatSync.getAction -> WASyncdConst.Actions.DeleteChat
     }
@@ -81,6 +88,7 @@ public final class DeleteChatHandler implements WebAppStateActionHandler {
      * @return {@link SyncPatchType#REGULAR_HIGH}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebDeleteChatSync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
         return DeleteChatAction.COLLECTION_NAME; // WAWebDeleteChatSync.collectionName = WASyncdConst.CollectionName.RegularHigh
     }
@@ -92,6 +100,7 @@ public final class DeleteChatHandler implements WebAppStateActionHandler {
      * @return the version number {@code 6}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebDeleteChatSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return DeleteChatAction.ACTION_VERSION; // WAWebDeleteChatSync.getVersion -> 6
     }
@@ -109,6 +118,7 @@ public final class DeleteChatHandler implements WebAppStateActionHandler {
      * @return {@code true} if the mutation was applied successfully
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebDeleteChatSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebDeleteChatSync.applyMutations
     }
@@ -141,6 +151,7 @@ public final class DeleteChatHandler implements WebAppStateActionHandler {
      * @return the detailed application result
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebDeleteChatSync", exports = {"applyMutations", "getMessageRange", "$DeleteChatSync$p_1", "deleteChat"}, adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) { // WAWebDeleteChatSync.applyMutations: e.operation === "set" check, else return Unsupported
             return MutationApplicationResult.unsupported(); // WAWebDeleteChatSync.applyMutations: l++, {actionState: Unsupported}
@@ -188,7 +199,6 @@ public final class DeleteChatHandler implements WebAppStateActionHandler {
             // WAWebDeleteChatSync.applyMutations: var m = createWid(d.chat.id)
             // WAWebDeleteChatSync.applyMutations: var p = replaceMessageRangeRemoteJid(m, c)
             // WAWebDeleteChatSync.applyMutations: return a.$DeleteChatSync$p_1(m, p, u==="0", n)
-
             // WAWebDeleteChatSync.$DeleteChatSync$p_1:
             //   encodes the SyncActionValue, adds active message range,
             //   constructs local message range, compares with incoming range:
@@ -243,6 +253,7 @@ public final class DeleteChatHandler implements WebAppStateActionHandler {
      * @return the conflict resolution indicating which mutation to keep
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebDeleteChatSync", exports = "resolveConflicts", adaptation = WhatsAppAdaptation.ADAPTED)
     public ConflictResolution resolveConflicts(DecryptedMutation.Trusted localMutation, DecryptedMutation.Trusted remoteMutation) {
         var localAction = localMutation.value().action() // WAWebDeleteChatSync.resolveConflicts: var c = nullthrows(i.deleteChatAction) — i decoded from e.binarySyncAction
                 .filter(a -> a instanceof DeleteChatAction)
@@ -335,6 +346,7 @@ public final class DeleteChatHandler implements WebAppStateActionHandler {
      *                         no messages and the caller wants a full delete
      * @return the pending mutation for the delete-chat action
      */
+    @WhatsAppWebExport(moduleName = "WAWebDeleteChatSync", exports = {"getDeleteChatMutation", "buildDeleteChatMutation", "buildDeleteChatIndexArgs"}, adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncPendingMutation getDeleteChatMutation(
             Instant timestamp,
             Jid chatJid,

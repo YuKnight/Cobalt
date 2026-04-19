@@ -63,11 +63,9 @@ final class NotificationDisappearingModeStreamHandler implements SocketStream.Ha
      */
     @Override
     public void handle(Node node) {
-        try {
-            handleDisappearingModeNotification(node);
-        } finally {
-            sendNotificationAck(node);
-        }
+        // WAWebHandleDisappearingModeNotification.d: update then ack, sequentially in the async worker
+        handleDisappearingModeNotification(node);
+        sendNotificationAck(node);
     }
 
     /**

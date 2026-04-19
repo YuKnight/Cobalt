@@ -141,7 +141,6 @@ public final class NotificationSyncStreamHandler implements SocketStream.Handler
         var collectionsToSync = new ArrayList<>(changedCollections.keySet()); // WAWebHandleServerSyncNotification._ (_ = Array.from(t.keys()))
 
         // WAWebHandleServerSyncNotification._ (e.offline && _.forEach(offlineNotificationsCount)): skipped (WAM telemetry)
-
         LOGGER.log(System.Logger.Level.INFO, // WAWebHandleServerSyncNotification._ (LOG("syncd: incoming sync notification for collections\n    ..."))
                 "syncd: incoming sync notification for collections\n    {0}",
                 changedCollections.entrySet().stream()

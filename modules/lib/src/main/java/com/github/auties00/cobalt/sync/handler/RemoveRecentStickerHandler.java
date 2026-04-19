@@ -2,14 +2,21 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncActionState;
+import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.media.RemoveRecentStickerAction;
+import com.github.auties00.cobalt.model.sync.action.media.RemoveRecentStickerActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 import java.time.Instant;
+import java.util.List;
 
 /**
  * Handles {@code removeRecentSticker} app-state sync mutations.
@@ -43,6 +50,7 @@ import java.time.Instant;
  *           ({@code "removeRecentSticker"}), and {@code getVersion()} returning
  *           the literal {@code 7}
  */
+@WhatsAppWebModule(moduleName = "WAWebStickersRemoveRecentSyncAction")
 public final class RemoveRecentStickerHandler implements WebAppStateActionHandler {
     /**
      * The {@code "recent_sticker"} primary feature flag name.
@@ -55,6 +63,7 @@ public final class RemoveRecentStickerHandler implements WebAppStateActionHandle
      *
      * @implNote WAWebMiscGatingUtils.isRecentStickersMDEnabled — primary feature key
      */
+    @WhatsAppWebExport(moduleName = "WAWebMiscGatingUtils", exports = "isRecentStickersMDEnabled", adaptation = WhatsAppAdaptation.ADAPTED)
     private static final String RECENT_STICKER_FEATURE = "recent_sticker"; // WAWebMiscGatingUtils.isRecentStickersMDEnabled: primaryFeatureEnabled("recent_sticker")
 
     /**
@@ -63,6 +72,7 @@ public final class RemoveRecentStickerHandler implements WebAppStateActionHandle
      * @implNote WAWebStickersRemoveRecentSyncAction.default — WA Web exports a
      *           single pre-instantiated handler ({@code d = new c; l.default = d})
      */
+    @WhatsAppWebExport(moduleName = "WAWebStickersRemoveRecentSyncAction", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final RemoveRecentStickerHandler INSTANCE = new RemoveRecentStickerHandler();
 
     /**
@@ -71,6 +81,7 @@ public final class RemoveRecentStickerHandler implements WebAppStateActionHandle
      * @implNote WAWebStickersRemoveRecentSyncAction — WA Web instantiates the
      *           handler once via {@code new c()} and exports it as the module default
      */
+    @WhatsAppWebExport(moduleName = "WAWebStickersRemoveRecentSyncAction", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private RemoveRecentStickerHandler() {
 
     }
@@ -83,6 +94,7 @@ public final class RemoveRecentStickerHandler implements WebAppStateActionHandle
      *           {@code "removeRecentSticker"}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebStickersRemoveRecentSyncAction", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
         return RemoveRecentStickerAction.ACTION_NAME; // WAWebStickersRemoveRecentSyncAction.getAction
     }
@@ -95,6 +107,7 @@ public final class RemoveRecentStickerHandler implements WebAppStateActionHandle
      *           in the constructor
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebStickersRemoveRecentSyncAction", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
         return RemoveRecentStickerAction.COLLECTION_NAME; // WAWebStickersRemoveRecentSyncAction constructor: this.collectionName = RegularLow
     }
@@ -106,6 +119,7 @@ public final class RemoveRecentStickerHandler implements WebAppStateActionHandle
      *           literal {@code 7}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebStickersRemoveRecentSyncAction", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return RemoveRecentStickerAction.ACTION_VERSION; // WAWebStickersRemoveRecentSyncAction.getVersion: return 7
     }
@@ -124,6 +138,7 @@ public final class RemoveRecentStickerHandler implements WebAppStateActionHandle
      *           to a boolean
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebStickersRemoveRecentSyncAction", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: single-path adapter for batch-only WA Web entry
     }
@@ -140,6 +155,7 @@ public final class RemoveRecentStickerHandler implements WebAppStateActionHandle
      * @implNote WAWebStickersRemoveRecentSyncAction.applyMutations
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebStickersRemoveRecentSyncAction", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         // WAWebStickersRemoveRecentSyncAction.applyMutations:
         //   if (!WAWebMiscGatingUtils.isRecentStickersMDEnabled())
@@ -225,7 +241,49 @@ public final class RemoveRecentStickerHandler implements WebAppStateActionHandle
      * @param instant the {@link Instant} read from the protobuf, must not be {@code null}
      * @return the epoch-second value of {@code instant}
      */
+    @WhatsAppWebExport(moduleName = "WAWebStickersRemoveRecentSyncAction", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     private static long toEpochComparable(Instant instant) {
         return instant.getEpochSecond(); // WAWebStickersRemoveRecentSyncAction.applyMutations: numeric value of lastStickerSentTs
+    }
+
+    /**
+     * Builds a pending outgoing mutation that removes a sticker from the
+     * recent-stickers collection across linked devices.
+     *
+     * <p>Per WhatsApp Web {@code WAWebStickersRemoveRecentSyncAction}: emits a
+     * SET mutation at {@code ["removeRecentSticker", stickerFileHash]} in the
+     * REGULAR_LOW collection with {@code version = 7} and a
+     * {@code removeRecentStickerAction} sub-message carrying the current
+     * timestamp as {@code lastStickerSentTs}. Receiving devices compare this
+     * timestamp against their local recent-sticker entry to decide whether to
+     * remove it.
+     *
+     * @implNote WAWebStickersRemoveRecentSyncAction — outgoing SET mutation
+     *           shape mirrors the inbound payload that
+     *           {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
+     *           consumes
+     * @param stickerHash the sticker file hash used as the mutation index
+     * @return the pending mutation ready to be pushed via
+     *         {@link com.github.auties00.cobalt.sync.WebAppStateService#pushPatches}
+     */
+    @WhatsAppWebExport(moduleName = "WAWebStickersRemoveRecentSyncAction", exports = "generateRemoveStickerMutation", adaptation = WhatsAppAdaptation.ADAPTED)
+    public SyncPendingMutation getRemoveRecentStickerMutation(String stickerHash) {
+        var timestamp = Instant.now(); // WAWebSyncdActionUtils.buildPendingMutation: timestamp: unixTime()
+        var action = new RemoveRecentStickerActionBuilder() // WAWebStickersRemoveRecentSyncAction: {removeRecentStickerAction: {lastStickerSentTs: ...}}
+                .lastStickerSentTs(timestamp) // WAWebStickersRemoveRecentSyncAction.applyMutations: lastStickerSentTs field
+                .build();
+        var value = new SyncActionValueBuilder() // WAWebSyncdActionUtils.buildPendingMutation
+                .timestamp(timestamp) // WAWebSyncdActionUtils.buildPendingMutation: timestamp: i
+                .removeRecentStickerAction(action) // WAWebStickersRemoveRecentSyncAction: {removeRecentStickerAction: ...}
+                .build();
+        var index = JSON.toJSONString(List.of(RemoveRecentStickerAction.ACTION_NAME, stickerHash)); // WAWebSyncdActionUtils.buildPendingMutation
+        var mutation = new DecryptedMutation.Trusted(
+                index,
+                value,
+                SyncdOperation.SET, // WAWebStickersRemoveRecentSyncAction: operation: SyncdOperation.SET
+                timestamp,
+                RemoveRecentStickerAction.ACTION_VERSION // WAWebStickersRemoveRecentSyncAction.getVersion: 7
+        );
+        return new SyncPendingMutation(mutation, 0); // WAWebSyncdActionUtils.buildPendingMutation
     }
 }

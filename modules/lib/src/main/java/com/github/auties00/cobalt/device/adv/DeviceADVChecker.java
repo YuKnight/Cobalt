@@ -14,6 +14,7 @@ import com.github.auties00.cobalt.model.device.sync.PendingDeviceSync;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
+import com.github.auties00.cobalt.wam.event.AdvStoredTimestampExpiredEventBuilder;
 
 import java.lang.System.Logger.Level;
 import java.time.Duration;
@@ -212,8 +213,8 @@ public final class DeviceADVChecker implements AutoCloseable {
      * singleton {@code p} runner with an {@code AdvToSystemBridgeImpl} bridge
      * and calls {@code run(unixTimeWithoutClockSkewCorrection())}. The runner
      * calls {@code getUsersForExpiration}, {@code removeCompanions},
-     * {@code sendADVStoredTimestampExpiredEvents} (WAM, skipped),
-     * and {@code sendOrQueueDeviceUsyncQuery}.
+     * {@code sendADVStoredTimestampExpiredEvents}, and
+     * {@code sendOrQueueDeviceUsyncQuery}.
      */
     @WhatsAppWebExport(moduleName = "WAWebAdvDeviceInfoCheckJob",
             exports = "runAdvDeviceInfoCheck",
@@ -249,6 +250,13 @@ public final class DeviceADVChecker implements AutoCloseable {
                     lastCheck.get(),
                     myUserJid
             );
+
+            // WAWebAdvDeviceInfoCheckJob.AdvToSystemBridgeImpl.sendADVStoredTimestampExpiredEvents:
+            // WA Web fires this right after removeCompanions (even in the self-expired
+            // logout branch, because both statements execute synchronously before the
+            // socketLogout promise resolves). Mirror that ordering by emitting before
+            // the logout early return so telemetry is not lost.
+            sendAdvStoredTimestampExpiredEvents(result.expiredLists(), now, expiryThreshold);
 
             // WAWebAdvDeviceInfoCheckJob.AdvToSystemBridgeImpl.removeCompanions:
             // if own device list expired AND AB prop is true, trigger logout and
@@ -421,6 +429,53 @@ public final class DeviceADVChecker implements AutoCloseable {
 
         LOGGER.log(Level.DEBUG, "Marked device list as deleted for {0}, cleaned up {1} companion devices",
                 userJid, deviceList.devices().size() - 1);
+    }
+
+    /**
+     * Emits one {@code AdvStoredTimestampExpired} WAM event per expired device
+     * list reporting, in hours, how far past its expiration the stored
+     * timestamp is.
+     *
+     * <p>For every expired device list the overshoot is computed as
+     * {@code now - (timestamp + expiryThreshold)}. When non-negative the
+     * overshoot is converted to hours (rounded to the nearest hour) and a
+     * {@link com.github.auties00.cobalt.wam.event.AdvStoredTimestampExpiredEvent}
+     * is committed through the client's {@code WamService}. Lists whose
+     * overshoot is negative (not yet past the expiration cutoff) are skipped,
+     * matching WA Web's inline {@code if (!(r < 0))} guard.
+     *
+     * @implNote WAWebAdvDeviceInfoCheckJob.AdvToSystemBridgeImpl.sendADVStoredTimestampExpiredEvents:
+     * iterates the {@code usersExpired} map computing
+     * {@code r = now - (t.timestamp + numDaysKeyIndexListExpiration * DAY_SECONDS)}
+     * and, when {@code r >= 0}, emits
+     * {@code new AdvStoredTimestampExpiredWamEvent({advExpireTimeInHours: Math.round(r/HOUR_SECONDS)}).commit()}.
+     * @param expiredLists    the device lists classified as expired
+     * @param now             the reference instant used to compute overshoot
+     * @param expiryThreshold the configured key-index-list expiration threshold
+     */
+    @WhatsAppWebExport(moduleName = "WAWebAdvDeviceInfoCheckJob",
+            exports = "runAdvDeviceInfoCheck",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    private void sendAdvStoredTimestampExpiredEvents(List<DeviceList> expiredLists, Instant now, Duration expiryThreshold) {
+        if (expiredLists.isEmpty()) {
+            return;
+        }
+        var wamService = client.wamService();
+        for (var expiredList : expiredLists) {
+            // WAWebAdvDeviceInfoCheckJob.sendADVStoredTimestampExpiredEvents:
+            // r = now - (t.timestamp + expiryDays*DAY_SECONDS)
+            var overshoot = Duration.between(expiredList.timestamp().plus(expiryThreshold), now);
+            if (overshoot.isNegative()) {
+                // WAWebAdvDeviceInfoCheckJob.sendADVStoredTimestampExpiredEvents: if(!(r<0))
+                continue;
+            }
+            // WAWebAdvDeviceInfoCheckJob.sendADVStoredTimestampExpiredEvents:
+            // a = Math.round(r / HOUR_SECONDS)
+            var hours = Math.toIntExact(Math.round(overshoot.toSeconds() / 3600.0));
+            wamService.commit(new AdvStoredTimestampExpiredEventBuilder()
+                    .advExpireTimeInHours(hours)
+                    .build());
+        }
     }
 
     /**

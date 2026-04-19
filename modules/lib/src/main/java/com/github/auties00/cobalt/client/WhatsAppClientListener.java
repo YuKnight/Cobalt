@@ -39,7 +39,6 @@ import java.util.Set;
  * @see WhatsAppClient#addListener(WhatsAppClientListener)
  * @see WhatsAppClient#removeListener(WhatsAppClientListener)
  */
-// TODO: Maybe it's better to have client and store have listeners so everything can be listened
 public interface WhatsAppClientListener {
     /**
      * Called when a node is sent to the WhatsApp server.

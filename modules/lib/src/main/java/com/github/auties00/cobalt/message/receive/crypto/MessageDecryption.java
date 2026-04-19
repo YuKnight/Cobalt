@@ -202,13 +202,11 @@ public final class MessageDecryption {
 
         // WAWebSignalCipherApi.decryptSignalProto
         // Converts the sender JID into a Signal protocol address for session lookup
-
         var address = senderJid.toSignalAddress();
         return switch (encryptionType) {
             case PKMSG -> {
                 // WAWebSignalCipherApi.decryptSignalProto PKMSG branch
                 // Deserializes the PreKey envelope, decrypts via the session cipher, and strips padding
-
                 try {
                     var message = SignalPreKeyMessage.ofSerialized(ciphertext);
                     var paddedPlaintext = sessionCipher.decrypt(address, message);
@@ -218,7 +216,6 @@ public final class MessageDecryption {
                             "Invalid PreKeySignalMessage format from: " + senderJid, e);
                 } catch (SignalMissingSessionException e) {
                     // PKMSG establishes a session, so missing-session is unusual; still map it for robustness
-
                     throw new WhatsAppMessageException.Receive.NoSession(
                             "No session for PreKeyMessage from: " + senderJid, false, e);
                 } catch (SignalUninitializedSessionException e) {
@@ -229,7 +226,6 @@ public final class MessageDecryption {
                             "Identity key changed for: " + senderJid, e);
                 } catch (SignalDecryptException e) {
                     // Distinguish duplicate/old-counter errors from generic decryption errors
-
                     if (isDuplicateCounterError(e)) {
                         throw new WhatsAppMessageException.Receive.DuplicateMessage(
                                 "Decryption failed for PreKeyMessage from: " + senderJid, e);
@@ -244,7 +240,6 @@ public final class MessageDecryption {
             case MSG -> {
                 // WAWebSignalCipherApi.decryptSignalProto MSG branch
                 // Deserializes the SignalMessage, decrypts via the session cipher, and strips padding
-
                 try {
                     var message = SignalMessage.ofSerialized(ciphertext);
                     var paddedPlaintext = sessionCipher.decrypt(address, message);
@@ -254,7 +249,6 @@ public final class MessageDecryption {
                             "Invalid SignalMessage format from: " + senderJid, e);
                 } catch (SignalMissingSessionException e) {
                     // MSG requires an existing session; raise NoSession so sender can re-send as PKMSG
-
                     throw new WhatsAppMessageException.Receive.NoSession(
                             "No session exists for MSG from: " + senderJid, false, e);
                 } catch (SignalUninitializedSessionException e) {
@@ -303,7 +297,6 @@ public final class MessageDecryption {
     private boolean isDuplicateCounterError(SignalDecryptException e) {
         // WAWebCryptoLibrary.decryptSignalProto
         // Pattern-matches the error message to detect old-counter duplicates
-
         var message = e.getMessage();
         return message != null && (
                 message.contains("old counter") ||
@@ -346,23 +339,19 @@ public final class MessageDecryption {
 
         // WAWebSignalCommonUtils.createSignalLikeSenderKeyName
         // Produces the sender-key name used to look up the per-sender group session
-
         var senderKeyName = SenderKeyNameFactory.create(groupJid, senderJid);
 
         // WAWebSignalCipherApi.decryptGroupSignalProto
         // Decrypts the ciphertext via the group cipher and strips padding
-
         try {
             var paddedPlaintext = groupCipher.decrypt(senderKeyName, ciphertext);
             return removePadding(paddedPlaintext);
         } catch (SignalMissingSenderKeyException e) {
             // No sender key record at all; sender should re-distribute their key
-
             throw new WhatsAppMessageException.Receive.NoSenderKey(
                     "No sender key exists for group: " + groupJid + " sender: " + senderJid, e);
         } catch (SignalMissingSenderKeyStateException e) {
             // Record exists but no state for the message key id (sender rotated their key)
-
             throw new WhatsAppMessageException.Receive.InvalidSenderKey(
                     "Sender key state not found for ID " + e.id().orElse(-1) +
                             " in group: " + groupJid + " sender: " + senderJid, e);
@@ -375,7 +364,6 @@ public final class MessageDecryption {
                     "Group decryption failed for message from: " + senderJid + " in group: " + groupJid, e);
         } catch (SecurityException e) {
             // Sender key signature verification failed
-
             throw new WhatsAppMessageException.Receive.InvalidSenderKey(
                     "Sender key signature verification failed from: " + senderJid + " in group: " + groupJid, e);
         } catch (ProtobufDeserializationException e) {
@@ -437,7 +425,6 @@ public final class MessageDecryption {
         try {
             // WAWebBotMessageSecret.decryptMsmsgBotMessage
             // Decodes the outer MessageSecretMessage protobuf carrying IV and encrypted payload
-
             var secretMessage = SecretMessageContainerSpec.decode(ciphertext);
             var encIv = secretMessage.encIv().orElseThrow(() ->
                     new WhatsAppMessageException.Receive.InvalidMessage(
@@ -448,23 +435,19 @@ public final class MessageDecryption {
 
             // WAWebBotMessageSecret.genBotMsgSecretFromMsgSecret
             // Derives the bot-specific secret from the stored messageSecret
-
             var botSecret = BotMessageSecret.derive(messageSecret);
 
             // WAWebBotMessageSecret function S()
             // Derives the per-message AES-GCM key via HKDF extract-and-expand
-
             var aesKey = deriveBotPerMessageKey(
                     messageId, targetSenderJid, botSenderJid, botSecret);
 
             // WAWebBotMessageSecret.decryptMsmsgBotMessage
             // Builds the AAD as messageId + 0x00 + botSenderJid for GCM authentication
-
             var aad = buildBotAad(messageId, botSenderJid);
 
             // WACryptoAesGcm.gcmDecrypt
             // Decrypts the payload with AES-GCM using the derived key, IV, and AAD
-
             var cipher = Cipher.getInstance(AES_GCM_ALGORITHM);
             var keySpec = new SecretKeySpec(aesKey, "AES");
             var gcmSpec = new GCMParameterSpec(AES_GCM_TAG_BITS, encIv);
@@ -505,12 +488,10 @@ public final class MessageDecryption {
 
         // WACryptoPkcs7.unpad
         // Reads the last byte as the padding length
-
         var paddingLength = paddedPlaintext[paddedPlaintext.length - 1] & 0xFF;
 
         // WACryptoPkcs7.unpad
         // Validates the padding length is within the allowed 1..16 range
-
         if (paddingLength < MIN_PADDING || paddingLength > MAX_PADDING) {
             throw new IllegalArgumentException(
                     "Invalid padding length: " + paddingLength + " (expected " + MIN_PADDING + "-" + MAX_PADDING + ")"
@@ -519,7 +500,6 @@ public final class MessageDecryption {
 
         // WACryptoPkcs7.unpad
         // Validates the padding length does not exceed the plaintext length
-
         if (paddingLength > paddedPlaintext.length) {
             throw new IllegalArgumentException(
                     "Padding length " + paddingLength + " exceeds message length " + paddedPlaintext.length
@@ -528,7 +508,6 @@ public final class MessageDecryption {
 
         // WACryptoPkcs7.unpad
         // Returns the original plaintext by trimming the trailing padding bytes
-
         var originalLength = paddedPlaintext.length - paddingLength;
         return Arrays.copyOf(paddedPlaintext, originalLength);
     }
@@ -557,7 +536,6 @@ public final class MessageDecryption {
 
         // WAWebCryptoLibrary.processSenderKeyDistributionMsg
         // Builds the sender-key name and delegates to the group cipher to install the key
-
         var senderKeyName = SenderKeyNameFactory.create(groupJid, senderJid);
         groupCipher.process(senderKeyName, distributionMsg);
     }
@@ -583,7 +561,6 @@ public final class MessageDecryption {
 
         // WAWebCryptoLibrary.processSenderKeyDistributionMsg
         // Deserialises the raw distribution bytes and delegates to the SignalSenderKeyDistributionMessage overload
-
         var distributionMsg = SignalSenderKeyDistributionMessage.ofSerialized(distributionData);
         processSenderKeyDistribution(groupJid, senderJid, distributionMsg);
     }
@@ -607,7 +584,6 @@ public final class MessageDecryption {
 
         // WAWebCryptoLibrary.getRemoteRegId
         // Returns true when the store has a session record for the Signal address
-
         var address = deviceJid.toSignalAddress();
         return store.findSessionByAddress(address).isPresent();
     }
@@ -633,7 +609,6 @@ public final class MessageDecryption {
 
         // WAWebCryptoLibrary
         // Returns true when the store has a sender-key record keyed by the sender-key name
-
         var senderKeyName = SenderKeyNameFactory.create(groupJid, senderJid);
         return store.findSenderKeyByName(senderKeyName).isPresent();
     }
@@ -658,14 +633,12 @@ public final class MessageDecryption {
     public Optional<byte[]> extractIdentityKeyFromPkmsg(byte[] ciphertext) {
         // WAWebSignalUtilsApi.extractIdentityKey
         // Returns empty on null/empty input
-
         if (ciphertext == null || ciphertext.length == 0) {
             return Optional.empty();
         }
 
         // WAWebSignalUtilsApi.extractIdentityKey
         // Deserialises the PreKeySignalMessage and returns its identity key point bytes
-
         try {
             var message = SignalPreKeyMessage.ofSerialized(ciphertext);
             var identityKey = message.identityKey();
@@ -711,14 +684,12 @@ public final class MessageDecryption {
     ) throws GeneralSecurityException {
         // WAWebBotMessageSecret function S()
         // Encodes the messageId and sender JIDs as UTF-8 for the HKDF info
-
         var idBytes = messageId.getBytes(StandardCharsets.UTF_8);
         var targetBytes = targetSenderJid.toString().getBytes(StandardCharsets.UTF_8);
         var botBytes = botSenderJid.toString().getBytes(StandardCharsets.UTF_8);
 
         // WAWebBotMessageSecret function S()
         // Concatenates the three components to form the HKDF info
-
         var info = new byte[idBytes.length + targetBytes.length + botBytes.length];
         System.arraycopy(idBytes, 0, info, 0, idBytes.length);
         System.arraycopy(targetBytes, 0, info, idBytes.length, targetBytes.length);
@@ -726,7 +697,6 @@ public final class MessageDecryption {
 
         // WACryptoHkdf.extractAndExpand
         // Performs HKDF-Extract (null salt) then HKDF-Expand to the target key size
-
         var kdf = KDF.getInstance(HKDF_ALGORITHM);
         var params = HKDFParameterSpec.ofExtract()
                 .addIKM(botSecret)
@@ -753,7 +723,6 @@ public final class MessageDecryption {
     private byte[] buildBotAad(String messageId, Jid botSenderJid) {
         // WAWebBotMessageSecret.decryptMsmsgBotMessage
         // Constructs the AAD as the UTF-8 messageId followed by a null byte and the bot JID
-
         var idBytes = messageId.getBytes(StandardCharsets.UTF_8);
         var botBytes = botSenderJid.toString().getBytes(StandardCharsets.UTF_8);
         var aad = new byte[idBytes.length + 1 + botBytes.length];

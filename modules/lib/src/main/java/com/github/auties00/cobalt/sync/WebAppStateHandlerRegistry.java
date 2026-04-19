@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.sync;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.sync.handler.*;
 
 import java.util.HashMap;
@@ -15,6 +18,7 @@ import java.util.Optional;
  *
  * @implNote WAWebSyncdGetActionHandler.setActionHandlers, WAWebSyncdGetActionHandler.getActionHandler, WAWebSyncdGetActionHandler.maxSupportedVersion
  */
+@WhatsAppWebModule(moduleName = "WAWebSyncdGetActionHandler")
 public final class WebAppStateHandlerRegistry {
     /**
      * Map of action names to their registered handlers.
@@ -33,6 +37,7 @@ public final class WebAppStateHandlerRegistry {
      *
      * @implNote WAWebSyncdGetActionHandler.setActionHandlers, WAWebCollectionHandlerActions.ActionHandlers
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdGetActionHandler", exports = "setActionHandlers", adaptation = WhatsAppAdaptation.ADAPTED)
     public WebAppStateHandlerRegistry() {
         this.handlers = new HashMap<>(); // ADAPTED: WAWebSyncdGetActionHandler (eagerly created vs WA Web lazy Map)
         registerDefaultHandlers(); // WAWebHandleSuccess -> WAWebSyncdGetActionHandler.setActionHandlers(WAWebCollectionHandlerActions.ActionHandlers)
@@ -145,6 +150,7 @@ public final class WebAppStateHandlerRegistry {
      * @param handler the handler to register
      * @implNote WAWebSyncdGetActionHandler.setActionHandlers
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdGetActionHandler", exports = "setActionHandlers", adaptation = WhatsAppAdaptation.ADAPTED)
     public void registerHandler(WebAppStateActionHandler handler) {
         handlers.put(handler.actionName(), handler); // WAWebSyncdGetActionHandler.setActionHandlers
     }
@@ -160,6 +166,7 @@ public final class WebAppStateHandlerRegistry {
      * @return the handler, or empty if not registered
      * @implNote WAWebSyncdGetActionHandler.getActionHandler
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdGetActionHandler", exports = "getActionHandler", adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<WebAppStateActionHandler> findHandler(String actionName) {
         return Optional.ofNullable(handlers.get(actionName)); // ADAPTED: WAWebSyncdGetActionHandler.getActionHandler (returns Optional instead of undefined, no lazy Map init)
     }
@@ -174,6 +181,7 @@ public final class WebAppStateHandlerRegistry {
      * @return the maximum supported version across all handlers
      * @implNote WAWebSyncdGetActionHandler.maxSupportedVersion
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdGetActionHandler", exports = "maxSupportedVersion", adaptation = WhatsAppAdaptation.ADAPTED)
     public int maxSupportedVersion() {
         return handlers.values().stream() // ADAPTED: WAWebSyncdGetActionHandler.maxSupportedVersion (recomputes each call vs WA Web lazy cache in var s)
                 .mapToInt(WebAppStateActionHandler::version) // WAWebSyncdGetActionHandler.maxSupportedVersion: e.getVersion()

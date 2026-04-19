@@ -3,6 +3,9 @@ package com.github.auties00.cobalt.sync.handler;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncActionState;
@@ -42,6 +45,8 @@ import java.util.List;
  *           {@code chatJidIndex = 3}, {@code getVersion() = 1} and
  *           {@code getAction() = WASyncdConst.Actions.SettingsSync}
  */
+@WhatsAppWebModule(moduleName = "WAWebSettingsSync")
+@WhatsAppWebModule(moduleName = "WAWebSettingsSyncHelpers")
 public final class SettingsSyncHandler implements WebAppStateActionHandler {
     /**
      * Singleton instance of this handler.
@@ -52,6 +57,7 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
      *
      * @implNote WAWebSettingsSync — {@code var C = new y; l.default = C}
      */
+    @WhatsAppWebExport(moduleName = "WAWebSettingsSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final SettingsSyncHandler INSTANCE = new SettingsSyncHandler();
 
     /**
@@ -84,6 +90,7 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
      *           that only initializes {@code this.collectionName = RegularLow}
      *           and {@code this.chatJidIndex = 3}
      */
+    @WhatsAppWebExport(moduleName = "WAWebSettingsSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private SettingsSyncHandler() {
 
     }
@@ -97,6 +104,7 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
      * @return the constant {@link SettingsSyncAction#ACTION_NAME}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebSettingsSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
         return SettingsSyncAction.ACTION_NAME; // WAWebSettingsSync.getAction -> Actions.SettingsSync
     }
@@ -112,6 +120,7 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
      *         {@link SyncPatchType#REGULAR_LOW}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebSettingsSync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
         return SettingsSyncAction.COLLECTION_NAME; // WAWebSettingsSync -> CollectionName.RegularLow
     }
@@ -123,6 +132,7 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
      * @return the constant {@link SettingsSyncAction#ACTION_VERSION}, always {@code 1}
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebSettingsSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return SettingsSyncAction.ACTION_VERSION; // WAWebSettingsSync.getVersion -> 1
     }
@@ -143,6 +153,7 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
      * @return {@code true} if the apply succeeded, {@code false} otherwise
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebSettingsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: WAWebSettingsSync.applyMutations
     }
@@ -182,6 +193,7 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
      * @return a list of results parallel to the input
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebSettingsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public List<MutationApplicationResult> applyMutationBatchResults(WhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
         // WAWebSettingsSync.applyMutations: if (!h()) return e.map(() => ({actionState: Unsupported}))
         if (!isSettingsSyncEnabled(client)) {
@@ -248,6 +260,7 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
      * @return the detailed application result
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebSettingsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         // WAWebSettingsSync.applyMutations: if (!h()) return Unsupported
         if (!isSettingsSyncEnabled(client)) {
@@ -310,6 +323,7 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
      * @param mutation the trusted, decoded mutation to apply
      * @return the detailed application result
      */
+    @WhatsAppWebExport(moduleName = "WAWebSettingsSync", exports = "$SettingsSync$p_1", adaptation = WhatsAppAdaptation.ADAPTED)
     private MutationApplicationResult applyOne(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         // WAWebSettingsSync.$SettingsSync$p_1: var n = t.indexParts; if (!n || n.length !== 4) return Malformed
         JSONArray indexArray;
@@ -597,6 +611,7 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
      * @param settingKey the setting key whose value should be persisted
      * @param scope      either {@link #APP_SCOPE} for global settings or a chat JID string
      */
+    @WhatsAppWebExport(moduleName = "WAWebSettingsSyncHelpers", exports = "applySettingUpdate", adaptation = WhatsAppAdaptation.ADAPTED)
     private void applySettingUpdate(WhatsAppClient client,
                                     SettingsSyncAction action,
                                     SettingsSyncAction.SettingKey settingKey,

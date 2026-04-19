@@ -103,14 +103,14 @@ public final class ErrorStreamHandler implements SocketStream.Handler {
         // WABackendHandleError.errorParser: switch (t) { case c.SMAX_INVALID: return p(); ... }
         if (code == SMAX_INVALID_CODE) {
             // WABackendHandleError.p: WALogger.ERROR(`Invalid stanza sent (smax-invalid)`)
-            //                         .sendLogs("smax-invalid")  -- telemetry, skipped
+            //                         .sendLogs("smax-invalid") , telemetry, skipped
             LOGGER.log(System.Logger.Level.ERROR, "Invalid stanza sent (smax-invalid)");
             return;
         }
 
         // WABackendHandleError.errorParser: default: return _(t)
         // WABackendHandleError._: WALogger.ERROR(`Unknown error code: ${e}`, e)
-        //                         .sendLogs("unknown-error-code")  -- telemetry, skipped
+        //                         .sendLogs("unknown-error-code") , telemetry, skipped
         LOGGER.log(System.Logger.Level.ERROR, "Unknown error code: {0}", code);
     }
 }

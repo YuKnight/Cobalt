@@ -22,4 +22,7 @@ public interface BannerEventEvent extends WamEventSpec {
 
     @WamProperty(index = 4, type = WamType.STRING)
     Optional<String> deviceId();
+
+    @WamProperty(index = 5, type = WamType.STRING)
+    Optional<String> notificationLogId();
 }

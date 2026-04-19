@@ -26,4 +26,7 @@ public interface DisappearingModeSettingEventsEvent extends WamEventSpec {
 
     @WamProperty(index = 4, type = WamType.INTEGER)
     OptionalInt previousEphemeralityDuration();
+
+    @WamProperty(index = 6, type = WamType.BOOLEAN)
+    Optional<Boolean> isAfterRead();
 }

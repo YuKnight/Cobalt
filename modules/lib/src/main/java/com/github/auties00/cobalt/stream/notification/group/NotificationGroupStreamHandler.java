@@ -13,6 +13,7 @@ import com.github.auties00.cobalt.model.chat.group.GroupPartipantRole;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.stream.SocketStream;
+import com.github.auties00.cobalt.wam.event.GroupJoinCEventBuilder;
 
 import java.time.Instant;
 import java.util.LinkedHashSet;
@@ -260,6 +261,19 @@ public final class NotificationGroupStreamHandler implements SocketStream.Handle
      */
     private void applyCreate(Node notification, Chat chat, Jid groupJid, Node action) {
         var groupNode = action.getChild("group").orElse(action);
+        // WAWebHandleGroupCreation.handleGroupCreation: when the notification
+        // author is null or is not the current PN user, the recipient was
+        // added to a group they did not create, so a GroupJoinC telemetry
+        // event is committed. The property list is empty (WA Web definition:
+        // GroupJoinC:[158,{},[1,1,1],"regular"]).
+        var notificationAuthor = notification.getAttributeAsJid("participant").orElse(null);
+        var mePnUser = whatsapp.store().jid().orElse(null);
+        if (notificationAuthor == null
+                || mePnUser == null
+                || !notificationAuthor.toUserJid().equals(mePnUser.toUserJid())) {
+            whatsapp.wamService().commit(new GroupJoinCEventBuilder().build()); // WAWebHandleGroupCreation: new GroupJoinCWamEvent().commit()
+        }
+
         // WAWebHandleGroupNotification.I: subject
         var subject = groupNode.getAttributeAsString("subject", null);
         if (subject != null) {
@@ -318,38 +332,51 @@ public final class NotificationGroupStreamHandler implements SocketStream.Handle
                     .orElse(null);
             applyMemberAddMode(metadata, "admin_add".equals(memberAddModeStr));
 
-            // WAWebHandleGroupNotification.I: isParentGroup, isParentGroupClosed
+            // WAWebHandleGroupNotification.T: memberLinkMode (parsed from <member_link_mode> content)
+            var memberLinkModeContent = groupNode.getChild("member_link_mode")
+                    .flatMap(Node::toContentString)
+                    .orElse(null);
+            applyMemberLinkMode(metadata, memberLinkModeContent);
+
+            // WAWebHandleGroupNotification.T: limitSharingEnabled child (opus gating ignored server-side)
+            applyLimitSharingEnabled(metadata, groupNode.hasChild("limit_sharing_enabled"));
+
+            // WAWebHandleGroupNotification.T: generalChatAutoAddDisabled read from the
+            // notification <create> action node, not from the nested <group> element
+            applyGeneralChatAutoAddDisabled(metadata, action.hasChild("auto_add_disabled"));
+
+            // WAWebHandleGroupNotification.T: isParentGroup, isParentGroupClosed
             if (metadata instanceof GroupMetadata groupMetadata) {
-                // WAWebHandleGroupNotification.I: support
+                // WAWebHandleGroupNotification.T: support
                 groupMetadata.setSupport(groupNode.hasChild("support"));
-                // WAWebHandleGroupNotification.I: defaultSubgroup
+                // WAWebHandleGroupNotification.T: defaultSubgroup
                 groupMetadata.setDefaultSubgroup(groupNode.hasChild("default_sub_group"));
-                // WAWebHandleGroupNotification.I: generalSubgroup
+                // WAWebHandleGroupNotification.T: generalSubgroup
                 groupMetadata.setGeneralSubgroup(groupNode.hasChild("general_chat"));
-                // WAWebHandleGroupNotification.I: hiddenSubgroup
+                // WAWebHandleGroupNotification.T: hiddenSubgroup
                 groupMetadata.setHiddenSubgroup(groupNode.hasChild("hidden_group"));
-                // WAWebHandleGroupNotification.I: groupSafetyCheck
+                // WAWebHandleGroupNotification.T: groupSafetyCheck
                 groupMetadata.setGroupSafetyCheck(groupNode.hasChild("group_safety_check"));
-                // WAWebHandleGroupNotification.I: hasCapi
+                // WAWebHandleGroupNotification.T: hasCapi
                 groupMetadata.setHasCapi(groupNode.hasChild("capi"));
-                // WAWebHandleGroupNotification.I: size
+                // WAWebHandleGroupNotification.T: size
                 var size = groupNode.getAttributeAsInt("size", (Integer) null);
                 if (size != null) {
                     groupMetadata.setSize(size);
                 }
 
-                // WAWebHandleGroupNotification.I: linkedParent via extractLinkedParent
+                // WAWebHandleGroupNotification.T: linkedParent via extractLinkedParent
                 groupNode.getChild("linked_parent")
                         .flatMap(lp -> lp.getAttributeAsJid("jid"))
                         .ifPresent(groupMetadata::setParentCommunityJid);
 
-                // WAWebHandleGroupNotification.I: groupAdder = participant
+                // WAWebHandleGroupNotification.T: groupAdder = participant
                 var groupAdder = notification.getAttributeAsJid("participant").orElse(null);
                 if (groupAdder != null) {
                     groupMetadata.setGroupAdder(groupAdder.toUserJid());
                 }
             } else if (metadata instanceof CommunityMetadata communityMetadata) {
-                // WAWebHandleGroupNotification.I: isParentGroup = parent child
+                // WAWebHandleGroupNotification.T: isParentGroup = parent child
                 // communities have these flags in the create stanza
                 communityMetadata.setSupport(groupNode.hasChild("support"));
                 communityMetadata.setDefaultSubgroup(groupNode.hasChild("default_sub_group"));
@@ -361,7 +388,82 @@ public final class NotificationGroupStreamHandler implements SocketStream.Handle
                 if (size != null) {
                     communityMetadata.setSize(size);
                 }
+
+                // WAWebHandleGroupNotification.T: allowNonAdminSubGroupCreation (community-only)
+                communityMetadata.setAllowNonAdminSubGroupCreation(
+                        groupNode.hasChild("allow_non_admin_sub_group_creation"));
+
+                // WAWebHandleGroupNotification.T: isParentGroupClosed derived from
+                // <parent default_membership_approval_mode="request_required">
+                var parentClosed = groupNode.getChild("parent")
+                        .flatMap(parent -> parent.getAttributeAsString("default_membership_approval_mode"))
+                        .map("request_required"::equals)
+                        .orElse(false);
+                communityMetadata.setParentGroupClosed(parentClosed);
             }
+        }
+    }
+
+    /**
+     * Applies the {@code memberLinkMode} content string extracted from the
+     * {@code <member_link_mode>} child of a create stanza to the metadata.
+     * The WA Web parser maps {@code "admin_link"} to {@code ADMIN_LINK} and
+     * {@code "all_member_link"} to {@code ALL_MEMBER_LINK}, ignoring unknown
+     * values.
+     *
+     * @param metadata the metadata to update
+     * @param content  the content string, or {@code null} if absent
+     * @implNote WAWebHandleGroupNotification.T: memberLinkMode via
+     *     WAWebGroupMemberLinkMode.MemberLinkMode
+     */
+    private void applyMemberLinkMode(ChatMetadata metadata, String content) {
+        if (content == null) {
+            return;
+        }
+        if (metadata instanceof GroupMetadata groupMetadata) {
+            if ("admin_link".equals(content)) {
+                groupMetadata.setMemberLinkMode(ChatPolicy.ADMINS);
+            } else if ("all_member_link".equals(content)) {
+                groupMetadata.setMemberLinkMode(ChatPolicy.ANYONE);
+            }
+        } else if (metadata instanceof CommunityMetadata communityMetadata) {
+            if ("admin_link".equals(content)) {
+                communityMetadata.setMemberLinkModeAdminOnly(true);
+            } else if ("all_member_link".equals(content)) {
+                communityMetadata.setMemberLinkModeAdminOnly(false);
+            }
+        }
+    }
+
+    /**
+     * Applies the {@code limitSharingEnabled} flag to the metadata.
+     *
+     * @param metadata the metadata to update
+     * @param value    whether link/media sharing is limited to admins
+     * @implNote WAWebHandleGroupNotification.T: limitSharingEnabled child
+     */
+    private void applyLimitSharingEnabled(ChatMetadata metadata, boolean value) {
+        if (metadata instanceof GroupMetadata groupMetadata) {
+            groupMetadata.setLimitSharingEnabled(value);
+        } else if (metadata instanceof CommunityMetadata communityMetadata) {
+            communityMetadata.setLimitSharingEnabled(value);
+        }
+    }
+
+    /**
+     * Applies the {@code generalChatAutoAddDisabled} flag directly to a
+     * metadata instance. Used both by the top-level {@code auto_add_disabled}
+     * action and by the create flow which reads the nested child.
+     *
+     * @param metadata the metadata to update
+     * @param value    whether auto-add to the general chat is disabled
+     * @implNote WAWebHandleGroupNotification.T: generalChatAutoAddDisabled
+     */
+    private void applyGeneralChatAutoAddDisabled(ChatMetadata metadata, boolean value) {
+        if (metadata instanceof GroupMetadata groupMetadata) {
+            groupMetadata.setGeneralChatAutoAddDisabled(value);
+        } else if (metadata instanceof CommunityMetadata communityMetadata) {
+            communityMetadata.setGeneralChatAutoAddDisabled(value);
         }
     }
 
@@ -766,10 +868,8 @@ public final class NotificationGroupStreamHandler implements SocketStream.Handle
      */
     private void applyGeneralChatAutoAddDisabled(Jid groupJid, boolean value) {
         var metadata = currentMetadata(groupJid);
-        if (metadata instanceof GroupMetadata groupMetadata) {
-            groupMetadata.setGeneralChatAutoAddDisabled(value);
-        } else if (metadata instanceof CommunityMetadata communityMetadata) {
-            communityMetadata.setGeneralChatAutoAddDisabled(value);
+        if (metadata != null) {
+            applyGeneralChatAutoAddDisabled(metadata, value);
         }
     }
 

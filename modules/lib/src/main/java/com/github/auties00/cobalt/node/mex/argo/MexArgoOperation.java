@@ -49,7 +49,6 @@ public non-sealed interface MexArgoOperation extends MexOperation {
     static NodeBuilder createMexNode(String queryId, byte[] argoPayload) {
         // WAWebMexClient.fetchQuery
         // Builds the inner <query> element carrying the query_id attribute and the Argo payload bytes
-
         var queryNode = new NodeBuilder()
                 .description("query")
                 .attribute("query_id", queryId)
@@ -58,7 +57,6 @@ public non-sealed interface MexArgoOperation extends MexOperation {
 
         // WAWebMexClient.fetchQuery
         // Wraps the query in an IQ stanza routed to the user server under the w:mex namespace
-
         return new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "w:mex")

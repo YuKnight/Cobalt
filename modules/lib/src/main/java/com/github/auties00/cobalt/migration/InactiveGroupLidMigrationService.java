@@ -157,7 +157,6 @@ public final class InactiveGroupLidMigrationService {
     public void start() {
         // WAWebInactiveGroupLidMigrationJob.migrateInactiveGroupsToLid
         // Short-circuits scheduling when the migration has already been marked complete in a previous call
-
         if (complete.get()) {
             LOGGER.log(System.Logger.Level.DEBUG,
                     "[lid-inactive-group-migration] already done, skip");
@@ -166,7 +165,6 @@ public final class InactiveGroupLidMigrationService {
 
         // WAWebTasksDefinitions.registerTasks
         // Schedules the migration pass to run after the 60-second post-pairing grace period
-
         scheduledTask = SchedulerUtils.scheduleDelayed(INITIAL_DELAY, this::run);
     }
 
@@ -212,7 +210,6 @@ public final class InactiveGroupLidMigrationService {
         try {
             // WAWebInactiveGroupLidMigrationJob.migrateInactiveGroupsToLid
             // Gates execution on the AB prop that enables inactive-group LID migration server-side
-
             if (!abPropsService.getBool(ABProp.ENABLE_INACTIVE_GROUP_LID_MIGRATION)) {
                 LOGGER.log(System.Logger.Level.DEBUG,
                         "[lid-inactive-group-migration] ABProp disabled, skip");
@@ -221,7 +218,6 @@ public final class InactiveGroupLidMigrationService {
 
             // WAWebInactiveGroupLidMigrationJob.migrateInactiveGroupsToLid
             // Re-checks the complete flag in case the initial pass ran during a previous session
-
             if (complete.get()) {
                 LOGGER.log(System.Logger.Level.DEBUG,
                         "[lid-inactive-group-migration] already done, skip");
@@ -233,7 +229,6 @@ public final class InactiveGroupLidMigrationService {
 
             // WAWebInactiveGroupLidMigrationJob.migrateInactiveGroupsToLid
             // Collects the set of group chats that are still on phone-number addressing
-
             var pnGroups = findPnGroups();
             if (pnGroups.isEmpty()) {
                 LOGGER.log(System.Logger.Level.INFO,
@@ -247,7 +242,6 @@ public final class InactiveGroupLidMigrationService {
 
             // ADAPTED: WAWebInactiveGroupLidMigrationJob.migrateInactiveGroupsToLid
             // WA Web uses queryAndUpdateAllGroupMetadata for a batch request; Cobalt issues one query per group
-
             for (var groupJid : pnGroups) {
                 try {
                     client.queryChatMetadata(groupJid);
@@ -263,7 +257,6 @@ public final class InactiveGroupLidMigrationService {
 
             // WAWebInactiveGroupLidMigrationJob.migrateInactiveGroupsToLid
             // Re-scans the store after the refresh to decide between completion and retry
-
             var remaining = findPnGroups();
             if (remaining.isEmpty()) {
                 LOGGER.log(System.Logger.Level.INFO,
@@ -314,12 +307,10 @@ public final class InactiveGroupLidMigrationService {
                 .map(chat -> chat.jid())
                 // WAWebInactiveGroupLidMigrationJob.migrateInactiveGroupsToLid
                 // Restricts the scan to chats on the groups-or-communities server
-
                 .filter(jid -> jid.hasServer(JidServer.groupOrCommunity()))
                 .filter(jid -> {
                     // WAWebInactiveGroupLidMigrationJob.migrateInactiveGroupsToLid
                     // Keeps only groups whose metadata is cached, still on PN addressing, and neither suspended nor terminated
-
                     var metadata = store.findChatMetadata(jid).orElse(null);
                     return metadata != null
                             && !metadata.isLidAddressingMode()

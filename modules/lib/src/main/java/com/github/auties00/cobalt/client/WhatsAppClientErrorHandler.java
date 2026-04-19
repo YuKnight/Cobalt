@@ -218,6 +218,9 @@ public interface WhatsAppClientErrorHandler {
 
             if (exception instanceof WhatsAppReconnectionException) {
                 logger.log(WARNING, "[{0}] Cannot reconnect: retrying on next timeout", jid);
+                if (printer != null) {
+                    printer.accept(whatsapp, exception);
+                }
                 return Result.DISCARD;
             }
 

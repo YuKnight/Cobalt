@@ -45,7 +45,10 @@ import java.util.logging.Logger;
  */
 @WhatsAppWebModule(moduleName = "WAWebSyncdRequestBuilder")
 @WhatsAppWebModule(moduleName = "WAWebSyncdRequestBuilderBuild")
+@WhatsAppWebModule(moduleName = "WAWebSyncdRequestBuilderTypesConverter")
+@WhatsAppWebModule(moduleName = "WAWebSyncdRequestBuilderUtils")
 @WhatsAppWebModule(moduleName = "WAWebSyncdRequestEncode")
+@WhatsAppWebModule(moduleName = "WAWebSyncdMMSUpload")
 public final class MutationRequestBuilder {
     private static final Logger LOGGER = Logger.getLogger(MutationRequestBuilder.class.getName());
 
@@ -73,12 +76,26 @@ public final class MutationRequestBuilder {
      * upload metadata so the caller can run the {@code _uploadSuccessful}
      * path after a successful server response.
      *
-     * @implNote WAWebSyncdRequestBuilderBuild.buildSyncIqNode,
-     *           WAWebSyncdRequestBuilderBuild._buildCollectionNodes
+     * <p>Semantically equivalent to invoking
+     * {@code WAWebSyncdRequestBuilder.buildAppStateSyncRequest} with a
+     * single-collection set: compacts mutation ids (pre-compaction) per
+     * WA Web's {@code compactMap(t, e => e.id)}, then delegates to
+     * {@code buildSyncIqNode}.
+     *
+     * @implNote WAWebSyncdRequestBuilder.buildAppStateSyncRequest
+     *           (single-collection variant),
+     *           WAWebSyncdRequestBuilderBuild.buildSyncIqNode,
+     *           WAWebSyncdRequestBuilderBuild._buildCollectionNodes.
+     *           ADAPTED: WA Web always batches across the dirty set; Cobalt
+     *           additionally exposes a single-collection variant for the
+     *           individual retry path in
+     *           {@code WAWebSyncdServerSync.serverSync}.
      * @param patchType the collection type to sync
      * @param patches   the pending mutations to include
      * @return the sync request containing the IQ node and optional upload info
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdRequestBuilder", exports = "buildAppStateSyncRequest", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebSyncdRequestBuilderBuild", exports = "buildSyncIqNode", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncRequest buildSyncRequest(SyncPatchType patchType, SequencedCollection<SyncPendingMutation> patches) {
         // ADAPTED: WAWebSyncdRequestBuilderBuild._buildCollectionNodes — getCollectionVersionInTransaction
         var hashState = whatsapp.store()
@@ -138,7 +155,6 @@ public final class MutationRequestBuilder {
                 .attribute("to", Jid.userServer()) // ADAPTED: WAWebSyncdRequestBuilderBuild.g — S_WHATSAPP_NET
                 .content(syncNode);
         // ADAPTED: id attribute added automatically by WhatsAppClient.sendNode — WAWebSyncdRequestBuilderBuild.g — generateId()
-
         return new SyncRequest(node, uploadInfo);
     }
 
@@ -178,10 +194,17 @@ public final class MutationRequestBuilder {
      * {@link SyncRequest.UploadedPatchInfo}.
      *
      * @implNote WAWebSyncdRequestBuilderBuild._buildCollectionNodes (inner function C/b),
+     *           WAWebSyncdRequestBuilderBuild._generateMutationsToUpload (orphan REMOVE filter
+     *           step — function D lines filtering REMOVE mutations whose index is not in
+     *           {@code getSyncActionsByCollectionsInTransaction}; the rotation-mutation
+     *           generation step is delegated to {@link #buildKeyRotationMutations}),
      *           WAWebSyncdAntiTampering.computeOutgoingSnapshotAndPatchMacs,
-     *           WAWebSyncdMMSUpload.exceedInlineMutationCount,
-     *           WAWebSyncdMMSUpload.exceedPatchProtobufSize,
-     *           WAWebSyncdMMSUpload.uploadPatch,
+     *           WAWebSyncdMMSUpload.exceedInlineMutationCount (function g — inlined threshold check on
+     *           {@code syncdMutations.size()} vs {@code min(2000, max(100, abProp))}),
+     *           WAWebSyncdMMSUpload.exceedPatchProtobufSize (function h — inlined threshold check on
+     *           encoded patch bytes vs {@code min(100, max(10, abProp)) * 1000}),
+     *           WAWebSyncdMMSUpload.uploadPatch (function d/m — delegated to
+     *           {@link #uploadExternalMutations(List)}),
      *           WAWebSyncdRequestBuilderBuild.L (inline patch builder)
      * @param patchType       the collection type
      * @param patches         the compacted pending mutations
@@ -193,6 +216,8 @@ public final class MutationRequestBuilder {
      *                        the compacted subset
      * @return the serialized patch bytes and upload metadata
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdMMSUpload", exports = "exceedInlineMutationCount", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebSyncdMMSUpload", exports = "exceedPatchProtobufSize", adaptation = WhatsAppAdaptation.ADAPTED)
     private PatchBuildResult buildPatchProtobuf(SyncPatchType patchType, SequencedCollection<SyncPendingMutation> patches, SyncHashValue hashState, List<String> allMutationIds) {
         // ADAPTED: WAWebSyncdKeyManagement.getActiveKey — get latest key
         var keys = whatsapp.store().appStateKeys();
@@ -448,7 +473,21 @@ public final class MutationRequestBuilder {
      *
      * @implNote WAWebSyncdRequestBuilderBuild._generateMutationsToUpload (function T/D),
      *           WAWebSyncdRequestBuilderBuild.x (rotation SET generation),
-     *           WAWebSyncdRequestBuilderBuild.$ (rotation REMOVE generation)
+     *           WAWebSyncdRequestBuilderBuild.$ (rotation REMOVE generation),
+     *           WAWebSyncdRequestBuilderTypesConverter.syncActionsToPendingMutations (inlined
+     *           at both rotation sites — Cobalt's {@link SyncActionEntry} already holds the
+     *           decoded {@link com.github.auties00.cobalt.model.sync.SyncActionValue}, so the
+     *           WA Web decode/re-encode pipeline collapses to wrapping the value in a
+     *           {@link DecryptedMutation.Trusted} paired with the caller-supplied operation;
+     *           the {@code binarySyncData → value → binarySyncAction} round-trip is absorbed
+     *           by {@link EncryptedMutation#of(SyncPendingMutation, MutationKeys, byte[])}
+     *           which re-serializes the value when it builds the outgoing {@code SyncActionData}),
+     *           WAWebSyncdWamAppState.addKeyRotationRemoveCount (skipped per Cobalt's
+     *           telemetry policy — WA Web reports the rotation REMOVE count as a WAM metric).
+     *           ADAPTED: the orphan-REMOVE filter step of {@code _generateMutationsToUpload}
+     *           lives in the caller ({@link #buildPatchProtobuf}) because Cobalt encrypts the
+     *           user mutations first and delegates rotation generation here; the concatenation
+     *           of user mutations + rotation SETs + rotation REMOVEs happens at the call site.
      * @param patchType   the collection type
      * @param patches     the core mutations being sent (to exclude from rotation)
      * @param storedEntries the stored sync action entries for this collection, reused from the caller
@@ -459,6 +498,8 @@ public final class MutationRequestBuilder {
      * @return the additional encrypted mutations for key rotation (SETs + REMOVEs)
      * @throws GeneralSecurityException if encryption fails
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdRequestBuilderBuild", exports = "_generateMutationsToUpload", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebSyncdRequestBuilderTypesConverter", exports = "syncActionsToPendingMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     private List<EncryptedMutation> buildKeyRotationMutations(
             SyncPatchType patchType,
             SequencedCollection<SyncPendingMutation> patches,
@@ -473,16 +514,17 @@ public final class MutationRequestBuilder {
             batchIndices.add(patch.mutation().index());
         }
 
-        // WAWebSyncdRequestBuilderBuild.D — r = getSyncActionsByCollectionsInTransaction([e])
-        // then filter by !a.has(e.index) && !syncKeyIdsEqual(e.keyId, n)
-        // then sortBy(e => getKeyEpoch(e.keyId))
-        var allEntries = storedEntries.stream()
+        // WAWebSyncdRequestBuilderBuild.x — rotation SET list is sorted by key epoch before slicing
+        // so the oldest-key entries are rotated first. The REMOVE rotation path in WA Web (function $)
+        // does NOT sort; it iterates the stored entries in their original insertion order.
+        // The sort therefore must be scoped to the SET path only.
+        var sortedEntriesForSet = storedEntries.stream()
                 .sorted(Comparator.comparingInt(e -> SyncKeyUtils.getKeyEpoch(e.keyId()))) // WAWebSyncdRequestBuilderBuild.x — sortBy(getKeyEpoch)
                 .toList();
         var maxAdditional = Math.min(5, Math.max(0, abPropsService.getInt(ABProp.SYNCD_ADDITIONAL_MUTATIONS_COUNT))); // WAWebSyncdRequestBuilderBuild.D — Math.min(p=5, getABPropConfigValue("syncd_additional_mutations_count"))
         var result = new ArrayList<EncryptedMutation>();
 
-        for (var entry : allEntries) {
+        for (var entry : sortedEntriesForSet) {
             if (result.size() >= maxAdditional) { // WAWebSyncdRequestBuilderBuild.x — i.slice(0, l)
                 break;
             }
@@ -514,7 +556,8 @@ public final class MutationRequestBuilder {
 
         // WAWebSyncdRequestBuilderBuild.$ — generate REMOVE mutations for old-key entries
         // Per WA Web: only SET operations' indices are collected (not REMOVE), matching
-        // t.filter(e => e.operation === SET).map(e => e.index)
+        // t.filter(e => e.operation === SET).map(e => e.index). The function $ iterates
+        // the stored entries in their original order (no sortBy), unlike the SET path (x).
         var allSetIndices = new HashSet<String>();
         for (var patch : patches) {
             if (patch.mutation().operation() == SyncdOperation.SET) { // WAWebSyncdRequestBuilderBuild.$ — filter to SET operations only
@@ -525,7 +568,8 @@ public final class MutationRequestBuilder {
             allSetIndices.add(rotationSource.index()); // WAWebSyncdRequestBuilderBuild.$ — rotation SETs always have SET operation
         }
 
-        for (var entry : allEntries) {
+        // WAWebSyncdRequestBuilderBuild.$ — iterate stored entries in original order (no sort)
+        for (var entry : storedEntries) {
             if (entry.actionIndex() == null || !allSetIndices.contains(entry.actionIndex())) { // WAWebSyncdRequestBuilderBuild.$ — r.has(e.index)
                 continue;
             }
@@ -569,16 +613,44 @@ public final class MutationRequestBuilder {
      * Builds a sync request node that batches multiple collections into a
      * single IQ stanza.
      *
-     * <p>Per WhatsApp Web {@code WAWebSyncdRequestBuilder}: all dirty collections
-     * are batched into a single IQ with one {@code <sync>} node containing
-     * multiple {@code <collection>} children.
+     * <p>Per WhatsApp Web {@code WAWebSyncdRequestBuilder.buildAppStateSyncRequest}:
+     * for the set of dirty collections passed in, the pending mutations for
+     * each collection are loaded, all pending mutation IDs are captured
+     * (pre-compaction) via {@code compactMap(t, e => e.id)}, the mutations
+     * are compacted, and the per-collection maps are passed to
+     * {@code buildSyncIqNode} which returns a single IQ node containing one
+     * {@code <sync>} with multiple {@code <collection>} children.
+     *
+     * <p>Per WA Web {@code buildAppStateSyncRequest}: when the AB prop
+     * {@code kmp_syncd_engine_outgoing_processor_enabled} is {@code true},
+     * the request is built via
+     * {@code WAWebKmpSyncdRequestBuilder.buildOutgoingRequestWithKmp} instead.
+     * Cobalt does not implement the experimental KMP engine path; the AB
+     * prop defaults to {@code false} so this is a no-op under default
+     * configuration.
      *
      * @implNote WAWebSyncdRequestBuilder.buildAppStateSyncRequest,
      *           WAWebSyncdRequestBuilderBuild.buildSyncIqNode,
-     *           WAWebSyncdRequestBuilderBuild._buildCollectionNodes
+     *           WAWebSyncdRequestBuilderBuild._buildCollectionNodes.
+     *           ADAPTED: WA Web loads pending mutations internally via
+     *           {@code getSyncPendingMutationsByCollectionInTransaction};
+     *           Cobalt accepts pre-loaded mutations via the
+     *           {@code collectionPatches} parameter (caller performs the
+     *           load). The return shape is also restructured:
+     *           {@code collectionWithPendingMutationsIds},
+     *           {@code collectionWithEncryptedMutations}, and
+     *           {@code localCollectionVersions} are carried per-collection
+     *           inside each {@link SyncRequest.UploadedPatchInfo} in
+     *           {@code uploadInfos} rather than as separate top-level maps;
+     *           {@code pendingCollectionsInBootstrap} maps to
+     *           {@code skippedUploads}. The KMP engine fallback
+     *           ({@code kmp_syncd_engine_outgoing_processor_enabled}) is
+     *           not implemented (default {@code false}).
      * @param collectionPatches map of collection types to their pending mutations
      * @return the batched sync request containing the IQ node, per-collection upload metadata, and skipped uploads
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdRequestBuilder", exports = "buildAppStateSyncRequest", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebSyncdRequestBuilderBuild", exports = "buildSyncIqNode", adaptation = WhatsAppAdaptation.ADAPTED)
     public BatchedSyncRequest buildBatchedSyncRequest(Map<SyncPatchType, SequencedCollection<SyncPendingMutation>> collectionPatches) {
         var collectionNodes = new ArrayList<com.github.auties00.cobalt.node.Node>();
         var uploadInfos = new LinkedHashMap<SyncPatchType, SyncRequest.UploadedPatchInfo>();
@@ -669,12 +741,21 @@ public final class MutationRequestBuilder {
      * reference. In Cobalt the {@code MediaConnection.upload} method handles
      * encryption, upload, and field population in a single call.
      *
-     * @implNote WAWebSyncdMMSUpload.uploadPatch, WAWebSyncdNetCallbacksApi.uploadSyncExternalPatch,
-     *           WAWebSyncdMMSUpload.buildExternalBlobReference,
-     *           WAWebSyncdRequestEncode.encodeSyncdMutations
+     * @implNote WAWebSyncdMMSUpload.uploadPatch (function d/m), WAWebSyncdNetCallbacksApi.uploadSyncExternalPatch,
+     *           WAWebSyncdMMSUpload.buildExternalBlobReference (function p/_),
+     *           WAWebSyncdRequestEncode.encodeSyncdMutations.
+     *           ADAPTED: WA Web's three-step pipeline (uploadSyncExternalPatch → buildExternalBlobReference →
+     *           f encodes SyncdPatch) is collapsed: uploadSyncExternalPatch + buildExternalBlobReference are
+     *           fused into {@code MediaConnection.upload} which encrypts, uploads, and populates the
+     *           {@link ExternalBlobReference} fields ({@code mediaKey}, {@code directPath}, {@code handle},
+     *           {@code fileSizeBytes}, {@code fileSha256}, {@code fileEncSha256}) in a single call; the
+     *           final {@code f} step (encoding SyncdPatch with externalMutations) is performed by the caller
+     *           in {@link #buildPatchProtobuf} after this method returns
      * @param mutations the list of mutations to upload externally
      * @return the populated {@code ExternalBlobReference} with CDN metadata
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdMMSUpload", exports = "uploadPatch", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebSyncdMMSUpload", exports = "buildExternalBlobReference", adaptation = WhatsAppAdaptation.ADAPTED)
     private ExternalBlobReference uploadExternalMutations(List<SyncdMutation> mutations) {
         var syncdMutations = new SyncdMutationsBuilder()
                 .mutations(mutations)
@@ -708,20 +789,33 @@ public final class MutationRequestBuilder {
      *
      * <p>Per WhatsApp Web {@code compactPatch}: when multiple mutations target
      * the same index (e.g., rapidly toggling a setting), only the final state
-     * is sent to the server.
+     * is sent to the server. The reference implementation reverses the input,
+     * applies a {@code unique-by-key} filter (internal helper {@code c}) keyed
+     * on {@code e.index}, then reverses the result so that the last occurrence
+     * of each index is preserved in its original relative position.
      *
-     * @implNote WAWebSyncdRequestBuilderUtils.compactPatch
+     * @implNote WAWebSyncdRequestBuilderUtils.compactPatch (and its internal
+     *           unique-by-key helper {@code c}). ADAPTED: WA Web reverses the
+     *           input array in place via {@code e.reverse()}; Cobalt makes a
+     *           defensive copy before reversing so the caller's
+     *           {@link SequencedCollection} is not mutated. The key function
+     *           {@code e => e.index} maps to {@code patch.mutation().index()}
+     *           because Cobalt's {@link SyncPendingMutation} wraps the mutation
+     *           inside a {@link DecryptedMutation.Trusted} record rather than
+     *           exposing {@code index} as a direct property.
      * @param patches the pending mutations to compact
      * @return the compacted mutations
      */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdRequestBuilderUtils", exports = "compactPatch", adaptation = WhatsAppAdaptation.ADAPTED)
     private SequencedCollection<SyncPendingMutation> compactPatch(SequencedCollection<SyncPendingMutation> patches) {
-        // WAWebSyncdRequestBuilderUtils.compactPatch — e.reverse(), deduplicate, .reverse()
+        // WAWebSyncdRequestBuilderUtils.compactPatch — return c(e.reverse(), e => e.index).reverse()
         var reversed = new ArrayList<SyncPendingMutation>(patches);
         Collections.reverse(reversed); // WAWebSyncdRequestBuilderUtils.compactPatch — e.reverse()
         var seen = new HashSet<String>();
         var deduplicated = new ArrayList<SyncPendingMutation>(reversed.size());
         for (var patch : reversed) {
-            if (seen.add(patch.mutation().index())) { // WAWebSyncdRequestBuilderUtils.l — unique by index
+            // WAWebSyncdRequestBuilderUtils.c — var n=new Set; return e.filter(e => n.has(t(e)) ? false : (n.add(t(e)), true))
+            if (seen.add(patch.mutation().index())) {
                 deduplicated.add(patch);
             }
         }
