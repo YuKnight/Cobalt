@@ -9,6 +9,7 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.stream.SocketStream;
+import com.github.auties00.cobalt.stream.control.OfflineNotificationsReporter;
 
 /**
  * Routes inbound device-category notification stanzas to specialised
@@ -55,21 +56,26 @@ public final class NotificationDeviceDispatcher implements SocketStream.Handler 
      * Constructs a new dispatcher and instantiates every sub-handler with
      * the shared dependencies.
      *
-     * @param whatsapp                the non-{@code null} client providing store and network access
-     * @param deviceLinkingService the alt-device-linking service consumed by the linking handler
-     * @param abPropsService          the A/B props service consumed by the server-crypto handler
-     * @param deviceService           the device service consumed by the device-list handler
+     * @param whatsapp                     the non-{@code null} client providing store and network access
+     * @param deviceLinkingService         the alt-device-linking service consumed by the linking handler
+     * @param abPropsService               the A/B props service consumed by the server-crypto handler
+     * @param deviceService                the device service consumed by the device-list handler
+     * @param offlineNotificationsReporter the shared reporter that records per-collection
+     *                                     offline {@code server_sync} notification counts for the
+     *                                     {@code MdAppStateOfflineNotifications} WAM event; forwarded to
+     *                                     the server-sync handler
      */
     public NotificationDeviceDispatcher(
             WhatsAppClient whatsapp,
             CompanionPairingService deviceLinkingService,
             ABPropsService abPropsService,
-            DeviceService deviceService
+            DeviceService deviceService,
+            OfflineNotificationsReporter offlineNotificationsReporter
     ) {
         this.notificationDeviceHandler = new NotificationDeviceStreamHandler(whatsapp, deviceService);
         this.notificationLinkingHandler = new NotificationLinkingStreamHandler(whatsapp, deviceLinkingService);
         this.notificationServerCryptoHandler = new NotificationServerCryptoStreamHandler(whatsapp, abPropsService);
-        this.notificationSyncHandler = new NotificationSyncStreamHandler(whatsapp);
+        this.notificationSyncHandler = new NotificationSyncStreamHandler(whatsapp, offlineNotificationsReporter);
     }
 
     /**

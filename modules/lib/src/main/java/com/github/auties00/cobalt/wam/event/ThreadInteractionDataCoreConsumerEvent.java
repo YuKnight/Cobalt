@@ -15,6 +15,27 @@ import java.util.OptionalInt;
 
 @WamEvent(id = 6466)
 public interface ThreadInteractionDataCoreConsumerEvent extends WamEventSpec {
+    @WamProperty(index = 138, type = WamType.INTEGER)
+    OptionalInt afterReadDuration();
+
+    @WamProperty(index = 139, type = WamType.INTEGER)
+    OptionalInt afterReadMessagesExpired();
+
+    @WamProperty(index = 144, type = WamType.INTEGER)
+    OptionalInt afterReadMessagesReceived();
+
+    @WamProperty(index = 140, type = WamType.INTEGER)
+    OptionalInt afterReadMessagesSent();
+
+    @WamProperty(index = 141, type = WamType.INTEGER)
+    OptionalInt afterReadMessagesUnreadExpired();
+
+    @WamProperty(index = 142, type = WamType.BOOLEAN)
+    Optional<Boolean> afterReadTurnedOff();
+
+    @WamProperty(index = 143, type = WamType.BOOLEAN)
+    Optional<Boolean> afterReadTurnedOn();
+
     @WamProperty(index = 1, type = WamType.INTEGER)
     OptionalInt audioMessagesReceived();
 
@@ -126,6 +147,12 @@ public interface ThreadInteractionDataCoreConsumerEvent extends WamEventSpec {
     @WamProperty(index = 41, type = WamType.INTEGER)
     OptionalInt forwardVideoMessagesReceived();
 
+    @WamProperty(index = 134, type = WamType.INTEGER)
+    OptionalInt forwardPtvMessagesReceived();
+
+    @WamProperty(index = 135, type = WamType.INTEGER)
+    OptionalInt forwardPtvMessagesSent();
+
     @WamProperty(index = 42, type = WamType.INTEGER)
     OptionalInt forwardVideoMessagesSent();
 
@@ -201,6 +228,9 @@ public interface ThreadInteractionDataCoreConsumerEvent extends WamEventSpec {
     @WamProperty(index = 121, type = WamType.BOOLEAN)
     Optional<Boolean> isManagedAccount();
 
+    @WamProperty(index = 136, type = WamType.BOOLEAN)
+    Optional<Boolean> isMessageYourself();
+
     @WamProperty(index = 59, type = WamType.BOOLEAN)
     Optional<Boolean> isMetaAiAssistant();
 
@@ -216,6 +246,9 @@ public interface ThreadInteractionDataCoreConsumerEvent extends WamEventSpec {
     @WamProperty(index = 123, type = WamType.BOOLEAN)
     Optional<Boolean> isUsernameThread();
 
+    @WamProperty(index = 137, type = WamType.BOOLEAN)
+    Optional<Boolean> isUsernameThreadAtCreation();
+
     @WamProperty(index = 124, type = WamType.BOOLEAN)
     Optional<Boolean> limitSharingOption();
 
@@ -225,11 +258,20 @@ public interface ThreadInteractionDataCoreConsumerEvent extends WamEventSpec {
     @WamProperty(index = 63, type = WamType.INTEGER)
     OptionalInt markedReadMessageCnt();
 
+    @WamProperty(index = 131, type = WamType.STRING)
+    Optional<String> matchedMessagesMarkedAsReadWithDeltaTime();
+
+    @WamProperty(index = 132, type = WamType.STRING)
+    Optional<String> matchedMessagesReadWithDeltaTime();
+
     @WamProperty(index = 64, type = WamType.INTEGER)
     OptionalInt messagesRead();
 
     @WamProperty(index = 65, type = WamType.INTEGER)
     OptionalInt messagesReceived();
+
+    @WamProperty(index = 133, type = WamType.INTEGER)
+    OptionalInt messagesReceivedWithEnabledReadReceipt();
 
     @WamProperty(index = 66, type = WamType.INTEGER)
     OptionalInt messagesSent();
@@ -338,6 +380,9 @@ public interface ThreadInteractionDataCoreConsumerEvent extends WamEventSpec {
 
     @WamProperty(index = 109, type = WamType.STRING)
     Optional<String> threadIdByLid();
+
+    @WamProperty(index = 130, type = WamType.INTEGER)
+    OptionalInt tombstoneAiFutureproofedMessagesReceived();
 
     @WamProperty(index = 128, type = WamType.INTEGER)
     OptionalInt tombstoneEphemeralMessagesReceived();

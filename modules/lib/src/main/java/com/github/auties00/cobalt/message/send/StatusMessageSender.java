@@ -24,6 +24,10 @@ import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
 import com.github.auties00.cobalt.model.privacy.PrivacySettingType;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
+import com.github.auties00.cobalt.wam.event.PrekeysDepletionEventBuilder;
+import com.github.auties00.cobalt.wam.type.MessageType;
+import com.github.auties00.cobalt.wam.type.PrekeysFetchContext;
+import com.github.auties00.cobalt.wam.type.WamSizeBuckets;
 
 import java.util.*;
 
@@ -200,9 +204,19 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
 
         // WAWebEncryptAndSendStatusMsg: encrypt SK distribution for new devices
         // WAWebGetGroupKeyDistributionMsg: populates ICDC per device
-        var skDistPayloads = skDistribDevices.isEmpty()
-                ? List.<MessageEncryptedPayload>of()
-                : senderKeyDistribution.encrypt(statusJid, senderKeyBytes, skDistribDevices);
+        List<MessageEncryptedPayload> skDistPayloads;
+        if (skDistribDevices.isEmpty()) {
+            skDistPayloads = List.of();
+        } else {
+            // WAWebEncryptAndSendStatusMsg: yield ensureE2ESessions(U, !1, k) — ensureE2ESessions
+            // for skDistribList and emit PrekeysDepletionEvent before encrypting distribution.
+            var depletedPrekeyCount = deviceService.ensureSessions(skDistribDevices);
+            // WAWebEncryptAndSendStatusMsg -> WAWebPostPrekeysDepletionMetric.maybePostPrekeysDepletionMetric:
+            // {count, prekeysFetchReason: SEND_MESSAGE, messageType: STATUS,
+            // deviceSizeBucket: numberToSizeBucket(B.length)} where B is the full audience list.
+            emitPrekeysDepletionEvents(depletedPrekeyCount, MessageType.STATUS, allDevices.size());
+            skDistPayloads = senderKeyDistribution.encrypt(statusJid, senderKeyBytes, skDistribDevices);
+        }
 
         // WAWebEncryptAndSendStatusMsg: build participants node
         // Contains both SK distribution <to> and existing device <to> nodes
@@ -421,7 +435,13 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
     ) {
         var container = messageInfo.message();
 
-        deviceService.ensureSessions(allDevices);
+        var depletedPrekeyCount = deviceService.ensureSessions(allDevices);
+        // WAWebEncryptAndSendStatusMsg.encryptAndSendStatusDirectMsg routes through
+        // WAWebSendMsgCreateFanoutStanza.createFanoutMsgStanza with fanoutType=GROUP_DIRECT,
+        // so WAWebPostPrekeysDepletionMetric.maybePostPrekeysDepletionMetric is called with
+        // messageType=MESSAGE_TYPE.GROUP (per the GROUP_DIRECT branch in createFanoutMsgStanza,
+        // which maps GROUP_DIRECT->GROUP and INDIVIDUAL fanoutType->INDIVIDUAL).
+        emitPrekeysDepletionEvents(depletedPrekeyCount, MessageType.GROUP, allDevices.size());
         var senderIcdc = deviceService.computeIcdc(requireSelfJid()).orElse(null);
         var payloads = encryptForDevices(encryption, allDevices, container, statusJid, senderIcdc, null);
         if (payloads.isEmpty()) {
@@ -464,5 +484,41 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
         flushStore();
         var ackNode = client.sendNode(stanza);
         return AckParser.parse(ackNode);
+    }
+
+    /**
+     * Emits one {@link com.github.auties00.cobalt.wam.event.PrekeysDepletionEvent} per
+     * depleted one-time pre-key reported by the last {@code ensureSessions} call.
+     *
+     * <p>No-op when {@code depletedPrekeyCount} is {@code 0}, matching the early return in
+     * {@code WAWebPostPrekeysDepletionMetric.maybePostPrekeysDepletionMetric}.
+     *
+     * @param depletedPrekeyCount number of depleted one-time pre-keys (may be zero)
+     * @param messageType         the WAM message type for this send
+     * @param deviceCount         the number of devices used for
+     *                            {@code deviceSizeBucket} classification via
+     *                            {@link WamSizeBuckets#numberToSizeBucket(int)}
+     *
+     * @implNote WAWebPostPrekeysDepletionMetric.maybePostPrekeysDepletionMetric: emits
+     *     {@code t} (count) events inside a {@code setTimeout(...,0)}; Cobalt emits
+     *     synchronously on the calling virtual thread.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebPostPrekeysDepletionMetric",
+            exports = "maybePostPrekeysDepletionMetric",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private void emitPrekeysDepletionEvents(int depletedPrekeyCount, MessageType messageType, Integer deviceCount) {
+        // WAWebPostPrekeysDepletionMetric.maybePostPrekeysDepletionMetric: early-return guard
+        if (depletedPrekeyCount <= 0) {
+            return;
+        }
+        var bucket = deviceCount == null ? null : WamSizeBuckets.numberToSizeBucket(deviceCount);
+        // WAWebPostPrekeysDepletionMetric.maybePostPrekeysDepletionMetric: for (var e=0;e<t;e++) commit()
+        for (var i = 0; i < depletedPrekeyCount; i++) {
+            client.wamService().commit(new PrekeysDepletionEventBuilder()
+                    .prekeysFetchReason(PrekeysFetchContext.SEND_MESSAGE)
+                    .messageType(messageType)
+                    .deviceSizeBucket(bucket)
+                    .build());
+        }
     }
 }

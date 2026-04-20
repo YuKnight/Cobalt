@@ -17,6 +17,7 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.chat.ChatMessageContextInfoBuilder;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.model.chat.ChatMetadata;
 import com.github.auties00.cobalt.model.chat.group.GroupMetadata;
 import com.github.auties00.cobalt.model.chat.group.GroupParticipant;
 import com.github.auties00.cobalt.model.chat.group.GroupParticipantBuilder;
@@ -34,8 +35,16 @@ import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.wam.event.AddressingModeMismatchEventBuilder;
+import com.github.auties00.cobalt.wam.event.MdDeviceSyncAckEventBuilder;
+import com.github.auties00.cobalt.wam.event.MdGroupParticipantMissAckEventBuilder;
+import com.github.auties00.cobalt.wam.event.PrekeysDepletionEventBuilder;
 import com.github.auties00.cobalt.wam.type.AddressingMode;
+import com.github.auties00.cobalt.wam.type.ClientGroupSizeBucket;
+import com.github.auties00.cobalt.wam.type.MessageType;
 import com.github.auties00.cobalt.wam.type.MismatchOriginType;
+import com.github.auties00.cobalt.wam.type.PrekeysFetchContext;
+import com.github.auties00.cobalt.wam.type.TypeOfGroupEnum;
+import com.github.auties00.cobalt.wam.type.WamSizeBuckets;
 
 import java.security.GeneralSecurityException;
 import java.util.*;
@@ -320,9 +329,21 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
                 // WAWebSendGroupSkmsgJob: get sender key bytes and encrypt SK distribution
                 // WAWebGetGroupKeyDistributionMsg: populates ICDC per device
                 var senderKeyBytes = encryption.getSenderKeyBytes(groupJid, senderJid);
-                var skDistPayloads = skDistribDevices.isEmpty()
-                        ? List.<MessageEncryptedPayload>of()
-                        : senderKeyDistribution.encrypt(groupJid, senderKeyBytes, skDistribDevices);
+                List<MessageEncryptedPayload> skDistPayloads;
+                if (skDistribDevices.isEmpty()) {
+                    skDistPayloads = List.of();
+                } else {
+                    // WAWebSendGroupSkmsgJob: yield g(l, P, i) — ensureE2ESessions for the
+                    // skDistribList and emit PrekeysDepletionEvent before encrypting.
+                    var depletedPrekeyCount = deviceService.ensureSessions(skDistribDevices);
+                    // WAWebSendGroupSkmsgJob -> WAWebPostPrekeysDepletionMetric.maybePostPrekeysDepletionMetric:
+                    // {count, prekeysFetchReason: SEND_MESSAGE, messageType: GROUP,
+                    // deviceSizeBucket: r.deviceSizeBucket}. The bucket in WA Web is the
+                    // group's cached total-device bucket; Cobalt uses the total fanout set
+                    // (skDistribDevices + skExistingDevices) as the closest equivalent.
+                    emitPrekeysDepletionEvents(depletedPrekeyCount, MessageType.GROUP, allSkDevices.size());
+                    skDistPayloads = senderKeyDistribution.encrypt(groupJid, senderKeyBytes, skDistribDevices);
+                }
 
                 // WAWebSendGroupSkmsgJob: bot feedback messages skip SKMSG
                 // encryption and phash (delivered only via <bot> node)
@@ -467,7 +488,14 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
                     LOGGER.log(System.Logger.Level.DEBUG,
                             "encryptAndSendSenderKeyMsg: phash mismatch for {0}, server: {1}",
                             messageInfo.key().id(), serverPhash);
-                    resendAsGroupDirect(groupJid, messageInfo, allSkDevices, addressingMode);
+                    // WAWebSendGroupSkmsgJob: resendPersistedGroupMsgWrapper({...,
+                    //   serverAddressingMode: J.success.addressingMode})
+                    // The server-reported addressing mode from the ack is forwarded
+                    // so WAWebPostMdDeviceSyncAckMetric can populate it on the
+                    // MdDeviceSyncAck event.
+                    var serverAddressingMode = ack.addressingMode().orElse(null);
+                    resendAsGroupDirect(groupJid, messageInfo, allSkDevices,
+                            addressingMode, serverAddressingMode, chatMetadata, senderJid);
                 }
 
                 // WAWebSendGroupSkmsgJob: handle addressing mode mismatch
@@ -583,6 +611,10 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
                 // WAWebSendGroupKeyDistributionMsgJob: get sender key info
                 // and encrypt distribution messages
                 var senderKeyBytes = encryption.getSenderKeyBytes(groupJid, senderJid);
+                // WAWebSendGroupKeyDistributionMsgJob: yield ensureE2ESessions(f, !1, DEFAULT).
+                // WA Web does NOT emit the prekeys-depletion metric for this standalone
+                // sender-key distribution job, so neither does Cobalt.
+                deviceService.ensureSessions(skDistribDevices);
                 var skDistPayloads = senderKeyDistribution.encrypt(
                         groupJid, senderKeyBytes, skDistribDevices);
 
@@ -750,24 +782,85 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
      * Resends the message to delta devices using group-direct (per-device)
      * encryption after a phash mismatch.
      *
+     * <p>Before re-querying the group, emits a {@code MdDeviceSyncAck}
+     * WAM event mirroring
+     * {@link com.github.auties00.cobalt.wam.event.MdDeviceSyncAckEvent}.
+     *
+     * @param groupJid               the target group JID
+     * @param messageInfo            the outgoing message being resent
+     * @param originalDevices        the device list from the initial send
+     *                               (used to compute the delta)
+     * @param addressingMode         the local addressing mode used to build
+     *                               the stanza ({@code "lid"} or {@code "pn"})
+     * @param serverAddressingMode   the addressing mode returned on the
+     *                               server ack (may be {@code null})
+     * @param groupMetadataCandidate the group metadata used to derive the
+     *                               WAM {@code localAddressingMode} property
+     *                               for the emitted {@code MdDeviceSyncAck}
+     *                               event (may be {@code null})
+     * @param senderJid              the sender device JID used for this send
+     *                               (selected earlier in
+     *                               {@link #send(Jid, ChatMessageInfo)} based
+     *                               on the group addressing mode); its server
+     *                               determines the {@code isLid} property of
+     *                               the emitted {@code MdDeviceSyncAck} event
+     *
      * @apiNote WAWebResendGroupMsg.resendGroupMsg: re-queries the group,
      * computes delta device list, sends via sendDirectMsgToDeviceList
      * with GROUP_DIRECT fanout type.
+     * WAWebPostMdDeviceSyncAckMetric.postMdDeviceSyncAckMetric: emits
+     * MdDeviceSyncAck (id 2180) at the top of the resend path.
      */
     @WhatsAppWebExport(moduleName = "WAWebResendGroupMsg", exports = "resendGroupMsg",
             adaptation = WhatsAppAdaptation.DIRECT)
     @WhatsAppWebExport(moduleName = "WAWebSendGroupDirectJob", exports = "encryptAndSendGroupDirectMsg",
             adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WAWebPostMdDeviceSyncAckMetric",
+            exports = "postMdDeviceSyncAckMetric", adaptation = WhatsAppAdaptation.DIRECT)
     private void resendAsGroupDirect(
             Jid groupJid,
             ChatMessageInfo messageInfo,
             Collection<Jid> originalDevices,
-            String addressingMode
+            String addressingMode,
+            String serverAddressingMode,
+            ChatMetadata groupMetadataCandidate,
+            Jid senderJid
     ) {
+        // WAWebResendGroupMsg.resendGroupMsg: before re-querying the group,
+        // WAWebPostMdDeviceSyncAckMetric.postMdDeviceSyncAckMetric emits
+        // MdDeviceSyncAck (id 2180). For the group branch:
+        //   revoke               = isRevokeMsg(msg)
+        //   chatType             = getMessageChatTypeFromWid(groupJid) -> GROUP
+        //   isLid                = msgRecord.data.from.isLid() (sender device)
+        //   localAddressingMode  = getAddressingModeMetricsFromGroupMetadata(groupData)
+        //   serverAddressingMode = getWamAddressingModeFromString(serverAddressingMode)
+        var senderIsLid = senderJid != null && senderJid.hasLidServer();
+        AddressingMode localWamMode = null;
+        if (groupMetadataCandidate instanceof GroupMetadata gm) {
+            // WAWebWamAddressingModeUtils.getAddressingModeMetricsFromGroupMetadata:
+            // returns null when isLidAddressingMode is null/undefined - Cobalt stores
+            // a primitive boolean so the mapping is unconditional here.
+            localWamMode = gm.isLidAddressingMode() ? AddressingMode.LID : AddressingMode.PN;
+        }
+        client.wamService().commit(new MdDeviceSyncAckEventBuilder()
+                .revoke(UserMessageSender.isRevokeMessage(messageInfo))
+                .chatType(UserMessageSender.chatTypeFromJid(groupJid))
+                .isLid(senderIsLid)
+                .localAddressingMode(localWamMode)
+                .serverAddressingMode(wamAddressingMode(serverAddressingMode))
+                .build());
+
         // WAWebResendGroupMsg: re-query group, get refreshed fanout
         // Sender JID for phash: resend path does not emit phash in
         // the stanza, so the exact sender is not critical here
         var refreshedFanout = deviceService.getGroupFanout(groupJid, requireSelfJid());
+
+        // WAWebResendGroupMsg.resendGroupMsg: after sendQueryGroup refreshes the
+        // participant record, WAWebMaybePostMdGroupSyncMetrics.maybePostGroupSyncMetrics
+        // diffs the original SK user list against the fresh participant record and
+        // emits MdGroupParticipantMissAck (id 4146) when either side is non-empty.
+        var refreshedMetadata = store.findChatMetadata(groupJid).orElse(null);
+        emitMdGroupParticipantMissAck(messageInfo, originalDevices, refreshedMetadata);
 
         // WAWebResendGroupMsg: delta = refreshed - original
         var originalJids = originalDevices.stream()
@@ -789,7 +882,10 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
 
         // WAWebSendDirectMsgToDeviceList: GROUP_DIRECT fanout
         var container = messageInfo.message();
-        deviceService.ensureSessions(deltaDevices);
+        var depletedPrekeyCount = deviceService.ensureSessions(deltaDevices);
+        // WAWebSendMsgCreateFanoutStanza -> WAWebPostPrekeysDepletionMetric.maybePostPrekeysDepletionMetric
+        // emits PrekeysDepletionEvent (id 3014) with SEND_MESSAGE / GROUP for GROUP_DIRECT fanoutType.
+        emitPrekeysDepletionEvents(depletedPrekeyCount, MessageType.GROUP, deltaDevices.size());
         var senderIcdc = deviceService.computeIcdc(requireSelfJid())
                 .orElse(null);
         var payloads = encryptForDevices(encryption, deltaDevices, container, groupJid, senderIcdc, null);
@@ -843,6 +939,175 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
 
         flushStore();
         client.sendNode(stanza);
+    }
+
+    /**
+     * Emits the {@code MdGroupParticipantMissAck} WAM event (id 4146) when
+     * the group's participant record has changed between the original SKMSG
+     * fan-out and the post-phash-mismatch re-query.
+     *
+     * <p>The event is suppressed when no participants were added or removed,
+     * matching WA Web's {@code maybePostGroupSyncMetrics} guard.
+     *
+     * @param messageInfo      the message being resent (drives
+     *                         {@code messageIsRevoke})
+     * @param originalDevices  the device JIDs from the initial SKMSG send
+     *                         (drives {@code isLid} and the removed-side of
+     *                         the diff)
+     * @param refreshedMetadata the refreshed chat metadata obtained after
+     *                          the group re-query (drives the added-side of
+     *                          the diff, {@code groupSizeBucket}, and
+     *                          {@code typeOfGroup}); may be {@code null}
+     *
+     * @apiNote WAWebMaybePostMdGroupSyncMetrics.maybePostGroupSyncMetrics:
+     * computes {@code added}/{@code removed} via {@code computeParticipantChange},
+     * skips when both are zero, otherwise commits the event with
+     * {@code messageIsRevoke}, {@code groupSizeBucket}, {@code typeOfGroup},
+     * {@code isLid}, {@code participantAddCount}, {@code participantRemoveCount}.
+     * WAWebResendGroupMsg.resendGroupMsg: invokes the helper after
+     * {@code sendQueryGroup} via function {@code E}, passing the deduped
+     * user-wid list derived from the original SKMSG device list.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMaybePostMdGroupSyncMetrics",
+            exports = "maybePostGroupSyncMetrics", adaptation = WhatsAppAdaptation.DIRECT)
+    private void emitMdGroupParticipantMissAck(
+            ChatMessageInfo messageInfo,
+            Collection<Jid> originalDevices,
+            ChatMetadata refreshedMetadata
+    ) {
+        // WAWebResendGroupMsg.resendGroupMsg: D = Array.from(new Set(S.map(asUserWidOrThrow)))
+        // dedupes the original SKMSG device list down to user JIDs before diffing.
+        var originalUserJids = originalDevices.stream()
+                .map(Jid::toUserJid)
+                .map(Jid::toString)
+                .collect(Collectors.toUnmodifiableSet());
+
+        // WAWebGroupMsgSendUtils.getParticipantRecord: returns the participant
+        // table row for the group; Cobalt reads the equivalent data from the
+        // refreshed chat metadata just updated by queryChatMetadata.
+        Set<String> currentUserJids;
+        if (refreshedMetadata instanceof GroupMetadata gm) {
+            currentUserJids = gm.participants().stream()
+                    .map(p -> p.userJid().toString())
+                    .collect(Collectors.toUnmodifiableSet());
+        } else {
+            currentUserJids = Set.of();
+        }
+
+        // WAWebMaybePostMdGroupSyncMetrics.computeParticipantChange:
+        // added = |current \ original|, removed = |original \ current|
+        var added = 0;
+        for (var jid : currentUserJids) {
+            if (!originalUserJids.contains(jid)) {
+                added++;
+            }
+        }
+        var removed = 0;
+        for (var jid : originalUserJids) {
+            if (!currentUserJids.contains(jid)) {
+                removed++;
+            }
+        }
+
+        // WAWebMaybePostMdGroupSyncMetrics: skip commit when no change
+        if (added == 0 && removed == 0) {
+            return;
+        }
+
+        // WAWebMaybePostMdGroupSyncMetrics: p.isLid = t.some(w => w.isLid())
+        // The deduped original wid list carries LID servers if any device was
+        // addressed via LID on the initial send.
+        var isLid = originalDevices.stream().anyMatch(Jid::hasLidServer);
+
+        // WAWebMaybePostMdGroupSyncMetrics: groupSizeBucket uses
+        // groupData.participantCount (participant record size, capped at 32
+        // minimum via WAWebWamGroupMetricUtils.capCount).
+        int participantCount = 0;
+        if (refreshedMetadata instanceof GroupMetadata gm) {
+            participantCount = gm.participants().size();
+        }
+        var groupSizeBucket = toGroupSizeBucket(Math.max(participantCount, 32));
+
+        // WAWebMaybePostMdGroupSyncMetrics: typeOfGroup = groupData.wamTypeOfGroup
+        // ?? TYPE_OF_GROUP_ENUM.GROUP
+        var typeOfGroup = refreshedMetadata instanceof GroupMetadata gm
+                ? typeOfGroupFromMetadata(gm)
+                : TypeOfGroupEnum.GROUP;
+
+        // WAWebMaybePostMdGroupSyncMetrics: messageIsRevoke =
+        // WAWebSendMsgCommonApi.isRevokeMsg(msgProtobuf)
+        client.wamService().commit(new MdGroupParticipantMissAckEventBuilder()
+                .messageIsRevoke(UserMessageSender.isRevokeMessage(messageInfo))
+                .groupSizeBucket(groupSizeBucket)
+                .typeOfGroup(typeOfGroup)
+                .isLid(isLid)
+                .participantAddCount(added)
+                .participantRemoveCount(removed)
+                .build());
+    }
+
+    /**
+     * Buckets a participant count into a {@link ClientGroupSizeBucket}.
+     *
+     * @param count the participant count (already capped to a minimum of 32
+     *              by the caller)
+     * @return the corresponding bucket, never {@code null}
+     *
+     * @apiNote WAWebWamNumberToClientGroupSizeBucket: threshold ladder
+     * {@code SMALL(<=33)}, {@code MEDIUM(<=65)}, {@code LARGE(<=129)},
+     * {@code EXTRA_LARGE(<=257)}, {@code XX_LARGE(<=513)}, {@code LT1024(<=1025)},
+     * {@code LT1500(<=1501)}, {@code LT2000(<=2001)}, {@code LT2500(<=2501)},
+     * {@code LT3000(<=3001)}, {@code LT3500(<=3501)}, {@code LT4000(<=4001)},
+     * {@code LT4500(<=4501)}, {@code LT5000(<=5001)}, else
+     * {@code LARGEST_BUCKET}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebWamNumberToClientGroupSizeBucket",
+            exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
+    private static ClientGroupSizeBucket toGroupSizeBucket(int count) {
+        if (count <= 33) return ClientGroupSizeBucket.SMALL;
+        if (count <= 65) return ClientGroupSizeBucket.MEDIUM;
+        if (count <= 129) return ClientGroupSizeBucket.LARGE;
+        if (count <= 257) return ClientGroupSizeBucket.EXTRA_LARGE;
+        if (count <= 513) return ClientGroupSizeBucket.XX_LARGE;
+        if (count <= 1025) return ClientGroupSizeBucket.LT1024;
+        if (count <= 1501) return ClientGroupSizeBucket.LT1500;
+        if (count <= 2001) return ClientGroupSizeBucket.LT2000;
+        if (count <= 2501) return ClientGroupSizeBucket.LT2500;
+        if (count <= 3001) return ClientGroupSizeBucket.LT3000;
+        if (count <= 3501) return ClientGroupSizeBucket.LT3500;
+        if (count <= 4001) return ClientGroupSizeBucket.LT4000;
+        if (count <= 4501) return ClientGroupSizeBucket.LT4500;
+        if (count <= 5001) return ClientGroupSizeBucket.LT5000;
+        return ClientGroupSizeBucket.LARGEST_BUCKET;
+    }
+
+    /**
+     * Maps a {@link GroupMetadata} to the WAM {@link TypeOfGroupEnum} value
+     * populated on metrics events.
+     *
+     * @param metadata the group metadata
+     * @return the WAM group type, never {@code null}
+     *
+     * @apiNote WAWebGroupType.getGroupTypeFromGroupMetadata + groupTypeToWamEnum:
+     * {@code defaultSubgroup} -> {@code DEFAULT_SUBGROUP},
+     * {@code parentCommunityJid != null} (and not default/general) ->
+     * {@code SUBGROUP}, everything else (including community announcement
+     * general chat and standalone groups) -> {@code GROUP}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebGroupType",
+            exports = {"getGroupTypeFromGroupMetadata", "groupTypeToWamEnum"},
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private static TypeOfGroupEnum typeOfGroupFromMetadata(GroupMetadata metadata) {
+        if (metadata.isDefaultSubgroup()) {
+            return TypeOfGroupEnum.DEFAULT_SUBGROUP;
+        }
+        if (metadata.isGeneralSubgroup()) {
+            return TypeOfGroupEnum.GROUP;
+        }
+        if (metadata.parentCommunityJid().isPresent()) {
+            return TypeOfGroupEnum.SUBGROUP;
+        }
+        return TypeOfGroupEnum.GROUP;
     }
 
     /**
@@ -950,5 +1215,41 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
             return null;
         }
         return "lid".equals(mode) ? AddressingMode.LID : AddressingMode.PN;
+    }
+
+    /**
+     * Emits one {@link com.github.auties00.cobalt.wam.event.PrekeysDepletionEvent} per
+     * depleted one-time pre-key reported by the last {@code ensureSessions} call.
+     *
+     * <p>No-op when {@code depletedPrekeyCount} is {@code 0}, matching the early return in
+     * {@code WAWebPostPrekeysDepletionMetric.maybePostPrekeysDepletionMetric}.
+     *
+     * @param depletedPrekeyCount number of depleted one-time pre-keys (may be zero)
+     * @param messageType         the WAM message type for this send
+     * @param deviceCount         the number of devices in the fanout; used to bucket
+     *                            {@code deviceSizeBucket} via
+     *                            {@link WamSizeBuckets#numberToSizeBucket(int)}
+     *
+     * @implNote WAWebPostPrekeysDepletionMetric.maybePostPrekeysDepletionMetric: emits
+     *     {@code t} (count) events inside a {@code setTimeout(...,0)}; Cobalt emits
+     *     synchronously on the calling virtual thread.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebPostPrekeysDepletionMetric",
+            exports = "maybePostPrekeysDepletionMetric",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private void emitPrekeysDepletionEvents(int depletedPrekeyCount, MessageType messageType, Integer deviceCount) {
+        // WAWebPostPrekeysDepletionMetric.maybePostPrekeysDepletionMetric: early-return guard
+        if (depletedPrekeyCount <= 0) {
+            return;
+        }
+        var bucket = deviceCount == null ? null : WamSizeBuckets.numberToSizeBucket(deviceCount);
+        // WAWebPostPrekeysDepletionMetric.maybePostPrekeysDepletionMetric: for (var e=0;e<t;e++) commit()
+        for (var i = 0; i < depletedPrekeyCount; i++) {
+            client.wamService().commit(new PrekeysDepletionEventBuilder()
+                    .prekeysFetchReason(PrekeysFetchContext.SEND_MESSAGE)
+                    .messageType(messageType)
+                    .deviceSizeBucket(bucket)
+                    .build());
+        }
     }
 }

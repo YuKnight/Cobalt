@@ -4,9 +4,9 @@
       "type": "http",
       "url": "http://localhost:8787/mcp"
     },
-    "intellij": {
-      "type": "sse",
-      "url": "http://localhost:64342/sse"
+    "debugger": {
+      "type": "http",
+      "url": "http://127.0.0.1:29190/debugger-mcp/streamable-http"
     }
   }
 }

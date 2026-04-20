@@ -9,8 +9,11 @@ import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.util.DataUtils;
 import com.github.auties00.cobalt.wam.binary.WamGlobalEncoder;
+import com.github.auties00.cobalt.wam.event.PsIdUpdateEventBuilder;
+import com.github.auties00.cobalt.wam.event.WamClientErrorsEventBuilder;
 import com.github.auties00.cobalt.wam.model.WamEventSpec;
 import com.github.auties00.cobalt.wam.model.WamChannel;
+import com.github.auties00.cobalt.wam.type.PsIdAction;
 import com.google.i18n.phonenumbers.PhoneNumberUtil;
 
 import java.lang.invoke.MethodHandles;
@@ -43,12 +46,14 @@ import java.util.logging.Logger;
  * in-flight data as ephemeral — buffers that have not been uploaded
  * when the service is closed are silently discarded.
  *
- * @apiNote This service does not emit {@code WamClientErrorsWamEvent}
- * or {@code WamDroppedEventWamEvent} for internal health monitoring.
- * WhatsApp Web uses these events to track buffer drops, validation
- * failures, and WAM processing errors for operational visibility.
- * This implementation logs warnings instead, as WAM system health
- * telemetry is not a goal of this project.
+ * @apiNote This service emits {@code WamClientErrorsWamEvent} with
+ * {@code wamClientBufferDropErrorCount = 1} when a buffer is dropped
+ * because it exceeds {@link #MAX_UPLOAD_SIZE}, mirroring WA Web's
+ * {@code _executePending} and {@code oe} (upload) self-metric paths.
+ * This service does not emit {@code WamDroppedEventWamEvent} for
+ * per-event validation failures: WA Web uses it to track events
+ * rejected by {@code runPreCommitValidation} for operational
+ * visibility; this implementation logs a warning instead.
  *
  * @implNote Adapts the WA Web WAM telemetry pipeline: event commit comes
  *     from {@code WAWebWamCommonLogEvent}, buffer rotation and flush from
@@ -263,6 +268,19 @@ public final class WamService {
         this.scheduler = Executors.newSingleThreadScheduledExecutor(Thread.ofVirtual().factory());
         scheduler.scheduleWithFixedDelay(this::checkMidCycleUpload, SERIALIZE_INTERVAL_SECONDS, SERIALIZE_INTERVAL_SECONDS, TimeUnit.SECONDS);
         scheduler.scheduleWithFixedDelay(this::flush, FLUSH_INTERVAL_SECONDS, FLUSH_INTERVAL_SECONDS, TimeUnit.SECONDS);
+
+        // WAWebWamPrivateStats.initPrivateStats: emit a PsIdUpdateEvent
+        // with action CREATED for every rotation group that has no
+        // prior value in storage. Cobalt does not persist PS IDs
+        // across sessions, so every group is treated as freshly created
+        // on each initialization.
+        for (var info : privateStatsId.snapshotAll()) {
+            commit(new PsIdUpdateEventBuilder()
+                    .psIdAction(PsIdAction.CREATED)
+                    .psIdKey(info.keyHashInt())
+                    .psIdRotationFrequence(info.rotationDays())
+                    .build());
+        }
     }
 
     /**
@@ -499,7 +517,17 @@ public final class WamService {
         }
 
         if (channel == WamChannel.PRIVATE) {
-            privateStatsId.rotateAndGet();
+            // WAWebWamPrivateStats internal rotate function: after
+            // regenerating a PS ID value, logs a PsIdUpdateEvent with
+            // action ROTATED for that entry.
+            var rotated = privateStatsId.rotateAndReportChanges();
+            for (var info : rotated) {
+                commit(new PsIdUpdateEventBuilder()
+                        .psIdAction(PsIdAction.ROTATED)
+                        .psIdKey(info.keyHashInt())
+                        .psIdRotationFrequence(info.rotationDays())
+                        .build());
+            }
             flushPrivateByPsIdGroup(events);
         } else {
             var bufferKey = channel == WamChannel.REGULAR ? "regular" : "realtime";
@@ -588,6 +616,13 @@ public final class WamService {
     private void buildAndSend(WamChannel channel, List<WamPendingEvent> events, int[] weights, OptionalInt[] beacons, byte[] globalsBytes, int from, int to, int size) {
         if (size > MAX_UPLOAD_SIZE) {
             LOGGER.warning("Dropping WAM buffer of " + size + " bytes (exceeds upload limit)");
+            // WAWebWam.oe: when WAWebWamUtils.isWamBufferTooBigToUpload
+            // is true, the buffer is dropped and a WamClientErrorsWamEvent
+            // with wamClientBufferDropErrorCount = 1 is committed as a
+            // pipeline self-metric.
+            commit(new WamClientErrorsEventBuilder()
+                    .wamClientBufferDropErrorCount(1)
+                    .build());
             completeFutures(events, from, to);
             return;
         }
@@ -931,6 +966,13 @@ public final class WamService {
                 }
 
                 LOGGER.warning("WAM upload failed with error " + errorCode + ", dropping buffer");
+                // WAWebWam._executePending catch block: when upload fails
+                // permanently, a WamClientErrorsWamEvent with
+                // wamClientBufferDropErrorCount = 1 is committed to track
+                // the dropped buffer.
+                commit(new WamClientErrorsEventBuilder()
+                        .wamClientBufferDropErrorCount(1)
+                        .build());
                 return;
             } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
@@ -947,6 +989,12 @@ public final class WamService {
                     }
                 } else {
                     LOGGER.warning("WAM upload failed after " + MAX_RETRIES + " retries: " + e.getMessage());
+                    // WAWebWam._executePending catch block: exhausted
+                    // retries count as a dropped buffer for pipeline
+                    // self-metrics.
+                    commit(new WamClientErrorsEventBuilder()
+                            .wamClientBufferDropErrorCount(1)
+                            .build());
                 }
             }
         }

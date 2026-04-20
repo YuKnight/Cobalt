@@ -19,6 +19,10 @@ import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.sync.WebAppStateService;
 import com.github.auties00.cobalt.util.SchedulerUtils;
+import com.github.auties00.cobalt.wam.event.MdAppStateKeyRotationEventBuilder;
+import com.github.auties00.cobalt.wam.event.MdBootstrapAppStateCriticalDataProcessingEventBuilder;
+import com.github.auties00.cobalt.wam.type.BootstrapAppStateDataStageCode;
+import com.github.auties00.cobalt.wam.type.MdAppStateKeyRotationReasonCode;
 
 import java.security.SecureRandom;
 import java.time.Duration;
@@ -260,6 +264,54 @@ public final class SyncKeyRotationService {
     }
 
     /**
+     * Emits a {@code MdBootstrapAppStateCriticalDataProcessingEvent} for the
+     * {@link BootstrapAppStateDataStageCode#MISSING_KEYS_RECEIVED} stage when the
+     * critical data sync is still in progress.
+     *
+     * <p>Per WhatsApp Web {@code WAWebKeyManagementHandleKeyShareApi.handleAppStateSyncKeyShare}:
+     * the first statement of the inner async function is
+     * {@code logCriticalBootstrapStageIfNecessary(MISSING_KEYS_RECEIVED)}, fired before
+     * any key validation. Cobalt splits {@code handleAppStateSyncKeyShare} between
+     * {@code MessageStreamHandler.processAppStateSyncKeyShare} (validation) and
+     * {@link #handleKeyShare} (storage); this method is exposed so the caller-side
+     * validator can fire the emission at the WA Web position, regardless of whether
+     * any key survives validation.
+     *
+     * @implNote WAWebKeyManagementHandleKeyShareApi.handleAppStateSyncKeyShare,
+     *           WAWebSyncdCriticalBootstrapProcessingApi.logCriticalBootstrapStageIfNecessary
+     */
+    @WhatsAppWebExport(moduleName = "WAWebKeyManagementHandleKeyShareApi", exports = "handleAppStateSyncKeyShare", adaptation = WhatsAppAdaptation.ADAPTED)
+    public void logMissingKeysReceived() {
+        logCriticalBootstrapStageIfNecessary(BootstrapAppStateDataStageCode.MISSING_KEYS_RECEIVED);
+    }
+
+    /**
+     * Emits a {@code MdBootstrapAppStateCriticalDataProcessingEvent} for the
+     * supplied bootstrap stage when the critical data sync is still in progress.
+     *
+     * <p>Per WhatsApp Web
+     * {@code WAWebSyncdCriticalBootstrapProcessingApi.logCriticalBootstrapStageIfNecessary}:
+     * the event is gated on
+     * {@code WAWebSyncBootstrap.isSyncDCriticalDataSyncInProcess()}. In Cobalt that
+     * global state machine is approximated by checking whether the
+     * {@link SyncPatchType#CRITICAL_BLOCK} collection has been bootstrapped yet,
+     * mirroring {@link com.github.auties00.cobalt.sync.WebAppStateService}.
+     *
+     * @implNote WAWebSyncdCriticalBootstrapProcessingApi.logCriticalBootstrapStageIfNecessary
+     * @param stage the bootstrap stage reached; never {@code null}
+     */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdCriticalBootstrapProcessingApi", exports = "logCriticalBootstrapStageIfNecessary", adaptation = WhatsAppAdaptation.ADAPTED)
+    private void logCriticalBootstrapStageIfNecessary(BootstrapAppStateDataStageCode stage) {
+        if (whatsapp.store().findWebAppState(SyncPatchType.CRITICAL_BLOCK).bootstrapped()) {
+            return;
+        }
+        whatsapp.wamService().commit(new MdBootstrapAppStateCriticalDataProcessingEventBuilder()
+                .bootstrapAppStateDataStage(stage) // WAWebSyncdCriticalBootstrapProcessingApi: bootstrapAppStateDataStage: e
+                .mdTimestamp((int) System.currentTimeMillis()) // WAWebSyncdCriticalBootstrapProcessingApi: mdTimestamp: unixTimeMs()
+                .build());
+    }
+
+    /**
      * Syncs all collections currently in {@code BLOCKED} state.
      *
      * <p>Per WhatsApp Web {@code WAWebSyncd.syncBlockedCollections} (J): retrieves all
@@ -372,9 +424,17 @@ public final class SyncKeyRotationService {
 
         if (expired) { // WAWebSyncdKeyManagement._: i && (LOG(...), reportSyncdKeyRotationEvent(APP_STATE_SYNC_KEY_EXPIRY))
             LOGGER.info("syncd: key rotation due to key expiry"); // WAWebSyncdKeyManagement._: LOG("syncd: key rotation due to key expiry")
+            // WAWebSyncdMetrics.reportSyncdKeyRotationEvent: new MdAppStateKeyRotationWamEvent({mdAppStateKeyRotationReason: APP_STATE_SYNC_KEY_EXPIRY}).commit()
+            whatsapp.wamService().commit(new MdAppStateKeyRotationEventBuilder()
+                    .mdAppStateKeyRotationReason(MdAppStateKeyRotationReasonCode.APP_STATE_SYNC_KEY_EXPIRY)
+                    .build());
         }
         if (deviceRemoved) { // WAWebSyncdKeyManagement._: l && (LOG(...), reportSyncdKeyRotationEvent(DEVICE_DEREGISTERATION))
             LOGGER.info("syncd: key rotation due to device removal"); // WAWebSyncdKeyManagement._: LOG("syncd: key rotation due to device removal")
+            // WAWebSyncdMetrics.reportSyncdKeyRotationEvent: new MdAppStateKeyRotationWamEvent({mdAppStateKeyRotationReason: DEVICE_DEREGISTERATION}).commit()
+            whatsapp.wamService().commit(new MdAppStateKeyRotationEventBuilder()
+                    .mdAppStateKeyRotationReason(MdAppStateKeyRotationReasonCode.DEVICE_DEREGISTERATION)
+                    .build());
         }
 
         // WAWebSyncdKeyManagement._: return (...,_(t)) — WA Web returns the recursive call's result,

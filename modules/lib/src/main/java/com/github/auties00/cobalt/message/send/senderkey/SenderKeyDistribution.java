@@ -183,10 +183,11 @@ public final class SenderKeyDistribution {
         Objects.requireNonNull(senderKeyBytes, "senderKeyBytes");
         Objects.requireNonNull(devices, "devices");
 
-        // ADAPTED: WAWebSendGroupSkmsgJob calls ensureE2ESessions before
-        // getKeyDistributionMsg; Cobalt inlines it here since the caller
-        // (GroupMessageSender) does not call ensureSessions for SK distrib devices
-        deviceService.ensureSessions(devices);
+        // WAWebGetGroupKeyDistributionMsg.getKeyDistributionMsg: session establishment for the
+        // skDistrib devices is the caller's responsibility (WAWebSendGroupSkmsgJob invokes
+        // ensureE2ESessions before this function and also emits the PrekeysDepletionEvent).
+        // GroupMessageSender mirrors that by calling deviceService.ensureSessions on the
+        // skDistribDevices just before invoking this method.
 
         // WAWebGetGroupKeyDistributionMsg.getKeyDistributionMsg: build the
         // base distribution protobuf

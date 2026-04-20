@@ -8,6 +8,7 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.props.ABPropsService;
+import com.github.auties00.cobalt.stream.control.OfflineNotificationsReporter;
 import com.github.auties00.cobalt.stream.notification.account.NotificationAccountDispatcher;
 import com.github.auties00.cobalt.stream.notification.business.NotificationBusinessDispatcher;
 import com.github.auties00.cobalt.stream.notification.device.NotificationDeviceDispatcher;
@@ -83,29 +84,35 @@ public final class NotificationStreamHandler implements SocketStream.Handler {
      * Constructs a new notification dispatcher and wires each of the four
      * sub-dispatchers with their own dependencies.
      *
-     * @param whatsapp                the WhatsApp client used by every
-     *                                sub-dispatcher
-     * @param deviceLinkingService the alt-device-linking service that owns
-     *                                the pairing-code handshake state
-     * @param lidMigrationService     service used to reconcile LID/PN
-     *                                addressing during business-related
-     *                                notifications
-     * @param abPropsService          service used to retrieve feature flags
-     *                                during device notification handling
-     * @param deviceService           service used to reconcile linked-device
-     *                                state during device and account
-     *                                notifications
+     * @param whatsapp                       the WhatsApp client used by every
+     *                                       sub-dispatcher
+     * @param deviceLinkingService           the alt-device-linking service that owns
+     *                                       the pairing-code handshake state
+     * @param lidMigrationService            service used to reconcile LID/PN
+     *                                       addressing during business-related
+     *                                       notifications
+     * @param abPropsService                 service used to retrieve feature flags
+     *                                       during device notification handling
+     * @param deviceService                  service used to reconcile linked-device
+     *                                       state during device and account
+     *                                       notifications
+     * @param offlineNotificationsReporter   shared reporter that accumulates per-collection
+     *                                       offline {@code server_sync} notification counts
+     *                                       for the {@code MdAppStateOfflineNotifications}
+     *                                       WAM event; forwarded to the device dispatcher
+     *                                       for consumption by the server-sync handler
      */
     public NotificationStreamHandler(
             WhatsAppClient whatsapp,
             CompanionPairingService deviceLinkingService,
             LidMigrationService lidMigrationService,
             ABPropsService abPropsService,
-            DeviceService deviceService
+            DeviceService deviceService,
+            OfflineNotificationsReporter offlineNotificationsReporter
     ) {
         this.accountHandler = new NotificationAccountDispatcher(whatsapp, deviceService);
         this.businessHandler = new NotificationBusinessDispatcher(whatsapp, lidMigrationService);
-        this.deviceHandler = new NotificationDeviceDispatcher(whatsapp, deviceLinkingService, abPropsService, deviceService);
+        this.deviceHandler = new NotificationDeviceDispatcher(whatsapp, deviceLinkingService, abPropsService, deviceService, offlineNotificationsReporter);
         this.groupHandler = new NotificationGroupStreamHandler(whatsapp);
     }
 

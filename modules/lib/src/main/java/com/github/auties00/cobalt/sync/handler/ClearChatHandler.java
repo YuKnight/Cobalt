@@ -341,7 +341,10 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
      * not maintain the active-message-range infrastructure (browser-specific
      * IndexedDB concern). A {@code null} range is permitted and will result in
      * a mutation without a range; the sync server tolerates this for chats
-     * without any messages. The WAM telemetry commit is intentionally omitted.
+     * without any messages. The WAM telemetry commit
+     * ({@code MdSyncdDogfoodingFeatureUsageWamEvent}) is performed at the caller
+     * ({@code WhatsAppClient.clearChat}) since this method has no
+     * {@link com.github.auties00.cobalt.wam.WamService} handle.
      *
      * @implNote WAWebClearChatSync.getClearChatMutation,
      *           WAWebSyncdActionUtils.buildPendingMutation

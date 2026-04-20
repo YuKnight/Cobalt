@@ -35,6 +35,8 @@ import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidProvider;
 import com.github.auties00.cobalt.model.jid.JidServer;
 import com.github.auties00.cobalt.model.message.*;
+import com.github.auties00.cobalt.model.message.context.ContextInfo;
+import com.github.auties00.cobalt.model.message.context.ContextualMessage;
 import com.github.auties00.cobalt.model.message.poll.*;
 import com.github.auties00.cobalt.model.message.system.PinInChatMessage;
 import com.github.auties00.cobalt.model.message.system.PinInChatMessageBuilder;
@@ -152,7 +154,7 @@ import java.util.stream.Stream;
  */
 @SuppressWarnings({"unused", "UnusedReturnValue"})
 @WhatsAppWebModule(moduleName = "WAWebSocketModel")
-public final class WhatsAppClient {
+public class WhatsAppClient {
     /**
      * The single-byte encoding of the Signal identity key type, used when
      * building the {@code <type>} node in pre-key upload stanzas.
@@ -452,6 +454,16 @@ public final class WhatsAppClient {
                         disconnect(WhatsAppClientDisconnectReason.RECONNECTING);
                     }
                 });
+                // WAWebOpenChatSocket.J — after the socket_open and
+                // auth_handshake QPL spans have closed successfully, a
+                // WebcSocketConnectWamEvent is committed summarising the
+                // two durations and the connect reason. The event is only
+                // emitted for web companions (the "webc" prefix in
+                // WAWebOpenChatSocket and WAWebWebcSocketConnectWamEvent);
+                // mobile sessions do not commit it.
+                if (store.clientType() == WhatsAppClientType.WEB) {
+                    emitWebcSocketConnectEvent(reason);
+                }
                 lastFailure = null;
                 break;
             } catch (IOException throwable) {
@@ -490,6 +502,52 @@ public final class WhatsAppClient {
                     .unstarted(() -> disconnect(WhatsAppClientDisconnectReason.DISCONNECTED, false));
             Runtime.getRuntime().addShutdownHook(shutdownHook);
         }
+    }
+
+    /**
+     * Commits a {@code WebcSocketConnect} WAM event summarising the two
+     * sub-phases of the chat socket setup — the transport open and the
+     * Noise XX handshake — together with the reason for this connect
+     * attempt.
+     *
+     * <p>The durations are read from the active {@link WhatsAppSocketClient}
+     * which measured them internally as the connection progressed.  The
+     * {@code webcSocketConnectReason} field is set to
+     * {@link WebcSocketConnectReasonType#RECONNECT RECONNECT} when this
+     * connect is part of a reconnection attempt and to
+     * {@link WebcSocketConnectReasonType#PAGE_LOAD PAGE_LOAD} otherwise,
+     * matching the WA Web check against
+     * {@code WAWebPageLoadLogging.wasPageLoadQplLogged()}.
+     *
+     * <p>{@code webcSocketHostname} is intentionally left unset because
+     * WA Web never populates it either (only the property definition
+     * references it in
+     * {@code WAWebWebcSocketConnectWamEvent.defineEvents}).
+     *
+     * @implNote WAWebOpenChatSocket.B, WAWebOpenChatSocket.J — constructs a
+     *     {@code WebcSocketConnectWamEvent}, seeds the connect reason, marks
+     *     the socket-connect and auth-handshake durations, then commits it
+     * @param reason the disconnection reason driving this connect, or
+     *               {@code null} for the initial connect
+     */
+    private void emitWebcSocketConnectEvent(WhatsAppClientDisconnectReason reason) {
+        var socketConnectDuration = socketClient.socketConnectDuration();
+        var authHandshakeDuration = socketClient.authHandshakeDuration();
+        // WAWebOpenChatSocket.B — wasPageLoadQplLogged() ? RECONNECT : PAGE_LOAD
+        var connectReason = reason == WhatsAppClientDisconnectReason.RECONNECTING
+                ? WebcSocketConnectReasonType.RECONNECT
+                : WebcSocketConnectReasonType.PAGE_LOAD;
+        var builder = new WebcSocketConnectEventBuilder()
+                .webcSocketConnectReason(connectReason); // WAWebOpenChatSocket.B
+        if (socketConnectDuration != null) {
+            // WAWebOpenChatSocket.B — markWebcSocketConnectDuration
+            builder.webcSocketConnectDuration(Instant.ofEpochMilli(socketConnectDuration.toMillis()));
+        }
+        if (authHandshakeDuration != null) {
+            // WAWebOpenChatSocket.J — markWebcAuthHandshakeDuration
+            builder.webcAuthHandshakeDuration(Instant.ofEpochMilli(authHandshakeDuration.toMillis()));
+        }
+        wamService.commit(builder.build());
     }
 
     /**
@@ -763,6 +821,169 @@ public final class WhatsAppClient {
     }
 
     /**
+     * Dispatches a MEX (GraphQL-over-XMPP) IQ stanza and records a
+     * {@link MexEventV2Event} describing the outcome of the request.
+     *
+     * <p>This is the shared sink for every outgoing MEX request and mirrors
+     * WA Web's {@code WAWebMexNativeClient.fetchQuery} where each fetch is
+     * wrapped by a {@code MexPerfTracker} that logs a {@code MexEventV2}
+     * WAM event on success or failure. The tracker-driven shape is collapsed
+     * into this single helper so that every Cobalt MEX dispatch site can
+     * reuse the same timing, error-capture and telemetry contract without
+     * duplicating the try/catch boilerplate.
+     *
+     * @implNote WAWebMexNativeClient.fetchQuery: the JS path constructs a
+     * {@code MexPerfTracker(true)}, calls {@code start()},
+     * {@code setQueryId(id)}, {@code setOperationName(name)}, invokes
+     * {@code WAWebMexRelayEnvironment.fetchFunc}, then on success
+     * {@code setHasData(true) + stop() + logEvent()} and on error
+     * {@code setErrors(...) + setHasData(false) + stop() + logEvent()}.
+     * Cobalt replicates the same emission shape directly from here.
+     * @param node          the outbound MEX IQ builder; a random id is
+     *                      attached if absent
+     * @param queryId       the compiled GraphQL query identifier
+     *                      (corresponds to {@code params.id} in WA Web)
+     * @param operationName the GraphQL operation name (corresponds to
+     *                      {@code params.name} in WA Web, for example
+     *                      {@code mexGetNewsletter})
+     * @param isArgoPayload {@code true} if the MEX payload is Argo-encoded,
+     *                      {@code false} for the JSON variant
+     * @return the response node from the WhatsApp relay
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexNativeClient", exports = "fetchQuery",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Node sendMexNode(NodeBuilder node, String queryId, String operationName, boolean isArgoPayload) {
+        // WAWebMexNativeClient.fetchQuery: MexPerfTracker start
+        var start = Instant.now();
+        var startTimeMs = start.toEpochMilli();
+        try {
+            var response = sendNode(node);
+            // WAWebMexNativeClient.fetchQuery: success path - setHasData(true), stop(), logEvent()
+            var end = Instant.now();
+            commitMexEventV2(queryId, operationName, isArgoPayload, startTimeMs, end.toEpochMilli(), true, null, null);
+            return response;
+        } catch (RuntimeException exception) {
+            // WAWebMexNativeClient.fetchQuery: error path - setHasData(false), setErrors(...), stop(), logEvent()
+            var end = Instant.now();
+            var errorsJson = mexErrorsJson(exception);
+            var errorCodesJson = mexErrorCodesJson(exception);
+            commitMexEventV2(queryId, operationName, isArgoPayload, startTimeMs, end.toEpochMilli(), false, errorsJson, errorCodesJson);
+            throw exception;
+        }
+    }
+
+    /**
+     * Dispatches a MEX IQ stanza whose response is discarded while still
+     * emitting the {@link MexEventV2Event} telemetry.
+     *
+     * <p>Used by MEX mutations where the caller only needs the side effect
+     * of the stanza (for example newsletter leave/join) and ignores the
+     * returned payload. Internally the method still blocks on the response
+     * so the telemetry accurately records success/failure of the round trip,
+     * matching the semantics of the original {@code sendNode(request.toNode())}
+     * call sites the helper replaced.
+     *
+     * @implNote WAWebMexNativeClient.fetchQuery: the underlying JS tracker
+     * logs success whenever {@code fetchFunc} returns without throwing,
+     * regardless of whether the caller consumes the payload. Cobalt preserves
+     * that invariant by delegating to {@link #sendMexNode(NodeBuilder, String,
+     * String, boolean)} and discarding the return value.
+     * @param node          the outbound MEX IQ builder; a random id is
+     *                      attached if absent
+     * @param queryId       the compiled GraphQL query identifier
+     * @param operationName the GraphQL operation name
+     * @param isArgoPayload {@code true} if the MEX payload is Argo-encoded,
+     *                      {@code false} for the JSON variant
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexNativeClient", exports = "fetchQuery",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void sendMexNodeWithNoResponse(NodeBuilder node, String queryId, String operationName, boolean isArgoPayload) {
+        // WAWebMexNativeClient.fetchQuery: delegate to sendMexNode and discard the response
+        sendMexNode(node, queryId, operationName, isArgoPayload);
+    }
+
+    /**
+     * Builds and commits the {@link MexEventV2Event} WAM record for a
+     * single MEX dispatch.
+     *
+     * @implNote WAWebMexLogging.MexPerfTracker.logEvent: mirrors the direct
+     * commit performed by the JS tracker, populating the same field set
+     * with the values accumulated during the request lifecycle.
+     * @param queryId       the GraphQL query identifier
+     * @param operationName the GraphQL operation name
+     * @param isArgoPayload {@code true} if the payload is Argo-encoded
+     * @param startTimeMs   the request start time, in milliseconds since epoch
+     * @param endTimeMs     the request end time, in milliseconds since epoch
+     * @param hasData       {@code true} if the request produced a payload
+     * @param errorsJson    the JSON-encoded error array, or {@code null} on
+     *                      success
+     * @param errorCodesJson the JSON-encoded error-code array, or
+     *                      {@code null} on success
+     */
+    private void commitMexEventV2(String queryId, String operationName, boolean isArgoPayload,
+                                  long startTimeMs, long endTimeMs, boolean hasData,
+                                  String errorsJson, String errorCodesJson) {
+        // WAWebMexNativeClient.fetchQuery -> MexPerfTracker.logEvent
+        var durationMs = Math.max(0L, endTimeMs - startTimeMs);
+        wamService.commit(new MexEventV2EventBuilder()
+                .mexEventV2IsMex(Boolean.TRUE)
+                .mexEventV2IsArgoPayload(isArgoPayload)
+                .mexEventV2OperationName(operationName)
+                .mexEventV2QueryId(queryId)
+                .mexEventV2StartTime((int) startTimeMs)
+                .mexEventV2EndTime((int) endTimeMs)
+                .mexEventV2DurationMs(Instant.ofEpochMilli(durationMs))
+                .mexEventV2HasData(hasData)
+                .mexEventV2Errors(errorsJson)
+                .mexEventV2ErrorCodes(errorCodesJson)
+                .build());
+    }
+
+    /**
+     * Serialises a dispatch failure into the JSON array shape consumed by
+     * the {@code mexEventV2Errors} WAM property.
+     *
+     * @implNote WAWebMexLogging.createLoggingClientError /
+     * createLoggingTransportError: WA Web wraps each failure in a
+     * {@code {code, detail, type}} record and then serialises the array via
+     * {@code JSON.stringify}. Cobalt reuses the {@code CLIENT} classifier
+     * here because the failure propagated through the local transport stack
+     * rather than as a server-side error extension.
+     * @param exception the failure raised by {@link #sendNode(NodeBuilder)}
+     * @return the JSON-encoded error array
+     */
+    private static String mexErrorsJson(RuntimeException exception) {
+        // WAWebMexLogging.parseErrorsAndCodes: JSON.stringify(errors)
+        var message = exception.getMessage();
+        var arr = new com.alibaba.fastjson2.JSONArray();
+        var obj = new JSONObject();
+        obj.put("code", 417);
+        obj.put("detail", message == null ? "" : message);
+        obj.put("type", "CLIENT");
+        arr.add(obj);
+        return arr.toJSONString();
+    }
+
+    /**
+     * Serialises a dispatch failure's error codes into the JSON array shape
+     * consumed by the {@code mexEventV2ErrorCodes} WAM property.
+     *
+     * @implNote WAWebMexLogging.parseErrorsAndCodes: {@code errors.map(e =>
+     * e.code)} then {@code JSON.stringify}. Cobalt emits the same
+     * {@code [code]} array for the single wrapped failure.
+     * @param exception the failure raised by the underlying dispatch
+     * @return the JSON-encoded integer array
+     */
+    private static String mexErrorCodesJson(RuntimeException exception) {
+        // WAWebMexLogging.parseErrorsAndCodes: JSON.stringify(errors.map(e -> e.code))
+        var arr = new com.alibaba.fastjson2.JSONArray();
+        arr.add(417);
+        return arr.toJSONString();
+    }
+
+    /**
      * Disconnects this client from the WhatsApp servers, preserving its
      * credentials for future reconnections.
      *
@@ -974,9 +1195,26 @@ public final class WhatsAppClient {
      * applies the returned {@link WhatsAppClientErrorHandler.Result} as a
      * concrete session-control decision.
      *
+     * <p>Before delegating, any app-state (syncd) fatal failure is mirrored
+     * to the WAM pipeline via {@link #emitSyncdFatalErrorMetric(WhatsAppWebAppStateSyncException)}.
+     * This mirrors WA Web's {@code WAWebSyncdUploadFatalErrorMetric.uploadFatalErrorMetric}
+     * central uploader, which WA Web fans out at every inline syncd fatal
+     * detection site. Because Cobalt's error model is intentionally
+     * configurable (per {@code CLAUDE.md}'s Error Model section), every
+     * syncd throw site in {@code WebAppStateService}, {@code MutationResponseParser},
+     * {@code MutationRequestBuilder}, {@code MutationIntegrityVerifier},
+     * {@code DecryptedMutation}, {@code EncryptedMutation}, and
+     * {@code SnapshotRecoveryService} converges on this single {@code handleFailure}
+     * entry point &mdash; so emitting the WAM event here is sufficient to
+     * cover all WA-Web {@code uploadFatalErrorMetric} call sites.
+     *
      * @param exception the exception to handle
      */
     public void handleFailure(WhatsAppException exception) {
+        if (exception instanceof WhatsAppWebAppStateSyncException syncdException) {
+            // WAWebSyncdUploadFatalErrorMetric.uploadFatalErrorMetric: new MdFatalErrorWamEvent({...}).commitAndWaitForFlush(true)
+            emitSyncdFatalErrorMetric(syncdException);
+        }
         var result = errorHandler.handleError(this, exception);
         switch (result) {
             case BAN -> disconnect(WhatsAppClientDisconnectReason.BANNED);
@@ -984,6 +1222,181 @@ public final class WhatsAppClient {
             case DISCONNECT -> disconnect(WhatsAppClientDisconnectReason.DISCONNECTED);
             case RECONNECT -> disconnect(WhatsAppClientDisconnectReason.RECONNECTING);
         }
+    }
+
+    /**
+     * Commits a {@link MdFatalErrorEvent} describing the given app-state sync
+     * failure, mirroring WA Web's
+     * {@code WAWebSyncdUploadFatalErrorMetric.uploadFatalErrorMetric} central
+     * fatal-metric uploader.
+     *
+     * <p>Only fatal subtypes of {@link WhatsAppWebAppStateSyncException} emit
+     * the event, matching WA Web's split between {@code SyncdFatalError}
+     * (emits {@code MdFatalErrorWamEvent}) and {@code SyncdRetryableError} /
+     * {@code SyncdMissingKeyError} (do not). The three identifying
+     * properties that WA Web's secondary KMP path
+     * ({@code WAWebKmpWamLogger.reportMdFatalError}) also considers
+     * sufficient &mdash; {@code mdFatalErrorCode}, {@code collection}, and
+     * {@code isFatal} &mdash; are populated from the exception subtype and
+     * any carried {@link SyncPatchType}. The richer property set that WA
+     * Web's canonical site populates (the ~30 {@code macFatal*},
+     * {@code timeSince*}, {@code appContext}, {@code mailboxAgeDays},
+     * {@code recoveryStatus} fields) is populated at WA Web's inline
+     * detection sites; Cobalt's typed-exception model intentionally does
+     * not thread that rich context through the exception hierarchy, per
+     * {@code CLAUDE.md}.
+     *
+     * @param exception the fatal or retryable app-state sync exception
+     *                  flowing through {@link #handleFailure}; never
+     *                  {@code null}
+     */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdUploadFatalErrorMetric",
+            exports = "uploadFatalErrorMetric",
+            adaptation = com.github.auties00.cobalt.meta.model.WhatsAppAdaptation.ADAPTED)
+    private void emitSyncdFatalErrorMetric(WhatsAppWebAppStateSyncException exception) {
+        if (!exception.isFatal()) {
+            // WAWebSyncdUploadFatalErrorMetric only receives fatal errors; retryable
+            // errors (SyncdRetryableError / SyncdMissingKeyError) short-circuit
+            // before reaching uploadFatalErrorMetric.
+            return;
+        }
+        var code = mapSyncdFatalErrorCode(exception);
+        if (code == null) {
+            // Defensive: unclassified subtype (should not happen given the sealed
+            // hierarchy is exhaustively mapped). Skip emission rather than commit
+            // a misleading code.
+            return;
+        }
+        var collection = extractSyncdCollection(exception);
+        var builder = new MdFatalErrorEventBuilder()
+                .mdFatalErrorCode(code) // WAWebSyncdUploadFatalErrorMetric.uploadFatalErrorMetric: mdFatalErrorCode: t
+                .isFatal(true); // WAWebSyncdUploadFatalErrorMetric.uploadFatalErrorMetric: isFatal: l — always true on this path
+        if (collection != null) {
+            builder.collection(collection); // WAWebSyncdUploadFatalErrorMetric.uploadFatalErrorMetric: collection: n ? collectionNameToMetric(n) : undefined
+        }
+        wamService.commit(builder.build());
+    }
+
+    /**
+     * Maps a {@link WhatsAppWebAppStateSyncException} subtype to the
+     * corresponding {@link MdSyncdFatalErrorCode}.
+     *
+     * <p>Mirrors the union of WA Web's
+     * {@code WAWebSyncdMetricFatalErrorListener.convertSyncdErrorCode}
+     * switch and the inline {@code uploadFatalErrorMetric} calls scattered
+     * across {@code WAWebKeyManagementHandleKeyShareApi} and
+     * {@code WAWebSyncdNetCallbacksApi}.
+     *
+     * @param exception the app-state sync exception; never {@code null}
+     * @return the matching {@link MdSyncdFatalErrorCode}, or {@code null}
+     *         for subtypes that should not emit the metric (retryable
+     *         subtypes are filtered upstream, so this only returns
+     *         {@code null} for defensive coverage)
+     */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdMetricFatalErrorListener",
+            exports = "convertSyncdErrorCode",
+            adaptation = com.github.auties00.cobalt.meta.model.WhatsAppAdaptation.ADAPTED)
+    private static MdSyncdFatalErrorCode mapSyncdFatalErrorCode(WhatsAppWebAppStateSyncException exception) {
+        return switch (exception) {
+            // WAWebSyncdAntiTampering / MutationIntegrityVerifier: SyncdFatalError("unable to validate snapshot mac")
+            case WhatsAppWebAppStateSyncException.SnapshotMacMismatch ignored -> MdSyncdFatalErrorCode.MAC_MISMATCH_SNAPSHOT;
+            // WAWebSyncdAntiTampering.validatePatchMac / MutationIntegrityVerifier: SyncdFatalError("unable to validate patch mac")
+            case WhatsAppWebAppStateSyncException.PatchMacMismatch ignored -> MdSyncdFatalErrorCode.MAC_MISMATCH_PATCH;
+            // WAWebSyncdError / DecryptedMutation: SyncdFatalError("decryption failure: valueMAC mismatch")
+            case WhatsAppWebAppStateSyncException.ValueMacMismatch ignored -> MdSyncdFatalErrorCode.DECRYPTION_FAILED_VALUE_MAC_MISMATCH;
+            // WAWebSyncdError / DecryptedMutation: SyncdFatalError("decryption failure: indexMAC mismatch")
+            case WhatsAppWebAppStateSyncException.IndexMacMismatch ignored -> MdSyncdFatalErrorCode.DECRYPTION_FAILED_INDEX_MAC_MISMATCH;
+            // WAWebSyncdStoreMissingKeys: MISSING_KEY_ON_ALL_CLIENTS
+            case WhatsAppWebAppStateSyncException.MissingKeyOnAllDevices ignored -> MdSyncdFatalErrorCode.MISSING_KEY_ON_ALL_CLIENTS;
+            // WAWebSyncdStoreMissingKeys._timeoutWhileWaitingForMissingKey: TIMEOUT_WHILE_WAITING_FOR_MISSING_KEY
+            case WhatsAppWebAppStateSyncException.TimeoutWhileWaitingForMissingKey ignored -> MdSyncdFatalErrorCode.TIMEOUT_WHILE_WAITING_FOR_MISSING_KEY;
+            // WASyncdKmpEncryptionManager: SyncdFatalError(e.message)
+            case WhatsAppWebAppStateSyncException.DecryptionFailed ignored -> MdSyncdFatalErrorCode.DECRYPTION_FAILED;
+            // WAWebSyncdError: MAC computation / encryption failures bucket under ENCRYPTION_FAILED
+            case WhatsAppWebAppStateSyncException.MacComputationFailed ignored -> MdSyncdFatalErrorCode.ENCRYPTION_FAILED;
+            // WAWebSyncdValidateMutations.validateAndTypeSetMutations: SyncdFatalError for missing action timestamp
+            case WhatsAppWebAppStateSyncException.MissingActionTimestamp ignored -> MdSyncdFatalErrorCode.MISSING_ACTION_TIMESTAMP;
+            // WAWebSyncdValidateMutations.validateNoSameIndexForMultipleMutations: SyncdFatalError("same index for multiple mutations in patch")
+            case WhatsAppWebAppStateSyncException.DuplicateIndexInPatch ignored -> MdSyncdFatalErrorCode.SAME_INDEX_FOR_MULTIPLE_MUTATIONS_IN_PATCH;
+            // WAWebSyncdValidateMutations.validateNoDuplicatePatchVersionInCollection: SyncdFatalError("duplicate patch version in collection")
+            case WhatsAppWebAppStateSyncException.DuplicatePatchVersion ignored -> MdSyncdFatalErrorCode.DUPLICATE_PATCH_VERSION_IN_COLLECTION;
+            // WAWebSyncdError: SyncdFatalError("syncd: has missing patches") → SERVER_DID_NOT_SEND_ALL_PATCHES
+            case WhatsAppWebAppStateSyncException.MissingPatches ignored -> MdSyncdFatalErrorCode.SERVER_DID_NOT_SEND_ALL_PATCHES;
+            // WAWebSyncdError: terminal patch with exit code — map by code when known, default TERMINAL_PATCH_UNKNOWN
+            case WhatsAppWebAppStateSyncException.TerminalPatch terminal -> mapTerminalPatchCode(terminal);
+            // WAWebNonMessageDataRequestHandler.m: decode failure on recovery snapshot — ENCODE path
+            case WhatsAppWebAppStateSyncException.ExternalDecodeFailed ignored -> MdSyncdFatalErrorCode.UNKNOWN;
+            // WAWebSyncdError: catch-all SyncdFatalError → UNKNOWN
+            case WhatsAppWebAppStateSyncException.UnexpectedError ignored -> MdSyncdFatalErrorCode.UNKNOWN;
+            // Retryable subtypes — never reach here because handleFailure pre-filters
+            // by isFatal(); listed explicitly so the sealed switch remains exhaustive.
+            case WhatsAppWebAppStateSyncException.MissingKey ignored -> null;
+            case WhatsAppWebAppStateSyncException.Conflict ignored -> null;
+            case WhatsAppWebAppStateSyncException.RetryableServerError ignored -> null;
+            case WhatsAppWebAppStateSyncException.ExternalDownloadFailed ignored -> null;
+        };
+    }
+
+    /**
+     * Maps a {@link WhatsAppWebAppStateSyncException.TerminalPatch} to the
+     * corresponding {@link MdSyncdFatalErrorCode}, using the patch's exit
+     * code when available.
+     *
+     * @param terminal the terminal patch exception; never {@code null}
+     * @return the matching fatal error code; never {@code null}
+     */
+    private static MdSyncdFatalErrorCode mapTerminalPatchCode(WhatsAppWebAppStateSyncException.TerminalPatch terminal) {
+        // WA Web: exit code 100 → TERMINAL_PATCH_MISSING_DATA, 101 → TERMINAL_PATCH_DESERIALIZATION_ERROR, else TERMINAL_PATCH_UNKNOWN.
+        // Cobalt's DisconnectReason carries a DisconnectCode sealed interface whose records encode the 100 / 101 wire values.
+        var code = terminal.exitCode() == null
+                ? null
+                : terminal.exitCode().code().orElse(null);
+        if (code instanceof com.github.auties00.cobalt.model.error.DisconnectCode.MissingData) {
+            return MdSyncdFatalErrorCode.TERMINAL_PATCH_MISSING_DATA;
+        }
+        if (code instanceof com.github.auties00.cobalt.model.error.DisconnectCode.DeserializationError) {
+            return MdSyncdFatalErrorCode.TERMINAL_PATCH_DESERIALIZATION_ERROR;
+        }
+        return MdSyncdFatalErrorCode.TERMINAL_PATCH_UNKNOWN;
+    }
+
+    /**
+     * Extracts the affected {@link SyncPatchType} from an app-state sync
+     * exception (when it carries one) and maps it to the WAM
+     * {@link com.github.auties00.cobalt.wam.type.Collection} enum.
+     *
+     * <p>Mirrors WA Web's
+     * {@code WAWebSyncdMetrics.collectionNameToMetric} conversion, which
+     * translates the wire collection name to the WAM enum constant.
+     *
+     * @param exception the app-state sync exception; never {@code null}
+     * @return the matching {@link com.github.auties00.cobalt.wam.type.Collection}
+     *         constant, or {@code null} when the exception does not carry
+     *         a collection
+     */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdMetrics",
+            exports = "collectionNameToMetric",
+            adaptation = com.github.auties00.cobalt.meta.model.WhatsAppAdaptation.DIRECT)
+    private static com.github.auties00.cobalt.wam.type.Collection extractSyncdCollection(WhatsAppWebAppStateSyncException exception) {
+        SyncPatchType patchType = switch (exception) {
+            case WhatsAppWebAppStateSyncException.SnapshotMacMismatch e -> e.collectionName();
+            case WhatsAppWebAppStateSyncException.PatchMacMismatch e -> e.collectionName();
+            case WhatsAppWebAppStateSyncException.MissingPatches e -> e.collectionName();
+            case WhatsAppWebAppStateSyncException.TerminalPatch e -> e.collectionName();
+            case WhatsAppWebAppStateSyncException.DuplicateIndexInPatch e -> e.collectionName();
+            case WhatsAppWebAppStateSyncException.DuplicatePatchVersion e -> e.collectionName();
+            default -> null;
+        };
+        if (patchType == null) {
+            return null;
+        }
+        return switch (patchType) {
+            case CRITICAL_BLOCK -> com.github.auties00.cobalt.wam.type.Collection.CRITICAL_BLOCK;
+            case CRITICAL_UNBLOCK_LOW -> com.github.auties00.cobalt.wam.type.Collection.CRITICAL_UNBLOCK_LOW;
+            case REGULAR -> com.github.auties00.cobalt.wam.type.Collection.REGULAR;
+            case REGULAR_HIGH -> com.github.auties00.cobalt.wam.type.Collection.REGULAR_HIGH;
+            case REGULAR_LOW -> com.github.auties00.cobalt.wam.type.Collection.REGULAR_LOW;
+        };
     }
     //</editor-fold>
     //<editor-fold desc="Web app state">
@@ -1002,10 +1415,19 @@ public final class WhatsAppClient {
      * Requests that the companion app-state service pull the latest
      * patches for the given patch types from the server.
      *
+     * <p>Returns whether any of the synced collections contributed actual state changes, i.e.
+     * at least one collection response carried patches or a snapshot. Callers that need to
+     * distinguish a no-op sync from one that applied remote updates (for example to emit the
+     * {@code mdAppStateDirtyBits} WAM event with {@code dirtyBitsFalsePositive = !hadChanges})
+     * can inspect the return value; other callers may safely ignore it.
+     *
      * @param patches the patch types to pull; an empty array is tolerated
+     * @return {@code true} if any synced collection had patches or a snapshot; {@code false}
+     *         when every collection sync completed without applying any state changes, or when
+     *         {@code patches} is empty
      */
-    public void pullWebAppState(SyncPatchType... patches) {
-        webAppStateService.pullPatches(patches);
+    public boolean pullWebAppState(SyncPatchType... patches) {
+        return webAppStateService.pullPatches(patches);
     }
 
     /**
@@ -1428,7 +1850,8 @@ public final class WhatsAppClient {
                     .collect(Collectors.toCollection(LinkedHashSet::new));
             var communityGroupsQuery = new FetchAllSubgroupsMex.Request(groupId.toString(), "INTERACTIVE", null);
             var communityGroupsRequestNode = communityGroupsQuery.toNode();
-            var communityGroupsResponseNode = sendNode(communityGroupsRequestNode);
+            // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+            var communityGroupsResponseNode = sendMexNode(communityGroupsRequestNode, FetchAllSubgroupsMex.QUERY_ID, "mexCommunityGetSubgroups", false);
             var communityGroupsResponse = FetchAllSubgroupsMex.Response.of(communityGroupsResponseNode);
             var communityLinkedGroups = new LinkedHashSet<CommunityLinkedGroup>();
             communityGroupsResponse.ifPresent(response -> {
@@ -1993,7 +2416,8 @@ public final class WhatsAppClient {
                 512, // WAWebBizQueryOrderJob.queryOrder: default thumbnail width used across the product catalog surface
                 512  // WAWebBizQueryOrderJob.queryOrder: default thumbnail height
         );
-        var response = sendNode(request.toNode());
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendMexNode(request.toNode(), QueryOrderMex.QUERY_ID, "queryOrder", false);
         return QueryOrderMex.Response.of(response)
                 .map(QueryOrderMex.Response::order);
     }
@@ -2034,6 +2458,11 @@ public final class WhatsAppClient {
         var quickReplyId = DataUtils.randomHex(16); // ADAPTED: WA Web mints a client-side uuid inside the compose flow
         var resolvedKeywords = keywords == null ? List.<String>of() : List.copyOf(keywords);
         var timestamp = Instant.now();
+        // WAWebAddQuickReplyAction.addQuickReplyAction: WAWebQuickReplyLogging.logQuickReplyAddedEvent()
+        wamService.commit(new QuickReplyEventBuilder()
+                .quickReplyAction(com.github.auties00.cobalt.wam.type.QuickReplyAction.ACTION_SETTINGS_ADDED) // WAWebQuickReplyLogging.logQuickReplyAddedEvent: QUICK_REPLY_ACTION.ACTION_SETTINGS_ADDED
+                .quickReplyEntryPoint(QuickReplyEntryPoint.QUICK_REPLY_ENTRY_POINT_SETTINGS_MENU) // WAWebQuickReplyLogging.logQuickReplyAddedEvent: QUICK_REPLY_ENTRY_POINT.QUICK_REPLY_ENTRY_POINT_SETTINGS_MENU
+                .build());
         var mutation = QuickReplyHandler.INSTANCE.getQuickReplyAddOrEditMutation(
                 quickReplyId, shortcut, message, 0, resolvedKeywords, timestamp);
         webAppStateService.pushPatches(QuickReplyAction.COLLECTION_NAME, List.of(mutation)); // WAWebSyncdCoreApi.lockForSync([], [mutation], ...)
@@ -2089,6 +2518,11 @@ public final class WhatsAppClient {
         int currentCount = store.findQuickReply(quickReplyId) // WAWebQuickRepliesSync.applyMutations: s.count || 0
                 .map(QuickReply::count)
                 .orElse(0);
+        // WAWebEditQuickReplyAction.editQuickReplyAction: WAWebQuickReplyLogging.logQuickReplyEditEvent()
+        wamService.commit(new QuickReplyEventBuilder()
+                .quickReplyAction(com.github.auties00.cobalt.wam.type.QuickReplyAction.ACTION_SETTINGS_EDITED) // WAWebQuickReplyLogging.logQuickReplyEditEvent: QUICK_REPLY_ACTION.ACTION_SETTINGS_EDITED
+                .quickReplyEntryPoint(QuickReplyEntryPoint.QUICK_REPLY_ENTRY_POINT_SETTINGS_MENU) // WAWebQuickReplyLogging.logQuickReplyEditEvent: QUICK_REPLY_ENTRY_POINT.QUICK_REPLY_ENTRY_POINT_SETTINGS_MENU
+                .build());
         var mutation = QuickReplyHandler.INSTANCE.getQuickReplyAddOrEditMutation(
                 quickReplyId, shortcut, message, currentCount, resolvedKeywords, timestamp);
         webAppStateService.pushPatches(QuickReplyAction.COLLECTION_NAME, List.of(mutation));
@@ -2128,6 +2562,11 @@ public final class WhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public void deleteQuickReply(String quickReplyId) {
         Objects.requireNonNull(quickReplyId, "quickReplyId cannot be null");
+        // WAWebDeleteQuickReplyAction.deleteQuickReplyAction: WAWebQuickReplyLogging.logQuickReplyDeleteEvent()
+        wamService.commit(new QuickReplyEventBuilder()
+                .quickReplyAction(com.github.auties00.cobalt.wam.type.QuickReplyAction.ACTION_SETTINGS_DELETED) // WAWebQuickReplyLogging.logQuickReplyDeleteEvent: QUICK_REPLY_ACTION.ACTION_SETTINGS_DELETED
+                .quickReplyEntryPoint(QuickReplyEntryPoint.QUICK_REPLY_ENTRY_POINT_SETTINGS_MENU) // WAWebQuickReplyLogging.logQuickReplyDeleteEvent: QUICK_REPLY_ENTRY_POINT.QUICK_REPLY_ENTRY_POINT_SETTINGS_MENU
+                .build());
         var mutation = QuickReplyHandler.INSTANCE.getQuickReplyDeleteMutation(quickReplyId, Instant.now());
         webAppStateService.pushPatches(QuickReplyAction.COLLECTION_NAME, List.of(mutation));
         store.removeQuickReply(quickReplyId); // ADAPTED: WAWebQuickRepliesSync.applyMutations -> getQuickReplyTable().remove(l) applied eagerly
@@ -2643,7 +3082,8 @@ public final class WhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public SequencedCollection<Newsletter> queryNewsletters() {
         var request = new FetchAllNewslettersMetadataMex.Request(Boolean.TRUE); // WAWebMexFetchAllNewslettersMetadataJob.mexFetchAllNewsletters: fetch_wamo_sub: true
-        var response = sendNode(request.toNode());
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendMexNode(request.toNode(), FetchAllNewslettersMetadataMex.QUERY_ID, "mexFetchAllNewsletters", false);
         var parsed = FetchAllNewslettersMetadataMex.Response.of(response);
         var newsletters = new LinkedHashSet<Newsletter>();
         parsed.ifPresent(r -> {
@@ -2847,11 +3287,41 @@ public final class WhatsAppClient {
                 .attribute("to", Jid.of(JidServer.groupOrCommunity())) // WAWebGroupInviteJob.joinGroupViaInvite: to: G_US
                 .attribute("type", "set") // WAWebGroupInviteJob.joinGroupViaInvite: type: "set"
                 .content(inviteNode);
-        var response = sendNode(iqNode);
-        return response.getChild("group") // joinGroupViaInviteParser: maybeChild("group")
-                .or(() -> response.getChild("membership_approval_request")) // joinGroupViaInviteParser: t ? membership_approval_request : group
-                .flatMap(node -> node.getAttributeAsJid("jid")) // joinGroupViaInviteParser: attrGroupJid("jid")
-                .orElseThrow(() -> new NoSuchElementException("Invalid join-group response: %s".formatted(response)));
+        // WAWebGroupInviteJob.joinGroupViaInvite times the IQ with self.performance.now() and in
+        // the finally block invokes WAWebGroupJoinRequestMetricUtils.logMembershipRequestCreate
+        // ONLY when the caller anticipated a membership_approval_request response (the second
+        // parameter `t`). Cobalt infers the same condition from the response shape: a
+        // <membership_approval_request> child indicates the join has been gated behind admin
+        // approval, so the create-request metric applies.
+        var start = Instant.now();
+        var successful = true;
+        Jid resolvedGroup = null;
+        boolean approvalGated = false;
+        try {
+            var response = sendNode(iqNode);
+            var approvalChild = response.getChild("membership_approval_request"); // joinGroupViaInviteParser: t ? membership_approval_request : group
+            approvalGated = approvalChild.isPresent();
+            resolvedGroup = response.getChild("group") // joinGroupViaInviteParser: maybeChild("group")
+                    .or(() -> approvalChild)
+                    .flatMap(node -> node.getAttributeAsJid("jid")) // joinGroupViaInviteParser: attrGroupJid("jid")
+                    .orElseThrow(() -> new NoSuchElementException("Invalid join-group response: %s".formatted(response)));
+            return resolvedGroup;
+        } catch (RuntimeException e) {
+            successful = false;
+            throw e;
+        } finally {
+            if (approvalGated || !successful) {
+                // WAWebGroupJoinRequestMetricUtils.logMembershipRequestCreate: emits
+                // new WaFsGroupJoinRequestActionWamEvent({groupJid, groupJoinRequestAction:
+                // MEMBERSHIP_REQUEST_CREATE, responseTime, isSuccessful}).commit().
+                wamService.commit(new WaFsGroupJoinRequestActionEventBuilder()
+                        .groupJid(resolvedGroup != null ? sanitizeGroupJidForWam(resolvedGroup) : "") // WAWebGroupJoinRequestMetricUtils.getSanitizedJid: "" when unavailable
+                        .groupJoinRequestAction(GroupJoinRequestActionType.MEMBERSHIP_REQUEST_CREATE)
+                        .isSuccessful(successful)
+                        .serverResponseTime(Instant.ofEpochMilli(Instant.now().toEpochMilli() - start.toEpochMilli()))
+                        .build());
+            }
+        }
     }
 
     /**
@@ -3062,6 +3532,16 @@ public final class WhatsAppClient {
                         result.add(jid);
                     }
                 });
+        // WAWebGroupJoinRequestMetricUtils.logViewPendingParticipant: fires when the pending
+        // participant list is viewed. Cobalt does not have a UI surface, so this query is the
+        // closest functional counterpart — WA Web hard-codes responseTime:0 and isSuccessful:true
+        // in the helper, which we mirror here.
+        wamService.commit(new WaFsGroupJoinRequestActionEventBuilder()
+                .groupJid(sanitizeGroupJidForWam(group)) // WAWebGroupJoinRequestMetricUtils.getSanitizedJid
+                .groupJoinRequestAction(GroupJoinRequestActionType.VIEW_PENDING_PARTICIPANTS)
+                .isSuccessful(true) // WAWebGroupJoinRequestMetricUtils.logViewPendingParticipant: isSuccessful: !0
+                .serverResponseTime(Instant.ofEpochMilli(0L)) // WAWebGroupJoinRequestMetricUtils.logViewPendingParticipant: responseTime: 0
+                .build());
         return result;
     }
 
@@ -3084,8 +3564,32 @@ public final class WhatsAppClient {
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsMembershipRequestsActionRequest",
             exports = "makeMembershipRequestsActionRequest",
             adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebMembershipApprovalRequestAction",
+            exports = "approveMembershipApprovalRequest",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public void acceptGroupJoinRequest(Jid group, Jid applicant) {
-        changeMembershipRequestState(group, applicant, "approve"); // WASmaxOutGroupsMembershipRequestsActionRequest: makeMembershipRequestsActionRequestMembershipRequestsActionApprove
+        // WAWebMembershipApprovalRequestAction.approveMembershipApprovalRequest:
+        // wraps the IQ emission in try/catch to emit WaFsGroupJoinRequestAction
+        // with action=MEMBERSHIP_REQUEST_APPROVE and an isSuccessful flag driven
+        // by whether the IQ threw. Cobalt mirrors that pattern.
+        var start = Instant.now();
+        var successful = true;
+        try {
+            changeMembershipRequestState(group, applicant, "approve"); // WASmaxOutGroupsMembershipRequestsActionRequest: makeMembershipRequestsActionRequestMembershipRequestsActionApprove
+        } catch (RuntimeException e) {
+            successful = false;
+            throw e;
+        } finally {
+            // WAWebGroupJoinRequestMetricUtils.logMembershipRequestApprove: delegates to the shared
+            // emitter which builds new WaFsGroupJoinRequestActionWamEvent({groupJid, groupJoinRequestAction,
+            // groupJoinRequestGroupsInCommon, serverResponseTime, isSuccessful}).commit().
+            wamService.commit(new WaFsGroupJoinRequestActionEventBuilder()
+                    .groupJid(sanitizeGroupJidForWam(group)) // WAWebGroupJoinRequestMetricUtils.getSanitizedJid
+                    .groupJoinRequestAction(GroupJoinRequestActionType.MEMBERSHIP_REQUEST_APPROVE)
+                    .isSuccessful(successful)
+                    .serverResponseTime(Instant.ofEpochMilli(Instant.now().toEpochMilli() - start.toEpochMilli()))
+                    .build());
+        }
     }
 
     /**
@@ -3106,8 +3610,32 @@ public final class WhatsAppClient {
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsMembershipRequestsActionRequest",
             exports = "makeMembershipRequestsActionRequest",
             adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebMembershipApprovalRequestAction",
+            exports = "rejectMembershipApprovalRequest",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public void rejectGroupJoinRequest(Jid group, Jid applicant) {
-        changeMembershipRequestState(group, applicant, "reject"); // WASmaxOutGroupsMembershipRequestsActionRequest: makeMembershipRequestsActionRequestMembershipRequestsActionReject
+        // WAWebMembershipApprovalRequestAction.rejectMembershipApprovalRequest:
+        // wraps the IQ emission in try/catch/finally to emit WaFsGroupJoinRequestAction
+        // with action=MEMBERSHIP_REQUEST_REJECT and an isSuccessful flag driven by
+        // whether the IQ threw. Cobalt mirrors that pattern.
+        var start = Instant.now();
+        var successful = true;
+        try {
+            changeMembershipRequestState(group, applicant, "reject"); // WASmaxOutGroupsMembershipRequestsActionRequest: makeMembershipRequestsActionRequestMembershipRequestsActionReject
+        } catch (RuntimeException e) {
+            successful = false;
+            throw e;
+        } finally {
+            // WAWebGroupJoinRequestMetricUtils.logMembershipRequestReject: delegates to the shared
+            // emitter which builds new WaFsGroupJoinRequestActionWamEvent({groupJid, groupJoinRequestAction,
+            // groupJoinRequestGroupsInCommon, serverResponseTime, isSuccessful}).commit().
+            wamService.commit(new WaFsGroupJoinRequestActionEventBuilder()
+                    .groupJid(sanitizeGroupJidForWam(group)) // WAWebGroupJoinRequestMetricUtils.getSanitizedJid
+                    .groupJoinRequestAction(GroupJoinRequestActionType.MEMBERSHIP_REQUEST_REJECT)
+                    .isSuccessful(successful)
+                    .serverResponseTime(Instant.ofEpochMilli(Instant.now().toEpochMilli() - start.toEpochMilli()))
+                    .build());
+        }
     }
 
     /**
@@ -3147,6 +3675,34 @@ public final class WhatsAppClient {
                 .attribute("type", "set") // WAWebSmaxBaseIQSetRequestMixin: type: "set"
                 .content(membershipActionNode);
         sendNode(iqNode); // WASmaxGroupsMembershipRequestsActionRPC.sendMembershipRequestsActionRPC
+    }
+
+    /**
+     * Sanitizes a group JID for inclusion in
+     * {@link WaFsGroupJoinRequestActionEvent#groupJid()}.
+     *
+     * <p>Mirrors {@code WAWebGroupJoinRequestMetricUtils.getSanitizedJid},
+     * which drops legacy subject-based group JIDs (those containing a
+     * {@code -}) and reports them as the empty string so that the metric
+     * only carries the modern {@code @g.us} form.
+     *
+     * @param group the group JID to sanitize, may be {@code null}
+     * @return the sanitized JID string, or the empty string when
+     *         {@code group} is {@code null} or legacy
+     *
+     * @implNote WA Web uses {@code e?.toJid() ?? ""} and then
+     * {@code n.includes("-") ? "" : n}; Cobalt applies the same two-step
+     * check against {@link Jid#toString()}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebGroupJoinRequestMetricUtils",
+            exports = "getSanitizedJid",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    private String sanitizeGroupJidForWam(Jid group) {
+        if (group == null) {
+            return "";
+        }
+        var jid = group.toString(); // WAWebGroupJoinRequestMetricUtils.getSanitizedJid: e.toJid()
+        return jid.contains("-") ? "" : jid; // WAWebGroupJoinRequestMetricUtils.getSanitizedJid: n.includes("-") ? "" : n
     }
 
     /**
@@ -3644,7 +4200,8 @@ public final class WhatsAppClient {
                 Boolean.TRUE, // fetch_wamo_sub
                 inputJson.toJSONString()
         );
-        var response = sendNode(request.toNode());
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendMexNode(request.toNode(), FetchNewsletterMex.QUERY_ID, "mexGetNewsletter", false);
         var parsed = FetchNewsletterMex.Response.of(response);
         if (parsed.isEmpty()) {
             return Optional.empty();
@@ -3692,7 +4249,8 @@ public final class WhatsAppClient {
             input.fluentPut("picture", Base64.getEncoder().encodeToString(picture));
         }
         var request = new CreateNewsletterMex.Request(input.toJSONString());
-        var response = sendNode(request.toNode());
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendMexNode(request.toNode(), CreateNewsletterMex.QUERY_ID, "mexCreateNewsletter", false);
         var parsed = CreateNewsletterMex.Response.of(response)
                 .orElseThrow(() -> new NoSuchElementException("Missing create-newsletter response: %s".formatted(response)));
         var id = parsed.id()
@@ -3741,7 +4299,8 @@ public final class WhatsAppClient {
             updates.fluentPut("picture", picture.length == 0 ? "" : Base64.getEncoder().encodeToString(picture));
         }
         var request = new UpdateNewsletterMex.Request(newsletter.toString(), updates.toJSONString());
-        sendNode(request.toNode());
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        sendMexNodeWithNoResponse(request.toNode(), UpdateNewsletterMex.QUERY_ID, "mexUpdateNewsletter", false);
     }
 
     /**
@@ -3764,7 +4323,8 @@ public final class WhatsAppClient {
     public void deleteNewsletter(Jid newsletter) {
         Objects.requireNonNull(newsletter, "newsletter cannot be null");
         var request = new DeleteNewsletterMex.Request(newsletter.toString());
-        sendNode(request.toNode());
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        sendMexNodeWithNoResponse(request.toNode(), DeleteNewsletterMex.QUERY_ID, "mexDeleteNewsletter", false);
         store.removeNewsletter(newsletter); // WAWebNewsletterBridgeApi.deleteNewsletter: evict from local store
     }
 
@@ -3792,7 +4352,8 @@ public final class WhatsAppClient {
     public void joinNewsletter(Jid newsletter) {
         Objects.requireNonNull(newsletter, "newsletter cannot be null");
         var request = new JoinNewsletterMex.Request(newsletter.toString());
-        sendNode(request.toNode());
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        sendMexNodeWithNoResponse(request.toNode(), JoinNewsletterMex.QUERY_ID, "mexJoinNewsletter", false);
         store.findNewsletterByJid(newsletter)
                 .orElseGet(() -> store.addNewNewsletter(newsletter));
         // WAWebNewsletterSubscribeAction.subscribeToNewsletterAction ->
@@ -3835,7 +4396,8 @@ public final class WhatsAppClient {
     public void leaveNewsletter(Jid newsletter) {
         Objects.requireNonNull(newsletter, "newsletter cannot be null");
         var request = new LeaveNewsletterMex.Request(newsletter.toString());
-        sendNode(request.toNode());
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        sendMexNodeWithNoResponse(request.toNode(), LeaveNewsletterMex.QUERY_ID, "mexLeaveNewsletter", false);
         store.removeNewsletter(newsletter);
         // WAWebNewsletterUnsubscribeAction.unsubscribeFromNewsletterAction ->
         // WAWebNewsletterAttributionLogging.NewsletterCoreEventLogger.log({cid, channelCoreEventType: UNFOLLOW, ...})
@@ -3884,7 +4446,8 @@ public final class WhatsAppClient {
                 .fluentPut("type", "MUTE_ADMIN_ACTIVITY") // WAWebNewsletterUpdateUserSettingJob: ADMIN_NOTIFICATIONS -> "MUTE_ADMIN_ACTIVITY"
                 .fluentPut("value", mute ? "ON" : "OFF"); // WAWebNewsletterUpdateUserSettingJob: MUTED_STATE -> "ON", else "OFF"
         var request = new UpdateNewsletterUserSettingMex.Request(input.toJSONString());
-        sendNode(request.toNode());
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        sendMexNodeWithNoResponse(request.toNode(), UpdateNewsletterUserSettingMex.QUERY_ID, "mexUpdateNewsletterUserSetting", false);
         // WAWebNewsletterUpdateUserSettingsAction.updateNewsletterUserSettingsAction ->
         // NewsletterCoreEventLogger.log({cid, channelCoreEventType: MUTE|UNMUTE,
         //   channelRequestMetadata: JSON.stringify(a.map(s => (mute?"mute":"unmute")+"_"+s))}).
@@ -4005,7 +4568,8 @@ public final class WhatsAppClient {
     public void acceptNewsletterAdminInvite(Jid newsletter) {
         Objects.requireNonNull(newsletter, "newsletter cannot be null");
         var request = new AcceptNewsletterAdminInviteMex.Request(newsletter.toString());
-        sendNode(request.toNode());
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        sendMexNodeWithNoResponse(request.toNode(), AcceptNewsletterAdminInviteMex.QUERY_ID, "acceptNewsletterAdminInvite", false);
     }
 
     /**
@@ -4034,7 +4598,8 @@ public final class WhatsAppClient {
         Objects.requireNonNull(newsletter, "newsletter cannot be null");
         Objects.requireNonNull(admin, "admin cannot be null");
         var request = new RevokeNewsletterAdminInviteMex.Request(newsletter.toString(), admin.toString());
-        sendNode(request.toNode());
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        sendMexNodeWithNoResponse(request.toNode(), RevokeNewsletterAdminInviteMex.QUERY_ID, "revokeNewsletterAdminInvite", false);
     }
 
     /**
@@ -4062,7 +4627,8 @@ public final class WhatsAppClient {
         Objects.requireNonNull(newsletter, "newsletter cannot be null");
         Objects.requireNonNull(admin, "admin cannot be null");
         var request = new DemoteNewsletterAdminMex.Request(newsletter.toString(), admin.toString());
-        sendNode(request.toNode());
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        sendMexNodeWithNoResponse(request.toNode(), DemoteNewsletterAdminMex.QUERY_ID, "demoteNewsletterAdmin", false);
     }
 
     /**
@@ -4099,7 +4665,8 @@ public final class WhatsAppClient {
         var updates = new JSONObject()
                 .fluentPut("settings", settings);
         var request = new UpdateNewsletterMex.Request(newsletter.toString(), updates.toJSONString());
-        sendNode(request.toNode());
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        sendMexNodeWithNoResponse(request.toNode(), UpdateNewsletterMex.QUERY_ID, "mexUpdateNewsletter", false);
     }
 
     /**
@@ -4229,7 +4796,8 @@ public final class WhatsAppClient {
                 DEFAULT_CATALOG_IMAGE_HEIGHT,
                 null
         );
-        var response = sendNode(request.toNode()); // WAWebMexClient.fetchQuery
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendMexNode(request.toNode(), QueryCatalogMex.QUERY_ID, "queryCatalog", false);
         // WAWebCatalogEventLogger.createCatalogEventLogger(GET_CATALOG): emit GraphqlCatalogRequest WAM event based on response
         logGraphqlCatalogRequest(response, GraphqlCatalogEndpoint.GET_CATALOG);
         return QueryCatalogMex.Response.of(response)
@@ -4308,7 +4876,8 @@ public final class WhatsAppClient {
                 DEFAULT_CATALOG_IMAGE_HEIGHT,
                 null
         );
-        var response = sendNode(request.toNode()); // WAWebMexClient.fetchQuery
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendMexNode(request.toNode(), QueryProductCollectionsMex.QUERY_ID, "queryProductCollections", false);
         // WAWebCatalogEventLogger.createCatalogEventLogger(GET_COLLECTIONS): emit GraphqlCatalogRequest WAM event based on response
         logGraphqlCatalogRequest(response, GraphqlCatalogEndpoint.GET_COLLECTIONS);
         return QueryProductCollectionsMex.Response.of(response)
@@ -5172,24 +5741,64 @@ public final class WhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     @WhatsAppWebExport(moduleName = "WAWebWamChatPSALogger", exports = "logChatPSADelete",
             adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebActionListenerHelpers", exports = "logMessageDeleteActionsMetric",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public AckResult deleteMessage(MessageKey key, boolean everyone) {
         Objects.requireNonNull(key, "key cannot be null");
         if (everyone) {
             var parentJid = key.parentJid() // WAWebRevokeMsgAction._sendRevoke: s.id.remote
                     .orElseThrow(() -> new IllegalArgumentException("key must carry a parentJid"));
+            // WAWebActionListenerHelpers.logMessageDeleteActionsMetric: mediaType: y(t.list) computed over the
+            // original messages before the revoke send mutates local state.
+            // WAWebRevokeMsgAction._sendRevoke: same `s` (original message) is read for
+            // messageType/messageMediaType/revokeSendDelay before the send, because the local
+            // state is replaced with the revoke marker afterwards.
+            var messageIdForMedia = key.id().orElse(null);
+            var originalInfo = messageIdForMedia == null
+                    ? null
+                    : store.findMessageById(parentJid, messageIdForMedia)
+                            .filter(ChatMessageInfo.class::isInstance)
+                            .map(ChatMessageInfo.class::cast)
+                            .orElse(null);
+            var mediaType = originalInfo == null
+                    ? null
+                    : WamMsgUtils.getWamMediaType(originalInfo);
+            // WAWebRevokeMsgAction._sendRevoke: C = unixTime(); v = C - WAWebMsgGetters.getT(s)
+            var sendInstant = Instant.now();
+            var revokeSendDelaySeconds = originalInfo == null
+                    ? null
+                    : originalInfo.timestamp()
+                            .map(t -> (int) (sendInstant.getEpochSecond() - t.getEpochSecond()))
+                            .orElse(null);
             var protocol = new ProtocolMessageBuilder() // WAWebRevokeMsgAction._sendRevoke: {type: PROTOCOL, kind: ProtocolRevoke, protocolMessageKey: s.id}
                     .key(key) // WAWebRevokeMsgAction._sendRevoke: protocolMessageKey: s.id
                     .type(ProtocolMessage.Type.REVOKE) // WAWebRevokeMsgAction._sendRevoke: MsgKind.ProtocolRevoke, subtype: sender_revoke | admin_revoke
-                    .timestampMs(Instant.now()) // WAWebRevokeMsgAction._sendRevoke: revokeTimestamp: C
+                    .timestampMs(sendInstant) // WAWebRevokeMsgAction._sendRevoke: revokeTimestamp: C
                     .build();
             var wrapper = MessageContainer.of(protocol); // WAWebRevokeMsgAction._sendRevoke -> WAWebSendMsgRecordAction.sendMsgRecord
-            return messageService.send(parentJid, wrapper); // WAWebRevokeMsgAction._sendRevoke -> sendMsgRecord
+            var ack = messageService.send(parentJid, wrapper); // WAWebRevokeMsgAction._sendRevoke -> sendMsgRecord
+            // WAWebActionListener._e.then(...): logMessageDeleteActionsMetric(t, a, true) fires after the revoke send completes successfully.
+            emitMessageDeleteActionsEvent(parentJid, DeleteActionType.DELETE_FOR_EVERYONE, mediaType);
+            // WAWebRevokeMsgAction._sendRevoke: `c === SendMsgResult.OK` gate before
+            // `new SendRevokeMessageWamEvent({messageType, messageMediaType, revokeSendDelay}).commit()`.
+            if (ack != null && ack.isSuccess()) {
+                emitSendRevokeMessageEvent(parentJid, mediaType, revokeSendDelaySeconds);
+            }
+            return ack;
         }
 
         var parentJid = key.parentJid() // WAWebChatSendMessages.sendDeleteMsgs: i.id (chatJid)
                 .orElseThrow(() -> new IllegalArgumentException("key must carry a parentJid"));
         var messageId = key.id() // WAWebChatSendMessages.sendDeleteMsgs: s = t.list (messageIds)
                 .orElseThrow(() -> new IllegalArgumentException("key must carry an id"));
+
+        // WAWebActionListenerHelpers.logMessageDeleteActionsMetric: mediaType: y(t.list) -
+        // resolved before the in-memory message is removed, otherwise getWamMediaType cannot classify it.
+        var mediaType = store.findMessageById(parentJid, messageId)
+                .filter(ChatMessageInfo.class::isInstance)
+                .map(ChatMessageInfo.class::cast)
+                .map(WamMsgUtils::getWamMediaType)
+                .orElse(null);
 
         // WAWebChatSendMessages.sendDeleteMsgs: s.forEach(e => e.delete())
         store.findChatByJid(parentJid)
@@ -5227,7 +5836,132 @@ public final class WhatsAppClient {
         ); // WAWebChatSendMessages.sendDeleteMsgs: WAWebChatSendDeleteMsgsBridge
         // WAWebActionListenerHelpers: if(getIsPSA(e)) for(r=0;r<t.list.length;r++) WAWebWamChatPSALogger.logChatPSADelete(t.list[r])
         logPsaActionIfApplicable(key, PsaMessageActionType.DELETE); // WAWebWamChatPSALogger.logChatPSADelete -> PSA_MESSAGE_ACTION_TYPE.DELETE
+        // WAWebActionListener.pe.then(...): logMessageDeleteActionsMetric(a, i, false) fires after the delete-for-me
+        // send-result count equals the input count (full success).
+        emitMessageDeleteActionsEvent(parentJid, DeleteActionType.DELETE_FOR_ME, mediaType);
         return null;
+    }
+
+    /**
+     * Emits a {@link MessageDeleteActionsEvent} for a completed delete-for-me
+     * or delete-for-everyone action on a single message.
+     *
+     * <p>WhatsApp Web emits this event from
+     * {@code WAWebActionListenerHelpers.logMessageDeleteActionsMetric(chat, request, isDeleteForEveryone)},
+     * which is invoked from the two delete listeners
+     * ({@code send_delete_msgs} and {@code send_revoke_msgs}) once the
+     * underlying send has completed successfully. WA Web batches the metric
+     * over the full list of deleted messages; Cobalt's public
+     * {@link #deleteMessage(MessageKey, boolean)} API deletes one message per
+     * invocation, so {@code messagesDeleted} is always {@code 1} and
+     * {@code mediaType} is simply the classification of the single message
+     * being deleted (equivalent to WA Web's single-element
+     * {@code y(t.list)} result).
+     *
+     * <p>The {@code threadId} property is intentionally left unset because
+     * Cobalt does not adapt {@code WAWebChatThreadLogging} (HMAC-based chat
+     * thread identifiers), mirroring the treatment of the same property in
+     * other Cobalt events that WA Web populates via {@code getChatThreadID}.
+     *
+     * @param chatJid          the chat JID of the deleted message; used to
+     *                         derive {@code isAGroup}; must not be
+     *                         {@code null}
+     * @param deleteActionType the delete action type to report; must not be
+     *                         {@code null}
+     * @param mediaType        the WAM media type of the deleted message, or
+     *                         {@code null} when the message could not be
+     *                         resolved from the local store (matches WA
+     *                         Web's {@code y(t.list)} returning
+     *                         {@code undefined})
+     *
+     * @implNote Adapts {@code WAWebActionListenerHelpers.logMessageDeleteActionsMetric}:
+     * WA Web builds {@code new MessageDeleteActionsWamEvent({deleteActionType,
+     * isAGroup: getIsGroup(chat), messagesDeleted: t.list.length,
+     * threadId: yield getChatThreadID(chat.id.toJid()), mediaType: y(t.list)
+     * }).commitAndWaitForFlush()}. Cobalt mirrors the payload using
+     * {@link Jid#hasGroupOrCommunityServer()} for {@code isAGroup} (equivalent
+     * to {@code WAWebChatGetters.getIsGroup}) and leaves {@code threadId}
+     * unset. The event is committed via {@link WamService#commit(Object)};
+     * {@code commitAndWaitForFlush} is not needed here because Cobalt's
+     * {@code WamService} dispatches commits asynchronously without a separate
+     * synchronous flush API.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebActionListenerHelpers", exports = "logMessageDeleteActionsMetric",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private void emitMessageDeleteActionsEvent(Jid chatJid, DeleteActionType deleteActionType, MediaType mediaType) {
+        var builder = new MessageDeleteActionsEventBuilder() // WAWebActionListenerHelpers.logMessageDeleteActionsMetric: new MessageDeleteActionsWamEvent({...})
+                .deleteActionType(deleteActionType) // WAWebActionListenerHelpers: deleteActionType: n ? DELETE_FOR_EVERYONE : DELETE_FOR_ME
+                .isAGroup(chatJid.hasGroupOrCommunityServer()) // WAWebActionListenerHelpers: isAGroup: getIsGroup(e)
+                .messagesDeleted(1); // WAWebActionListenerHelpers: messagesDeleted: t.list.length (Cobalt deletes one message per API call)
+        // WAWebActionListenerHelpers: mediaType: y(t.list) - y returns undefined when the set is empty
+        if (mediaType != null) {
+            builder.mediaType(mediaType);
+        }
+        // WAWebActionListenerHelpers: threadId: yield getChatThreadID(e.id.toJid()) - WAWebChatThreadLogging
+        // (HMAC-based thread id) is not adapted in Cobalt, so threadId is left unset.
+        wamService.commit(builder.build()); // WAWebActionListenerHelpers: .commitAndWaitForFlush()
+    }
+
+    /**
+     * Emits a {@link SendRevokeMessageEvent} (id {@code 1348}) for a
+     * delete-for-everyone send that successfully round-tripped to the server.
+     *
+     * <p>WhatsApp Web emits this event inside
+     * {@code WAWebRevokeMsgAction._sendRevoke}: after calling
+     * {@code WAWebSendMsgRecordAction.sendMsgRecord(D)} (and,
+     * independently, {@code WAWebSendMsgRecordAction.sendAddonRecord(n)}
+     * for the comment-addon branch), the returned
+     * {@code messageSendResult} is checked against
+     * {@link AckResult#isSuccess()}'s equivalent
+     * {@code SendMsgResult.OK} before the event is committed. The payload
+     * mirrors WA Web verbatim:
+     * {@code {messageType: getWamMessageType(s),
+     *        messageMediaType: getWamMediaType(s),
+     *        revokeSendDelay: C - getT(s)}}
+     * where {@code s} is the <em>original</em> message being revoked and
+     * {@code C} is the unix timestamp at which the revoke was issued.
+     *
+     * <p>Cobalt's public {@link #deleteMessage(MessageKey, boolean)} API
+     * exposes only the delete-for-everyone path for a single message, so
+     * the event is emitted once per successful revoke send. The comment
+     * addon branch in {@code WAWebRevokeMsgAction._sendRevoke} has no
+     * Cobalt counterpart (comment-addon revoke is not implemented) and
+     * therefore has no emission site here.
+     *
+     * @param chatJid       the chat JID of the message being revoked, used
+     *                      to derive {@code messageType}; must not be
+     *                      {@code null}
+     * @param mediaType     the WAM media type classification of the
+     *                      <em>original</em> message being revoked, or
+     *                      {@code null} when the message could not be
+     *                      resolved from the local store
+     * @param revokeSendDelaySeconds the number of seconds elapsed between
+     *                      the original message's server timestamp and the
+     *                      moment the revoke send was issued, or
+     *                      {@code null} when the original timestamp could
+     *                      not be resolved
+     *
+     * @implNote Adapts the two
+     * {@code new SendRevokeMessageWamEvent({...}).commit()} sites in
+     * {@code WAWebRevokeMsgAction._sendRevoke}. WA Web calls
+     * {@code .commit()}; Cobalt routes through
+     * {@link WamService#commit(Object)}. {@code messageType} is derived
+     * from the chat JID via {@link WamMsgUtils#getWamMessageType(Jid)}
+     * which mirrors the JID-based classification WA Web performs inside
+     * {@code getWamMessageType(s)} after resolving {@code s.id.remote}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebRevokeMsgAction", exports = "_sendRevoke",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private void emitSendRevokeMessageEvent(Jid chatJid, MediaType mediaType, Integer revokeSendDelaySeconds) {
+        var builder = new SendRevokeMessageEventBuilder() // WAWebRevokeMsgAction._sendRevoke: new SendRevokeMessageWamEvent({...})
+                .messageType(WamMsgUtils.getWamMessageType(chatJid)); // WAWebRevokeMsgAction._sendRevoke: messageType: getWamMessageType(s)
+        if (mediaType != null) {
+            builder.messageMediaType(mediaType); // WAWebRevokeMsgAction._sendRevoke: messageMediaType: getWamMediaType(s)
+        }
+        if (revokeSendDelaySeconds != null) {
+            builder.revokeSendDelay(revokeSendDelaySeconds); // WAWebRevokeMsgAction._sendRevoke: revokeSendDelay: v = C - getT(s)
+        }
+        wamService.commit(builder.build()); // WAWebRevokeMsgAction._sendRevoke: .commit()
     }
 
     /**
@@ -5281,10 +6015,112 @@ public final class WhatsAppClient {
                 .timestamp(Instant.now()) // WAWebSendStatusMsgAction.createTextStatusMsgData: t: unixTime()
                 .broadcast(true) // WAWebSendStatusMsgAction: status is a broadcast JID
                 .build();
-        // Route through MessageService.send(MessageInfo) -> StatusMessageSender.send.
-        // Reuses the public StatusMessageSender.send path per the delegation rule.
-        messageService.send(messageInfo); // WAWebEncryptAndSendStatusMsg.encryptAndSendStatusMsg
+        // WAWebSendStatusMsgAction._sendStatusMessage: var i = new StatusPosterActionsLogger;
+        // The logger's constructor seeds a per-operation random sessionId that it
+        // re-uses across the REQUEST / SUCCESS / FAILURE emissions for this send.
+        var statusPostingSessionId = newStatusPostingSessionId(); // WAWebLogStatusPosterActions: this.sessionId = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER)
+        // WAWebSendStatusMsgAction._sendStatusMessage: var l = y(e.type) -> status content type mapping.
+        var statusContentType = resolveStatusContentType(content);
+        // WAWebSendStatusMsgAction._sendStatusMessage: i.logPostStatusRequest(l, a) — a=0 (no retry) for the first attempt.
+        wamService.commit(new StatusPosterActionsEventBuilder()
+                .statusEventType(StatusEventType.POST_STATUS_REQUEST)
+                .statusContentType(statusContentType)
+                .retryCount(0)
+                .statusPostingSessionId(statusPostingSessionId)
+                .build());
+        try {
+            // Route through MessageService.send(MessageInfo) -> StatusMessageSender.send.
+            // Reuses the public StatusMessageSender.send path per the delegation rule.
+            messageService.send(messageInfo); // WAWebEncryptAndSendStatusMsg.encryptAndSendStatusMsg
+        } catch (RuntimeException error) {
+            // WAWebSendStatusMsgAction._sendStatusMessage catch block:
+            // m = getErrorSafe(t); i.logPostStatusFailure(l, m.message, a)
+            wamService.commit(new StatusPosterActionsEventBuilder()
+                    .statusEventType(StatusEventType.POST_STATUS_FAILURE)
+                    .statusContentType(statusContentType)
+                    .statusPostFailureReason(error.getMessage())
+                    .retryCount(0)
+                    .statusPostingSessionId(statusPostingSessionId)
+                    .build());
+            throw error;
+        }
+        // WAWebSendStatusMsgAction._sendStatusMessage: d = yield statusIdForLogging(e); i.logPostStatusSuccess(l, d).
+        // WAWebStatusLoggingUtils.statusIdForLogging returns the plain msg id when no
+        // chat-thread logging secret (WAWebUserPrefsMultiDevice.getChatThreadLoggingSecretB64)
+        // is configured; Cobalt does not maintain such a secret so we follow the same fallback.
+        wamService.commit(new StatusPosterActionsEventBuilder()
+                .statusEventType(StatusEventType.POST_STATUS_SUCCESS)
+                .statusContentType(statusContentType)
+                .statusId(messageId)
+                .statusPostingSessionId(statusPostingSessionId)
+                .build());
         return messageInfo;
+    }
+
+    /**
+     * Maps a status {@link MessageContainer}'s content to the WAM
+     * {@link StatusContentType} classification used by
+     * {@link StatusPosterActionsEvent#statusContentType()}.
+     *
+     * <p>WhatsApp Web derives the status content type from the outgoing
+     * {@code Msg} model's {@code e.type} string
+     * ({@code "chat" | "image" | "video" | "gif" | "sticker" | "ptt" |
+     * "audio"}); Cobalt inspects the unwrapped payload type directly because
+     * it never builds the intermediate string value.
+     *
+     * @param content the status payload to classify; never {@code null}
+     * @return the resolved content type, defaulting to {@link StatusContentType#PHOTO}
+     *         for unrecognized payloads (mirroring WA Web's {@code default:
+     *         PHOTO} branch)
+     *
+     * @implNote WAWebSendStatusMsgAction.y: single-branch switch on
+     *     {@code e.type}. {@code "gif"} and {@code "sticker"} both resolve
+     *     to {@link StatusContentType#GIF}; {@code "ptt"} and {@code "audio"}
+     *     both resolve to {@link StatusContentType#VOICE}. Cobalt re-uses
+     *     {@code VideoMessage.gifPlayback()} to detect the GIF variant of
+     *     a video, matching the protobuf-level distinction WA Web applies
+     *     upstream when producing the string type.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebSendStatusMsgAction", exports = "y",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private StatusContentType resolveStatusContentType(MessageContainer content) {
+        // WAWebSendStatusMsgAction.y: switch(e){...}
+        return switch (content.content()) {
+            case com.github.auties00.cobalt.model.message.text.ExtendedTextMessage ignored -> StatusContentType.TEXT; // "chat" -> TEXT
+            case com.github.auties00.cobalt.model.message.media.ImageMessage ignored -> StatusContentType.PHOTO; // "image" -> PHOTO
+            case com.github.auties00.cobalt.model.message.media.VideoMessage video ->
+                    video.gifPlayback() ? StatusContentType.GIF : StatusContentType.VIDEO; // "gif"/"video"
+            case com.github.auties00.cobalt.model.message.media.StickerMessage ignored -> StatusContentType.GIF; // "sticker" -> GIF
+            case com.github.auties00.cobalt.model.message.media.AudioMessage ignored -> StatusContentType.VOICE; // "ptt"/"audio" -> VOICE
+            default -> StatusContentType.PHOTO; // WAWebSendStatusMsgAction.y: default: PHOTO
+        };
+    }
+
+    /**
+     * Generates a fresh {@code statusPostingSessionId} for one invocation of
+     * {@link #sendStatus(MessageContainer)} or {@link #deleteStatus(String)}.
+     *
+     * <p>WhatsApp Web's {@code StatusPosterActionsLogger} constructor seeds a
+     * random integer and re-uses it across the three event emissions produced
+     * by a single logger instance (REQUEST / SUCCESS / FAILURE). Cobalt
+     * mirrors that scoping by calling this helper once per action and
+     * threading the returned id through every emission.
+     *
+     * @return a non-negative pseudo-random int used as the session id
+     *
+     * @implNote WAWebLogStatusPosterActions.StatusPosterActionsLogger:
+     *     {@code this.sessionId = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER)}.
+     *     The {@link StatusPosterActionsEvent#statusPostingSessionId()} property is
+     *     defined as {@link com.github.auties00.cobalt.wam.model.WamType#INTEGER INTEGER},
+     *     so Cobalt narrows the JS 53-bit seed to an {@code int} range.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebLogStatusPosterActions", exports = "StatusPosterActionsLogger",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private int newStatusPostingSessionId() {
+        // nextInt(Integer.MAX_VALUE) yields a non-negative int. WA Web's 53-bit seed
+        // is stored in a WamType.INTEGER slot, so a 31-bit value is sufficient and
+        // matches the builder's Integer parameter type.
+        return ThreadLocalRandom.current().nextInt(Integer.MAX_VALUE);
     }
 
     /**
@@ -5331,7 +6167,35 @@ public final class WhatsAppClient {
                 .timestampMs(Instant.now()) // WAWebRevokeStatusAction.createRevokeStatusMsgData: revokeTimestamp: unixTime()
                 .build();
         var wrapper = MessageContainer.of(protocol); // WAWebRevokeStatusAction.sendStatusRevokeMsgAction: v = {type: Message, data: C}
-        return messageService.send(statusJid, wrapper); // WAWebRevokeStatusAction.sendStatusRevokeMsgAction -> WAWebEncryptAndSendStatusMsg.encryptAndSendStatusMsg
+        // WAWebRevokeStatusAction.sendStatusRevokeMsgAction: var h = new StatusPosterActionsLogger;
+        // h.logDeleteStatusRequest() before the dispatch, then logDeleteStatusSuccess() or
+        // logDeleteStatusFailure(L.message) depending on the outcome — all three emissions
+        // share the logger's single sessionId.
+        var statusPostingSessionId = newStatusPostingSessionId(); // WAWebLogStatusPosterActions: this.sessionId
+        // WAWebRevokeStatusAction.sendStatusRevokeMsgAction: h.logDeleteStatusRequest()
+        wamService.commit(new StatusPosterActionsEventBuilder()
+                .statusEventType(StatusEventType.DELETE_STATUS_REQUEST)
+                .statusPostingSessionId(statusPostingSessionId)
+                .build());
+        AckResult ack;
+        try {
+            ack = messageService.send(statusJid, wrapper); // WAWebRevokeStatusAction.sendStatusRevokeMsgAction -> WAWebEncryptAndSendStatusMsg.encryptAndSendStatusMsg
+        } catch (RuntimeException error) {
+            // WAWebRevokeStatusAction.sendStatusRevokeMsgAction catch block:
+            // L = getErrorSafe(e); h.logDeleteStatusFailure(L==null?void 0:L.message)
+            wamService.commit(new StatusPosterActionsEventBuilder()
+                    .statusEventType(StatusEventType.DELETE_STATUS_FAILURE)
+                    .statusPostFailureReason(error.getMessage())
+                    .statusPostingSessionId(statusPostingSessionId)
+                    .build());
+            throw error;
+        }
+        // WAWebRevokeStatusAction.sendStatusRevokeMsgAction: h.logDeleteStatusSuccess()
+        wamService.commit(new StatusPosterActionsEventBuilder()
+                .statusEventType(StatusEventType.DELETE_STATUS_SUCCESS)
+                .statusPostingSessionId(statusPostingSessionId)
+                .build());
+        return ack;
     }
 
     /**
@@ -5541,6 +6405,8 @@ public final class WhatsAppClient {
         var container = source.message(); // WAWebChatForwardMessage.forwardMessages: sendTextMsgToChatAction / sendMediaMsgToChatAction with forwarded container
         // WAWebForwardMessagesToChat.forwardMessagesToChats: u.map(e => WAWebMsgGetters.getIsPSA(e) && WAWebWamChatPSALogger.logChatPSAForward(e))
         logPsaActionIfApplicable(source, PsaMessageActionType.FORWARD); // WAWebWamChatPSALogger.logChatPSAForward -> PSA_MESSAGE_ACTION_TYPE.FORWARD
+        // WAWebSendMsgRecordAction.sendMsgRecord: e.isForwarded && (n = WAWebMsgUtilsBridge.createMessageForwardMetric(e))
+        emitForwardSendEvent(source, destination, container);
         return messageService.send(destination, container); // WAWebChatForwardMessage.forwardMessages -> sendMsgRecord
     }
 
@@ -5595,6 +6461,8 @@ public final class WhatsAppClient {
         for (var destination : destinations) {
             for (var source : resolvedSources) {
                 var container = source.message(); // WAWebChatForwardMessage.getForwardedMessageFields: omit local-only fields
+                // WAWebSendMsgRecordAction.sendMsgRecord: e.isForwarded && (n = WAWebMsgUtilsBridge.createMessageForwardMetric(e))
+                emitForwardSendEvent(source, destination, container);
                 messageService.send(destination, container); // WAWebChatForwardMessage.forwardMessages -> sendMsgRecord
             }
         }
@@ -5897,6 +6765,163 @@ public final class WhatsAppClient {
                 .build());
     }
 
+    /**
+     * Emits a {@link ForwardSendEvent} for a forwarded message right before it
+     * is handed off to the send pipeline.
+     *
+     * <p>WhatsApp Web builds this event inside
+     * {@code WAWebMsgUtilsBridge.createMessageForwardMetric} and commits it via
+     * {@code WAWebSendMsgRecordAction.sendMsgRecord} once the forwarded message
+     * has been transmitted. Cobalt folds the two steps together at the public
+     * forward entry points because Cobalt's send pipeline does not carry the
+     * {@code isForwarded} flag through to the encryption layer. The populated
+     * properties mirror WA Web exactly: {@code messageType},
+     * {@code messageMediaType}, {@code mediaCaptionPresent},
+     * {@code fastForwardEnabled} and {@code messageIsFanout} are hard-coded to
+     * the WA Web literal values, the forward-count derived booleans come from
+     * the source message's {@link ContextInfo}, and {@code ephemeralityDuration}
+     * comes from {@link ChatMessageInfo#ephemeralDuration()} when available.
+     *
+     * <p>Optional properties that WA Web resolves from modules Cobalt does not
+     * implement ({@code ephemeralityInitiator},
+     * {@code ephemeralityTriggerAction}, {@code disappearingChatInitiator},
+     * {@code senderDefaultDisappearingDuration},
+     * {@code receiverDefaultDisappearingDuration}, {@code typeOfGroup}) are
+     * intentionally left unset so that the emitted event reflects only the
+     * information Cobalt can derive without inventing values.
+     *
+     * <p>Non-{@link ChatMessageInfo} sources (for example newsletters, which
+     * cannot carry a {@code forwardingScore}) are emitted with the forward-count
+     * booleans cleared, matching WA Web's behaviour for messages whose
+     * {@code forwardingScore} getter returns {@code null}.
+     *
+     * @param source    the resolved source message being forwarded; must not
+     *                  be {@code null}
+     * @param destination the destination chat JID of the forwarded send; must
+     *                    not be {@code null}
+     * @param forwarded the {@link MessageContainer} being dispatched; must not
+     *                  be {@code null}
+     *
+     * @implNote Adapts {@code WAWebMsgUtilsBridge.createMessageForwardMetric}
+     * and its commit in {@code WAWebSendMsgRecordAction.sendMsgRecord}.
+     * WA Web uses the forwarded message ({@code e}) for both the message-type
+     * and media-type classifications and for the forward-count getters; Cobalt
+     * mirrors this by reading all classification sources off the new
+     * {@code destination} for {@code messageType} and off the source message's
+     * container for {@code messageMediaType} / {@code mediaCaptionPresent}
+     * because Cobalt's forwarded container reuses the source payload verbatim.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMsgUtilsBridge", exports = "createMessageForwardMetric",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgRecordAction", exports = "sendMsgRecord",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private void emitForwardSendEvent(MessageInfo source, Jid destination, MessageContainer forwarded) {
+        // WAWebMsgUtilsBridge.createMessageForwardMetric: var a = !!t.caption; t.type === DOCUMENT && (a = t.isCaptionByUser)
+        var mediaCaptionPresent = hasMediaCaption(forwarded);
+        // WAWebMsgUtilsBridge.createMessageForwardMetric: isFrequentlyForwarded: !!getIsFrequentlyForwarded(t); isForwardedForward: getNumTimesForwarded(t) > 1
+        var numTimesForwarded = numTimesForwarded(source);
+        // WAWebConstantsDeprecated.FREQUENTLY_FORWARDED_SENTINEL = 127
+        var isFrequentlyForwarded = numTimesForwarded >= 127;
+        var isForwardedForward = numTimesForwarded > 1;
+        var builder = new ForwardSendEventBuilder()
+                // WAWebMsgUtilsBridge.createMessageForwardMetric: messageType: getWamMessageType(t)
+                .messageType(WamMsgUtils.getWamMessageType(destination))
+                // WAWebMsgUtilsBridge.createMessageForwardMetric: messageMediaType: getWamMediaType(t)
+                .messageMediaType(WamMsgUtils.getWamMediaType(forwarded))
+                // WAWebMsgUtilsBridge.createMessageForwardMetric: mediaCaptionPresent: a
+                .mediaCaptionPresent(mediaCaptionPresent)
+                // WAWebMsgUtilsBridge.createMessageForwardMetric: fastForwardEnabled: !0
+                .fastForwardEnabled(true)
+                // WAWebMsgUtilsBridge.createMessageForwardMetric: messageIsFanout: !0
+                .messageIsFanout(true)
+                // WAWebMsgUtilsBridge.createMessageForwardMetric: isFrequentlyForwarded
+                .isFrequentlyForwarded(isFrequentlyForwarded)
+                // WAWebMsgUtilsBridge.createMessageForwardMetric: isForwardedForward
+                .isForwardedForward(isForwardedForward);
+        // WAWebMsgUtilsBridge.createMessageForwardMetric: t.ephemeralDuration != null && (i.ephemeralityDuration = t.ephemeralDuration)
+        if (source instanceof ChatMessageInfo chatSource) {
+            var ephemeralDuration = chatSource.ephemeralDuration();
+            if (ephemeralDuration.isPresent()) {
+                builder.ephemeralityDuration(ephemeralDuration.getAsInt());
+            }
+        }
+        wamService.commit(builder.build());
+    }
+
+    /**
+     * Returns whether the forwarded {@link MessageContainer} carries a
+     * user-visible caption.
+     *
+     * <p>The helper mirrors WA Web's inline caption check inside
+     * {@code WAWebMsgUtilsBridge.createMessageForwardMetric}: for every payload
+     * type the caption presence boils down to {@code !!e.caption}. WA Web's
+     * {@code DOCUMENT} branch replaces the truthiness check with
+     * {@code e.isCaptionByUser}; Cobalt's {@code DocumentMessage} does not
+     * expose an {@code isCaptionByUser} field, so the method falls back to the
+     * generic caption truthiness check to avoid inventing a missing signal.
+     *
+     * @param container the forwarded message container; must not be
+     *                  {@code null}
+     * @return {@code true} when the container carries a non-empty caption,
+     *         {@code false} otherwise
+     *
+     * @implNote WAWebMsgUtilsBridge.createMessageForwardMetric: {@code var a =
+     * !!t.caption; t.type === MSG_TYPE.DOCUMENT && (a = t.isCaptionByUser)}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMsgUtilsBridge", exports = "createMessageForwardMetric",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private static boolean hasMediaCaption(MessageContainer container) {
+        if (container == null) {
+            return false;
+        }
+        return switch (container.content()) {
+            case com.github.auties00.cobalt.model.message.media.ImageMessage image -> image.caption().map(s -> !s.isEmpty()).orElse(false);
+            case com.github.auties00.cobalt.model.message.media.VideoMessage video -> video.caption().map(s -> !s.isEmpty()).orElse(false);
+            case com.github.auties00.cobalt.model.message.media.DocumentMessage document -> document.caption().map(s -> !s.isEmpty()).orElse(false);
+            case null, default -> false;
+        };
+    }
+
+    /**
+     * Returns the number of times a message has been forwarded, matching WA
+     * Web's {@code WAWebMsgGetters.getNumTimesForwarded} helper.
+     *
+     * <p>The helper resolves {@code forwardingScore} from the source message's
+     * primary {@link ContextInfo}. When the score is unset WA Web falls back
+     * to {@code isForwarded ? 1 : 0}; Cobalt mirrors the same fallback because
+     * the forwarding score and forwarded flag live on the same
+     * {@link ContextInfo} record.
+     *
+     * @param source the resolved source message whose forwarding count is
+     *               being computed; must not be {@code null}
+     * @return the forwarding count, or zero when no context info is available
+     *
+     * @implNote WAWebMsgGetters.getNumTimesForwarded:
+     * {@code forwardingScore == null ? (isForwarded ? 1 : 0) : (forwardingScore || 0)}.
+     * NewsletterMessageInfo cannot carry a {@code forwardingScore}, so the
+     * helper returns zero for non-{@link ChatMessageInfo} sources.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMsgGetters", exports = "getNumTimesForwarded",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private static int numTimesForwarded(MessageInfo source) {
+        if (!(source instanceof ChatMessageInfo chatSource)) {
+            return 0;
+        }
+        var contextInfo = chatSource.message()
+                .contextualContent()
+                .flatMap(ContextualMessage::contextInfo);
+        if (contextInfo.isEmpty()) {
+            return 0;
+        }
+        var ctx = contextInfo.get();
+        var score = ctx.forwardingScore();
+        if (score.isPresent()) {
+            return score.getAsInt();
+        }
+        // WAWebMsgGetters.getNumTimesForwarded: fallback -> isForwarded ? 1 : 0
+        return ctx.isForwarded() ? 1 : 0;
+    }
+
     //<editor-fold desc="Chat operations">
     /**
      * Builds a minimal outgoing {@link SyncActionMessageRange} for the given
@@ -6004,6 +7029,10 @@ public final class WhatsAppClient {
     public void pinChat(Jid chat, boolean pin) {
         Objects.requireNonNull(chat, "chat cannot be null");
         var timestamp = Instant.now(); // WAWebSetPinChatAction.setPin: var _ = unixTimeMs()
+        // WAWebPinChatSync.getMutationsForPin: r("gkx")("26258") || new MdSyncdDogfoodingFeatureUsageWamEvent({mdSyncdDogfoodingFeature: PIN_MUTATION}).commit()
+        wamService.commit(new MdSyncdDogfoodingFeatureUsageEventBuilder()
+                .mdSyncdDogfoodingFeature(MdFeatureCode.PIN_MUTATION)
+                .build());
         var mutations = PinChatHandler.INSTANCE.getMutationsForPin(timestamp, pin, chat); // WAWebPinChatSync.getMutationsForPin
         webAppStateService.pushPatches(PinChatHandler.INSTANCE.collectionName(), mutations); // WAWebChatPinBridge.setPin: lockForSync(["chat"], i, ...)
         store.findChatByJid(chat).ifPresent(chatModel -> { // WAWebSetPinChatAction.setPin: t.pin = u
@@ -6230,6 +7259,12 @@ public final class WhatsAppClient {
         var timestamp = Instant.now(); // WAWebClearChatSync.getClearChatMutation: timestamp: e
         var chatModel = store.findChatByJid(chat).orElse(null); // WAWebSyncdGetChat.resolveChatForMutationIndex (at apply time)
         var messageRange = chatModel != null ? buildOutgoingMessageRange(chatModel) : null; // WAWebClearChatSync.getClearChatMutation: constructForwardMovingMessageRange
+        // WAWebClearChatSync.getClearChatMutation: r("gkx")("26258") || new MdSyncdDogfoodingFeatureUsageWamEvent({mdSyncdDogfoodingFeature: n ? CLEAR_CHAT_REMOVE_STARRED_MUTATION : CLEAR_CHAT_KEEP_STARRED_MUTATION}).commit()
+        wamService.commit(new MdSyncdDogfoodingFeatureUsageEventBuilder()
+                .mdSyncdDogfoodingFeature(!keepStarred
+                        ? MdFeatureCode.CLEAR_CHAT_REMOVE_STARRED_MUTATION
+                        : MdFeatureCode.CLEAR_CHAT_KEEP_STARRED_MUTATION)
+                .build());
         // WAWebClearChatSync.$ClearChatSync$p_3: [t.toJid(), n?"1":"0", r?"1":"0"] — n = deleteStarred (inverse of keepStarred), r = deleteMedia
         var mutation = ClearChatHandler.INSTANCE.getClearChatMutation(timestamp, chat, !keepStarred, false, messageRange); // WAWebClearChatSync.getClearChatMutation
         webAppStateService.pushPatches(ClearChatHandler.INSTANCE.collectionName(), List.of(mutation)); // WAWebSyncdCoreApi.lockForSync -> push
@@ -6270,6 +7305,10 @@ public final class WhatsAppClient {
         var timestamp = Instant.now(); // WAWebDeleteChatSync.getDeleteChatMutation: timestamp: e
         var chatModel = store.findChatByJid(chat).orElse(null); // WAWebSyncdGetChat.resolveChatForMutationIndex (at apply time)
         var messageRange = chatModel != null ? buildOutgoingMessageRange(chatModel) : null; // WAWebDeleteChatSync.getDeleteChatMutation: constructForwardMovingMessageRange
+        // WAWebDeleteChatSync.getDeleteChatMutation: r("gkx")("26258") || new MdSyncdDogfoodingFeatureUsageWamEvent({mdSyncdDogfoodingFeature: DELETE_MUTATION}).commit()
+        wamService.commit(new MdSyncdDogfoodingFeatureUsageEventBuilder()
+                .mdSyncdDogfoodingFeature(MdFeatureCode.DELETE_MUTATION)
+                .build());
         var mutation = DeleteChatHandler.INSTANCE.getDeleteChatMutation(timestamp, chat, false, messageRange); // WAWebDeleteChatSync.getDeleteChatMutation
         webAppStateService.pushPatches(DeleteChatHandler.INSTANCE.collectionName(), List.of(mutation)); // WAWebSyncdCoreApi.lockForSync -> push
         if (chatModel != null) { // WAWebDeleteChatSync.deleteChat: deleteFromStorage
@@ -6404,6 +7443,18 @@ public final class WhatsAppClient {
                 .type(LabelEditAction.ListType.CUSTOM)
                 .build();
         store.addLabel(label); // WAWebBizLabelEditingAction.labelAddAction: LabelCollection.add(...)
+        // WAWebListsActions.createNewListAction -> WAWebListsLogging.logListUpdate (listAction: CREATE).
+        // Cobalt collapses the outer WAWebListsActions.createNewListAction wrapper (which carries
+        // the entryPoint and the set of chats being tagged) into this single createLabel method, so
+        // updateEntryPoint / groupsAdded / usersAdded / groupsAfterUpdate / usersAfterUpdate are
+        // omitted because the Cobalt API surface does not accept an entry point and does not tag
+        // chats as part of label creation (matches WA Web's {chatsBeforeUpdate: [], addedChats: [],
+        // removedChats: []} degenerate case where all counter fields are elided).
+        wamService.commit(new ListUpdateEventBuilder()
+                .listAction(ListAction.CREATE) // WAWebListsActions.createNewListAction: listAction: LIST_ACTION.CREATE
+                .listId(nextId) // WAWebListsActions.createNewListAction: listId: a (the freshly allocated id)
+                .listType(ListType.CUSTOM) // WAWebListsLogging.logListUpdate -> getListType(SchemaLabel.ListType.CUSTOM) = LIST_TYPE.CUSTOM (createLabel always inserts CUSTOM)
+                .build());
         return labelId;
     }
 
@@ -6445,6 +7496,7 @@ public final class WhatsAppClient {
                 timestamp
         );
         webAppStateService.pushPatches(LabelEditAction.COLLECTION_NAME, List.of(mutation)); // WAWebSyncdCoreApi.lockForSync(["label"], [p], ...)
+        var renamed = existing == null || !name.equals(existing.name()); // WAWebListsActions.editListAction: l = n.name !== a
         if (existing != null) { // WAWebBizLabelEditingAction.labelEditAction: LabelCollection.add(..., {merge: true})
             existing.setName(name);
             existing.setColor(colorIndex);
@@ -6455,6 +7507,30 @@ public final class WhatsAppClient {
                     .color(colorIndex)
                     .build();
             store.addLabel(label);
+        }
+        // WAWebListsActions.editListAction -> WAWebListsLogging.logListUpdate (listAction: RENAME).
+        // WA Web only logs the RENAME event when the name actually changed (l === true); the
+        // UPDATE_MEMBERS branch is not triggered from Cobalt's editLabel because the Cobalt API
+        // does not bundle chat-membership changes into this call (those go through the separate
+        // associateLabel / dissociateLabel entry points, whose WA Web counterparts do not log
+        // a ListUpdate event on their own). updateEntryPoint is omitted because the Cobalt API
+        // does not carry an entry point; listType / predefinedId come from the existing label
+        // as in WAWebListsLogging.logListUpdate's LabelCollection.get(""+l) lookup.
+        if (renamed) {
+            var listIdNumber = parseLabelIdToListId(labelId);
+            if (listIdNumber != null) {
+                var builder = new ListUpdateEventBuilder()
+                        .listAction(ListAction.RENAME) // WAWebListsActions.editListAction: listAction: LIST_ACTION.RENAME
+                        .listId(listIdNumber); // WAWebListsActions.editListAction: listId: Number(n.id)
+                var wamListType = existing != null ? mapWamListType(existing.type().orElse(null)) : null; // WAWebListsLogging.logListUpdate: f = getListType(_.type); f != null && (u.listType = f)
+                if (wamListType != null) {
+                    builder.listType(wamListType);
+                }
+                if (existing != null && existing.predefinedId().isPresent()) { // WAWebListsLogging.logListUpdate: _.predefinedId != null && (u.predefinedId = _.predefinedId)
+                    builder.predefinedId(existing.predefinedId().getAsInt());
+                }
+                wamService.commit(builder.build());
+            }
         }
     }
 
@@ -6505,6 +7581,24 @@ public final class WhatsAppClient {
         }
         webAppStateService.pushPatches(LabelEditAction.COLLECTION_NAME, mutations); // WAWebSyncdCoreApi.lockForSync(["label","label-association","chat"], [u].concat(c), ...)
         store.removeLabel(labelId); // WAWebBizLabelEditingAction.labelDeleteAction: LabelCollection.remove(e)
+        // WAWebListsActions.deleteListAction -> WAWebListsLogging.logListUpdate (listAction: DELETE).
+        // updateEntryPoint is omitted because the Cobalt API does not accept an entry point;
+        // listType / predefinedId are read from the label snapshot captured before removal, mirroring
+        // WAWebListsLogging.logListUpdate's LabelCollection.get(""+l) lookup.
+        var listIdNumber = parseLabelIdToListId(labelId);
+        if (listIdNumber != null) {
+            var builder = new ListUpdateEventBuilder()
+                    .listAction(ListAction.DELETE) // WAWebListsActions.deleteListAction: listAction: LIST_ACTION.DELETE
+                    .listId(listIdNumber); // WAWebListsActions.deleteListAction: listId: Number(e)
+            var wamListType = existing != null ? mapWamListType(existing.type().orElse(null)) : null; // WAWebListsLogging.logListUpdate: f = getListType(_.type); f != null && (u.listType = f)
+            if (wamListType != null) {
+                builder.listType(wamListType);
+            }
+            if (existing != null && existing.predefinedId().isPresent()) { // WAWebListsLogging.logListUpdate: _.predefinedId != null && (u.predefinedId = _.predefinedId)
+                builder.predefinedId(existing.predefinedId().getAsInt());
+            }
+            wamService.commit(builder.build());
+        }
     }
 
     /**
@@ -6859,17 +7953,29 @@ public final class WhatsAppClient {
      * issues a {@link ChatAssignmentAction} on the {@code REGULAR} sync
      * collection and updates the in-memory chat-assignment map.
      *
+     * <p>Emits a {@link MdChatAssignmentEvent} mirroring
+     * {@code WAWebChatAssignmentLogEvents.logChatAssignment}: the action type
+     * is {@code ACTION_UNASSIGNED} when {@code agentId} is empty,
+     * {@code ACTION_REASSIGNED} when the chat already had an assigned agent,
+     * or {@code ACTION_ASSIGNED} otherwise. The chat type is derived from
+     * {@code chat}'s JID server. The {@code chatAssignmentEntryPoint} is not
+     * populated because Cobalt's public API does not surface a UI-level
+     * entry point to callers.
+     *
      * @param chat    the chat JID
      * @param agentId the agent identifier
      * @throws NullPointerException if any argument is {@code null}
      *
-     * @implNote WAWebBizChatAssignmentAction.changeChatAssignment
+     * @implNote WAWebBizChatAssignmentAction.changeChatAssignment + WAWebChatAssignmentLogEvents.logChatAssignment
      */
     @WhatsAppWebExport(moduleName = "WAWebBizChatAssignmentAction", exports = "changeChatAssignment",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebChatAssignmentLogEvents", exports = "logChatAssignment",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public void assignChatToAgent(Jid chat, String agentId) {
         Objects.requireNonNull(chat, "chat cannot be null");
         Objects.requireNonNull(agentId, "agentId cannot be null");
+        var previousAgentId = store.chatAssignmentStates().get(chat.toString()); // WAWebBizChatAssignmentAction.changeChatAssignment: i[r] = e.chat.assignedAgent != null
         var timestamp = Instant.now();
         var mutation = ChatAssignmentHandler.INSTANCE.createChatAssignmentMutation( // WAWebChatAssignmentSync.createChatAssignmentMutations
                 chat,
@@ -6884,6 +7990,103 @@ public final class WhatsAppClient {
             states.put(chat.toString(), agentId); // WAWebChatAssignmentSync.applyMutations: i.push({...chatId, agentId})
         }
         store.setChatAssignmentStates(states);
+        emitChatAssignmentEvent(chat, agentId, previousAgentId != null); // WAWebChatAssignmentLogEvents.logChatAssignment(n.chat, (a=n.agentId)!=null?a:"", i[r], t, e.length)
+    }
+
+    /**
+     * Emits a {@link MdChatAssignmentEvent} for a single-chat assignment change.
+     *
+     * <p>Mirrors the helper {@code p(t, n, a)} and top-level
+     * {@code logChatAssignment} in {@code WAWebChatAssignmentLogEvents}:
+     * <ul>
+     *   <li>{@code chatAssignmentAction} reflects the transition: empty target
+     *       agent id yields {@code ACTION_UNASSIGNED}; otherwise the prior
+     *       assignment flag chooses between {@code ACTION_REASSIGNED} and
+     *       {@code ACTION_ASSIGNED}.</li>
+     *   <li>{@code chatAssignmentChatType} is mapped from the chat JID server
+     *       following {@code WAWebChatModel.getChatAssignmentChatType}:
+     *       user server -> {@code INDIVIDUAL}, group/community server ->
+     *       {@code GROUP}, broadcast server -> {@code COMMUNITY},
+     *       newsletter server -> {@code CHANNEL}.</li>
+     *   <li>{@code chatAssignmentAgentId} is the target agent id (empty on
+     *       unassign).</li>
+     *   <li>{@code chatAssignmentMdId} is the device id of the target agent
+     *       looked up in {@link WhatsAppStore#agentStates()}, defaulting to
+     *       {@code -1} when the agent is unknown (matches WA Web's
+     *       {@code c?.deviceId ?? -1} fallback).</li>
+     *   <li>{@code assignerAgentId} is the current device's own agent id
+     *       when the device is itself registered as an agent, otherwise the
+     *       empty string (matches WA Web's
+     *       {@code u = AgentCollection.getModelsArray().find(t => t.deviceId === meDeviceId); assignerAgentId = u?.id ?? ""}).</li>
+     *   <li>{@code assignerMdId} is the caller's device id from
+     *       {@link WhatsAppStore#jid()}.</li>
+     *   <li>{@code chatAssignmentBrowserId} is empty and
+     *       {@code assignerBrowserId} is empty because Cobalt does not
+     *       emulate WA Web's {@code persistentExpiringId()} browser cookie.</li>
+     *   <li>{@code chatsCnt} is always {@code 1} because Cobalt's public API
+     *       takes a single {@code (chat, agentId)} pair (WA Web batches and
+     *       uses {@code e.length}).</li>
+     *   <li>{@code chatAssignmentEntryPoint} is omitted because Cobalt does
+     *       not surface a UI entry point parameter on its API.</li>
+     * </ul>
+     *
+     * @param chat                 the chat JID being assigned
+     * @param agentId              the target agent id (empty on unassign)
+     * @param hadPreviousAssignment whether the chat already had an assigned agent before this change
+     *
+     * @implNote WAWebChatAssignmentLogEvents.logChatAssignment and the private
+     *           helper {@code p(t, n, a)} that constructs the
+     *           {@code MdChatAssignmentWamEvent}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebChatAssignmentLogEvents", exports = "logChatAssignment",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private void emitChatAssignmentEvent(Jid chat, String agentId, boolean hadPreviousAssignment) {
+        // WAWebChatAssignmentLogEvents.logChatAssignment: t === "" ? ACTION_UNASSIGNED : n ? ACTION_REASSIGNED : ACTION_ASSIGNED
+        ChatAssignmentActionType action;
+        if (agentId.isEmpty()) {
+            action = ChatAssignmentActionType.ACTION_UNASSIGNED;
+        } else if (hadPreviousAssignment) {
+            action = ChatAssignmentActionType.ACTION_REASSIGNED;
+        } else {
+            action = ChatAssignmentActionType.ACTION_ASSIGNED;
+        }
+        // WAWebChatModel.getChatAssignmentChatType: switch (getKind(this)) { Chat->INDIVIDUAL, Group->GROUP, Broadcast|Community->COMMUNITY, Newsletter->CHANNEL }
+        ChatAssignmentChatType chatType;
+        if (chat.hasUserServer() || chat.hasLidServer()) {
+            chatType = ChatAssignmentChatType.INDIVIDUAL;
+        } else if (chat.hasGroupOrCommunityServer()) {
+            chatType = ChatAssignmentChatType.GROUP;
+        } else if (chat.hasBroadcastServer()) {
+            chatType = ChatAssignmentChatType.COMMUNITY;
+        } else if (chat.hasNewsletterServer()) {
+            chatType = ChatAssignmentChatType.CHANNEL;
+        } else {
+            chatType = null; // WAWebChatModel.getChatAssignmentChatType throws TypeError; Cobalt omits the property instead of throwing from telemetry
+        }
+        // WAWebChatAssignmentLogEvents.p: c = AgentCollection.get(n); chatAssignmentMdId = c?.deviceId ?? -1
+        var targetAgent = store.agentStates().get(agentId); // lookup by agentId == map key (see AgentActionHandler.applyMutationResult)
+        var chatAssignmentMdId = targetAgent != null && targetAgent.deviceID().isPresent()
+                ? targetAgent.deviceID().getAsInt()
+                : -1;
+        // WAWebChatAssignmentLogEvents.p: d = getMeDevicePnOrThrow_DO_NOT_USE().getDeviceId()
+        var meDeviceId = store.jid().map(Jid::device).orElse(0);
+        // WAWebChatAssignmentLogEvents.p: u = AgentCollection.getModelsArray().find(t => t.deviceId === meDeviceId); assignerAgentId = u?.id ?? ""
+        var assignerAgentId = store.agentStates().entrySet().stream()
+                .filter(entry -> entry.getValue().deviceID().isPresent() && entry.getValue().deviceID().getAsInt() == meDeviceId)
+                .map(Map.Entry::getKey)
+                .findFirst()
+                .orElse("");
+        wamService.commit(new MdChatAssignmentEventBuilder() // WAWebChatAssignmentLogEvents: new MdChatAssignmentWamEvent({...}).commit()
+                .assignerAgentId(assignerAgentId) // WAWebChatAssignmentLogEvents.p: (i=u==null?void 0:u.id)!=null?i:""
+                .assignerBrowserId("") // WAWebChatAssignmentLogEvents.p: persistentExpiringId() — Cobalt does not emulate the browser cookie id
+                .assignerMdId(meDeviceId) // WAWebChatAssignmentLogEvents.p: assignerMdId: d
+                .chatAssignmentAction(action) // WAWebChatAssignmentLogEvents.logChatAssignment: chatAssignmentAction: i
+                .chatAssignmentAgentId(agentId) // WAWebChatAssignmentLogEvents.p: (l=c==null?void 0:c.id)!=null?l:""
+                .chatAssignmentBrowserId("") // WAWebChatAssignmentLogEvents.p: m ? persistentExpiringId() : "" — Cobalt does not emulate the browser cookie id
+                .chatAssignmentChatType(chatType) // WAWebChatAssignmentLogEvents.p: chatAssignmentChatType: t.getChatAssignmentChatType()
+                .chatAssignmentMdId(chatAssignmentMdId) // WAWebChatAssignmentLogEvents.p: (s=c==null?void 0:c.deviceId)!=null?s:-1
+                .chatsCnt(1) // WAWebChatAssignmentLogEvents.logChatAssignment: chatsCnt: a = e.length — Cobalt API takes a single chat per call
+                .build());
     }
 
     /**
@@ -7964,7 +9167,8 @@ public final class WhatsAppClient {
                 "new_owner_id", newOwner.toString()
         ));
         var request = new TransferCommunityOwnershipMex.Request(input);
-        sendNode(request.toNode()); // WAWebMexClient.fetchQuery
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        sendMexNodeWithNoResponse(request.toNode(), TransferCommunityOwnershipMex.QUERY_ID, "mexTransferCommunityOwnershipJob", false);
     }
 
     /**
@@ -7996,7 +9200,8 @@ public final class WhatsAppClient {
             throw new IllegalArgumentException("Expected a group/community");
         }
         var request = new FetchSubgroupSuggestionsMex.Request(community.toString(), "INTERACTIVE", null);
-        var response = sendNode(request.toNode()); // WAWebMexClient.fetchQuery
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendMexNode(request.toNode(), FetchSubgroupSuggestionsMex.QUERY_ID, "mexFetchSubgroupSuggestions", false);
         return FetchSubgroupSuggestionsMex.Response.of(response)
                 .flatMap(FetchSubgroupSuggestionsMex.Response::subGroupSuggestions)
                 .stream()
@@ -8134,7 +9339,8 @@ public final class WhatsAppClient {
             throw new IllegalArgumentException("Expected a group/community");
         }
         var request = new QuerySubgroupParticipantCountMex.Request(subgroup.toString());
-        var response = sendNode(request.toNode()); // WAWebMexClient.fetchQuery
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendMexNode(request.toNode(), QuerySubgroupParticipantCountMex.QUERY_ID, "mexQuerySubgroupParticipantCount", false);
         return QuerySubgroupParticipantCountMex.Response.of(response)
                 .flatMap(QuerySubgroupParticipantCountMex.Response::subGroups)
                 .stream()
@@ -8177,7 +9383,8 @@ public final class WhatsAppClient {
             throw new IllegalArgumentException("Expected a group/community");
         }
         var request = new FetchAllSubgroupsMex.Request(community.toString(), "INTERACTIVE", null);
-        var response = sendNode(request.toNode()); // WAWebMexClient.fetchQuery
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendMexNode(request.toNode(), FetchAllSubgroupsMex.QUERY_ID, "mexCommunityGetSubgroups", false);
         var parsed = FetchAllSubgroupsMex.Response.of(response);
         var result = new ArrayList<Jid>();
         parsed.ifPresent(entry -> {
@@ -8672,16 +9879,23 @@ public final class WhatsAppClient {
                 // WAWebSetPropertyGroupAction: new CommunityGroupJourneyEvent({action, surface: COMMUNITY_SETTINGS, chat: t}).commit()
                 // WAWebCommunityGroupJourneyEventImpl: a===0 (policy != ADMINS) => SELECT_COMMUNITY_ADMINS_CAN_ADD_GROUPS, else SELECT_EVERYONE_CAN_ADD_GROUPS.
                 // Cobalt enabled == (policy == ADMINS), matching WA Web a===1, so action inverts: enabled => SELECT_COMMUNITY_ADMINS_CAN_ADD_GROUPS.
-                // commitCommunityGroupJourneyEvent(
-                //                        enabled
-                //                                ? ChatFilterActionTypes.SELECT_COMMUNITY_ADMINS_CAN_ADD_GROUPS
-                //                                : ChatFilterActionTypes.SELECT_EVERYONE_CAN_ADD_GROUPS,
-                //                        SurfaceType.COMMUNITY_SETTINGS,
-                //                        group);
+                commitCommunityGroupJourneyEvent(
+                        enabled
+                                ? ChatFilterActionTypes.SELECT_COMMUNITY_ADMINS_CAN_ADD_GROUPS
+                                : ChatFilterActionTypes.SELECT_EVERYONE_CAN_ADD_GROUPS,
+                        SurfaceType.COMMUNITY_SETTINGS,
+                        group);
             }
-            case LIMIT_SHARING -> sendMexGroupPropertyUpdate(group,
-                    // WAWebSetPropertyGroupAction: {limit_sharing: {limit_sharing_enabled: a===1, limit_sharing_trigger: "CHAT_SETTING"}}. ADMINS policy => sharing limited.
-                    "{\"limit_sharing\":{\"limit_sharing_enabled\":" + enabled + ",\"limit_sharing_trigger\":\"CHAT_SETTING\"}}");
+            case LIMIT_SHARING -> {
+                sendMexGroupPropertyUpdate(group,
+                        // WAWebSetPropertyGroupAction: {limit_sharing: {limit_sharing_enabled: a===1, limit_sharing_trigger: "CHAT_SETTING"}}. ADMINS policy => sharing limited.
+                        "{\"limit_sharing\":{\"limit_sharing_enabled\":" + enabled + ",\"limit_sharing_trigger\":\"CHAT_SETTING\"}}");
+                // WAWebLimitSharingUIUtils.W: new LimitSharingSettingUpdateWamEvent({toggleUpdateAction: t.sharingLimited===true ? TURN_ON : TURN_OFF}).commit()
+                // WA Web emits this AFTER the group mutation (D) completes via I(e, t, n, r) => { yield D(e, t); W(t); }. threadId and opusAction are omitted by WA Web at this site.
+                wamService.commit(new LimitSharingSettingUpdateEventBuilder()
+                        .toggleUpdateAction(enabled ? ToggleUpdateAction.TURN_ON : ToggleUpdateAction.TURN_OFF)
+                        .build());
+            }
             case MEMBER_ADD_MODE -> sendMexGroupPropertyUpdate(group,
                     // WAWebSetPropertyGroupAction: {member_add_mode: a===1?"ALL_MEMBER_ADD":"ADMIN_ADD"}. ADMINS policy => ADMIN_ADD.
                     "{\"member_add_mode\":\"" + (enabled ? "ADMIN_ADD" : "ALL_MEMBER_ADD") + "\"}");
@@ -8729,8 +9943,102 @@ public final class WhatsAppClient {
      */
     private void sendMexGroupPropertyUpdate(Jid group, String updateJson) {
         var request = new UpdateGroupPropertyMex.Request(group.toString(), updateJson); // WAWebMexUpdateGroupPropertyJob: variables={group_id, update}
-        var response = sendNode(request.toNode());
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendMexNode(request.toNode(), UpdateGroupPropertyMex.QUERY_ID, "mexUpdateGroupProperty", false);
         UpdateGroupPropertyMex.Response.of(response); // WAWebMexUpdateGroupPropertyJob: checks data.xwa2_group_update_property.state
+    }
+
+    /**
+     * Emits a {@link GroupJourneyEvent} matching the construction in
+     * {@code WAWebCommunityGroupJourneyEventImpl.commit}.
+     *
+     * <p>Derives {@code groupSize}, {@code threadType} and {@code userRole}
+     * from the local {@link ChatMetadata} for {@code group} the same way
+     * {@code WAWebGetThreadType.getThreadType} and
+     * {@code WAWebGetUserRole.getUserRole} derive them from
+     * {@code chat.groupMetadata}:
+     * <ul>
+     *   <li>{@code groupSize} mirrors
+     *       {@code chat.groupMetadata.participants.length ?? 0}.</li>
+     *   <li>{@code threadType} mirrors the {@code getThreadType} switch:
+     *       {@link ThreadType#PARENT_GROUP PARENT_GROUP} for a
+     *       {@link CommunityMetadata community} and
+     *       {@link ThreadType#GROUP GROUP} for a plain
+     *       {@link GroupMetadata group}. Only emitted for surfaces listed in
+     *       {@code shouldLogThreadType}.</li>
+     *   <li>{@code userRole} mirrors {@code getUserRole}:
+     *       {@link UserRoleType#CADMIN CADMIN} when the local user is an
+     *       admin of a parent community,
+     *       {@link UserRoleType#ADMIN ADMIN} when the local user is an
+     *       admin of any other group and
+     *       {@link UserRoleType#MEMBER MEMBER} otherwise.</li>
+     * </ul>
+     *
+     * <p>{@code appSessionId} is populated in WA Web via
+     * {@code WAWebGetSharedSessionId.getSharedSessionId}, which returns the
+     * browser-tab session id. Cobalt is a headless library with no
+     * per-session UI identifier and leaves the field unset.
+     *
+     * @param action  the non-{@code null} action that triggered the event
+     * @param surface the non-{@code null} UI surface constant used by WA Web
+     * @param group   the non-{@code null} target group / community JID
+     *
+     * @implNote WAWebCommunityGroupJourneyEventImpl: {@code
+     * n.commit = function(){var e = new(o("WAWebGroupJourneyWamEvent")).GroupJourneyWamEvent({actionType, appSessionId, surface, groupSize}); var t = this.getThreadType(); if (t != null) e.threadType = t; var n = this.getUserRole(); if (n != null) e.userRole = n; e.commit();}}
+     */
+    private void commitCommunityGroupJourneyEvent(ChatFilterActionTypes action, SurfaceType surface, Jid group) {
+        var metadata = store.findChatMetadata(group).orElse(null); // WAWebCommunityGroupJourneyEventImpl: this.chat
+        var builder = new GroupJourneyEventBuilder()
+                .actionType(action) // WAWebCommunityGroupJourneyEventImpl: actionType: this.action
+                .surface(surface); // WAWebCommunityGroupJourneyEventImpl: surface: this.surface
+        // WAWebCommunityGroupJourneyEventImpl.getGroupSize: n == null ? 0 : (t = n.participants.length) != null ? t : 0
+        var groupSize = metadata == null ? 0 : metadata.participants().size();
+        builder.groupSize(groupSize); // WAWebCommunityGroupJourneyEventImpl: groupSize: this.getGroupSize()
+        // WAWebCommunityGroupJourneyEventImpl.shouldLogThreadType: returns true for COMMUNITY_SETTINGS (and other community/chat surfaces)
+        if (metadata != null && shouldLogCommunityJourneyThreadType(surface)) {
+            // WAWebGetThreadType: COMMUNITY => PARENT_GROUP; DEFAULT => GROUP (Cobalt only has these two ChatMetadata variants)
+            var threadType = metadata instanceof CommunityMetadata ? ThreadType.PARENT_GROUP : ThreadType.GROUP;
+            builder.threadType(threadType); // WAWebCommunityGroupJourneyEventImpl: if (t != null) e.threadType = t
+        }
+        // WAWebGetUserRole: iAmAdmin && isParentGroup -> CADMIN; iAmAdmin -> ADMIN; else MEMBER
+        if (metadata != null) {
+            var selfJid = store.jid().orElse(null); // WAWebGetUserRole: t.participants.iAmAdmin() compares the local user against the participant set
+            if (selfJid != null) {
+                var iAmAdmin = metadata.participants().stream()
+                        .filter(participant -> Objects.equals(participant.userJid().toUserJid(), selfJid.toUserJid()))
+                        .anyMatch(participant -> participant.rank().isPresent()); // ADMIN / FOUNDER -> admin; USER (rank == null) -> member
+                var isParentGroup = metadata instanceof CommunityMetadata; // WAWebGroupMetadataBase.isParentGroup === groupType === COMMUNITY
+                var userRole = iAmAdmin
+                        ? (isParentGroup ? UserRoleType.CADMIN : UserRoleType.ADMIN)
+                        : UserRoleType.MEMBER;
+                builder.userRole(userRole); // WAWebCommunityGroupJourneyEventImpl: if (n != null) e.userRole = n
+            }
+        }
+        wamService.commit(builder.build()); // WAWebCommunityGroupJourneyEventImpl: e.commit()
+    }
+
+    /**
+     * Returns whether the supplied {@code surface} is one of the surfaces for
+     * which {@code WAWebCommunityGroupJourneyEventImpl.shouldLogThreadType}
+     * includes the thread type in the emitted
+     * {@link GroupJourneyEvent}.
+     *
+     * @param surface the non-{@code null} UI surface to check
+     * @return {@code true} when the thread type should be logged
+     *
+     * @implNote WAWebCommunityGroupJourneyEventImpl.shouldLogThreadType
+     * switches on {@code this.surface} and returns {@code true} for
+     * {@code CHAT}, {@code CHATLIST}, {@code COMMUNITY_HOME},
+     * {@code COMMUNITY_TAB}, {@code COMMUNITY_NAV},
+     * {@code COMMUNITY_NAV_SHEET}, {@code COMMUNITY_SETTINGS} and
+     * {@code GROUP_INFO}; all other surfaces return {@code false}.
+     */
+    private static boolean shouldLogCommunityJourneyThreadType(SurfaceType surface) {
+        return switch (surface) {
+            case CHAT, CHATLIST, COMMUNITY_HOME, COMMUNITY_TAB, COMMUNITY_NAV, COMMUNITY_NAV_SHEET,
+                 COMMUNITY_SETTINGS, GROUP_INFO -> true;
+            default -> false;
+        };
     }
 
     //<editor-fold desc="Stickers">
@@ -8886,6 +10194,12 @@ public final class WhatsAppClient {
                 .timestamp(Instant.now()) // WAWebPollsSendPollCreationMsgAction: t: unixTime()
                 .build();
         messageService.send(messageInfo); // WAWebSendMsgChatAction.addAndSendMsgToChat
+        commitPollsActionsMetric( // WAWebPollsSendPollCreationMsgAction.sendPollCreation: commitPollsActionsMetric({action: CREATE_POLL, chat: a, creationDateInSeconds: _.t, pollOptionsCount: l.options.length})
+                chat,
+                PollActionType.CREATE_POLL,
+                messageInfo.timestamp().orElse(Instant.now()),
+                pollOptions.size()
+        );
         return messageInfo;
     }
 
@@ -8949,7 +10263,28 @@ public final class WhatsAppClient {
                 .vote(vote) // WAWebPollsSendVoteMsgAction: vote: PollEncValue
                 .senderTimestampMs(Instant.now()) // WAWebPollsSendVoteMsgAction: senderTimestampMs
                 .build();
-        return messageService.send(parentJid, MessageContainer.of(pollUpdate)); // WAWebSendMsgChatAction.addAndSendMsgToChat
+        var result = messageService.send(parentJid, MessageContainer.of(pollUpdate)); // WAWebSendMsgChatAction.addAndSendMsgToChat
+        // WAWebPollsSendVoteMsgAction: y = t.size > 0 ? (p ? CHANGE_VOTE : VOTE) : REMOVE_VOTE;
+        //   Cobalt does not maintain a PollVoteCollection keyed by parent+sender,
+        //   so the CHANGE_VOTE branch (previous-vote lookup) cannot be distinguished
+        //   here; we classify any non-empty selection as VOTE and empty as REMOVE_VOTE.
+        var pollAction = selectedOptions.isEmpty()
+                ? PollActionType.REMOVE_VOTE
+                : PollActionType.VOTE;
+        // WAWebPollsSendVoteMsgAction: creationDateInSeconds: e.t, pollOptionsCount: e.pollOptions.length
+        //   Resolve the original poll creation message from the store so we can
+        //   forward its timestamp and options count, matching WA Web's e = parent msg.
+        var pollCreationTimestamp = Instant.now();
+        var pollOptionsCount = 0;
+        var pollCreationMessage = store.findMessageByKey(pollKey).orElse(null);
+        if (pollCreationMessage instanceof ChatMessageInfo chatPoll) {
+            pollCreationTimestamp = chatPoll.timestamp().orElse(pollCreationTimestamp);
+            if (chatPoll.message().content() instanceof PollCreationMessage poll) {
+                pollOptionsCount = poll.options().size();
+            }
+        }
+        commitPollsActionsMetric(parentJid, pollAction, pollCreationTimestamp, pollOptionsCount);
+        return result;
     }
 
     /**
@@ -8993,7 +10328,247 @@ public final class WhatsAppClient {
                 .vote(vote)
                 .senderTimestampMs(Instant.now())
                 .build();
-        return messageService.send(parentJid, MessageContainer.of(pollUpdate));
+        var result = messageService.send(parentJid, MessageContainer.of(pollUpdate));
+        // WAWebPollsSendVoteMsgAction: empty selection -> REMOVE_VOTE
+        //   closePoll is modelled in Cobalt as an empty-vote PollUpdate, which
+        //   maps onto WA Web's REMOVE_VOTE metric classification.
+        var pollCreationTimestamp = Instant.now();
+        var pollOptionsCount = 0;
+        var pollCreationMessage = store.findMessageByKey(pollKey).orElse(null);
+        if (pollCreationMessage instanceof ChatMessageInfo chatPoll) {
+            pollCreationTimestamp = chatPoll.timestamp().orElse(pollCreationTimestamp);
+            if (chatPoll.message().content() instanceof PollCreationMessage poll) {
+                pollOptionsCount = poll.options().size();
+            }
+        }
+        commitPollsActionsMetric(parentJid, PollActionType.REMOVE_VOTE, pollCreationTimestamp, pollOptionsCount);
+        return result;
+    }
+
+    /**
+     * Commits the {@link PollsActionsEvent} WAM event for a poll create / vote
+     * / remove-vote dispatch.
+     *
+     * <p>Adapts {@code WAWebPollsActionsMetricUtils.commitPollsActionsMetric}
+     * ({@code s(e)} in the bundled JS) and its internal event builder
+     * ({@code u(chat, action)}):
+     * <pre>
+     * function s(e) {
+     *   var t=e.action, n=e.chat, r=e.creationDateInSeconds, o=e.pollOptionsCount,
+     *       a=u(n,t);
+     *   a.pollCreationDs=c(r); a.pollOptionsCount=o; a.commit();
+     * }
+     * function u(e,t) {
+     *   var n = new PollsActionsWamEvent({pollAction: t});
+     *   if (WAWebChatGetters.getIsGroup(e)) {
+     *     n.groupSizeBucket = WAWebWamNumberToClientGroupSizeBucket(e.getParticipantCount());
+     *     n.isAdmin = e.iAmAdmin();
+     *   }
+     *   n.chatType = WAWebGetMessageChatTypeFromWid.getMessageChatTypeFromWid(e.id);
+     *   return n;
+     * }
+     * function c(e) { // WAWeb-moment truncate-to-day helper
+     *   var t = moment.utc(e * 1e3);
+     *   t.startOf("day"); return t.unix();
+     * }
+     * </pre>
+     *
+     * <p>The {@code typeOfGroup} property is populated via
+     * {@code pollsWamTypeOfGroup} when the chat is a group / community,
+     * mirroring the way WA Web reads
+     * {@code groupData.wamTypeOfGroup} in the same set of flows (
+     * {@code WAWebPollsSendPollCreationMsgAction},
+     * {@code WAWebPollsSendVoteMsgAction}, and the newsletter counterparts).
+     *
+     * @param chatJid         the chat the poll is hosted in
+     * @param action          the poll action being logged
+     * @param creationInstant the poll creation timestamp (WA Web's
+     *                        {@code creationDateInSeconds} input before the
+     *                        {@code startOf("day")} truncation)
+     * @param optionsCount    the number of options on the underlying poll
+     *
+     * @implNote {@code WAWebPollsActionsMetricUtils.commitPollsActionsMetric}
+     *           invoked from {@code WAWebPollsSendPollCreationMsgAction},
+     *           {@code WAWebPollsSendVoteMsgAction}, and
+     *           {@code WAWebNewsletterSendVoteMsgAction}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebPollsActionsMetricUtils", exports = "commitPollsActionsMetric",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private void commitPollsActionsMetric(Jid chatJid, PollActionType action,
+                                          Instant creationInstant, int optionsCount) {
+        var builder = new PollsActionsEventBuilder()
+                .pollAction(action) // WAWebPollsActionsMetricUtils.u: new PollsActionsWamEvent({pollAction: t})
+                .pollOptionsCount(optionsCount) // WAWebPollsActionsMetricUtils.s: a.pollOptionsCount = o
+                .pollCreationDs(pollCreationDsFromInstant(creationInstant)) // WAWebPollsActionsMetricUtils.s: a.pollCreationDs = c(r); c = moment.utc(e*1e3).startOf("day").unix()
+                .chatType(pollsWamChatType(chatJid)); // WAWebPollsActionsMetricUtils.u: n.chatType = getMessageChatTypeFromWid(e.id)
+        // WAWebPollsActionsMetricUtils.u: if (WAWebChatGetters.getIsGroup(e)) { groupSizeBucket, isAdmin }
+        if (chatJid.hasGroupOrCommunityServer()) {
+            var metadata = store.findChatMetadata(chatJid).orElse(null);
+            if (metadata instanceof GroupMetadata group) {
+                var participantCount = group.participants().size();
+                builder.groupSizeBucket(pollsWamGroupSizeBucket(Math.max(participantCount, 32))); // WAWebPollsActionsMetricUtils.u: WAWebWamNumberToClientGroupSizeBucket(e.getParticipantCount())
+                var selfJid = store.jid().orElse(null);
+                if (selfJid != null) {
+                    builder.isAdmin(pollsWamIsAdmin(group, selfJid)); // WAWebPollsActionsMetricUtils.u: n.isAdmin = e.iAmAdmin()
+                }
+                // WAWebMaybePostMdGroupSyncMetrics / WAWebGroupType: wamTypeOfGroup — mirrored here
+                // because every poll-action call site in WA Web operates on a chat that also
+                // carries a WAM typeOfGroup classification via the shared WAWebGroupType helper.
+                builder.typeOfGroup(pollsWamTypeOfGroup(group));
+            }
+        }
+        wamService.commit(builder.build()); // WAWebPollsActionsMetricUtils.s: a.commit()
+    }
+
+    /**
+     * Truncates the given instant to the start of the UTC day and returns the
+     * resulting unix seconds value.
+     *
+     * <p>Mirrors {@code WAWebPollsActionsMetricUtils.c}:
+     * {@code moment.utc(e*1e3).startOf("day").unix()}.
+     *
+     * @param instant the input instant
+     * @return the unix-second value of the UTC start of the same day
+     *
+     * @apiNote WAWebPollsActionsMetricUtils.c — truncate-to-day helper used by
+     * the {@code pollCreationDs} property.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebPollsActionsMetricUtils", exports = "c",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    private static int pollCreationDsFromInstant(Instant instant) {
+        // moment.utc(e*1e3).startOf("day").unix(): truncate to UTC day boundary
+        var epochDays = instant.getEpochSecond() / 86400L;
+        return (int) (epochDays * 86400L);
+    }
+
+    /**
+     * Maps a chat JID to the {@link MessageChatType} classification used by
+     * {@link PollsActionsEvent#chatType()}.
+     *
+     * <p>Mirrors {@code WAWebGetMessageChatTypeFromWid.getMessageChatTypeFromWid}
+     * by dispatching over the JID's server component: user/LID/hosted -> INDIVIDUAL,
+     * group/community -> GROUP, status -> STATUS, broadcast -> BROADCAST,
+     * newsletter -> CHANNEL, anything else -> OTHER.
+     *
+     * @param jid the chat JID to classify; must not be {@code null}
+     * @return the corresponding {@link MessageChatType}; never {@code null}
+     *
+     * @apiNote WAWebGetMessageChatTypeFromWid.getMessageChatTypeFromWid —
+     *          duplicated here because the same helper in
+     *          {@code UserMessageSender} is package-private.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebGetMessageChatTypeFromWid",
+            exports = "getMessageChatTypeFromWid",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    private static MessageChatType pollsWamChatType(Jid jid) {
+        if (jid.isStatusBroadcastAccount()) {
+            return MessageChatType.STATUS;
+        }
+        if (jid.hasBroadcastServer()) {
+            return MessageChatType.BROADCAST;
+        }
+        if (jid.hasGroupOrCommunityServer()) {
+            return MessageChatType.GROUP;
+        }
+        if (jid.hasNewsletterServer()) {
+            return MessageChatType.CHANNEL;
+        }
+        if (jid.hasUserServer() || jid.hasLidServer()) {
+            return MessageChatType.INDIVIDUAL;
+        }
+        return MessageChatType.OTHER;
+    }
+
+    /**
+     * Buckets a participant count into a {@link ClientGroupSizeBucket} for
+     * poll-action emissions.
+     *
+     * <p>Duplicates the ladder in
+     * {@code GroupMessageSender.toGroupSizeBucket} because that helper is
+     * private to its own class. The thresholds are identical.
+     *
+     * @param count the participant count, already raised to a minimum of 32 by
+     *              the caller
+     * @return the corresponding bucket, never {@code null}
+     *
+     * @apiNote WAWebWamNumberToClientGroupSizeBucket — identical ladder.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebWamNumberToClientGroupSizeBucket",
+            exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
+    private static ClientGroupSizeBucket pollsWamGroupSizeBucket(int count) {
+        if (count <= 33) return ClientGroupSizeBucket.SMALL;
+        if (count <= 65) return ClientGroupSizeBucket.MEDIUM;
+        if (count <= 129) return ClientGroupSizeBucket.LARGE;
+        if (count <= 257) return ClientGroupSizeBucket.EXTRA_LARGE;
+        if (count <= 513) return ClientGroupSizeBucket.XX_LARGE;
+        if (count <= 1025) return ClientGroupSizeBucket.LT1024;
+        if (count <= 1501) return ClientGroupSizeBucket.LT1500;
+        if (count <= 2001) return ClientGroupSizeBucket.LT2000;
+        if (count <= 2501) return ClientGroupSizeBucket.LT2500;
+        if (count <= 3001) return ClientGroupSizeBucket.LT3000;
+        if (count <= 3501) return ClientGroupSizeBucket.LT3500;
+        if (count <= 4001) return ClientGroupSizeBucket.LT4000;
+        if (count <= 4501) return ClientGroupSizeBucket.LT4500;
+        if (count <= 5001) return ClientGroupSizeBucket.LT5000;
+        return ClientGroupSizeBucket.LARGEST_BUCKET;
+    }
+
+    /**
+     * Returns {@code true} when the logged-in account is an administrator of
+     * the given group, used by the {@code isAdmin} property of
+     * {@link PollsActionsEvent}.
+     *
+     * <p>Mirrors WA Web's {@code groupMetadata.participants.iAmAdmin()} lookup
+     * by locating the local user in the participant set and checking whether
+     * the participant entry has a non-empty rank.
+     *
+     * @param metadata the group metadata to inspect; never {@code null}
+     * @param selfJid  the logged-in account's JID; never {@code null}
+     * @return {@code true} when the current account is an admin / founder of
+     *         the group; {@code false} otherwise
+     *
+     * @apiNote WAWebParticipants.iAmAdmin() as used by
+     * {@code WAWebPollsActionsMetricUtils.u}.
+     */
+    private static boolean pollsWamIsAdmin(GroupMetadata metadata, Jid selfJid) {
+        return metadata.participants().stream()
+                .filter(participant -> Objects.equals(participant.userJid().toUserJid(), selfJid.toUserJid()))
+                .anyMatch(participant -> participant.rank().isPresent()); // ADMIN / FOUNDER -> true; USER (rank == null) -> false
+    }
+
+    /**
+     * Maps a {@link GroupMetadata} instance to the {@link TypeOfGroupEnum}
+     * classification used by the {@code typeOfGroup} property on
+     * {@link PollsActionsEvent}.
+     *
+     * <p>Mirrors WA Web's {@code groupData.wamTypeOfGroup} resolution (
+     * {@code WAWebGroupType.getGroupTypeFromGroupMetadata} +
+     * {@code groupTypeToWamEnum}):
+     * {@code defaultSubgroup} -> {@link TypeOfGroupEnum#DEFAULT_SUBGROUP};
+     * {@code parentCommunityJid != null} (and not default/general) ->
+     * {@link TypeOfGroupEnum#SUBGROUP}; everything else (including community
+     * announcement general chat and standalone groups) ->
+     * {@link TypeOfGroupEnum#GROUP}.
+     *
+     * @param metadata the group metadata to classify; never {@code null}
+     * @return the matching {@link TypeOfGroupEnum}; never {@code null}
+     *
+     * @apiNote WAWebGroupType.getGroupTypeFromGroupMetadata + groupTypeToWamEnum.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebGroupType",
+            exports = {"getGroupTypeFromGroupMetadata", "groupTypeToWamEnum"},
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private static TypeOfGroupEnum pollsWamTypeOfGroup(GroupMetadata metadata) {
+        if (metadata.isDefaultSubgroup()) {
+            return TypeOfGroupEnum.DEFAULT_SUBGROUP;
+        }
+        if (metadata.isGeneralSubgroup()) {
+            return TypeOfGroupEnum.GROUP;
+        }
+        if (metadata.parentCommunityJid().isPresent()) {
+            return TypeOfGroupEnum.SUBGROUP;
+        }
+        return TypeOfGroupEnum.GROUP;
     }
 
     //</editor-fold>
@@ -9108,6 +10683,13 @@ public final class WhatsAppClient {
      * {@link WhatsAppStore#favoriteChats()}, appends the new JID if not
      * already present, and emits the full updated list.
      *
+     * <p>This overload performs the favourite without recording a WAM entry
+     * point. Callers that know the UI surface originating the action should
+     * use {@link #favoriteChat(Jid, FavoritesUpdateEntryPoint)} so that a
+     * {@link MessagingFavoritesUpdateEvent} is logged, matching WA Web's
+     * behaviour where the event fires only when
+     * {@code options.entryPoint != null}.
+     *
      * @param chat the JID of the chat to favourite
      * @throws NullPointerException if {@code chat} is {@code null}
      *
@@ -9118,14 +10700,77 @@ public final class WhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebFavoritesSync", exports = "getFavoritesMutation",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public void favoriteChat(Jid chat) {
+        favoriteChat(chat, null); // WAWebAddToFavoritesAction.addToFavoritesAction: entryPoint omitted -> logAddingMessagingFavorites skipped
+    }
+
+    /**
+     * Adds the given chat to the favourites list, propagates the change to
+     * every linked device, and emits a
+     * {@link MessagingFavoritesUpdateEvent} describing the transition when
+     * {@code entryPoint} is non-{@code null}.
+     *
+     * <p>Per WhatsApp Web {@code WAWebAddToFavoritesAction.addToFavoritesAction}:
+     * when the caller supplies an {@code entryPoint}, the action invokes
+     * {@code WAWebFavoritesLogging.logAddingMessagingFavorites(items, entryPoint)}
+     * which counts the contacts/groups in the current
+     * {@code FavoriteCollection} and derives the post-update counts by
+     * classifying the items being added via {@code WAWebWid.isGroup}.
+     * Cobalt reproduces that accounting here using
+     * {@link Jid#hasGroupOrCommunityServer()} as the {@code isGroup}
+     * equivalent.
+     *
+     * @param chat       the JID of the chat to favourite
+     * @param entryPoint the UI entry point that initiated the action, or
+     *                   {@code null} to suppress the WAM event (matching
+     *                   WA Web's {@code entryPoint != null} guard)
+     * @throws NullPointerException if {@code chat} is {@code null}
+     *
+     * @implNote WAWebAddToFavoritesAction.addToFavoritesAction +
+     *           WAWebFavoritesLogging.logAddingMessagingFavorites — emits
+     *           {@link MessagingFavoritesUpdateEvent} with before/after
+     *           contact and group counts derived from the current
+     *           {@link WhatsAppStore#favoriteChats()} and the target chat.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebAddToFavoritesAction", exports = "addToFavoritesAction",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void favoriteChat(Jid chat, FavoritesUpdateEntryPoint entryPoint) {
         Objects.requireNonNull(chat, "chat cannot be null");
         var current = new ArrayList<>(store.favoriteChats()); // WAWebFavoritesSync.getFavoritesMutation: current favorites collection
-        if (!current.contains(chat)) { // ADAPTED: WA Web client-side dedupes by orderIndex; Cobalt dedupes by JID equality
+        // WAWebFavoritesLogging.logAddingMessagingFavorites: count existing contacts/groups before mutating the list
+        var contactsBefore = 0; // WAWebFavoritesLogging.logAddingMessagingFavorites: var a = 0
+        var groupsBefore = 0; // WAWebFavoritesLogging.logAddingMessagingFavorites: var l = 0
+        for (var existing : current) { // WAWebFavoritesLogging.logAddingMessagingFavorites: FavoriteCollection.forEach
+            if (existing.hasGroupOrCommunityServer()) { // WAWebFavoritesLogging.logAddingMessagingFavorites: WAWebWid.isGroup(e.id)
+                groupsBefore++; // WAWebFavoritesLogging.logAddingMessagingFavorites: l++
+            } else {
+                contactsBefore++; // WAWebFavoritesLogging.logAddingMessagingFavorites: a++
+            }
+        }
+        var added = !current.contains(chat); // ADAPTED: WA Web client-side dedupes by orderIndex; Cobalt dedupes by JID equality
+        if (added) {
             current.add(chat);
         }
         var mutation = FavoritesHandler.INSTANCE.getFavoritesMutation(current, Instant.now()); // WAWebFavoritesSync.getFavoritesMutation
         webAppStateService.pushPatches(FavoritesAction.COLLECTION_NAME, List.of(mutation)); // WAWebSyncdCoreApi.lockForSync
         store.setFavoriteChats(current); // WAWebFavoritesSync.applyMutations: setFavorites(h) — apply locally for eager consistency
+        if (entryPoint != null) { // WAWebAddToFavoritesAction.addToFavoritesAction: a.entryPoint != null && logAddingMessagingFavorites(p, a.entryPoint)
+            var contactsAfter = contactsBefore; // WAWebFavoritesLogging.logAddingMessagingFavorites: i = a
+            var groupsAfter = groupsBefore; // WAWebFavoritesLogging.logAddingMessagingFavorites: s = l
+            if (added) { // WAWebFavoritesLogging.logAddingMessagingFavorites: t.forEach(e -> WAWebWid.isGroup(e.id) ? s++ : i++)
+                if (chat.hasGroupOrCommunityServer()) {
+                    groupsAfter++;
+                } else {
+                    contactsAfter++;
+                }
+            }
+            wamService.commit(new MessagingFavoritesUpdateEventBuilder() // WAWebFavoritesLogging.logAddingMessagingFavorites: new MessagingFavoritesUpdateWamEvent({...}).commit()
+                    .favoritesUpdateEntryPoint(entryPoint) // WAWebFavoritesLogging.logAddingMessagingFavorites: favoritesUpdateEntryPoint: n
+                    .contactFavCountBeforeUpdate(contactsBefore) // WAWebFavoritesLogging.logAddingMessagingFavorites: contactFavCountBeforeUpdate: a
+                    .contactFavCountAfterUpdate(contactsAfter) // WAWebFavoritesLogging.logAddingMessagingFavorites: contactFavCountAfterUpdate: i
+                    .groupFavCountBeforeUpdate(groupsBefore) // WAWebFavoritesLogging.logAddingMessagingFavorites: groupFavCountBeforeUpdate: l
+                    .groupFavCountAfterUpdate(groupsAfter) // WAWebFavoritesLogging.logAddingMessagingFavorites: groupFavCountAfterUpdate: s
+                    .build());
+        }
     }
 
     /**
@@ -9134,7 +10779,12 @@ public final class WhatsAppClient {
      * sync collection.
      *
      * <p>Counterpart to {@link #favoriteChat(Jid)}: emits the same full
-     * favourites list minus the target JID.
+     * favourites list minus the target JID. Callers that know the UI surface
+     * originating the action should use
+     * {@link #unfavoriteChat(Jid, FavoritesUpdateEntryPoint)} so that a
+     * {@link MessagingFavoritesUpdateEvent} is logged, matching WA Web's
+     * behaviour where the event fires only when
+     * {@code options.entryPoint != null}.
      *
      * @param chat the JID of the chat to unfavourite
      * @throws NullPointerException if {@code chat} is {@code null}
@@ -9145,12 +10795,77 @@ public final class WhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebFavoritesSync", exports = "getFavoritesMutation",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public void unfavoriteChat(Jid chat) {
+        unfavoriteChat(chat, null); // WAWebRemoveFromFavoritesAction.removeFromFavoritesAction: entryPoint omitted -> logRemovingMessagingFavorites skipped
+    }
+
+    /**
+     * Removes the given chat from the favourites list, propagates the change
+     * to every linked device, and emits a
+     * {@link MessagingFavoritesUpdateEvent} describing the transition when
+     * {@code entryPoint} is non-{@code null}.
+     *
+     * <p>Per WhatsApp Web
+     * {@code WAWebRemoveFromFavoritesAction.removeFromFavoritesAction}: when
+     * the caller supplies an {@code entryPoint}, the action invokes
+     * {@code WAWebFavoritesLogging.logRemovingMessagingFavorites([id], entryPoint)}
+     * which counts the current contacts/groups in {@code FavoriteCollection},
+     * clones those to the after-counts, then decrements the after-counts by
+     * the removed ids (classified via {@code WAWebWid.isGroup}) clamped at
+     * zero. Cobalt reproduces that accounting here using
+     * {@link Jid#hasGroupOrCommunityServer()} as the {@code isGroup}
+     * equivalent.
+     *
+     * @param chat       the JID of the chat to unfavourite
+     * @param entryPoint the UI entry point that initiated the action, or
+     *                   {@code null} to suppress the WAM event (matching
+     *                   WA Web's {@code entryPoint != null} guard)
+     * @throws NullPointerException if {@code chat} is {@code null}
+     *
+     * @implNote WAWebRemoveFromFavoritesAction.removeFromFavoritesAction +
+     *           WAWebFavoritesLogging.logRemovingMessagingFavorites — emits
+     *           {@link MessagingFavoritesUpdateEvent} with before/after
+     *           contact and group counts derived from the current
+     *           {@link WhatsAppStore#favoriteChats()} and the target chat.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebRemoveFromFavoritesAction", exports = "removeFromFavoritesAction",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void unfavoriteChat(Jid chat, FavoritesUpdateEntryPoint entryPoint) {
         Objects.requireNonNull(chat, "chat cannot be null");
         var current = new ArrayList<>(store.favoriteChats());
-        current.remove(chat);
+        // WAWebFavoritesLogging.logRemovingMessagingFavorites: count existing contacts/groups before mutating the list
+        var contactsBefore = 0; // WAWebFavoritesLogging.logRemovingMessagingFavorites: var n = 0
+        var groupsBefore = 0; // WAWebFavoritesLogging.logRemovingMessagingFavorites: var i = 0
+        for (var existing : current) { // WAWebFavoritesLogging.logRemovingMessagingFavorites: FavoriteCollection.forEach
+            if (existing.hasGroupOrCommunityServer()) { // WAWebFavoritesLogging.logRemovingMessagingFavorites: WAWebWid.isGroup(e.id)
+                groupsBefore++; // WAWebFavoritesLogging.logRemovingMessagingFavorites: i++
+            } else {
+                contactsBefore++; // WAWebFavoritesLogging.logRemovingMessagingFavorites: n++
+            }
+        }
+        var removed = current.remove(chat);
         var mutation = FavoritesHandler.INSTANCE.getFavoritesMutation(current, Instant.now());
         webAppStateService.pushPatches(FavoritesAction.COLLECTION_NAME, List.of(mutation));
         store.setFavoriteChats(current);
+        if (entryPoint != null) { // WAWebRemoveFromFavoritesAction.removeFromFavoritesAction: a.entryPoint != null && logRemovingMessagingFavorites([i], a.entryPoint)
+            var contactsAfter = contactsBefore; // WAWebFavoritesLogging.logRemovingMessagingFavorites: a = n
+            var groupsAfter = groupsBefore; // WAWebFavoritesLogging.logRemovingMessagingFavorites: l = i
+            if (removed) { // WAWebFavoritesLogging.logRemovingMessagingFavorites: e.forEach(e -> WAWebWid.isGroup(e) ? l-- : a--)
+                if (chat.hasGroupOrCommunityServer()) {
+                    groupsAfter--;
+                } else {
+                    contactsAfter--;
+                }
+            }
+            contactsAfter = Math.max(contactsAfter, 0); // WAWebFavoritesLogging.logRemovingMessagingFavorites: a = Math.max(a, 0)
+            groupsAfter = Math.max(groupsAfter, 0); // WAWebFavoritesLogging.logRemovingMessagingFavorites: l = Math.max(l, 0)
+            wamService.commit(new MessagingFavoritesUpdateEventBuilder() // WAWebFavoritesLogging.logRemovingMessagingFavorites: new MessagingFavoritesUpdateWamEvent({...}).commit()
+                    .favoritesUpdateEntryPoint(entryPoint) // WAWebFavoritesLogging.logRemovingMessagingFavorites: favoritesUpdateEntryPoint: t
+                    .contactFavCountBeforeUpdate(contactsBefore) // WAWebFavoritesLogging.logRemovingMessagingFavorites: contactFavCountBeforeUpdate: n
+                    .contactFavCountAfterUpdate(contactsAfter) // WAWebFavoritesLogging.logRemovingMessagingFavorites: contactFavCountAfterUpdate: a
+                    .groupFavCountBeforeUpdate(groupsBefore) // WAWebFavoritesLogging.logRemovingMessagingFavorites: groupFavCountBeforeUpdate: i
+                    .groupFavCountAfterUpdate(groupsAfter) // WAWebFavoritesLogging.logRemovingMessagingFavorites: groupFavCountAfterUpdate: l
+                    .build());
+        }
     }
 
     /**
@@ -9262,7 +10977,9 @@ public final class WhatsAppClient {
                 .type(PinInChatMessage.Type.PIN_FOR_ALL) // WAWebSendPinMessageAction.sendPinInChatMsg: PIN_FOR_ALL
                 .senderTimestampMs(Instant.now()) // WAWebSendPinMessageAction: senderTimestampMs
                 .build();
-        return messageService.send(parentJid, MessageContainer.of(pin)); // WAWebSendAddonMsgChatAction -> sendMsgRecord
+        var ackResult = messageService.send(parentJid, MessageContainer.of(pin)); // WAWebSendAddonMsgChatAction -> sendMsgRecord
+        commitPinInChatMessageSendEvent(parentJid, msgKey, PinInChatType.PIN_FOR_ALL, null); // WAWebSendPinMessageAction.sendPinInChatMsg: logPinInChatMessageSend({msg, parentMsg, chat, timeRemainingToExpirySecs: C}) — C is undefined on PIN, defaults to 0 (omitted here)
+        return ackResult;
     }
 
     /**
@@ -9290,7 +11007,174 @@ public final class WhatsAppClient {
                 .type(PinInChatMessage.Type.UNPIN_FOR_ALL) // WAWebSendPinMessageAction.sendPinInChatMsg: UNPIN_FOR_ALL
                 .senderTimestampMs(Instant.now())
                 .build();
-        return messageService.send(parentJid, MessageContainer.of(pin));
+        var ackResult = messageService.send(parentJid, MessageContainer.of(pin));
+        // WAWebSendPinMessageAction.sendPinInChatMsg: on UNPIN_FOR_ALL, `C` = PinInChatCollection.getByParentMsgKey(parentMsgKey).leftExpirationTime().
+        // Cobalt does not model an active-pin table with a TTL, so timeRemainingToExpirySecs is omitted rather than fabricated.
+        commitPinInChatMessageSendEvent(parentJid, msgKey, PinInChatType.UNPIN_FOR_ALL, null);
+        return ackResult;
+    }
+
+    /**
+     * Commits the {@link PinInChatMessageSendEvent} WAM event for a successful
+     * pin or unpin dispatch from {@link #pinMessageInChat(MessageKey)} /
+     * {@link #unpinMessageInChat(MessageKey)}.
+     *
+     * <p>Adapts {@code WAWebPinInChatMetricUtils.logPinInChatMessageSend}
+     * ({@code e(e)} in the bundled JS): classifies the chat as a group (or
+     * community) and, when it is, resolves the
+     * {@link GroupTypeClient}/{@link GroupRoleType} pair that WA Web derives
+     * from {@code c(groupMetadata.groupType)} and
+     * {@code d(groupMetadata.participants.iAmAdmin())}.
+     *
+     * <p>Additional properties WA Web logs from the message models:
+     * <ul>
+     *   <li>{@code mediaType} &mdash; classification of the pinned parent
+     *       message via {@link WamMsgUtils#getWamMediaType(ChatMessageInfo)};
+     *   <li>{@code isSelfParentMessage} &mdash; whether the parent message was
+     *       authored by the local account ({@code fromMe()} on the resolved
+     *       {@link ChatMessageInfo}); omitted when the parent cannot be
+     *       resolved in the store;
+     *   <li>{@code isSelfPin} &mdash; always {@code true}: this helper is only
+     *       called from the outbound pin/unpin code paths, matching WA Web's
+     *       {@code getIsSentByMe(a)} where {@code a} is the just-constructed
+     *       {@code fromMe:true} PinInChat message;
+     *   <li>{@code pinInChatExpirySecs} &mdash; always {@code 0} because
+     *       Cobalt's {@link PinInChatMessage} model does not carry a
+     *       {@code pinExpiryDuration} field; WA Web itself falls back to
+     *       {@code 0} when the field is unset
+     *       ({@code (t=a.pinExpiryDuration)!=null?t:0}).
+     * </ul>
+     *
+     * @param parentJid                  the chat JID hosting the pinned message
+     * @param parentMsgKey               the key of the pinned (parent) message
+     * @param pinInChatType              the pin operation type (PIN or UNPIN)
+     * @param timeRemainingToExpirySecs  the remaining seconds on the existing
+     *                                   pin for UNPIN paths (source: WA Web's
+     *                                   {@code PinInChatCollection.leftExpirationTime}),
+     *                                   or {@code null} to omit the property
+     *                                   (used on the PIN path and whenever
+     *                                   Cobalt cannot compute a TTL)
+     *
+     * @implNote {@code WAWebPinInChatMetricUtils.logPinInChatMessageSend}
+     *           invoked from {@code WAWebSendPinMessageAction.sendPinInChatMsg}
+     */
+    @WhatsAppWebExport(moduleName = "WAWebPinInChatMetricUtils", exports = "logPinInChatMessageSend",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private void commitPinInChatMessageSendEvent(Jid parentJid, MessageKey parentMsgKey,
+                                                 PinInChatType pinInChatType,
+                                                 Integer timeRemainingToExpirySecs) {
+        var builder = new PinInChatMessageSendEventBuilder()
+                .pinInChatType(pinInChatType) // WAWebPinInChatMetricUtils: pinInChatType: u(WANullthrows(a.pinMessageType))
+                .isSelfPin(Boolean.TRUE) // WAWebPinInChatMetricUtils: isSelfPin: WAWebMsgGetters.getIsSentByMe(a) — always true on the outbound path (fromMe:true PinInChat msg)
+                .pinInChatExpirySecs(0); // WAWebPinInChatMetricUtils: pinInChatExpirySecs: (t=a.pinExpiryDuration)!=null?t:0 — Cobalt's PinInChatMessage has no pinExpiryDuration, matches the 0 fallback
+        var isAGroup = parentJid.hasGroupOrCommunityServer(); // WAWebChatGetters.getIsGroup(n)
+        builder.isAGroup(isAGroup); // WAWebPinInChatMetricUtils: isAGroup: m
+        if (isAGroup) { // WAWebPinInChatMetricUtils: if (m) { var f = WANullthrows(n.groupMetadata); ... }
+            var metadata = store.findChatMetadata(parentJid).orElse(null);
+            if (metadata != null) {
+                var groupTypeClient = pinWamGroupTypeClient(metadata); // WAWebPinInChatMetricUtils.c: groupTypeClient: c(f.groupType)
+                if (groupTypeClient != null) {
+                    builder.groupTypeClient(groupTypeClient);
+                }
+                var selfJid = store.jid().orElse(null);
+                if (selfJid != null) {
+                    builder.groupRole(pinWamGroupRole(metadata, selfJid)); // WAWebPinInChatMetricUtils.d: groupRole: d(f.participants.iAmAdmin())
+                }
+            }
+        }
+        // WAWebPinInChatMetricUtils: mediaType: WAWebWamMsgUtils.getWamMediaType(parentMsg)
+        // WAWebPinInChatMetricUtils: isSelfParentMessage: WAWebMsgGetters.getIsSentByMe(parentMsg)
+        store.findMessageByKey(parentMsgKey).ifPresent(parentMessage -> {
+            if (parentMessage instanceof ChatMessageInfo chatParent) {
+                builder.mediaType(WamMsgUtils.getWamMediaType(chatParent));
+            }
+            builder.isSelfParentMessage(parentMessage.key().fromMe());
+        });
+        if (timeRemainingToExpirySecs != null) { // WAWebPinInChatMetricUtils: timeRemainingToExpirySecs: s (defaulted to 0 when undefined)
+            builder.timeRemainingToExpirySecs(timeRemainingToExpirySecs);
+        }
+        wamService.commit(builder.build()); // WAWebPinInChatMetricUtils: new PinInChatMessageSendWamEvent({...}).commit()
+    }
+
+    /**
+     * Maps a {@link ChatMetadata} instance to the WAM
+     * {@link GroupTypeClient} classification expected by
+     * {@link PinInChatMessageSendEvent#groupTypeClient()}.
+     *
+     * <p>Adapts {@code WAWebPinInChatMetricUtils.c}, which dispatches over
+     * {@code WAWebGroupType.GroupType} values derived from
+     * {@code WAWebGroupType.getGroupTypeFromGroupMetadata}:
+     * <ul>
+     *   <li>{@code DEFAULT} &rarr; {@link GroupTypeClient#REGULAR_GROUP}</li>
+     *   <li>{@code LINKED_SUBGROUP} &rarr; {@link GroupTypeClient#SUB_GROUP}</li>
+     *   <li>{@code LINKED_ANNOUNCEMENT_GROUP} &rarr; {@link GroupTypeClient#DEFAULT_SUB_GROUP}</li>
+     *   <li>{@code COMMUNITY} &rarr; {@link GroupTypeClient#PARENT_GROUP}</li>
+     *   <li>{@code LINKED_GENERAL_GROUP} &rarr; {@link GroupTypeClient#SUB_GROUP}</li>
+     * </ul>
+     *
+     * <p>Cobalt encodes the community (parent group) variant via a dedicated
+     * {@link CommunityMetadata} type, while subgroup flags live on
+     * {@link GroupMetadata#isDefaultSubgroup()} /
+     * {@link GroupMetadata#isGeneralSubgroup()} /
+     * {@link GroupMetadata#parentCommunityJid()}.
+     *
+     * @param metadata the chat metadata to classify; never {@code null}
+     * @return the matching {@link GroupTypeClient}, or {@code null} if the
+     *         metadata cannot be classified (matches the {@code undefined}
+     *         return that {@code c} produces for a missing {@code GroupType})
+     *
+     * @implNote {@code WAWebPinInChatMetricUtils.c} combined with
+     *           {@code WAWebGroupType.getGroupTypeFromGroupMetadata}
+     */
+    private static GroupTypeClient pinWamGroupTypeClient(ChatMetadata metadata) {
+        if (metadata instanceof CommunityMetadata) {
+            return GroupTypeClient.PARENT_GROUP; // WAWebGroupType: COMMUNITY -> PARENT_GROUP
+        }
+        if (metadata instanceof GroupMetadata group) {
+            if (group.isDefaultSubgroup()) {
+                return GroupTypeClient.DEFAULT_SUB_GROUP; // WAWebGroupType: LINKED_ANNOUNCEMENT_GROUP -> DEFAULT_SUB_GROUP
+            }
+            if (group.isGeneralSubgroup()) {
+                return GroupTypeClient.SUB_GROUP; // WAWebGroupType: LINKED_GENERAL_GROUP -> SUB_GROUP
+            }
+            if (group.parentCommunityJid().isPresent()) {
+                return GroupTypeClient.SUB_GROUP; // WAWebGroupType: LINKED_SUBGROUP -> SUB_GROUP
+            }
+            return GroupTypeClient.REGULAR_GROUP; // WAWebGroupType: DEFAULT -> REGULAR_GROUP
+        }
+        return null;
+    }
+
+    /**
+     * Maps the current local account's role in a group / community to the
+     * WAM {@link GroupRoleType} classification expected by
+     * {@link PinInChatMessageSendEvent#groupRole()}.
+     *
+     * <p>Adapts {@code WAWebPinInChatMetricUtils.d}
+     * ({@code return e ? ADMIN : MEMBER}) where {@code e} is
+     * {@code groupMetadata.participants.iAmAdmin()}. The local account is
+     * located inside the participant set by matching on the user-form JID,
+     * mirroring the identity check used elsewhere in this class (see
+     * {@link #commitCommunityGroupJourneyEvent(ChatFilterActionTypes, SurfaceType, Jid)}
+     * for the reference pattern).
+     *
+     * @param metadata the chat metadata to inspect; never {@code null}
+     * @param selfJid  the logged-in account's JID; never {@code null}
+     * @return {@link GroupRoleType#ADMIN} when the local account's
+     *         participant entry has a non-empty rank
+     *         ({@link GroupPartipantRole#ADMIN} or
+     *         {@link GroupPartipantRole#FOUNDER}); {@link GroupRoleType#MEMBER}
+     *         otherwise
+     *
+     * @implNote {@code WAWebPinInChatMetricUtils.d} with
+     *           {@code participants.iAmAdmin()} realised via the participant
+     *           rank lookup used across Cobalt's group role helpers
+     */
+    private static GroupRoleType pinWamGroupRole(ChatMetadata metadata, Jid selfJid) {
+        var iAmAdmin = metadata.participants().stream()
+                .filter(participant -> Objects.equals(participant.userJid().toUserJid(), selfJid.toUserJid()))
+                .anyMatch(participant -> participant.rank().isPresent()); // ADMIN / FOUNDER -> true; USER (rank == null) -> false
+        return iAmAdmin ? GroupRoleType.ADMIN : GroupRoleType.MEMBER;
     }
 
     /**
@@ -9832,4 +11716,68 @@ public final class WhatsAppClient {
     }
 
     //</editor-fold>
+
+    /**
+     * Parses a label identifier into the integer {@code listId} used by the
+     * {@link ListUpdateEvent} WAM event.
+     *
+     * <p>Per WhatsApp Web {@code WAWebListsActions} the {@code listId} field is
+     * always populated via {@code Number(labelId)} or the freshly allocated
+     * integer id returned by {@code getNextLabelId}. Cobalt's labels are keyed
+     * by string, so we attempt a numeric parse; ids that are not valid integers
+     * (for example, predefined filters keyed by name) would be reported as
+     * {@code NaN} on WA Web and are skipped here — WAM integer properties
+     * cannot carry {@code NaN}.
+     *
+     * @implNote WAWebListsActions.createNewListAction / editListAction / deleteListAction:
+     *           {@code Number(n.id)} / {@code Number(e)} / literal {@code a} from
+     *           {@code getNextLabelId}
+     * @param labelId the string label identifier to parse
+     * @return the integer list id, or {@code null} if {@code labelId} does not
+     *         parse as an integer
+     */
+    private static Integer parseLabelIdToListId(String labelId) {
+        try {
+            return Integer.parseInt(labelId); // WAWebListsActions: Number(n.id) / Number(e)
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    /**
+     * Maps a {@link LabelEditAction.ListType} from the sync model onto the
+     * WAM-level {@link ListType} enum used by {@link ListUpdateEvent} and
+     * {@link ListUpdateUserJourneyEvent}.
+     *
+     * <p>Per WhatsApp Web {@code WAWebListsLogging.getListType}:
+     * {@code NONE -> NONE}, {@code UNREAD -> UNREAD}, {@code GROUPS -> GROUP},
+     * {@code FAVORITES -> FAVORITE}, {@code PREDEFINED -> PREDEFINED},
+     * {@code CUSTOM -> CUSTOM}, {@code COMMUNITY -> COMMUNITY}, and
+     * {@code SERVER_ASSIGNED -> SERVER_ASSIGNED}. The additional {@code DRAFTED},
+     * {@code AI_HANDOFF}, and {@code CHANNELS} values present in the Cobalt
+     * model enum are not mapped because {@code WAWebListsLogging.getListType}
+     * only handles the eight cases above and returns {@code undefined} for
+     * anything else.
+     *
+     * @implNote WAWebListsLogging.getListType
+     * @param type the sync-model list type, may be {@code null}
+     * @return the corresponding WAM list type, or {@code null} if the input is
+     *         {@code null} or has no WAM counterpart
+     */
+    private static ListType mapWamListType(LabelEditAction.ListType type) {
+        if (type == null) {
+            return null; // WAWebListsLogging.getListType: if (e != null) switch (e) { ... } — null input returns undefined
+        }
+        return switch (type) {
+            case NONE -> ListType.NONE; // WAWebListsLogging.getListType: ListType.NONE -> LIST_TYPE.NONE
+            case UNREAD -> ListType.UNREAD; // WAWebListsLogging.getListType: ListType.UNREAD -> LIST_TYPE.UNREAD
+            case GROUPS -> ListType.GROUP; // WAWebListsLogging.getListType: ListType.GROUPS -> LIST_TYPE.GROUP
+            case FAVORITES -> ListType.FAVORITE; // WAWebListsLogging.getListType: ListType.FAVORITES -> LIST_TYPE.FAVORITE
+            case PREDEFINED -> ListType.PREDEFINED; // WAWebListsLogging.getListType: ListType.PREDEFINED -> LIST_TYPE.PREDEFINED
+            case CUSTOM -> ListType.CUSTOM; // WAWebListsLogging.getListType: ListType.CUSTOM -> LIST_TYPE.CUSTOM
+            case COMMUNITY -> ListType.COMMUNITY; // WAWebListsLogging.getListType: ListType.COMMUNITY -> LIST_TYPE.COMMUNITY
+            case SERVER_ASSIGNED -> ListType.SERVER_ASSIGNED; // WAWebListsLogging.getListType: ListType.SERVER_ASSIGNED -> LIST_TYPE.SERVER_ASSIGNED
+            default -> null; // WAWebListsLogging.getListType: switch has no default branch, so other inputs return undefined
+        };
+    }
 }

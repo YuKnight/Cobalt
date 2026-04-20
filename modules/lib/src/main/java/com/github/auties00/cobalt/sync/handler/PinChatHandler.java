@@ -12,6 +12,8 @@ import com.github.auties00.cobalt.model.sync.action.contact.PinAction;
 import com.github.auties00.cobalt.model.sync.action.contact.PinActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.event.MdSyncdDogfoodingFeatureUsageEventBuilder;
+import com.github.auties00.cobalt.wam.type.MdFeatureCode;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -256,6 +258,11 @@ public final class PinChatHandler implements WebAppStateActionHandler {
                 return MutationApplicationResult.success(); // WAWebPinChatSync.applyMutation: {actionState: Success}
             }
 
+            // WAWebPinChatSync.applyMutation: r("gkx")("26258") || new MdSyncdDogfoodingFeatureUsageWamEvent({mdSyncdDogfoodingFeature: UNPIN_4TH_CHAT_MUTATION}).commit()
+            client.wamService().commit(new MdSyncdDogfoodingFeatureUsageEventBuilder()
+                    .mdSyncdDogfoodingFeature(MdFeatureCode.UNPIN_4TH_CHAT_MUTATION)
+                    .build());
+
             // WAWebPinChatSync.applyMutation: var b = C.reduce((e, t) => t.timestamp < e.timestamp ? t : e)
             // Find the oldest pinned chat (lowest timestamp).
             var oldestPinned = allPinnedChats.stream() // WAWebPinChatSync.applyMutation: C.reduce((e, t) => t.timestamp < e.timestamp ? t : e)
@@ -343,6 +350,11 @@ public final class PinChatHandler implements WebAppStateActionHandler {
             client.store().setNewsletterPinStates(states); // ADAPTED: persist the updated map back to the store
             return MutationApplicationResult.success(); // WAWebPinChatSync.applyMutation: {actionState: Success}
         }
+
+        // WAWebPinChatSync.applyMutation: r("gkx")("26258") || new MdSyncdDogfoodingFeatureUsageWamEvent({mdSyncdDogfoodingFeature: UNPIN_4TH_CHAT_MUTATION}).commit()
+        client.wamService().commit(new MdSyncdDogfoodingFeatureUsageEventBuilder()
+                .mdSyncdDogfoodingFeature(MdFeatureCode.UNPIN_4TH_CHAT_MUTATION)
+                .build());
 
         // WAWebPinChatSync.applyMutation: var b = C.reduce((e, t) => t.timestamp < e.timestamp ? t : e)
         var oldest = states.entrySet().stream() // WAWebPinChatSync.applyMutation: C.reduce((e, t) => t.timestamp < e.timestamp ? t : e)
@@ -454,7 +466,8 @@ public final class PinChatHandler implements WebAppStateActionHandler {
      */
     public List<SyncPendingMutation> getMutationsForPin(Instant timestamp, boolean pinned, Jid chatJid) {
         // WAWebPinChatSync.getMutationsForPin: gkx("26258") || new MdSyncdDogfoodingFeatureUsageWamEvent({mdSyncdDogfoodingFeature: PIN_MUTATION}).commit()
-        // ADAPTED: WAM telemetry intentionally omitted in Cobalt.
+        // The PIN_MUTATION WAM emission is performed at the caller (WhatsAppClient.pinChat) since
+        // this method has no WamService handle (handler is a singleton with no injected client).
         var mutations = new ArrayList<SyncPendingMutation>(); // WAWebPinChatSync.getMutationsForPin: var a = [yield this.getPinMutation(e, t, n)]
         mutations.add(getPinMutation(timestamp, pinned, chatJid)); // WAWebPinChatSync.getMutationsForPin: yield this.getPinMutation(e, t, n)
         // WAWebPinChatSync.getMutationsForPin: t && a.push(yield WAWebArchiveChatSync.getArchiveChatMutation(e, false, n))

@@ -20,6 +20,9 @@ public interface PollsActionsEvent extends WamEventSpec {
     @WamProperty(index = 1, type = WamType.ENUM)
     Optional<ClientGroupSizeBucket> groupSizeBucket();
 
+    @WamProperty(index = 9, type = WamType.BOOLEAN)
+    Optional<Boolean> hideVoterName();
+
     @WamProperty(index = 6, type = WamType.BOOLEAN)
     Optional<Boolean> isAGroup();
 
@@ -31,6 +34,9 @@ public interface PollsActionsEvent extends WamEventSpec {
 
     @WamProperty(index = 4, type = WamType.INTEGER)
     OptionalInt pollCreationDs();
+
+    @WamProperty(index = 10, type = WamType.INTEGER)
+    OptionalInt pollDurationMs();
 
     @WamProperty(index = 5, type = WamType.INTEGER)
     OptionalInt pollOptionsCount();

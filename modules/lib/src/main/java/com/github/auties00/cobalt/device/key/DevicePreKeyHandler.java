@@ -111,18 +111,49 @@ public final class DevicePreKeyHandler {
     }
 
     /**
+     * Result of a pre-key fetch/establish pass.
+     *
+     * <p>Mirrors the {@code {missedPrekeyCount, depletedPrekeyCount, deletedDevices}} tuple
+     * returned by {@code WAWebManageE2ESessionsJob.ensureE2ESessions} and the
+     * {@code {depletedPrekeyCount, processedPrekeyCount}} tuple from
+     * {@code WAWebProcessKeyBundle.processKeyBundles}. Cobalt keeps the two fields that
+     * downstream WAM emission needs: the resolved bundles and the count of devices in
+     * the response whose one-time pre-key was missing (depleted server-side pool).
+     *
+     * @param bundles             the pre-key bundles keyed by device JID
+     * @param depletedPrekeyCount the number of devices in the response for which the
+     *                            server returned no one-time pre-key (the pool was
+     *                            depleted for that device)
+     *
+     * @implNote WAWebProcessKeyBundle.splitKeyBundles: the count is incremented for
+     *     each response entry where {@code !i.key && !i.wid.isBot()}; Cobalt replicates
+     *     that check during response parsing.
+     */
+    public record PreKeyFetchResult(Map<Jid, SignalPreKeyBundle> bundles, int depletedPrekeyCount) {
+        /**
+         * Canonical constructor that copies the bundles map for immutability.
+         *
+         * @param bundles             the pre-key bundles keyed by device JID
+         * @param depletedPrekeyCount the depleted one-time pre-key count
+         */
+        public PreKeyFetchResult {
+            bundles = bundles == null ? Map.of() : Map.copyOf(bundles);
+        }
+    }
+
+    /**
      * Fetches pre-key bundles for the specified devices and establishes Signal sessions.
      *
      * <p>Convenience overload that passes {@code false} for the identity-reason flag.
      *
      * @param deviceJids the device JIDs to fetch pre-keys for
-     * @return map of device JIDs to their pre-key bundles; empty if the fetch fails
+     * @return the fetch result with bundles and depleted one-time pre-key count
      * @implNote WAWebFetchPrekeysJob.fetchPrekeys: default call does not set {@code reason=identity}.
      */
     @WhatsAppWebExport(moduleName = "WAWebFetchPrekeysJob",
             exports = "fetchPrekeys",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public Map<Jid, SignalPreKeyBundle> fetchAndProcessPreKeyBundles(Collection<Jid> deviceJids) {
+    public PreKeyFetchResult fetchAndProcessPreKeyBundles(Collection<Jid> deviceJids) {
         return fetchAndProcessPreKeyBundles(deviceJids, false);
     }
 
@@ -150,11 +181,11 @@ public final class DevicePreKeyHandler {
     @WhatsAppWebExport(moduleName = "WAWebManageE2ESessionsJob",
             exports = "ensureE2ESessions",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public Map<Jid, SignalPreKeyBundle> fetchAndProcessPreKeyBundles(Collection<Jid> deviceJids, boolean hasUserReasonIdentity) {
+    public PreKeyFetchResult fetchAndProcessPreKeyBundles(Collection<Jid> deviceJids, boolean hasUserReasonIdentity) {
         Objects.requireNonNull(deviceJids, "deviceJids cannot be null");
 
         if (deviceJids.isEmpty()) {
-            return Map.of();
+            return new PreKeyFetchResult(Map.of(), 0);
         }
 
         // WAWebManageE2ESessionsJob.ensureE2ESessions
@@ -185,6 +216,7 @@ public final class DevicePreKeyHandler {
         }
 
         var allBundles = new HashMap<Jid, SignalPreKeyBundle>();
+        var depletedPrekeyCount = 0;
 
         if (!newFutures.isEmpty()) {
             var devicesToFetch = new ArrayList<>(newFutures.keySet());
@@ -193,7 +225,7 @@ public final class DevicePreKeyHandler {
             // WAWebFetchPrekeysJob.fetchPrekeys
             // Fans out one virtual-thread subtask per batch to dispatch IQs in parallel
             try (var scope = StructuredTaskScope.open()) {
-                var subtasks = new ArrayList<Subtask<Map<Jid, SignalPreKeyBundle>>>();
+                var subtasks = new ArrayList<Subtask<PreKeyBatchResult>>();
                 for (var batch : batches) {
                     subtasks.add(scope.fork(() -> fetchPreKeyBatch(batch, hasUserReasonIdentity)));
                 }
@@ -201,7 +233,11 @@ public final class DevicePreKeyHandler {
 
                 for (var subtask : subtasks) {
                     if (subtask.state() == Subtask.State.SUCCESS) {
-                        var fetchedBundles = subtask.get();
+                        var batchResult = subtask.get();
+                        // WAWebProcessKeyBundle.processKeyBundles: aggregates depletedPrekeyCount
+                        // across batches (E += (N=w.depletedPrekeyCount)!=null?N:0)
+                        depletedPrekeyCount += batchResult.depletedPrekeyCount();
+                        var fetchedBundles = batchResult.bundles();
                         allBundles.putAll(fetchedBundles);
 
                         for (var entry : fetchedBundles.entrySet()) {
@@ -234,7 +270,9 @@ public final class DevicePreKeyHandler {
         }
 
         // WAWebManageE2ESessionsJob.ensureE2ESessions
-        // Waits for previously in-flight requests to complete so deduplicated callers get the same bundle
+        // Waits for previously in-flight requests to complete so deduplicated callers get the same bundle.
+        // Depleted counts are NOT re-attributed here: WA Web dedupes via its WaitableMap so only the
+        // originating caller contributes to the depletion metric for a given device.
         for (var entry : existingFutures.entrySet()) {
             try {
                 var bundle = entry.getValue().join();
@@ -269,7 +307,21 @@ public final class DevicePreKeyHandler {
             sessionCipher.process(address, bundle);
         }
 
-        return allBundles;
+        return new PreKeyFetchResult(allBundles, depletedPrekeyCount);
+    }
+
+    /**
+     * Per-batch pre-key fetch result carrying the parsed bundles and the count of
+     * depleted one-time pre-keys found in that batch's response.
+     *
+     * @param bundles             the pre-key bundles parsed from this batch's response
+     * @param depletedPrekeyCount the depleted one-time pre-key count for this batch
+     *
+     * @implNote WAWebProcessKeyBundle.splitKeyBundles: returns {@code {primaryBundle,
+     *     companionBundle, depletedPrekeyCount}}; Cobalt collapses the primary/companion
+     *     split since sorting happens later and only keeps the depleted count.
+     */
+    private record PreKeyBatchResult(Map<Jid, SignalPreKeyBundle> bundles, int depletedPrekeyCount) {
     }
 
     /**
@@ -277,14 +329,14 @@ public final class DevicePreKeyHandler {
      *
      * @param deviceJids            the devices included in this batch
      * @param hasUserReasonIdentity whether to set {@code reason="identity"} on each user node
-     * @return map of device JID to parsed pre-key bundle for this batch
+     * @return the batch result with parsed bundles and depleted one-time pre-key count
      * @implNote WAWebFetchPrekeysJob.fetchPrekeys: sends the IQ and passes the response to
      * the response parser.
      */
     @WhatsAppWebExport(moduleName = "WAWebFetchPrekeysJob",
             exports = "fetchPrekeys",
             adaptation = WhatsAppAdaptation.DIRECT)
-    private Map<Jid, SignalPreKeyBundle> fetchPreKeyBatch(List<Jid> deviceJids, boolean hasUserReasonIdentity) {
+    private PreKeyBatchResult fetchPreKeyBatch(List<Jid> deviceJids, boolean hasUserReasonIdentity) {
         var query = buildPreKeyQuery(deviceJids, hasUserReasonIdentity);
         var response = client.sendNode(query);
         return parsePreKeyResponse(response);
@@ -370,27 +422,45 @@ public final class DevicePreKeyHandler {
      * queried device; entries that fail to parse are logged and skipped so one malformed
      * device does not fail the batch.
      *
+     * <p>Also tallies the depleted one-time pre-key count: devices whose {@code <user>} entry
+     * has no {@code <key>} child (server-side pool exhausted for that device) and which are
+     * not bot JIDs. This count is used by {@code PrekeysDepletionEvent} (id 3014).
+     *
      * @param response the IQ response node
-     * @return map of device JID to parsed pre-key bundle
+     * @return the batch result with parsed bundles and depleted one-time pre-key count
      * @implNote WAWebFetchPrekeysJob.fetchPrekeys: iterates the response list and delegates
      * per-user parsing to an internal function matching {@link #parseUserPreKeyBundle}.
+     * WAWebProcessKeyBundle.splitKeyBundles: increments the depleted counter when
+     * {@code !i.key && !i.wid.isBot()}.
      */
     @WhatsAppWebExport(moduleName = "WAWebFetchPrekeysJob",
             exports = "fetchPrekeys",
             adaptation = WhatsAppAdaptation.DIRECT)
-    private Map<Jid, SignalPreKeyBundle> parsePreKeyResponse(Node response) {
+    @WhatsAppWebExport(moduleName = "WAWebProcessKeyBundle",
+            exports = "splitKeyBundles",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private PreKeyBatchResult parsePreKeyResponse(Node response) {
         var result = new HashMap<Jid, SignalPreKeyBundle>();
+        var depletedPrekeyCount = 0;
 
         var listNode = response.getChild("list");
         if (listNode.isEmpty()) {
-            return result;
+            return new PreKeyBatchResult(result, 0);
         }
 
         for (var userNode : listNode.get().getChildren("user")) {
             try {
+                var deviceJid = userNode.getRequiredAttributeAsJid("jid");
+
+                // WAWebProcessKeyBundle.splitKeyBundles: !i.key && !i.wid.isBot()
+                // Counts devices whose server-side one-time pre-key pool is depleted,
+                // excluding bot JIDs which never carry one-time pre-keys.
+                if (userNode.getChild("key").isEmpty() && !deviceJid.isBot()) {
+                    depletedPrekeyCount++;
+                }
+
                 var bundle = parseUserPreKeyBundle(userNode);
                 if (bundle != null) {
-                    var deviceJid = userNode.getRequiredAttributeAsJid("jid");
                     result.put(deviceJid, bundle);
                 }
             } catch (Exception e) {
@@ -399,7 +469,7 @@ public final class DevicePreKeyHandler {
             }
         }
 
-        return result;
+        return new PreKeyBatchResult(result, depletedPrekeyCount);
     }
 
     /**
@@ -503,21 +573,25 @@ public final class DevicePreKeyHandler {
      * missing pre-key bundles.
      *
      * @param deviceJids the device JIDs to ensure sessions for
+     * @return the number of devices in the server response for which the one-time pre-key
+     *         pool was depleted (i.e. no {@code <key>} element was returned for a non-bot
+     *         device); used by the caller to emit {@code PrekeysDepletionEvent}
      * @implNote WAWebManageE2ESessionsJob.ensureE2ESessions: combines the
-     * "missing session?" filter and the fetch into a single top-level entry point.
+     * "missing session?" filter and the fetch into a single top-level entry point and
+     * returns {@code {missedPrekeyCount, depletedPrekeyCount, deletedDevices}}.
      */
     @WhatsAppWebExport(moduleName = "WAWebManageE2ESessionsJob",
             exports = "ensureE2ESessions",
             adaptation = WhatsAppAdaptation.DIRECT)
-    public void ensureSessions(Collection<Jid> deviceJids) {
+    public int ensureSessions(Collection<Jid> deviceJids) {
         // WAWebManageE2ESessionsJob.ensureE2ESessions
         // Only fetches pre-keys for devices without an existing Signal session
         var devicesNeedingSessions = findDevicesNeedingSessions(deviceJids);
         if (devicesNeedingSessions.isEmpty()) {
-            return;
+            return 0;
         }
 
-        fetchAndProcessPreKeyBundles(devicesNeedingSessions);
+        return fetchAndProcessPreKeyBundles(devicesNeedingSessions).depletedPrekeyCount();
     }
 
     /**

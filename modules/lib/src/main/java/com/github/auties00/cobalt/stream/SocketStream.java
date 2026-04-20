@@ -14,6 +14,7 @@ import com.github.auties00.cobalt.stream.call.CallStreamHandler;
 import com.github.auties00.cobalt.stream.control.ErrorStreamHandler;
 import com.github.auties00.cobalt.stream.control.FailureStreamHandler;
 import com.github.auties00.cobalt.stream.control.InfoBulletinStreamHandler;
+import com.github.auties00.cobalt.stream.control.OfflineNotificationsReporter;
 import com.github.auties00.cobalt.stream.control.StreamErrorStreamHandler;
 import com.github.auties00.cobalt.stream.control.SuccessStreamHandler;
 import com.github.auties00.cobalt.stream.control.XmlStreamEndStreamHandler;
@@ -137,6 +138,10 @@ public final class SocketStream {
      * @param companionPairingService          companion pairing service
      */
     public SocketStream(WhatsAppClient whatsapp, WhatsAppClientVerificationHandler.Web webVerificationHandler, LidMigrationService lidMigrationService, InactiveGroupLidMigrationService inactiveGroupLidMigrationService, MessageService messageService, ABPropsService abPropsService, DeviceService deviceService, WamService wamService, SnapshotRecoveryService snapshotRecoveryService, WebAppStateService webAppStateService, CompanionPairingService companionPairingService) {
+        // WAWebHandleReportServerSyncNotification: shared between the server_sync notification
+        // handler (producer) and the info-bulletin offline handler (consumer/flush) to mirror
+        // WA Web's module-scoped offlineNotificationsCount map.
+        var offlineNotificationsReporter = new OfflineNotificationsReporter(whatsapp);
         var result = new HashMap<String, Handler>();
         addHandler(result, "iq", new IqStreamHandler(whatsapp, webVerificationHandler, deviceService, snapshotRecoveryService, companionPairingService));
         addHandler(result, "message", new MessageStreamHandler(
@@ -155,9 +160,10 @@ public final class SocketStream {
                 companionPairingService,
                 lidMigrationService,
                 abPropsService,
-                deviceService
+                deviceService,
+                offlineNotificationsReporter
         ));
-        addHandler(result, "ib", new InfoBulletinStreamHandler(whatsapp, webAppStateService));
+        addHandler(result, "ib", new InfoBulletinStreamHandler(whatsapp, webAppStateService, offlineNotificationsReporter));
         addHandler(result, "success", new SuccessStreamHandler(
                 whatsapp,
                 abPropsService,

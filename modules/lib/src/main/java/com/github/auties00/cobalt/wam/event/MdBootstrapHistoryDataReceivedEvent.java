@@ -30,6 +30,9 @@ public interface MdBootstrapHistoryDataReceivedEvent extends WamEventSpec {
     @WamProperty(index = 1, type = WamType.STRING)
     Optional<String> mdSessionId();
 
+    @WamProperty(index = 8, type = WamType.STRING)
+    Optional<String> mdSyncFailureReason();
+
     @WamProperty(index = 4, type = WamType.INTEGER)
     OptionalInt mdTimestamp();
 }

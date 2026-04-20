@@ -22,6 +22,8 @@ import com.github.auties00.cobalt.model.sync.data.SyncdSnapshotRecovery;
 import com.github.auties00.cobalt.model.sync.data.SyncdSnapshotRecoverySpec;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
+import com.github.auties00.cobalt.wam.event.NonMessagePeerDataRequestEventBuilder;
+import com.github.auties00.cobalt.wam.type.PeerDataRequestType;
 import it.auties.protobuf.stream.ProtobufInputStream;
 
 import java.io.ByteArrayInputStream;
@@ -315,8 +317,9 @@ public final class SnapshotRecoveryService {
             throw new IllegalStateException("Own JID not available for snapshot recovery request");
         }
 
+        var peerMessageId = MessageIdGenerator.generate(MessageIdVersion.V2, self); // WAWebSendNonMessageDataRequest.D: yield WAWebMsgKey.newId()
         var messageKey = new MessageKeyBuilder() // WAWebSendNonMessageDataRequest.D: new WAWebMsgKey({fromMe: true, remote: getMePnUserOrThrow(), id: ...})
-                .id(MessageIdGenerator.generate(MessageIdVersion.V2, self)) // WAWebSendNonMessageDataRequest.D: yield WAWebMsgKey.newId()
+                .id(peerMessageId)
                 .parentJid(self) // WAWebSendNonMessageDataRequest.D: remote: getMePnUserOrThrow()
                 .fromMe(true) // WAWebSendNonMessageDataRequest.D: fromMe: true
                 .senderJid(self)
@@ -325,6 +328,16 @@ public final class SnapshotRecoveryService {
                 .key(messageKey)
                 .message(messageContainer)
                 .build();
+        // WAWebNonMessageDataRequestLoggingUtils.logNonMessagePeerDataRequest: emitted for every
+        // fanout message in WAWebSendNonMessageDataRequest.sendPeerDataOperationRequest. For
+        // COMPANION_SYNCD_SNAPSHOT_FATAL_RECOVERY WAWebNonMessageDataRequestLoggingUtils.d returns 1,
+        // WAWebNonMessageDataRequestLoggingUtils.m maps to PEER_DATA_REQUEST_TYPE.SYNCD_SNAPSHOT_RECOVERY,
+        // and peerDataRequestSessionId is the outbound peer message key id (t.id.id).
+        client.wamService().commit(new NonMessagePeerDataRequestEventBuilder()
+                .peerDataRequestCount(1)
+                .peerDataRequestType(PeerDataRequestType.SYNCD_SNAPSHOT_RECOVERY)
+                .peerDataRequestSessionId(peerMessageId)
+                .build());
         client.sendPeerMessage(primaryDevice, messageInfo); // WAWebSendNonMessageDataRequest.sendPeerDataOperationRequest -> WAWebSendAppStateSyncMsgJob.encryptAndSendKeyMsg({msg: t, pushPriority: null, privacySensitive: undefined})
     }
 

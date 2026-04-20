@@ -1959,17 +1959,23 @@ public final class DeviceService {
      * list.  Devices that already have established sessions are skipped.
      *
      * @param deviceJids the device JIDs to ensure sessions for
+     * @return the number of devices in the server response for which the one-time
+     *         pre-key pool was depleted (no {@code <key>} element returned for a
+     *         non-bot device); callers should pass this count to
+     *         {@link com.github.auties00.cobalt.wam.WamService#commit} via
+     *         {@link com.github.auties00.cobalt.wam.event.PrekeysDepletionEventBuilder}
+     *         to mirror {@code WAWebPostPrekeysDepletionMetric.maybePostPrekeysDepletionMetric}.
      *
      * @implNote WAWebSendMsgCreateFanoutStanza.createFanoutMsgStanza:
      * calls {@code ensureE2ESessions(devices)} before encrypting.
      * WAWebManageE2ESessionsJob.ensureE2ESessions: deduplicates concurrent session
-     * establishment requests.
+     * establishment requests and returns the depleted pre-key count.
      */
     @WhatsAppWebExport(moduleName = "WAWebManageE2ESessionsJob",
             exports = "ensureE2ESessions",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public void ensureSessions(Collection<Jid> deviceJids) {
-        preKeyHandler.ensureSessions(deviceJids);
+    public int ensureSessions(Collection<Jid> deviceJids) {
+        return preKeyHandler.ensureSessions(deviceJids);
     }
 
     /**

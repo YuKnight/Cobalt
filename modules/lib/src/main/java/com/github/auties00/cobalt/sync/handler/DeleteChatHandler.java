@@ -332,7 +332,9 @@ public final class DeleteChatHandler implements WebAppStateActionHandler {
      * <p>In Cobalt the caller supplies the message range because Cobalt does
      * not maintain the active-message-range infrastructure (browser-specific
      * IndexedDB concern). The WAM telemetry commit
-     * ({@code MdSyncdDogfoodingFeatureUsageWamEvent}) is intentionally omitted.
+     * ({@code MdSyncdDogfoodingFeatureUsageWamEvent}) is performed at the caller
+     * ({@code WhatsAppClient.deleteChat}) since this method has no
+     * {@link com.github.auties00.cobalt.wam.WamService} handle.
      *
      * @implNote WAWebDeleteChatSync.getDeleteChatMutation,
      *           WAWebDeleteChatSync.buildDeleteChatMutation,

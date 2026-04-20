@@ -9,6 +9,7 @@ import com.github.auties00.cobalt.model.jid.migration.PhoneNumberToLIDMapping;
 import com.github.auties00.cobalt.model.media.MediaVisibility;
 import com.github.auties00.cobalt.model.media.StickerMetadata;
 import com.github.auties00.cobalt.model.message.PrivacySystemMessage;
+import com.github.auties00.cobalt.model.message.system.history.HistorySyncType;
 import com.github.auties00.cobalt.model.setting.GlobalSettings;
 import com.github.auties00.cobalt.model.setting.WallpaperSettings;
 import com.github.auties00.collections.ConcurrentLinkedHashMap;
@@ -947,70 +948,6 @@ public abstract sealed class HistorySync {
 
         /**
          * Returns the protobuf wire index of this state.
-         *
-         * @return the protobuf enum index
-         */
-        public int index() {
-            return this.index;
-        }
-    }
-
-    /**
-     * Kind of history sync represented by the enclosing payload.
-     *
-     * <p>Different types drive different receive-side workflows: bootstrapping
-     * from scratch, streaming the user's full archive, refreshing only recent
-     * messages, delivering push-name updates, shipping non-blocking metadata,
-     * or answering an explicit on-demand history request.
-     */
-    @ProtobufEnum(name = "HistorySync.HistorySyncType")
-    public enum HistorySyncType {
-        /**
-         * Initial onboarding chunk carrying the minimum needed to render the
-         * account.
-         */
-        INITIAL_BOOTSTRAP(0),
-        /**
-         * Initial status-v3 stream.
-         */
-        INITIAL_STATUS_V3(1),
-        /**
-         * Full history transfer, including all chats and messages.
-         */
-        FULL(2),
-        /**
-         * Recent-history transfer (bounded time window).
-         */
-        RECENT(3),
-        /**
-         * Push-name update stream.
-         */
-        PUSH_NAME(4),
-        /**
-         * Non-blocking metadata chunk that can be applied asynchronously.
-         */
-        NON_BLOCKING_DATA(5),
-        /**
-         * On-demand response to an explicit history request from the client.
-         */
-        ON_DEMAND(6);
-
-        /**
-         * Constructs a history-sync type constant.
-         *
-         * @param index the protobuf wire index
-         */
-        HistorySyncType(@ProtobufEnumIndex int index) {
-            this.index = index;
-        }
-
-        /**
-         * Protobuf wire index for this type.
-         */
-        final int index;
-
-        /**
-         * Returns the protobuf wire index of this type.
          *
          * @return the protobuf enum index
          */

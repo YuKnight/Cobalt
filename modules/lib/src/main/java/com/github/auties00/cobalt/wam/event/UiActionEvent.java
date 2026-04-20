@@ -94,4 +94,7 @@ public interface UiActionEvent extends WamEventSpec {
 
     @WamProperty(index = 27, type = WamType.STRING)
     Optional<String> unifiedSessionId();
+
+    @WamProperty(index = 28, type = WamType.INTEGER)
+    OptionalInt traceIdInt();
 }

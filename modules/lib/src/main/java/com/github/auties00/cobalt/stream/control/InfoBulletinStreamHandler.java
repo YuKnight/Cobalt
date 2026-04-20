@@ -10,6 +10,7 @@ import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.stream.SocketStream;
 import com.github.auties00.cobalt.sync.WebAppStateService;
+import com.github.auties00.cobalt.wam.event.MdAppStateDirtyBitsEventBuilder;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -217,12 +218,29 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
     private final WebAppStateService webAppStateService;
 
     /**
+     * Shared reporter that accumulates per-collection offline
+     * {@code server_sync} notification counts in
+     * {@code NotificationSyncStreamHandler} and flushes them as a WAM event
+     * when the offline bulletin arrives.
+     *
+     * @implNote WAWebHandleReportServerSyncNotification: WA Web keeps the
+     * count map at module scope and flushes via
+     * {@code reportOfflineNotifications()}; Cobalt reifies both sides as a
+     * shared reporter object injected into producer and consumer.
+     */
+    private final OfflineNotificationsReporter offlineNotificationsReporter;
+
+    /**
      * Constructs a new info bulletin stream handler bound to the supplied
      * client and web app-state service.
      *
-     * @param whatsapp           the WhatsApp client instance, must not be {@code null}
-     * @param webAppStateService the web app-state service used for orphan
-     *                           mutation retries, must not be {@code null}
+     * @param whatsapp                     the WhatsApp client instance, must not be {@code null}
+     * @param webAppStateService           the web app-state service used for orphan
+     *                                     mutation retries, must not be {@code null}
+     * @param offlineNotificationsReporter the shared reporter used to flush
+     *                                     accumulated offline {@code server_sync}
+     *                                     notification counts as a WAM event when the
+     *                                     offline bulletin arrives, must not be {@code null}
      * @implNote WAWebHandleInfoBulletin.default: the handler is registered
      * by {@code WADeprecatedWapParser("infoBulletinParser", ...)}; Cobalt
      * registers handlers as {@link SocketStream.Handler} implementations
@@ -230,9 +248,10 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleInfoBulletin", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public InfoBulletinStreamHandler(WhatsAppClient whatsapp, WebAppStateService webAppStateService) {
+    public InfoBulletinStreamHandler(WhatsAppClient whatsapp, WebAppStateService webAppStateService, OfflineNotificationsReporter offlineNotificationsReporter) {
         this.whatsapp = whatsapp;
         this.webAppStateService = webAppStateService;
+        this.offlineNotificationsReporter = offlineNotificationsReporter;
     }
 
     /**
@@ -449,7 +468,16 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
         if (!collectionsToSync.isEmpty()) {
             whatsapp.store().setSyncedWebAppState(false); // ADAPTED: Cobalt gate that lets the next app-state consumer re-pull
             // WAWebHandleDirtyBits.p: WAWebSyncd.markCollectionsForSync(...)
-            whatsapp.pullWebAppState(collectionsToSync.toArray(SyncPatchType[]::new));
+            // WAWebHandleDirtyBits.p: BackendEventBus.onceAppStateSyncCompleted(e => {
+            //   var t = e.some(r => r.patches?.length > 0 || r.snapshot != null);
+            //   new MdAppStateDirtyBitsWamEvent({dirtyBitsFalsePositive: !t}).commit()
+            // });
+            // In Cobalt pullWebAppState is synchronous (virtual thread) and returns the
+            // Cobalt equivalent of `e.some(...)` directly.
+            var hasAppStateChanges = whatsapp.pullWebAppState(collectionsToSync.toArray(SyncPatchType[]::new));
+            whatsapp.wamService().commit(new MdAppStateDirtyBitsEventBuilder() // WAWebHandleDirtyBits.p: new MdAppStateDirtyBitsWamEvent({dirtyBitsFalsePositive: !t}).commit()
+                    .dirtyBitsFalsePositive(!hasAppStateChanges)
+                    .build());
         }
 
         clearDirtyBits(allDirtyEntries); // WAWebHandleDirtyBits.handleDirtyBits: return WAWebClearDirtyBitsJob.clearDirtyBits(d)
@@ -582,6 +610,7 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
         var count = offlineNode.getAttributeAsInt("count", 0); // WAWebHandleInfoBulletin.default parser: e.child(OFFLINE).attrInt("count")
         LOGGER.log(System.Logger.Level.DEBUG,
                 "Received offline bulletin with count={0}", count);
+        offlineNotificationsReporter.report(); // WAWebHandleInfoBulletin.default dispatch: WAWebHandleReportServerSyncNotification.reportOfflineNotifications()
         if (count == 0) { // WAWebMessageDedupUtils.maybeClearPendingMessages: if (count === 0) clear the pending cache
             webAppStateService.retryAllOrphanMutations(); // ADAPTED: Cobalt retries orphan mutations when the backlog is empty; WA Web only clears the dedup cache
         }

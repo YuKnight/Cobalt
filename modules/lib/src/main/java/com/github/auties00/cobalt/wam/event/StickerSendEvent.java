@@ -39,6 +39,9 @@ public interface StickerSendEvent extends WamEventSpec {
     @WamProperty(index = 9, type = WamType.BOOLEAN)
     Optional<Boolean> stickerIsLottie();
 
+    @WamProperty(index = 15, type = WamType.BOOLEAN)
+    Optional<Boolean> stickerIsPremium();
+
     @WamProperty(index = 11, type = WamType.BOOLEAN)
     Optional<Boolean> stickerIsTenor();
 

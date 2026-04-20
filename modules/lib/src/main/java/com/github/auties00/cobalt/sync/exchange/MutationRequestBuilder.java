@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.exchange;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.exception.WhatsAppMediaException;
 import com.github.auties00.cobalt.exception.WhatsAppWebAppStateSyncException;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
@@ -26,9 +27,15 @@ import com.github.auties00.cobalt.sync.crypto.MutationIntegrityVerifier;
 import com.github.auties00.cobalt.sync.crypto.MutationKeys;
 import com.github.auties00.cobalt.sync.crypto.MutationLTHash;
 import com.github.auties00.cobalt.sync.key.SyncKeyUtils;
+import com.github.auties00.cobalt.wam.event.MediaUpload2EventBuilder;
+import com.github.auties00.cobalt.wam.type.MediaType;
+import com.github.auties00.cobalt.wam.type.MediaUploadModeType;
+import com.github.auties00.cobalt.wam.type.MediaUploadResultType;
+import com.github.auties00.cobalt.wam.type.UploadOriginType;
 
 import java.io.ByteArrayInputStream;
 import java.security.GeneralSecurityException;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.logging.Logger;
@@ -764,6 +771,7 @@ public final class MutationRequestBuilder {
         // ADAPTED: WAWebSyncdMMSUpload.uploadPatch — uploadSyncExternalPatch(e)
         // WAWebSyncdNetCallbacksApi.uploadSyncExternalPatch — encryptAndUpload({blob, type:"md-app-state", ...})
         var externalRef = new ExternalBlobReferenceBuilder().build();
+        var uploadStart = Instant.now();
         try {
             var uploaded = whatsapp.store()
                     .awaitMediaConnection()
@@ -772,15 +780,186 @@ public final class MutationRequestBuilder {
                 // WAWebSyncdNetCallbacksApi.uploadSyncExternalPatch — if (handle == null) throw err("Missing handle after uploading external patch to mms4")
                 throw new IllegalStateException("Missing handle after uploading external patch to mms4");
             }
+            commitMediaUpload2Success(uploadStart); // WAWebCreateMediaUploadMetrics.handleUploadSuccess
             return externalRef; // ADAPTED: WAWebSyncdMMSUpload.buildExternalBlobReference — fields populated by upload service
         } catch (InterruptedException exception) {
+            commitMediaUpload2Failure(uploadStart, exception); // WAWebCreateMediaUploadMetrics.handleUploadError
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Interrupted while uploading external mutations", exception);
         } catch (IllegalStateException exception) {
+            commitMediaUpload2Failure(uploadStart, exception); // WAWebCreateMediaUploadMetrics.handleUploadError
             throw exception;
         } catch (Throwable throwable) {
+            commitMediaUpload2Failure(uploadStart, throwable); // WAWebCreateMediaUploadMetrics.handleUploadError
             throw new IllegalStateException("Failed to upload external mutations", throwable);
         }
+    }
+
+    /**
+     * Commits a successful {@code MediaUpload2Event} for an app-state external
+     * patch upload.
+     *
+     * <p>Mirrors the terminal success path of
+     * {@code WAWebCreateMediaUploadMetrics.handleUploadSuccess} (the {@code f}
+     * handler returned by the metrics factory): sets
+     * {@code overallUploadResult=OK}, {@code overallIsFinal=true}, the
+     * {@code resumeHttpCode/uploadHttpCode/finalizeHttpCode} HTTP codes, and
+     * the factory-seeded descriptors (mediaType, upload origin, upload mode,
+     * mms version). The WA Web factory seeds additional transient timers via
+     * {@code markOverallCumT}; Cobalt collapses the CDN upload into one
+     * {@code MediaConnection.upload} call and reports the end-to-end duration
+     * as {@code overallT}.
+     *
+     * @implNote WAWebCreateMediaUploadMetrics.handleUploadSuccess invoked from
+     * WAWebSyncdNetCallbacksApi.uploadSyncExternalPatch via
+     * WAWebUploadManager.encryptAndUpload with {@code type="md-app-state"} and
+     * {@code uploadOrigin=UNKNOWN} (the Web reference passes
+     * {@code UPLOAD_ORIGIN.UNKNOWN} because app-state uploads are not bound to
+     * a chat; Cobalt reports {@code MESSAGE_HISTORY_SYNC} to align with the
+     * download-side {@code MediaDownload2Event} that the same flow emits).
+     * @param uploadStart the instant at which the upload attempt began
+     */
+    @WhatsAppWebExport(moduleName = "WAWebCreateMediaUploadMetrics",
+            exports = "default",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private void commitMediaUpload2Success(Instant uploadStart) {
+        var overallT = Instant.ofEpochMilli(Duration.between(uploadStart, Instant.now()).toMillis());
+        whatsapp.wamService().commit(new MediaUpload2EventBuilder()
+                .overallMediaType(MediaType.MD_APP_STATE)
+                .overallMmsVersion(4)
+                .overallUploadOrigin(UploadOriginType.MESSAGE_HISTORY_SYNC)
+                .overallUploadMode(MediaUploadModeType.REGULAR)
+                .overallUploadResult(MediaUploadResultType.OK)
+                .overallIsFinal(Boolean.TRUE)
+                .resumeHttpCode(404)
+                .uploadHttpCode(200)
+                .finalizeHttpCode(200)
+                .overallT(overallT)
+                .overallAttemptCount(1)
+                .overallRetryCount(0)
+                .build());
+    }
+
+    /**
+     * Commits a failing {@code MediaUpload2Event} for an app-state external
+     * patch upload.
+     *
+     * <p>Mirrors the terminal error path of
+     * {@code WAWebCreateMediaUploadMetrics.handleUploadError} (the {@code g}
+     * handler returned by the metrics factory): classifies the thrown error
+     * into a {@link MediaUploadResultType} via the equivalent of
+     * {@code WAWebWamMediaMetricUtils.getMetricUploadErrorResultType}, sets
+     * {@code overallIsFinal=true}, and when the error carries an HTTP status
+     * code records it on {@code uploadHttpCode} and {@code finalizeHttpCode}
+     * (matching the {@code u.uploadHttpCode = n; u.finalizeHttpCode = n}
+     * assignments in the WA Web reference).
+     *
+     * @implNote WAWebCreateMediaUploadMetrics.handleUploadError invoked from
+     * WAWebSyncdNetCallbacksApi.uploadSyncExternalPatch when the underlying
+     * {@code encryptAndUpload} call rejects.
+     * @param uploadStart the instant at which the upload attempt began
+     * @param throwable   the error that aborted the upload
+     */
+    @WhatsAppWebExport(moduleName = "WAWebCreateMediaUploadMetrics",
+            exports = "default",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebWamMediaMetricUtils",
+            exports = "getMetricUploadErrorResultType",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private void commitMediaUpload2Failure(Instant uploadStart, Throwable throwable) {
+        var overallT = Instant.ofEpochMilli(Duration.between(uploadStart, Instant.now()).toMillis());
+        var builder = new MediaUpload2EventBuilder()
+                .overallMediaType(MediaType.MD_APP_STATE)
+                .overallMmsVersion(4)
+                .overallUploadOrigin(UploadOriginType.MESSAGE_HISTORY_SYNC)
+                .overallUploadMode(MediaUploadModeType.REGULAR)
+                .overallUploadResult(classifyMediaUploadError(throwable))
+                .overallIsFinal(Boolean.TRUE)
+                .overallT(overallT)
+                .overallAttemptCount(1)
+                .overallRetryCount(0);
+        var statusCode = extractUploadHttpStatusCode(throwable);
+        if (statusCode != null) {
+            builder.uploadHttpCode(statusCode);
+            builder.finalizeHttpCode(statusCode);
+        }
+        whatsapp.wamService().commit(builder.build());
+    }
+
+    /**
+     * Classifies a thrown upload error into a {@link MediaUploadResultType}.
+     *
+     * <p>The WA Web reference inspects the error's prototype chain
+     * ({@code MMSThrottleError}, {@code MMSUnauthorizedError},
+     * {@code MediaTooLargeError}, {@code MediaInvalidError}, generic
+     * {@code HttpStatusCodeError}); Cobalt collapses the MMS error classes
+     * into {@link WhatsAppMediaException.Upload} with an optional HTTP status
+     * code, so the classifier dispatches on the status code when present.
+     *
+     * @implNote WAWebWamMediaMetricUtils.getMetricUploadErrorResultType.
+     * @param throwable the error that aborted the upload
+     * @return the matching {@link MediaUploadResultType}
+     */
+    @WhatsAppWebExport(moduleName = "WAWebWamMediaMetricUtils",
+            exports = "getMetricUploadErrorResultType",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private MediaUploadResultType classifyMediaUploadError(Throwable throwable) {
+        if (throwable instanceof InterruptedException) {
+            return MediaUploadResultType.ERROR_CANCEL;
+        }
+        if (throwable instanceof WhatsAppMediaException.Upload uploadException) {
+            var statusCode = uploadException.httpStatusCode();
+            if (statusCode.isPresent()) {
+                return switch (statusCode.getAsInt()) {
+                    case 401 -> MediaUploadResultType.ERROR_REQUEST;
+                    case 413 -> MediaUploadResultType.ERROR_TOO_LARGE;
+                    case 415 -> MediaUploadResultType.ERROR_BAD_MEDIA;
+                    case 507 -> MediaUploadResultType.ERROR_THROTTLE;
+                    default -> {
+                        if (statusCode.getAsInt() >= 500) {
+                            yield MediaUploadResultType.ERROR_SERVER;
+                        }
+                        yield MediaUploadResultType.ERROR_UPLOAD;
+                    }
+                };
+            }
+            return MediaUploadResultType.ERROR_UPLOAD;
+        }
+        if (throwable instanceof WhatsAppMediaException) {
+            return MediaUploadResultType.ERROR_UPLOAD;
+        }
+        return MediaUploadResultType.ERROR_UNKNOWN;
+    }
+
+    /**
+     * Extracts the HTTP status code carried by an upload error, if any.
+     *
+     * <p>Mirrors {@code WAWebWamMediaMetricUtils.getStatusCode}, which reads
+     * the {@code status} attribute from {@code HttpStatusCodeError} instances.
+     *
+     * @implNote WAWebWamMediaMetricUtils.getStatusCode.
+     * @param throwable the error to inspect
+     * @return the HTTP status code, or {@code null} when the error does not
+     *         carry one
+     */
+    @WhatsAppWebExport(moduleName = "WAWebWamMediaMetricUtils",
+            exports = "getStatusCode",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private Integer extractUploadHttpStatusCode(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (current instanceof WhatsAppMediaException mediaException) {
+                var statusCode = mediaException.httpStatusCode();
+                if (statusCode.isPresent()) {
+                    return statusCode.getAsInt();
+                }
+            }
+            if (current.getCause() == current) {
+                break;
+            }
+            current = current.getCause();
+        }
+        return null;
     }
 
     /**

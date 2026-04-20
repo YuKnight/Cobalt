@@ -14,6 +14,9 @@ public interface ThreadInteractionDataAiEvent extends WamEventSpec {
     @WamProperty(index = 1, type = WamType.ENUM)
     Optional<AiChatOriginsType> aiChatOrigins();
 
+    @WamProperty(index = 29, type = WamType.STRING)
+    Optional<String> aiDiscoveryTab();
+
     @WamProperty(index = 2, type = WamType.INTEGER)
     OptionalInt bottomSheetAnimatedSent();
 

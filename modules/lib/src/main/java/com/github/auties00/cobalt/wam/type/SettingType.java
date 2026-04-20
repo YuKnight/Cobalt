@@ -35,5 +35,7 @@ public enum SettingType {
     @WamEnumConstant(27) IS_GROUP_REACTIONS_NOTIFICATION_ENABLED,
     @WamEnumConstant(28) IS_STATUS_NOTIFICATION_ENABLED,
     @WamEnumConstant(29) STATUS_NOTIFICATION_TONE_ID,
-    @WamEnumConstant(30) SHOULD_PLAY_SOUND_FOR_CALL_NOTIFICATION
+    @WamEnumConstant(30) SHOULD_PLAY_SOUND_FOR_CALL_NOTIFICATION,
+    @WamEnumConstant(31) CHAT_THEME_ID,
+    @WamEnumConstant(32) COLOR_SCHEME_ID
 }

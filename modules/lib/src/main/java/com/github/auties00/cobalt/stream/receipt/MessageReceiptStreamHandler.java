@@ -4,6 +4,7 @@ import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.message.MessageService;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.model.device.DeviceConstants;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.MessageInfo;
 import com.github.auties00.cobalt.model.message.MessageReceipt;
@@ -14,6 +15,11 @@ import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.stream.SocketStream;
+import com.github.auties00.cobalt.wam.event.MdRetryFromUnknownDeviceEventBuilder;
+import com.github.auties00.cobalt.wam.event.ReceiptStanzaReceiveEventBuilder;
+import com.github.auties00.cobalt.wam.type.DeviceType;
+import com.github.auties00.cobalt.wam.type.MessageType;
+import com.github.auties00.cobalt.wam.type.ReceiptStanzaStage;
 import com.github.auties00.libsignal.SignalSessionCipher;
 import com.github.auties00.libsignal.key.SignalIdentityPublicKey;
 import com.github.auties00.libsignal.state.SignalPreKeyBundleBuilder;
@@ -39,6 +45,7 @@ import java.util.Objects;
 @WhatsAppWebModule(moduleName = "WAWebHandleMsgReceiptParser")
 @WhatsAppWebModule(moduleName = "WAWebHandleMessageRetryRequest")
 @WhatsAppWebModule(moduleName = "WAWebHandleRetryRequest")
+@WhatsAppWebModule(moduleName = "WAWebRetryRequestParser")
 public final class MessageReceiptStreamHandler implements SocketStream.Handler {
     /**
      * Logger instance for this handler.
@@ -98,6 +105,16 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
             return;
         }
 
+        // WAWebCreateReceiptStanzaReceiveMetric.createReceiptStanzaReceiveMetric:
+        // construct the ReceiptStanzaReceive metric with OVERALL stage and
+        // default totalCount=1, and start its duration timer. Commit is deferred
+        // until after parse/process, and only happens for non-offline receipts
+        // (WAWebHandleMsgReceipt.b: "u==null && t(a)").
+        var receiptMetric = new ReceiptStanzaReceiveEventBuilder()
+                .receiptStanzaStage(ReceiptStanzaStage.OVERALL)
+                .receiptStanzaTotalCount(1)
+                .startReceiptStanzaDuration();
+
         var parsed = parseReceipt(node);
         if (parsed == null) {
             sendAck(node, null);
@@ -107,6 +124,7 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
         // WAWebHandleMsgReceipt.default: CONTENT_GONE skips processing, only sends ack
         if (parsed instanceof SimpleReceipt simple && simple.ack() == ReceiptAck.CONTENT_GONE) {
             sendAck(node, parsed);
+            commitReceiptMetric(receiptMetric, parsed);
             return;
         }
 
@@ -124,6 +142,113 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
         }
 
         sendAck(node, parsed);
+        commitReceiptMetric(receiptMetric, parsed);
+    }
+
+    /**
+     * Populates the parsed-receipt-dependent fields on the supplied
+     * {@link ReceiptStanzaReceiveEventBuilder} and commits the event.
+     * <p>
+     * Mirrors the closure returned by
+     * {@code WAWebCreateReceiptStanzaReceiveMetric.createReceiptStanzaReceiveMetric}:
+     * derives {@code messageType} from the {@code from} JID, sets
+     * {@code receiptStanzaType} to the raw ack string (or {@code "delivery"} when
+     * absent, per {@code WAWebAck.ACK_STRING.DELIVERY}), overrides the default
+     * {@code receiptStanzaTotalCount} of {@code 1} with the external id count
+     * for simple receipts when available, stops the duration timer, and
+     * commits. The caller gates the commit on the stanza's {@code offline}
+     * attribute being absent, matching WA Web's
+     * {@code u==null && t(a)} guard in {@code WAWebHandleMsgReceipt.b}.
+     *
+     * @param builder the pre-populated event builder returned by
+     *                {@link #handle(Node)}
+     * @param parsed  the parsed receipt carrying {@code from},
+     *                {@code ackString}, {@code offline}, and (for simple
+     *                receipts) the external id list
+     * @implNote WAWebCreateReceiptStanzaReceiveMetric.createReceiptStanzaReceiveMetric,
+     *           WAWebHandleMsgReceipt.b (commit gate)
+     */
+    private void commitReceiptMetric(ReceiptStanzaReceiveEventBuilder builder, ParsedReceipt parsed) {
+        // WAWebHandleMsgReceipt.b: commit only when the stanza-level offline
+        // attribute was absent. Cobalt records that attribute via
+        // ReceiptLike.offline() (true when the <receipt> carried offline="...").
+        if (parsed.offline()) {
+            return;
+        }
+
+        // WAWebCreateReceiptStanzaReceiveMetric: e.messageType = s(from)
+        builder.messageType(resolveMessageType(parsed.from()));
+
+        // WAWebCreateReceiptStanzaReceiveMetric: receiptStanzaType defaults to
+        // ACK_STRING.DELIVERY ("delivery") when ackString is null; otherwise it
+        // is the raw type string when it matches a known RECEIPT_TYPES_TO_ACK
+        // entry. Cobalt's parser normalises unknown strings to RECEIVED, so we
+        // simply propagate the original ackString when present.
+        var ackString = parsed.ackString();
+        builder.receiptStanzaType(ackString != null ? ackString : "delivery");
+
+        // WAWebCreateReceiptStanzaReceiveMetric:
+        // (receipts?.length) != null && (receiptStanzaTotalCount = receipts.length)
+        // WA Web's parser only attaches a "receipts" array to aggregated-by-type
+        // and aggregated-by-message receipts (each entry corresponds to one
+        // <user> child). Simple receipts never populate that field, so the
+        // default count of 1 is retained by WA Web even when the <list>
+        // contains multiple <item>s. Cobalt mirrors that exactly.
+        switch (parsed) {
+            case AggregatedByTypeReceipt aggregatedByType ->
+                    builder.receiptStanzaTotalCount(aggregatedByType.receipts().size());
+            case AggregatedByMessageReceipt aggregatedByMessage ->
+                    builder.receiptStanzaTotalCount(aggregatedByMessage.receipts().size());
+            case SimpleReceipt ignored -> {
+                // WA Web: leave the default totalCount of 1 in place for simple receipts
+            }
+        }
+
+        // WAWebCreateReceiptStanzaReceiveMetric: e.markReceiptStanzaDuration();
+        // e.commit()
+        builder.stopReceiptStanzaDuration();
+        whatsapp.wamService().commit(builder.build());
+    }
+
+    /**
+     * Resolves the {@link MessageType} WAM enum value for a receipt's
+     * {@code from} JID, mirroring the {@code s(e)} helper in
+     * {@code WAWebCreateReceiptStanzaReceiveMetric}.
+     * <p>
+     * The status broadcast account is checked first (because it is also a
+     * broadcast-server JID), followed by group/community, broadcast, and
+     * newsletter server checks. Any other JID falls through to
+     * {@link MessageType#INDIVIDUAL}.
+     *
+     * @param from the {@code from} attribute of the incoming receipt
+     *             stanza
+     * @return the resolved WAM message-type classification
+     * @implNote WAWebCreateReceiptStanzaReceiveMetric.s,
+     *           WAWebWid.isStatus, WAWebWid.isGroup, WAWebWid.isBroadcast,
+     *           WAWebWid.isNewsletter
+     */
+    private static MessageType resolveMessageType(Jid from) {
+        if (from == null) {
+            return MessageType.INDIVIDUAL;
+        }
+        // WAWebCreateReceiptStanzaReceiveMetric.s: WAWebWid.isStatus -> STATUS
+        if (from.isStatusBroadcastAccount()) {
+            return MessageType.STATUS;
+        }
+        // WAWebCreateReceiptStanzaReceiveMetric.s: WAWebWid.isGroup -> GROUP
+        if (from.hasGroupOrCommunityServer()) {
+            return MessageType.GROUP;
+        }
+        // WAWebCreateReceiptStanzaReceiveMetric.s: WAWebWid.isBroadcast -> BROADCAST
+        if (from.hasBroadcastServer()) {
+            return MessageType.BROADCAST;
+        }
+        // WAWebCreateReceiptStanzaReceiveMetric.s: WAWebWid.isNewsletter -> CHANNEL
+        if (from.hasNewsletterServer()) {
+            return MessageType.CHANNEL;
+        }
+        // WAWebCreateReceiptStanzaReceiveMetric.s: fallback INDIVIDUAL
+        return MessageType.INDIVIDUAL;
     }
 
     /**
@@ -292,7 +417,31 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
             return;
         }
 
-        processRetryKeyBundle(node, participant != null ? participant : from);
+        // WAWebHandleRetryRequest.E (k function): h = chat.isUser() ? t.from : t.participant
+        // In the stanza layout, user/bot 1:1 retries have participant == null and the top-level
+        // from is the requester device; group/broadcast retries carry the device in participant
+        // and the group JID in from. Using "participant ?? from" mirrors the WA Web selection.
+        var requester = participant != null ? participant : from;
+        if (requester == null) {
+            LOGGER.log(System.Logger.Level.DEBUG,
+                    "handleRetryRequest: no requester found for incoming retry request");
+            return;
+        }
+
+        // WAWebHandleRetryRequest.E (k function): y = h.device || 0;
+        // if (!hasDevice(h, y)) { ...sendLogs(...); new MdRetryFromUnknownDeviceWamEvent({...}).commit(); return; }
+        var deviceId = Math.max(requester.device(), 0);
+        if (!isDeviceKnown(requester, deviceId)) {
+            LOGGER.log(System.Logger.Level.DEBUG,
+                    "handleRetryRequest: device {0} not found for {1}",
+                    deviceId, requester.user());
+            // WAWebRetryRequestParser: offline = receipt.hasAttr("offline")
+            var offline = node.hasAttribute("offline");
+            emitRetryFromUnknownDevice(deviceId, offline);
+            return;
+        }
+
+        processRetryKeyBundle(node, requester);
         if (originalId == null) {
             return;
         }
@@ -432,6 +581,61 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
         } catch (Throwable ignored) {
             // ADAPTED: WAWebHandleRetryRequest — WA Web logs warning but continues
         }
+    }
+
+    /**
+     * Determines whether the requester device is present in the cached device list
+     * for the user identified by {@code requester}.
+     * <p>
+     * Mirrors {@code WAWebApiDeviceList.hasDevice}: the primary device (id
+     * {@link DeviceConstants#PRIMARY_DEVICE_ID}) is always considered known; any
+     * other device id is resolved against the device list stored for the user JID.
+     *
+     * @param requester the device-level JID whose presence is being checked
+     * @param deviceId  the device id to locate; {@code 0} means primary
+     * @return {@code true} if the device is known for the user; {@code false} otherwise
+     * @implNote WAWebApiDeviceList.hasDevice — Cobalt inlines the lookup rather
+     *           than depending on {@code DeviceService} to keep this handler
+     *           decoupled from the device-service constructor parameter graph.
+     */
+    private boolean isDeviceKnown(Jid requester, int deviceId) {
+        // WAWebApiDeviceList.hasDevice: primary device always exists
+        if (deviceId == DeviceConstants.PRIMARY_DEVICE_ID) {
+            return true;
+        }
+        // WAWebApiDeviceList.hasDevice: check cached device list for the user JID
+        var deviceList = whatsapp.store().findDeviceList(requester.toUserJid()).orElse(null);
+        if (deviceList == null || deviceList.deleted()) {
+            return false;
+        }
+        return deviceList.devices().stream().anyMatch(device -> device.id() == deviceId);
+    }
+
+    /**
+     * Emits the {@code MdRetryFromUnknownDevice} WAM event to signal that a retry
+     * receipt referenced a device that is not present in the cached device list.
+     * <p>
+     * The {@code senderType} is {@code PRIMARY} when the requester device id equals
+     * {@link DeviceConstants#PRIMARY_DEVICE_ID} ({@code 0}), and {@code COMPANION}
+     * otherwise.
+     *
+     * @param deviceId the requester device id read from the retry stanza
+     * @param offline  whether the original {@code <receipt>} stanza carried the
+     *                 {@code offline} attribute (i.e. the retry was delivered from
+     *                 the offline-processing queue)
+     * @implNote WAWebHandleRetryRequest.E — emission line
+     *           {@code new MdRetryFromUnknownDeviceWamEvent({offline, senderType}).commit()}
+     */
+    private void emitRetryFromUnknownDevice(int deviceId, boolean offline) {
+        // WAWebHandleRetryRequest.E: senderType = y === WAJids.DEFAULT_DEVICE_ID ? PRIMARY : COMPANION
+        var senderType = deviceId == DeviceConstants.PRIMARY_DEVICE_ID
+                ? DeviceType.PRIMARY
+                : DeviceType.COMPANION;
+        // WAWebHandleRetryRequest.E: new MdRetryFromUnknownDeviceWamEvent({offline, senderType}).commit()
+        whatsapp.wamService().commit(new MdRetryFromUnknownDeviceEventBuilder()
+                .offline(offline)
+                .senderType(senderType)
+                .build());
     }
 
     /**

@@ -4,7 +4,9 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.util.DataUtils;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -70,24 +72,64 @@ final class WamPrivateStatsId {
 
     /**
      * Rotates any identifiers whose rotation period has elapsed and
-     * returns a snapshot of the current hash-int-to-value mapping.
+     * returns metadata for each rotation group whose value was
+     * regenerated in this call.
      *
-     * @return an unmodifiable map from hash integer to the current
-     *         hex identifier value
+     * <p>This is used by the WAM pipeline to emit a
+     * {@code PsIdUpdateEvent} with action {@code ROTATED} for each
+     * regenerated entry, mirroring the per-rotation
+     * {@code logPsIdUpdate} calls in
+     * {@code WAWebWamPrivateStats}'s internal rotate function.
+     *
+     * @return the list of rotation group descriptors (hash integer and
+     *         rotation period in days) that were regenerated, possibly
+     *         empty
      */
-    Map<Integer, String> rotateAndGet() {
+    List<RotationInfo> rotateAndReportChanges() {
+        return rotate();
+    }
+
+    /**
+     * Returns a snapshot of every rotation group descriptor currently
+     * held (hash integer and rotation period in days).
+     *
+     * <p>This is used at WAM service initialization to emit a
+     * {@code PsIdUpdateEvent} with action {@code CREATED} for each
+     * entry, mirroring the per-new-entry {@code logPsIdUpdate} calls
+     * in {@code WAWebWamPrivateStats.initPrivateStats}. Because Cobalt
+     * does not persist PS IDs across sessions, every entry is treated
+     * as freshly created on startup.
+     *
+     * @return an unmodifiable list of rotation group descriptors
+     */
+    List<RotationInfo> snapshotAll() {
+        var result = new ArrayList<RotationInfo>(entries.size());
+        for (var entry : entries.values()) {
+            result.add(new RotationInfo(entry.keyHashInt, entry.rotationDays));
+        }
+        return List.copyOf(result);
+    }
+
+    /**
+     * Performs the in-place rotation of entries whose period has
+     * elapsed and returns metadata for those that were regenerated.
+     *
+     * @return the list of rotation descriptors for entries that were
+     *         regenerated in this call
+     */
+    private List<RotationInfo> rotate() {
         var now = Instant.now().getEpochSecond();
+        var rotated = new ArrayList<RotationInfo>();
         for (var mapEntry : entries.entrySet()) {
             var entry = mapEntry.getValue();
             if (shouldRotate(entry, now)) {
                 var value = DataUtils.randomHex(32);
                 var newEntry = new Entry(entry.key, entry.keyHashInt, entry.rotationDays, value, now);
                 mapEntry.setValue(newEntry);
+                rotated.add(new RotationInfo(entry.keyHashInt, entry.rotationDays));
             }
         }
-        var result = new LinkedHashMap<Integer, String>();
-        entries.forEach((k, v) -> result.put(k, v.value));
-        return Map.copyOf(result);
+        return rotated;
     }
 
     /**
@@ -135,6 +177,20 @@ final class WamPrivateStatsId {
         var periodSeconds = entry.rotationDays * DAY_SECONDS;
         var currentPeriodStart = (nowEpochSec / periodSeconds) * periodSeconds;
         return entry.creationEpochSec < currentPeriodStart;
+    }
+
+    /**
+     * Descriptor exposed to the WAM pipeline for a rotation group that
+     * is reported as created or rotated.
+     *
+     * @param keyHashInt   the rotation group hash integer, used as the
+     *                     {@code psIdKey} on the emitted
+     *                     {@code PsIdUpdateEvent}
+     * @param rotationDays the rotation period in days, used as the
+     *                     {@code psIdRotationFrequence} on the emitted
+     *                     {@code PsIdUpdateEvent}
+     */
+    record RotationInfo(int keyHashInt, int rotationDays) {
     }
 
     /**

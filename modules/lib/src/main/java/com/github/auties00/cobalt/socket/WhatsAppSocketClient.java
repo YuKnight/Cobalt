@@ -48,6 +48,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.HexFormat;
 import java.util.Objects;
@@ -124,13 +126,13 @@ public sealed abstract class WhatsAppSocketClient {
         var transportSecurity = createTransportSecurity(tunnel, store, sslEngineFactory);
 
         return switch (platform) {
-            case WEB -> {
+            case WEB, WINDOWS -> {
                 var userAgent = store.device().toUserAgent(store.clientVersion());
                 var webSocket = new WebSocketClientLayer(transportSecurity, "/ws/chat", userAgent);
                 var whatsAppLayer = new WhatsAppSocketClientLayer(webSocket);
                 yield new Browser(store, whatsAppLayer);
             }
-            case WINDOWS, MACOS -> {
+            case MACOS -> {
                 var whatsAppLayer = new WhatsAppSocketClientLayer(transportSecurity);
                 yield new Desktop(store, whatsAppLayer);
             }
@@ -161,7 +163,8 @@ public sealed abstract class WhatsAppSocketClient {
     }
 
     private static SocketClientLayer<?> createTransportSecurity(SocketClientLayer<?> tunnel, WhatsAppStore store, WhatsAppSslEngineFactory engineFactory) {
-        if (store.device().platform() == ClientPlatformType.WEB) {
+        var platform = store.device().platform();
+        if (platform == ClientPlatformType.WEB || platform == ClientPlatformType.WINDOWS) {
             return SocketClientSecurityLayer.newTls(tunnel, engineFactory);
         }
         return SocketClientSecurityLayer.newPlain(tunnel);
@@ -250,6 +253,41 @@ public sealed abstract class WhatsAppSocketClient {
     private ByteBuffer reusableFinalChunk;
 
     /**
+     * The wall-clock duration measured from the start of
+     * {@link #connect(WhatsAppSocketListener)} until the underlying
+     * transport reports the connection as open (for WEB companions this
+     * corresponds to WebSocket upgrade completion; for MACOS/MOBILE this
+     * corresponds to the pre-tunnel TCP connect).
+     *
+     * <p>Mirrors the WA Web {@code socket_open} QPL span that
+     * {@code WAWebOpenChatSocket.B} records via
+     * {@code startPageLoadQplMeasure("socket_open")} /
+     * {@code endPageLoadQplMeasure("socket_open")} and that
+     * {@code WebcSocketConnectWamEvent.markWebcSocketConnectDuration}
+     * captures immediately after.
+     *
+     * @implNote WAWebOpenChatSocket.B — socket_open QPL span
+     */
+    private volatile Duration socketConnectDuration;
+
+    /**
+     * The wall-clock duration measured from the start of the Noise XX
+     * handshake (first byte of {@code ClientHello}) until the handshake
+     * derives the read/write keys.
+     *
+     * <p>Mirrors the WA Web {@code auth_handshake} QPL span that
+     * {@code WAWebOpenChatSocket.B} opens via
+     * {@code startPageLoadQplMeasure("auth_handshake")} just before calling
+     * {@code startWebcAuthHandshakeDuration()} and that
+     * {@code WAWebOpenChatSocket.J} closes via
+     * {@code endPageLoadQplMeasure("auth_handshake")} immediately followed
+     * by {@code markWebcAuthHandshakeDuration()}.
+     *
+     * @implNote WAWebOpenChatSocket.B, WAWebOpenChatSocket.J — auth_handshake span
+     */
+    private volatile Duration authHandshakeDuration;
+
+    /**
      * Constructs a new WhatsApp socket client with the given store and
      * WhatsApp application layer.
      *
@@ -281,8 +319,65 @@ public sealed abstract class WhatsAppSocketClient {
         this.listener = listener;
 
         var decryptingListener = new DecryptingListener();
+        // WAWebOpenChatSocket.B — startPageLoadQplMeasure("socket_open")
+        var socketOpenStart = Instant.now();
         whatsAppLayer.connect(getEndpoint(), decryptingListener);
-        connectImpl();
+        connectImpl(socketOpenStart);
+    }
+
+    /**
+     * Records that the underlying transport (WebSocket upgrade or raw TCP
+     * tunnel) has finished connecting, so that
+     * {@link #socketConnectDuration()} reflects the elapsed time between
+     * the start of {@link #connect(WhatsAppSocketListener)} and the end
+     * of the transport connect.
+     *
+     * <p>Subclasses call this at the point in
+     * {@link #connectImpl(Instant)} that corresponds to the WA Web
+     * {@code endPageLoadQplMeasure("socket_open")} /
+     * {@code markWebcSocketConnectDuration()} pair in
+     * {@code WAWebOpenChatSocket.B}.
+     *
+     * @implNote WAWebOpenChatSocket.B — end of the socket_open QPL span
+     * @param socketOpenStart the timestamp captured at the start of the
+     *                        public {@link #connect(WhatsAppSocketListener)}
+     */
+    final void markSocketOpenDone(Instant socketOpenStart) {
+        this.socketConnectDuration = Duration.between(socketOpenStart, Instant.now());
+    }
+
+    /**
+     * Returns the measured transport-open duration for the current session,
+     * or {@code null} if the socket has not finished opening yet.
+     *
+     * <p>This value mirrors the WA Web
+     * {@code WebcSocketConnectWamEvent.webcSocketConnectDuration} field
+     * that {@code WAWebOpenChatSocket.B} captures via
+     * {@code markWebcSocketConnectDuration()} immediately after closing
+     * the {@code socket_open} QPL measure.
+     *
+     * @implNote WAWebOpenChatSocket.B — markWebcSocketConnectDuration
+     * @return the transport open duration, or {@code null} if unavailable
+     */
+    public final Duration socketConnectDuration() {
+        return socketConnectDuration;
+    }
+
+    /**
+     * Returns the measured Noise handshake duration for the current
+     * session, or {@code null} if the handshake has not completed.
+     *
+     * <p>This value mirrors the WA Web
+     * {@code WebcSocketConnectWamEvent.webcAuthHandshakeDuration} field
+     * that {@code WAWebOpenChatSocket.J} captures via
+     * {@code markWebcAuthHandshakeDuration()} immediately after closing
+     * the {@code auth_handshake} QPL measure.
+     *
+     * @implNote WAWebOpenChatSocket.J — markWebcAuthHandshakeDuration
+     * @return the Noise handshake duration, or {@code null} if unavailable
+     */
+    public final Duration authHandshakeDuration() {
+        return authHandshakeDuration;
     }
 
     /**
@@ -301,9 +396,17 @@ public sealed abstract class WhatsAppSocketClient {
      * handshake (because the transport is still in pre-tunnel mode and
      * the handshake reads need that).
      *
+     * <p>Subclasses must call {@link #markSocketOpenDone(Instant)} at the
+     * point where the transport-open phase finishes (before
+     * {@link #performNoiseHandshake()}) so that
+     * {@link #socketConnectDuration()} reports the correct value.
+     *
+     * @param socketOpenStart the timestamp captured at the start of the
+     *                        public {@link #connect(WhatsAppSocketListener)},
+     *                        used to compute the transport-open duration
      * @throws IOException if the handshake fails
      */
-    abstract void connectImpl() throws IOException;
+    abstract void connectImpl(Instant socketOpenStart) throws IOException;
 
     /**
      * Disconnects and destroys cipher keys.
@@ -518,6 +621,11 @@ public sealed abstract class WhatsAppSocketClient {
      * @throws IOException if the handshake fails
      */
     final void performNoiseHandshake() throws IOException {
+        // WAWebOpenChatSocket.B — startPageLoadQplMeasure("auth_handshake") +
+        // startWebcAuthHandshakeDuration(): the Noise handshake span begins
+        // here and is closed in WAWebOpenChatSocket.J via
+        // markWebcAuthHandshakeDuration().
+        var handshakeStart = Instant.now();
         var ephemeralKeyPair = SignalIdentityKeyPair.random();
         var prologue = getHandshakePrologue();
 
@@ -596,6 +704,11 @@ public sealed abstract class WhatsAppSocketClient {
             this.readCipher = Cipher.getInstance(ALGORITHM);
             this.readCounter = 0;
             this.readKey = new SecretKeySpec(keys, 32, 32, "AES");
+
+            // WAWebOpenChatSocket.J — endPageLoadQplMeasure("auth_handshake") +
+            // markWebcAuthHandshakeDuration(): the Noise handshake span closes
+            // once the read/write keys have been derived successfully.
+            this.authHandshakeDuration = Duration.between(handshakeStart, Instant.now());
         } catch (IOException e) {
             throw e;
         } catch (Throwable e) {
@@ -981,11 +1094,28 @@ public sealed abstract class WhatsAppSocketClient {
          * @return the user agent
          */
         private UserAgent getUserAgent() {
+            var appVersion = store.clientVersion();
+            var mcc = "000";
+            var mnc = "000";
+            // WAWebClientPayload.C — on the hybrid Windows shell a six-digit
+            // WINDOWS_BUILD injected as the URL param `windowsBuild` is
+            // copied into appVersion.quaternary, and when its length is 6
+            // its halves overwrite mcc/mnc. The quaternary is already set
+            // on the cached ClientAppVersion by WhatsAppWindowsClientInfo;
+            // here we just mirror the mcc/mnc override when applicable.
+            if (store.device().platform() == ClientPlatformType.WINDOWS
+                    && appVersion.quaternary().isPresent()) {
+                var buildStr = Integer.toString(appVersion.quaternary().getAsInt());
+                if (buildStr.length() == 6) {
+                    mcc = buildStr.substring(0, 3);
+                    mnc = buildStr.substring(3, 6);
+                }
+            }
             return new ClientPayloadUserAgentBuilder()
                     .platform(getPlatform())
-                    .appVersion(store.clientVersion())
-                    .mcc("000")
-                    .mnc("000")
+                    .appVersion(appVersion)
+                    .mcc(mcc)
+                    .mnc(mnc)
                     .releaseChannel(store.releaseChannel())
                     .localeLanguageIso6391("en")
                     .localeCountryIso31661Alpha2("US")
@@ -1109,15 +1239,22 @@ public sealed abstract class WhatsAppSocketClient {
     }
 
     /**
-     * Browser-based WhatsApp companion client.
+     * Browser-hosted WhatsApp companion client, also used for the Windows
+     * hybrid desktop shell.
      *
      * <p>Connects via WebSocket over TLS to {@code web.whatsapp.com:443},
      * performs the HTTP upgrade inside {@link WhatsAppSocketClientLayer#connect},
      * then runs the Noise handshake through the async chain.
+     *
+     * <p>The WebSocket transport is shared by the web browser client and
+     * the Windows hybrid desktop shell because the hybrid shell reuses the
+     * same JavaScript bundle and the same endpoint
+     * ({@code wss://web.whatsapp.com/ws/chat}); only the handshake payload
+     * varies, which is expressed through {@link #getWebSubPlatform()}.
      */
     static final class Browser extends Web {
         /**
-         * The WebSocket endpoint for browser companions.
+         * The WebSocket endpoint for browser and Windows hybrid companions.
          */
         private static final InetSocketAddress WEB_SOCKET_ENDPOINT = new InetSocketAddress("web.whatsapp.com", 443);
 
@@ -1138,8 +1275,11 @@ public sealed abstract class WhatsAppSocketClient {
          * mark the WhatsApp context ready for real datagrams.
          */
         @Override
-        void connectImpl() throws IOException {
+        void connectImpl(Instant socketOpenStart) throws IOException {
             whatsAppLayer.finishConnect();
+            // WAWebOpenChatSocket.B — endPageLoadQplMeasure("socket_open") +
+            // markWebcSocketConnectDuration()
+            markSocketOpenDone(socketOpenStart);
             performNoiseHandshake();
             whatsAppLayer.markHandshakeComplete();
             whatsAppLayer.startListenerExecutor();
@@ -1147,17 +1287,25 @@ public sealed abstract class WhatsAppSocketClient {
 
         @Override
         ClientPlatformType getPlatform() {
+            // WAWebClientPayload.C — the Windows hybrid shell keeps the
+            // UserAgent.platform as WEB and only distinguishes itself from
+            // a browser through the WebInfo.webSubPlatform field.
             return ClientPlatformType.WEB;
         }
 
         @Override
         ClientPayload.WebInfo.WebSubPlatform getWebSubPlatform() {
-            return ClientPayload.WebInfo.WebSubPlatform.WEB_BROWSER;
+            return switch (store.device().platform()) {
+                case WINDOWS -> ClientPayload.WebInfo.WebSubPlatform.WIN_HYBRID;
+                case WEB -> ClientPayload.WebInfo.WebSubPlatform.WEB_BROWSER;
+                default -> throw new IllegalStateException(
+                        "Browser client does not support platform: " + store.device().platform());
+            };
         }
     }
 
     /**
-     * Native desktop WhatsApp companion client (Windows / macOS).
+     * Native macOS desktop WhatsApp companion client.
      *
      * <p>Connects via raw TCP like {@link Mobile} but authenticates as a
      * companion device using the Web payload structure (webInfo block,
@@ -1166,6 +1314,10 @@ public sealed abstract class WhatsAppSocketClient {
      * <p>Unlike {@link Browser}, there is no WebSocket upgrade: Noise
      * runs directly over the transport, so {@code finishConnect} is
      * deferred until after the handshake (same ordering as {@link Mobile}).
+     *
+     * <p>Only macOS uses this transport. The Windows desktop build ships
+     * as a hybrid web/native shell that reuses the web WebSocket endpoint,
+     * so it is served by {@link Browser}.
      */
     static final class Desktop extends Web {
         /**
@@ -1184,7 +1336,11 @@ public sealed abstract class WhatsAppSocketClient {
         }
 
         @Override
-        void connectImpl() throws IOException {
+        void connectImpl(Instant socketOpenStart) throws IOException {
+            // For macOS desktop there is no WebSocket upgrade: the transport
+            // is already open by the time we reach this point, so we close
+            // the socket_open span immediately.
+            markSocketOpenDone(socketOpenStart);
             performNoiseHandshake();
             whatsAppLayer.markHandshakeComplete();
             whatsAppLayer.startListenerExecutor();
@@ -1193,22 +1349,12 @@ public sealed abstract class WhatsAppSocketClient {
 
         @Override
         ClientPlatformType getPlatform() {
-            return switch (store.device().platform()) {
-                case WINDOWS -> ClientPlatformType.WEB;
-                case MACOS -> ClientPlatformType.MACOS;
-                default -> throw new IllegalStateException(
-                        "Desktop client does not support platform: " + store.device().platform());
-            };
+            return ClientPlatformType.MACOS;
         }
 
         @Override
         ClientPayload.WebInfo.WebSubPlatform getWebSubPlatform() {
-            return switch (store.device().platform()) {
-                case WINDOWS -> ClientPayload.WebInfo.WebSubPlatform.WIN_HYBRID;
-                case MACOS -> ClientPayload.WebInfo.WebSubPlatform.DARWIN;
-                default -> throw new IllegalStateException(
-                        "Desktop client does not support platform: " + store.device().platform());
-            };
+            return ClientPayload.WebInfo.WebSubPlatform.DARWIN;
         }
     }
 
@@ -1250,7 +1396,11 @@ public sealed abstract class WhatsAppSocketClient {
          * chain to async mode via {@link WhatsAppSocketClientLayer#finishConnect}.
          */
         @Override
-        void connectImpl() throws IOException {
+        void connectImpl(Instant socketOpenStart) throws IOException {
+            // For mobile there is no WebSocket upgrade: the raw TCP transport
+            // is already open by the time we reach this point, so we close
+            // the socket_open span immediately.
+            markSocketOpenDone(socketOpenStart);
             performNoiseHandshake();
             whatsAppLayer.markHandshakeComplete();
             whatsAppLayer.startListenerExecutor();

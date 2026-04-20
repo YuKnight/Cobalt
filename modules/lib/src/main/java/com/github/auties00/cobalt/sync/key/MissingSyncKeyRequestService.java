@@ -17,7 +17,10 @@ import com.github.auties00.cobalt.model.message.system.ProtocolMessageBuilder;
 import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyIdBuilder;
 import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyRequest;
 import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyRequestBuilder;
+import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.wam.event.MdBootstrapAppStateCriticalDataProcessingEventBuilder;
+import com.github.auties00.cobalt.wam.type.BootstrapAppStateDataStageCode;
 
 import java.time.Instant;
 import java.util.*;
@@ -349,7 +352,39 @@ public final class MissingSyncKeyRequestService {
                     "syncd: sendAppStateSyncKeyRequest failed for all " + companionDevices.size() + " peer device(s): " + errorDetails);
         }
 
+        // WAWebKeyManagementSendKeyRequestApi.sendAppStateSyncKeyRequest:
+        //   return logCriticalBootstrapStageIfNecessary(MISSING_KEYS_REQUESTED), h;
+        // Emission happens AFTER the key request has been dispatched to peers, right
+        // before returning the set of fulfilled device IDs.
+        logCriticalBootstrapStageIfNecessary(BootstrapAppStateDataStageCode.MISSING_KEYS_REQUESTED);
+
         return successfulDeviceIds; // WAWebKeyManagementSendKeyRequestApi.sendAppStateSyncKeyRequest: h (fulfilled device IDs)
+    }
+
+    /**
+     * Emits a {@code MdBootstrapAppStateCriticalDataProcessingEvent} for the
+     * supplied bootstrap stage when the critical data sync is still in progress.
+     *
+     * <p>Per WhatsApp Web
+     * {@code WAWebSyncdCriticalBootstrapProcessingApi.logCriticalBootstrapStageIfNecessary}:
+     * the event is gated on
+     * {@code WAWebSyncBootstrap.isSyncDCriticalDataSyncInProcess()}. In Cobalt that
+     * global state machine is approximated by checking whether the
+     * {@link SyncPatchType#CRITICAL_BLOCK} collection has been bootstrapped yet,
+     * mirroring {@link com.github.auties00.cobalt.sync.WebAppStateService}.
+     *
+     * @implNote WAWebSyncdCriticalBootstrapProcessingApi.logCriticalBootstrapStageIfNecessary
+     * @param stage the bootstrap stage reached; never {@code null}
+     */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdCriticalBootstrapProcessingApi", exports = "logCriticalBootstrapStageIfNecessary", adaptation = WhatsAppAdaptation.ADAPTED)
+    private void logCriticalBootstrapStageIfNecessary(BootstrapAppStateDataStageCode stage) {
+        if (store.findWebAppState(SyncPatchType.CRITICAL_BLOCK).bootstrapped()) {
+            return;
+        }
+        client.wamService().commit(new MdBootstrapAppStateCriticalDataProcessingEventBuilder()
+                .bootstrapAppStateDataStage(stage) // WAWebSyncdCriticalBootstrapProcessingApi: bootstrapAppStateDataStage: e
+                .mdTimestamp((int) System.currentTimeMillis()) // WAWebSyncdCriticalBootstrapProcessingApi: mdTimestamp: unixTimeMs()
+                .build());
     }
 
     /**

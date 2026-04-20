@@ -21,6 +21,9 @@ import com.github.auties00.cobalt.model.setting.GlobalSettings;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.wam.event.Lid11MigrationLifecycleEventBuilder;
+import com.github.auties00.cobalt.wam.type.MigrationStageEnum;
+import com.github.auties00.cobalt.wam.type.StageFailureReasonEnum;
 
 import com.github.auties00.cobalt.util.SchedulerUtils;
 
@@ -408,6 +411,16 @@ public final class LidMigrationService {
                         if (state.get() == LidMigrationState.WAITING_MAPPINGS) {
                             LOGGER.log(System.Logger.Level.WARNING,
                                     "LID migration timed out after {0}s waiting for mappings", timeoutSeconds);
+                            // WAWebLid1x1MigrationTimeout.h: new Lid11MigrationLifecycleWamEvent({
+                            //   migrationStage: COMPANION_LOCAL_MIGRATION_FAILED,
+                            //   stageFailureReason: COMPANION_TIMEOUT_BASED_ON_DEVICE_CAPABILITY,
+                            //   isLocally1x1MigratedFromDb: Lid1X1MigrationUtils.isLidMigrated()
+                            // }).commitAndWaitForFlush(true)
+                            whatsapp.wamService().commit(new Lid11MigrationLifecycleEventBuilder()
+                                    .migrationStage(MigrationStageEnum.COMPANION_LOCAL_MIGRATION_FAILED)
+                                    .stageFailureReason(StageFailureReasonEnum.COMPANION_TIMEOUT_BASED_ON_DEVICE_CAPABILITY)
+                                    .isLocally1x1MigratedFromDb(isLidMigrated())
+                                    .build());
                             handleError(new WhatsAppLidMigrationException.FailedToParseMappings(
                                     "Timed out waiting for peer migration mappings"));
                         }
@@ -465,6 +478,15 @@ public final class LidMigrationService {
         // WAWebLid1X1ThreadAccountMigrations.setLidMigrationMappings
         // A null payload means the peer message could not be decoded, which forces a logout in WA Web
         if (payload == null) {
+            // WAWebLid1X1ThreadAccountMigrations.setLidMigrationMappings (e == null branch):
+            //   new Lid11MigrationLifecycleWamEvent({
+            //     migrationStage: COMPANION_LOCAL_MIGRATION_FAILED,
+            //     stageFailureReason: MALFORMED_PEER_MESSAGE
+            //   }).commitAndWaitForFlush(true)
+            whatsapp.wamService().commit(new Lid11MigrationLifecycleEventBuilder()
+                    .migrationStage(MigrationStageEnum.COMPANION_LOCAL_MIGRATION_FAILED)
+                    .stageFailureReason(StageFailureReasonEnum.MALFORMED_PEER_MESSAGE)
+                    .build());
             handleError(new WhatsAppLidMigrationException.FailedToParseMappings("null payload"));
             return;
         }
@@ -489,6 +511,13 @@ public final class LidMigrationService {
             // ADAPTED: WAWebLid1X1ThreadAccountMigrations.setLidMigrationMappings
             // Records the receive timestamp to serve as a fallback when no primary migration timestamp is reported
             this.receiveTimestamp = Instant.now();
+
+            // WAWebLid1X1ThreadAccountMigrations.setLidMigrationMappings:
+            //   new Lid11MigrationLifecycleWamEvent({migrationStage: COMPANION_RECEIVED_PEER_MESSAGE}).commit()
+            // Emitted unconditionally when a peer-mapping sync arrives (even when the mapping list is empty).
+            whatsapp.wamService().commit(new Lid11MigrationLifecycleEventBuilder()
+                    .migrationStage(MigrationStageEnum.COMPANION_RECEIVED_PEER_MESSAGE)
+                    .build());
 
             // WAWebLid1x1MigrationMsgParser.parseLidMigrationMappingSyncMsg
             // Extracts the mapping list; the parser tolerates an empty list and returns {mappings: [], primaryMigrationTsSec: null}
@@ -778,6 +807,17 @@ public final class LidMigrationService {
      *           the executor for the migration flow.
      *           ADAPTED: WAWebLid1X1MigrationGating.setIsLidMigrated:
      *           the state transition to COMPLETE replaces the UserPrefs write.
+     *           WAM emissions (Lid11MigrationLifecycleEvent) are wired
+     *           at the start (COMPANION_LOCAL_MIGRATION_STARTED),
+     *           the incompatibility short-circuit
+     *           (COMPANION_LOCAL_MIGRATION_FAILED +
+     *           COMPANION_UNSUPPORTED_VERSION), the success tail
+     *           (COMPANION_LOCAL_MIGRATION_ENDED with mapping/thread
+     *           counters), the logout-based failure from resolveThread
+     *           (COMPANION_LOCAL_MIGRATION_FAILED +
+     *           INITIATED_LOGOUT_BASED_ON_MAPPING), and the catch-all
+     *           internal error (COMPANION_LOCAL_MIGRATION_FAILED +
+     *           INTERNAL_ERROR).
      */
     @WhatsAppWebExport(moduleName = "WAWebLid1X1ThreadAccountMigrations", exports = "migrate1x1Chats",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -788,8 +828,28 @@ public final class LidMigrationService {
             return;
         }
 
+        // WAWebLid1X1ThreadAccountMigrations.migrate1x1Chats (function W, first statement):
+        //   new Lid11MigrationLifecycleWamEvent({
+        //     migrationStage: COMPANION_LOCAL_MIGRATION_STARTED,
+        //     mappingCount: lidPnMigrationPrimaryCache.getAllPnLidMappings().length
+        //   }).commit()
+        // WA Web counts the flat list of PN->LID mappings; Cobalt mirrors this with the assigned-LID cache size.
+        whatsapp.wamService().commit(new Lid11MigrationLifecycleEventBuilder()
+                .migrationStage(MigrationStageEnum.COMPANION_LOCAL_MIGRATION_STARTED)
+                .mappingCount(primaryPnToAssignedLidCache.size())
+                .build());
+
         // Check compatibility AB prop before proceeding
         if (!abPropsService.getBool(ABProp.LID_ONE_ON_ONE_MIGRATION_COMPATIBLE)) {
+            // WAWebLid1X1ThreadAccountMigrations.migrate1x1Chats (killswitch branch):
+            //   new Lid11MigrationLifecycleWamEvent({
+            //     migrationStage: COMPANION_LOCAL_MIGRATION_FAILED,
+            //     stageFailureReason: COMPANION_UNSUPPORTED_VERSION
+            //   }).commitAndWaitForFlush(true)
+            whatsapp.wamService().commit(new Lid11MigrationLifecycleEventBuilder()
+                    .migrationStage(MigrationStageEnum.COMPANION_LOCAL_MIGRATION_FAILED)
+                    .stageFailureReason(StageFailureReasonEnum.COMPANION_UNSUPPORTED_VERSION)
+                    .build());
             handleError(new WhatsAppLidMigrationException.IncompatibleClient());
             return;
         }
@@ -810,10 +870,50 @@ public final class LidMigrationService {
                 }
             }
 
+            // WAWebLid1X1ThreadAccountMigrations.migrate1x1Chats: counters l, s, and migrated-thread tally
+            // l: companionHasADifferentMappingCount - PN chats where primary LID differs from the locally known LID
+            // s: chatNotInMappingCount             - PN chats whose user has no currentLid mapping yet
+            // migratedThreadCount                  - length of i.push(...) entries (KEEP when already LID + MIGRATE)
+            var companionHasADifferentMappingCount = 0;
+            var chatNotInMappingCount = 0;
+            var migratedThreadCount = 0;
+
             // Phase 1: Resolve all threads (split thread detection is inline)
             for (var chat : chatsToProcess) {
                 var resolution = resolveThread(chat, existingLidThreads);
                 resolutions.add(resolution);
+
+                // WAWebLid1X1ThreadAccountMigrations.migrate1x1Chats: metric tallies inside the chat map
+                //   var y = getCurrentLid(asUserWidOrThrow(n));         // latestLocalLid
+                //   y == null && s++;                                    // chatNotInMappingCount
+                //   r.equals(y, lidPnMigrationPrimaryCache.getLidForPn(n)) || l++; // companionHasADifferentMappingCount
+                //   i.push({id, accountLid: S.threadLid, lidOriginType}) // migratedThreadCount source
+                // Cobalt derives the same metrics from the chat model and the primary caches.
+                var chatJid = chat.jid();
+                if (chatJid.hasUserServer()) {
+                    var user = chatJid.user();
+                    var latestLocalLid = user != null ? store.findLidByPhone(chatJid).orElse(null) : null;
+                    if (latestLocalLid == null) {
+                        chatNotInMappingCount++;
+                    }
+                    var primaryLid = user != null ? primaryPnToAssignedLidCache.get(user) : null;
+                    var latestLocalLidUser = latestLocalLid != null ? latestLocalLid.toUserJid() : null;
+                    var primaryLidUser = primaryLid != null ? primaryLid.toUserJid() : null;
+                    if (!Objects.equals(latestLocalLidUser, primaryLidUser)) {
+                        companionHasADifferentMappingCount++;
+                    }
+                }
+
+                // WAWebLid1X1ThreadAccountMigrations.migrate1x1Chats: i.push(...) happens for already-LID chats and migrated PN chats
+                switch (resolution) {
+                    case LidMigrationResolution.Migrate _ -> migratedThreadCount++;
+                    case LidMigrationResolution.Keep keep -> {
+                        if (keep.reason() == LidMigrationResolution.KeepReason.ALREADY_LID) {
+                            migratedThreadCount++;
+                        }
+                    }
+                    case LidMigrationResolution.Delete _ -> { /* not counted, matches WA Web's m.push path */ }
+                }
             }
 
             // Phase 2: Execute migrations
@@ -829,9 +929,49 @@ public final class LidMigrationService {
             // WAWebLid1X1ThreadAccountMigrations.migrate1x1Chats: learnMappingsInBulk() after lock
             learnMappingsInBulk();
 
+            // WAWebLid1X1ThreadAccountMigrations.migrate1x1Chats (success tail, after learnMappingsInBulk):
+            //   var c = sumBy(getAllPnLidMappings(), e => e.primaryProvidedLatestLid != null ? 1 : 0);
+            //   new Lid11MigrationLifecycleWamEvent({
+            //     migrationStage: COMPANION_LOCAL_MIGRATION_ENDED,
+            //     mappingCount: getAllPnLidMappings().length,
+            //     migratedThreadCount: i.length,
+            //     companionHasADifferentMappingCount: l,
+            //     chatNotInMappingCount: s,
+            //     latestMappingCount: c
+            //   }).commit()
+            var latestMappingCount = primaryPnToLatestLidCache.size();
+            whatsapp.wamService().commit(new Lid11MigrationLifecycleEventBuilder()
+                    .migrationStage(MigrationStageEnum.COMPANION_LOCAL_MIGRATION_ENDED)
+                    .mappingCount(primaryPnToAssignedLidCache.size())
+                    .migratedThreadCount(migratedThreadCount)
+                    .companionHasADifferentMappingCount(companionHasADifferentMappingCount)
+                    .chatNotInMappingCount(chatNotInMappingCount)
+                    .latestMappingCount(latestMappingCount)
+                    .build());
+
         } catch (WhatsAppLidMigrationException e) {
+            // WAWebLid1X1ThreadAccountMigrations.migrate1x1Chats (u != null branch):
+            //   new Lid11MigrationLifecycleWamEvent({
+            //     migrationStage: COMPANION_LOCAL_MIGRATION_FAILED,
+            //     stageFailureReason: INITIATED_LOGOUT_BASED_ON_MAPPING
+            //   }).commitAndWaitForFlush(true)
+            // resolveThread throws (PrimaryMappingsObsolete / NoLidAvailable / SplitThreadMismatch) map to the
+            // WA Web logoutReason returned from getResolvedThreadAccountLid that drives this failure emission.
+            whatsapp.wamService().commit(new Lid11MigrationLifecycleEventBuilder()
+                    .migrationStage(MigrationStageEnum.COMPANION_LOCAL_MIGRATION_FAILED)
+                    .stageFailureReason(StageFailureReasonEnum.INITIATED_LOGOUT_BASED_ON_MAPPING)
+                    .build());
             handleError(e);
         } catch (Throwable throwable) {
+            // WAWebLid1X1ThreadAccountMigrations.migrate1x1Chats (outer catch):
+            //   new Lid11MigrationLifecycleWamEvent({
+            //     migrationStage: COMPANION_LOCAL_MIGRATION_FAILED,
+            //     stageFailureReason: INTERNAL_ERROR
+            //   }).commitAndWaitForFlush(true)
+            whatsapp.wamService().commit(new Lid11MigrationLifecycleEventBuilder()
+                    .migrationStage(MigrationStageEnum.COMPANION_LOCAL_MIGRATION_FAILED)
+                    .stageFailureReason(StageFailureReasonEnum.INTERNAL_ERROR)
+                    .build());
             handleError(new WhatsAppLidMigrationException.FailedToParseMappings("migration execution failed", throwable));
         }
     }

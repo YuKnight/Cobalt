@@ -101,6 +101,9 @@ public interface LoginEvent extends WamEventSpec {
     @WamProperty(index = 9, type = WamType.INTEGER)
     OptionalInt serverErrorCode();
 
+    @WamProperty(index = 29, type = WamType.INTEGER)
+    OptionalInt traceIdInt();
+
     @WamProperty(index = 28, type = WamType.INTEGER)
     OptionalInt unprocessedMessageCount();
 }

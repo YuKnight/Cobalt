@@ -12,6 +12,8 @@ import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.event.Lid11MigrationLifecycleEventBuilder;
+import com.github.auties00.cobalt.wam.type.MigrationStageEnum;
 
 import java.util.HashMap;
 import java.util.Objects;
@@ -36,7 +38,9 @@ import java.util.Objects;
  *       elapses &mdash; skipped in Cobalt (timeout/lifecycle telemetry);</li>
  *   <li>commits a {@code Lid11MigrationLifecycleWamEvent} WAM telemetry
  *       event when a new {@code chatDbMigrationTimestamp} arrives &mdash;
- *       skipped in Cobalt (WAM);</li>
+ *       mirrored in Cobalt via
+ *       {@link com.github.auties00.cobalt.wam.event.Lid11MigrationLifecycleEvent}
+ *       with {@code migrationStage = COMPANION_RECEIVED_DEVICE_CAPABILITY};</li>
  *   <li>triggers {@code frontendFireAndForget("initializeMetaAiBotAiThreads")}
  *       when {@code aiThread.supportLevel} is {@code INFRA} or {@code FULL}
  *       &mdash; skipped in Cobalt (frontend-only RPC);</li>
@@ -254,13 +258,29 @@ public final class DeviceCapabilitiesHandler implements WebAppStateActionHandler
             capabilities.userHasAvatar()
                     .ifPresent(avatar -> client.store().setHasAvatar(avatar.userHasAvatar()));
             // WAWebDeviceCapabilitiesSync.applyMutations: e.value.deviceCapabilities.lidMigration.chatDbMigrationTimestamp != null
-            // ADAPTED: WA Web commits a Lid11MigrationLifecycleWamEvent (WAM telemetry) when the
-            // timestamp is present and the device is not yet marked as LID-migrated; Cobalt
-            // instead forwards the timestamp to the LidMigrationService so it can progress the
-            // local migration state machine.
+            // Forwards the timestamp to the LidMigrationService so it can progress the local
+            // migration state machine, and emits the companion-received-device-capability WAM
+            // event when the timestamp is present and the account is not yet LID-migrated,
+            // exactly matching the guarded WA Web emission.
             capabilities.lidMigration()
                     .flatMap(DeviceCapabilities.LIDMigration::chatDbMigrationTimestamp)
-                    .ifPresent(client.lidMigrationService()::observeChatDbMigrationTimestamp);
+                    .ifPresent(timestamp -> {
+                        client.lidMigrationService().observeChatDbMigrationTimestamp(timestamp);
+                        // WAWebDeviceCapabilitiesSync.applyMutations:
+                        //   chatDbMigrationTimestamp != null && !Lid1X1MigrationUtils.isLidMigrated()
+                        //     && new Lid11MigrationLifecycleWamEvent({
+                        //          migrationStage: COMPANION_RECEIVED_DEVICE_CAPABILITY,
+                        //          isLocally1x1MigratedFromDb: Lid1X1MigrationUtils.isLidMigrated()
+                        //        }).commit()
+                        // WA Web always passes the post-check value which is false at this point;
+                        // Cobalt keeps the same read so the wire payload stays byte-identical.
+                        if (!client.lidMigrationService().isLidMigrated()) {
+                            client.wamService().commit(new Lid11MigrationLifecycleEventBuilder()
+                                    .migrationStage(MigrationStageEnum.COMPANION_RECEIVED_DEVICE_CAPABILITY)
+                                    .isLocally1x1MigratedFromDb(client.lidMigrationService().isLidMigrated())
+                                    .build());
+                        }
+                    });
             // NO_WA_BASIS for the following WA Web behaviours, deliberately omitted:
             //   - frontendFireAndForget("initializeMetaAiBotAiThreads", {}) when aiThread.supportLevel
             //     is INFRA or FULL (frontend-only RPC);

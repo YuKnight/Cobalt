@@ -21,6 +21,10 @@ import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKey;
 import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyData;
 import com.github.auties00.cobalt.model.signal.KeyId;
 import com.github.auties00.cobalt.model.sync.*;
+import com.github.auties00.cobalt.model.sync.action.chat.ArchiveChatAction;
+import com.github.auties00.cobalt.model.sync.action.chat.ClearChatAction;
+import com.github.auties00.cobalt.model.sync.action.chat.DeleteChatAction;
+import com.github.auties00.cobalt.model.sync.action.chat.MarkChatAsReadAction;
 import com.github.auties00.cobalt.model.sync.data.*;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
@@ -36,7 +40,28 @@ import com.github.auties00.cobalt.sync.exchange.SyncRequest;
 import com.github.auties00.cobalt.sync.key.MissingSyncKeyRequestService;
 import com.github.auties00.cobalt.sync.key.MissingSyncKeyTimeoutScheduler;
 import com.github.auties00.cobalt.sync.key.SyncKeyRotationService;
+import com.github.auties00.cobalt.sync.handler.SyncdIndexUtils;
 import com.github.auties00.cobalt.util.SchedulerUtils;
+import com.github.auties00.cobalt.wam.event.MdAppStateMessageRangeEventBuilder;
+import com.github.auties00.cobalt.wam.event.MdAppStateSyncMutationStatsEventBuilder;
+import com.github.auties00.cobalt.wam.event.MdBootstrapAppStateCriticalDataProcessingEventBuilder;
+import com.github.auties00.cobalt.wam.event.MdBootstrapAppStateDataDownloadedEventBuilder;
+import com.github.auties00.cobalt.wam.event.MdBootstrapDataAppliedEventBuilder;
+import com.github.auties00.cobalt.wam.event.MdSyncdMutationEventBuilder;
+import com.github.auties00.cobalt.wam.event.MediaDownload2EventBuilder;
+import com.github.auties00.cobalt.wam.type.BootstrapAppStateDataStageCode;
+import com.github.auties00.cobalt.wam.type.DownloadOriginType;
+import com.github.auties00.cobalt.wam.type.MdBootstrapPayloadType;
+import com.github.auties00.cobalt.wam.type.MdBootstrapSource;
+import com.github.auties00.cobalt.wam.type.MdBootstrapStepResult;
+import com.github.auties00.cobalt.wam.type.MediaDownloadModeType;
+import com.github.auties00.cobalt.wam.type.MediaDownloadResultType;
+import com.github.auties00.cobalt.wam.type.MediaType;
+import com.github.auties00.cobalt.wam.type.MutationBundleType;
+import com.github.auties00.cobalt.wam.type.MutationCountBucket;
+import com.github.auties00.cobalt.wam.type.MutationDirectionType;
+import com.github.auties00.cobalt.wam.type.MutationOperationType;
+import com.github.auties00.cobalt.wam.type.SyncdCollectionType;
 import it.auties.protobuf.stream.ProtobufInputStream;
 
 import java.io.InputStream;
@@ -121,6 +146,8 @@ import java.util.logging.Logger;
 @WhatsAppWebModule(moduleName = "WAWebSyncdFatal")
 @WhatsAppWebModule(moduleName = "WAWebSyncdFatalExceptionNotificationApi")
 @WhatsAppWebModule(moduleName = "WAWebSyncdServerSync")
+@WhatsAppWebModule(moduleName = "WAWebSyncdReportSyncdStatJob")
+@WhatsAppWebModule(moduleName = "WAWebSyncdWamUtils")
 public final class WebAppStateService {
     private static final Logger LOGGER = Logger.getLogger(WebAppStateService.class.getName());
 
@@ -137,6 +164,13 @@ public final class WebAppStateService {
     private final ABPropsService abPropsService;
     private final SnapshotRecoveryService snapshotRecoveryService;
     private volatile CompletableFuture<?> periodicSyncJob;
+    /**
+     * Handle of the currently scheduled daily syncd stats reporting job, or
+     * {@code null} when no job is scheduled.
+     *
+     * @implNote WAWebTasksDefinitions.REPORT_SYNCD_ACTION_STAT (recurring daily task handle)
+     */
+    private volatile CompletableFuture<?> periodicReportSyncdStatsJob;
 
     /**
      * Creates a new WebAppStateService instance.
@@ -189,16 +223,28 @@ public final class WebAppStateService {
      * Pulls patches from the server.
      * Called from Whatsapp.pullWebAppState().
      *
+     * <p>Returns whether any of the synced collections contributed actual state changes, i.e.
+     * at least one collection response carried patches or a snapshot. The return value is the
+     * Cobalt equivalent of WA Web's {@code onceAppStateSyncCompleted} callback argument which
+     * is an array of per-collection results with {@code patches} and {@code snapshot} fields;
+     * {@code WAWebHandleDirtyBits.p} inspects it as
+     * {@code !e.some(r => r.patches?.length > 0 || r.snapshot != null)} to detect false-positive
+     * dirty bits.
+     *
      * @implNote WAWebSyncd.markCollectionsForSync (pull path), WAWebSyncd.V
      * @param patchTypes the collection types to sync
+     * @return {@code true} if any synced collection had patches or a snapshot; {@code false}
+     *         when every collection sync completed without applying any state changes, or when
+     *         {@code patchTypes} is empty
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncd", exports = "markCollectionsForSync", adaptation = WhatsAppAdaptation.ADAPTED)
-    public void pullPatches(SyncPatchType... patchTypes) {
+    public boolean pullPatches(SyncPatchType... patchTypes) {
         var allCollections = new LinkedHashSet<SyncPatchType>(); // ADAPTED: WAWebSyncd.V: n = t != null ? yield H(e,t) : e (no server version filter in pull path)
         Collections.addAll(allCollections, patchTypes); // WAWebSyncd.V: collections list
         if (!allCollections.isEmpty()) { // WAWebSyncd.V: n.forEach(...)
-            syncCollectionsBatched(allCollections); // WAWebSyncd.V: Z() -> ee() -> scheduleSyncCollections
+            return syncCollectionsBatched(allCollections); // WAWebSyncd.V: Z() -> ee() -> scheduleSyncCollections
         }
+        return false;
     }
 
     /**
@@ -299,13 +345,20 @@ public final class WebAppStateService {
      * <p>After the initial batched round, collections that need further pagination
      * (i.e. those with {@code has_more_patches}) fall back to individual sync loops.
      *
+     * <p>Returns whether any collection in the batch contributed real state changes. The
+     * return value is used by {@link #pullPatches} to surface a dirty-bit false-positive
+     * signal to callers (notably {@code InfoBulletinStreamHandler} handling a
+     * {@code syncd_app_state} dirty-bit notification).
+     *
      * @implNote WAWebSyncdServerSync.serverSync (outer loop),
      *           WAWebSyncdServerSync.S (syncRound — first batched round),
      *           WAWebSyncdServerSync.L (buildAndSendIq)
      * @param patchTypes the non-critical collection types to sync
+     * @return {@code true} if any response in the batch carried at least one patch or a
+     *         snapshot reference; {@code false} otherwise
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdServerSync", exports = "serverSync", adaptation = WhatsAppAdaptation.ADAPTED)
-    private void syncCollectionsBatched(Set<SyncPatchType> patchTypes) {
+    private boolean syncCollectionsBatched(Set<SyncPatchType> patchTypes) {
         // WAWebSyncdServerSync.L: collectionsToSkip + collectionWithPendingMutationsIds
         var collectionPatches = new LinkedHashMap<SyncPatchType, SequencedCollection<SyncPendingMutation>>();
         var skippedUploads = new LinkedHashSet<SyncPatchType>(); // WAWebSyncdServerSync.L: collectionsToSkip
@@ -318,6 +371,11 @@ public final class WebAppStateService {
             collectionPatches.put(patchType, pending);
         }
 
+        // Mirror of the array passed to WAWebBackendEventBus.onceAppStateSyncCompleted in
+        // WAWebSyncd; WAWebHandleDirtyBits.p inspects it via
+        // `e.some(r => r.patches?.length > 0 || r.snapshot != null)`.
+        var hasAppStateChanges = false;
+
         try {
             for (var patchType : patchTypes) {
                 store.markWebAppStateInFlight(patchType); // ADAPTED: WAWebSyncd.ee: A = A.union(t)
@@ -325,8 +383,14 @@ public final class WebAppStateService {
 
             // WAWebSyncdServerSync.L: build + send batched IQ
             var batchedRequest = requestBuilder.buildBatchedSyncRequest(collectionPatches);
+            // WAWebSyncdServerSync.L: logCriticalBootstrapStageIfNecessary(REQUEST_BUILT) right before the IQ is dispatched.
+            logCriticalBootstrapStageIfNecessary(BootstrapAppStateDataStageCode.REQUEST_BUILT);
             var responseNode = whatsapp.sendNode(batchedRequest.node()); // WAWebSyncdServerSync.L: deprecatedSendIq
+            // WAWebSyncdServerSync.L: logCriticalBootstrapStageIfNecessary(RESPONSE_RECEIVED) after the IQ response is received (m.success).
+            logCriticalBootstrapStageIfNecessary(BootstrapAppStateDataStageCode.RESPONSE_RECEIVED);
             var responses = responseParser.parseBatchedSyncResponse(responseNode); // WAWebSyncdServerSync.L: syncResponseParser
+            // WAWebSyncdServerSync.L: logCriticalBootstrapStageIfNecessary(RESPONSE_PARSED_VALID) after syncResponseParser succeeds.
+            logCriticalBootstrapStageIfNecessary(BootstrapAppStateDataStageCode.RESPONSE_PARSED_VALID);
 
             // WAWebSyncdServerSync.S: pre-filter ErrorRetry/ErrorFatal/Blocked -> done
             // Per WA Web WAWebSyncdResponseParser.h: collection-level errors are captured
@@ -360,6 +424,12 @@ public final class WebAppStateService {
                     continue;
                 }
 
+                // WAWebHandleDirtyBits.p: the onceAppStateSyncCompleted callback observes
+                // `r.patches?.length > 0 || r.snapshot != null` per collection result.
+                if (!response.patches().isEmpty() || response.snapshotReference().isPresent()) {
+                    hasAppStateChanges = true;
+                }
+
                 try {
                     handleSyncResponse(response); // WAWebSyncdServerSync.S: applyAppStateSyncResponse
                     var uploadInfo = batchedRequest.uploadInfos().get(response.collectionName());
@@ -382,7 +452,7 @@ public final class WebAppStateService {
             for (var patchType : patchTypes) {
                 handleSyncError(throwable, patchType);
             }
-            return;
+            return hasAppStateChanges;
         }
 
         // WAWebSyncdServerSync.S: post-apply routing — collections needing refetch
@@ -399,6 +469,7 @@ public final class WebAppStateService {
                 syncCollection(patchType); // WAWebSyncdServerSync.serverSync: individual retry loop
             }
         }
+        return hasAppStateChanges;
     }
 
     /**
@@ -865,11 +936,17 @@ public final class WebAppStateService {
         // ADAPTED: WAWebSyncd tracks in-flight collections in a Set (A); Cobalt uses state machine
         store.markWebAppStateInFlight(patchType);
 
+        // WAWebSyncdServerSync.L: logCriticalBootstrapStageIfNecessary(REQUEST_BUILT) right before the IQ is dispatched.
+        logCriticalBootstrapStageIfNecessary(BootstrapAppStateDataStageCode.REQUEST_BUILT);
         // WAWebSyncdServerSync.L: yield deprecatedSendIq(u, syncResponseParser) — blocking on virtual thread
         var response = whatsapp.sendNode(syncRequest.node()); // WAWebSyncdServerSync.L
+        // WAWebSyncdServerSync.L: logCriticalBootstrapStageIfNecessary(RESPONSE_RECEIVED) after the IQ response is received (m.success).
+        logCriticalBootstrapStageIfNecessary(BootstrapAppStateDataStageCode.RESPONSE_RECEIVED);
 
         // WAWebSyncdServerSync.L: syncResponseParser parses the IQ response
         var parsedResponse = responseParser.parseSyncResponse(response); // WAWebSyncdServerSync.L
+        // WAWebSyncdServerSync.L: logCriticalBootstrapStageIfNecessary(RESPONSE_PARSED_VALID) after syncResponseParser succeeds.
+        logCriticalBootstrapStageIfNecessary(BootstrapAppStateDataStageCode.RESPONSE_PARSED_VALID);
         return new SyncRoundResult(parsedResponse, syncRequest.uploadInfo(), skippedPendingUpload);
     }
 
@@ -902,6 +979,85 @@ public final class WebAppStateService {
         var wasBootstrapped = store.findWebAppState(collectionName).bootstrapped(); // WAWebSyncdCollectionUtils.isBootstrap(n): n != null means bootstrapped
         var localVersionBeforeSync = getCurrentVersion(collectionName); // WAWebSyncdCollectionHandler.Ie: n (localVersion parameter)
 
+        // WAWebSyncdCollectionHandler.Fe (downloadExternalSyncData): capture download
+        // start timestamp and total external blob size before any CDN download, so that
+        // reportSyncdBootstrapAppStateDownloadMetric can be emitted after Promise.all
+        // completes (success) or in the outer catch (failure). Only tracked for the
+        // bootstrap branch — WA Web gates the emission on isBootstrap(existingVersion).
+        var bootstrapDownload = wasBootstrapped ? null : new BootstrapDownloadTracker(collectionName); // WAWebSyncdCollectionHandler.Fe: u = unixTimeMs(), s = 0
+        if (bootstrapDownload != null) {
+            // WAWebSyncdCollectionHandler.Fe: s += WALongInt.numberOrThrowIfTooLarge(snapshotRef.fileSizeBytes ?? 0)
+            if (syncResponse.snapshotReference().isPresent()) {
+                var snapshotSize = syncResponse.snapshotReference().get().fileSizeBytes();
+                if (snapshotSize.isPresent()) {
+                    bootstrapDownload.addBytes(snapshotSize.getAsLong());
+                }
+            }
+            // WAWebSyncdCollectionHandler.Fe: patches.forEach(p => { if (p.externalMutations) s += ... })
+            for (var patch : syncResponse.patches()) {
+                if (patch.externalMutations().isPresent()) {
+                    var patchSize = patch.externalMutations().get().fileSizeBytes();
+                    if (patchSize.isPresent()) {
+                        bootstrapDownload.addBytes(patchSize.getAsLong());
+                    }
+                }
+            }
+        }
+
+        try {
+            handleSyncResponseInternal(syncResponse, collectionName, wasBootstrapped, localVersionBeforeSync);
+        } catch (Throwable throwable) {
+            // WAWebSyncdCollectionHandler.Fe: try { await Promise.all([l,m]); ...success }
+            //   catch { reportSyncdBootstrapAppStateDownloadMetric({..., isSuccess: "failure"}); throw }
+            if (bootstrapDownload != null) {
+                emitBootstrapAppStateDataDownloaded(bootstrapDownload, MdBootstrapStepResult.FAILURE, throwable);
+            }
+            throw throwable;
+        }
+
+        // WAWebSyncdCollectionHandler.Fe: reportSyncdBootstrapAppStateDownloadMetric({..., isSuccess: "success"})
+        // after Promise.all([downloadSnapshot, downloadPatches]) resolves.
+        if (bootstrapDownload != null) {
+            emitBootstrapAppStateDataDownloaded(bootstrapDownload, MdBootstrapStepResult.SUCCESS, null);
+        }
+    }
+
+    /**
+     * Performs the snapshot and patch processing for a single collection sync
+     * response, without the bootstrap download telemetry tracking.
+     *
+     * <p>Extracted from {@link #handleSyncResponse} so that the bootstrap
+     * download metric can wrap this body in a single try/catch that mirrors
+     * WA Web's {@code downloadExternalSyncData} (Fe) emission pattern:
+     * success after the downloads complete, failure in the outer catch.
+     *
+     * @implNote WAWebSyncdCollectionHandler.applyAppStateSyncResponse body;
+     *           download-metric emission is handled by {@link #handleSyncResponse}
+     * @param syncResponse          the parsed sync response for a single collection
+     * @param collectionName        the collection being processed
+     * @param wasBootstrapped       {@code true} if the collection was already bootstrapped
+     * @param localVersionBeforeSync the local collection version before this sync round
+     */
+    private void handleSyncResponseInternal(
+            MutationSyncResponse syncResponse,
+            SyncPatchType collectionName,
+            boolean wasBootstrapped,
+            long localVersionBeforeSync
+    ) {
+        // WAWebSyncdCollectionHandler.applyAppStateSyncResponse: h = performance.now() captured
+        // right before the snapshot/patch apply phase, used to compute the step duration
+        // reported via WAWebSyncdMetrics.reportSyncdBootstrapDataApplied.
+        var applyStartTs = System.currentTimeMillis();
+        // WAWebSyncdCollectionHandler.applyAppStateSyncResponse: f = snapshot object (truthy
+        // when a snapshot was sent by the server). Snapshot-recovered rounds also set
+        // recoveredFromSnapshot=true below; usedSnapshot is reported for either path to
+        // mirror WA Web's emission which only gates on whether the server payload carried
+        // a snapshot, not on which apply branch was taken.
+        var snapshotAppliedFromServer = syncResponse.snapshotReference().isPresent();
+        // WAWebSyncdCollectionHandler.applyAppStateSyncResponse: g = patches array returned
+        // from Ae() (downloadExternalSyncData). Truthy in WA Web when patches were sent,
+        // regardless of whether any mutations were materially applied.
+        var patchesPresent = !syncResponse.patches().isEmpty();
         // Phase A: Process snapshot if present
         var recoveredFromSnapshot = false;
         if (syncResponse.snapshotReference().isPresent()) {
@@ -928,6 +1084,21 @@ public final class WebAppStateService {
             var untrusted = snapshotMutations.isEmpty()
                     ? List.<DecryptedMutation.Untrusted>of()
                     : decryptMutations(snapshotMutations);
+
+            // WAWebSyncdCollectionHandler._applySnapshotAndPatches: after decrypting snapshot mutations,
+            // iterate and emit per-mutation MdSyncdMutationWamEvent via
+            // WAWebSyncdWamReportingUtils.syncReportMutationToWam (called with isPatch=false, incoming=true).
+            emitSyncdMutationWamEvents(
+                    collectionName,
+                    syncResponse.version(),
+                    MutationDirectionType.INCOMING,
+                    MutationBundleType.SNAPSHOT,
+                    untrusted,
+                    null); // snapshot has no patchMac
+
+            // WAWebSyncdCollectionHandler._applySnapshotAndPatches: after decrypting snapshot mutations,
+            // reportSyncdDecryptedMutations logs per-chat message range sizes via WAM.
+            reportDecryptedMutationMessageRanges(untrusted);
 
             if (!untrusted.isEmpty()) {
                 validateNoDuplicateIndices(collectionName, untrusted, false);
@@ -983,6 +1154,17 @@ public final class WebAppStateService {
         }
 
         if (recoveredFromSnapshot) {
+            // WAWebSyncdCollectionHandler.applyAppStateSyncResponse: reportSyncdBootstrapDataApplied
+            // is emitted on every bootstrap round of a non-critical collection that received a
+            // server payload, regardless of which apply branch was taken. The recovered-snapshot
+            // branch counts as usedSnapshot=true because the server did send a snapshot.
+            emitBootstrapDataAppliedIfNeeded(
+                    collectionName,
+                    wasBootstrapped,
+                    snapshotAppliedFromServer,
+                    patchesPresent,
+                    true,
+                    applyStartTs);
             store.markWebAppStateUpToDate(collectionName);
             return;
         }
@@ -1042,6 +1224,20 @@ public final class WebAppStateService {
             }
 
             var untrusted = decryptMutations(patchMutations);
+            // WAWebSyncdCollectionHandler._applyPatch: after decrypting patch mutations,
+            // iterate and emit per-mutation MdSyncdMutationWamEvent via
+            // WAWebSyncdWamReportingUtils.syncReportMutationToWam (isPatch=true, incoming=true).
+            emitSyncdMutationWamEvents(
+                    collectionName,
+                    patch.version().map(v -> v.version().orElse(0L)).orElse(0L),
+                    MutationDirectionType.INCOMING,
+                    MutationBundleType.PATCH,
+                    untrusted,
+                    patch.patchMac().orElse(null));
+
+            // WAWebSyncdCollectionHandler._applyPatch: after decrypting patch mutations,
+            // reportSyncdDecryptedMutations logs per-chat message range sizes via WAM.
+            reportDecryptedMutationMessageRanges(untrusted);
             validateNoDuplicateIndices(collectionName, untrusted, true);
 
             var currentHash = getCurrentLTHash(collectionName);
@@ -1087,6 +1283,21 @@ public final class WebAppStateService {
             }
         }
 
+        // WAWebSyncdCollectionHandler.applyAppStateSyncResponse:
+        //   if ((g||f) && isBootstrap(n) && !isCriticalCollection(i)) {
+        //     reportSyncdBootstrapDataApplied(i, f != null ? SNAPSHOT_USED : SNAPSHOT_NOT_USED, O);
+        //   }
+        // Emitted after all snapshot/patch application for the non-critical collections that
+        // were bootstrapped this round. Critical collections fire their own equivalent via
+        // WAWebSyncBootstrap.setSyncDCriticalDataSyncCompleted, which has no Cobalt counterpart.
+        emitBootstrapDataAppliedIfNeeded(
+                collectionName,
+                wasBootstrapped,
+                snapshotAppliedFromServer,
+                patchesPresent,
+                snapshotAppliedFromServer,
+                applyStartTs);
+
         // WAWebSyncdCollectionHandler.applyAppStateSyncResponse: state transition
         // WA Web returns the response to the caller which checks hasMorePatches for routing.
         // The hasMore flag must always be checked, even when no mutations were received,
@@ -1095,6 +1306,344 @@ public final class WebAppStateService {
             store.markWebAppStatePending(collectionName);
         } else { // WAWebSyncdServerSync.R: Success -> UP_TO_DATE
             store.markWebAppStateUpToDate(collectionName);
+        }
+    }
+
+    /**
+     * Emits a {@code MdBootstrapDataAppliedEvent} for the app-state branch when
+     * a non-critical collection's first-time bootstrap round finishes applying.
+     *
+     * <p>Per WhatsApp Web
+     * {@code WAWebSyncdCollectionHandler.applyAppStateSyncResponse}: at the end
+     * of the function, guarded by
+     * {@code (g || f) && isBootstrap(n) && !isCriticalCollection(i)}, the
+     * handler invokes
+     * {@code WAWebSyncdMetrics.reportSyncdBootstrapDataApplied(i, f != null
+     * ? SNAPSHOT_USED : SNAPSHOT_NOT_USED, O)} which delegates to
+     * {@code WAWebCollectionHandlerWamMutation.logMetricsForDataApplied},
+     * constructing and committing a {@code MdBootstrapDataAppliedWamEvent}
+     * with {@code mdBootstrapPayloadType=NON_CRITICAL},
+     * {@code mdBootstrapSource=APP_STATE},
+     * {@code collection=collectionNameToMetric(e)},
+     * {@code mdBootstrapStepDuration=n},
+     * {@code usedSnapshot=(t===SNAPSHOT_USED)},
+     * {@code mdSessionId=MdSyncFieldStatsMeta.getMdSessionId()} and
+     * {@code mdTimestamp=unixTimeMs()}.
+     *
+     * <p>Only fires on bootstrap rounds (the first time a collection is synced)
+     * of non-critical collections ({@code REGULAR}, {@code REGULAR_LOW},
+     * {@code REGULAR_HIGH}). Critical collections fire
+     * {@code MdBootstrapDataAppliedEvent} with
+     * {@code mdBootstrapPayloadType=CRITICAL} through
+     * {@code WAWebSyncBootstrap.setSyncDCriticalDataSyncCompleted}, for which
+     * Cobalt has no equivalent global flag (bootstrap tracking lives at the
+     * per-collection {@code SyncCollectionMetadata.bootstrapped} level).
+     *
+     * @implNote WAWebSyncdCollectionHandler.applyAppStateSyncResponse (emission
+     *           gate), WAWebSyncdMetrics.reportSyncdBootstrapDataApplied
+     *           (intermediate entry point),
+     *           WAWebCollectionHandlerWamMutation.logMetricsForDataApplied
+     *           (actual event construction),
+     *           WAWebSyncdMetrics.collectionNameToMetric (name-to-enum mapping).
+     *           Cobalt has no equivalent of
+     *           {@code MdSyncFieldStatsMeta.getMdSessionId} (which hashes
+     *           primary + companion identity keys) so {@code mdSessionId} is
+     *           omitted, matching {@link #logCriticalBootstrapStageIfNecessary}.
+     * @param collectionName          the collection being bootstrapped
+     * @param wasBootstrapped         {@code true} if the collection was already
+     *                                bootstrapped before this round (emission
+     *                                is skipped)
+     * @param snapshotAppliedFromServer {@code true} if the server payload
+     *                                  carried a snapshot reference for this
+     *                                  round
+     * @param patchesPresent          {@code true} if the server payload carried
+     *                                any patches for this round
+     * @param usedSnapshot            value of the {@code usedSnapshot} property
+     *                                ({@code true} when a snapshot was applied,
+     *                                including the recovered-snapshot path)
+     * @param applyStartTs            the millisecond timestamp captured at the
+     *                                start of the apply phase, used to compute
+     *                                {@code mdBootstrapStepDuration}
+     */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdCollectionHandler", exports = "applyAppStateSyncResponse", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebSyncdMetrics", exports = "reportSyncdBootstrapDataApplied", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebCollectionHandlerWamMutation", exports = "logMetricsForDataApplied", adaptation = WhatsAppAdaptation.ADAPTED)
+    private void emitBootstrapDataAppliedIfNeeded(
+            SyncPatchType collectionName,
+            boolean wasBootstrapped,
+            boolean snapshotAppliedFromServer,
+            boolean patchesPresent,
+            boolean usedSnapshot,
+            long applyStartTs
+    ) {
+        // WAWebSyncdCollectionHandler.applyAppStateSyncResponse: (g||f)
+        if (!snapshotAppliedFromServer && !patchesPresent) {
+            return;
+        }
+        // WAWebSyncdCollectionHandler.applyAppStateSyncResponse: isBootstrap(n)
+        // In WA Web `isBootstrap(n)` is `n == null`, i.e. the collection has never
+        // been bootstrapped before this round — equivalent to !wasBootstrapped here.
+        if (wasBootstrapped) {
+            return;
+        }
+        // WAWebSyncdCollectionHandler.applyAppStateSyncResponse: !isCriticalCollection(i)
+        if (collectionName.isCritical()) {
+            return;
+        }
+        var now = System.currentTimeMillis();
+        // WAWebSyncdCollectionHandler.applyAppStateSyncResponse: O = floor(performance.now() - h)
+        var duration = (int) (now - applyStartTs);
+        whatsapp.wamService().commit(new MdBootstrapDataAppliedEventBuilder()
+                // WAWebCollectionHandlerWamMutation.logMetricsForDataApplied:
+                //   mdBootstrapPayloadType: MD_BOOTSTRAP_PAYLOAD_TYPE.NON_CRITICAL
+                .mdBootstrapPayloadType(MdBootstrapPayloadType.NON_CRITICAL)
+                // WAWebCollectionHandlerWamMutation.logMetricsForDataApplied:
+                //   mdBootstrapSource: MD_BOOTSTRAP_SOURCE.APP_STATE
+                .mdBootstrapSource(MdBootstrapSource.APP_STATE)
+                // WAWebCollectionHandlerWamMutation.logMetricsForDataApplied:
+                //   collection: WAWebSyncdMetrics.collectionNameToMetric(e)
+                .collection(mapCollection(collectionName))
+                // WAWebCollectionHandlerWamMutation.logMetricsForDataApplied:
+                //   mdBootstrapStepDuration: n (the O value passed from applyAppStateSyncResponse)
+                .mdBootstrapStepDuration(duration)
+                // WAWebCollectionHandlerWamMutation.logMetricsForDataApplied:
+                //   usedSnapshot: t === SyncdBootstrapDataAppliedSnapshotUsed.SNAPSHOT_USED
+                .usedSnapshot(usedSnapshot)
+                // WAWebCollectionHandlerWamMutation.logMetricsForDataApplied:
+                //   mdTimestamp: WATimeUtils.unixTimeMs()
+                .mdTimestamp((int) now)
+                // NO_WA_BASIS: WA Web populates mdSessionId via
+                // MdSyncFieldStatsMeta.getMdSessionId() which hashes primary +
+                // companion identity keys; Cobalt has no equivalent derivation
+                // so mdSessionId is omitted, mirroring MdBootstrapAppStateDataDownloadedEvent
+                // and MdBootstrapAppStateCriticalDataProcessingEvent.
+                .build());
+    }
+
+    /**
+     * Maps a {@link SyncPatchType} collection to the corresponding
+     * {@link com.github.auties00.cobalt.wam.type.Collection} WAM enum constant
+     * used by
+     * {@link MdBootstrapDataAppliedEventBuilder#collection(com.github.auties00.cobalt.wam.type.Collection)}.
+     *
+     * <p>Per WhatsApp Web
+     * {@code WAWebSyncdMetrics.collectionNameToMetric}: the exhaustive match
+     * throws on unknown collection names. Cobalt's enum encodes the closed
+     * domain, so the wildcard branch is unreachable.
+     *
+     * @implNote WAWebSyncdMetrics.collectionNameToMetric. Uses the fully
+     *           qualified name to avoid clashing with {@link java.util.Collection}
+     *           imported via the wildcard.
+     * @param collectionName the non-{@code null} collection to map
+     * @return the matching WAM {@link com.github.auties00.cobalt.wam.type.Collection}
+     *         enum constant
+     */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdMetrics", exports = "collectionNameToMetric", adaptation = WhatsAppAdaptation.DIRECT)
+    private static com.github.auties00.cobalt.wam.type.Collection mapCollection(SyncPatchType collectionName) {
+        return switch (collectionName) {
+            // WAWebSyncdMetrics.collectionNameToMetric: CriticalBlock -> CRITICAL_BLOCK
+            case CRITICAL_BLOCK -> com.github.auties00.cobalt.wam.type.Collection.CRITICAL_BLOCK;
+            // WAWebSyncdMetrics.collectionNameToMetric: CriticalUnblockLow -> CRITICAL_UNBLOCK_LOW
+            case CRITICAL_UNBLOCK_LOW -> com.github.auties00.cobalt.wam.type.Collection.CRITICAL_UNBLOCK_LOW;
+            // WAWebSyncdMetrics.collectionNameToMetric: Regular -> REGULAR
+            case REGULAR -> com.github.auties00.cobalt.wam.type.Collection.REGULAR;
+            // WAWebSyncdMetrics.collectionNameToMetric: RegularHigh -> REGULAR_HIGH
+            case REGULAR_HIGH -> com.github.auties00.cobalt.wam.type.Collection.REGULAR_HIGH;
+            // WAWebSyncdMetrics.collectionNameToMetric: RegularLow -> REGULAR_LOW
+            case REGULAR_LOW -> com.github.auties00.cobalt.wam.type.Collection.REGULAR_LOW;
+        };
+    }
+
+    /**
+     * Maps a {@link SyncPatchType} collection to the {@link SyncdCollectionType}
+     * WAM enum constant used by {@code MdSyncdMutationEvent} and siblings.
+     *
+     * <p>Per WhatsApp Web
+     * {@code WAWebSyncdWamReportingUtils.h} (unnamed local mapping function),
+     * the mapping is one-to-one between {@code WASyncdConst.CollectionName.*} and
+     * {@code WAWebWamEnumSyncdCollectionType.SYNCD_COLLECTION_TYPE.*}.
+     *
+     * @implNote WAWebSyncdWamReportingUtils.h (local mapping used by
+     *           {@code syncReportMutationToWam},
+     *           {@code syncReportBundleAndSummaryToWam}, and
+     *           {@code reportSyncdWamAccumulator}).
+     * @param collectionName the non-{@code null} collection to map
+     * @return the matching {@link SyncdCollectionType} enum constant
+     */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdWamReportingUtils", exports = "h", adaptation = WhatsAppAdaptation.DIRECT)
+    private static SyncdCollectionType mapSyncdCollectionType(SyncPatchType collectionName) {
+        return switch (collectionName) {
+            case CRITICAL_BLOCK -> SyncdCollectionType.CRITICAL_BLOCK;
+            case CRITICAL_UNBLOCK_LOW -> SyncdCollectionType.CRITICAL_UNBLOCK_LOW;
+            case REGULAR -> SyncdCollectionType.REGULAR;
+            case REGULAR_HIGH -> SyncdCollectionType.REGULAR_HIGH;
+            case REGULAR_LOW -> SyncdCollectionType.REGULAR_LOW;
+        };
+    }
+
+    /**
+     * Emits one {@code MdSyncdMutationEvent} per decrypted mutation for an
+     * incoming snapshot or patch.
+     *
+     * <p>Per WhatsApp Web
+     * {@code WAWebSyncdCollectionHandler._applySnapshotAndPatches} (snapshot
+     * branch) and {@code _applyPatch} (patch branch), after decrypting the
+     * mutations the handler iterates them and calls
+     * {@code WAWebSyncdWamReportingUtils.syncReportMutationToWam(collection,
+     * version, /*incoming*&#47;true, base64(indexMac), mutationName, isRemove,
+     * /*isPatch*&#47;bundleIsPatch, mdSessionId, base64(patchMac))}. The reporter
+     * constructs and commits a {@code MdSyncdMutationWamEvent} per mutation
+     * when the {@code syncd_mutation_and_bundle_logging} AB prop allowlist
+     * includes the collection.
+     *
+     * <p>Cobalt omits the AB allowlist gate (matches Cobalt's project-wide WAM
+     * emission policy: always emit; filtering is handled upstream) and derives
+     * each property from the decrypted mutation directly.
+     *
+     * @implNote WAWebSyncdWamReportingUtils.syncReportMutationToWam (single
+     *           WA Web helper called from three distinct sites in
+     *           WAWebSyncdCollectionHandler). Cobalt inlines the allowlist
+     *           guard as unconditional emission. {@code appSessionId} and
+     *           {@code companionSessionIds} are omitted as Cobalt has no
+     *           {@code getSharedSessionId}/{@code getMdSessionId} derivation
+     *           (same NO_WA_BASIS rationale as {@code emitBootstrapDataApplied}
+     *           above).
+     *           {@code contentLength} is hardcoded to {@code 0} to match WA
+     *           Web which writes the literal {@code contentLength:0} at every
+     *           call site.
+     *           {@code syncdKeyhash} and {@code syncdKeyid} are written as
+     *           empty strings — WA Web writes {@code ""} at every call site
+     *           (the non-empty key hash/id values live on
+     *           {@code MdSyncdMutationsSummaryWamEvent}, which is a separate
+     *           event id).
+     * @param collectionName      the collection the mutations belong to
+     * @param seqNumber           the patch/snapshot seq number (version)
+     * @param direction           {@link MutationDirectionType#INCOMING} for
+     *                            snapshot/patch apply,
+     *                            {@link MutationDirectionType#OUTGOING} for
+     *                            upload ack
+     * @param bundle              {@link MutationBundleType#SNAPSHOT} for the
+     *                            snapshot branch,
+     *                            {@link MutationBundleType#PATCH} for the
+     *                            patch branch
+     * @param mutations           the decrypted mutations (post-verify but
+     *                            pre-apply, matching the WA Web call ordering)
+     * @param patchMac            the wire patch MAC for PATCH bundles, or
+     *                            {@code null} for SNAPSHOT bundles. Base64-url
+     *                            encoded on emission to match WA Web's
+     *                            {@code WABase64.encodeB64UrlSafe} formatting
+     */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdWamReportingUtils", exports = "syncReportMutationToWam", adaptation = WhatsAppAdaptation.ADAPTED)
+    private void emitSyncdMutationWamEvents(
+            SyncPatchType collectionName,
+            long seqNumber,
+            MutationDirectionType direction,
+            MutationBundleType bundle,
+            SequencedCollection<DecryptedMutation.Untrusted> mutations,
+            byte[] patchMac) {
+        if (mutations.isEmpty()) {
+            return;
+        }
+        var syncdCollection = mapSyncdCollectionType(collectionName);
+        var seqNumberInt = (int) seqNumber; // WAWebSyncdWamReportingUtils.syncReportMutationToWam: seqNumber: t (JS number)
+        var patchMacStr = patchMac == null || patchMac.length == 0
+                ? ""
+                : Base64.getUrlEncoder().withoutPadding().encodeToString(patchMac); // WABase64.encodeB64UrlSafe
+        for (var mutation : mutations) {
+            // WAWebSyncdActionUtils.getMutationNameFromIndex: parseIndex(e, t)?.[0]
+            var mutationName = com.github.auties00.cobalt.sync.handler.SyncdIndexUtils
+                    .getMutationNameFromIndex(null, mutation.index());
+            if (mutationName == null || mutationName.isBlank()) {
+                mutationName = "no-mutation-name"; // WAWebSyncdWamReportingUtils.syncReportMutationToWam: a != null ? a : "no-mutation-name"
+            }
+            // WAWebSyncdWamReportingUtils.syncReportMutationToWam: mutationMac: WABase64.encodeB64UrlSafe(indexMac)
+            var mutationMac = Base64.getUrlEncoder().withoutPadding().encodeToString(mutation.indexMac());
+            // WAWebSyncdWamReportingUtils.syncReportMutationToWam:
+            //   mutationOperation: i ? REMOVE : SET (i = operation === REMOVE)
+            var mutationOperation = mutation.operation() == SyncdOperation.REMOVE
+                    ? MutationOperationType.REMOVE
+                    : MutationOperationType.SET;
+            whatsapp.wamService().commit(new MdSyncdMutationEventBuilder() // WAWebMdSyncdMutationWamEvent.MdSyncdMutationWamEvent
+                    .contentLength(0) // WAWebSyncdWamReportingUtils.syncReportMutationToWam: contentLength:0 (literal)
+                    .isInBootstrap(false) // WAWebSyncdWamReportingUtils.syncReportMutationToWam: isInBootstrap:!1 (literal)
+                    .isUsingLid(false) // WAWebSyncdWamReportingUtils.syncReportMutationToWam: isUsingLid:!1 (literal)
+                    .mutationBundle(bundle) // WAWebSyncdWamReportingUtils.syncReportMutationToWam: l ? PATCH : SNAPSHOT
+                    .mutationDirection(direction) // WAWebSyncdWamReportingUtils.syncReportMutationToWam: n ? INCOMING : OUTGOING
+                    .mutationMac(mutationMac) // WAWebSyncdWamReportingUtils.syncReportMutationToWam: mutationMac: r (b64url(indexMac))
+                    .mutationName(mutationName) // WAWebSyncdWamReportingUtils.syncReportMutationToWam: mutationName: a != null ? a : "no-mutation-name"
+                    .mutationOperation(mutationOperation)
+                    .seqNumber(seqNumberInt) // WAWebSyncdWamReportingUtils.syncReportMutationToWam: seqNumber: t
+                    .syncdCollection(syncdCollection) // WAWebSyncdWamReportingUtils.syncReportMutationToWam: syncdCollection: h(e)
+                    .syncdKeyhash("") // WAWebSyncdWamReportingUtils.syncReportMutationToWam: syncdKeyhash:"" (literal)
+                    .syncdKeyid("") // WAWebSyncdWamReportingUtils.syncReportMutationToWam: syncdKeyid:"" (literal)
+                    .patchMac(patchMacStr) // WAWebSyncdWamReportingUtils.syncReportMutationToWam: patchMac: c != null ? c : ""
+                    // NO_WA_BASIS: appSessionId — WA Web calls getSharedSessionId(); Cobalt has no equivalent derivation (same omission as MdBootstrapDataAppliedEvent in this file)
+                    // NO_WA_BASIS: companionSessionIds — WA Web uses mdSessionId from identity-key hashing; Cobalt has no equivalent
+                    .build());
+        }
+    }
+
+    /**
+     * Emits one {@code MdSyncdMutationEvent} per uploaded mutation after a
+     * successful outgoing patch push.
+     *
+     * <p>Per WhatsApp Web {@code WAWebSyncdCollectionHandler.$e}
+     * ({@code _uploadSuccessful}): the post-upload callback iterates the
+     * acknowledged mutations and calls
+     * {@code WAWebSyncdWamReportingUtils.syncReportMutationToWam(e, d,
+     * /*incoming*&#47;false, base64(indexMac), mutationName, isRemove,
+     * /*isPatch*&#47;true, mdSessionId, base64(uploadedPatchMac))}. The reporter
+     * then constructs a {@code MdSyncdMutationWamEvent} per mutation.
+     *
+     * <p>Cobalt's upload success path lives in {@link #processUploadSuccess};
+     * the uploaded mutations are represented as
+     * {@link SyncRequest.UploadedMutationInfo}. WA Web always emits
+     * {@code isInBootstrap:false} and {@code mutationBundle:PATCH} for this
+     * site (uploads are by definition outgoing patches post-bootstrap); Cobalt
+     * mirrors that.
+     *
+     * @implNote WAWebSyncdCollectionHandler.$e (upload success loop) +
+     *           WAWebSyncdWamReportingUtils.syncReportMutationToWam (reporter).
+     * @param collectionName the collection that was uploaded
+     * @param seqNumber      the new patch version acknowledged by the server
+     * @param mutations      the acknowledged mutations
+     */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdCollectionHandler", exports = "$e", adaptation = WhatsAppAdaptation.ADAPTED)
+    private void emitSyncdMutationWamEventsForUpload(
+            SyncPatchType collectionName,
+            long seqNumber,
+            List<SyncRequest.UploadedMutationInfo> mutations) {
+        if (mutations.isEmpty()) {
+            return;
+        }
+        var syncdCollection = mapSyncdCollectionType(collectionName);
+        var seqNumberInt = (int) seqNumber;
+        for (var mutation : mutations) {
+            var mutationName = com.github.auties00.cobalt.sync.handler.SyncdIndexUtils
+                    .getMutationNameFromIndex(null, mutation.actionIndex());
+            if (mutationName == null || mutationName.isBlank()) {
+                mutationName = "no-mutation-name"; // WAWebSyncdWamReportingUtils.syncReportMutationToWam: a != null ? a : "no-mutation-name"
+            }
+            var mutationMac = Base64.getUrlEncoder().withoutPadding().encodeToString(mutation.indexMac()); // WABase64.encodeB64UrlSafe
+            var mutationOperation = mutation.operation() == SyncdOperation.REMOVE
+                    ? MutationOperationType.REMOVE
+                    : MutationOperationType.SET;
+            whatsapp.wamService().commit(new MdSyncdMutationEventBuilder() // WAWebMdSyncdMutationWamEvent.MdSyncdMutationWamEvent
+                    .contentLength(0) // WAWebSyncdWamReportingUtils.syncReportMutationToWam: contentLength:0 (literal)
+                    .isInBootstrap(false) // WAWebSyncdWamReportingUtils.syncReportMutationToWam: isInBootstrap:!1 (literal)
+                    .isUsingLid(false) // WAWebSyncdWamReportingUtils.syncReportMutationToWam: isUsingLid:!1 (literal)
+                    .mutationBundle(MutationBundleType.PATCH) // WAWebSyncdCollectionHandler.$e call: l=!0 -> PATCH
+                    .mutationDirection(MutationDirectionType.OUTGOING) // WAWebSyncdCollectionHandler.$e call: n=false -> OUTGOING
+                    .mutationMac(mutationMac) // WAWebSyncdWamReportingUtils.syncReportMutationToWam: mutationMac: base64(indexMac)
+                    .mutationName(mutationName)
+                    .mutationOperation(mutationOperation)
+                    .seqNumber(seqNumberInt) // WAWebSyncdCollectionHandler.$e call: t = newVersion d
+                    .syncdCollection(syncdCollection)
+                    .syncdKeyhash("") // WAWebSyncdWamReportingUtils.syncReportMutationToWam: literal ""
+                    .syncdKeyid("") // WAWebSyncdWamReportingUtils.syncReportMutationToWam: literal ""
+                    // NO_WA_BASIS: patchMac — WA Web passes base64(e.patchMac) per-mutation, but Cobalt's UploadedMutationInfo does not carry the wire patch MAC; omitted (WA Web also falls back to "" when null)
+                    // NO_WA_BASIS: appSessionId / companionSessionIds — same omission rationale as incoming path
+                    .build());
         }
     }
 
@@ -1190,6 +1739,13 @@ public final class WebAppStateService {
                 store.removeSyncActionEntry(patchType, mutation.indexMac());
             }
         }
+
+        // WAWebSyncdCollectionHandler.$e (_uploadSuccessful): after persisting sync
+        // action entries, iterate the uploaded mutations and emit one
+        // MdSyncdMutationWamEvent per mutation via
+        // WAWebSyncdWamReportingUtils.syncReportMutationToWam (called with
+        // incoming=false, isPatch=true, isInBootstrap=false).
+        emitSyncdMutationWamEventsForUpload(patchType, expectedVersion, uploadInfo.mutations());
 
         // Remove only the pending mutations that participated in this upload.
         var uploadedPendingMutationIds = new HashSet<>(uploadInfo.uploadedPendingMutationIds());
@@ -1378,12 +1934,15 @@ public final class WebAppStateService {
     private SyncdSnapshot downloadAndDecodeSnapshot(ExternalBlobReference snapshotRef) {
         validateExternalBlobReference(snapshotRef); // ADAPTED: WAWebSyncdValidateServerSyncProtobuf.validateExternalBlobReference — validated pre-download
 
+        var downloadStart = Instant.now();
         try {
             var downloadedData = whatsapp.store()
                     .awaitMediaConnection()
                     .download(snapshotRef); // WAWebSyncdNetCallbacksApi.downloadSyncBlob(blobRef, "snapshot", collectionName)
             try (var protobufStream = ProtobufInputStream.fromStream(downloadedData)) {
-                return SyncdSnapshotSpec.decode(protobufStream); // WAWebSyncdDecode.decodeSyncdSnapshot
+                var decoded = SyncdSnapshotSpec.decode(protobufStream); // WAWebSyncdDecode.decodeSyncdSnapshot
+                commitMediaDownload2Success(downloadStart); // WAWebCreateMediaDownloadMetrics.handleDownloadAndDecryptSuccess
+                return decoded;
             } catch (Throwable throwable) {
                 throw new WhatsAppWebAppStateSyncException.UnexpectedError("Failed to decode snapshot", throwable); // WAWebSyncdDecode.decodeSyncdSnapshot — SyncdFatalError
             }
@@ -1391,6 +1950,7 @@ public final class WebAppStateService {
             if (throwable instanceof WhatsAppWebAppStateSyncException exception) {
                 throw exception;
             }
+            commitMediaDownload2Failure(downloadStart, throwable); // WAWebCreateMediaDownloadMetrics.handleDownloadError
             // Per WA Web WAWebSyncdNetCallbacksApi.downloadSyncBlob: MediaNotFoundError
             // (HTTP 404 / CDN blob expired) is re-thrown as
             // `new SyncdFatalError("external patch expired")` — a fatal error that
@@ -1602,11 +2162,15 @@ public final class WebAppStateService {
     private InputStream downloadExternalMutation(ExternalBlobReference externalRef) {
         validateExternalBlobReference(externalRef); // ADAPTED: WAWebSyncdValidateServerSyncProtobuf.validateExternalBlobReference — validated pre-download
 
+        var downloadStart = Instant.now();
         try {
-            return whatsapp.store()
+            var downloaded = whatsapp.store()
                     .awaitMediaConnection()
                     .download(externalRef); // WAWebSyncdNetCallbacksApi.downloadSyncBlob(blobRef, "patch", collectionName)
+            commitMediaDownload2Success(downloadStart); // WAWebCreateMediaDownloadMetrics.handleDownloadAndDecryptSuccess
+            return downloaded;
         } catch (Throwable throwable) {
+            commitMediaDownload2Failure(downloadStart, throwable); // WAWebCreateMediaDownloadMetrics.handleDownloadError
             // Per WA Web WAWebSyncdNetCallbacksApi.downloadSyncBlob: when the CDN returns
             // MediaNotFoundError (HTTP 404 / expired blob) for an external patch, WA Web
             // throws `new SyncdFatalError("external patch expired")` — fatal, not retryable.
@@ -1615,6 +2179,129 @@ public final class WebAppStateService {
             }
             throw new WhatsAppWebAppStateSyncException.ExternalDownloadFailed(throwable); // WAWebSyncdNetCallbacksApi.downloadSyncBlob — non-404 download failures are retryable
         }
+    }
+
+    /**
+     * Commits a successful {@code MediaDownload2Event} for an app-state CDN
+     * blob download.
+     *
+     * @implNote WAWebCreateMediaDownloadMetrics.handleDownloadAndDecryptSuccess:
+     * invoked from WAWebSyncdNetCallbacksApi.downloadSyncBlob via
+     * WAWebDownloadManager.downloadAndMaybeDecrypt with
+     * {@code type="md-app-state"} and
+     * {@code downloadOrigin=MESSAGE_HISTORY_SYNC}.
+     * @param downloadStart the instant at which the download attempt began
+     */
+    @WhatsAppWebExport(moduleName = "WAWebCreateMediaDownloadMetrics",
+            exports = "createMediaDownloadMetrics",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private void commitMediaDownload2Success(Instant downloadStart) {
+        var overallT = Instant.ofEpochMilli(Duration.between(downloadStart, Instant.now()).toMillis());
+        whatsapp.wamService().commit(new MediaDownload2EventBuilder()
+                .overallMediaType(MediaType.MD_APP_STATE)
+                .overallMmsVersion(4)
+                .overallDownloadOrigin(DownloadOriginType.MESSAGE_HISTORY_SYNC)
+                .overallDownloadMode(MediaDownloadModeType.FULL)
+                .overallDownloadResult(MediaDownloadResultType.OK)
+                .overallIsFinal(Boolean.TRUE)
+                .downloadHttpCode(200)
+                .overallT(overallT)
+                .overallAttemptCount(1)
+                .overallRetryCount(0)
+                .build());
+    }
+
+    /**
+     * Commits a failing {@code MediaDownload2Event} for an app-state CDN
+     * blob download.
+     *
+     * @implNote WAWebCreateMediaDownloadMetrics.handleDownloadError: maps the
+     * error via WAWebWamMediaMetricUtils.getMetricDownloadErrorResultType,
+     * sets {@code overallIsFinal=true} and, when present, the
+     * {@code downloadHttpCode} extracted from the HTTP status.
+     * @param downloadStart the instant at which the download attempt began
+     * @param throwable     the error that aborted the download
+     */
+    @WhatsAppWebExport(moduleName = "WAWebCreateMediaDownloadMetrics",
+            exports = "createMediaDownloadMetrics",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebWamMediaMetricUtils",
+            exports = "getMetricDownloadErrorResultType",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private void commitMediaDownload2Failure(Instant downloadStart, Throwable throwable) {
+        var overallT = Instant.ofEpochMilli(Duration.between(downloadStart, Instant.now()).toMillis());
+        var builder = new MediaDownload2EventBuilder()
+                .overallMediaType(MediaType.MD_APP_STATE)
+                .overallMmsVersion(4)
+                .overallDownloadOrigin(DownloadOriginType.MESSAGE_HISTORY_SYNC)
+                .overallDownloadMode(MediaDownloadModeType.FULL)
+                .overallDownloadResult(classifyMediaDownloadError(throwable))
+                .overallIsFinal(Boolean.TRUE)
+                .overallT(overallT)
+                .overallAttemptCount(1)
+                .overallRetryCount(0);
+        var statusCode = extractHttpStatusCode(throwable);
+        if (statusCode != null) {
+            builder.downloadHttpCode(statusCode);
+        }
+        whatsapp.wamService().commit(builder.build());
+    }
+
+    /**
+     * Maps a download failure to the appropriate
+     * {@link MediaDownloadResultType} using the same rules as WA Web's
+     * {@code WAWebWamMediaMetricUtils.getMetricDownloadErrorResultType}.
+     *
+     * @implNote WAWebWamMediaMetricUtils.getMetricDownloadErrorResultType:
+     * classifies by error class and HTTP status (404/410 -> TOO_OLD, 416 ->
+     * CANNOT_RESUME, 401 -> INVALID_URL, 429/507 -> THROTTLE; network errors
+     * -> NETWORK; other -> UNKNOWN).
+     * @param throwable the error raised by the download path
+     * @return the mapped result type
+     */
+    @WhatsAppWebExport(moduleName = "WAWebWamMediaMetricUtils",
+            exports = "getMetricDownloadErrorResultType",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private static MediaDownloadResultType classifyMediaDownloadError(Throwable throwable) {
+        for (var current = throwable; current != null; current = current.getCause()) {
+            if (current instanceof WhatsAppMediaException.Download download) {
+                var optStatus = download.httpStatusCode();
+                if (optStatus.isEmpty()) {
+                    // HttpNetworkError -> ERROR_NETWORK
+                    return MediaDownloadResultType.ERROR_NETWORK;
+                }
+                var status = optStatus.getAsInt();
+                return switch (status) {
+                    case 404, 410 -> MediaDownloadResultType.ERROR_TOO_OLD;
+                    case 416 -> MediaDownloadResultType.ERROR_CANNOT_RESUME;
+                    case 401 -> MediaDownloadResultType.ERROR_INVALID_URL;
+                    case 429, 507 -> MediaDownloadResultType.ERROR_THROTTLE;
+                    default -> MediaDownloadResultType.ERROR_UNKNOWN;
+                };
+            }
+        }
+        return MediaDownloadResultType.ERROR_UNKNOWN;
+    }
+
+    /**
+     * Extracts the HTTP status code embedded in a download failure, if any.
+     *
+     * @implNote WAWebWamMediaMetricUtils.getStatusCode:
+     * {@code e instanceof HttpStatusCodeError ? e.status : null}.
+     * @param throwable the error raised by the download path
+     * @return the status code, or {@code null} if unavailable
+     */
+    @WhatsAppWebExport(moduleName = "WAWebWamMediaMetricUtils",
+            exports = "getStatusCode",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private static Integer extractHttpStatusCode(Throwable throwable) {
+        for (var current = throwable; current != null; current = current.getCause()) {
+            if (current instanceof WhatsAppMediaException.Download download) {
+                var optStatus = download.httpStatusCode();
+                return optStatus.isPresent() ? optStatus.getAsInt() : null;
+            }
+        }
+        return null;
     }
 
     /**
@@ -1827,6 +2514,269 @@ public final class WebAppStateService {
     }
 
     /**
+     * Reports the size of any per-chat message range snapshot carried by
+     * decrypted chat action mutations to the WAM pipeline.
+     *
+     * <p>Per WhatsApp Web {@code WAWebSyncdMetricCriticalBootstrapStage.reportSyncdDecryptedMutations}:
+     * iterates over each decoded {@code SyncActionData.value}; when the payload is an
+     * {@code archiveChatAction}, {@code markChatAsReadAction}, {@code clearChatAction},
+     * or {@code deleteChatAction} and carries a non-null {@code messageRange}, invokes
+     * {@code WAWebCollectionHandlerWamMutation.logMetricsForMutationLength(a.messages.length)}
+     * which in turn constructs and commits a {@code MdAppStateMessageRangeWamEvent} with
+     * {@code additionalMessagesCount} set to {@code messageRange.messages.length}.
+     *
+     * <p>This method is invoked after {@link #decryptMutations} returns for both the
+     * snapshot and patch application paths, matching the two call sites in
+     * {@code WAWebSyncdCollectionHandler._applySnapshotAndPatches} and
+     * {@code WAWebSyncdCollectionHandler._applyPatch}.
+     *
+     * @implNote WAWebSyncdMetricCriticalBootstrapStage.reportSyncdDecryptedMutations,
+     *           WAWebCollectionHandlerWamMutation.logMetricsForMutationLength
+     * @param untrusted the decrypted mutations to inspect for chat action message ranges
+     */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdMetricCriticalBootstrapStage", exports = "reportSyncdDecryptedMutations", adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WAWebCollectionHandlerWamMutation", exports = "logMetricsForMutationLength", adaptation = WhatsAppAdaptation.DIRECT)
+    private void reportDecryptedMutationMessageRanges(SequencedCollection<DecryptedMutation.Untrusted> untrusted) {
+        // WAWebSyncdMetricCriticalBootstrapStage.reportSyncdDecryptedMutations:
+        //   logCriticalBootstrapStageIfNecessary(MUTATIONS_DECRYPTED) is the first step of this helper.
+        logCriticalBootstrapStageIfNecessary(BootstrapAppStateDataStageCode.MUTATIONS_DECRYPTED);
+        for (var mutation : untrusted) {
+            // WAWebSyncdMetricCriticalBootstrapStage.reportSyncdDecryptedMutations:
+            //   r.archiveChatAction ? r.archiveChatAction.messageRange
+            // : r.markChatAsReadAction ? r.markChatAsReadAction.messageRange
+            // : r.clearChatAction ? r.clearChatAction.messageRange
+            // : r.deleteChatAction ? r.deleteChatAction.messageRange : null
+            var messageRange = mutation.value().action()
+                    .flatMap(action -> switch (action) {
+                        case ArchiveChatAction a -> a.messageRange();
+                        case MarkChatAsReadAction a -> a.messageRange();
+                        case ClearChatAction a -> a.messageRange();
+                        case DeleteChatAction a -> a.messageRange();
+                        default -> Optional.<SyncActionMessageRange>empty();
+                    })
+                    .orElse(null);
+            if (messageRange == null) { // WAWebSyncdMetricCriticalBootstrapStage: a != null guard
+                continue;
+            }
+            // WAWebCollectionHandlerWamMutation.logMetricsForMutationLength: new MdAppStateMessageRangeWamEvent({additionalMessagesCount: e}).commit()
+            whatsapp.wamService().commit(new MdAppStateMessageRangeEventBuilder()
+                    .additionalMessagesCount(messageRange.messages().size())
+                    .build());
+        }
+    }
+
+    /**
+     * Emits a {@code MdBootstrapAppStateCriticalDataProcessingEvent} when a
+     * critical-bootstrap stage is reached during the initial app-state sync.
+     *
+     * <p>Per WhatsApp Web
+     * {@code WAWebSyncdCriticalBootstrapProcessingApi.logCriticalBootstrapStageIfNecessary}:
+     * the event is only emitted while
+     * {@code WAWebSyncBootstrap.isSyncDCriticalDataSyncInProcess()} returns
+     * {@code true} &mdash; i.e. the first-run critical data sync has not yet
+     * completed. In Cobalt this is approximated by checking whether the
+     * {@link SyncPatchType#CRITICAL_BLOCK} collection has been bootstrapped,
+     * matching {@link com.github.auties00.cobalt.stream.notification.device.NotificationSyncStreamHandler#isCriticalDataSyncInProcess}.
+     *
+     * <p>WA Web populates three properties on every emission:
+     * {@code bootstrapAppStateDataStage} (the current stage),
+     * {@code mdSessionId} (the current session id derived from primary +
+     * companion identity keys by {@code WAWebSyncdMdSession.genCurrentSessionId}),
+     * and {@code mdTimestamp} (current unix time in milliseconds truncated to
+     * int32). Cobalt does not compute an equivalent of {@code mdSessionId}, so
+     * that property is left unset; the other two are mirrored exactly.
+     *
+     * @implNote WAWebSyncdCriticalBootstrapProcessingApi.logCriticalBootstrapStageIfNecessary,
+     *           WAWebSyncBootstrap.isSyncDCriticalDataSyncInProcess
+     * @param stage the bootstrap stage reached; never {@code null}
+     */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdCriticalBootstrapProcessingApi", exports = "logCriticalBootstrapStageIfNecessary", adaptation = WhatsAppAdaptation.ADAPTED)
+    private void logCriticalBootstrapStageIfNecessary(BootstrapAppStateDataStageCode stage) {
+        // WAWebSyncdCriticalBootstrapProcessingApi.logCriticalBootstrapStageIfNecessary:
+        //   if (WAWebSyncBootstrap.isSyncDCriticalDataSyncInProcess()) { emit(); }
+        // ADAPTED: WA Web tracks a global syncdCritical state machine; Cobalt approximates
+        // it by checking whether the critical_block collection has been bootstrapped yet.
+        if (store.findWebAppState(SyncPatchType.CRITICAL_BLOCK).bootstrapped()) {
+            return;
+        }
+        // WAWebSyncdCriticalBootstrapProcessingApi.logCriticalBootstrapStageIfNecessary:
+        //   new MdBootstrapAppStateCriticalDataProcessingWamEvent({
+        //       bootstrapAppStateDataStage: e,
+        //       mdSessionId: yield MdSyncFieldStatsMeta.getMdSessionId(),
+        //       mdTimestamp: unixTimeMs()
+        //   }).commit()
+        // ADAPTED: Cobalt has no equivalent of genCurrentSessionId (which hashes
+        // primary + companion identity keys), so mdSessionId is omitted.
+        whatsapp.wamService().commit(new MdBootstrapAppStateCriticalDataProcessingEventBuilder()
+                .bootstrapAppStateDataStage(stage) // WAWebSyncdCriticalBootstrapProcessingApi: bootstrapAppStateDataStage: e
+                .mdTimestamp((int) System.currentTimeMillis()) // WAWebSyncdCriticalBootstrapProcessingApi: mdTimestamp: unixTimeMs()
+                .build());
+    }
+
+    /**
+     * Emits {@code MdBootstrapAppStateDataDownloadedEvent} after the external
+     * snapshot and patch downloads complete for a collection being bootstrapped
+     * for the first time.
+     *
+     * <p>Per WhatsApp Web {@code WAWebCollectionHandlerWamSyncUtil.commitBootstrapAppStateDownloadMetric}:
+     * the event is built with the collection's payload type (critical vs.
+     * non-critical), the elapsed download duration since
+     * {@code BootstrapDownloadTracker.startTs()}, the accumulated payload
+     * size in bytes (clamped to int32), the step result (success/failure),
+     * the current unix timestamp, and the md session id. Storage quota
+     * estimation fields are populated from the browser's
+     * {@code navigator.storage.estimate()} API when available.
+     *
+     * <p>WA Web emits this unconditionally for bootstrap rounds; Cobalt
+     * mirrors that by only invoking this helper when the collection was
+     * not previously bootstrapped. Cobalt has no browser storage API so
+     * {@code mdStorageQuotaBytes} and {@code mdStorageQuotaUsedBytes} are
+     * omitted; Cobalt also has no equivalent of {@code genCurrentSessionId}
+     * (which hashes primary + companion identity keys) so {@code mdSessionId}
+     * is omitted.
+     *
+     * @implNote WAWebCollectionHandlerWamSyncUtil.commitBootstrapAppStateDownloadMetric
+     *           (emission), WAWebSyncdMetrics.reportSyncdBootstrapAppStateDownloadMetric
+     *           (entry point wrapping the emission)
+     * @param tracker the download tracker carrying start timestamp and accumulated size
+     * @param result  the step result, {@link MdBootstrapStepResult#SUCCESS} when the
+     *                downloads completed or {@link MdBootstrapStepResult#FAILURE}
+     *                otherwise
+     * @param failure the throwable that caused the failure, or {@code null} on success;
+     *                used to populate {@code mdSyncFailureReason}
+     */
+    @WhatsAppWebExport(moduleName = "WAWebCollectionHandlerWamSyncUtil", exports = "commitBootstrapAppStateDownloadMetric", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebSyncdMetrics", exports = "reportSyncdBootstrapAppStateDownloadMetric", adaptation = WhatsAppAdaptation.ADAPTED)
+    private void emitBootstrapAppStateDataDownloaded(
+            BootstrapDownloadTracker tracker,
+            MdBootstrapStepResult result,
+            Throwable failure
+    ) {
+        var now = System.currentTimeMillis();
+        var duration = now - tracker.startTs();
+        var builder = new MdBootstrapAppStateDataDownloadedEventBuilder()
+                // WAWebCollectionHandlerWamSyncUtil.commitBootstrapAppStateDownloadMetric:
+                //   mdBootstrapPayloadType: e.includes(t) ? CRITICAL : NON_CRITICAL
+                .mdBootstrapPayloadType(tracker.collectionName().isCritical()
+                        ? MdBootstrapPayloadType.CRITICAL
+                        : MdBootstrapPayloadType.NON_CRITICAL)
+                // WAWebCollectionHandlerWamSyncUtil.commitBootstrapAppStateDownloadMetric:
+                //   mdTimestamp: unixTimeMs()
+                .mdTimestamp((int) now)
+                // WAWebCollectionHandlerWamSyncUtil.commitBootstrapAppStateDownloadMetric:
+                //   mdBootstrapStepDuration: unixTimeMs() - n
+                .mdBootstrapStepDuration((int) duration)
+                // WAWebCollectionHandlerWamSyncUtil.commitBootstrapAppStateDownloadMetric:
+                //   mdBootstrapStepResult: a==="success" ? SUCCESS : FAILURE
+                .mdBootstrapStepResult(result);
+        // WAWebCollectionHandlerWamSyncUtil.commitBootstrapAppStateDownloadMetric:
+        //   try { var s = WALongInt.maybeNumberOrThrowIfTooLarge(r); if (s != null) i.mdBootstrapPayloadSize = s; } catch {}
+        if (tracker.totalBytes() > 0 && tracker.totalBytes() <= Integer.MAX_VALUE) {
+            builder.mdBootstrapPayloadSize((int) tracker.totalBytes());
+        }
+        // NO_WA_BASIS: WA Web reads mdStorageQuotaBytes/mdStorageQuotaUsedBytes from
+        // navigator.storage.estimate(); Cobalt runs on the JVM and has no equivalent
+        // browser quota API, so both storage quota fields are omitted.
+        // NO_WA_BASIS: WA Web populates mdSessionId via MdSyncFieldStatsMeta.getMdSessionId()
+        // which hashes primary + companion identity keys; Cobalt has no equivalent session id
+        // derivation, so mdSessionId is omitted (same as MdBootstrapAppStateCriticalDataProcessingEvent).
+        // NO_WA_BASIS: WA Web's commitBootstrapAppStateDownloadMetric does not populate
+        // mdSyncFailureReason (index 17) — the spec defines the field but neither the
+        // primary emitter nor the KmpWamLogger variant ever writes to it. The `failure`
+        // throwable is accepted here for symmetry with WA Web's isSuccess==="failure"
+        // branch (so the on-failure emission carries the same shape) and kept available
+        // in case a future WA Web revision starts populating mdSyncFailureReason at
+        // this callsite.
+        assert failure == null || result == MdBootstrapStepResult.FAILURE;
+        whatsapp.wamService().commit(builder.build()); // WAWebCollectionHandlerWamSyncUtil.commitBootstrapAppStateDownloadMetric: i.commit()
+    }
+
+    /**
+     * Mutable accumulator for the bootstrap app state download metric
+     * tracked across the snapshot and patch-external download phase of a
+     * single sync response.
+     *
+     * <p>Per WhatsApp Web {@code WAWebSyncdCollectionHandler.Fe}, the
+     * download metric is computed from the collection name, a start
+     * timestamp captured before any CDN download, and a running sum of
+     * the {@code fileSizeBytes} of each external blob reference
+     * downloaded. The start timestamp is captured eagerly at construction
+     * so it matches WA Web's {@code u = unixTimeMs()} at the top of the
+     * download function; per-blob sizes are added via {@link #addBytes}.
+     *
+     * @implNote WAWebSyncdCollectionHandler.Fe (downloadExternalSyncData —
+     *           u/s accumulator state)
+     */
+    private static final class BootstrapDownloadTracker {
+        /**
+         * Collection being downloaded; fed into {@code mdBootstrapPayloadType}
+         * via {@link SyncPatchType#isCritical()}.
+         */
+        private final SyncPatchType collectionName;
+
+        /**
+         * Unix timestamp (ms) captured at the start of the download phase,
+         * used to compute {@code mdBootstrapStepDuration}.
+         */
+        private final long startTs;
+
+        /**
+         * Running sum of the plaintext {@code fileSizeBytes} of each
+         * external blob downloaded so far.
+         */
+        private long totalBytes;
+
+        /**
+         * Creates a new tracker with a start timestamp of {@code System.currentTimeMillis()}
+         * and a zero byte accumulator.
+         *
+         * @param collectionName the collection being downloaded
+         */
+        private BootstrapDownloadTracker(SyncPatchType collectionName) {
+            this.collectionName = collectionName;
+            this.startTs = System.currentTimeMillis();
+        }
+
+        /**
+         * Returns the collection being downloaded.
+         *
+         * @return the collection name
+         */
+        private SyncPatchType collectionName() {
+            return collectionName;
+        }
+
+        /**
+         * Returns the unix timestamp captured at construction.
+         *
+         * @return the start timestamp in milliseconds
+         */
+        private long startTs() {
+            return startTs;
+        }
+
+        /**
+         * Returns the running sum of external blob sizes.
+         *
+         * @return the total downloaded bytes
+         */
+        private long totalBytes() {
+            return totalBytes;
+        }
+
+        /**
+         * Adds a single blob's plaintext size to the running total.
+         *
+         * @param bytes the {@code fileSizeBytes} value from an external blob reference
+         */
+        private void addBytes(long bytes) {
+            if (bytes > 0) {
+                totalBytes += bytes;
+            }
+        }
+    }
+
+    /**
      * Applies a batch of trusted mutations to the store via the handler registry.
      *
      * <p>Per WhatsApp Web {@code WAWebSyncdCollectionHandler._applySetMutations} (Xe):
@@ -1841,6 +2791,8 @@ public final class WebAppStateService {
      * @param remoteMutations the trusted mutations to apply
      */
     private void applyMutations(SyncPatchType collectionName, SequencedCollection<DecryptedMutation.Trusted> remoteMutations) {
+        // WAWebSyncdCollectionHandler._applySetMutations: logCriticalBootstrapStageIfNecessary(ABOUT_TO_APPLY_MUTATIONS) at entry.
+        logCriticalBootstrapStageIfNecessary(BootstrapAppStateDataStageCode.ABOUT_TO_APPLY_MUTATIONS);
         // Step 1: Resolve conflicts with pending local mutations
         var mutationsToApply = resolveConflicts(remoteMutations, collectionName);
 
@@ -1921,6 +2873,9 @@ public final class WebAppStateService {
                 }
             }
         }
+
+        // WAWebSyncdCollectionHandler._applySetMutations: logCriticalBootstrapStageIfNecessary(APPLIED_MUTATIONS) right before the return/log block at the end of the function.
+        logCriticalBootstrapStageIfNecessary(BootstrapAppStateDataStageCode.APPLIED_MUTATIONS);
 
         // Step 4: Retry orphan mutations that may now succeed
         retryOrphanMutations(collectionName);
@@ -2533,6 +3488,8 @@ public final class WebAppStateService {
             );
             if (result) {
                 store.markWebAppStateErrorRetry(collectionName); // WAWebSyncdServerSync.S: ErrorRetry
+                // WAWebSyncd.ie: if (e.state === CollectionState.ErrorRetry) logCriticalBootstrapStageIfNecessary(ENTERED_RETRY_MODE)
+                logCriticalBootstrapStageIfNecessary(BootstrapAppStateDataStageCode.ENTERED_RETRY_MODE);
             } else {
                 store.markWebAppStateErrorFatal(collectionName); // WAWebSyncd.oe: expired -> Fatal
             }
@@ -2662,6 +3619,12 @@ public final class WebAppStateService {
         // Per WA Web WAWebTasksDefinitions: start the periodic key rotation
         // background job (every 27 days) independently of mutation push
         syncKeyRotationService.startPeriodicRotationJob();
+
+        // Per WA Web WAWebTasksDefinitions.REPORT_SYNCD_ACTION_STAT:
+        // start the daily syncd stats reporting job which iterates all sync
+        // action entries, groups by mutation name, buckets per-state counts,
+        // and commits one MdAppStateSyncMutationStats WAM event per mutation.
+        startPeriodicReportSyncdStatsJob();
     }
 
     /**
@@ -2707,15 +3670,213 @@ public final class WebAppStateService {
     }
 
     /**
+     * Starts the daily syncd stats reporting job.
+     *
+     * <p>Per WhatsApp Web {@code WAWebTasksDefinitions.REPORT_SYNCD_ACTION_STAT}:
+     * schedules a recurring task that every {@code DAY_SECONDS} invokes
+     * {@link #reportSyncdStats()} to walk all stored sync action entries,
+     * bucket their per-state counts, and commit one
+     * {@code MdAppStateSyncMutationStats} WAM event per mutation name.
+     *
+     * @implNote WAWebTasksDefinitions.REPORT_SYNCD_ACTION_STAT,
+     *           WAWebSyncdReportSyncdStatJob.reportSyncdStatsJob
+     */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdReportSyncdStatJob", exports = "reportSyncdStatsJob", adaptation = WhatsAppAdaptation.ADAPTED)
+    private void startPeriodicReportSyncdStatsJob() {
+        stopPeriodicReportSyncdStatsJob(); // WAWebTasksDefinitions: ensure no duplicate task is scheduled
+        scheduleNextPeriodicReportSyncdStats();
+    }
+
+    /**
+     * Schedules the next execution of the daily syncd stats reporting job.
+     *
+     * <p>Per WhatsApp Web {@code WAWebTasksDefinitions}: the task body returns
+     * {@code DAY_SECONDS} after each run, so the runtime reschedules the task
+     * one day later. Cobalt mirrors this by self-rescheduling from within the
+     * {@code finally} block of the task lambda.
+     *
+     * @implNote WAWebTasksDefinitions.REPORT_SYNCD_ACTION_STAT (return DAY_SECONDS)
+     */
+    private void scheduleNextPeriodicReportSyncdStats() {
+        periodicReportSyncdStatsJob = SchedulerUtils.scheduleDelayed(
+                Duration.ofDays(1), // WAWebTasksDefinitions.REPORT_SYNCD_ACTION_STAT: return o("WATimeUtils").DAY_SECONDS
+                () -> {
+                    try {
+                        reportSyncdStats(); // WAWebSyncdReportSyncdStatJob.reportSyncdStatsJob body
+                    } catch (Exception e) {
+                        LOGGER.warning("Periodic syncd stats reporting job failed: " + e.getMessage()); // ADAPTED: WA Web job orchestrator logs per-task failures
+                    } finally {
+                        scheduleNextPeriodicReportSyncdStats(); // WAWebTasksDefinitions: return DAY_SECONDS -> reschedule
+                    }
+                }
+        );
+    }
+
+    /**
+     * Walks every stored sync action entry, buckets per-state counts by
+     * mutation name, and commits one {@code MdAppStateSyncMutationStats} WAM
+     * event per distinct mutation.
+     *
+     * <p>Per WhatsApp Web {@code WAWebSyncdReportSyncdStatJob.reportSyncdStatsJob}
+     * plus {@code WAWebSyncdWamUtils.generateActionStatCounts}: fetches every row of
+     * the sync actions table across all collections, resolves the mutation name via
+     * {@code getMutationNameFromIndex} (falling back to {@code "no-mutation-name"}
+     * when the index cannot be parsed), tallies each row under its mutation name
+     * by {@code actionState} ({@code Success}/{@code Skipped} increment
+     * {@code applied}; {@code Malformed} increments {@code invalid}; {@code Orphan}
+     * increments {@code orphan}; {@code Unsupported} increments {@code unsupported};
+     * {@code Failed} increments {@code failed}), converts each count to a
+     * {@link MutationCountBucket} via {@link #convertToBucket(int)}, and emits
+     * one event per mutation name with the bucketed fields.
+     *
+     * @implNote WAWebSyncdReportSyncdStatJob.reportSyncdStatsJob,
+     *           WAWebSyncdWamUtils.generateActionStatCounts,
+     *           WAWebSyncdWamUtils.convertToBucket
+     */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdReportSyncdStatJob", exports = "reportSyncdStatsJob", adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WAWebSyncdWamUtils", exports = "generateActionStatCounts", adaptation = WhatsAppAdaptation.ADAPTED)
+    void reportSyncdStats() {
+        // WAWebSyncdWamUtils.generateActionStatCounts: var e = new Map, t = yield getSyncActionsTable().all()
+        var counts = new LinkedHashMap<String, ActionStatCounts>();
+        for (var patchType : SyncPatchType.values()) { // ADAPTED: WA Web reads the flat sync actions table; Cobalt iterates per-collection sync-action views
+            for (var entry : store.getSyncActionEntries(patchType)) { // WAWebSyncdWamUtils.generateActionStatCounts: t.forEach(function(t) { ... })
+                // WAWebSyncdWamUtils.generateActionStatCounts: var r = getMutationNameFromIndex(t.collection, t.index) || "no-mutation-name"
+                var actionName = SyncdIndexUtils.getMutationNameFromIndex(patchType.toString(), entry.actionIndex());
+                if (actionName == null || actionName.isBlank()) {
+                    actionName = "no-mutation-name"; // WAWebSyncdWamUtils.generateActionStatCounts: || "no-mutation-name"
+                }
+                var bucket = counts.computeIfAbsent(actionName, name -> new ActionStatCounts()); // WAWebSyncdWamUtils.generateActionStatCounts: var a = e.get(r) ?? { action: r, applied: 0, invalid: 0, orphan: 0, unsupported: 0, failed: 0 }
+                var actionState = entry.actionState();
+                if (actionState == null) {
+                    // ADAPTED: WA Web throws on unknown actionState via `throw Error("Match: No case...")`;
+                    // Cobalt tolerates a null state so the reporting job never aborts mid-collection.
+                    continue;
+                }
+                switch (actionState) { // WAWebSyncdWamUtils.generateActionStatCounts: exhaustive switch on t.actionState
+                    case SUCCESS, SKIPPED -> bucket.applied++; // WAWebSyncdWamUtils.generateActionStatCounts: Success || Skipped -> a.applied++
+                    case MALFORMED -> bucket.invalid++;         // WAWebSyncdWamUtils.generateActionStatCounts: Malformed  -> a.invalid++
+                    case ORPHAN -> bucket.orphan++;             // WAWebSyncdWamUtils.generateActionStatCounts: Orphan     -> a.orphan++
+                    case UNSUPPORTED -> bucket.unsupported++;   // WAWebSyncdWamUtils.generateActionStatCounts: Unsupported-> a.unsupported++
+                    case FAILED -> bucket.failed++;             // WAWebSyncdWamUtils.generateActionStatCounts: Failed     -> a.failed++
+                }
+            }
+        }
+
+        // WAWebSyncdReportSyncdStatJob.reportSyncdStatsJob: for (var t of e.values()) { new MdAppStateSyncMutationStatsWamEvent({...}).commit() }
+        for (var entry : counts.entrySet()) {
+            var actionName = entry.getKey();
+            var stats = entry.getValue();
+            whatsapp.wamService().commit(new MdAppStateSyncMutationStatsEventBuilder()
+                    .syncdAction(actionName)                           // WAWebSyncdReportSyncdStatJob: syncdAction: t.action
+                    .applied(convertToBucket(stats.applied))           // WAWebSyncdReportSyncdStatJob: applied: n.convertToBucket(t.applied)
+                    .invalid(convertToBucket(stats.invalid))           // WAWebSyncdReportSyncdStatJob: invalid: n.convertToBucket(t.invalid)
+                    .orphan(convertToBucket(stats.orphan))             // WAWebSyncdReportSyncdStatJob: orphan: n.convertToBucket(t.orphan)
+                    .unsupported(convertToBucket(stats.unsupported))   // WAWebSyncdReportSyncdStatJob: unsupported: n.convertToBucket(t.unsupported)
+                    .failed(convertToBucket(stats.failed))             // WAWebSyncdReportSyncdStatJob: failed: n.convertToBucket(t.failed)
+                    .build());
+        }
+    }
+
+    /**
+     * Converts a non-negative mutation count to its corresponding
+     * {@link MutationCountBucket}.
+     *
+     * <p>Per WhatsApp Web {@code WAWebSyncdWamUtils.convertToBucket}: maps
+     * {@code 0 -> ZERO}, {@code 1 -> ONE}, {@code <10 -> LT10},
+     * {@code <100 -> LT100}, {@code <500 -> LT500}, {@code <1000 -> LT1K},
+     * {@code <5000 -> LT5K}, otherwise {@code GTE5K}. Negative inputs throw
+     * in WA Web via {@code err("cannot convert negative number to a bucket")}.
+     *
+     * @implNote WAWebSyncdWamUtils.convertToBucket
+     * @param count the non-negative mutation count
+     * @return the bucket constant for the given count
+     * @throws IllegalArgumentException when {@code count} is negative
+     */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdWamUtils", exports = "convertToBucket", adaptation = WhatsAppAdaptation.DIRECT)
+    private static MutationCountBucket convertToBucket(int count) {
+        // WAWebSyncdWamUtils.convertToBucket: if (e<0) throw err("cannot convert negative number to a bucket")
+        if (count < 0) {
+            throw new IllegalArgumentException("cannot convert negative number to a bucket");
+        }
+        if (count == 0) return MutationCountBucket.ZERO;    // WAWebSyncdWamUtils.convertToBucket: e===0 -> ZERO
+        if (count == 1) return MutationCountBucket.ONE;     // WAWebSyncdWamUtils.convertToBucket: e===1 -> ONE
+        if (count < 10) return MutationCountBucket.LT10;    // WAWebSyncdWamUtils.convertToBucket: e<10  -> LT10
+        if (count < 100) return MutationCountBucket.LT100;  // WAWebSyncdWamUtils.convertToBucket: e<100 -> LT100
+        if (count < 500) return MutationCountBucket.LT500;  // WAWebSyncdWamUtils.convertToBucket: e<500 -> LT500
+        if (count < 1_000) return MutationCountBucket.LT1K; // WAWebSyncdWamUtils.convertToBucket: e<1e3 -> LT1K
+        if (count < 5_000) return MutationCountBucket.LT5K; // WAWebSyncdWamUtils.convertToBucket: e<5e3 -> LT5K
+        return MutationCountBucket.GTE5K;                   // WAWebSyncdWamUtils.convertToBucket: else  -> GTE5K
+    }
+
+    /**
+     * Stops the daily syncd stats reporting job.
+     *
+     * @implNote WAWebTasksDefinitions.REPORT_SYNCD_ACTION_STAT (cancellation)
+     */
+    public void stopPeriodicReportSyncdStatsJob() {
+        var job = periodicReportSyncdStatsJob;
+        if (job != null) {
+            job.cancel(false);
+            periodicReportSyncdStatsJob = null;
+        }
+    }
+
+    /**
+     * Mutable accumulator used to tally per-action-state counts for a single
+     * mutation name while walking the sync actions table.
+     *
+     * @implNote WAWebSyncdWamUtils.generateActionStatCounts: per-action accumulator
+     *           object {@code {action, applied, invalid, orphan, unsupported, failed}}
+     */
+    private static final class ActionStatCounts {
+        /**
+         * Count of mutations in the {@code SUCCESS} or {@code SKIPPED} state.
+         *
+         * @implNote WAWebSyncdWamUtils.generateActionStatCounts: a.applied (Success || Skipped)
+         */
+        int applied;
+
+        /**
+         * Count of mutations in the {@code MALFORMED} state.
+         *
+         * @implNote WAWebSyncdWamUtils.generateActionStatCounts: a.invalid (Malformed)
+         */
+        int invalid;
+
+        /**
+         * Count of mutations in the {@code ORPHAN} state.
+         *
+         * @implNote WAWebSyncdWamUtils.generateActionStatCounts: a.orphan
+         */
+        int orphan;
+
+        /**
+         * Count of mutations in the {@code UNSUPPORTED} state.
+         *
+         * @implNote WAWebSyncdWamUtils.generateActionStatCounts: a.unsupported
+         */
+        int unsupported;
+
+        /**
+         * Count of mutations in the {@code FAILED} state.
+         *
+         * @implNote WAWebSyncdWamUtils.generateActionStatCounts: a.failed
+         */
+        int failed;
+    }
+
+    /**
      * Resets all background jobs and schedulers.
      *
-     * <p>Stops the periodic sync job, key rotation job, backoff scheduler, and
-     * missing key timeout scheduler. Called during disconnect or logout.
+     * <p>Stops the periodic sync job, key rotation job, daily syncd stats
+     * reporting job, backoff scheduler, and missing key timeout scheduler.
+     * Called during disconnect or logout.
      *
      * @implNote WAWebSyncd (module-level cleanup on disconnect/logout)
      */
     public void reset() {
         stopPeriodicSyncJob();
+        stopPeriodicReportSyncdStatsJob();
         syncKeyRotationService.stopPeriodicRotationJob();
         retryScheduler.close();
         missingSyncKeyTimeoutScheduler.shutdown();

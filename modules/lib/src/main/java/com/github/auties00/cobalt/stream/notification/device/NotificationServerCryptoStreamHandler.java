@@ -10,6 +10,7 @@ import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.stream.SocketStream;
+import com.github.auties00.cobalt.wam.event.WaOldCodeEventBuilder;
 
 import javax.crypto.Cipher;
 import javax.crypto.KDF;
@@ -382,7 +383,17 @@ final class NotificationServerCryptoStreamHandler implements SocketStream.Handle
                     "Ignoring non-numeric device-switch code {0}",
                     code);
         }
-        // WAM: WaOldCodeWamEvent - skipped (telemetry)
+
+        // WAWebHandleDeviceSwitchingNotification.default:
+        //   var d = o("WAWebUserPrefsMeUser").getMeDevicePnOrThrow_DO_NOT_USE().getDeviceId().toString();
+        //   new(o("WAWebWaOldCodeWamEvent")).WaOldCodeWamEvent({deviceId: d}).commit();
+        var meDeviceId = whatsapp.store().jid()
+                .map(Jid::device)
+                .map(String::valueOf)
+                .orElse(null);
+        whatsapp.wamService().commit(new WaOldCodeEventBuilder()
+                .deviceId(meDeviceId)
+                .build());
     }
 
     /**

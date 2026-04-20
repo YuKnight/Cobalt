@@ -28,6 +28,12 @@ import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
+import com.github.auties00.cobalt.wam.event.MdDeviceSyncAckEventBuilder;
+import com.github.auties00.cobalt.wam.event.PrekeysDepletionEventBuilder;
+import com.github.auties00.cobalt.wam.type.MessageChatType;
+import com.github.auties00.cobalt.wam.type.MessageType;
+import com.github.auties00.cobalt.wam.type.PrekeysFetchContext;
+import com.github.auties00.cobalt.wam.type.WamSizeBuckets;
 
 import java.util.Collection;
 import java.util.List;
@@ -309,7 +315,12 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
     ) {
         var container = messageInfo.message();
         // WAWebSendMsgCreateFanoutStanza: ensureE2ESessions before encrypting
-        deviceService.ensureSessions(devices);
+        var depletedPrekeyCount = deviceService.ensureSessions(devices);
+        // WAWebSendMsgCreateFanoutStanza -> WAWebPostPrekeysDepletionMetric.maybePostPrekeysDepletionMetric
+        // emits PrekeysDepletionEvent (id 3014) with SEND_MESSAGE / INDIVIDUAL. For INDIVIDUAL fanout
+        // WAWebSendMsgCreateFanoutStanza passes deviceSizeBucket=null (the bucket is only set for
+        // GROUP_DIRECT fanouts).
+        emitPrekeysDepletionEvents(depletedPrekeyCount, MessageType.INDIVIDUAL, null);
         var senderIcdc = deviceService.computeIcdc(requireSelfJid())
                 .orElse(null);
         var recipientIcdc = deviceService.computeIcdc(chatJid)
@@ -624,9 +635,13 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
      * WAWebResendUserMsg.resendUserMsg: computes delta via
      * {@code differenceBy(b, a, String)}, resends with
      * {@code isResendingMsg: true} (device_fanout="false").
+     * WAWebPostMdDeviceSyncAckMetric.postMdDeviceSyncAckMetric: emits the
+     * {@code MdDeviceSyncAck} WAM event before the resend.
      */
     @WhatsAppWebExport(moduleName = "WAWebResendUserMsg", exports = "resendUserMsg",
             adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WAWebPostMdDeviceSyncAckMetric",
+            exports = "postMdDeviceSyncAckMetric", adaptation = WhatsAppAdaptation.DIRECT)
     private void handlePhashMismatch(
             Jid chatJid,
             ChatMessageInfo messageInfo,
@@ -635,6 +650,18 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
     ) {
         LOGGER.log(System.Logger.Level.DEBUG,
                 "Phash mismatch for {0}, server phash: {1}", chatJid, serverPhash);
+
+        // WAWebSendUserMsgJob.encryptAndSendUserMsg: when the server returns a
+        // phash mismatch, WAWebPostMdDeviceSyncAckMetric.postMdDeviceSyncAckMetric
+        // emits MdDeviceSyncAck (id 2180) before the resend is scheduled.
+        // For the 1:1 branch: revoke = isRevokeMsg(msg), chatType = fromWid(chatJid),
+        // isLid = chatJid.isLid(); groupData and serverAddressingMode are not
+        // supplied, so localAddressingMode and serverAddressingMode stay empty.
+        client.wamService().commit(new MdDeviceSyncAckEventBuilder()
+                .revoke(isRevokeMessage(messageInfo))
+                .chatType(chatTypeFromJid(chatJid))
+                .isLid(chatJid.hasLidServer())
+                .build());
 
         var refreshedDevices = deviceService.getUserFanout(chatJid, serverPhash);
 
@@ -656,5 +683,114 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
                 deltaDevices.size(), chatJid);
 
         encryptBuildAndSend(chatJid, messageInfo, deltaDevices, true);
+    }
+
+    /**
+     * Returns the WAM {@link MessageChatType} for the given chat JID.
+     *
+     * <p>Mirrors the mapping used by WA Web's
+     * {@code WAWebGetMessageChatTypeFromWid.getMessageChatTypeFromWid}:
+     * user/legacy-user JIDs map to {@code INDIVIDUAL}, group/community JIDs
+     * to {@code GROUP}, broadcast to {@code BROADCAST}, status to
+     * {@code STATUS}, newsletter to {@code CHANNEL}, everything else to
+     * {@code OTHER}.
+     *
+     * @param jid the chat JID to classify
+     * @return the corresponding {@link MessageChatType}
+     *
+     * @apiNote WAWebGetMessageChatTypeFromWid.getMessageChatTypeFromWid:
+     *          returns {@code MESSAGE_CHAT_TYPE.INDIVIDUAL / GROUP /
+     *          BROADCAST / STATUS / CHANNEL / OTHER} based on the JID
+     *          predicates.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebGetMessageChatTypeFromWid",
+            exports = "getMessageChatTypeFromWid",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    static MessageChatType chatTypeFromJid(Jid jid) {
+        if (jid == null) {
+            return MessageChatType.OTHER;
+        }
+        if (jid.isStatusBroadcastAccount()) {
+            return MessageChatType.STATUS;
+        }
+        if (jid.hasBroadcastServer()) {
+            return MessageChatType.BROADCAST;
+        }
+        if (jid.hasGroupOrCommunityServer()) {
+            return MessageChatType.GROUP;
+        }
+        if (jid.hasNewsletterServer()) {
+            return MessageChatType.CHANNEL;
+        }
+        if (jid.hasUserServer() || jid.hasLidServer()) {
+            return MessageChatType.INDIVIDUAL;
+        }
+        return MessageChatType.OTHER;
+    }
+
+    /**
+     * Returns {@code true} when the given message is a revoke protocol
+     * message.
+     *
+     * <p>Mirrors WA Web's
+     * {@code WAWebSendMsgCommonApi.isRevokeMsg}: checks the message
+     * protobuf for a {@code protocolMessage} payload of type
+     * {@link ProtocolMessage.Type#REVOKE}.
+     *
+     * @param messageInfo the outgoing message
+     * @return {@code true} if the payload is a revoke protocol message
+     *
+     * @apiNote WAWebSendMsgCommonApi.isRevokeMsg:
+     *          {@code e.protocolMessage != null &&
+     *          e.protocolMessage.type === Message$ProtocolMessage$Type.REVOKE}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "isRevokeMsg",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    static boolean isRevokeMessage(ChatMessageInfo messageInfo) {
+        if (messageInfo == null) {
+            return false;
+        }
+        return messageInfo.message().content() instanceof ProtocolMessage protocol
+                && protocol.type().orElse(null) == ProtocolMessage.Type.REVOKE;
+    }
+
+    /**
+     * Emits one {@link com.github.auties00.cobalt.wam.event.PrekeysDepletionEvent} per
+     * depleted one-time pre-key reported by the last {@code ensureSessions} call, matching
+     * the {@code SEND_MESSAGE} reason used by the message fanout path.
+     *
+     * <p>No-op when {@code depletedPrekeyCount} is {@code 0}, matching the early return in
+     * {@code WAWebPostPrekeysDepletionMetric.maybePostPrekeysDepletionMetric}
+     * ({@code if (t==null||t===0) return}).
+     *
+     * @param depletedPrekeyCount number of depleted one-time pre-keys (may be zero)
+     * @param messageType         the WAM message type for this send
+     * @param deviceCount         the fanout device count to classify into a
+     *                            {@code deviceSizeBucket}, or {@code null} to omit the
+     *                            bucket property (matches WA Web's conditional
+     *                            {@code fanoutType===GROUP_DIRECT ? numberToSizeBucket(n.length) : null})
+     *
+     * @implNote WAWebPostPrekeysDepletionMetric.maybePostPrekeysDepletionMetric: emits
+     *     {@code t} (count) events inside a {@code setTimeout(...,0)}; Cobalt emits
+     *     synchronously on the calling virtual thread which matches the end-of-turn
+     *     semantics of the JS timeout.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebPostPrekeysDepletionMetric",
+            exports = "maybePostPrekeysDepletionMetric",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private void emitPrekeysDepletionEvents(int depletedPrekeyCount, MessageType messageType, Integer deviceCount) {
+        // WAWebPostPrekeysDepletionMetric.maybePostPrekeysDepletionMetric: early-return guard
+        if (depletedPrekeyCount <= 0) {
+            return;
+        }
+        var bucket = deviceCount == null ? null : WamSizeBuckets.numberToSizeBucket(deviceCount);
+        // WAWebPostPrekeysDepletionMetric.maybePostPrekeysDepletionMetric: for (var e=0;e<t;e++) commit()
+        for (var i = 0; i < depletedPrekeyCount; i++) {
+            client.wamService().commit(new PrekeysDepletionEventBuilder()
+                    .prekeysFetchReason(PrekeysFetchContext.SEND_MESSAGE)
+                    .messageType(messageType)
+                    .deviceSizeBucket(bucket)
+                    .build());
+        }
     }
 }

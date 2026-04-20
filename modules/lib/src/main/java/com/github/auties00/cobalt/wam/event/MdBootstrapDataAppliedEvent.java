@@ -52,6 +52,9 @@ public interface MdBootstrapDataAppliedEvent extends WamEventSpec {
     @WamProperty(index = 10, type = WamType.ENUM)
     Optional<MdBootstrapHistoryPayloadType> mdBootstrapHistoryPayloadType();
 
+    @WamProperty(index = 25, type = WamType.INTEGER)
+    OptionalInt mdBootstrapInlineContactsCount();
+
     @WamProperty(index = 18, type = WamType.INTEGER)
     OptionalInt mdBootstrapMessagesCount();
 

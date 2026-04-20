@@ -17,7 +17,14 @@ import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.stream.SocketStream;
 import com.github.auties00.cobalt.sync.SnapshotRecoveryService;
 import com.github.auties00.cobalt.util.DataUtils;
+import com.github.auties00.cobalt.wam.event.Lid11MigrationLifecycleEventBuilder;
+import com.github.auties00.cobalt.wam.event.MdLinkDeviceCompanionEventBuilder;
+import com.github.auties00.cobalt.wam.type.MdLinkDeviceCompanionStage;
+import com.github.auties00.cobalt.wam.type.MigrationStageEnum;
 
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -466,6 +473,12 @@ public final class IqStreamHandler implements SocketStream.Handler {
             cancelRotationLocked(); // ADAPTED: WAWebHandlePairDevice.g timer checks isRegistered() and cancels; we cancel eagerly once pair-success arrives
         }
 
+        // WAWebHandlePairSuccess.y: var a = WATimeUtils.unixTimeWithoutClockSkewCorrection() captured
+        // at entry and threaded into initDeviceLinkEvent / commitDeviceLinkEvent as the
+        // `regStartTime` baseline. Cobalt captures it here so the mdDurationS/mdTimestampS
+        // deltas on the MdLinkDeviceCompanionEvent commits below are consistent across stages.
+        var regStartSeconds = Instant.now().getEpochSecond();
+
         var pairSuccess = iqNode.getChild("pair-success").orElse(null); // WAWebHandlePairSuccess: receiveSetRegRPC extracts pair-success child
         if (pairSuccess == null) {
             LOGGER.log(System.Logger.Level.WARNING, "Received md iq without pair-success child"); // NO_WA_BASIS: defensive check
@@ -487,16 +500,162 @@ public final class IqStreamHandler implements SocketStream.Handler {
 
         var validatedIdentity = deviceService.extractAndValidateLocalSignedDeviceIdentity(pairSuccess) // WAWebHandlePairSuccess: decode HMAC, verify, generate device signature
                 .orElse(null);
-        if (validatedIdentity != null) {
-            store.setSignedDeviceIdentity(validatedIdentity); // WAWebHandlePairSuccess: setADVSignedIdentity($)
-            sendPairSuccessResponse(iqNode, validatedIdentity); // WAWebHandlePairSuccess: return q = d({deviceIdentityElementValue: W, deviceIdentityKeyIndex: B})
+
+        if (validatedIdentity == null) {
+            // WAWebHandlePairSuccess.y: if HMAC fails, m() returns without committing a link
+            // event; if verifyDeviceIdentityAccountSignature fails, commitDeviceLinkEvent(401)
+            // fires. Cobalt's DeviceService.extractAndValidateLocalSignedDeviceIdentity
+            // collapses both failures into an empty Optional (the underlying
+            // WhatsAppAdvValidationException is handed to the client error handler).
+            // Emit a generic commit with errorCode=-1 so the telemetry pipeline still records
+            // a failed pairing attempt; 401-vs-HMAC distinction is not preserved here because
+            // the validator does not surface the specific sub-type to this handler.
+            emitMdLinkDeviceCompanionStage(null, -1, null, regStartSeconds);
+            return;
         }
 
-        extractPairingProps(pairSuccess) // WAWebHandlePairSuccess: if (_ != null) yield C(_)
-                .ifPresent(props -> snapshotRecoveryService.updatePrimaryDeviceSupportsSyncdRecovery(props.isSyncdSnapshotRecoveryEnabled())); // WAWebHandlePairSuccess.C/b: updatePrimaryDeviceSupportsSyncdRecovery(i === true)
-        store.setRegistered(true); // WAWebHandlePairSuccess: setPairingTimestamp(a), marks as registered
-        store.setOnline(true); // ADAPTED: Cobalt sets online flag
-        safeSave("pair-success"); // ADAPTED: Cobalt persists store
+        // WAWebHandlePairSuccess.y: var w = yield initDeviceLinkEvent(P, M.identityKeyPair.pubKey, a);
+        // yield setDeviceLinkPairStage(PAIR_SUCCESS_RECEIVED).
+        // P is the accountSignatureKey from the decoded SignedDeviceIdentity (available once
+        // validation passes); M.identityKeyPair.pubKey is the local companion identity key.
+        // The reporter hashes both into mdSessionId and emits the PAIR_SUCCESS_RECEIVED stage.
+        var mdSessionId = computeMdLinkSessionId(
+                validatedIdentity.accountSignatureKey().orElse(null),
+                store.identityKeyPair().publicKey().toEncodedPoint()
+        );
+        emitMdLinkDeviceCompanionStage(MdLinkDeviceCompanionStage.PAIR_SUCCESS_RECEIVED, null, mdSessionId, regStartSeconds);
+
+        try {
+            store.setSignedDeviceIdentity(validatedIdentity); // WAWebHandlePairSuccess: setADVSignedIdentity($)
+            sendPairSuccessResponse(iqNode, validatedIdentity); // WAWebHandlePairSuccess: return q = d({deviceIdentityElementValue: W, deviceIdentityKeyIndex: B})
+
+            // WAWebHandlePairSuccess.y: yield setDeviceLinkPairStage(PAIR_DEVICE_SIGN_SENT).
+            // Emitted after the signed identity response has been sent back to the server;
+            // WA Web performs the commit immediately after assembling q and before the next
+            // yield, so we mirror that ordering by committing right after sendPairSuccessResponse.
+            emitMdLinkDeviceCompanionStage(MdLinkDeviceCompanionStage.PAIR_DEVICE_SIGN_SENT, null, mdSessionId, regStartSeconds);
+
+            extractPairingProps(pairSuccess) // WAWebHandlePairSuccess: if (_ != null) yield C(_)
+                    .ifPresent(props -> {
+                        snapshotRecoveryService.updatePrimaryDeviceSupportsSyncdRecovery(props.isSyncdSnapshotRecoveryEnabled()); // WAWebHandlePairSuccess.C/b: updatePrimaryDeviceSupportsSyncdRecovery(i === true)
+                        // WAWebHandlePairSuccess.C/b: n === true && (
+                        //   yield Lid1X1MigrationUtils.setIsLidMigrated(true, LidMigrationSource.HISTORY, a),
+                        //   new Lid11MigrationLifecycleWamEvent({
+                        //     migrationStage: COMPANION_MIGRATED_ON_NEW_PAIRING,
+                        //     webClientDidPairingStanzaIndicated1x1MigrationThisSession: true,
+                        //     isLocally1x1MigratedFromDb: Lid1X1MigrationUtils.isLidMigrated()
+                        //   }).commit()
+                        // )
+                        // Cobalt routes the isChatDbLidMigrated flag through the migration service and
+                        // mirrors WA Web's unconditional WAM commit with the post-setIsLidMigrated read.
+                        if (props.isChatDbLidMigrated()) {
+                            whatsapp.wamService().commit(new Lid11MigrationLifecycleEventBuilder()
+                                    .migrationStage(MigrationStageEnum.COMPANION_MIGRATED_ON_NEW_PAIRING)
+                                    .webClientDidPairingStanzaIndicated1x1MigrationThisSession(true)
+                                    .isLocally1x1MigratedFromDb(whatsapp.lidMigrationService().isLidMigrated())
+                                    .build());
+                        }
+                    });
+            store.setRegistered(true); // WAWebHandlePairSuccess: setPairingTimestamp(a), marks as registered
+            store.setOnline(true); // ADAPTED: Cobalt sets online flag
+            safeSave("pair-success"); // ADAPTED: Cobalt persists store
+        } catch (RuntimeException exception) {
+            // WAWebHandlePairSuccess.y catch branch: yield commitDeviceLinkEvent(-1) before
+            // logging out via socketLogout(LogoutReason.UnknownCompanion). Cobalt does not
+            // swallow the underlying exception — it is rethrown after the WAM emission so
+            // upstream error handling (client.handleFailure / socket teardown) still runs.
+            emitMdLinkDeviceCompanionStage(null, -1, mdSessionId, regStartSeconds);
+            throw exception;
+        }
+    }
+
+    /**
+     * Computes the {@code mdSessionId} used on the MdLinkDeviceCompanion WAM event.
+     *
+     * <p>Mirrors WAWebWamDeviceLinkReporter's {@code v(e, t)} helper which concatenates the
+     * account signature key, a {@code 0x5f} separator, and the local companion identity key
+     * public bytes, SHA-256 hashes the buffer, and base64-encodes the digest. The result
+     * uniquely identifies a pairing attempt across stage emissions.
+     *
+     * @param accountSignatureKey the account signature key from the validated
+     *                            {@link ADVSignedDeviceIdentity}, may be {@code null} when
+     *                            the identity did not embed one (in which case the session id
+     *                            cannot be computed and a {@code null} marker is returned)
+     * @param localIdentityKey    the local companion identity key public bytes
+     * @return the base64-encoded SHA-256 session id, or {@code null} when the input cannot
+     *         produce a deterministic hash
+     * @implNote WAWebWamDeviceLinkReporter.v: new Binary; writeBuffer(e); write(95); writeBuffer(t);
+     *           var r = n.readByteArrayView(); var a = yield sha256(r); return encodeB64(a).
+     */
+    private String computeMdLinkSessionId(byte[] accountSignatureKey, byte[] localIdentityKey) {
+        if (accountSignatureKey == null || localIdentityKey == null) {
+            return null;
+        }
+
+        try {
+            var digest = MessageDigest.getInstance("SHA-256");
+            digest.update(accountSignatureKey);
+            digest.update((byte) 0x5f); // WAWebWamDeviceLinkReporter.v: n.write(95)
+            digest.update(localIdentityKey);
+            return Base64.getEncoder().encodeToString(digest.digest());
+        } catch (NoSuchAlgorithmException exception) {
+            // SHA-256 is required by the JRE spec; this path is unreachable on any
+            // conforming platform. Log and fall through to a null session id so the
+            // telemetry emission can still run without the sessionId field populated.
+            LOGGER.log(System.Logger.Level.WARNING, "SHA-256 is not available: {0}", exception.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Commits a {@link com.github.auties00.cobalt.wam.event.MdLinkDeviceCompanionEvent} with
+     * the given stage and optional error code.
+     *
+     * <p>Every stage commit rebuilds the event from the pinned
+     * {@code regStartSeconds}/{@code mdSessionId} context so each emission carries the
+     * cumulative duration and timestamp. A {@code null} stage with a non-null error code
+     * corresponds to the WA Web {@code commitDeviceLinkEvent(errorCode)} path taken when the
+     * pairing flow aborts before the stage machine has advanced further.
+     *
+     * <p>Only the subset of properties that Cobalt can populate deterministically is set:
+     * {@code mdSessionId}, {@code mdTimestampS}, {@code mdDurationS},
+     * {@code mdLinkDeviceCompanionStage}, and {@code mdLinkDeviceCompanionErrorCode}.
+     * The remaining fields ({@code mdLinkDeviceExperienceId}, {@code userLocale},
+     * {@code applicationState}, {@code appContext}, etc.) are left unset because their
+     * source modules ({@code WAWebLinkDeviceExperience}, {@code WAWebAppTracker}) have no
+     * Cobalt counterpart — WA Web attaches them via {@code attachWAMAppContext} right before
+     * {@code commitAndWaitForFlush}, a frontend-only helper that Cobalt does not model.
+     *
+     * @param stage            the stage to record, or {@code null} for a raw error-code
+     *                         commit
+     * @param errorCode        the error code to attach, or {@code null} for a normal stage
+     *                         transition
+     * @param mdSessionId      the deterministic session id computed by
+     *                         {@link #computeMdLinkSessionId}, may be {@code null} when the
+     *                         session id could not be derived
+     * @param regStartSeconds  the Unix-seconds timestamp captured at pair-success entry
+     * @implNote WAWebWamDeviceLinkReporter.R (commitDeviceLinkEvent): rebuilds the event with
+     *           {mdDurationS, mdSessionId, mdTimestampS, mdLinkDeviceCompanionErrorCode,
+     *           mdLinkDeviceCompanionStage, mdLinkDeviceExperienceId}, attaches app context,
+     *           then commits. Cobalt omits the app-context attachment because Cobalt has no
+     *           WAWebAppTracker analogue.
+     */
+    private void emitMdLinkDeviceCompanionStage(MdLinkDeviceCompanionStage stage, Integer errorCode, String mdSessionId, long regStartSeconds) {
+        try {
+            var nowSeconds = Instant.now().getEpochSecond();
+            var builder = new MdLinkDeviceCompanionEventBuilder()
+                    .mdTimestampS((int) regStartSeconds) // WAWebWamDeviceLinkReporter.R: mdTimestampS: r.regStartTime
+                    .mdDurationS((int) (nowSeconds - regStartSeconds)) // WAWebWamDeviceLinkReporter.R: mdDurationS: unixTimeWithoutClockSkewCorrection() - r.regStartTime
+                    .mdLinkDeviceCompanionErrorCode(errorCode != null ? errorCode : 0) // WAWebWamDeviceLinkReporter.R: mdLinkDeviceCompanionErrorCode: t == null ? 0 : t
+                    .mdLinkDeviceCompanionStage(stage); // WAWebWamDeviceLinkReporter.R: mdLinkDeviceCompanionStage: i (u, the last stored stage)
+            if (mdSessionId != null) {
+                builder.mdSessionId(mdSessionId); // WAWebWamDeviceLinkReporter.R: mdSessionId: r.sessionId
+            }
+            whatsapp.wamService().commit(builder.build()); // WAWebWamDeviceLinkReporter.R: l.commitAndWaitForFlush(true)
+        } catch (RuntimeException wamException) {
+            // Telemetry emission must never disrupt the pairing flow: log and swallow.
+            LOGGER.log(System.Logger.Level.WARNING, "Cannot commit MdLinkDeviceCompanion event: {0}", wamException.getMessage());
+        }
     }
 
     /**

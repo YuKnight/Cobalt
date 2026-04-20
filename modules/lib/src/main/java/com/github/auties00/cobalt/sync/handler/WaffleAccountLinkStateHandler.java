@@ -1,6 +1,8 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.message.send.id.MessageIdGenerator;
+import com.github.auties00.cobalt.message.send.id.MessageIdVersion;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -16,6 +18,8 @@ import com.github.auties00.cobalt.model.sync.action.device.WaffleAccountLinkStat
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.event.NonMessagePeerDataRequestEventBuilder;
+import com.github.auties00.cobalt.wam.type.PeerDataRequestType;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -282,6 +286,17 @@ public final class WaffleAccountLinkStateHandler implements WebAppStateActionHan
         var container = new MessageContainerBuilder() // ADAPTED: WAWebSendNonMessageDataRequest wraps in message container via send pipeline
                 .protocolMessage(protocol)
                 .build();
+        // WAWebNonMessageDataRequestLoggingUtils.logNonMessagePeerDataRequest: emitted for every
+        // fanout message in WAWebSendNonMessageDataRequest.sendPeerDataOperationRequest. For
+        // WAFFLE_LINKING_NONCE_FETCH WAWebNonMessageDataRequestLoggingUtils.d returns 1,
+        // WAWebNonMessageDataRequestLoggingUtils.m maps to PEER_DATA_REQUEST_TYPE.WAFFLE_LINKING_NONCE_FETCH,
+        // and peerDataRequestSessionId is the outbound peer message key id (t.id.id).
+        var sessionId = MessageIdGenerator.generate(MessageIdVersion.V2, me); // WAWebSendNonMessageDataRequest.D: yield WAWebMsgKey.newId()
+        client.wamService().commit(new NonMessagePeerDataRequestEventBuilder()
+                .peerDataRequestCount(1)
+                .peerDataRequestType(PeerDataRequestType.WAFFLE_LINKING_NONCE_FETCH)
+                .peerDataRequestSessionId(sessionId)
+                .build());
         client.sendMessage(me.withDevice(0), container); // WAWebSendNonMessageDataRequest.k non-fanout path: createDeviceWidFromUserAndDevice(getMeDevicePnOrThrow().user, getMeDevicePnOrThrow().server, 0); WAWebSendAppStateSyncMsgJob.encryptAndSendKeyMsg
     }
 }

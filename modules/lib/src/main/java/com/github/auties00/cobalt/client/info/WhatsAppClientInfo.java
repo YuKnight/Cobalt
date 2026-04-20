@@ -22,6 +22,11 @@ import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
  * <ul>
  *   <li>{@link WhatsAppWebClientInfo} fetches {@code web.whatsapp.com}'s
  *       landing page and extracts the {@code client_revision} field.</li>
+ *   <li>{@link WhatsAppWindowsClientInfo} combines the web version with the
+ *       Microsoft Store package build of the native hybrid shell so that the
+ *       handshake {@code appVersion} carries a realistic
+ *       {@code quaternary} component, the way the real
+ *       {@code WAWebBuildConstants.WINDOWS_BUILD} URL parameter does.</li>
  *   <li>{@link WhatsAppMobileClientInfo} resolves to either an Android APK
  *       ({@code WhatsApp.apk}) or iOS bundle ({@code net.whatsapp.WhatsApp}
  *       lookup on the App Store) and reads the version, signing material
@@ -44,7 +49,7 @@ import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
  * @see ClientPlatformType
  */
 public sealed interface WhatsAppClientInfo
-        permits WhatsAppWebClientInfo, WhatsAppMobileClientInfo {
+        permits WhatsAppWebClientInfo, WhatsAppWindowsClientInfo, WhatsAppMobileClientInfo {
     /**
      * Returns the appropriate {@code WhatsAppClientInfo} implementation for
      * the given platform, using the personal-app flavour for mobile platforms
@@ -53,9 +58,14 @@ public sealed interface WhatsAppClientInfo
      * <p>Mobile business variants ({@code ANDROID_BUSINESS},
      * {@code IOS_BUSINESS}) return the dedicated business APK/IPA flavour so
      * that the advertised version and registration token match a real
-     * WhatsApp Business build. Desktop targets ({@code WINDOWS},
-     * {@code MACOS}) share the web flavour because both desktop clients ship
-     * the same JavaScript bundle as {@code web.whatsapp.com}.
+     * WhatsApp Business build. The macOS desktop target shares the web
+     * flavour because the Mac Catalyst build embeds the same JavaScript
+     * bundle as {@code web.whatsapp.com} and advertises no additional
+     * build number on the wire. The Windows desktop target has its own
+     * {@link WhatsAppWindowsClientInfo} so that the handshake
+     * {@code appVersion} carries the Windows store build number in
+     * {@code quaternary}, matching the {@code WINDOWS_BUILD} URL
+     * parameter injected by the real hybrid shell.
      *
      * @param platform the target client platform
      * @return a cached {@code WhatsAppClientInfo} whose version matches the
@@ -69,7 +79,8 @@ public sealed interface WhatsAppClientInfo
             case IOS -> WhatsAppIosClientInfo.ofPersonal();
             case ANDROID_BUSINESS -> WhatsAppAndroidClientInfo.ofBusiness();
             case IOS_BUSINESS -> WhatsAppIosClientInfo.ofBusiness();
-            case WINDOWS, MACOS, WEB -> WhatsAppWebClientInfo.of();
+            case WINDOWS -> WhatsAppWindowsClientInfo.of();
+            case MACOS, WEB -> WhatsAppWebClientInfo.of();
             default -> throw new IllegalStateException("Unexpected value: " + platform);
         };
     }

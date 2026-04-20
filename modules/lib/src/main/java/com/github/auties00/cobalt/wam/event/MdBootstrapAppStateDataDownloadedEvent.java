@@ -56,6 +56,9 @@ public interface MdBootstrapAppStateDataDownloadedEvent extends WamEventSpec {
     @WamProperty(index = 9, type = WamType.INTEGER)
     OptionalInt mdStorageQuotaUsedBytes();
 
+    @WamProperty(index = 17, type = WamType.STRING)
+    Optional<String> mdSyncFailureReason();
+
     @WamProperty(index = 3, type = WamType.INTEGER)
     OptionalInt mdTimestamp();
 }

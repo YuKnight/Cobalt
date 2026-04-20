@@ -6,6 +6,7 @@ import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.stream.SocketStream;
+import com.github.auties00.cobalt.stream.control.OfflineNotificationsReporter;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -46,13 +47,29 @@ public final class NotificationSyncStreamHandler implements SocketStream.Handler
     private final WhatsAppClient whatsapp;
 
     /**
+     * The shared reporter used to accumulate per-collection offline
+     * {@code server_sync} notification counts for the
+     * {@code MdAppStateOfflineNotifications} WAM event.
+     *
+     * @implNote WAWebHandleReportServerSyncNotification.offlineNotificationsCount:
+     * WA Web stores the count map at module scope; Cobalt models it as a
+     * shared reporter consumed by both this handler (producer) and
+     * {@code InfoBulletinStreamHandler} (flush on offline bulletin).
+     */
+    private final OfflineNotificationsReporter offlineNotificationsReporter;
+
+    /**
      * Constructs a new notification sync stream handler.
      *
-     * @param whatsapp the WhatsApp client instance
+     * @param whatsapp                     the WhatsApp client instance
+     * @param offlineNotificationsReporter the shared reporter used to record
+     *                                     per-collection offline server-sync
+     *                                     observations for later WAM flushing
      * @implNote WAWebHandleServerSyncNotification (module-level dependency injection)
      */
-    public NotificationSyncStreamHandler(WhatsAppClient whatsapp) {
+    public NotificationSyncStreamHandler(WhatsAppClient whatsapp, OfflineNotificationsReporter offlineNotificationsReporter) {
         this.whatsapp = whatsapp;
+        this.offlineNotificationsReporter = offlineNotificationsReporter;
     }
 
     /**
@@ -107,7 +124,11 @@ public final class NotificationSyncStreamHandler implements SocketStream.Handler
      *
      * <p>Per WhatsApp Web, the {@code from} attribute is validated against
      * {@code S_WHATSAPP_NET} and an error is logged if they do not match.
-     * The offline flag triggers WAM telemetry counters (skipped in Cobalt).
+     * When the notification carries the {@code offline} attribute, each
+     * affected collection also bumps the shared
+     * {@link OfflineNotificationsReporter}, which is flushed into a
+     * {@code MdAppStateOfflineNotifications} WAM event by the info
+     * bulletin handler once the offline backlog window ends.
      *
      * @param node the notification node to process
      * @implNote WAWebHandleServerSyncNotification._ (main processing logic)
@@ -140,7 +161,15 @@ public final class NotificationSyncStreamHandler implements SocketStream.Handler
 
         var collectionsToSync = new ArrayList<>(changedCollections.keySet()); // WAWebHandleServerSyncNotification._ (_ = Array.from(t.keys()))
 
-        // WAWebHandleServerSyncNotification._ (e.offline && _.forEach(offlineNotificationsCount)): skipped (WAM telemetry)
+        // WAWebHandleServerSyncNotification._ (e.offline && _.forEach(offlineNotificationsCount)): records per-collection
+        // observation counts so that the info-bulletin offline handler can emit MdAppStateOfflineNotificationsWamEvent
+        // with the accumulated redundantCount when the offline backlog window ends.
+        var offline = node.hasAttribute("offline"); // WAWebHandleServerSyncNotification.p (a = t.hasAttr("offline"))
+        if (offline) {
+            for (var collection : collectionsToSync) {
+                offlineNotificationsReporter.increment(collection); // WAWebHandleServerSyncNotification._ (offlineNotificationsCount.set(e, t+1) or set(e, 1))
+            }
+        }
         LOGGER.log(System.Logger.Level.INFO, // WAWebHandleServerSyncNotification._ (LOG("syncd: incoming sync notification for collections\n    ..."))
                 "syncd: incoming sync notification for collections\n    {0}",
                 changedCollections.entrySet().stream()

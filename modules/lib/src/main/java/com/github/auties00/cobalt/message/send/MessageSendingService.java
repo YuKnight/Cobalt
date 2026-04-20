@@ -18,8 +18,13 @@ import com.github.auties00.cobalt.model.jid.JidServer;
 import com.github.auties00.cobalt.model.message.MessageContainer;
 import com.github.auties00.cobalt.model.message.MessageInfo;
 import com.github.auties00.cobalt.model.message.MessageKey;
+import com.github.auties00.cobalt.model.message.context.ContextualMessage;
+import com.github.auties00.cobalt.model.message.media.DocumentMessage;
+import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
 import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
 import com.github.auties00.cobalt.props.ABPropsService;
+import com.github.auties00.cobalt.wam.WamMsgUtils;
+import com.github.auties00.cobalt.wam.event.WebcMessageSendEventBuilder;
 
 import java.util.Objects;
 
@@ -55,6 +60,7 @@ import java.util.Objects;
 @WhatsAppWebModule(moduleName = "WAWebEncryptAndSendStatusMsg")
 @WhatsAppWebModule(moduleName = "WAWebNewsletterSendMessageQueryJob")
 @WhatsAppWebModule(moduleName = "WAWebSendAppStateSyncMsgJob")
+@WhatsAppWebModule(moduleName = "WAWebSendMsgRecordAction")
 public final class MessageSendingService {
     /**
      * Prepares raw {@link MessageContainer} instances into fully populated
@@ -114,6 +120,21 @@ public final class MessageSendingService {
     private final PeerMessageSender peerSender;
 
     /**
+     * The WhatsApp client used by this service to access the shared
+     * {@code WamService} for outbound telemetry emissions triggered at
+     * the top of the send pipeline (currently the
+     * {@code SendDocumentEvent} commit performed when a
+     * {@link DocumentMessage} enters the service).
+     *
+     * @implNote ADAPTED: WA Web's {@code WAWebProcessRawMedia} calls the
+     * document-send WAM logger via a module-level import. Cobalt does not
+     * have a raw-media processing stage, so the emission is hoisted to
+     * the send pipeline entry point and the already-injected client is
+     * reused to reach the {@code WamService}.
+     */
+    private final WhatsAppClient client;
+
+    /**
      * Creates a new message sending service.
      *
      * @param client         the WhatsApp client for sending stanzas
@@ -137,6 +158,7 @@ public final class MessageSendingService {
         Objects.requireNonNull(deviceService, "deviceService");
         Objects.requireNonNull(abPropsService, "abPropsService");
 
+        this.client = client;
         var store = client.store();
         this.preparer = new MessagePreparer(store);
         this.messageDedup = new MessageDedup();
@@ -237,6 +259,18 @@ public final class MessageSendingService {
                 .parentJid()
                 .orElseThrow(() -> new IllegalArgumentException("parentJid is required for outgoing messages"));
 
+        // WAWebProcessRawMedia.processRawMedia -> WAWebProcessRawMediaLogging.logSendDocumentEvent:
+        // WA Web emits SendDocumentEvent (id 2172) when the user picks a document. Cobalt has no
+        // raw-media processing stage, so the emission is hoisted to the send pipeline entry point
+        // and fires once per outbound DocumentMessage send.
+        if (messageInfo.message() != null
+                && messageInfo.message().content() instanceof DocumentMessage document) {
+            WamMsgUtils.logSendDocumentEvent(
+                    client.wamService(),
+                    document.fileName().orElse(null),
+                    document.mediaSize().orElse(0L));
+        }
+
         // WAWebMessageDedupUtils: check if this message ID is already in flight
         if (messageDedup.isPending(messageId)) {
             throw new WhatsAppMessageException.Send.Unknown(
@@ -245,7 +279,12 @@ public final class MessageSendingService {
 
         messageDedup.add(messageId);
         try {
-            return switch (messageInfo) {
+            // WAWebSendMsgRecordAction.sendMsgRecord: builds WebcMessageSendWamEvent (id 2072)
+            // before send and commits it only on success, skipping the event entirely for
+            // protocol revoke messages (sender_revoke / admin_revoke subtypes). Newsletters go
+            // through WAWebNewsletterSendMessageQueryJob and are excluded from this emission.
+            var sendEvent = buildWebcMessageSendEvent(messageInfo);
+            var result = switch (messageInfo) {
                 case ChatMessageInfo chatMessage when parentJid.hasUserServer() || parentJid.hasLidServer() ->
                     // WAWebSendMsgJob: to.isUser() → encryptAndSendUserMsg
                     userSender.send(parentJid, chatMessage);
@@ -262,9 +301,80 @@ public final class MessageSendingService {
                     parentJid, "Unsupported combination: " + messageInfo.getClass().getSimpleName()
                             + " with JID type " + parentJid.server());
             };
+            // WAWebSendMsgRecordAction.sendMsgRecord: b.markMessageSendT(); b.commit() on the success
+            // branch. WA Web's catch blocks drop the event; Cobalt mirrors that by only committing
+            // when the send path returns normally.
+            if (sendEvent != null) {
+                client.wamService().commit(sendEvent.stopMessageSendT().build());
+            }
+            return result;
         } finally {
             messageDedup.remove(messageId);
         }
+    }
+
+    /**
+     * Builds a {@link WebcMessageSendEventBuilder} for the given outbound
+     * message, or returns {@code null} if the event must be suppressed for
+     * this send.
+     *
+     * <p>Mirrors the event-construction gate in
+     * {@code WAWebSendMsgRecordAction.sendMsgRecord}:
+     * <ul>
+     *   <li>The event is never built for newsletter sends — WA Web routes
+     *       newsletters through {@code WAWebNewsletterSendMessageQueryJob}
+     *       which does not log this event.</li>
+     *   <li>The event is skipped when the message is a protocol revoke
+     *       ({@code sender_revoke} / {@code admin_revoke} subtype in WA Web
+     *       maps to {@link ProtocolMessage.Type#REVOKE} in Cobalt), matching
+     *       WA Web's {@code h} guard.</li>
+     *   <li>Otherwise the builder is populated with {@code messageType} /
+     *       {@code messageMediaType} from {@link WamMsgUtils},
+     *       {@code messageIsForward} from the optional
+     *       {@link ContextualMessage#contextInfo()}, and
+     *       {@link WebcMessageSendEventBuilder#startMessageSendT()} is called
+     *       so the timer begins before the network round-trip.</li>
+     * </ul>
+     *
+     * @param messageInfo the message about to be sent; must not be
+     *                    {@code null}
+     * @return a pre-configured builder with the timer started, or
+     * {@code null} when the event should not be emitted for this send
+     *
+     * @implNote WAWebSendMsgRecordAction.sendMsgRecord:
+     * {@code h = i.type === PROTOCOL && ["sender_revoke","admin_revoke"].includes(i.subtype);
+     * return h || (b = new WebcMessageSendWamEvent({messageType, messageMediaType, messageIsForward: !!i.isForwarded}));}
+     */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgRecordAction", exports = "sendMsgRecord",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private WebcMessageSendEventBuilder buildWebcMessageSendEvent(MessageInfo messageInfo) {
+        // WAWebSendMsgRecordAction.sendMsgRecord: newsletters go through a different WA Web
+        // module (WAWebNewsletterSendMessageQueryJob) that does not emit WebcMessageSendWamEvent.
+        if (!(messageInfo instanceof ChatMessageInfo chatMessage)) {
+            return null;
+        }
+        var content = chatMessage.message() == null ? null : chatMessage.message().content();
+        // WAWebSendMsgRecordAction.sendMsgRecord: h = type === PROTOCOL && subtype in {sender_revoke, admin_revoke}
+        // Cobalt collapses both subtypes into ProtocolMessage.Type.REVOKE, so the REVOKE branch is
+        // the exact skip gate for this event.
+        if (content instanceof ProtocolMessage protocol
+                && protocol.type().orElse(null) == ProtocolMessage.Type.REVOKE) {
+            return null;
+        }
+        // WAWebSendMsgRecordAction.sendMsgRecord: messageIsForward = !!i.isForwarded; the Msg
+        // field is populated from ContextInfo.isForwarded in Cobalt's contextual messages.
+        var isForwarded = content instanceof ContextualMessage contextual
+                && contextual.contextInfo().map(ctx -> ctx.isForwarded()).orElse(false);
+        return new WebcMessageSendEventBuilder()
+                // WAWebSendMsgRecordAction.sendMsgRecord: messageType = WAWebWamMsgUtils.getWamMessageType(i)
+                .messageType(WamMsgUtils.getWamMessageType(chatMessage))
+                // WAWebSendMsgRecordAction.sendMsgRecord: messageMediaType = WAWebWamMsgUtils.getWamMediaType(i)
+                .messageMediaType(WamMsgUtils.getWamMediaType(chatMessage))
+                // WAWebSendMsgRecordAction.sendMsgRecord: messageIsForward = !!i.isForwarded
+                .messageIsForward(isForwarded)
+                // WAWebSendMsgRecordAction.sendMsgRecord: the event starts timing at construction
+                // and is stopped via markMessageSendT() on the success branch before commit().
+                .startMessageSendT();
     }
 
     /**
