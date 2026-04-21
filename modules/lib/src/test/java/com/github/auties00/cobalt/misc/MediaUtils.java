@@ -1,4 +1,4 @@
-package com.github.auties00.cobalt.util;
+package com.github.auties00.cobalt.misc;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;

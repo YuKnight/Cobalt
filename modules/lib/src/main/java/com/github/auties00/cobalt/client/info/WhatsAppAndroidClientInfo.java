@@ -1,6 +1,10 @@
 package com.github.auties00.cobalt.client.info;
 
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONArray;
+import com.alibaba.fastjson2.JSONObject;
 import com.github.auties00.cobalt.model.device.pairing.ClientAppVersion;
+import com.github.auties00.cobalt.util.PlayStoreUtils;
 import net.dongliu.apk.parser.ByteArrayApkFile;
 import net.dongliu.apk.parser.bean.ApkSigner;
 import net.dongliu.apk.parser.bean.CertificateMeta;
@@ -8,18 +12,19 @@ import net.dongliu.apk.parser.bean.CertificateMeta;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
-import java.net.URI;
+import java.io.InputStream;
 import java.net.URLEncoder;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.security.cert.CertificateException;
 import java.util.Base64;
 import java.util.Collection;
+import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.zip.ZipInputStream;
 
 /**
  * Resolves the client metadata required to impersonate the native Android
@@ -31,14 +36,15 @@ import java.util.NoSuchElementException;
  * certificates, the MD5 digest of the embedded {@code classes.dex}, and the
  * national phone number, keyed by a PBKDF2-derived key seeded from the
  * package name, the {@code about_logo.png} resource and a hardcoded salt.
- * This class downloads the current APK from WhatsApp's distribution URLs,
- * extracts all of that material, and caches it so the heavy download runs at
- * most once per flavour per JVM.
+ * This class downloads the current APK through
+ * {@link PlayStoreUtils#downloadApk(String)} (base + every split in the
+ * Play Store App Bundle), extracts all of that material, and caches it so
+ * the heavy download runs at most once per flavour per JVM.
  *
- * <p>Two flavours are supported: the consumer build from
- * {@code whatsapp.com/android/current/WhatsApp.apk} and the business build
- * from {@code d.cdnpure.com}. Each flavour has its own lazily-initialised
- * singleton protected by a double-checked lock.
+ * <p>Two flavours are supported: the consumer build
+ * ({@code com.whatsapp}) and the business build ({@code com.whatsapp.w4b}).
+ * Each flavour has its own lazily-initialised singleton protected by a
+ * double-checked lock.
  *
  * @apiNote This class has no WA Web counterpart: it implements the native
  *          Android registration token scheme that lives inside the Android
@@ -58,24 +64,26 @@ final class WhatsAppAndroidClientInfo implements WhatsAppMobileClientInfo {
     private static final byte[] MOBILE_ANDROID_SALT = Base64.getDecoder().decode("PkTwKSZqUfAUyR0rPQ8hYJ0wNsQQ3dW1+3SCnyTXIfEAxxS75FwkDf47wNv/c8pP3p0GXKR6OOQmhyERwx74fw1RYSU10I4r1gyBVDbRJ40pidjM41G1I1oN");
 
     /**
-     * Public distribution URL for the current consumer WhatsApp APK.
+     * Known paths that the {@code about_logo.png} drawable has shipped
+     * under across WhatsApp releases. The PBKDF2 password derivation
+     * consumes the first matching entry; remaining paths are fallbacks
+     * for older or differently-bucketed builds.
      */
-    private static final URI MOBILE_PERSONAL_ANDROID_URL = URI.create("https://www.whatsapp.com/android/current/WhatsApp.apk");
+    private static final List<String> ABOUT_LOGO_PATHS = List.of(
+            "res/drawable-hdpi/about_logo.png",
+            "res/drawable-hdpi-v4/about_logo.png",
+            "res/drawable-xxhdpi-v4/about_logo.png"
+    );
 
     /**
-     * Mirror URL that serves the current WhatsApp Business APK.
-     *
-     * <p>WhatsApp does not publish the business APK on
-     * {@code whatsapp.com} so the implementation relies on a third-party
-     * mirror that tracks the latest release.
+     * Play Store package identifier for the consumer WhatsApp APK.
      */
-    private static final URI MOBILE_BUSINESS_ANDROID_URL = URI.create("https://d.cdnpure.com/b/APK/com.whatsapp.w4b?version=latest");
+    private static final String PERSONAL_PACKAGE = "com.whatsapp";
 
     /**
-     * User-Agent sent with the APK download request to avoid being served
-     * an HTML error page instead of the binary.
+     * Play Store package identifier for the WhatsApp Business APK.
      */
-    private static final String MOBILE_ANDROID_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36";
+    private static final String BUSINESS_PACKAGE = "com.whatsapp.w4b";
 
     /**
      * Cached instance for the consumer APK flavour, populated on first
@@ -133,16 +141,25 @@ final class WhatsAppAndroidClientInfo implements WhatsAppMobileClientInfo {
     private final boolean business;
 
     /**
+     * Play Store {@code versionCode} the APK was fetched at, used purely
+     * as the invalidation key for the on-disk JSON cache.
+     */
+    private final int versionCode;
+
+    /**
      * Constructs a new instance from the values extracted out of the APK.
      *
      * @param version the parsed application version
+     * @param versionCode the Play Store {@code versionCode} used as the
+     *     cache invalidation key
      * @param md5Hash the MD5 digest of {@code classes.dex}
      * @param secretKey the derived HMAC-SHA1 key
      * @param certificates the APK signing certificates in DER form
      * @param business whether this represents the business flavour
      */
-    private WhatsAppAndroidClientInfo(ClientAppVersion version, byte[] md5Hash, SecretKeySpec secretKey, byte[][] certificates, boolean business) {
+    private WhatsAppAndroidClientInfo(ClientAppVersion version, int versionCode, byte[] md5Hash, SecretKeySpec secretKey, byte[][] certificates, boolean business) {
         this.version = version;
+        this.versionCode = versionCode;
         this.md5Hash = md5Hash;
         this.secretKey = secretKey;
         this.certificates = certificates;
@@ -186,90 +203,241 @@ final class WhatsAppAndroidClientInfo implements WhatsAppMobileClientInfo {
     }
 
     /**
-     * Downloads the consumer or business APK and extracts the version,
-     * {@code classes.dex} hash, signing certificates, and derived HMAC key.
+     * Downloads the consumer or business APK through the anonymous Play
+     * Store pipeline and extracts the version, {@code classes.dex} hash,
+     * signing certificates, and derived HMAC key.
+     *
+     * <p>Play Store distributes modern WhatsApp builds as an App Bundle,
+     * so the returned collection contains a base APK plus one or more
+     * configuration splits. The base APK carries the manifest,
+     * {@code classes.dex} and signing certificates and is fully
+     * materialised into a {@link ByteArrayApkFile} because cert
+     * extraction needs random access to the APK Signing Block at the
+     * tail of the archive. Splits are only consulted for
+     * {@code about_logo.png} when the base APK omits it, and are
+     * stream-scanned with {@link ZipInputStream} so they never get
+     * parsed by {@code apk-parser} nor fully held in memory. Any split
+     * stream left unread is closed in the {@code finally} block so its
+     * HTTP transfer is aborted.
      *
      * @param business {@code true} for the business flavour, {@code false}
      *                 for the consumer flavour
      * @return a populated {@code WhatsAppAndroidClientInfo} instance
-     * @throws RuntimeException if the HTTP download, the APK parsing, or the
-     *                          cryptographic derivation fails
+     * @throws RuntimeException if the HTTP download, the APK parsing, or
+     *                          the cryptographic derivation fails
      */
     private static WhatsAppAndroidClientInfo queryApkInfo(boolean business) {
-        try(var httpClient = HttpClient.newBuilder()
-                .followRedirects(HttpClient.Redirect.ALWAYS)
-                .build()) {
-            var request = HttpRequest.newBuilder()
-                    .uri(business ? MOBILE_BUSINESS_ANDROID_URL : MOBILE_PERSONAL_ANDROID_URL)
-                    .GET()
-                    .header("User-Agent", MOBILE_ANDROID_USER_AGENT)
-                    .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7")
-                    .header("Accept-Language", "en-US,en;q=0.9")
-                    .header("Sec-Fetch-Dest", "document")
-                    .header("Sec-Fetch-Mode", "navigate")
-                    .header("Sec-Fetch-Site", "none")
-                    .header("Sec-Fetch-User", "?1")
-                    .build();
-            var response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
-            if (response.statusCode() != 200) {
-                throw new IOException("HTTP request failed with status code: " + response.statusCode());
+        var packageName = business ? BUSINESS_PACKAGE : PERSONAL_PACKAGE;
+        try {
+            // Queries the Play Store catalogue for the latest versionCode
+            // first so we can short-circuit straight to the on-disk cache
+            // when nothing has changed since the previous run.
+            var latest = PlayStoreUtils.latestVersion(packageName);
+            var cached = loadCached(business);
+            if (cached != null && cached.versionCode == latest.code()) {
+                return cached;
             }
 
-            try (var apkFile = new ByteArrayApkFile(response.body())) {
+            // The cache is either missing or stale — download the current
+            // APK through the already-resolved versionCode, extract the
+            // required material, and persist a fresh cache for the next
+            // JVM.
+            try (var downloaded = PlayStoreUtils.downloadApk(packageName, latest.code());
+                 var baseApk = new ByteArrayApkFile(downloaded.baseApk().readAllBytes())) {
+                // Tries the base APK first — most builds ship about_logo.png there.
+                var aboutLogo = findAboutLogoInBase(baseApk);
+                if (aboutLogo == null) {
+                    // Density-qualified drawables only ship in config.<density>dpi
+                    // splits, never in native-ABI or locale splits. Close every
+                    // non-density split eagerly so its HTTP transfer is aborted
+                    // instead of spending tens of MB downloading native libs we
+                    // will not scan, and scan the rest via ZipInputStream until
+                    // one of the known paths is found.
+                    for (var split : downloaded.splits().entrySet()) {
+                        if (!isDensityConfigSplit(split.getKey())) {
+                            try {
+                                split.getValue().close();
+                            } catch (IOException ignored) {
+                            }
+                            continue;
+                        }
+                        aboutLogo = findAboutLogoInSplit(split.getValue());
+                        if (aboutLogo != null) {
+                            break;
+                        }
+                    }
+                }
+                if (aboutLogo == null) {
+                    throw new NoSuchElementException("Missing about_logo.png from apk");
+                }
+
                 // Parses AndroidManifest.xml to extract the advertised build version
-                var version = ClientAppVersion.of(apkFile.getApkMeta().getVersionName());
+                var version = ClientAppVersion.of(baseApk.getApkMeta().getVersionName());
 
                 // Hashes the compiled Dalvik bytecode so the server can verify
                 // the caller possesses the exact same classes.dex
                 var digest = MessageDigest.getInstance("MD5");
-                digest.update(apkFile.getFileData("classes.dex"));
+                digest.update(baseApk.getFileData("classes.dex"));
                 var md5Hash = digest.digest();
 
                 // Derives the PBKDF2-HMAC-SHA1 key from the package name and the
                 // about_logo.png asset, which together act as an application secret
-                var secretKey = getSecretKey(apkFile.getApkMeta().getPackageName(), getAboutLogo(apkFile));
+                var secretKey = getSecretKey(baseApk.getApkMeta().getPackageName(), aboutLogo);
 
                 // Extracts the APK signing certificates so each one can be folded
                 // into the registration token HMAC
-                var certificates = getCertificates(apkFile);
-                return new WhatsAppAndroidClientInfo(version, md5Hash, secretKey, certificates, business);
+                var certificates = getCertificates(baseApk);
+
+                var info = new WhatsAppAndroidClientInfo(version, latest.code(), md5Hash, secretKey, certificates, business);
+                saveCached(info);
+                return info;
             }
-        } catch (IOException | GeneralSecurityException | InterruptedException exception) {
+        } catch (IOException | GeneralSecurityException exception) {
             throw new RuntimeException("Cannot extract data from APK", exception);
         }
     }
 
     /**
-     * Returns the raw bytes of the {@code about_logo.png} asset from the
-     * APK, tolerating the several density-bucket paths the image can live
-     * under across WhatsApp releases.
+     * Reads and decodes the on-disk JSON cache for the given flavour.
+     * Any read or parse failure is swallowed and causes {@code null} to
+     * be returned, triggering a fresh download.
      *
-     * @param apkFile the parsed APK
-     * @return the PNG bytes of the {@code about_logo} drawable
-     * @throws IOException if reading the APK entry fails
-     * @throws NoSuchElementException if none of the known paths contain the
-     *                                asset
+     * @param business whether this is the business flavour
+     * @return the decoded client info, or {@code null} if the file is
+     *     missing, unreadable, or malformed
      */
-    private static byte[] getAboutLogo(ByteArrayApkFile apkFile) throws IOException {
-        // Looks up the drawable in the default hdpi bucket first
-        var resource = apkFile.getFileData("res/drawable-hdpi/about_logo.png");
-        if (resource != null) {
-            return resource;
+    private static WhatsAppAndroidClientInfo loadCached(boolean business) {
+        var path = cacheFile(business);
+        if (!Files.isRegularFile(path)) {
+            return null;
         }
-
-        // Falls back to the hdpi-v4 API-gated bucket used by older releases
-        var resourceV4 = apkFile.getFileData("res/drawable-hdpi-v4/about_logo.png");
-        if (resourceV4 != null) {
-            return resourceV4;
+        try (var in = Files.newInputStream(path)) {
+            var json = JSON.parseObject(in);
+            var decoder = Base64.getDecoder();
+            var version = ClientAppVersion.of(json.getString("version"));
+            var versionCode = json.getIntValue("versionCode");
+            var md5Hash = decoder.decode(json.getString("md5Hash"));
+            var secretKey = new SecretKeySpec(decoder.decode(json.getString("secretKey")), "PBKDF2");
+            var certs = json.getJSONArray("certificates");
+            var certificates = new byte[certs.size()][];
+            for (var i = 0; i < certs.size(); i++) {
+                certificates[i] = decoder.decode(certs.getString(i));
+            }
+            return new WhatsAppAndroidClientInfo(version, versionCode, md5Hash, secretKey, certificates, business);
+        } catch (IOException | RuntimeException ignored) {
+            return null;
         }
+    }
 
-        // Falls back to the xxhdpi-v4 bucket used by recent releases
-        var xxResourceV4 = apkFile.getFileData("res/drawable-xxhdpi-v4/about_logo.png");
-        if (xxResourceV4 != null) {
-            return xxResourceV4;
+    /**
+     * Serialises {@code info} to JSON and writes it to the per-flavour
+     * cache file, creating parent directories as needed. Byte fields are
+     * emitted as Base64 strings so the payload stays plain JSON. Any
+     * write failure is silently swallowed: the cache is a best-effort
+     * optimisation and a failed write just means the next invocation
+     * will re-fetch.
+     *
+     * @param info the client info to persist
+     */
+    private static void saveCached(WhatsAppAndroidClientInfo info) {
+        try {
+            var path = cacheFile(info.business);
+            var parent = path.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+            var encoder = Base64.getEncoder();
+            var certificates = new JSONArray();
+            for (var cert : info.certificates) {
+                certificates.add(encoder.encodeToString(cert));
+            }
+            var json = new JSONObject();
+            json.put("versionCode", info.versionCode);
+            json.put("version", info.version.toString());
+            json.put("md5Hash", encoder.encodeToString(info.md5Hash));
+            json.put("secretKey", encoder.encodeToString(info.secretKey.getEncoded()));
+            json.put("certificates", certificates);
+            Files.writeString(path, json.toJSONString());
+        } catch (IOException | RuntimeException ignored) {
+            // Cache write failures are non-fatal; next call will re-fetch.
         }
+    }
 
-        throw new NoSuchElementException("Missing about_logo.png from apk");
+    /**
+     * Resolves the on-disk path of the JSON cache file for the given
+     * flavour, rooted at {@code $user.home/.cobalt/cache/}.
+     *
+     * @param business whether this is the business flavour
+     * @return the cache file path
+     */
+    private static Path cacheFile(boolean business) {
+        return Path.of(
+                System.getProperty("user.home"),
+                ".cobalt",
+                "cache",
+                "wa-android-" + (business ? "business" : "personal") + ".json"
+        );
+    }
+
+    /**
+     * Returns {@code true} when the given Play Store split identifier
+     * designates a density-configuration split (e.g. {@code config.hdpi},
+     * {@code config.xxhdpi}, {@code config.xxxhdpi}). Only these splits
+     * can carry density-qualified drawables such as
+     * {@code about_logo.png}; ABI splits ({@code config.arm64_v8a}, ...)
+     * and locale splits ({@code config.en}, ...) never do.
+     *
+     * @param splitName the split identifier reported by the Play Store
+     * @return {@code true} if the split can carry density-qualified
+     *     drawables
+     */
+    private static boolean isDensityConfigSplit(String splitName) {
+        return splitName != null && splitName.endsWith("dpi");
+    }
+
+    /**
+     * Looks up each {@link #ABOUT_LOGO_PATHS} entry in the base APK and
+     * returns the first match, or {@code null} if none are present.
+     *
+     * @param baseApk the materialised base APK
+     * @return the raw PNG bytes, or {@code null} when the base APK does
+     *     not carry the drawable
+     * @throws IOException if reading an APK entry fails
+     */
+    private static byte[] findAboutLogoInBase(ByteArrayApkFile baseApk) throws IOException {
+        for (var path : ABOUT_LOGO_PATHS) {
+            var data = baseApk.getFileData(path);
+            if (data != null) {
+                return data;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Stream-scans a split APK for an {@code about_logo.png} entry under
+     * any of the known {@link #ABOUT_LOGO_PATHS}, returning the first
+     * match. Uses {@link ZipInputStream} rather than {@link ByteArrayApkFile}
+     * so the caller never has to hold the full split in memory and can
+     * abort the underlying HTTP transfer as soon as the entry is located.
+     *
+     * @param stream the split's response body stream
+     * @return the raw PNG bytes, or {@code null} when the split does not
+     *     carry any of the candidate paths
+     * @throws IOException if reading the stream or an entry's decompressed
+     *     bytes fails
+     */
+    private static byte[] findAboutLogoInSplit(InputStream stream) throws IOException {
+        try (var zip = new ZipInputStream(stream)) {
+            var entry = zip.getNextEntry();
+            while (entry != null) {
+                if (ABOUT_LOGO_PATHS.contains(entry.getName())) {
+                    return zip.readAllBytes();
+                }
+                entry = zip.getNextEntry();
+            }
+            return null;
+        }
     }
 
     /**

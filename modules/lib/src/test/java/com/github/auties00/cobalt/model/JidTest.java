@@ -1,4 +1,4 @@
-package com.github.auties00.cobalt.misc;
+package com.github.auties00.cobalt.model;
 
 import it.auties.protobuf.model.ProtobufString;
 import com.github.auties00.cobalt.exception.WhatsAppMalformedJidException;

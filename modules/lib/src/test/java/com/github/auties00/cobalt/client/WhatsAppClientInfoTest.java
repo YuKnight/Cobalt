@@ -1,4 +1,4 @@
-package com.github.auties00.cobalt.misc;
+package com.github.auties00.cobalt.client;
 
 import com.github.auties00.cobalt.client.info.WhatsAppClientInfo;
 import com.github.auties00.cobalt.client.info.WhatsAppMobileClientInfo;
@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 import static com.github.auties00.cobalt.model.device.pairing.ClientPlatformType.*;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
-public class ClientsTest {
+public class WhatsAppClientInfoTest {
     private static final Long PHONE_NUMBER_MOCK = 34751869223L;
 
     @Test

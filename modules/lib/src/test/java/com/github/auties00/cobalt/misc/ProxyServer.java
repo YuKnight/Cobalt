@@ -1,4 +1,4 @@
-package com.github.auties00.cobalt.util;
+package com.github.auties00.cobalt.misc;
 
 import com.github.auties00.cobalt.client.WhatsAppClientProxy;
 import org.bouncycastle.asn1.x500.X500Name;
