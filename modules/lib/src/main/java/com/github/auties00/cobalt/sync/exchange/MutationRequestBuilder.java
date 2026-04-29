@@ -16,6 +16,7 @@ import com.github.auties00.cobalt.model.signal.KeyIdBuilder;
 import com.github.auties00.cobalt.model.sync.SyncHashValue;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.SyncActionEntry;
+import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.model.sync.data.*;
 import com.github.auties00.cobalt.node.NodeBuilder;
@@ -27,6 +28,7 @@ import com.github.auties00.cobalt.sync.crypto.MutationIntegrityVerifier;
 import com.github.auties00.cobalt.sync.crypto.MutationKeys;
 import com.github.auties00.cobalt.sync.crypto.MutationLTHash;
 import com.github.auties00.cobalt.sync.key.SyncKeyUtils;
+import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.MediaUpload2EventBuilder;
 import com.github.auties00.cobalt.wam.type.MediaType;
 import com.github.auties00.cobalt.wam.type.MediaUploadModeType;
@@ -61,6 +63,10 @@ public final class MutationRequestBuilder {
 
     private final WhatsAppClient whatsapp;
     private final ABPropsService abPropsService;
+    /**
+     * The WAM telemetry service used to commit media-upload events.
+     */
+    private final WamService wamService;
 
     /**
      * Constructs a new mutation request builder.
@@ -69,10 +75,12 @@ public final class MutationRequestBuilder {
      *           with constructor DI per Cobalt architecture
      * @param whatsapp       the WhatsApp client instance
      * @param abPropsService the AB props service for threshold configuration
+     * @param wamService     the WAM telemetry service for committing media-upload events
      */
-    public MutationRequestBuilder(WhatsAppClient whatsapp, ABPropsService abPropsService) {
+    public MutationRequestBuilder(WhatsAppClient whatsapp, ABPropsService abPropsService, WamService wamService) {
         this.whatsapp = whatsapp;
         this.abPropsService = abPropsService;
+        this.wamService = wamService;
     }
 
     /**
@@ -506,7 +514,7 @@ public final class MutationRequestBuilder {
      *           {@link DecryptedMutation.Trusted} because Cobalt's {@link SyncActionEntry}
      *           does not store a per-action timestamp (WA Web's {@code SyncActionEntry} carries
      *           one only because it is populated from a freshly received mutation that has the
-     *           timestamp from the wire). Cobalt synthesizes {@link java.time.Instant#now()}
+     *           timestamp from the wire). Cobalt synthesizes {@link Instant#now()}
      *           solely to satisfy the {@code Trusted} record's non-null contract; the field is
      *           never read on the rotation path — neither
      *           {@link EncryptedMutation#of(SyncPendingMutation, MutationKeys, byte[])} (which
@@ -695,7 +703,7 @@ public final class MutationRequestBuilder {
     @WhatsAppWebExport(moduleName = "WAWebSyncdRequestBuilder", exports = "buildAppStateSyncRequest", adaptation = WhatsAppAdaptation.ADAPTED)
     @WhatsAppWebExport(moduleName = "WAWebSyncdRequestBuilderBuild", exports = "buildSyncIqNode", adaptation = WhatsAppAdaptation.ADAPTED)
     public BatchedSyncRequest buildBatchedSyncRequest(Map<SyncPatchType, SequencedCollection<SyncPendingMutation>> collectionPatches) {
-        var collectionNodes = new ArrayList<com.github.auties00.cobalt.node.Node>();
+        var collectionNodes = new ArrayList<Node>();
         var uploadInfos = new LinkedHashMap<SyncPatchType, SyncRequest.UploadedPatchInfo>();
         var skippedUploads = new LinkedHashSet<SyncPatchType>();
         for (var entry : collectionPatches.entrySet()) {
@@ -861,7 +869,7 @@ public final class MutationRequestBuilder {
             adaptation = WhatsAppAdaptation.ADAPTED)
     private void commitMediaUpload2Success(Instant uploadStart) {
         var overallT = Instant.ofEpochMilli(Duration.between(uploadStart, Instant.now()).toMillis());
-        whatsapp.wamService().commit(new MediaUpload2EventBuilder()
+        wamService.commit(new MediaUpload2EventBuilder()
                 .overallMediaType(MediaType.MD_APP_STATE)
                 .overallMmsVersion(4)
                 .overallUploadOrigin(UploadOriginType.MESSAGE_HISTORY_SYNC)
@@ -920,7 +928,7 @@ public final class MutationRequestBuilder {
             builder.uploadHttpCode(statusCode);
             builder.finalizeHttpCode(statusCode);
         }
-        whatsapp.wamService().commit(builder.build());
+        wamService.commit(builder.build());
     }
 
     /**

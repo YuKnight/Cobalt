@@ -268,7 +268,7 @@ public final class MediaConnection {
      * @param response the IQ response node containing a {@code media_conn}
      *                 child
      * @return the parsed media connection
-     * @throws java.util.NoSuchElementException if the response is missing the
+     * @throws NoSuchElementException if the response is missing the
      *         {@code media_conn} child or one of the mandatory
      *         {@code auth}, {@code ttl}, {@code auth_ttl}, or
      *         {@code max_buckets} attributes
@@ -1006,7 +1006,7 @@ public final class MediaConnection {
      * parameter for newsletter-video uploads gated behind the
      * {@code web_channel_video_server_transcode_upload} A/B prop. None of
      * these are exercised by Cobalt's single-shot upload path; see
-     * {@link com.github.auties00.cobalt.props.ABProp#WEB_CHANNEL_VIDEO_SERVER_TRANSCODE_UPLOAD}
+     * {@link ABProp#WEB_CHANNEL_VIDEO_SERVER_TRANSCODE_UPLOAD}
      * for the prop and the {@link #upload} javadoc for the streaming-feature
      * gap.
      *

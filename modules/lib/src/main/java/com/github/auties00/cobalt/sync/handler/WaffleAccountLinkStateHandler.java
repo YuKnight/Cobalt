@@ -20,6 +20,7 @@ import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 import com.github.auties00.cobalt.wam.event.NonMessagePeerDataRequestEventBuilder;
 import com.github.auties00.cobalt.wam.type.PeerDataRequestType;
+import com.github.auties00.cobalt.wam.WamService;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -120,8 +121,8 @@ public final class WaffleAccountLinkStateHandler implements WebAppStateActionHan
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebWaffleAccountLinkStateSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: single-path adapter for batch-only WA Web entry
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: single-path adapter for batch-only WA Web entry
     }
 
     /**
@@ -156,7 +157,7 @@ public final class WaffleAccountLinkStateHandler implements WebAppStateActionHan
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebWaffleAccountLinkStateSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public List<MutationApplicationResult> applyMutationBatchResults(WhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
+    public List<MutationApplicationResult> applyMutationBatchResults(WhatsAppClient client, WamService wamService, List<DecryptedMutation.Trusted> mutations) {
         var accountLinkingEnabled = client.abPropsService().getBool(ABProp.WEB_WAFFLE); // WAWebWaffleAccountLinkStateSync.applyMutations: WAWebAccountLinkingGatingUtils.accountLinkingEnabled() -> getABPropConfigValue("web_waffle")
         DecryptedMutation.Trusted latest = null; // WAWebWaffleAccountLinkStateSync.applyMutations: var a
         var results = new ArrayList<MutationApplicationResult>(mutations.size()); // WAWebWaffleAccountLinkStateSync.applyMutations: var u = t.map(...)
@@ -194,7 +195,7 @@ public final class WaffleAccountLinkStateHandler implements WebAppStateActionHan
             client.store().setWaffleAccountLinkStateTimestamp(latest.timestamp()); // ADAPTED: createOrUpdateAccountLinkingState linkTimestamp field
             // WAWebWaffleAccountLinkStateSync.applyMutations: m === AccountLinkState.Active && (yield requestNonceFromPrimary())
             if (linkState == WaffleAccountLinkStateAction.AccountLinkState.ACTIVE) {
-                requestNonceFromPrimary(client); // WAWebAccountLinkingNonceFetchAPI.requestNonceFromPrimary
+                requestNonceFromPrimary(client, wamService); // WAWebAccountLinkingNonceFetchAPI.requestNonceFromPrimary
             }
         }
 
@@ -221,7 +222,7 @@ public final class WaffleAccountLinkStateHandler implements WebAppStateActionHan
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebWaffleAccountLinkStateSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         if (!client.abPropsService().getBool(ABProp.WEB_WAFFLE)) { // WAWebWaffleAccountLinkStateSync.applyMutations: WAWebAccountLinkingGatingUtils.accountLinkingEnabled() == false branch
             return MutationApplicationResult.unsupported(); // WAWebWaffleAccountLinkStateSync.applyMutations: {actionState: Unsupported}
         }
@@ -242,7 +243,7 @@ public final class WaffleAccountLinkStateHandler implements WebAppStateActionHan
         client.store().setWaffleAccountLinkStateTimestamp(mutation.timestamp()); // ADAPTED: createOrUpdateAccountLinkingState linkTimestamp field
         // WAWebWaffleAccountLinkStateSync.applyMutations: m === AccountLinkState.Active && (yield requestNonceFromPrimary())
         if (linkState == WaffleAccountLinkStateAction.AccountLinkState.ACTIVE) {
-            requestNonceFromPrimary(client); // WAWebAccountLinkingNonceFetchAPI.requestNonceFromPrimary
+            requestNonceFromPrimary(client, wamService); // WAWebAccountLinkingNonceFetchAPI.requestNonceFromPrimary
         }
         return MutationApplicationResult.success(); // WAWebWaffleAccountLinkStateSync.applyMutations: {actionState: Success}
     }
@@ -264,13 +265,14 @@ public final class WaffleAccountLinkStateHandler implements WebAppStateActionHan
      * micro-optimization is intentionally omitted here because sync mutations
      * are processed sequentially in Cobalt.
      *
-     * @param client the WhatsApp client used to dispatch the peer message
+     * @param client     the WhatsApp client used to dispatch the peer message
+     * @param wamService the WAM telemetry service used to commit the non-message peer data request event
      * @implNote WAWebAccountLinkingNonceFetchAPI.requestNonceFromPrimary,
      *           WAWebSendNonMessageDataRequest.sendPeerDataOperationRequest
      */
     @WhatsAppWebExport(moduleName = "WAWebAccountLinkingNonceFetchAPI", exports = "requestNonceFromPrimary", adaptation = WhatsAppAdaptation.ADAPTED)
     @WhatsAppWebExport(moduleName = "WAWebSendNonMessageDataRequest", exports = "sendPeerDataOperationRequest", adaptation = WhatsAppAdaptation.ADAPTED)
-    private void requestNonceFromPrimary(WhatsAppClient client) {
+    private void requestNonceFromPrimary(WhatsAppClient client, WamService wamService) {
         var me = client.store().jid().orElse(null); // ADAPTED: WAWebSendNonMessageDataRequest.D: getMePnUserOrThrow_DO_NOT_USE() / getMeDevicePnOrThrow_DO_NOT_USE()
         if (me == null) {
             return; // ADAPTED: defensive guard against missing own JID; WA Web throws via getMePnUserOrThrow_DO_NOT_USE
@@ -292,7 +294,7 @@ public final class WaffleAccountLinkStateHandler implements WebAppStateActionHan
         // WAWebNonMessageDataRequestLoggingUtils.m maps to PEER_DATA_REQUEST_TYPE.WAFFLE_LINKING_NONCE_FETCH,
         // and peerDataRequestSessionId is the outbound peer message key id (t.id.id).
         var sessionId = MessageIdGenerator.generate(MessageIdVersion.V2, me); // WAWebSendNonMessageDataRequest.D: yield WAWebMsgKey.newId()
-        client.wamService().commit(new NonMessagePeerDataRequestEventBuilder()
+        wamService.commit(new NonMessagePeerDataRequestEventBuilder()
                 .peerDataRequestCount(1)
                 .peerDataRequestType(PeerDataRequestType.WAFFLE_LINKING_NONCE_FETCH)
                 .peerDataRequestSessionId(sessionId)

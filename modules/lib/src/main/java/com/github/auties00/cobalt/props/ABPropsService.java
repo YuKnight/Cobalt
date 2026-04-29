@@ -9,6 +9,7 @@ import com.github.auties00.cobalt.node.NodeBuilder;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -445,7 +446,7 @@ public final class ABPropsService {
         // or SamplingConfig ({event_code, sampling_weight}).
         var propNodes = propsNode.getChildren("prop");
         var experimentCount = 0;
-        var parsedSamplingConfigs = new java.util.LinkedHashMap<Integer, Integer>();
+        var parsedSamplingConfigs = new LinkedHashMap<Integer, Integer>();
         for (var propNode : propNodes) {
             // WASmaxInAbPropsExperimentConfigMixin.parseExperimentConfigMixin is
             // attempted first; on failure SamplingConfigMixin is tried.

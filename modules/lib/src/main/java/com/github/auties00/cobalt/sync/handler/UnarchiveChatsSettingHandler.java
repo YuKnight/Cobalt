@@ -16,6 +16,7 @@ import com.github.auties00.cobalt.model.sync.action.setting.UnarchiveChatsSettin
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -117,8 +118,8 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebArchiveSettingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebArchiveSettingSync.applyMutations
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebArchiveSettingSync.applyMutations
     }
 
     /**
@@ -141,7 +142,7 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebArchiveSettingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public List<MutationApplicationResult> applyMutationBatchResults(WhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
+    public List<MutationApplicationResult> applyMutationBatchResults(WhatsAppClient client, WamService wamService, List<DecryptedMutation.Trusted> mutations) {
         if (mutations.isEmpty()) { // WAWebArchiveSettingSync.applyMutations: if (e.length > 0) check, else return [{actionState: Failed}]
             return List.of();
         }
@@ -150,7 +151,7 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
         for (var i = 0; i < mutations.size() - 1; i++) { // WAWebArchiveSettingSync.applyMutations: only processes e[e.length - 1]
             results.add(MutationApplicationResult.skipped());
         }
-        results.add(applyMutationResult(client, mutations.getLast())); // WAWebArchiveSettingSync.applyMutations: var l = e[e.length - 1]
+        results.add(applyMutationResult(client, wamService, mutations.getLast())); // WAWebArchiveSettingSync.applyMutations: var l = e[e.length - 1]
         return results;
     }
 
@@ -178,7 +179,7 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebArchiveSettingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) { // WAWebArchiveSettingSync.applyMutations: l.operation === "set" check
             return MutationApplicationResult.unsupported(); // WAWebArchiveSettingSync.applyMutations: {actionState: Unsupported}
         }
@@ -411,7 +412,7 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
      */
     private Jid extractChatJidFromArchiveIndex(String actionIndex) {
         try {
-            var parsed = com.alibaba.fastjson2.JSON.parseArray(actionIndex); // WAWebArchiveSettingSync: JSON.parse(e.index)
+            var parsed = JSON.parseArray(actionIndex); // WAWebArchiveSettingSync: JSON.parse(e.index)
             if (parsed == null || parsed.size() < 2) {
                 return null;
             }

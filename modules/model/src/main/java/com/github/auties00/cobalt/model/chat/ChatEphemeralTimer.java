@@ -1,8 +1,5 @@
 package com.github.auties00.cobalt.model.chat;
 
-import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
-import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
-import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import it.auties.protobuf.annotation.ProtobufDeserializer;
 import it.auties.protobuf.annotation.ProtobufSerializer;
 
@@ -12,40 +9,47 @@ import java.util.Arrays;
 /**
  * Represents the available durations for disappearing messages in a WhatsApp chat.
  *
- * <p>When disappearing messages are enabled in a one-to-one or group conversation,
- * every new message sent to the chat is automatically deleted after the configured
- * duration. WhatsApp supports a fixed set of timer values: 24 hours, 7 days, and
- * 90 days, plus a special {@link #OFF} value that disables the feature entirely.
+ * <p>When the disappearing-messages feature is enabled in a one-to-one or group
+ * conversation, every new message sent to that chat is automatically deleted from
+ * every participant's device after the configured duration has elapsed since the
+ * message was sent. WhatsApp restricts the timer to a small fixed set of values,
+ * exposed as the constants on this enum: 24 hours, 7 days, and 90 days, plus the
+ * special {@link #OFF} value that disables the feature entirely.
  *
- * <p>Instances are serialized to and from protobuf as an integer representing the
- * duration in seconds. The {@link #of(Integer)} factory method also accepts values
- * expressed in days for backward compatibility.
+ * <p>The timer is serialized over the wire as the duration in seconds. The
+ * {@link #of(Integer)} factory accepts either a seconds value (the canonical
+ * wire encoding) or a days value (a convenience for callers that already work
+ * in days), falling back to {@link #OFF} on unrecognized input.
  */
-@WhatsAppWebModule(moduleName = "WAWebEphemeralIsDurationAllowed")
 public enum ChatEphemeralTimer {
     /**
-     * Disappearing messages are disabled. Messages in the chat are retained
-     * indefinitely.
+     * Disappearing messages are disabled. New messages sent to the chat are
+     * retained indefinitely on every participant's device.
      */
     OFF(Duration.ofDays(0)),
 
     /**
-     * Messages disappear after 24 hours.
+     * Disappearing-messages timer of 24 hours. New messages are automatically
+     * deleted one day after they are sent.
      */
     ONE_DAY(Duration.ofDays(1)),
 
     /**
-     * Messages disappear after 7 days.
+     * Disappearing-messages timer of 7 days. New messages are automatically
+     * deleted one week after they are sent.
      */
     ONE_WEEK(Duration.ofDays(7)),
 
     /**
-     * Messages disappear after 90 days.
+     * Disappearing-messages timer of 90 days. New messages are automatically
+     * deleted three months after they are sent.
      */
     THREE_MONTHS(Duration.ofDays(90));
 
     /**
-     * The duration after which messages are automatically deleted.
+     * The duration after which messages tagged with this timer are automatically
+     * deleted, expressed as a {@link Duration}. {@link #OFF} carries a zero
+     * duration to indicate that no auto-deletion takes place.
      */
     private final Duration period;
 
@@ -59,8 +63,8 @@ public enum ChatEphemeralTimer {
     }
 
     /**
-     * Returns the duration after which messages are automatically deleted
-     * in this timer mode.
+     * Returns the duration after which messages tagged with this timer are
+     * automatically deleted. {@link #OFF} returns a zero duration.
      *
      * @return the ephemeral timer duration, never {@code null}
      */
@@ -71,8 +75,9 @@ public enum ChatEphemeralTimer {
     /**
      * Returns the {@code ChatEphemeralTimer} matching the given integer value.
      *
-     * <p>The value may be expressed in seconds or in days. If the value is
-     * {@code null} or does not match any known timer, {@link #OFF} is returned.
+     * <p>The value may be expressed in seconds (the canonical wire encoding)
+     * or in days (for caller convenience). {@code null} or an unrecognized
+     * value yields {@link #OFF}.
      *
      * @param value the timer value in seconds or days, or {@code null}
      * @return the matching timer, or {@link #OFF} if no match is found
@@ -97,44 +102,26 @@ public enum ChatEphemeralTimer {
     }
 
     /**
-     * Returns whether the given duration (in seconds) is a valid ephemeral-timer
+     * Returns whether the given duration in seconds is a valid ephemeral-timer
      * value accepted by WhatsApp.
      *
-     * <p>A duration is considered allowed when it is either
-     * <ul>
-     *   <li>exactly {@code 0}, which disables disappearing messages (the
-     *       {@link #OFF} timer), or</li>
-     *   <li>one of the fixed positive values {@code 86400} (1 day),
-     *       {@code 604800} (7 days) or {@code 7776000} (90 days), matching
-     *       {@link #ONE_DAY}, {@link #ONE_WEEK} and {@link #THREE_MONTHS}
-     *       respectively.</li>
-     * </ul>
-     * Any negative value, or any other positive value not in the fixed set, is
-     * rejected.
+     * <p>A duration is allowed when it is either {@code 0} (which disables
+     * disappearing messages, matching {@link #OFF}) or one of the fixed
+     * positive values that correspond to {@link #ONE_DAY}, {@link #ONE_WEEK}
+     * and {@link #THREE_MONTHS}. Negative values and any other positive value
+     * not in the fixed set are rejected.
      *
      * @param durationSeconds the candidate duration, in seconds
      * @return {@code true} if {@code durationSeconds} is {@code 0} or matches
      *         one of the defined timers, {@code false} otherwise
-     * @implNote ADAPTED: WAWebEphemeralIsDurationAllowed.isEphemeralDurationAllowed.
-     * WA Web hard-codes the allowed positive values in a module-level array
-     * ({@code [86400, 604800, 7776e3]}) and treats {@code t < 0} as rejected,
-     * {@code t === 0} as accepted, and anything else as a membership check
-     * against the array. Cobalt derives the same set from this enum's variants
-     * so the allowed durations stay in a single source of truth.
      */
-    @WhatsAppWebExport(moduleName = "WAWebEphemeralIsDurationAllowed",
-            exports = "isEphemeralDurationAllowed",
-            adaptation = WhatsAppAdaptation.ADAPTED)
     public static boolean isEphemeralDurationAllowed(int durationSeconds) {
-        // WAWebEphemeralIsDurationAllowed.isEphemeralDurationAllowed: t < 0 ? false
         if (durationSeconds < 0) {
             return false;
         }
-        // WAWebEphemeralIsDurationAllowed.isEphemeralDurationAllowed: t === 0 ? true
         if (durationSeconds == 0) {
             return true;
         }
-        // WAWebEphemeralIsDurationAllowed.isEphemeralDurationAllowed: e.includes(t) where e = [86400, 604800, 7776e3]
         for (var timer : values()) {
             if (timer != OFF && timer.period.toSeconds() == durationSeconds) {
                 return true;

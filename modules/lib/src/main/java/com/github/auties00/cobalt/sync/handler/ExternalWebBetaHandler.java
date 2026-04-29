@@ -11,6 +11,7 @@ import com.github.auties00.cobalt.model.sync.action.device.ExternalWebBetaAction
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 /**
  * Handles external web beta sync actions.
@@ -106,8 +107,8 @@ public final class ExternalWebBetaHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebExternalWebBetaSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS;
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -132,7 +133,7 @@ public final class ExternalWebBetaHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebExternalWebBetaSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         if (!client.abPropsService().getBool(ABProp.EXTERNAL_BETA_CAN_JOIN)) { // WAWebExternalWebBetaSync.applyMutations: getABPropConfigValue("external_beta_can_join") !== true
             return MutationApplicationResult.unsupported();
         }

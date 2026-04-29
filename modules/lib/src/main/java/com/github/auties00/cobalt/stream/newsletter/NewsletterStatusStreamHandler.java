@@ -5,6 +5,7 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.MessageContainer;
 import com.github.auties00.cobalt.model.message.MessageContainerSpec;
+import com.github.auties00.cobalt.model.message.MessageInfo;
 import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
 import com.github.auties00.cobalt.model.message.MessageStatus;
 import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
@@ -274,7 +275,7 @@ public final class NewsletterStatusStreamHandler implements SocketStream.Handler
      * handleSingleMsg completes.  Cobalt directly notifies listeners
      * on virtual threads.
      */
-    private void notifyNewMessage(com.github.auties00.cobalt.model.message.MessageInfo info) {
+    private void notifyNewMessage(MessageInfo info) {
         for (var listener : whatsapp.store().listeners()) {
             Thread.startVirtualThread(() -> listener.onNewMessage(whatsapp, info));
         }

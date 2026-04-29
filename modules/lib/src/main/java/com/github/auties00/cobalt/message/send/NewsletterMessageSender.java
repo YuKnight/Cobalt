@@ -27,6 +27,7 @@ import com.github.auties00.cobalt.model.message.text.ReactionMessage;
 import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
+import com.github.auties00.cobalt.wam.WamService;
 
 import java.util.Optional;
 
@@ -92,15 +93,16 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
     /**
      * Creates a new newsletter message sender.
      *
-     * @param client the WhatsApp client for sending stanzas
+     * @param client     the WhatsApp client for sending stanzas
+     * @param wamService the WAM telemetry service inherited by the base sender
      *
      * @implNote ADAPTED: WAWebNewsletterSendMessageQueryJob uses module-level
      * imports; Cobalt uses constructor-based DI instead.
      */
     @WhatsAppWebExport(moduleName = "WAWebNewsletterSendMessageQueryJob", exports = "querySendNewsletterMessage",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    NewsletterMessageSender(WhatsAppClient client) {
-        super(client);
+    NewsletterMessageSender(WhatsAppClient client, WamService wamService) {
+        super(client, wamService);
     }
 
     /**

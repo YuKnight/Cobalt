@@ -1,0 +1,172 @@
+package com.github.auties00.cobalt.node.smax.newsletters;
+
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
+import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.node.Node;
+import com.github.auties00.cobalt.node.NodeBuilder;
+import com.github.auties00.cobalt.node.smax.SmaxOperation;
+import com.github.auties00.cobalt.node.smax.util.SmaxBaseServerErrorMixin;
+import com.github.auties00.cobalt.node.smax.util.SmaxIqResultResponseMixin;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+
+/**
+ * The outbound stanza variant — wraps the
+ * {@code <message_updates count since? before|after>} payload in the
+ * canonical
+ * {@code <iq xmlns="newsletter" type="get" to=NEWSLETTER_JID>}
+ * envelope.
+ */
+@WhatsAppWebModule(moduleName = "WASmaxOutNewslettersGetNewsletterMessageUpdatesRequest")
+@WhatsAppWebModule(moduleName = "WASmaxOutNewslettersNewsletterIQGetRequestMixin")
+public final class SmaxNewslettersGetNewsletterMessageUpdatesRequest implements SmaxOperation.Request {
+    /**
+     * The newsletter JID being polled. Routed verbatim into the IQ's
+     * {@code to} attribute.
+     */
+    private final Jid newsletterJid;
+
+    /**
+     * The maximum number of {@code <message>} entries the relay should
+     * return in this batch.
+     */
+    private final int count;
+
+    /**
+     * The optional unix-second floor — the relay only returns updates
+     * applied at or after this timestamp; {@code null} requests the
+     * full delta.
+     */
+    private final Long since;
+
+    /**
+     * The pagination cursor; never {@code null}.
+     */
+    private final SmaxNewslettersGetNewsletterMessageUpdatesDirection direction;
+
+    /**
+     * Constructs a new request.
+     *
+     * @param newsletterJid the newsletter JID; never {@code null}
+     * @param count         the per-call cap; must be non-negative
+     * @param since         the optional unix-second floor; may be
+     *                      {@code null}
+     * @param direction     the cursor; never {@code null}
+     * @throws NullPointerException if {@code newsletterJid} or
+     *                              {@code direction} is {@code null}
+     */
+    public SmaxNewslettersGetNewsletterMessageUpdatesRequest(Jid newsletterJid, int count, Long since, SmaxNewslettersGetNewsletterMessageUpdatesDirection direction) {
+        this.newsletterJid = Objects.requireNonNull(newsletterJid, "newsletterJid cannot be null");
+        this.count = count;
+        this.since = since;
+        this.direction = Objects.requireNonNull(direction, "direction cannot be null");
+    }
+
+    /**
+     * Returns the newsletter JID being polled.
+     *
+     * @return the JID; never {@code null}
+     */
+    public Jid newsletterJid() {
+        return newsletterJid;
+    }
+
+    /**
+     * Returns the per-call cap.
+     *
+     * @return the count
+     */
+    public int count() {
+        return count;
+    }
+
+    /**
+     * Returns the optional unix-second floor.
+     *
+     * @return an {@link Optional} carrying the floor, or empty when
+     *         omitted
+     */
+    public Optional<Long> since() {
+        return Optional.ofNullable(since);
+    }
+
+    /**
+     * Returns the cursor direction.
+     *
+     * @return the cursor; never {@code null}
+     */
+    public SmaxNewslettersGetNewsletterMessageUpdatesDirection direction() {
+        return direction;
+    }
+
+    /**
+     * Builds the outbound IQ stanza ready for dispatch.
+     *
+     * @return a {@link NodeBuilder} carrying the IQ envelope and the
+     *         {@code <message_updates>} payload
+     *
+     * @implNote {@code WASmaxOutNewslettersGetNewsletterMessageUpdatesRequest.makeGetNewsletterMessageUpdatesRequest}
+     *           composes
+     *           {@code WASmaxOutNewslettersNewsletterIQGetRequestMixin}
+     *           ({@code xmlns="newsletter"}, {@code to=JID(iqTo)},
+     *           {@code id=generateId()}, {@code type="get"}) over
+     *           {@code <message_updates count since? before|after>}.
+     */
+    @Override
+    @WhatsAppWebExport(moduleName = "WASmaxOutNewslettersGetNewsletterMessageUpdatesRequest",
+            exports = "makeGetNewsletterMessageUpdatesRequest",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    public NodeBuilder toNode() {
+        // WASmaxOutNewslettersGetNewsletterMessageUpdatesRequest:
+        //   smax("message_updates", {count, since: OPTIONAL(INT), before|after})
+        var updatesBuilder = new NodeBuilder()
+                .description("message_updates")
+                .attribute("count", count);
+        if (since != null) {
+            updatesBuilder.attribute("since", since);
+        }
+        switch (direction) {
+            case SmaxNewslettersGetNewsletterMessageUpdatesDirection.Before before -> updatesBuilder.attribute("before", before.pivot());
+            case SmaxNewslettersGetNewsletterMessageUpdatesDirection.After after -> updatesBuilder.attribute("after", after.pivot());
+        }
+        // WASmaxOutNewslettersNewsletterIQGetRequestMixin: smax("iq", {to: JID(iqTo), xmlns: "newsletter"})
+        // WASmaxOutNewslettersBaseIQGetRequestMixin: smax("iq", {id: generateId(), type: "get"})
+        return new NodeBuilder()
+                .description("iq")
+                .attribute("xmlns", "newsletter")
+                .attribute("to", newsletterJid)
+                .attribute("type", "get")
+                .content(updatesBuilder.build());
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == this) {
+            return true;
+        }
+        if (obj == null || obj.getClass() != this.getClass()) {
+            return false;
+        }
+        var that = (SmaxNewslettersGetNewsletterMessageUpdatesRequest) obj;
+        return this.count == that.count
+                && Objects.equals(this.newsletterJid, that.newsletterJid)
+                && Objects.equals(this.since, that.since)
+                && Objects.equals(this.direction, that.direction);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(newsletterJid, count, since, direction);
+    }
+
+    @Override
+    public String toString() {
+        return "SmaxNewslettersGetNewsletterMessageUpdatesRequest[newsletterJid="
+                + newsletterJid + ", count=" + count
+                + ", since=" + since + ", direction=" + direction + ']';
+    }
+}

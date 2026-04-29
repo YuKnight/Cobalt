@@ -28,6 +28,7 @@ import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
+import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.MdDeviceSyncAckEventBuilder;
 import com.github.auties00.cobalt.wam.event.PrekeysDepletionEventBuilder;
 import com.github.auties00.cobalt.wam.type.MessageChatType;
@@ -168,6 +169,7 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
      * @param reportingStanza the reporting stanza builder
      * @param ctwaStanza     the CTWA attribution stanza builder
      * @param tcTokenStanza  the trusted contact token stanza builder
+     * @param wamService     the WAM telemetry service for committing send events
      *
      * @implNote ADAPTED: WAWebSendUserMsgJob uses module-level imports;
      * Cobalt uses constructor-based DI instead.
@@ -184,9 +186,10 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
             MetaStanza metaStanza,
             ReportingStanza reportingStanza,
             CtwaAttributionStanza ctwaStanza,
-            TcTokenStanza tcTokenStanza
+            TcTokenStanza tcTokenStanza,
+            WamService wamService
     ) {
-        super(client);
+        super(client, wamService);
         this.encryption = Objects.requireNonNull(encryption, "encryption");
         this.deviceService = Objects.requireNonNull(deviceService, "deviceService");
         this.abPropsService = Objects.requireNonNull(abPropsService, "abPropsService");
@@ -659,7 +662,7 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
         // For the 1:1 branch: revoke = isRevokeMsg(msg), chatType = fromWid(chatJid),
         // isLid = chatJid.isLid(); groupData and serverAddressingMode are not
         // supplied, so localAddressingMode and serverAddressingMode stay empty.
-        client.wamService().commit(new MdDeviceSyncAckEventBuilder()
+        wamService.commit(new MdDeviceSyncAckEventBuilder()
                 .revoke(isRevokeMessage(messageInfo))
                 .chatType(chatTypeFromJid(chatJid))
                 .isLid(chatJid.hasLidServer())
@@ -816,7 +819,7 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
         var bucket = deviceCount == null ? null : WamSizeBuckets.numberToSizeBucket(deviceCount);
         // WAWebPostPrekeysDepletionMetric.maybePostPrekeysDepletionMetric: for (var e=0;e<t;e++) commit()
         for (var i = 0; i < depletedPrekeyCount; i++) {
-            client.wamService().commit(new PrekeysDepletionEventBuilder()
+            wamService.commit(new PrekeysDepletionEventBuilder()
                     .prekeysFetchReason(PrekeysFetchContext.SEND_MESSAGE)
                     .messageType(messageType)
                     .deviceSizeBucket(bucket)

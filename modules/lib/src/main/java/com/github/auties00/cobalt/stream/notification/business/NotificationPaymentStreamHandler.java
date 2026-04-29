@@ -1,10 +1,15 @@
 package com.github.auties00.cobalt.stream.notification.business;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.model.chat.ChatMessageInfo.StubType;
+import com.github.auties00.cobalt.model.chat.ChatMessageInfoBuilder;
 import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.model.message.MessageContainer;
 import com.github.auties00.cobalt.model.message.MessageInfo;
 import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
+import com.github.auties00.cobalt.model.message.MessageStatus;
 import com.github.auties00.cobalt.model.payment.OrphanPaymentNotificationBuilder;
 import com.github.auties00.cobalt.model.payment.PaymentInfo;
 import com.github.auties00.cobalt.model.payment.PaymentInfoBuilder;
@@ -13,7 +18,10 @@ import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.stream.message.PaymentMessageStatus;
 import com.github.auties00.cobalt.stream.message.PaymentMessageTransactionType;
 import com.github.auties00.cobalt.stream.SocketStream;
+import com.github.auties00.cobalt.util.RandomIdUtils;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -27,6 +35,8 @@ import java.util.Objects;
  *
  * @implNote WAWebPaymentNotificationHandler
  */
+@WhatsAppWebModule(moduleName = "WAWebPaymentNotificationHandler")
+@WhatsAppWebModule(moduleName = "WAWebPaymentNotificationParser")
 final class NotificationPaymentStreamHandler implements SocketStream.Handler {
     /**
      * Logger for payment notification handling diagnostics.
@@ -93,12 +103,20 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
     /**
      * Handles a payment invite notification by processing {@code account-set-up} invites.
      *
-     * <p>When the invite type is {@code "account-set-up"}, WA Web creates a local
-     * notification template message and processes it through the single-message handler.
-     * This Cobalt implementation logs the invite details; the full notification template
-     * message creation is not yet implemented.
+     * <p>For the {@code "account-set-up"} type, materialises a local stub message
+     * representing the invite, attaches it to the inviter's chat (creating the chat
+     * if necessary), and dispatches an {@code onNewMessage} callback so listeners can
+     * surface it to the user. Other invite types are logged and otherwise ignored,
+     * matching WA Web which only processes {@code account-set-up} in this branch.
      *
-     * @implNote WAWebPaymentNotificationHandler (inner function handling invite branch)
+     * @implNote WAWebPaymentNotificationHandler (inner functions {@code _} and {@code R}):
+     *           {@code R(from, t)} fabricates a {@code NotificationTemplate} chat
+     *           message with {@code MsgSubtype.PaymentInviteAccountSetUp} and
+     *           {@code templateParams: [from]}, then hands it to
+     *           {@code WAWebHandleSingleMsgWorkerCompatible.handleSingleMsg}.
+     *           Cobalt has no {@code MsgSubtype} enum and uses the closest stub
+     *           type ({@link StubType#PAYMENT_ACTION_ACCOUNT_SETUP_REMINDER})
+     *           with {@code stubParameters} carrying the inviter JID.
      * @param node   the parent notification stanza node
      * @param invite the invite child node
      */
@@ -109,10 +127,57 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
         LOGGER.log(System.Logger.Level.DEBUG,
                 "Received payment invite notification type={0} service={1} id={2}",
                 type, service, node.getAttributeAsString("id", "[missing-id]"));
-        // TODO: For "account-set-up" type, WA Web creates a NotificationTemplate message
-        // via WAWebPaymentNotificationHandler inner function R and processes it through
-        // WAWebHandleSingleMsgFactory.handleSingleMsg. This would require creating a
-        // ChatMessageInfo with MsgSubtype.PaymentInviteAccountSetUp and storing it.
+        if (!"account-set-up".equals(type)) {
+            return;
+        }
+
+        // WAWebPaymentNotificationHandler function R: from = invite.from
+        var from = invite.getAttributeAsJid("from").orElse(null);
+        if (from == null) {
+            return;
+        }
+
+        // WAWebPaymentNotificationHandler function R: id = await MsgKey.newId()
+        var key = new MessageKeyBuilder()
+                .id(RandomIdUtils.newId())
+                .parentJid(from)
+                .fromMe(false)
+                .senderJid(from)
+                .build();
+
+        // WAWebPaymentNotificationHandler function R: t = invite.timestamp
+        var timestampAttr = invite.getAttributeAsLong("t");
+        var timestamp = timestampAttr.isPresent()
+                ? Instant.ofEpochSecond(timestampAttr.getAsLong())
+                : Instant.now();
+
+        // WAWebPaymentNotificationHandler function R:
+        // {type: NOTIFICATION_TEMPLATE, kind: NotificationTemplate,
+        //  subtype: PaymentInviteAccountSetUp, templateParams: [from], ...}
+        var info = new ChatMessageInfoBuilder()
+                .key(key)
+                .senderJid(from)
+                .timestamp(timestamp)
+                .status(MessageStatus.DELIVERED)
+                .stubType(StubType.PAYMENT_ACTION_ACCOUNT_SETUP_REMINDER)
+                .stubParameters(List.of(from.toString()))
+                .message(MessageContainer.empty())
+                .build();
+
+        // WAWebHandleSingleMsgWorkerCompatible.handleSingleMsg:
+        //   chatId: from -> resolve or create the chat, append the message, bump unread
+        var chat = whatsapp.store()
+                .findChatByJid(from)
+                .orElseGet(() -> whatsapp.store().addNewChat(from));
+        chat.setLastMsgTimestamp(timestamp);
+        chat.setConversationTimestamp(timestamp);
+        chat.setUnreadCount(chat.unreadCount().orElse(0) + 1);
+        chat.addMessage(info);
+
+        // WAWebBackendEventBus dispatch -> Cobalt listener callbacks
+        for (var listener : whatsapp.store().listeners()) {
+            Thread.startVirtualThread(() -> listener.onNewMessage(whatsapp, info));
+        }
     }
 
     /**

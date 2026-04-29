@@ -6,6 +6,8 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.model.sync.SyncActionMessageRange;
+import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.sync.ConflictResolution;
 import com.github.auties00.cobalt.model.sync.ConflictResolutionState;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
@@ -16,6 +18,7 @@ import com.github.auties00.cobalt.model.sync.action.chat.ArchiveChatAction;
 import com.github.auties00.cobalt.model.sync.action.chat.ArchiveChatActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -107,7 +110,7 @@ public final class ArchiveChatHandler implements WebAppStateActionHandler {
      * Applies an archive chat mutation to local state.
      *
      * <p>Delegates to {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
-     * and returns {@code true} if the result is {@link com.github.auties00.cobalt.model.sync.SyncActionState#SUCCESS}.
+     * and returns {@code true} if the result is {@link SyncActionState#SUCCESS}.
      *
      * @implNote WAWebArchiveChatSync.applyMutations — per-mutation inner logic,
      *           success check on the returned {@code syncApplyActionResult}
@@ -117,8 +120,8 @@ public final class ArchiveChatHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebArchiveChatSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS; // WAWebArchiveChatSync.applyMutations
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebArchiveChatSync.applyMutations
     }
 
     /**
@@ -145,7 +148,7 @@ public final class ArchiveChatHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebArchiveChatSync", exports = {"applyMutations", "validateSyncActionValue", "getMessageRange"}, adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) { // WAWebArchiveChatSync.applyMutations: e.operation === "set" check, else return Unsupported
             return MutationApplicationResult.unsupported(); // WAWebArchiveChatSync.applyMutations: d++, {actionState: Unsupported}
         }
@@ -298,7 +301,7 @@ public final class ArchiveChatHandler implements WebAppStateActionHandler {
             Instant timestamp,
             boolean archived,
             Jid chatJid,
-            com.github.auties00.cobalt.model.sync.SyncActionMessageRange messageRange
+            SyncActionMessageRange messageRange
     ) {
         var action = new ArchiveChatActionBuilder() // WAWebArchiveChatSync.getArchiveChatMutation: {archiveChatAction: {archived: t, messageRange: ...}}
                 .archived(archived) // WAWebArchiveChatSync.getArchiveChatMutation: archived: t
@@ -342,7 +345,7 @@ public final class ArchiveChatHandler implements WebAppStateActionHandler {
             Instant timestamp,
             boolean archived,
             Jid chatJid,
-            com.github.auties00.cobalt.model.sync.SyncActionMessageRange messageRange
+            SyncActionMessageRange messageRange
     ) {
         var mutations = new ArrayList<SyncPendingMutation>(); // WAWebArchiveChatSync.getMutationsForArchive: var a = [this.getArchiveChatMutation(e, t, r)]
         mutations.add(getArchiveChatMutation(timestamp, archived, chatJid, messageRange)); // WAWebArchiveChatSync.getMutationsForArchive: this.getArchiveChatMutation(e, t, r)

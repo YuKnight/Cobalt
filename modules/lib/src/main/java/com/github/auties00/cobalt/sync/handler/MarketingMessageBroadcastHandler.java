@@ -11,6 +11,7 @@ import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.business.MarketingMessageBroadcastAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 import java.util.HashMap;
 
@@ -116,8 +117,8 @@ public final class MarketingMessageBroadcastHandler implements WebAppStateAction
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPremiumMessageBroadcastSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: WAWebPremiumMessageBroadcastSync.applyMutations
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: WAWebPremiumMessageBroadcastSync.applyMutations
     }
 
     /**
@@ -168,7 +169,7 @@ public final class MarketingMessageBroadcastHandler implements WebAppStateAction
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPremiumMessageBroadcastSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         var indexArray = JSON.parseArray(mutation.index()); // WAWebPremiumMessageBroadcastSync.applyMutations: var r = e.indexParts
         var premiumMessageId = indexArray.getString(1); // WAWebPremiumMessageBroadcastSync.applyMutations: i = r[1]
         var messageId = indexArray.getString(2); // WAWebPremiumMessageBroadcastSync.applyMutations: l = r[2]

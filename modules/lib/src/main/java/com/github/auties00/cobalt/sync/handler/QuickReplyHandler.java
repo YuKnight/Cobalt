@@ -15,6 +15,7 @@ import com.github.auties00.cobalt.model.sync.action.chat.QuickReplyAction;
 import com.github.auties00.cobalt.model.sync.action.chat.QuickReplyActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 import java.time.Instant;
 import java.util.List;
@@ -128,8 +129,8 @@ public final class QuickReplyHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebQuickRepliesSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebQuickRepliesSync.applyMutations
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebQuickRepliesSync.applyMutations
     }
 
     /**
@@ -193,7 +194,7 @@ public final class QuickReplyHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebQuickRepliesSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) { // WAWebQuickRepliesSync.applyMutations: if (e.operation === "set") {...} return i++, {actionState: Unsupported}
             return MutationApplicationResult.unsupported(); // WAWebQuickRepliesSync.applyMutations: i++, {actionState: SyncActionState.Unsupported}
         }

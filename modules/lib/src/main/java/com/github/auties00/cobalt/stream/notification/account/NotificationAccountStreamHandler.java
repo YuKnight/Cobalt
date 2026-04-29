@@ -1,7 +1,9 @@
 package com.github.auties00.cobalt.stream.notification.account;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.WhatsAppClientListener;
 import com.github.auties00.cobalt.device.DeviceService;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.chat.ChatEphemeralTimer;
 import com.github.auties00.cobalt.model.contact.ContactTextStatus;
 import com.github.auties00.cobalt.model.contact.ContactTextStatusBuilder;
@@ -10,6 +12,7 @@ import com.github.auties00.cobalt.model.device.info.DeviceListBuilder;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.node.Node;
+import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.stream.SocketStream;
 
 import java.time.Instant;
@@ -17,6 +20,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Consumer;
 
 /**
  * Handles incoming account-sync notifications for the authenticated user's own
@@ -26,6 +30,7 @@ import java.util.Objects;
  *
  * @implNote WAWebHandleAccountSyncNotification
  */
+@WhatsAppWebModule(moduleName = "WAWebHandleAccountSyncNotification")
 final class NotificationAccountStreamHandler implements SocketStream.Handler {
 
     /**
@@ -603,7 +608,7 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
      * @implNote WAWebHandleAccountSyncNotification (NO_WA_BASIS - Cobalt listener dispatch pattern)
      * @param consumer the callback to execute for each listener
      */
-    private void fireListeners(java.util.function.Consumer<com.github.auties00.cobalt.client.WhatsAppClientListener> consumer) {
+    private void fireListeners(Consumer<WhatsAppClientListener> consumer) {
         for (var listener : whatsapp.store().listeners()) {
             Thread.startVirtualThread(() -> consumer.accept(listener));
         }
@@ -670,7 +675,7 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
         }
 
         // WAWebHandleAccountSyncNotification: WAWap.wap("ack", {id: CUSTOM_STRING(r.stanzaId), to: JID(r.from), class: "notification", type: "account_sync"})
-        whatsapp.sendNodeWithNoResponse(new com.github.auties00.cobalt.node.NodeBuilder()
+        whatsapp.sendNodeWithNoResponse(new NodeBuilder()
                 .description("ack")
                 .attribute("id", stanzaId)
                 .attribute("class", "notification") // WAWebHandleAccountSyncNotification: hardcoded "notification"

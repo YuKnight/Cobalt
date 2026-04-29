@@ -19,6 +19,7 @@ import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.sync.WebAppStateService;
 import com.github.auties00.cobalt.util.SchedulerUtils;
+import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.MdAppStateKeyRotationEventBuilder;
 import com.github.auties00.cobalt.wam.event.MdBootstrapAppStateCriticalDataProcessingEventBuilder;
 import com.github.auties00.cobalt.wam.type.BootstrapAppStateDataStageCode;
@@ -31,6 +32,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Logger;
@@ -59,7 +61,7 @@ import java.util.logging.Logger;
  *           by {@link #shareKeyWithCompanionDevices(AppStateSyncKey)}), and
  *           {@code sendSyncdKeyRequest} which is a direct alias of
  *           {@code WAWebKeyManagementSendKeyRequestApi.sendAppStateSyncKeyRequest}
- *           implemented in {@link com.github.auties00.cobalt.sync.key.MissingSyncKeyRequestService}.
+ *           implemented in {@link MissingSyncKeyRequestService}.
  *           In Cobalt the callback-registration indirection collapses to direct method calls
  *           via constructor-based dependency injection.
  */
@@ -119,6 +121,10 @@ public final class SyncKeyRotationService {
      */
     private final WebAppStateService webAppStateService;
     private final ABPropsService abPropsService;
+    /**
+     * The WAM telemetry service used to commit key rotation events.
+     */
+    private final WamService wamService;
     private volatile CompletableFuture<?> periodicRotationJob;
 
     /**
@@ -128,12 +134,14 @@ public final class SyncKeyRotationService {
      * @param webAppStateService the web app-state service used to
      *                           schedule missing-key follow-ups
      * @param abPropsService     the AB props service for threshold configuration
+     * @param wamService         the WAM telemetry service for committing key rotation events
      * @implNote WAWebSyncdKeyManagement (module-level dependencies)
      */
-    public SyncKeyRotationService(WhatsAppClient whatsapp, WebAppStateService webAppStateService, ABPropsService abPropsService) {
+    public SyncKeyRotationService(WhatsAppClient whatsapp, WebAppStateService webAppStateService, ABPropsService abPropsService, WamService wamService) {
         this.whatsapp = whatsapp;
         this.webAppStateService = webAppStateService;
         this.abPropsService = abPropsService;
+        this.wamService = wamService;
     }
 
     /**
@@ -295,7 +303,7 @@ public final class SyncKeyRotationService {
      * {@code WAWebSyncBootstrap.isSyncDCriticalDataSyncInProcess()}. In Cobalt that
      * global state machine is approximated by checking whether the
      * {@link SyncPatchType#CRITICAL_BLOCK} collection has been bootstrapped yet,
-     * mirroring {@link com.github.auties00.cobalt.sync.WebAppStateService}.
+     * mirroring {@link WebAppStateService}.
      *
      * @implNote WAWebSyncdCriticalBootstrapProcessingApi.logCriticalBootstrapStageIfNecessary
      * @param stage the bootstrap stage reached; never {@code null}
@@ -305,7 +313,7 @@ public final class SyncKeyRotationService {
         if (whatsapp.store().findWebAppState(SyncPatchType.CRITICAL_BLOCK).bootstrapped()) {
             return;
         }
-        whatsapp.wamService().commit(new MdBootstrapAppStateCriticalDataProcessingEventBuilder()
+        wamService.commit(new MdBootstrapAppStateCriticalDataProcessingEventBuilder()
                 .bootstrapAppStateDataStage(stage) // WAWebSyncdCriticalBootstrapProcessingApi: bootstrapAppStateDataStage: e
                 .mdTimestamp((int) System.currentTimeMillis()) // WAWebSyncdCriticalBootstrapProcessingApi: mdTimestamp: unixTimeMs()
                 .build());
@@ -425,14 +433,14 @@ public final class SyncKeyRotationService {
         if (expired) { // WAWebSyncdKeyManagement._: i && (LOG(...), reportSyncdKeyRotationEvent(APP_STATE_SYNC_KEY_EXPIRY))
             LOGGER.info("syncd: key rotation due to key expiry"); // WAWebSyncdKeyManagement._: LOG("syncd: key rotation due to key expiry")
             // WAWebSyncdMetrics.reportSyncdKeyRotationEvent: new MdAppStateKeyRotationWamEvent({mdAppStateKeyRotationReason: APP_STATE_SYNC_KEY_EXPIRY}).commit()
-            whatsapp.wamService().commit(new MdAppStateKeyRotationEventBuilder()
+            wamService.commit(new MdAppStateKeyRotationEventBuilder()
                     .mdAppStateKeyRotationReason(MdAppStateKeyRotationReasonCode.APP_STATE_SYNC_KEY_EXPIRY)
                     .build());
         }
         if (deviceRemoved) { // WAWebSyncdKeyManagement._: l && (LOG(...), reportSyncdKeyRotationEvent(DEVICE_DEREGISTERATION))
             LOGGER.info("syncd: key rotation due to device removal"); // WAWebSyncdKeyManagement._: LOG("syncd: key rotation due to device removal")
             // WAWebSyncdMetrics.reportSyncdKeyRotationEvent: new MdAppStateKeyRotationWamEvent({mdAppStateKeyRotationReason: DEVICE_DEREGISTERATION}).commit()
-            whatsapp.wamService().commit(new MdAppStateKeyRotationEventBuilder()
+            wamService.commit(new MdAppStateKeyRotationEventBuilder()
                     .mdAppStateKeyRotationReason(MdAppStateKeyRotationReasonCode.DEVICE_DEREGISTERATION)
                     .build());
         }
@@ -786,7 +794,7 @@ public final class SyncKeyRotationService {
                 .build();
 
         // WAWebKeyManagementSendKeyShareApi.sendAppStateSyncKeyShare: _ = i.map(device -> message object)
-        var messages = new ArrayList<java.util.Map.Entry<Jid, ChatMessageInfo>>(targetDevices.size());
+        var messages = new ArrayList<Map.Entry<Jid, ChatMessageInfo>>(targetDevices.size());
         for (var device : targetDevices) {
             var messageKey = new MessageKeyBuilder()
                     .id(MessageIdGenerator.generate(MessageIdVersion.V1, myJid)) // WAWebMsgKey.newId_DEPRECATED
@@ -797,7 +805,7 @@ public final class SyncKeyRotationService {
                     .key(messageKey)
                     .message(messageContainer)
                     .build();
-            messages.add(java.util.Map.entry(device, messageInfo));
+            messages.add(Map.entry(device, messageInfo));
         }
 
         // WAWebKeyManagementSendKeyShareApi.sendAppStateSyncKeyShare: log before sending

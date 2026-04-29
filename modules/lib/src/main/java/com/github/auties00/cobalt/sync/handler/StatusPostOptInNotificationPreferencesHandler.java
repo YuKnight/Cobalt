@@ -7,6 +7,7 @@ import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.device.StatusPostOptInNotificationPreferencesAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 /**
  * Handles {@link StatusPostOptInNotificationPreferencesAction} sync mutations
@@ -169,8 +170,8 @@ public final class StatusPostOptInNotificationPreferencesHandler implements WebA
      *         {@code false} otherwise
      */
     @Override
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: NO_WA_BASIS — boolean collapse over the typed result
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: NO_WA_BASIS — boolean collapse over the typed result
     }
 
     /**
@@ -214,7 +215,7 @@ public final class StatusPostOptInNotificationPreferencesHandler implements WebA
      * @return the detailed application result
      */
     @Override
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) { // NO_WA_BASIS: only SET makes sense for a single-boolean opt-in flag
             return MutationApplicationResult.unsupported();
         }

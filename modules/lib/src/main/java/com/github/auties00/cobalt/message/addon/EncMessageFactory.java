@@ -6,6 +6,10 @@ import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.MessageContainerSpec;
+import com.github.auties00.cobalt.model.message.poll.PollEncValue;
+import com.github.auties00.cobalt.model.message.poll.PollEncValueBuilder;
+import com.github.auties00.cobalt.model.message.poll.PollVoteMessageBuilder;
+import com.github.auties00.cobalt.model.message.poll.PollVoteMessageSpec;
 import com.github.auties00.cobalt.model.message.security.EncCommentMessageBuilder;
 import com.github.auties00.cobalt.model.message.security.EncCommentMessage;
 import com.github.auties00.cobalt.model.message.security.EncReactionMessageBuilder;
@@ -14,6 +18,11 @@ import com.github.auties00.cobalt.model.message.text.CommentMessage;
 import com.github.auties00.cobalt.model.message.text.ReactionMessage;
 import com.github.auties00.cobalt.model.message.text.ReactionMessageSpec;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -201,6 +210,101 @@ public final class EncMessageFactory {
         // Packs the ciphertext and IV into the EncReactionMessage protobuf wrapper
         return new EncReactionMessageBuilder()
                 .targetMessageKey(reaction.key().orElse(null))
+                .encPayload(encrypted.ciphertext())
+                .encIv(encrypted.iv())
+                .build();
+    }
+
+    /**
+     * Encrypts the voter's selected option labels into a {@link PollEncValue}
+     * suitable for embedding in an outgoing
+     * {@link com.github.auties00.cobalt.model.message.poll.PollUpdateMessage}.
+     *
+     * <p>Each selected label is hashed with SHA-256 to obtain the canonical
+     * 32-byte option digest, the digests are wrapped in a
+     * {@link com.github.auties00.cobalt.model.message.poll.PollVoteMessage},
+     * the protobuf is serialised, and the resulting bytes are encrypted under
+     * an HKDF-derived key bound to the parent poll's {@code messageSecret} via
+     * {@link MessageAddonEncryption#encrypt}. The poll-vote use case mixes the
+     * voter JID and the poll-creation stanza id into the AES-GCM AAD so a
+     * malicious server cannot rebind the ciphertext to a different voter.
+     *
+     * @param selectedOptions the option labels the voter chose, in any order
+     * @param pollCreation    the poll-creation message the vote refers to
+     * @param voterJid        the JID of the user casting the vote
+     * @return the {@link PollEncValue} containing the ciphertext and IV
+     * @throws NullPointerException     if any argument is {@code null}
+     * @throws IllegalArgumentException if {@code pollCreation} carries no
+     *                                  {@code messageSecret}, or its key has no
+     *                                  id or parent JID
+     * @implNote WAWebPollVoteEncryptMsgData.encryptPollVoteMsgData +
+     * WAWebPollsVoteEncryption.encryptVote +
+     * WAWebPollsProtobufConversion.protobufFromVote: WA Web reads
+     * {@code messageSecret} and {@code originalSender} from the poll-creation
+     * msg getters, computes {@code sha256(optionName)} for each selected label
+     * via {@code WAWebPollOptionHashUtils.getHashBufferForString}, builds a
+     * {@code PollVoteMessage} protobuf, and feeds it to
+     * {@code WAWebAddonEncryption.encryptAddOn} with the
+     * {@code POLL_VOTE} use-case label.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebPollsVoteEncryption", exports = "encryptVote",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public static PollEncValue encryptPollVote(List<String> selectedOptions, ChatMessageInfo pollCreation, Jid voterJid) {
+        Objects.requireNonNull(selectedOptions, "selectedOptions cannot be null");
+        Objects.requireNonNull(pollCreation, "pollCreation cannot be null");
+        Objects.requireNonNull(voterJid, "voterJid cannot be null");
+
+        // WAWebPollVoteEncryptMsgData.encryptPollVoteMsgData:
+        // s = WANullthrows(getMessageSecret(n)) — required for HKDF derivation
+        var pollSecret = pollCreation.messageSecret()
+                .orElseThrow(() -> new IllegalArgumentException("Poll creation has no messageSecret"));
+
+        // WAWebPollVoteEncryptMsgData.encryptPollVoteMsgData: stanzaId = n.id.id
+        var pollKey = pollCreation.key();
+        var pollKeyId = pollKey.id()
+                .orElseThrow(() -> new IllegalArgumentException("Poll creation key has no id"));
+        var pollKeyJid = pollKey.parentJid()
+                .orElseThrow(() -> new IllegalArgumentException("Poll creation key has no parentJid"));
+
+        // WAWebMsgGetters.getOriginalSender: senderJid when present, else self for fromMe, else parent jid
+        var originalSender = pollKey.senderJid()
+                .orElse(pollKey.fromMe() ? voterJid : pollKeyJid)
+                .toUserJid();
+
+        // WAWebPollsProtobufConversion.protobufFromVote +
+        // WAWebPollOptionHashUtils.getHashBufferForString:
+        // each selected option name is hashed with SHA-256 and stored as raw bytes
+        var optionHashes = new ArrayList<byte[]>(selectedOptions.size());
+        try {
+            var digest = MessageDigest.getInstance("SHA-256");
+            for (var option : selectedOptions) {
+                Objects.requireNonNull(option, "selectedOptions cannot contain null entries");
+                digest.reset();
+                optionHashes.add(digest.digest(option.getBytes(StandardCharsets.UTF_8)));
+            }
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("SHA-256 not available", e);
+        }
+
+        // WAWebPollsProtobufConversion.protobufFromVote: returns
+        // {selectedOptions: hashes} wrapped in PollVoteMessage; the protobuf is
+        // empty when no option is selected (REMOVE_VOTE)
+        var voteMessage = new PollVoteMessageBuilder()
+                .selectedOptions(optionHashes)
+                .build();
+        var plaintext = PollVoteMessageSpec.encode(voteMessage);
+
+        // WAWebPollsVoteEncryption.encryptVote -> WAWebAddonEncryption.encryptAddOn
+        // with use-case POLL_VOTE: HKDF-SHA256 derive key, AES-256-GCM encrypt with
+        // AAD = stanzaId || 0x00 || voterJid
+        var encrypted = MessageAddonEncryption.encrypt(
+                plaintext, pollSecret, pollKeyId,
+                originalSender, voterJid.toUserJid(),
+                MessageAddonType.POLL_VOTE);
+
+        // WAWebPollVoteEncryptMsgData.encryptPollVoteMsgData:
+        // encPollVote: {encPayload, encIv}
+        return new PollEncValueBuilder()
                 .encPayload(encrypted.ciphertext())
                 .encIv(encrypted.iv())
                 .build();

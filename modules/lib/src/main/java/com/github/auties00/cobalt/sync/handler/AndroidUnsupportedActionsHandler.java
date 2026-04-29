@@ -5,10 +5,12 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
+import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.device.AndroidUnsupportedActions;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 import java.util.logging.Logger;
 
@@ -111,8 +113,8 @@ public final class AndroidUnsupportedActionsHandler implements WebAppStateAction
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebAndroidUnsupportedActionsSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS; // WAWebAndroidUnsupportedActionsSync.applyMutations: actionState === Success
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebAndroidUnsupportedActionsSync.applyMutations: actionState === Success
     }
 
     /**
@@ -136,7 +138,7 @@ public final class AndroidUnsupportedActionsHandler implements WebAppStateAction
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebAndroidUnsupportedActionsSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         try { // WAWebAndroidUnsupportedActionsSync.applyMutations: try { ... } catch(e) { return {actionState: Failed} }
             if (mutation.operation() != SyncdOperation.SET) { // WAWebAndroidUnsupportedActionsSync.applyMutations: if (e.operation==="set") ... else: return Unsupported
                 return MutationApplicationResult.unsupported(); // WAWebAndroidUnsupportedActionsSync.applyMutations: {actionState: SyncActionState.Unsupported}

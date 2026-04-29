@@ -1,8 +1,5 @@
 package com.github.auties00.cobalt.model.message.system.history;
 
-import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
-import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
-import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.message.context.ContextInfo;
 import com.github.auties00.cobalt.model.message.context.ContextualMessage;
 
@@ -14,45 +11,37 @@ import java.util.Optional;
  * Informs a chat participant that a batch of historical messages is about to
  * be shared with them.
  *
- * <p>This notice is sent right before the corresponding
- * {@link MessageHistoryBundle} so that the chat UI can render a preview
- * banner (for example "You will receive N messages since T") and prepare the
- * user for the back-fill that follows. Unlike the bundle itself, the notice
- * carries no media reference; it only carries the descriptive metadata and
- * the surrounding context info.
- *
- * @implNote Mirrors the {@code Message$MessageHistoryNotice} protobuf spec
- * declared in {@code WAWebProtobufsE2E.pb} and produced by
- * {@code WAWebGenerateMessageHistoryNoticeProto} from the
- * {@code groupHistoryBundleMetadata} of the source message.
+ * <p>This notice is sent right before the corresponding history bundle so
+ * that the chat UI can render a preview banner (for example "You will
+ * receive N messages since T") and prepare the user for the back-fill that
+ * follows. Unlike the bundle itself, the notice carries no media reference;
+ * it only carries the descriptive {@link MessageHistoryMetadata} and the
+ * surrounding {@link ContextInfo}.
  */
 @ProtobufMessage(name = "Message.MessageHistoryNotice")
-@WhatsAppWebModule(moduleName = "WAWebProtobufsE2E.pb")
-@WhatsAppWebModule(moduleName = "WAWebGenerateMessageHistoryNoticeProto")
 public final class MessageHistoryNotice implements ContextualMessage {
     /**
-     * The quoted-message and mention context in which the notice was sent.
+     * The quoted-message and mention context in which the notice was sent,
+     * threading the banner underneath the conversation event that triggered
+     * the history share.
      */
     @ProtobufProperty(index = 1, type = ProtobufType.MESSAGE)
-    @WhatsAppWebExport(moduleName = "WAWebProtobufsE2E.pb", exports = "Message$MessageHistoryNoticeSpec.contextInfo", adaptation = WhatsAppAdaptation.DIRECT)
     ContextInfo contextInfo;
 
     /**
-     * The descriptive metadata (recipients, oldest timestamp, message count)
-     * of the history bundle being announced.
+     * The descriptive metadata of the announced history bundle, including
+     * the recipients, the oldest-message timestamps and the total message
+     * count used to populate the preview banner.
      */
     @ProtobufProperty(index = 2, type = ProtobufType.MESSAGE)
-    @WhatsAppWebExport(moduleName = "WAWebProtobufsE2E.pb", exports = "Message$MessageHistoryNoticeSpec.messageHistoryMetadata", adaptation = WhatsAppAdaptation.DIRECT)
-    @WhatsAppWebExport(moduleName = "WAWebGenerateMessageHistoryNoticeProto", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     MessageHistoryMetadata messageHistoryMetadata;
 
 
     /**
      * Constructs a new history-sharing notice.
      *
-     * @param contextInfo            the surrounding context info
-     * @param messageHistoryMetadata the metadata of the announced history
-     *                               bundle
+     * @param contextInfo            the surrounding context info, or {@code null}
+     * @param messageHistoryMetadata the metadata of the announced history bundle, or {@code null}
      */
     MessageHistoryNotice(ContextInfo contextInfo, MessageHistoryMetadata messageHistoryMetadata) {
         this.contextInfo = contextInfo;
@@ -60,8 +49,8 @@ public final class MessageHistoryNotice implements ContextualMessage {
     }
 
     /**
-     * Returns the contextual information (quoted message, mentions, ephemeral
-     * settings) that surrounds this notice.
+     * Returns the contextual information (quoted message, mentions,
+     * ephemeral-message settings) that surrounds this notice.
      *
      * @return an {@link Optional} containing the context info, or
      *         {@link Optional#empty()} if it was not provided
@@ -92,8 +81,7 @@ public final class MessageHistoryNotice implements ContextualMessage {
     /**
      * Sets the descriptive metadata of the announced history bundle.
      *
-     * @param messageHistoryMetadata the new history metadata, may be
-     *                               {@code null}
+     * @param messageHistoryMetadata the new history metadata, may be {@code null}
      */
     public void setMessageHistoryMetadata(MessageHistoryMetadata messageHistoryMetadata) {
         this.messageHistoryMetadata = messageHistoryMetadata;

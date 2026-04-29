@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.stream.notification.account;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
@@ -20,6 +21,7 @@ import java.util.Arrays;
  *
  * @implNote WAWebHandlePrivacyTokensNotification.default
  */
+@WhatsAppWebModule(moduleName = "WAWebHandlePrivacyTokensNotification")
 final class NotificationPrivacyStreamHandler implements SocketStream.Handler {
 
     /**

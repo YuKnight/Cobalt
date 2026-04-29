@@ -1,8 +1,5 @@
 package com.github.auties00.cobalt.model.message.commerce;
 
-import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
-import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
-import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.context.ContextInfo;
 import com.github.auties00.cobalt.model.message.MessageKey;
@@ -15,29 +12,32 @@ import java.util.OptionalInt;
 import java.util.OptionalLong;
 
 /**
- * A message describing a customer order placed against a WhatsApp
- * Business catalog.
+ * A message describing a customer order placed against a WhatsApp Business
+ * catalog.
  *
  * <p>Order messages are produced when a customer submits an order inquiry
  * from a business's catalog, and again when the business accepts or
  * declines the request. Each message carries the order identifier, a
  * thumbnail preview, the number of items, the current {@link OrderStatus}
- * of the order, the surface (e.g. catalog) where it was created, the
+ * of the order, the {@link OrderSurface} on which it was created, the
  * seller's JID, a monetary total expressed in thousandths of the unit of
- * the given currency, a payment token, and a {@link MessageKey} pointing
- * back to the original order request message.
+ * the given currency, a payment correlation token, and a {@link MessageKey}
+ * pointing back to the original order request message so that the buyer
+ * and seller can correlate the full order conversation.
  */
 @ProtobufMessage(name = "Message.OrderMessage")
 public final class OrderMessage implements ContextualMessage {
     /**
-     * The server-issued identifier of this order.
+     * The server-issued identifier of this order, used to correlate the
+     * buyer- and seller-side messages that make up the same order.
      */
     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
     String orderId;
 
     /**
-     * A thumbnail preview of the order, typically showing the first
-     * ordered product.
+     * A thumbnail preview of the order, typically showing the first ordered
+     * product. Encoded as raw image bytes ready for inline rendering by the
+     * recipient client.
      */
     @ProtobufProperty(index = 2, type = ProtobufType.BYTES)
     byte[] thumbnail;
@@ -49,33 +49,37 @@ public final class OrderMessage implements ContextualMessage {
     Integer itemCount;
 
     /**
-     * The current lifecycle status of the order.
+     * The current lifecycle status of the order, distinguishing inquiries,
+     * accepted orders and declined orders.
      */
     @ProtobufProperty(index = 4, type = ProtobufType.ENUM)
     OrderStatus status;
 
     /**
-     * Declares the surface of the business account that produced the order.
+     * Declares the surface of the business account that produced the order
+     * (for example a WhatsApp Business catalog).
      */
     @ProtobufProperty(index = 5, type = ProtobufType.ENUM)
     OrderSurface surface;
 
     /**
-     * An optional free-text message accompanying the order.
+     * An optional free-text message accompanying the order, typically a note
+     * the buyer attached when submitting the order or a note from the seller
+     * when responding.
      */
     @ProtobufProperty(index = 6, type = ProtobufType.STRING)
     String message;
 
     /**
      * The human-readable title of the order, typically the name of the
-     * catalog or the lead product.
+     * catalog or the lead product, used to label the order in the chat.
      */
     @ProtobufProperty(index = 7, type = ProtobufType.STRING)
     String orderTitle;
 
     /**
-     * The JID of the business account that owns the catalog from which
-     * the order was placed.
+     * The JID of the business account that owns the catalog from which the
+     * order was placed.
      */
     @ProtobufProperty(index = 8, type = ProtobufType.STRING)
     Jid sellerJid;
@@ -88,23 +92,23 @@ public final class OrderMessage implements ContextualMessage {
     String token;
 
     /**
-     * The total price of the order expressed in thousandths of the
-     * currency unit declared in {@link #totalCurrencyCode}.
-     *
-     * <p>For example, a value of {@code 12345} in {@code USD} represents
-     * {@code 12.345} US dollars.
+     * The total price of the order expressed in thousandths of the currency
+     * unit declared in {@link #totalCurrencyCode}. For example, a value of
+     * {@code 12345} in {@code USD} represents {@code 12.345} US dollars.
      */
     @ProtobufProperty(index = 10, type = ProtobufType.INT64)
     Long totalAmount1000;
 
     /**
-     * The ISO 4217 currency code used to interpret {@link #totalAmount1000}.
+     * The ISO 4217 currency code (for example {@code "USD"} or {@code "EUR"})
+     * used to interpret {@link #totalAmount1000}.
      */
     @ProtobufProperty(index = 11, type = ProtobufType.STRING)
     String totalCurrencyCode;
 
     /**
-     * Contextual metadata attached to this message.
+     * Contextual metadata attached to this message, such as a quoted
+     * message reference, mentions or forwarding score.
      */
     @ProtobufProperty(index = 17, type = ProtobufType.MESSAGE)
     ContextInfo contextInfo;
@@ -118,14 +122,15 @@ public final class OrderMessage implements ContextualMessage {
 
     /**
      * The key of the original order request message that this order
-     * responds to, allowing buyers and sellers to correlate the full
-     * order conversation.
+     * responds to, allowing buyers and sellers to correlate the full order
+     * conversation.
      */
     @ProtobufProperty(index = 13, type = ProtobufType.MESSAGE)
     MessageKey orderRequestMessageId;
 
     /**
-     * The type of catalog the order was placed from.
+     * The type of catalog the order was placed from, encoded as a wire
+     * string (see {@link CatalogType} for the canonical set of values).
      */
     @ProtobufProperty(index = 15, type = ProtobufType.STRING)
     String catalogType;
@@ -134,24 +139,21 @@ public final class OrderMessage implements ContextualMessage {
     /**
      * Constructs a new order message with every field set explicitly.
      *
-     * <p>This constructor is package-private; callers should use the
-     * generated {@code OrderMessageBuilder} to create instances.
-     *
-     * @param orderId the server-issued order identifier
-     * @param thumbnail the preview thumbnail bytes
-     * @param itemCount the number of items in the order
-     * @param status the current lifecycle status of the order
-     * @param surface the originating surface of the order
-     * @param message a free-text message accompanying the order
-     * @param orderTitle the human-readable title of the order
-     * @param sellerJid the JID of the selling business
-     * @param token the payment correlation token
-     * @param totalAmount1000 the total price in thousandths of the currency unit
-     * @param totalCurrencyCode the ISO 4217 currency code
-     * @param contextInfo the contextual metadata of the message
-     * @param messageVersion the order message format version
-     * @param orderRequestMessageId the key of the originating order request
-     * @param catalogType the catalog type from which the order was placed
+     * @param orderId               the server-issued order identifier, or {@code null}
+     * @param thumbnail             the preview thumbnail bytes, or {@code null}
+     * @param itemCount             the number of items in the order, or {@code null}
+     * @param status                the current lifecycle status of the order, or {@code null}
+     * @param surface               the originating surface of the order, or {@code null}
+     * @param message               a free-text message accompanying the order, or {@code null}
+     * @param orderTitle            the human-readable title of the order, or {@code null}
+     * @param sellerJid             the JID of the selling business, or {@code null}
+     * @param token                 the payment correlation token, or {@code null}
+     * @param totalAmount1000       the total price in thousandths of the currency unit, or {@code null}
+     * @param totalCurrencyCode     the ISO 4217 currency code, or {@code null}
+     * @param contextInfo           the contextual metadata of the message, or {@code null}
+     * @param messageVersion        the order message format version, or {@code null}
+     * @param orderRequestMessageId the key of the originating order request, or {@code null}
+     * @param catalogType           the catalog type from which the order was placed, or {@code null}
      */
     OrderMessage(String orderId, byte[] thumbnail, Integer itemCount, OrderStatus status, OrderSurface surface, String message, String orderTitle, Jid sellerJid, String token, Long totalAmount1000, String totalCurrencyCode, ContextInfo contextInfo, Integer messageVersion, MessageKey orderRequestMessageId, String catalogType) {
         this.orderId = orderId;
@@ -254,8 +256,8 @@ public final class OrderMessage implements ContextualMessage {
     }
 
     /**
-     * Returns the total price of the order expressed in thousandths of
-     * the currency unit declared in {@link #totalCurrencyCode()}.
+     * Returns the total price of the order expressed in thousandths of the
+     * currency unit declared in {@link #totalCurrencyCode()}.
      *
      * @return an {@link OptionalLong} containing the total in thousandths, or empty if not set
      */
@@ -264,8 +266,7 @@ public final class OrderMessage implements ContextualMessage {
     }
 
     /**
-     * Returns the ISO 4217 currency code used to interpret the total
-     * amount.
+     * Returns the ISO 4217 currency code used to interpret the total amount.
      *
      * @return an {@link Optional} containing the currency code, or empty if not set
      */
@@ -292,8 +293,8 @@ public final class OrderMessage implements ContextualMessage {
     }
 
     /**
-     * Returns the key of the original order request message that this
-     * order responds to.
+     * Returns the key of the original order request message that this order
+     * responds to.
      *
      * @return an {@link Optional} containing the request message key, or empty if not set
      */
@@ -529,55 +530,37 @@ public final class OrderMessage implements ContextualMessage {
      *
      * <p>The wire representation of {@link OrderMessage#catalogType} is a
      * plain string: each constant of this enum corresponds to one of the
-     * string values produced by WA Web's {@code WAWebOrderRequestMsg.flow}
-     * mirrored enum. Cobalt exposes the set as a typed {@link Enum} so that
-     * call sites can branch on a compile-checked value instead of spelling
-     * the string literally, but the field on {@link OrderMessage} remains a
-     * {@link String} to preserve the over-the-wire format.
-     *
-     * @implNote WAWebOrderRequestMsg.flow.CatalogType — mirrored string enum
-     *           built by {@code $InternalEnum.Mirrored(["SMB_META_CATALOG",
-     *           "NATIVE", "UNKNOWN"])}. The constant name equals its wire
-     *           string value.
+     * recognised string values. Cobalt exposes the set as a typed
+     * {@link Enum} so that call sites can branch on a compile-checked value
+     * instead of spelling the string literally, but the field on
+     * {@link OrderMessage} remains a {@link String} to preserve the
+     * over-the-wire format.
      */
-    @WhatsAppWebModule(moduleName = "WAWebOrderRequestMsg.flow")
     public enum CatalogType {
         /**
          * The order was placed from a Meta-hosted small-business catalog.
-         *
-         * @implNote WAWebOrderRequestMsg.flow.CatalogType.SMB_META_CATALOG
          */
-        @WhatsAppWebExport(moduleName = "WAWebOrderRequestMsg.flow", exports = "CatalogType.SMB_META_CATALOG", adaptation = WhatsAppAdaptation.DIRECT)
         SMB_META_CATALOG,
 
         /**
          * The order was placed from the business's native WhatsApp catalog.
-         *
-         * @implNote WAWebOrderRequestMsg.flow.CatalogType.NATIVE
          */
-        @WhatsAppWebExport(moduleName = "WAWebOrderRequestMsg.flow", exports = "CatalogType.NATIVE", adaptation = WhatsAppAdaptation.DIRECT)
         NATIVE,
 
         /**
          * The catalog backend could not be determined for the order.
-         *
-         * @implNote WAWebOrderRequestMsg.flow.CatalogType.UNKNOWN
          */
-        @WhatsAppWebExport(moduleName = "WAWebOrderRequestMsg.flow", exports = "CatalogType.UNKNOWN", adaptation = WhatsAppAdaptation.DIRECT)
         UNKNOWN;
 
         /**
-         * Returns the wire-format name of this catalog type, matching verbatim
-         * the string value emitted by {@code $InternalEnum.Mirrored} in WA Web.
+         * Returns the wire-format name of this catalog type, exactly matching
+         * the string value used in the {@code catalogType} proto field.
          *
-         * <p>Because {@code $InternalEnum.Mirrored} assigns each constant's
-         * string value to the constant's own name, this is exactly
-         * {@link #name()}; the dedicated accessor exists so that callers do
-         * not accidentally couple to {@link Enum#name()} for the wire format.
+         * <p>This is identical to {@link #name()}; the dedicated accessor
+         * exists so that callers do not accidentally couple to
+         * {@link Enum#name()} for the wire format.
          *
          * @return the string key used in the {@code catalogType} proto field
-         * @implNote WAWebOrderRequestMsg.flow: {@code $InternalEnum.Mirrored([...])}
-         *           sets {@code CatalogType.X === "X"} for every listed entry.
          */
         public String wireName() {
             return name();
@@ -585,21 +568,16 @@ public final class OrderMessage implements ContextualMessage {
 
         /**
          * Resolves a wire-format catalog type name to its enum constant, or
-         * returns {@code null} when the name does not correspond to any known
-         * catalog type.
+         * returns {@code null} when the name does not correspond to any
+         * known catalog type.
          *
          * <p>Unlike {@link #valueOf(String)} this method does not throw on
-         * unknown input, matching the defensive lookup behaviour used by WA
-         * Web callers when reading a catalog type that may have been
-         * introduced on the server since the client was built.
+         * unknown input, supporting defensive lookup for catalog types that
+         * may have been introduced on the server since the client was built.
          *
          * @param name the wire-format catalog type name, or {@code null}
          * @return the matching {@link CatalogType}, or {@code null} when
          *         {@code name} is {@code null} or not recognised
-         * @implNote ADAPTED: WAWebOrderRequestMsg.flow — JS reads the mirrored
-         *           map with a string index expression; the Java counterpart
-         *           converts the string to an enum constant and tolerates
-         *           unknown names.
          */
         public static CatalogType fromWireName(String name) {
             if (name == null) {

@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.socket.layer.tunnel;
 
 import com.github.auties00.cobalt.socket.layer.SocketClientLayer;
-import com.github.auties00.cobalt.client.WhatsAppClientProxy;
+import com.github.auties00.cobalt.proxy.WhatsAppProxy;
 import com.github.auties00.cobalt.socket.layer.tunnel.impl.DirectSocketClientTunnelLayer;
 import com.github.auties00.cobalt.socket.layer.tunnel.impl.HttpSocketClientTunnelLayer;
 import com.github.auties00.cobalt.socket.layer.tunnel.impl.SocksSocketClientTunnelLayer;
@@ -33,7 +33,7 @@ public interface SocketClientTunnelLayer extends SocketClientLayer<SocketClientT
      * @param innerLayer the layer below
      * @return a new SOCKS tunnel layer
      */
-    static SocketClientTunnelLayer newSocksTunnel(WhatsAppClientProxy.Socks socks, SocketClientLayer<?> innerLayer) {
+    static SocketClientTunnelLayer newSocksTunnel(WhatsAppProxy.Socks socks, SocketClientLayer<?> innerLayer) {
         return new SocksSocketClientTunnelLayer(socks, innerLayer);
     }
 
@@ -44,7 +44,7 @@ public interface SocketClientTunnelLayer extends SocketClientLayer<SocketClientT
      * @param innerLayer the layer below
      * @return a new HTTP tunnel layer
      */
-    static SocketClientTunnelLayer newHttpTunnel(WhatsAppClientProxy.Http http, SocketClientLayer<?> innerLayer) {
+    static SocketClientTunnelLayer newHttpTunnel(WhatsAppProxy.Http http, SocketClientLayer<?> innerLayer) {
         return new HttpSocketClientTunnelLayer(http, innerLayer);
     }
 }

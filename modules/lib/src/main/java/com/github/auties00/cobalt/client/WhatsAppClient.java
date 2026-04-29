@@ -1,10 +1,12 @@
 package com.github.auties00.cobalt.client;
 
 import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.exception.*;
 import com.github.auties00.cobalt.message.MessageService;
+import com.github.auties00.cobalt.message.addon.EncMessageFactory;
 import com.github.auties00.cobalt.message.send.ack.AckResult;
 import com.github.auties00.cobalt.message.send.id.MessageIdGenerator;
 import com.github.auties00.cobalt.message.send.id.MessageIdVersion;
@@ -15,9 +17,16 @@ import com.github.auties00.cobalt.migration.InactiveGroupLidMigrationService;
 import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.model.bot.profile.*;
 import com.github.auties00.cobalt.model.business.*;
-import com.github.auties00.cobalt.model.business.catalog.BusinessCatalog;
-import com.github.auties00.cobalt.model.business.catalog.BusinessCatalogEntry;
+import com.github.auties00.cobalt.model.business.cart.*;
+import com.github.auties00.cobalt.model.business.catalog.*;
+import com.github.auties00.cobalt.model.business.compliance.*;
+import com.github.auties00.cobalt.model.business.ctwa.BusinessCtwaContext;
+import com.github.auties00.cobalt.model.business.ctwa.BusinessCtwaContextBuilder;
+import com.github.auties00.cobalt.model.business.ctwa.BusinessCtwaMediaType;
+import com.github.auties00.cobalt.model.business.order.*;
+import com.github.auties00.cobalt.model.business.postcode.*;
 import com.github.auties00.cobalt.model.business.profile.*;
+import com.github.auties00.cobalt.model.call.CallLinkMedia;
 import com.github.auties00.cobalt.model.call.CallOffer;
 import com.github.auties00.cobalt.model.call.CallOfferBuilder;
 import com.github.auties00.cobalt.model.chat.*;
@@ -31,33 +40,45 @@ import com.github.auties00.cobalt.model.contact.ContactCard;
 import com.github.auties00.cobalt.model.contact.ContactStatus;
 import com.github.auties00.cobalt.model.contact.ContactTextStatus;
 import com.github.auties00.cobalt.model.device.identity.ADVEncryptionType;
+import com.github.auties00.cobalt.model.error.DisconnectCode;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidProvider;
 import com.github.auties00.cobalt.model.jid.JidServer;
 import com.github.auties00.cobalt.model.message.*;
 import com.github.auties00.cobalt.model.message.context.ContextInfo;
 import com.github.auties00.cobalt.model.message.context.ContextualMessage;
+import com.github.auties00.cobalt.model.message.media.*;
 import com.github.auties00.cobalt.model.message.poll.*;
+import com.github.auties00.cobalt.model.message.status.StatusPSA;
 import com.github.auties00.cobalt.model.message.system.PinInChatMessage;
 import com.github.auties00.cobalt.model.message.system.PinInChatMessageBuilder;
 import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
 import com.github.auties00.cobalt.model.message.system.ProtocolMessageBuilder;
+import com.github.auties00.cobalt.model.message.text.ExtendedTextMessage;
 import com.github.auties00.cobalt.model.message.text.ReactionMessage;
 import com.github.auties00.cobalt.model.message.text.ReactionMessageBuilder;
-import com.github.auties00.cobalt.model.newsletter.Newsletter;
-import com.github.auties00.cobalt.model.newsletter.NewsletterReactionSettings;
-import com.github.auties00.cobalt.model.newsletter.NewsletterViewerRole;
+import com.github.auties00.cobalt.model.newsletter.*;
 import com.github.auties00.cobalt.model.preference.Label;
+import com.github.auties00.cobalt.model.preference.LabelBuilder;
+import com.github.auties00.cobalt.model.preference.MessageFeedbackAction;
+import com.github.auties00.cobalt.model.preference.PsaChatBlockAction;
 import com.github.auties00.cobalt.model.preference.QuickReply;
+import com.github.auties00.cobalt.model.preference.QuickReplyBuilder;
+import com.github.auties00.cobalt.model.preference.WindowsPushChannel;
 import com.github.auties00.cobalt.model.privacy.*;
+import com.github.auties00.cobalt.model.setting.GdprReportType;
+import com.github.auties00.cobalt.model.setting.TosNotice;
+import com.github.auties00.cobalt.model.setting.TosNoticeBuilder;
+import com.github.auties00.cobalt.model.setting.TosNotices;
+import com.github.auties00.cobalt.model.setting.TosNoticesBuilder;
 import com.github.auties00.cobalt.model.sync.*;
 import com.github.auties00.cobalt.model.sync.action.bot.AiThreadRenameAction;
 import com.github.auties00.cobalt.model.sync.action.bot.BotWelcomeRequestAction;
 import com.github.auties00.cobalt.model.sync.action.bot.MaibaAIFeaturesControlAction;
 import com.github.auties00.cobalt.model.sync.action.business.BroadcastListParticipantAction;
 import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastListAction;
-import com.github.auties00.cobalt.model.sync.action.chat.ChatAssignmentAction;
-import com.github.auties00.cobalt.model.sync.action.chat.ChatAssignmentOpenedStatusAction;
+import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastListActionBuilder;
+import com.github.auties00.cobalt.model.sync.action.chat.*;
 import com.github.auties00.cobalt.model.sync.action.chat.QuickReplyAction;
 import com.github.auties00.cobalt.model.sync.action.contact.*;
 import com.github.auties00.cobalt.model.sync.action.device.TimeFormatAction;
@@ -70,21 +91,103 @@ import com.github.auties00.cobalt.model.sync.action.setting.UnarchiveChatsSettin
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
+import com.github.auties00.cobalt.node.iq.IqOperation;
+import com.github.auties00.cobalt.node.iq.biz.*;
+import com.github.auties00.cobalt.node.iq.dirty.IqClearDirtyBitsRequest;
+import com.github.auties00.cobalt.node.iq.dirty.IqClearDirtyBitsResponse;
+import com.github.auties00.cobalt.node.iq.encrypt.*;
+import com.github.auties00.cobalt.node.iq.media.IqQueryMediaConnsRequest;
+import com.github.auties00.cobalt.node.iq.media.IqQueryMediaConnsResponse;
+import com.github.auties00.cobalt.node.iq.profilepicture.IqSendProfilePictureRequest;
+import com.github.auties00.cobalt.node.iq.profilepicture.IqSendProfilePictureResponse;
+import com.github.auties00.cobalt.node.iq.stats.IqIssuePrivateStatsTokenRequest;
+import com.github.auties00.cobalt.node.iq.stats.IqIssuePrivateStatsTokenResponse;
+import com.github.auties00.cobalt.node.iq.syncd.IqSyncdServerSyncRequest;
+import com.github.auties00.cobalt.node.iq.syncd.IqSyncdServerSyncRequestCollection;
+import com.github.auties00.cobalt.node.iq.syncd.IqSyncdServerSyncResponse;
+import com.github.auties00.cobalt.node.iq.tos.*;
+import com.github.auties00.cobalt.node.iq.usync.IqUsyncMode;
+import com.github.auties00.cobalt.node.iq.usync.IqUsyncRequest;
+import com.github.auties00.cobalt.node.iq.usync.IqUsyncResponse;
+import com.github.auties00.cobalt.node.mex.MexOperation;
+import com.github.auties00.cobalt.node.mex.json.business.*;
+import com.github.auties00.cobalt.node.mex.json.community.*;
+import com.github.auties00.cobalt.node.mex.json.community.FetchAllSubgroupsMexResponse.DefaultSubGroup;
+import com.github.auties00.cobalt.node.mex.json.community.FetchAllSubgroupsMexResponse.SubGroups;
+import com.github.auties00.cobalt.node.mex.json.group.CreateInviteCodeMexRequest;
+import com.github.auties00.cobalt.node.mex.json.group.CreateInviteCodeMexResponse;
+import com.github.auties00.cobalt.node.mex.json.group.FetchGroupInfoIncludBotsMexRequest;
+import com.github.auties00.cobalt.node.mex.json.group.FetchGroupInfoIncludBotsMexResponse;
+import com.github.auties00.cobalt.node.mex.json.group.FetchGroupInfoMexRequest;
+import com.github.auties00.cobalt.node.mex.json.group.FetchGroupInfoMexResponse;
+import com.github.auties00.cobalt.node.mex.json.group.FetchGroupInviteCodeMexRequest;
+import com.github.auties00.cobalt.node.mex.json.group.FetchGroupInviteCodeMexResponse;
+import com.github.auties00.cobalt.node.mex.json.group.FetchGroupIsInternalMexRequest;
+import com.github.auties00.cobalt.node.mex.json.group.FetchGroupIsInternalMexResponse;
+import com.github.auties00.cobalt.node.mex.json.group.UpdateGroupPropertyMexRequest;
+import com.github.auties00.cobalt.node.mex.json.group.UpdateGroupPropertyMexResponse;
+import com.github.auties00.cobalt.node.mex.json.misc.*;
+import com.github.auties00.cobalt.node.mex.json.newsletter.*;
+import com.github.auties00.cobalt.node.mex.json.user.*;
+import com.github.auties00.cobalt.node.smax.abprops.SmaxAbPropsGetExperimentConfigRequest;
+import com.github.auties00.cobalt.node.smax.abprops.SmaxAbPropsGetExperimentConfigResponse;
+import com.github.auties00.cobalt.node.smax.abprops.SmaxAbPropsGetGroupExperimentConfigRequest;
+import com.github.auties00.cobalt.node.smax.abprops.SmaxAbPropsGetGroupExperimentConfigResponse;
+import com.github.auties00.cobalt.node.smax.account.*;
+import com.github.auties00.cobalt.node.smax.biz.*;
+import com.github.auties00.cobalt.node.smax.bot.SmaxBotBotListRequest;
+import com.github.auties00.cobalt.node.smax.bot.SmaxBotBotListResponse;
+import com.github.auties00.cobalt.node.smax.bugreporting.SmaxBugReportingReportBugMediaUpload;
+import com.github.auties00.cobalt.node.smax.bugreporting.SmaxBugReportingReportBugRequest;
+import com.github.auties00.cobalt.node.smax.bugreporting.SmaxBugReportingReportBugResponse;
+import com.github.auties00.cobalt.node.smax.groups.*;
+import com.github.auties00.cobalt.node.smax.inappcomms.SmaxInAppCommsEventRequest;
+import com.github.auties00.cobalt.node.smax.inappcomms.SmaxInAppCommsEventResponse;
+import com.github.auties00.cobalt.node.smax.mdcompanion.*;
+import com.github.auties00.cobalt.node.smax.message.SmaxMessagePublishNewsletterPayload;
+import com.github.auties00.cobalt.node.smax.message.SmaxMessagePublishNewsletterRequest;
+import com.github.auties00.cobalt.node.smax.message.SmaxMessagePublishNewsletterResponse;
+import com.github.auties00.cobalt.node.smax.newsletters.*;
+import com.github.auties00.cobalt.node.smax.offlinebatch.SmaxOfflineBatchRequest;
+import com.github.auties00.cobalt.node.smax.passivemode.SmaxPassiveModeActiveIQRequest;
+import com.github.auties00.cobalt.node.smax.passivemode.SmaxPassiveModeActiveIQResponse;
+import com.github.auties00.cobalt.node.smax.passivemode.SmaxPassiveModePassiveIQRequest;
+import com.github.auties00.cobalt.node.smax.passivemode.SmaxPassiveModePassiveIQResponse;
+import com.github.auties00.cobalt.node.smax.prekeys.SmaxPreKeysFetchKeyBundlesRequest;
+import com.github.auties00.cobalt.node.smax.prekeys.SmaxPreKeysFetchKeyBundlesResponse;
+import com.github.auties00.cobalt.node.smax.prekeys.SmaxPreKeysFetchMissingPreKeysRequest;
+import com.github.auties00.cobalt.node.smax.prekeys.SmaxPreKeysFetchMissingPreKeysResponse;
+import com.github.auties00.cobalt.node.smax.presence.SmaxAvailabilityRequest;
+import com.github.auties00.cobalt.node.smax.presence.SmaxSubscribeRequest;
+import com.github.auties00.cobalt.node.smax.privacy.*;
+import com.github.auties00.cobalt.node.smax.privatestats.SmaxPrivatestatsSignCredentialRequest;
+import com.github.auties00.cobalt.node.smax.privatestats.SmaxPrivatestatsSignCredentialResponse;
+import com.github.auties00.cobalt.node.smax.psa.SmaxPsaChatBlockGetRequest;
+import com.github.auties00.cobalt.node.smax.psa.SmaxPsaChatBlockGetResponse;
+import com.github.auties00.cobalt.node.smax.psa.SmaxPsaChatBlockSetRequest;
+import com.github.auties00.cobalt.node.smax.psa.SmaxPsaChatBlockSetResponse;
+import com.github.auties00.cobalt.node.smax.pushconfig.SmaxPushConfigSetRequest;
+import com.github.auties00.cobalt.node.smax.pushconfig.SmaxPushConfigSetResponse;
+import com.github.auties00.cobalt.node.smax.pushconfig.SmaxPushConfigSetSetVariant;
+import com.github.auties00.cobalt.node.smax.receipt.SmaxReceiptPublishViewRequest;
+import com.github.auties00.cobalt.node.smax.receipt.SmaxReceiptPublishViewResponse;
+import com.github.auties00.cobalt.node.smax.stats.SmaxStatsSendBufferRequest;
+import com.github.auties00.cobalt.node.smax.stats.SmaxStatsSendBufferResponse;
+import com.github.auties00.cobalt.node.smax.status.SmaxStatusPublishPostNewsletterStatusPayload;
+import com.github.auties00.cobalt.node.smax.status.SmaxStatusPublishPostNewsletterStatusRequest;
+import com.github.auties00.cobalt.node.smax.status.SmaxStatusPublishPostNewsletterStatusResponse;
+import com.github.auties00.cobalt.node.smax.support.*;
+import com.github.auties00.cobalt.node.smax.unifiedsession.SmaxUnifiedSessionShareRequest;
+import com.github.auties00.cobalt.node.smax.usernotice.SmaxUserNoticeGetDisclosureStageByIdsRequest;
+import com.github.auties00.cobalt.node.smax.usernotice.SmaxUserNoticeGetDisclosureStageByIdsResponse;
+import com.github.auties00.cobalt.node.smax.usernotice.SmaxUserNoticeGetDisclosuresRequest;
+import com.github.auties00.cobalt.node.smax.usernotice.SmaxUserNoticeGetDisclosuresResponse;
+import com.github.auties00.cobalt.node.smax.voip.*;
+import com.github.auties00.cobalt.node.smax.waffle.*;
 import com.github.auties00.cobalt.node.usync.UsyncBackoff;
 import com.github.auties00.cobalt.node.usync.UsyncQuery;
 import com.github.auties00.cobalt.node.usync.UsyncResult;
 import com.github.auties00.cobalt.node.usync.result.UsyncProtocolError;
-import com.github.auties00.cobalt.node.mex.json.business.QueryCatalogMex;
-import com.github.auties00.cobalt.node.mex.json.business.QueryOrderMex;
-import com.github.auties00.cobalt.node.mex.json.business.QueryProductCollectionsMex;
-import com.github.auties00.cobalt.node.mex.json.community.FetchAllSubgroupsMex;
-import com.github.auties00.cobalt.node.mex.json.community.FetchAllSubgroupsMex.Response.DefaultSubGroup;
-import com.github.auties00.cobalt.node.mex.json.community.FetchAllSubgroupsMex.Response.SubGroups;
-import com.github.auties00.cobalt.node.mex.json.community.FetchSubgroupSuggestionsMex;
-import com.github.auties00.cobalt.node.mex.json.community.QuerySubgroupParticipantCountMex;
-import com.github.auties00.cobalt.node.mex.json.community.TransferCommunityOwnershipMex;
-import com.github.auties00.cobalt.node.mex.json.group.UpdateGroupPropertyMex;
-import com.github.auties00.cobalt.node.mex.json.newsletter.*;
 import com.github.auties00.cobalt.pairing.CompanionPairingService;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
@@ -102,9 +205,9 @@ import com.github.auties00.cobalt.sync.key.SyncKeyUtils;
 import com.github.auties00.cobalt.util.BusinessLabelConstants;
 import com.github.auties00.cobalt.util.DataUtils;
 import com.github.auties00.cobalt.util.RandomIdUtils;
-import com.github.auties00.cobalt.wam.WamMsgUtils;
 import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.*;
+import com.github.auties00.cobalt.wam.model.WamEventSpec;
 import com.github.auties00.cobalt.wam.type.*;
 import com.github.auties00.curve25519.Curve25519;
 import com.github.auties00.libsignal.SignalSessionCipher;
@@ -112,14 +215,21 @@ import com.github.auties00.libsignal.groups.SignalGroupCipher;
 import com.github.auties00.libsignal.key.SignalIdentityPublicKey;
 import com.github.auties00.libsignal.key.SignalPreKeyPair;
 
+import javax.imageio.ImageIO;
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalTime;
 import java.util.*;
 import java.util.Collection;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -159,7 +269,7 @@ import java.util.stream.Stream;
  */
 @SuppressWarnings({"unused", "UnusedReturnValue"})
 @WhatsAppWebModule(moduleName = "WAWebSocketModel")
-public class WhatsAppClient {
+public final class WhatsAppClient {
     /**
      * The single-byte encoding of the Signal identity key type, used when
      * building the {@code <type>} node in pre-key upload stanzas.
@@ -223,6 +333,15 @@ public class WhatsAppClient {
     private static final int DEFAULT_CATALOG_IMAGE_HEIGHT = 100;
 
     /**
+     * Mirror of {@code WAWebBizCartConstants.CART_ITEM_MAX_QUANTITY}, the
+     * default per-line maximum quantity applied to refreshed-cart entries
+     * when the wire omits the {@code max_available} field.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebBizCartConstants", exports = "CART_ITEM_MAX_QUANTITY",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    private static final int CART_ITEM_MAX_QUANTITY = 99;
+
+    /**
      * The persisted session state (credentials, chats, contacts, Signal
      * keys, listeners) bound to this client.
      */
@@ -232,10 +351,6 @@ public class WhatsAppClient {
      * raised by any subsystem.
      */
     private final WhatsAppClientErrorHandler errorHandler;
-    /**
-     * The strategy that enriches outgoing messages with link previews.
-     */
-    private final WhatsAppClientMessagePreviewHandler messagePreviewHandler;
     /**
      * The service that drives companion app-state synchronisation (push
      * and pull of sync patches).
@@ -324,8 +439,6 @@ public class WhatsAppClient {
      *                                handler; required when
      *                                {@code store.clientType() == WEB}
      *                                and ignored otherwise
-     * @param messagePreviewHandler   the outgoing message preview
-     *                                decorator; must not be {@code null}
      * @param errorHandler            the recovery strategy for failures;
      *                                must not be {@code null}
      * @throws NullPointerException      if {@code store} or
@@ -334,7 +447,7 @@ public class WhatsAppClient {
      *                                   is required but missing, or
      *                                   present when it should not be
      */
-    WhatsAppClient(WhatsAppStore store, WhatsAppClientVerificationHandler.Web webVerificationHandler, WhatsAppClientMessagePreviewHandler messagePreviewHandler, WhatsAppClientErrorHandler errorHandler) {
+    WhatsAppClient(WhatsAppStore store, WhatsAppClientVerificationHandler.Web webVerificationHandler, WhatsAppClientErrorHandler errorHandler) {
         this.store = Objects.requireNonNull(store, "store cannot be null");
         this.errorHandler = Objects.requireNonNull(errorHandler, "errorHandler cannot be null");
         if ((store.clientType() == WhatsAppClientType.WEB) == (webVerificationHandler == null)) {
@@ -343,18 +456,17 @@ public class WhatsAppClient {
         var sessionCipher = new SignalSessionCipher(store);
         var groupCipher = new SignalGroupCipher(store);
         this.abPropsService = new ABPropsService(this);
-        this.snapshotRecoveryService = new SnapshotRecoveryService(this, abPropsService);
-        this.webAppStateService = new WebAppStateService(this, abPropsService, snapshotRecoveryService);
-        this.lidMigrationService = new LidMigrationService(this, abPropsService);
-        this.inactiveGroupLidMigrationService = new InactiveGroupLidMigrationService(this, abPropsService);
-        this.deviceService = new DeviceService(this, webAppStateService, abPropsService, sessionCipher);
-        this.messageService = new MessageService(this, sessionCipher, groupCipher, deviceService, abPropsService);
         this.wamService = new WamService(this, abPropsService);
+        this.snapshotRecoveryService = new SnapshotRecoveryService(this, abPropsService, wamService);
+        this.webAppStateService = new WebAppStateService(this, abPropsService, snapshotRecoveryService, wamService);
+        this.lidMigrationService = new LidMigrationService(this, abPropsService, wamService);
+        this.inactiveGroupLidMigrationService = new InactiveGroupLidMigrationService(this, abPropsService);
+        this.deviceService = new DeviceService(this, webAppStateService, abPropsService, sessionCipher, wamService);
+        this.messageService = new MessageService(this, sessionCipher, groupCipher, deviceService, abPropsService, wamService);
         this.usyncBackoff = new UsyncBackoff();
         this.pendingSocketRequests = new ConcurrentHashMap<>();
         this.companionPairingService = new CompanionPairingService(this, webVerificationHandler);
         this.socketStream = new SocketStream(this, webVerificationHandler, lidMigrationService, inactiveGroupLidMigrationService, messageService, abPropsService, deviceService, wamService, snapshotRecoveryService, webAppStateService, companionPairingService);
-        this.messagePreviewHandler = messagePreviewHandler;
         this.disconnecting = new AtomicBoolean();
     }
 
@@ -378,15 +490,6 @@ public class WhatsAppClient {
     }
 
     /**
-     * Returns the message preview handler installed on this client.
-     *
-     * @return the preview handler
-     */
-    public WhatsAppClientMessagePreviewHandler messagePreviewHandler() {
-        return messagePreviewHandler;
-    }
-
-    /**
      * Returns the AB properties service used for feature-gating checks.
      *
      * @return the AB properties service
@@ -396,23 +499,13 @@ public class WhatsAppClient {
     }
 
     /**
-     * Returns the WAM telemetry service used to batch and flush WhatsApp
-     * Metrics events over the three WAM transport channels.
-     *
-     * @return the WAM service
-     */
-    public WamService wamService() {
-        return wamService;
-    }
-
-    /**
      * Returns the LID migration service, which tracks the progress of
      * migrating legacy addressing (phone-number based) to LID-based
      * addressing across chats.
      *
      * @return the LID migration service
      */
-    public com.github.auties00.cobalt.migration.LidMigrationService lidMigrationService() {
+    public LidMigrationService lidMigrationService() {
         return lidMigrationService;
     }
 
@@ -835,16 +928,19 @@ public class WhatsAppClient {
     }
 
     /**
-     * Dispatches a MEX (GraphQL-over-XMPP) IQ stanza and records a
-     * {@link MexEventV2Event} describing the outcome of the request.
+     * Dispatches a typed MEX (GraphQL-over-XMPP) request and records a
+     * {@link MexEventV2Event} describing the outcome.
      *
      * <p>This is the shared sink for every outgoing MEX request and mirrors
      * WA Web's {@code WAWebMexNativeClient.fetchQuery} where each fetch is
-     * wrapped by a {@code MexPerfTracker} that logs a {@code MexEventV2}
-     * WAM event on success or failure. The tracker-driven shape is collapsed
-     * into this single helper so that every Cobalt MEX dispatch site can
-     * reuse the same timing, error-capture and telemetry contract without
-     * duplicating the try/catch boilerplate.
+     * wrapped by a {@code MexPerfTracker} that logs a {@code MexEventV2} WAM
+     * event on success or failure. Callers pass the typed request value
+     * directly — the GraphQL query id, the operation name, the encoding
+     * discriminant and the outbound stanza are all derived from the request
+     * itself through {@link MexOperation.Request#id()},
+     * {@link MexOperation.Request#name()},
+     * {@code instanceof MexOperation.ArgoRequest} and
+     * {@link MexOperation.Request#toNode()}.
      *
      * @implNote WAWebMexNativeClient.fetchQuery: the JS path constructs a
      * {@code MexPerfTracker(true)}, calls {@code start()},
@@ -853,26 +949,23 @@ public class WhatsAppClient {
      * {@code setHasData(true) + stop() + logEvent()} and on error
      * {@code setErrors(...) + setHasData(false) + stop() + logEvent()}.
      * Cobalt replicates the same emission shape directly from here.
-     * @param node          the outbound MEX IQ builder; a random id is
-     *                      attached if absent
-     * @param queryId       the compiled GraphQL query identifier
-     *                      (corresponds to {@code params.id} in WA Web)
-     * @param operationName the GraphQL operation name (corresponds to
-     *                      {@code params.name} in WA Web, for example
-     *                      {@code mexGetNewsletter})
-     * @param isArgoPayload {@code true} if the MEX payload is Argo-encoded,
-     *                      {@code false} for the JSON variant
+     * @param request the typed MEX request to dispatch; never {@code null}
      * @return the response node from the WhatsApp relay
      * @throws WhatsAppSessionException.Closed if the socket is no longer open
      */
     @WhatsAppWebExport(moduleName = "WAWebMexNativeClient", exports = "fetchQuery",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public Node sendMexNode(NodeBuilder node, String queryId, String operationName, boolean isArgoPayload) {
+    public Node sendNode(MexOperation.Request request) {
+        // WAWebMexNativeClient.fetchQuery: project params.id / params.name / payload encoding
+        // from the typed request value rather than receiving them as separate scalars
+        var queryId = request.id();
+        var operationName = request.name();
+        var isArgoPayload = request instanceof MexOperation.Request.Argo;
         // WAWebMexNativeClient.fetchQuery: MexPerfTracker start
         var start = Instant.now();
         var startTimeMs = start.toEpochMilli();
         try {
-            var response = sendNode(node);
+            var response = sendNode(request.toNode());
             // WAWebMexNativeClient.fetchQuery: success path - setHasData(true), stop(), logEvent()
             var end = Instant.now();
             commitMexEventV2(queryId, operationName, isArgoPayload, startTimeMs, end.toEpochMilli(), true, null, null);
@@ -888,7 +981,7 @@ public class WhatsAppClient {
     }
 
     /**
-     * Dispatches a MEX IQ stanza whose response is discarded while still
+     * Dispatches a typed MEX request whose response is discarded while still
      * emitting the {@link MexEventV2Event} telemetry.
      *
      * <p>Used by MEX mutations where the caller only needs the side effect
@@ -901,58 +994,17 @@ public class WhatsAppClient {
      * @implNote WAWebMexNativeClient.fetchQuery: the underlying JS tracker
      * logs success whenever {@code fetchFunc} returns without throwing,
      * regardless of whether the caller consumes the payload. Cobalt preserves
-     * that invariant by delegating to {@link #sendMexNode(NodeBuilder, String,
-     * String, boolean)} and discarding the return value.
-     * @param node          the outbound MEX IQ builder; a random id is
-     *                      attached if absent
-     * @param queryId       the compiled GraphQL query identifier
-     * @param operationName the GraphQL operation name
-     * @param isArgoPayload {@code true} if the MEX payload is Argo-encoded,
-     *                      {@code false} for the JSON variant
+     * that invariant by delegating to {@link #sendNode(MexOperation.Request)}
+     * and discarding the return value.
+     * @param request the typed MEX request to dispatch; never {@code null}
      * @throws WhatsAppSessionException.Closed if the socket is no longer open
      */
     @WhatsAppWebExport(moduleName = "WAWebMexNativeClient", exports = "fetchQuery",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public void sendMexNodeWithNoResponse(NodeBuilder node, String queryId, String operationName, boolean isArgoPayload) {
-        // WAWebMexNativeClient.fetchQuery: delegate to sendMexNode and discard the response
-        sendMexNode(node, queryId, operationName, isArgoPayload);
-    }
-
-    /**
-     * Convenience wrapper for dispatching a JSON MEX query.
-     *
-     * <p>Forwards to {@link #sendMexNode(NodeBuilder, String, String, boolean)}
-     * with {@code isArgoPayload=false}. Use this for the common case where
-     * the MEX request was built via
-     * {@link com.github.auties00.cobalt.node.mex.json.MexJsonOperation#createMexNode(String, String)}
-     * and the caller wants the raw response IQ to feed into a generated
-     * {@code Foo.Response.of(node)} parser.
-     *
-     * @param request       the outbound MEX IQ builder
-     * @param queryId       the compiled GraphQL query identifier
-     *                      (the {@code QUERY_ID} constant on the
-     *                      generated MEX interface)
-     * @param operationName the GraphQL operation name (used by the WAM
-     *                      telemetry only)
-     * @return the response IQ node
-     * @throws WhatsAppSessionException.Closed if the socket is no longer open
-     */
-    public Node executeMexJson(NodeBuilder request, String queryId, String operationName) {
-        return sendMexNode(request, queryId, operationName, false);
-    }
-
-    /**
-     * Returns the per-protocol USync backoff registry shared by every
-     * query dispatched through {@link #executeUsyncQuery(UsyncQuery)}.
-     *
-     * <p>Most callers do not need to interact with the registry directly;
-     * it is exposed so background tasks can clear backoffs after a
-     * connection-level reset.
-     *
-     * @return the backoff registry
-     */
-    public UsyncBackoff usyncBackoff() {
-        return usyncBackoff;
+    public void sendNodeWithNoResponse(MexOperation.Request request) {
+        // WAWebMexNativeClient.fetchQuery: delegate to the response-returning overload
+        // and discard the parsed result
+        sendNode(request);
     }
 
     /**
@@ -992,7 +1044,7 @@ public class WhatsAppClient {
      */
     @WhatsAppWebExport(moduleName = "WAWebUsync",
             exports = "USyncQuery.execute", adaptation = WhatsAppAdaptation.ADAPTED)
-    public UsyncResult executeUsyncQuery(UsyncQuery query) throws InterruptedException {
+    public UsyncResult sendNode(UsyncQuery query) throws InterruptedException {
         usyncBackoff.waitForBackoff(query);
         var response = sendNode(query.toNode());
         var result = query.parseResponse(response);
@@ -1057,7 +1109,7 @@ public class WhatsAppClient {
     private static String mexErrorsJson(RuntimeException exception) {
         // WAWebMexLogging.parseErrorsAndCodes: JSON.stringify(errors)
         var message = exception.getMessage();
-        var arr = new com.alibaba.fastjson2.JSONArray();
+        var arr = new JSONArray();
         var obj = new JSONObject();
         obj.put("code", 417);
         obj.put("detail", message == null ? "" : message);
@@ -1078,7 +1130,7 @@ public class WhatsAppClient {
      */
     private static String mexErrorCodesJson(RuntimeException exception) {
         // WAWebMexLogging.parseErrorsAndCodes: JSON.stringify(errors.map(e -> e.code))
-        var arr = new com.alibaba.fastjson2.JSONArray();
+        var arr = new JSONArray();
         arr.add(417);
         return arr.toJSONString();
     }
@@ -1367,13 +1419,13 @@ public class WhatsAppClient {
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdUploadFatalErrorMetric",
             exports = "uploadFatalErrorMetric",
-            adaptation = com.github.auties00.cobalt.meta.model.WhatsAppAdaptation.ADAPTED)
+            adaptation = WhatsAppAdaptation.ADAPTED)
     @WhatsAppWebExport(moduleName = "WAWebSyncdUploadFatalErrorMetricEmitter",
             exports = "emitUploadFatalErrorMetric",
-            adaptation = com.github.auties00.cobalt.meta.model.WhatsAppAdaptation.ADAPTED)
+            adaptation = WhatsAppAdaptation.ADAPTED)
     @WhatsAppWebExport(moduleName = "WAWebSyncdUploadFatalErrorMetricEmitter",
             exports = "listenForUploadFatalErrorMetric",
-            adaptation = com.github.auties00.cobalt.meta.model.WhatsAppAdaptation.ADAPTED)
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private void emitSyncdFatalErrorMetric(WhatsAppWebAppStateSyncException exception) {
         if (!exception.isFatal()) {
             // WAWebSyncdUploadFatalErrorMetric only receives fatal errors; retryable
@@ -1416,7 +1468,7 @@ public class WhatsAppClient {
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdMetricFatalErrorListener",
             exports = "convertSyncdErrorCode",
-            adaptation = com.github.auties00.cobalt.meta.model.WhatsAppAdaptation.ADAPTED)
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private static MdSyncdFatalErrorCode mapSyncdFatalErrorCode(WhatsAppWebAppStateSyncException exception) {
         return switch (exception) {
             // WAWebSyncdAntiTampering / MutationIntegrityVerifier: SyncdFatalError("unable to validate snapshot mac")
@@ -1472,10 +1524,10 @@ public class WhatsAppClient {
         var code = terminal.exitCode() == null
                 ? null
                 : terminal.exitCode().code().orElse(null);
-        if (code instanceof com.github.auties00.cobalt.model.error.DisconnectCode.MissingData) {
+        if (code instanceof DisconnectCode.MissingData) {
             return MdSyncdFatalErrorCode.TERMINAL_PATCH_MISSING_DATA;
         }
-        if (code instanceof com.github.auties00.cobalt.model.error.DisconnectCode.DeserializationError) {
+        if (code instanceof DisconnectCode.DeserializationError) {
             return MdSyncdFatalErrorCode.TERMINAL_PATCH_DESERIALIZATION_ERROR;
         }
         return MdSyncdFatalErrorCode.TERMINAL_PATCH_UNKNOWN;
@@ -1497,7 +1549,7 @@ public class WhatsAppClient {
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdMetrics",
             exports = "collectionNameToMetric",
-            adaptation = com.github.auties00.cobalt.meta.model.WhatsAppAdaptation.DIRECT)
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static com.github.auties00.cobalt.wam.type.Collection extractSyncdCollection(WhatsAppWebAppStateSyncException exception) {
         SyncPatchType patchType = switch (exception) {
             case WhatsAppWebAppStateSyncException.SnapshotMacMismatch e -> e.collectionName();
@@ -1588,12 +1640,15 @@ public class WhatsAppClient {
         store.setVerifiedName(verifiedName);
     }
     //</editor-fold>
+    //<editor-fold desc="Acknowledgements, receipts, and pre-keys">
     /**
      * Sends an acknowledgment stanza for the given inbound node, using
      * the node's own {@code id} attribute as the acknowledgment id.
      *
      * @param node the inbound node to acknowledge
      */
+    @WhatsAppWebExport(moduleName = "WAWebHandleMsgSendAck", exports = "sendAck",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public void sendAck(Node node) {
         var id = node.getRequiredAttributeAsString("id");
         sendAck(id, node);
@@ -1613,6 +1668,8 @@ public class WhatsAppClient {
      * @param id   the acknowledgment id
      * @param node the inbound node being acknowledged
      */
+    @WhatsAppWebExport(moduleName = "WAWebHandleMsgSendAck", exports = "sendAck",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public void sendAck(String id, Node node) {
         var ackBuilder = new NodeBuilder()
                 .description("ack")
@@ -1648,6 +1705,8 @@ public class WhatsAppClient {
      *                  upload; internally clamped to
      *                  {@link #MIN_PRE_KEYS_COUNT}
      */
+    @WhatsAppWebExport(moduleName = "WAWebUploadPreKeysJob", exports = "uploadPreKeys",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public void sendPreKeys(long keysCount) {
         keysCount = Math.max(keysCount, MIN_PRE_KEYS_COUNT);
         var startId = store.hasPreKeys() ? store.preKeys().getLast().id() + 1 : 1;
@@ -1726,6 +1785,10 @@ public class WhatsAppClient {
      * @param type the receipt type (for example {@code "read"} or
      *             {@code "played"}); {@code null} for a delivery receipt
      */
+    @WhatsAppWebExport(moduleName = "WAWebSendReceiptJobCommon", exports = "RECEIPT_TYPE",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebSendPlayedReceiptJob", exports = "default",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public void sendReceipt(String id, Jid from, String type) {
         var me = store.jid()
                 .orElse(null);
@@ -1741,7 +1804,9 @@ public class WhatsAppClient {
                 .build();
         sendNodeWithNoResponse(receipt);
     }
+    //</editor-fold>
 
+    //<editor-fold desc="Chats, groups, and metadata queries">
     /**
      * Queries the metadata of a group or community.
      *
@@ -1969,11 +2034,10 @@ public class WhatsAppClient {
                     .flatMap(participantNode -> participantNode.streamAttributeAsJid("jid"))
                     .map(jid -> new GroupParticipantBuilder().userJid(jid).build())
                     .collect(Collectors.toCollection(LinkedHashSet::new));
-            var communityGroupsQuery = new FetchAllSubgroupsMex.Request(groupId.toString(), "INTERACTIVE", null);
-            var communityGroupsRequestNode = communityGroupsQuery.toNode();
+            var communityGroupsQuery = new FetchAllSubgroupsMexRequest(groupId.toString(), "INTERACTIVE", null);
             // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
-            var communityGroupsResponseNode = sendMexNode(communityGroupsRequestNode, FetchAllSubgroupsMex.QUERY_ID, "mexCommunityGetSubgroups", false);
-            var communityGroupsResponse = FetchAllSubgroupsMex.Response.of(communityGroupsResponseNode);
+            var communityGroupsResponseNode = sendNode(communityGroupsQuery);
+            var communityGroupsResponse = FetchAllSubgroupsMexResponse.of(communityGroupsResponseNode);
             var communityLinkedGroups = new LinkedHashSet<CommunityLinkedGroup>();
             communityGroupsResponse.ifPresent(response -> {
                 response.defaultSubGroup().ifPresent(defaultSg -> communityLinkedGroups.add(
@@ -2434,14 +2498,14 @@ public class WhatsAppClient {
      */
     @WhatsAppWebExport(moduleName = "WAWebBusinessProfileJob", exports = "sendCoverPhoto",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public void setBusinessCoverPhoto(byte[] jpegBytes) {
+    public void changeBusinessCoverPhoto(byte[] jpegBytes) {
         Objects.requireNonNull(jpegBytes, "jpegBytes cannot be null");
         // ADAPTED: WAWebBusinessProfileJob.sendCoverPhoto requires an id/ts/token triple produced by the media upload pipeline.
         // Cobalt's business cover-photo upload helper is not yet implemented, so the entry point currently rejects the call
         // rather than silently producing a malformed IQ. The IQ shape that must be emitted once the upload helper is in place
         // is preserved in the @implNote above so downstream work can wire it in without changing the signature.
         throw new UnsupportedOperationException(
-                "setBusinessCoverPhoto requires the media upload pipeline (id, ts, token) which is not yet implemented in Cobalt");
+                "changeBusinessCoverPhoto requires the media upload pipeline (id, ts, token) which is not yet implemented in Cobalt");
     }
 
     /**
@@ -2488,14 +2552,620 @@ public class WhatsAppClient {
     }
 
     /**
+     * Fetches the long-lived public verification certificate published by a
+     * WhatsApp Business account.
+     *
+     * <p>WhatsApp Business accounts sign sensitive catalog payloads — the
+     * merchant phone-number envelope, address-verification responses, and
+     * the direct-connection-encrypted payloads attached to product orders —
+     * with a server-issued certificate. This call returns the PEM that backs
+     * those signatures so a Cobalt-driven storefront can verify that what
+     * came over the wire was actually emitted by the advertised business and
+     * not relayed through an impersonating peer.
+     *
+     * <p>Typical use is to fetch the certificate once when the storefront
+     * first interacts with a business, cache it for the merchant's lifetime,
+     * and re-validate every signed catalog response against it. Pair this
+     * call with {@link #queryBusinessSignedUserInfo(Jid)} to obtain the
+     * matching signed phone-number envelope.
+     *
+     * @param businessJid the JID of the business whose certificate is
+     *                    being fetched; never {@code null}
+     * @return the PEM string when the server returned a certificate;
+     *         {@link Optional#empty()} when the server replied with no
+     *         certificate (typically because the business has not been
+     *         provisioned with one yet)
+     * @throws NullPointerException            if {@code businessJid} is
+     *                                         {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer
+     *                                         open
+     *
+     * @implNote WAWebQueryGetPublicKeyJob.QueryGetPublicKey emits the same
+     *           {@code xmlns="w:biz:catalog" type="get"} IQ with
+     *           {@code smax_id=BizGetPublicKey}. Cobalt drops the
+     *           {@code WAWebBizGatingUtils.isGraphQLForGetPublicKeyEnabled}
+     *           gate and always takes the legacy IQ branch — callers do not
+     *           opt in to GraphQL on Cobalt — and the
+     *           {@code WAWebDirectConnectionUtils.stringToCertificateString}
+     *           prettifier is left to the caller since it only re-frames
+     *           the existing PEM with header/footer delimiters that may
+     *           already be present.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebQueryGetPublicKeyJob", exports = "QueryGetPublicKey",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<String> queryBusinessPublicKey(Jid businessJid) {
+        Objects.requireNonNull(businessJid, "businessJid cannot be null");
+        // WAWebQueryGetPublicKeyJob.QueryGetPublicKey: wap("iq", {to: S_WHATSAPP_NET, type: "get",
+        //   smax_id: SMAX_ID(BizGetPublicKey), xmlns: "w:biz:catalog"},
+        //   wap("public_key", {jid: USER_JID(createWid(businessJid))}))
+        var publicKeyQuery = new NodeBuilder()
+                .description("public_key")
+                .attribute("jid", businessJid) // WAWebCommsWapMd.USER_JID: render as <jid>@s.whatsapp.net for the catalog xmlns
+                .build();
+        var iqNode = new NodeBuilder()
+                .description("iq")
+                .attribute("xmlns", "w:biz:catalog") // WAWebQueryGetPublicKeyJob: xmlns: "w:biz:catalog"
+                .attribute("to", JidServer.user()) // WAWebQueryGetPublicKeyJob: to: S_WHATSAPP_NET
+                .attribute("type", "get") // WAWebQueryGetPublicKeyJob: type: "get"
+                .content(publicKeyQuery);
+        var response = sendNode(iqNode);
+        // WAWebQueryGetPublicKeyJob.getPublicKeyResponse parser:
+        //   t = e.maybeChild("public_key")?.maybeChild("pem")?.contentString()
+        // ADAPTED: WA Web wraps the PEM via stringToCertificateString — Cobalt returns the raw PEM since
+        // the existing certificate APIs accept either the wrapped or unwrapped form, and the
+        // ServerStatusCodeError branch is intentionally collapsed into Optional.empty() to match
+        // every other Cobalt legacy IQ getter.
+        return response.getChild("public_key")
+                .flatMap(publicKey -> publicKey.getChild("pem"))
+                .flatMap(Node::toContentString);
+    }
+
+    /**
+     * Fetches the cryptographically-signed phone-number envelope a WhatsApp
+     * Business account exposes to its catalog clients.
+     *
+     * <p>The envelope binds the business's JID to its merchant phone number
+     * and a notional business domain, all signed by the business's private
+     * key. Callers verify the signature with the matching certificate
+     * returned by {@link #queryBusinessPublicKey(Jid)}, which lets a
+     * Cobalt-driven storefront prove the displayed contact details actually
+     * belong to the business it is talking to. The {@code ttl_timestamp}
+     * carried alongside is the server-recommended expiry after which a
+     * client should re-fetch the envelope.
+     *
+     * <p>Most every field is wrapped in an {@link Optional} because the
+     * server omits the entire envelope (and any individual sub-field)
+     * whenever the business has not been provisioned with a signed identity
+     * — applications should treat an all-empty result as "no verifiable
+     * identity available" rather than as a hard error.
+     *
+     * @param businessJid the JID of the business whose signed-user-info
+     *                    envelope should be fetched; never {@code null}
+     * @return the parsed envelope; never {@code null}, with each field
+     *         exposed as an {@link Optional} since the server may omit any
+     *         or all of them
+     * @throws NullPointerException            if {@code businessJid} is
+     *                                         {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer
+     *                                         open
+     *
+     * @implNote WAWebQueryGetSignedUserInfoJob.QueryGetSignedUserInfo
+     *           dispatches the legacy IQ; the
+     *           {@code getSignedUserInfoResponse} parser collects every
+     *           grandchild via the inline
+     *           {@code (e, t) -> e?.maybeChild(t)?.contentString()}
+     *           helper. Cobalt mirrors that all-optional shape via
+     *           {@link BusinessSignedUserInfo}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebQueryGetSignedUserInfoJob", exports = "QueryGetSignedUserInfo",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    public BusinessSignedUserInfo queryBusinessSignedUserInfo(Jid businessJid) {
+        Objects.requireNonNull(businessJid, "businessJid cannot be null");
+        // WAWebQueryGetSignedUserInfoJob.QueryGetSignedUserInfo: wap("iq", {to: S_WHATSAPP_NET, type: "get",
+        //   xmlns: "w:biz:catalog"}, wap("signed_user_info", {biz_jid: USER_JID(createWid(businessJid))}))
+        var signedUserInfoQuery = new NodeBuilder()
+                .description("signed_user_info")
+                .attribute("biz_jid", businessJid) // WAWebQueryGetSignedUserInfoJob: biz_jid: USER_JID(createWid(t))
+                .build();
+        var iqNode = new NodeBuilder()
+                .description("iq")
+                .attribute("xmlns", "w:biz:catalog") // WAWebQueryGetSignedUserInfoJob: xmlns: "w:biz:catalog"
+                .attribute("to", JidServer.user()) // WAWebQueryGetSignedUserInfoJob: to: S_WHATSAPP_NET
+                .attribute("type", "get") // WAWebQueryGetSignedUserInfoJob: type: "get"
+                .content(signedUserInfoQuery);
+        var response = sendNode(iqNode);
+        // WAWebQueryGetSignedUserInfoJob.getSignedUserInfoResponse: maybeChild("signed_user_info") and then
+        // each leaf is read via the inline helper that returns undefined when missing. Note that the
+        // <signed_user_info> wrapper itself is also optional via maybeChild, so a missing wrapper yields
+        // four empty optionals rather than an exception.
+        var signedUserInfoNode = response.getChild("signed_user_info").orElse(null);
+        if (signedUserInfoNode == null) {
+            return new BusinessSignedUserInfoBuilder().build();
+        }
+        // WAWebQueryGetSignedUserInfoJob.getSignedUserInfoResponse:
+        //   {phoneNumber: e(n, "phone_number"),
+        //    phoneNumberSignatureExpiration: e(n, "ttl_timestamp"),
+        //    phoneNumberSignature: e(n, "phone_number_signature"),
+        //    businessDomain: e(n, "business_domain")}
+        var phoneNumber = signedUserInfoNode.getChild("phone_number").flatMap(Node::toContentString).orElse(null);
+        var ttlTimestamp = signedUserInfoNode.getChild("ttl_timestamp").flatMap(Node::toContentString).orElse(null);
+        var phoneNumberSignature = signedUserInfoNode.getChild("phone_number_signature").flatMap(Node::toContentString).orElse(null);
+        var businessDomain = signedUserInfoNode.getChild("business_domain").flatMap(Node::toContentString).orElse(null);
+        return new BusinessSignedUserInfoBuilder()
+                .phoneNumber(phoneNumber)
+                .phoneNumberSignatureExpiration(ttlTimestamp)
+                .phoneNumberSignature(phoneNumberSignature)
+                .businessDomain(businessDomain)
+                .build();
+    }
+
+    /**
+     * Fetches the legal-entity disclosure that one or more WhatsApp Business
+     * accounts publish to their customers.
+     *
+     * <p>Several jurisdictions (most notably India under the IT Rules 2021)
+     * require business accounts to register the legal name of the entity
+     * operating the account, the entity type, and dedicated customer-care /
+     * grievance-officer contact channels. WhatsApp surfaces those fields in
+     * the in-app "Business info" panel; this call returns the same data so
+     * a Cobalt-driven catalog browser can render the disclosure before
+     * letting the user place an order, or so a compliance dashboard can
+     * audit the merchant's registration status.
+     *
+     * <p>The call is batched: a single round trip resolves the disclosure
+     * for every JID the caller passes in, with each result returned in the
+     * same order as the input list. Businesses that have not registered any
+     * compliance information come back with empty / default-valued fields
+     * rather than being dropped from the result.
+     *
+     * @param bizJids the business JIDs whose compliance metadata should
+     *                be fetched; never {@code null}, must be non-empty
+     * @return the parsed compliance entries in server order; never
+     *         {@code null}, possibly empty
+     * @throws NullPointerException            if {@code bizJids} is
+     *                                         {@code null}
+     * @throws IllegalArgumentException        if {@code bizJids} is empty
+     * @throws WhatsAppSessionException.Closed if the socket is no longer
+     *                                         open
+     *
+     * @implNote WAWebMerchantComplianceJob.getMerchantCompliance
+     *           dispatches to the legacy IQ helper {@code p(e)} which
+     *           wraps each WID in a {@code <merchant_info jid/>} child;
+     *           Cobalt drops the
+     *           {@code WAWebBizGatingUtils.graphQLForGetComplianceInfo}
+     *           gate and always takes the legacy IQ branch.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMerchantComplianceJob", exports = "getMerchantCompliance",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public List<BusinessMerchantCompliance> queryMerchantCompliance(List<Jid> bizJids) {
+        Objects.requireNonNull(bizJids, "bizJids cannot be null");
+        if (bizJids.isEmpty()) {
+            throw new IllegalArgumentException("bizJids must not be empty");
+        }
+        // WAWebMerchantComplianceJob.p: wap("iq", {to: S_WHATSAPP_NET, xmlns: "w:biz:merchant_info",
+        //   type: "get", smax_id: SMAX_ID(MerchantGetComplianceInfo)},
+        //   e.map(t => wap("merchant_info", {jid: USER_JID(t.wid)})))
+        var merchantInfoNodes = new ArrayList<Node>(bizJids.size());
+        for (var jid : bizJids) {
+            Objects.requireNonNull(jid, "bizJids element cannot be null");
+            merchantInfoNodes.add(new NodeBuilder()
+                    .description("merchant_info")
+                    .attribute("jid", jid) // WAWebMerchantComplianceJob.p: jid: USER_JID(t.wid)
+                    .build());
+        }
+        var iqNode = new NodeBuilder()
+                .description("iq")
+                .attribute("xmlns", "w:biz:merchant_info") // WAWebMerchantComplianceJob.p: xmlns: "w:biz:merchant_info"
+                .attribute("to", JidServer.user()) // WAWebMerchantComplianceJob.p: to: S_WHATSAPP_NET
+                .attribute("type", "get") // WAWebMerchantComplianceJob.p: type: "get"
+                .content(merchantInfoNodes);
+        var response = sendNode(iqNode);
+        // WAWebMerchantComplianceJob.merchantComplianceResponse: forEachChildWithTag("merchant_info", ...)
+        var result = new ArrayList<BusinessMerchantCompliance>();
+        for (var merchantInfoNode : response.getChildren("merchant_info")) {
+            result.add(parseMerchantCompliance(merchantInfoNode));
+        }
+        return Collections.unmodifiableList(result);
+    }
+
+    /**
+     * Publishes or updates the legal-entity disclosure shown to customers
+     * on the authenticated business account.
+     *
+     * <p>This is the writer counterpart to
+     * {@link #queryMerchantCompliance(List)}: it overwrites the registered
+     * entity name, entity type, custom type description, registration flag
+     * and contact channels (customer care and grievance officer) shown in
+     * the WhatsApp Business "Business info" panel. The disclosure is
+     * server-persisted, propagates to every linked device, and becomes
+     * visible to anyone querying the same business JID.
+     *
+     * <p>Every textual parameter is nullable: a non-{@code null} value
+     * overwrites the server-side state, while {@code null} leaves the
+     * existing value untouched. The {@code registered} flag is always
+     * sent. The server echoes the post-update state back, which the method
+     * returns so callers can confirm what was actually persisted without
+     * an extra round trip.
+     *
+     * @param entityName              the legal-entity name; {@code null}
+     *                                to leave the existing value untouched
+     * @param entityType              the legal-entity type identifier;
+     *                                {@code null} to leave it untouched
+     * @param entityTypeCustom        free-text override for the entity
+     *                                type; {@code null} to leave it
+     *                                untouched
+     * @param registered              whether the entity is currently
+     *                                registered; always emitted on the
+     *                                wire
+     * @param customerCareDetails     the customer-care contact channels;
+     *                                {@code null} to leave them untouched
+     * @param grievanceOfficerDetails the grievance-officer contact
+     *                                channels; {@code null} to leave them
+     *                                untouched
+     * @return the merchant-compliance entry the server returned after
+     *         applying the update; never {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer
+     *                                         open
+     * @throws NoSuchElementException          if the response carries no
+     *                                         {@code <merchant_info>}
+     *                                         child
+     *
+     * @implNote WAWebMerchantComplianceJob.h (legacy IQ setter) emits
+     *           one ternary-gated {@code wap(...)} child per field;
+     *           Cobalt drops the
+     *           {@code WAWebBizGatingUtils.graphQLForSetComplianceInfo}
+     *           gate and always takes the legacy IQ branch. The wrapper
+     *           {@code is_registered} attribute defaults to {@code "false"}
+     *           when the input is unset, mirroring WA Web's
+     *           {@code u = c === void 0 ? false : c}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMerchantComplianceJob", exports = "setMerchantCompliance",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public BusinessMerchantCompliance changeMerchantCompliance(
+            String entityName,
+            String entityType,
+            String entityTypeCustom,
+            boolean registered,
+            BusinessContactDetails customerCareDetails,
+            BusinessGrievanceOfficerDetails grievanceOfficerDetails) {
+        var children = new ArrayList<Node>();
+        // WAWebMerchantComplianceJob.h: a !== void 0 ? wap("entity_name", null, a) : null
+        if (entityName != null) {
+            children.add(new NodeBuilder()
+                    .description("entity_name")
+                    .content(entityName)
+                    .build());
+        }
+        // WAWebMerchantComplianceJob.h: i !== void 0 ? wap("entity_type", null, i) : null
+        if (entityType != null) {
+            children.add(new NodeBuilder()
+                    .description("entity_type")
+                    .content(entityType)
+                    .build());
+        }
+        // WAWebMerchantComplianceJob.h: l !== void 0 ? wap("entity_type_custom", null, l) : null
+        if (entityTypeCustom != null) {
+            children.add(new NodeBuilder()
+                    .description("entity_type_custom")
+                    .content(entityTypeCustom)
+                    .build());
+        }
+        // WAWebMerchantComplianceJob.h: n ? wap("customer_care_details", ..., gated children) : null
+        if (customerCareDetails != null) {
+            children.add(buildContactDetailsNode("customer_care_details", customerCareDetails));
+        }
+        // WAWebMerchantComplianceJob.h: u ? wap("grievance_officer_details", ..., gated children) : null
+        if (grievanceOfficerDetails != null) {
+            children.add(buildGrievanceOfficerDetailsNode(grievanceOfficerDetails));
+        }
+        var merchantInfoNode = new NodeBuilder()
+                .description("merchant_info")
+                .attribute("is_registered", registered ? "true" : "false") // WAWebMerchantComplianceJob.h: is_registered: d ? "true" : "false"
+                .content(children)
+                .build();
+        var iqNode = new NodeBuilder()
+                .description("iq")
+                .attribute("xmlns", "w:biz:merchant_info") // WAWebMerchantComplianceJob.h: xmlns: "w:biz:merchant_info"
+                .attribute("to", JidServer.user()) // WAWebMerchantComplianceJob.h: to: S_WHATSAPP_NET
+                .attribute("type", "set") // WAWebMerchantComplianceJob.h: type: "set"
+                .content(merchantInfoNode);
+        var response = sendNode(iqNode);
+        // WAWebMerchantComplianceJob.merchantComplianceResponse parser: forEachChildWithTag("merchant_info").
+        // The setter response carries a single <merchant_info> child describing the post-update state.
+        var merchantInfoResult = response.getChild("merchant_info")
+                .orElseThrow(() -> new NoSuchElementException("Missing <merchant_info> in changeMerchantCompliance response"));
+        return parseMerchantCompliance(merchantInfoResult);
+    }
+
+    /**
+     * Parses a {@code <merchant_info>} child returned by the
+     * compliance GET / SET stanzas into a {@link BusinessMerchantCompliance}.
+     *
+     * <p>The {@code is_registered} attribute is read from the wrapper
+     * itself; the textual entity-name / entity-type fields fall back to
+     * the empty string when their child is absent (mirroring
+     * {@code maybeChild(...)?.contentString() || ""}); the
+     * {@code entity_type_custom} field stays {@link Optional} since WA
+     * Web preserves {@code undefined} in that case.
+     *
+     * @param merchantInfoNode the {@code <merchant_info>} stanza child
+     * @return the parsed compliance entry
+     *
+     * @implNote WAWebMerchantComplianceJob.merchantComplianceResponse:
+     *           the parser folds the customer-care and grievance blocks
+     *           through the inline
+     *           {@code e(node) = {email, landline_number, mobile_number}}
+     *           helper. Cobalt extracts that into
+     *           {@link #parseContactDetails(Node)} for reuse between
+     *           the two block types.
+     */
+    private BusinessMerchantCompliance parseMerchantCompliance(Node merchantInfoNode) {
+        // WAWebMerchantComplianceJob.merchantComplianceResponse: l = entity_name || ""
+        var entityName = merchantInfoNode.getChild("entity_name")
+                .flatMap(Node::toContentString)
+                .orElse("");
+        // WAWebMerchantComplianceJob.merchantComplianceResponse: s = entity_type || ""
+        var entityType = merchantInfoNode.getChild("entity_type")
+                .flatMap(Node::toContentString)
+                .orElse("");
+        // WAWebMerchantComplianceJob.merchantComplianceResponse: u = entity_type_custom (Optional preserved)
+        var entityTypeCustom = merchantInfoNode.getChild("entity_type_custom")
+                .flatMap(Node::toContentString)
+                .orElse(null);
+        // WAWebMerchantComplianceJob.merchantComplianceResponse: c = attrString("is_registered") === "true"
+        var isRegistered = merchantInfoNode.getAttributeAsString("is_registered")
+                .map("true"::equals)
+                .orElse(false);
+        var customerCareDetails = merchantInfoNode.getChild("customer_care_details")
+                .map(this::parseContactDetails)
+                .orElseGet(() -> new BusinessContactDetailsBuilder().build());
+        var grievanceOfficerDetails = merchantInfoNode.getChild("grievance_officer_details")
+                .map(this::parseGrievanceOfficerDetails)
+                .orElseGet(() -> new BusinessGrievanceOfficerDetailsBuilder().build());
+        return new BusinessMerchantComplianceBuilder()
+                .entityName(entityName)
+                .entityType(entityType)
+                .entityTypeCustom(entityTypeCustom)
+                .registered(isRegistered)
+                .customerCareDetails(customerCareDetails)
+                .grievanceOfficerDetails(grievanceOfficerDetails)
+                .build();
+    }
+
+    /**
+     * Parses a {@code <customer_care_details>} or {@code <grievance_officer_details>}
+     * inner block into a {@link BusinessContactDetails} record.
+     *
+     * @param node the contact-details stanza child
+     * @return the parsed contact triplet
+     *
+     * @implNote WAWebMerchantComplianceJob.merchantComplianceResponse: the
+     *           inline helper {@code e(t)} reads {@code email},
+     *           {@code landline_number} and {@code mobile_number} via
+     *           {@code maybeChild(...)?.contentString() || ""}. Cobalt
+     *           drops the {@code ""} fallback so empty Optionals
+     *           distinguish absent children from empty strings.
+     */
+    private BusinessContactDetails parseContactDetails(Node node) {
+        // WAWebMerchantComplianceJob.merchantComplianceResponse e(t): {email, landline_number, mobile_number}
+        var email = node.getChild("email").flatMap(Node::toContentString).orElse(null);
+        var landlineNumber = node.getChild("landline_number").flatMap(Node::toContentString).orElse(null);
+        var mobileNumber = node.getChild("mobile_number").flatMap(Node::toContentString).orElse(null);
+        return new BusinessContactDetailsBuilder()
+                .email(email)
+                .landlineNumber(landlineNumber)
+                .mobileNumber(mobileNumber)
+                .build();
+    }
+
+    /**
+     * Parses a {@code <grievance_officer_details>} inner block into a
+     * {@link BusinessGrievanceOfficerDetails} record.
+     *
+     * <p>Adds an officer {@code name} field on top of the
+     * {@link BusinessContactDetails} triplet; the {@code name} child is read via
+     * {@code maybeChild} on the WhatsApp Web side and exposed as an
+     * {@link Optional} here.
+     *
+     * @param node the grievance-officer stanza child
+     * @return the parsed officer details
+     *
+     * @implNote WAWebMerchantComplianceJob.merchantComplianceResponse:
+     *           {@code _ = babelHelpers.extends({name: m?.maybeChild("name")?.contentString() || ""}, e(m))}.
+     */
+    private BusinessGrievanceOfficerDetails parseGrievanceOfficerDetails(Node node) {
+        // WAWebMerchantComplianceJob.merchantComplianceResponse: name read via maybeChild
+        var name = node.getChild("name").flatMap(Node::toContentString).orElse(null);
+        var email = node.getChild("email").flatMap(Node::toContentString).orElse(null);
+        var landlineNumber = node.getChild("landline_number").flatMap(Node::toContentString).orElse(null);
+        var mobileNumber = node.getChild("mobile_number").flatMap(Node::toContentString).orElse(null);
+        return new BusinessGrievanceOfficerDetailsBuilder()
+                .name(name)
+                .email(email)
+                .landlineNumber(landlineNumber)
+                .mobileNumber(mobileNumber)
+                .build();
+    }
+
+    /**
+     * Builds a generic contact-details child node for the merchant
+     * compliance setter.
+     *
+     * @param description the wrapping element name (typically
+     *                    {@code "customer_care_details"})
+     * @param details     the contact triplet whose populated fields
+     *                    should be emitted
+     * @return the assembled node
+     *
+     * @implNote WAWebMerchantComplianceJob.h: each grandchild is
+     *           ternary-gated on {@code !== void 0}; Cobalt mirrors
+     *           that gating by skipping empty {@link Optional}s.
+     */
+    private Node buildContactDetailsNode(String description, BusinessContactDetails details) {
+        var children = new ArrayList<Node>();
+        // WAWebMerchantComplianceJob.h: n.email !== void 0 ? wap("email", null, n.email) : null
+        details.email().ifPresent(value -> children.add(new NodeBuilder()
+                .description("email")
+                .content(value)
+                .build()));
+        // WAWebMerchantComplianceJob.h: n.landlineNumber !== void 0 ? wap("landline_number", ...) : null
+        details.landlineNumber().ifPresent(value -> children.add(new NodeBuilder()
+                .description("landline_number")
+                .content(value)
+                .build()));
+        // WAWebMerchantComplianceJob.h: n.mobileNumber !== void 0 ? wap("mobile_number", ...) : null
+        details.mobileNumber().ifPresent(value -> children.add(new NodeBuilder()
+                .description("mobile_number")
+                .content(value)
+                .build()));
+        return new NodeBuilder()
+                .description(description)
+                .content(children)
+                .build();
+    }
+
+    /**
+     * Builds a {@code <grievance_officer_details>} child node for the
+     * merchant compliance setter, layering an optional {@code name} field
+     * on top of {@link #buildContactDetailsNode(String, BusinessContactDetails)}.
+     *
+     * @param details the grievance-officer details
+     * @return the assembled node
+     *
+     * @implNote WAWebMerchantComplianceJob.h: u.name !== void 0 ?
+     *           wap("name", null, u.name) : null; the remaining fields
+     *           reuse the customer-care contact-details layout.
+     */
+    private Node buildGrievanceOfficerDetailsNode(BusinessGrievanceOfficerDetails details) {
+        var children = new ArrayList<Node>();
+        // WAWebMerchantComplianceJob.h: u.name !== void 0 ? wap("name", null, u.name) : null
+        details.name().ifPresent(value -> children.add(new NodeBuilder()
+                .description("name")
+                .content(value)
+                .build()));
+        details.email().ifPresent(value -> children.add(new NodeBuilder()
+                .description("email")
+                .content(value)
+                .build()));
+        details.landlineNumber().ifPresent(value -> children.add(new NodeBuilder()
+                .description("landline_number")
+                .content(value)
+                .build()));
+        details.mobileNumber().ifPresent(value -> children.add(new NodeBuilder()
+                .description("mobile_number")
+                .content(value)
+                .build()));
+        return new NodeBuilder()
+                .description("grievance_officer_details")
+                .content(children)
+                .build();
+    }
+
+    /**
+     * Searches the WhatsApp Business category catalog for entries whose
+     * localized name matches the given partial query.
+     *
+     * <p>Every WhatsApp Business profile must declare a category (e.g.
+     * "Restaurant", "Clothing store") which is shown in the in-app business
+     * info panel and used for discoverability. WhatsApp's onboarding flow
+     * powers its "Business category" picker with this autocomplete endpoint:
+     * as the user types a few characters, the server returns the
+     * server-localized categories whose name matches. Cobalt-driven
+     * onboarding flows that let merchants configure their own category
+     * should call this on every keystroke to drive the same picker.
+     *
+     * <p>The result also surfaces a "not a business" placeholder id:
+     * categories that match the lookup but should be presented as the
+     * "not a business" sentinel option carry their {@code notABiz} flag set,
+     * which lets the caller render that option distinctly.
+     *
+     * @param query the partial text the user has typed; never {@code null}
+     * @return the matched categories, each with the server-issued id, the
+     *         localized display name, and the "not a business" flag; never
+     *         {@code null}
+     * @throws NullPointerException            if {@code query} is
+     *                                         {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer
+     *                                         open
+     * @throws NoSuchElementException          if the server's reply is
+     *                                         malformed
+     *
+     * @implNote WAWebQueryBusinessCategoriesJob.queryBusinessCategories
+     *           emits the same {@code xmlns="fb:thrift_iq" type="get"}
+     *           IQ. The parser walks the {@code <not_a_biz>} child first
+     *           to record its lone {@code <category id>} attribute as
+     *           {@code r}, then walks the {@code <categories>} children
+     *           and stamps each hit's {@code not_a_biz} flag with
+     *           {@code id === r}; Cobalt mirrors the ordering verbatim.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebQueryBusinessCategoriesJob", exports = "queryBusinessCategories",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    public BusinessCategoryTypeahead queryBusinessCategoryTypeahead(String query) {
+        Objects.requireNonNull(query, "query cannot be null");
+        // WAWebQueryBusinessCategoriesJob.queryBusinessCategories:
+        //   wap("request", {op: CUSTOM_STRING("profile_typeahead"), type: "catkit", v: "1"},
+        //       wap("query", null, t))
+        var queryNode = new NodeBuilder()
+                .description("query")
+                .content(query)
+                .build();
+        var requestNode = new NodeBuilder()
+                .description("request")
+                .attribute("op", "profile_typeahead") // WAWebQueryBusinessCategoriesJob: op: CUSTOM_STRING("profile_typeahead")
+                .attribute("type", "catkit") // WAWebQueryBusinessCategoriesJob: type: "catkit"
+                .attribute("v", "1") // WAWebQueryBusinessCategoriesJob: v: "1"
+                .content(queryNode)
+                .build();
+        var iqNode = new NodeBuilder()
+                .description("iq")
+                .attribute("xmlns", "fb:thrift_iq") // WAWebQueryBusinessCategoriesJob: xmlns: "fb:thrift_iq"
+                .attribute("to", JidServer.user()) // WAWebQueryBusinessCategoriesJob: to: S_WHATSAPP_NET
+                .attribute("type", "get") // WAWebQueryBusinessCategoriesJob: type: "get"
+                .content(requestNode);
+        var response = sendNode(iqNode);
+        // WAWebQueryBusinessCategoriesJob.businessCategoriesResponse: t = e.child("response")
+        var responseNode = response.getChild("response")
+                .orElseThrow(() -> new NoSuchElementException("Missing <response> in business-categories typeahead response"));
+        // WAWebQueryBusinessCategoriesJob.businessCategoriesResponse: r = "" then walk <not_a_biz>'s lone <category id> attribute
+        var notABizId = responseNode.getChild("not_a_biz")
+                .stream()
+                .flatMap(notABiz -> notABiz.getChildren("category").stream())
+                .map(category -> category.getAttributeAsString("id").orElse(""))
+                .reduce("", (acc, id) -> id); // WAWebQueryBusinessCategoriesJob: forEach overwrites r so the last <category id> wins
+        // WAWebQueryBusinessCategoriesJob.businessCategoriesResponse: a = t.child("categories"); the parser asserts presence
+        var categoriesContainer = responseNode.getChild("categories")
+                .orElseThrow(() -> new NoSuchElementException("Missing <categories> in business-categories typeahead response"));
+        var hits = new ArrayList<BusinessCategoryHit>();
+        for (var categoryNode : categoriesContainer.getChildren("category")) {
+            // WAWebQueryBusinessCategoriesJob.businessCategoriesResponse:
+            //   {id: e.attrString("id"), localized_display_name: e.contentString(), not_a_biz: r.length ? id === r : false}
+            var id = categoryNode.getAttributeAsString("id").orElse(null);
+            if (id == null) {
+                continue; // ADAPTED: WA Web's parser swallows exceptions via try/catch; Cobalt skips defensively.
+            }
+            var localizedName = categoryNode.toContentString().orElse("");
+            var isNotABiz = !notABizId.isEmpty() && id.equals(notABizId);
+            hits.add(new BusinessCategoryHitBuilder()
+                    .id(id)
+                    .localizedName(localizedName)
+                    .notABiz(isNotABiz)
+                    .build());
+        }
+        return new BusinessCategoryTypeaheadBuilder()
+                .categories(hits)
+                .notABizId(notABizId)
+                .build();
+    }
+
+    /**
      * Queries the detail of a business order identified by a message id and
      * a server-issued token.
      *
      * <p>Mirrors {@code WAWebBizQueryOrderJob.queryOrder}. The request is
-     * issued through the {@link QueryOrderMex} MEX operation, which wraps
+     * issued through the {@code queryOrder} MEX operation, which wraps
      * the GraphQL variables under {@code request.order} and dispatches the
      * IQ via the {@code w:mex} namespace. The response is projected into
-     * an {@link QueryOrderMex.Order} carrying the creation timestamp, the
+     * an {@link BusinessOrder} carrying the creation timestamp, the
      * price details and the ordered items.
      *
      * <p>This entry point targets the GraphQL code path; the legacy
@@ -2525,12 +3195,12 @@ public class WhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     @WhatsAppWebExport(moduleName = "WAWebBizOrderBridge", exports = "queryOrder",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public Optional<QueryOrderMex.Order> queryOrder(String messageId, String tokenBase64) {
+    public Optional<BusinessOrder> queryOrder(String messageId, String tokenBase64) {
         Objects.requireNonNull(messageId, "messageId cannot be null");
         Objects.requireNonNull(tokenBase64, "tokenBase64 cannot be null");
         var selfJid = store.jid() // WAWebUserPrefsMeUser.getMePnUserOrThrow_DO_NOT_USE().toString()
                 .orElseThrow(() -> new IllegalStateException("queryOrder requires a logged-in session"));
-        var request = new QueryOrderMex.Request(
+        var request = new QueryOrderMexRequest(
                 selfJid.toString(),
                 messageId,
                 tokenBase64,
@@ -2538,9 +3208,9 @@ public class WhatsAppClient {
                 512  // WAWebBizQueryOrderJob.queryOrder: default thumbnail height
         );
         // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
-        var response = sendMexNode(request.toNode(), QueryOrderMex.QUERY_ID, "queryOrder", false);
-        return QueryOrderMex.Response.of(response)
-                .map(QueryOrderMex.Response::order);
+        var response = sendNode(request);
+        return QueryOrderMexResponse.of(response)
+                .map(QueryOrderMexResponse::order);
     }
 
     /**
@@ -2560,7 +3230,7 @@ public class WhatsAppClient {
      * is built via
      * {@link QuickReplyHandler#getQuickReplyAddOrEditMutation(String, String, String, int, List, Instant)}
      * and committed through
-     * {@link WebAppStateService#pushPatches(SyncPatchType, java.util.SequencedCollection)}.
+     * {@link WebAppStateService#pushPatches(SyncPatchType, SequencedCollection)}.
      * @param shortcut the shortcut text the user types to trigger the quick reply
      * @param message  the message body to expand the shortcut into
      * @param keywords the optional keyword list used by the autocomplete
@@ -2589,7 +3259,7 @@ public class WhatsAppClient {
         webAppStateService.pushPatches(QuickReplyAction.COLLECTION_NAME, List.of(mutation)); // WAWebSyncdCoreApi.lockForSync([], [mutation], ...)
         // ADAPTED: WAWebSendQuickReplyAddOrEditMutation applies the entry locally after the sync round-trip;
         // Cobalt updates the store eagerly for consistent read-after-write semantics.
-        var entry = new com.github.auties00.cobalt.model.preference.QuickReplyBuilder()
+        var entry = new QuickReplyBuilder()
                 .id(quickReplyId)
                 .shortcut(shortcut)
                 .message(message)
@@ -2647,7 +3317,7 @@ public class WhatsAppClient {
         var mutation = QuickReplyHandler.INSTANCE.getQuickReplyAddOrEditMutation(
                 quickReplyId, shortcut, message, currentCount, resolvedKeywords, timestamp);
         webAppStateService.pushPatches(QuickReplyAction.COLLECTION_NAME, List.of(mutation));
-        var entry = new com.github.auties00.cobalt.model.preference.QuickReplyBuilder()
+        var entry = new QuickReplyBuilder()
                 .id(quickReplyId)
                 .shortcut(shortcut)
                 .message(message)
@@ -2673,7 +3343,7 @@ public class WhatsAppClient {
      * @implNote ADAPTED: WAWebDeleteQuickReplyAction — delegates to
      * {@link QuickReplyHandler#getQuickReplyDeleteMutation(String, Instant)}
      * and commits the mutation through
-     * {@link WebAppStateService#pushPatches(SyncPatchType, java.util.SequencedCollection)}.
+     * {@link WebAppStateService#pushPatches(SyncPatchType, SequencedCollection)}.
      * @param quickReplyId the id of the quick reply to delete
      * @throws NullPointerException            if {@code quickReplyId} is
      *                                         {@code null}
@@ -3184,7 +3854,7 @@ public class WhatsAppClient {
      * and reconciles them into the local store.
      *
      * <p>Dispatches the
-     * {@link FetchAllNewslettersMetadataMex.Request mexFetchAllNewsletters}
+     * {@link FetchAllNewslettersMetadataMexRequest mexFetchAllNewsletters}
      * MEX query and, for every item returned, ensures a matching
      * {@link Newsletter} exists in the store keyed by its JID. The order of
      * the returned collection mirrors the server-side order, which WA Web
@@ -3202,10 +3872,10 @@ public class WhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebNewsletterMetadataJob", exports = "getAllNewslettersMetadata",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public SequencedCollection<Newsletter> queryNewsletters() {
-        var request = new FetchAllNewslettersMetadataMex.Request(Boolean.TRUE); // WAWebMexFetchAllNewslettersMetadataJob.mexFetchAllNewsletters: fetch_wamo_sub: true
+        var request = new FetchAllNewslettersMetadataMexRequest(Boolean.TRUE); // WAWebMexFetchAllNewslettersMetadataJob.mexFetchAllNewsletters: fetch_wamo_sub: true
         // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
-        var response = sendMexNode(request.toNode(), FetchAllNewslettersMetadataMex.QUERY_ID, "mexFetchAllNewsletters", false);
-        var parsed = FetchAllNewslettersMetadataMex.Response.of(response);
+        var response = sendNode(request);
+        var parsed = FetchAllNewslettersMetadataMexResponse.of(response);
         var newsletters = new LinkedHashSet<Newsletter>();
         parsed.ifPresent(r -> {
             for (var item : r.items()) {
@@ -3443,6 +4113,77 @@ public class WhatsAppClient {
                         .build());
             }
         }
+    }
+
+    /**
+     * Fetches the profile picture of a group through a public invite link,
+     * without joining the group first.
+     *
+     * <p>WhatsApp's invite-link landing screen shows the group's icon,
+     * subject and member count before the user commits to joining; this
+     * method backs that preview. Applications that resolve
+     * {@code chat.whatsapp.com/<code>} links — for example to render a
+     * preview card before the user taps "Join group" — should call this
+     * with the parsed invite code to obtain a downloadable URL for the
+     * group icon.
+     *
+     * <p>This call does not change the local group membership and works
+     * even when the caller is not a member of the group; the returned URL
+     * can be downloaded via the standard media-download path.
+     *
+     * @param group      the JID of the group the invite refers to; must be
+     *                   a group JID
+     * @param inviteCode the public invite code parsed from the
+     *                   {@code chat.whatsapp.com} URL; never {@code null}
+     * @param type       the picture resolution — {@code "image"} for the
+     *                   full-size icon or {@code "preview"} for the
+     *                   low-resolution thumbnail; never {@code null}
+     * @param query      the lookup hint — typically {@code "url"} to
+     *                   request a CDN download URL; pass {@code null} to
+     *                   omit the attribute and ask the server only for
+     *                   identity metadata
+     * @return the picture identity, type, download URL and direct-path
+     *         tuple; never {@code null}
+     * @throws NullPointerException            if any non-optional argument
+     *                                         is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer
+     *                                         open
+     * @throws NoSuchElementException          if the server reply carries
+     *                                         no picture entry
+     *
+     * @implNote WAWebQueryGroupInviteProfilePicApi.queryGroupInviteLinkProfilePic
+     */
+    @WhatsAppWebExport(moduleName = "WAWebQueryGroupInviteProfilePicApi", exports = "queryGroupInviteLinkProfilePic",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public GroupInvitePicture queryGroupInvitePicture(Jid group, String inviteCode, String type, String query) {
+        Objects.requireNonNull(group, "group cannot be null");
+        Objects.requireNonNull(inviteCode, "inviteCode cannot be null");
+        Objects.requireNonNull(type, "type cannot be null");
+        // WAWebQueryGroupInviteProfilePicApi.queryGroupInviteLinkProfilePic: wap("picture", {type, query, invite: CUSTOM_STRING(r)})
+        var pictureBuilder = new NodeBuilder()
+                .description("picture")
+                .attribute("type", type) // WAWebQueryGroupInviteProfilePicApi: type from option, defaults DROP_ATTR; required for the picture lookup
+                .attribute("query", query) // WAWebQueryGroupInviteProfilePicApi: query from option, may be DROP_ATTR
+                .attribute("invite", inviteCode); // WAWebQueryGroupInviteProfilePicApi: invite: CUSTOM_STRING(r)
+        var iqNode = new NodeBuilder()
+                .description("iq")
+                .attribute("xmlns", "w:g2") // WAWebQueryGroupInviteProfilePicApi: xmlns: "w:g2"
+                .attribute("to", group) // WAWebQueryGroupInviteProfilePicApi: to: GROUP_JID(a)
+                .attribute("type", "get") // WAWebQueryGroupInviteProfilePicApi: type: "get"
+                .content(pictureBuilder.build());
+        var response = sendNode(iqNode);
+        // WAWebQueryGroupInviteProfilePicApi.queryGroupProfilePicParser: e.child("picture") -> {id, type, url, direct_path}
+        var pictureNode = response.getChild("picture")
+                .orElseThrow(() -> new NoSuchElementException("Missing <picture> in group invite picture response"));
+        var pictureId = pictureNode.getAttributeAsString("id")
+                .orElseThrow(() -> new NoSuchElementException("Missing picture id"));
+        var pictureType = pictureNode.getAttributeAsString("type")
+                .orElseThrow(() -> new NoSuchElementException("Missing picture type"));
+        var pictureUrl = pictureNode.getAttributeAsString("url")
+                .orElseThrow(() -> new NoSuchElementException("Missing picture url"));
+        var pictureDirectPath = pictureNode.getAttributeAsString("direct_path")
+                .orElseThrow(() -> new NoSuchElementException("Missing picture direct_path"));
+        return new GroupInvitePicture(pictureId, pictureType, URI.create(pictureUrl), pictureDirectPath);
     }
 
     /**
@@ -4297,7 +5038,7 @@ public class WhatsAppClient {
      * Queries metadata for a single newsletter with the viewer role the
      * account currently holds.
      *
-     * <p>Dispatches the {@link FetchNewsletterMex.Request mexGetNewsletter}
+     * <p>Dispatches the {@link FetchNewsletterMexRequest mexGetNewsletter}
      * MEX query with the newsletter JID serialised as the {@code input}
      * variable and the view flags enabled so the server returns the full
      * thread metadata together with the viewer-scoped settings.
@@ -4319,12 +5060,12 @@ public class WhatsAppClient {
         Objects.requireNonNull(newsletterJid, "newsletterJid cannot be null");
         // WAWebMexFetchNewsletterJob.mexGetNewsletter: u = WAWebWid.isNewsletter(t) ? "JID" : "INVITE"
         // input = {key: t, type: u, view_role: a}
-        var input = new FetchNewsletterMex.Request.Input(
+        var input = new FetchNewsletterMexRequest.Input(
                 newsletterJid.toString(),
                 "JID",
                 role != null ? role.name() : null
         );
-        var request = new FetchNewsletterMex.Request(
+        var request = new FetchNewsletterMexRequest(
                 Boolean.TRUE, // fetch_creation_time
                 Boolean.TRUE, // fetch_full_image (c = u !== "INVITE")
                 Boolean.TRUE, // fetch_viewer_metadata
@@ -4332,8 +5073,8 @@ public class WhatsAppClient {
                 input
         );
         // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
-        var response = sendMexNode(request.toNode(), FetchNewsletterMex.QUERY_ID, "mexGetNewsletter", false);
-        var parsed = FetchNewsletterMex.Response.of(response);
+        var response = sendNode(request);
+        var parsed = FetchNewsletterMexResponse.of(response);
         if (parsed.isEmpty()) {
             return Optional.empty();
         }
@@ -4346,7 +5087,7 @@ public class WhatsAppClient {
      * Creates a brand-new newsletter owned by this account.
      *
      * <p>Dispatches the
-     * {@link CreateNewsletterMex.Request mexCreateNewsletter} MEX mutation
+     * {@link CreateNewsletterMexRequest mexCreateNewsletter} MEX mutation
      * with the supplied name, optional description and optional picture
      * bytes. On success the server returns the freshly allocated newsletter
      * id which Cobalt resolves to a local {@link Newsletter} after
@@ -4370,19 +5111,10 @@ public class WhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Newsletter createNewsletter(String name, String description, byte[] picture) {
         Objects.requireNonNull(name, "name cannot be null");
-        var input = new JSONObject()
-                .fluentPut("name", name); // WAWebNewsletterCreateJob.createNewsletter: input.name
-        if (description != null) {
-            input.fluentPut("description", description); // WAWebNewsletterCreateJob.createNewsletter: input.description
-        }
-        if (picture != null && picture.length > 0) {
-            // WAWebNewsletterCreateJob.encodePicture: base64-encodes the raw JPEG bytes
-            input.fluentPut("picture", Base64.getEncoder().encodeToString(picture));
-        }
-        var request = new CreateNewsletterMex.Request(input.toJSONString());
+        var request = new CreateNewsletterMexRequest(name, description, picture == null && picture.length > 0 ? null : Base64.getEncoder().encodeToString(picture));
         // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
-        var response = sendMexNode(request.toNode(), CreateNewsletterMex.QUERY_ID, "mexCreateNewsletter", false);
-        var parsed = CreateNewsletterMex.Response.of(response)
+        var response = sendNode(request);
+        var parsed = CreateNewsletterMexResponse.of(response)
                 .orElseThrow(() -> new NoSuchElementException("Missing create-newsletter response: %s".formatted(response)));
         var id = parsed.id()
                 .orElseThrow(() -> new NoSuchElementException("Missing newsletter id in response"));
@@ -4396,7 +5128,7 @@ public class WhatsAppClient {
      * newsletter owned by this account.
      *
      * <p>Dispatches the
-     * {@link UpdateNewsletterMex.Request mexUpdateNewsletter} MEX mutation.
+     * {@link UpdateNewsletterMexRequest mexUpdateNewsletter} MEX mutation.
      * Fields left {@code null} are omitted from the request so the server
      * leaves them untouched.
      *
@@ -4429,16 +5161,16 @@ public class WhatsAppClient {
             // WAWebNewsletterCreateJob.encodePicture: empty byte[] clears the picture, non-empty replaces it
             updates.fluentPut("picture", picture.length == 0 ? "" : Base64.getEncoder().encodeToString(picture));
         }
-        var request = new UpdateNewsletterMex.Request(newsletter.toString(), updates);
+        var request = new UpdateNewsletterMexRequest(newsletter.toString(), updates);
         // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
-        sendMexNodeWithNoResponse(request.toNode(), UpdateNewsletterMex.QUERY_ID, "mexUpdateNewsletter", false);
+        sendNodeWithNoResponse(request);
     }
 
     /**
      * Permanently deletes a newsletter owned by this account.
      *
      * <p>Dispatches the
-     * {@link DeleteNewsletterMex.Request mexDeleteNewsletter} MEX mutation
+     * {@link DeleteNewsletterMexRequest mexDeleteNewsletter} MEX mutation
      * and removes the newsletter from the local store on success.
      *
      * @param newsletter the non-{@code null} newsletter JID
@@ -4453,9 +5185,9 @@ public class WhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public void deleteNewsletter(Jid newsletter) {
         Objects.requireNonNull(newsletter, "newsletter cannot be null");
-        var request = new DeleteNewsletterMex.Request(newsletter.toString());
+        var request = new DeleteNewsletterMexRequest(newsletter.toString());
         // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
-        sendMexNodeWithNoResponse(request.toNode(), DeleteNewsletterMex.QUERY_ID, "mexDeleteNewsletter", false);
+        sendNodeWithNoResponse(request);
         store.removeNewsletter(newsletter); // WAWebNewsletterBridgeApi.deleteNewsletter: evict from local store
     }
 
@@ -4464,7 +5196,7 @@ public class WhatsAppClient {
      * are delivered.
      *
      * <p>Dispatches the
-     * {@link JoinNewsletterMex.Request mexJoinNewsletter} MEX mutation and
+     * {@link JoinNewsletterMexRequest mexJoinNewsletter} MEX mutation and
      * registers the newsletter in the local store so subsequent lookups
      * succeed.
      *
@@ -4482,9 +5214,9 @@ public class WhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public void joinNewsletter(Jid newsletter) {
         Objects.requireNonNull(newsletter, "newsletter cannot be null");
-        var request = new JoinNewsletterMex.Request(newsletter.toString());
+        var request = new JoinNewsletterMexRequest(newsletter.toString());
         // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
-        sendMexNodeWithNoResponse(request.toNode(), JoinNewsletterMex.QUERY_ID, "mexJoinNewsletter", false);
+        sendNodeWithNoResponse(request);
         store.findNewsletterByJid(newsletter)
                 .orElseGet(() -> store.addNewNewsletter(newsletter));
         // WAWebNewsletterSubscribeAction.subscribeToNewsletterAction ->
@@ -4509,7 +5241,7 @@ public class WhatsAppClient {
      * being delivered.
      *
      * <p>Dispatches the
-     * {@link LeaveNewsletterMex.Request mexLeaveNewsletter} MEX mutation
+     * {@link LeaveNewsletterMexRequest mexLeaveNewsletter} MEX mutation
      * and removes the newsletter from the local store on success.
      *
      * @param newsletter the non-{@code null} newsletter JID
@@ -4526,9 +5258,9 @@ public class WhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public void leaveNewsletter(Jid newsletter) {
         Objects.requireNonNull(newsletter, "newsletter cannot be null");
-        var request = new LeaveNewsletterMex.Request(newsletter.toString());
+        var request = new LeaveNewsletterMexRequest(newsletter.toString());
         // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
-        sendMexNodeWithNoResponse(request.toNode(), LeaveNewsletterMex.QUERY_ID, "mexLeaveNewsletter", false);
+        sendNodeWithNoResponse(request);
         store.removeNewsletter(newsletter);
         // WAWebNewsletterUnsubscribeAction.unsubscribeFromNewsletterAction ->
         // WAWebNewsletterAttributionLogging.NewsletterCoreEventLogger.log({cid, channelCoreEventType: UNFOLLOW, ...})
@@ -4552,7 +5284,7 @@ public class WhatsAppClient {
      * newsletter.
      *
      * <p>Dispatches the
-     * {@link UpdateNewsletterUserSettingMex.Request mexUpdateNewsletterUserSetting}
+     * {@link UpdateNewsletterUserSettingMexRequest mexUpdateNewsletterUserSetting}
      * MEX mutation with {@code type=MUTE_ADMIN_ACTIVITY} and
      * {@code value=ON} (mute) or {@code value=OFF} (unmute).
      *
@@ -4574,12 +5306,12 @@ public class WhatsAppClient {
         Objects.requireNonNull(newsletter, "newsletter cannot be null");
         // WAWebNewsletterUpdateUserSettingJob: passes {newsletter_id, type, value} as a NESTED input object,
         // not a stringified JSON. WAWebMexClient.fetchQuery places it under variables.input.
-        var request = new UpdateNewsletterUserSettingMex.Request(
+        var request = new UpdateNewsletterUserSettingMexRequest(
                 newsletter.toString(),       // WAWebNewsletterUpdateUserSettingJob: newsletter_id
                 "MUTE_ADMIN_ACTIVITY",       // WAWebNewsletterUpdateUserSettingJob: ADMIN_NOTIFICATIONS -> "MUTE_ADMIN_ACTIVITY"
                 mute ? "ON" : "OFF");        // WAWebNewsletterUpdateUserSettingJob: MUTED_STATE -> "ON", else "OFF"
         // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
-        sendMexNodeWithNoResponse(request.toNode(), UpdateNewsletterUserSettingMex.QUERY_ID, "mexUpdateNewsletterUserSetting", false);
+        sendNodeWithNoResponse(request);
         // WAWebNewsletterUpdateUserSettingsAction.updateNewsletterUserSettingsAction ->
         // NewsletterCoreEventLogger.log({cid, channelCoreEventType: MUTE|UNMUTE,
         //   channelRequestMetadata: JSON.stringify(a.map(s => (mute?"mute":"unmute")+"_"+s))}).
@@ -4683,7 +5415,7 @@ public class WhatsAppClient {
      * account.
      *
      * <p>Dispatches the
-     * {@link AcceptNewsletterAdminInviteMex.Request acceptNewsletterAdminInvite}
+     * {@link AcceptNewsletterAdminInviteMexRequest acceptNewsletterAdminInvite}
      * MEX mutation.
      *
      * @param newsletter the non-{@code null} newsletter JID whose pending
@@ -4699,9 +5431,9 @@ public class WhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public void acceptNewsletterAdminInvite(Jid newsletter) {
         Objects.requireNonNull(newsletter, "newsletter cannot be null");
-        var request = new AcceptNewsletterAdminInviteMex.Request(newsletter.toString());
+        var request = new AcceptNewsletterAdminInviteMexRequest(newsletter.toString());
         // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
-        sendMexNodeWithNoResponse(request.toNode(), AcceptNewsletterAdminInviteMex.QUERY_ID, "acceptNewsletterAdminInvite", false);
+        sendNodeWithNoResponse(request);
     }
 
     /**
@@ -4709,7 +5441,7 @@ public class WhatsAppClient {
      * account for the given newsletter.
      *
      * <p>Dispatches the
-     * {@link RevokeNewsletterAdminInviteMex.Request revokeNewsletterAdminInvite}
+     * {@link RevokeNewsletterAdminInviteMexRequest revokeNewsletterAdminInvite}
      * MEX mutation.
      *
      * @param newsletter the non-{@code null} newsletter JID
@@ -4729,9 +5461,9 @@ public class WhatsAppClient {
     public void revokeNewsletterAdminInvite(Jid newsletter, Jid admin) {
         Objects.requireNonNull(newsletter, "newsletter cannot be null");
         Objects.requireNonNull(admin, "admin cannot be null");
-        var request = new RevokeNewsletterAdminInviteMex.Request(newsletter.toString(), admin.toString());
+        var request = new RevokeNewsletterAdminInviteMexRequest(newsletter.toString(), admin.toString());
         // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
-        sendMexNodeWithNoResponse(request.toNode(), RevokeNewsletterAdminInviteMex.QUERY_ID, "revokeNewsletterAdminInvite", false);
+        sendNodeWithNoResponse(request);
     }
 
     /**
@@ -4739,7 +5471,7 @@ public class WhatsAppClient {
      * follower.
      *
      * <p>Dispatches the
-     * {@link DemoteNewsletterAdminMex.Request demoteNewsletterAdmin} MEX
+     * {@link DemoteNewsletterAdminMexRequest demoteNewsletterAdmin} MEX
      * mutation.
      *
      * @param newsletter the non-{@code null} newsletter JID
@@ -4758,16 +5490,16 @@ public class WhatsAppClient {
     public void demoteNewsletterAdmin(Jid newsletter, Jid admin) {
         Objects.requireNonNull(newsletter, "newsletter cannot be null");
         Objects.requireNonNull(admin, "admin cannot be null");
-        var request = new DemoteNewsletterAdminMex.Request(newsletter.toString(), admin.toString());
+        var request = new DemoteNewsletterAdminMexRequest(newsletter.toString(), admin.toString());
         // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
-        sendMexNodeWithNoResponse(request.toNode(), DemoteNewsletterAdminMex.QUERY_ID, "demoteNewsletterAdmin", false);
+        sendNodeWithNoResponse(request);
     }
 
     /**
      * Updates the reaction policy for a newsletter owned by this account.
      *
      * <p>Dispatches the
-     * {@link UpdateNewsletterMex.Request mexUpdateNewsletter} MEX mutation
+     * {@link UpdateNewsletterMexRequest mexUpdateNewsletter} MEX mutation
      * with an {@code updates} object carrying the serialised reaction
      * settings. WA Web treats reaction policy changes as a standard
      * newsletter metadata edit.
@@ -4796,9 +5528,856 @@ public class WhatsAppClient {
                 .fluentPut("reaction_codes", reactionCodes);
         var updates = new JSONObject()
                 .fluentPut("settings", settings);
-        var request = new UpdateNewsletterMex.Request(newsletter.toString(), updates);
+        var request = new UpdateNewsletterMexRequest(newsletter.toString(), updates);
         // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
-        sendMexNodeWithNoResponse(request.toNode(), UpdateNewsletterMex.QUERY_ID, "mexUpdateNewsletter", false);
+        sendNodeWithNoResponse(request);
+    }
+
+    /**
+     * Queries the capability flags granted to this account on the given
+     * newsletter.
+     *
+     * <p>Capabilities indicate which privileged operations the authenticated
+     * user may perform — for example posting, moderating reactions, inviting
+     * additional admins or transferring ownership. The returned list is the
+     * raw upper-case wire values; callers may map them to a typed enum
+     * downstream.
+     *
+     * <p>Dispatches the
+     * {@link FetchNewsletterAdminCapabilitiesMexRequest mexFetchNewsletterAdminCapabilities}
+     * MEX query.
+     *
+     * @param newsletter the non-{@code null} newsletter JID
+     * @return an {@link Optional} containing the parsed response, or empty
+     *         if the relay returned no payload
+     * @throws NullPointerException if {@code newsletter} is {@code null}
+     *
+     * @implNote WAWebMexFetchNewsletterAdminCapabilitiesJob.mexFetchNewsletterAdminCapabilities:
+     * WA Web wraps the MEX call inside the {@code WAWebNewsletterAdminCapabilitiesQueryJob}
+     * orchestrator which also caches the capability set on the in-memory
+     * newsletter model. Cobalt collapses the orchestrator into a direct
+     * MEX call and returns the raw response without populating any local
+     * derived state.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexFetchNewsletterAdminCapabilitiesJob", exports = "mexFetchNewsletterAdminCapabilities",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<FetchNewsletterAdminCapabilitiesMexResponse> queryNewsletterAdminCapabilities(Jid newsletter) {
+        Objects.requireNonNull(newsletter, "newsletter cannot be null");
+        var request = new FetchNewsletterAdminCapabilitiesMexRequest(newsletter.toString());
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendNode(request);
+        return FetchNewsletterAdminCapabilitiesMexResponse.of(response);
+    }
+
+    /**
+     * Queries the administrator headcount and identifier metadata for the
+     * given newsletter.
+     *
+     * <p>The response exposes the {@code admin_count} scalar — useful when
+     * displaying an "X admins" badge — together with the newsletter id
+     * echoed back by the relay. Cobalt narrows the WA Web fragment to these
+     * two fields; the full admin profile list lives behind a separate query.
+     *
+     * <p>Dispatches the
+     * {@link FetchNewsletterAdminInfoMexRequest mexFetchNewsletterAdminInfo}
+     * MEX query.
+     *
+     * @param newsletter the non-{@code null} newsletter JID
+     * @return an {@link Optional} containing the parsed response, or empty
+     *         if the relay returned no payload
+     * @throws NullPointerException if {@code newsletter} is {@code null}
+     *
+     * @implNote WAWebMexFetchNewsletterAdminInfoJob.mexFetchNewsletterAdminInfo:
+     * Cobalt only exposes the {@code admin_count} scalar from the
+     * {@code xwa2_newsletter_admin} root; WA Web also hydrates the
+     * {@code admin_profile} sub-object which Cobalt skips.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexFetchNewsletterAdminInfoJob", exports = "mexFetchNewsletterAdminInfo",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<FetchNewsletterAdminInfoMexResponse> queryNewsletterAdminInfo(Jid newsletter) {
+        Objects.requireNonNull(newsletter, "newsletter cannot be null");
+        var request = new FetchNewsletterAdminInfoMexRequest(newsletter.toString());
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendNode(request);
+        return FetchNewsletterAdminInfoMexResponse.of(response);
+    }
+
+    /**
+     * Queries a paginated page of followers for the given newsletter.
+     *
+     * <p>Each follower entry includes the member JID, role and follow
+     * timestamp. Admins use this query to populate the follower roster and
+     * to manage role assignments. The caller is responsible for clamping
+     * {@code count} to the server-imposed maximum (WA Web reads it from
+     * {@code WAWebNewsletterGatingUtils.getMaxSubscriberNumber()}).
+     *
+     * <p>Dispatches the
+     * {@link FetchNewsletterFollowersMexRequest mexFetchNewsletterFollowers}
+     * MEX query.
+     *
+     * @param newsletter the non-{@code null} newsletter JID
+     * @param count      the requested follower page size; the caller should
+     *                   clamp it against the server maximum
+     * @return an {@link Optional} containing the parsed response, or empty
+     *         if the relay returned no payload
+     * @throws NullPointerException if {@code newsletter} is {@code null}
+     *
+     * @implNote WAWebMexFetchNewsletterFollowersJob.mexFetchNewsletterFollowers:
+     * the MEX reply does not currently surface a cursor token — the JS
+     * source consumes the full {@code edges} array in a single shot. If the
+     * relay later starts emitting one Cobalt will need a follow-up overload
+     * that threads the cursor through.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexFetchNewsletterFollowersJob", exports = "mexFetchNewsletterFollowers",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<FetchNewsletterFollowersMexResponse> queryNewsletterFollowers(Jid newsletter, int count) {
+        Objects.requireNonNull(newsletter, "newsletter cannot be null");
+        var request = new FetchNewsletterFollowersMexRequest(newsletter.toString(), count);
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendNode(request);
+        return FetchNewsletterFollowersMexResponse.of(response);
+    }
+
+    /**
+     * Queries the list of pending administrator invitations attached to the
+     * given newsletter.
+     *
+     * <p>Newsletter owners may issue admin invitations to other users; this
+     * query returns the invitations that have been issued but not yet
+     * accepted, so the owner UI can surface them as pending entries.
+     *
+     * <p>Dispatches the
+     * {@link FetchNewsletterPendingInvitesMexRequest mexFetchNewsletterPendingInvites}
+     * MEX query.
+     *
+     * @param newsletter the non-{@code null} newsletter JID whose pending
+     *                   admin invitations are being listed
+     * @return an {@link Optional} containing the parsed response, or empty
+     *         if the relay returned no payload
+     * @throws NullPointerException if {@code newsletter} is {@code null}
+     *
+     * @implNote WAWebMexFetchNewsletterPendingInvitesJob.mexFetchNewsletterPendingInvites:
+     * the GraphQL operation accepts a {@code newsletter_id} variable that
+     * scopes the query to a specific newsletter — Cobalt threads the JID
+     * through unchanged.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexFetchNewsletterPendingInvitesJob", exports = "mexFetchNewsletterPendingInvites",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<FetchNewsletterPendingInvitesMexResponse> queryNewsletterPendingInvites(Jid newsletter) {
+        Objects.requireNonNull(newsletter, "newsletter cannot be null");
+        var request = new FetchNewsletterPendingInvitesMexRequest(newsletter.toString());
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendNode(request);
+        return FetchNewsletterPendingInvitesMexResponse.of(response);
+    }
+
+    /**
+     * Queries a paginated page of the newsletter directory filtered by view
+     * (Recommended, New, Popular, Featured, Trending) and optional
+     * country/category filters.
+     *
+     * <p>This query powers the explore tab of the newsletter directory.
+     * The cursor token enables forward pagination — the caller should pass
+     * {@code null} on the first call and feed back the {@code endCursor}
+     * from the {@code page_info} block on subsequent ones.
+     *
+     * <p>Dispatches the
+     * {@link FetchNewsletterDirectoryListMexRequest mexFetchNewsletterDirectoryList}
+     * MEX query.
+     *
+     * @param view                 the directory slice to query; never
+     *                             {@code null}
+     * @param countryCodes         the ISO country codes to filter by, or
+     *                             {@code null} for no country filter
+     * @param categories           the upper-case category wire strings to
+     *                             filter by (e.g. {@code "BUSINESS"}), or
+     *                             {@code null} for no category filter
+     * @param limit                the page size, or {@code null} to let the
+     *                             relay apply its default
+     * @param cursorToken          the start cursor for pagination, or
+     *                             {@code null} on the first page
+     * @param fetchStatusMetadata  {@code true} to request the optional
+     *                             {@code status_metadata} sub-selection,
+     *                             mirroring
+     *                             {@code WAWebNewsletterGatingUtils.isNewsletterStatusReceiverEnabled()}
+     * @return an {@link Optional} containing the parsed response, or empty
+     *         if the relay returned no payload
+     * @throws NullPointerException if {@code view} is {@code null}
+     *
+     * @implNote WAWebMexFetchNewsletterDirectoryListJob.mexFetchNewsletterDirectoryList:
+     * WA Web's {@code WAWebNewsletterDirectoryCategoryUtils.getCategoryValueFromEnum}
+     * mapping is the caller's responsibility — Cobalt accepts the upper-case
+     * wire form directly.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexFetchNewsletterDirectoryListJob", exports = "mexFetchNewsletterDirectoryList",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<FetchNewsletterDirectoryListMexResponse> queryNewsletterDirectoryList(NewsletterDirectoryListView view, List<String> countryCodes, List<String> categories, Long limit, String cursorToken, boolean fetchStatusMetadata) {
+        Objects.requireNonNull(view, "view cannot be null");
+        var request = new FetchNewsletterDirectoryListMexRequest(view, countryCodes, categories, limit, cursorToken, fetchStatusMetadata);
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendNode(request);
+        return FetchNewsletterDirectoryListMexResponse.of(response);
+    }
+
+    /**
+     * Searches the newsletter directory for channels whose names, handles
+     * or descriptions match the given free-text query.
+     *
+     * <p>The optional category filter narrows the search to specific
+     * editorial categories. Pagination follows the same cursor protocol as
+     * {@link #queryNewsletterDirectoryList}: pass {@code null} on the
+     * initial call and feed back the cursor from {@code page_info} on
+     * subsequent ones.
+     *
+     * <p>Dispatches the
+     * {@link FetchNewsletterDirectorySearchResultsMexRequest mexFetchNewsletterDirectorySearchResults}
+     * MEX query.
+     *
+     * @param searchText           the free-text search query, or
+     *                             {@code null} to broadly search by category
+     *                             only
+     * @param categories           the upper-case category wire strings to
+     *                             filter by (e.g. {@code "BUSINESS"}), or
+     *                             {@code null} for no category filter
+     * @param limit                the page size, or {@code null} to let the
+     *                             relay apply its default
+     * @param cursorToken          the start cursor for pagination, or
+     *                             {@code null} on the first page
+     * @param fetchStatusMetadata  {@code true} to request the optional
+     *                             {@code status_metadata} sub-selection
+     * @return an {@link Optional} containing the parsed response, or empty
+     *         if the relay returned no payload
+     *
+     * @implNote WAWebMexFetchNewsletterDirectorySearchResultsJob.mexFetchNewsletterDirectorySearchResults:
+     * WA Web's category-enum-to-wire-string mapping is the caller's
+     * responsibility.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexFetchNewsletterDirectorySearchResultsJob", exports = "mexFetchNewsletterDirectorySearchResults",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<FetchNewsletterDirectorySearchResultsMexResponse> searchNewsletterDirectory(String searchText, List<String> categories, Long limit, String cursorToken, boolean fetchStatusMetadata) {
+        var request = new FetchNewsletterDirectorySearchResultsMexRequest(searchText, categories, limit, cursorToken, fetchStatusMetadata);
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendNode(request);
+        return FetchNewsletterDirectorySearchResultsMexResponse.of(response);
+    }
+
+    /**
+     * Queries the newsletter directory landing categories together with a
+     * preview of featured channels for each category.
+     *
+     * <p>WA Web renders this query's response as the directory landing
+     * surface: each category is shown together with a handful of featured
+     * newsletters as a visual preview before the user drills down. The
+     * optional input is a serialised filter context — Cobalt threads it
+     * through opaquely.
+     *
+     * <p>Dispatches the
+     * {@link FetchNewsletterDirectoryCategoriesPreviewMexRequest mexFetchNewsletterDirectoryCategoriesPreview}
+     * MEX query.
+     *
+     * @param input the optional input variable forwarded to the relay; may
+     *              be {@code null}
+     * @return an {@link Optional} containing the parsed response, or empty
+     *         if the relay returned no payload
+     *
+     * @implNote WAWebMexFetchNewsletterDirectoryCategoriesPreviewJob.mexFetchNewsletterDirectoryCategoriesPreview:
+     * the relay-side {@code input} variable is opaque on the Cobalt side
+     * and is forwarded as-is.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexFetchNewsletterDirectoryCategoriesPreviewJob", exports = "mexFetchNewsletterDirectoryCategoriesPreview",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<FetchNewsletterDirectoryCategoriesPreviewMexResponse> queryNewsletterDirectoryCategoriesPreview(String input) {
+        var request = new FetchNewsletterDirectoryCategoriesPreviewMexRequest(input);
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendNode(request);
+        return FetchNewsletterDirectoryCategoriesPreviewMexResponse.of(response);
+    }
+
+    /**
+     * Queries the recommended-newsletters feed personalised for this
+     * account.
+     *
+     * <p>Dispatches the
+     * {@link FetchRecommendedNewslettersMexRequest mexFetchRecommendedNewsletters}
+     * MEX query.
+     *
+     * @param limit                the maximum number of recommended
+     *                             newsletters to return, or {@code null}
+     *                             to let the relay apply its default page
+     *                             size
+     * @param countryCodes         the ISO country codes used to scope the
+     *                             recommendation, or {@code null} to omit
+     *                             the field
+     * @param fetchStatusMetadata  {@code true} to request the optional
+     *                             {@code status_metadata} sub-selection
+     * @return an {@link Optional} containing the parsed response, or empty
+     *         if the relay returned no payload
+     *
+     * @implNote WAWebMexFetchRecommendedNewslettersJob.mexFetchRecommendedNewsletters:
+     * the personalisation lives entirely server-side; the client just
+     * supplies the page size and country scope.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexFetchRecommendedNewslettersJob", exports = "mexFetchRecommendedNewsletters",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<FetchRecommendedNewslettersMexResponse> queryRecommendedNewsletters(Long limit, List<String> countryCodes, boolean fetchStatusMetadata) {
+        var request = new FetchRecommendedNewslettersMexRequest(limit, countryCodes, fetchStatusMetadata);
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendNode(request);
+        return FetchRecommendedNewslettersMexResponse.of(response);
+    }
+
+    /**
+     * Queries newsletters that are similar to the given seed newsletter.
+     *
+     * <p>WA Web surfaces this as a "you might also like" rail on the
+     * channel page. The relay computes the similarity entirely server-side;
+     * the client only supplies the seed JID, the page size and an optional
+     * country scope.
+     *
+     * <p>Dispatches the
+     * {@link FetchSimilarNewslettersMexRequest mexFetchSimilarNewsletters}
+     * MEX query.
+     *
+     * @param newsletter           the non-{@code null} seed newsletter JID
+     * @param limit                the maximum number of similar newsletters
+     *                             to return, or {@code null} to let the
+     *                             relay apply its default
+     * @param countryCodes         the ISO country codes used to scope the
+     *                             recommendation, or {@code null} to omit
+     *                             the field
+     * @param fetchStatusMetadata  {@code true} to request the optional
+     *                             {@code status_metadata} sub-selection
+     * @return an {@link Optional} containing the parsed response, or empty
+     *         if the relay returned no payload
+     * @throws NullPointerException if {@code newsletter} is {@code null}
+     *
+     * @implNote WAWebMexFetchSimilarNewslettersJob.mexFetchSimilarNewsletters:
+     * mirrors the JS coalescing {@code n!=null?n:[]} for {@code countryCodes}
+     * (a {@code null} value is serialised as an empty array on the wire).
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexFetchSimilarNewslettersJob", exports = "mexFetchSimilarNewsletters",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<FetchSimilarNewslettersMexResponse> querySimilarNewsletters(Jid newsletter, Long limit, List<String> countryCodes, boolean fetchStatusMetadata) {
+        Objects.requireNonNull(newsletter, "newsletter cannot be null");
+        var request = new FetchSimilarNewslettersMexRequest(newsletter.toString(), limit, countryCodes, fetchStatusMetadata);
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendNode(request);
+        return FetchSimilarNewslettersMexResponse.of(response);
+    }
+
+    /**
+     * Queries the lightweight ("dehydrated") metadata for the given
+     * newsletter.
+     *
+     * <p>The dehydrated representation drops the heavy fields
+     * (full image, viewer-scoped settings) returned by
+     * {@link #queryNewsletter}. It is the right choice for surfaces that
+     * only render the newsletter name, handle and small picture.
+     *
+     * <p>Dispatches the
+     * {@link FetchNewsletterDehydratedMexRequest mexGetNewsletterDehydrated}
+     * MEX query.
+     *
+     * @param newsletter the non-{@code null} newsletter JID or invite key
+     * @param role       the viewer role to assert during the query, or
+     *                   {@code null} to omit the {@code view_role} field
+     * @return an {@link Optional} containing the parsed response, or empty
+     *         if the relay returned no payload
+     * @throws NullPointerException if {@code newsletter} is {@code null}
+     *
+     * @implNote WAWebMexFetchNewsletterDehydratedJob.mexGetNewsletterDehydrated:
+     * Cobalt always sets {@code fetch_wamo_sub} to {@code true} so callers
+     * receive the same wamo subscription metadata as
+     * {@link #queryNewsletters}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexFetchNewsletterDehydratedJob", exports = "mexGetNewsletterDehydrated",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<FetchNewsletterDehydratedMexResponse> queryNewsletterDehydrated(Jid newsletter, NewsletterViewerRole role) {
+        Objects.requireNonNull(newsletter, "newsletter cannot be null");
+        var request = new FetchNewsletterDehydratedMexRequest(newsletter, role != null ? role.name() : null, true);
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendNode(request);
+        return FetchNewsletterDehydratedMexResponse.of(response);
+    }
+
+    /**
+     * Queries the server-side ("plaintext") link preview for a URL pasted
+     * into a newsletter compose surface.
+     *
+     * <p>Newsletter messages cannot use the regular client-side link
+     * preview pipeline because the recipient anonymity guarantee forbids
+     * the client from fetching the target URL directly. Instead, the
+     * server acts as a trusted proxy: it unfurls the URL, returns the
+     * title/description plus an encrypted media handle that can be
+     * downloaded through the standard media pipeline, and reveals nothing
+     * about the recipient.
+     *
+     * <p>Dispatches the
+     * {@link FetchPlaintextLinkPreviewMexRequest} MEX query.
+     *
+     * @param url the non-{@code null} URL to unfurl
+     * @return an {@link Optional} containing the parsed response, or empty
+     *         if the relay returned no payload
+     * @throws NullPointerException if {@code url} is {@code null}
+     *
+     * @implNote WAWebMexFetchPlaintextLinkPreviewJobQuery.graphql: the
+     * {@code input} variable is the raw URL serialised as a JSON string;
+     * Cobalt forwards it unchanged.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexFetchPlaintextLinkPreviewJobQuery.graphql", exports = "params.id",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<FetchPlaintextLinkPreviewMexResponse> queryNewsletterLinkPreview(String url) {
+        Objects.requireNonNull(url, "url cannot be null");
+        var request = new FetchPlaintextLinkPreviewMexRequest(url);
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendNode(request);
+        return FetchPlaintextLinkPreviewMexResponse.of(response);
+    }
+
+    /**
+     * Checks whether the given URL belongs to a domain whose link previews
+     * may be rendered inside newsletter messages.
+     *
+     * <p>The WhatsApp backend maintains an allow-list of domains whose
+     * previews may be unfurled in newsletter posts. Compose surfaces call
+     * this query before publishing so they can warn the user when a
+     * disallowed domain would otherwise be silently stripped of its
+     * preview.
+     *
+     * <p>Dispatches the
+     * {@link FetchNewsletterIsDomainPreviewableMexRequest mexFetchNewsletterIsDomainPreviewable}
+     * MEX query.
+     *
+     * @param url the non-{@code null} URL whose domain is being validated
+     * @return {@code true} when the relay reports the domain as
+     *         previewable, {@code false} otherwise (including when the
+     *         domain is missing from the response or the response is
+     *         empty)
+     * @throws NullPointerException if {@code url} is {@code null}
+     *
+     * @implNote WAWebNewsletterIsDomainPreviewableAction:
+     * WA Web wraps the MEX call inside the
+     * {@code mexFetchNewsletterIsDomainPreviewable([t])} call site that
+     * passes a single domain. Cobalt mirrors that single-element call shape
+     * and collapses the per-entry response map into a {@code boolean}; the
+     * raw {@link FetchNewsletterIsDomainPreviewableMexResponse.UrlPreviews}
+     * list is not exposed because callers asking for a single domain only
+     * care about the binary verdict.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebNewsletterIsDomainPreviewableAction", exports = "isDomainPreviewableAction",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebMexFetchNewsletterIsDomainPreviewableJob", exports = "mexFetchNewsletterIsDomainPreviewable",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public boolean isNewsletterDomainPreviewable(String url) {
+        Objects.requireNonNull(url, "url cannot be null");
+        var request = new FetchNewsletterIsDomainPreviewableMexRequest(List.of(url));
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendNode(request);
+        return FetchNewsletterIsDomainPreviewableMexResponse.of(response)
+                .map(FetchNewsletterIsDomainPreviewableMexResponse::urlPreviews)
+                .orElse(List.of())
+                .stream()
+                .anyMatch(FetchNewsletterIsDomainPreviewableMexResponse.UrlPreviews::isPreviewable);
+    }
+
+    /**
+     * Queries the per-emoji list of senders that reacted to the given
+     * newsletter message.
+     *
+     * <p>Each reaction code (emoji) is reported together with its sender
+     * roster — useful when building the "who reacted with X" surface in
+     * the message details panel. The query returns reactions for every
+     * code present on the message; callers can filter to a specific code
+     * client-side.
+     *
+     * <p>Dispatches the
+     * {@link FetchNewsletterMessageReactionSenderListMexRequest mexFetchNewsletterMessageReactionSenderList}
+     * MEX query.
+     *
+     * @param newsletter      the non-{@code null} newsletter JID
+     * @param serverMessageId the server-assigned message id
+     * @return an {@link Optional} containing the parsed response, or empty
+     *         if the relay returned no payload
+     * @throws NullPointerException if {@code newsletter} is {@code null}
+     *
+     * @implNote WAWebMexFetchNewsletterMessageReactionSenderListJob.mexFetchNewsletterMessageReactionSenderList:
+     * the JS source takes the reaction emoji as part of the post-fetch
+     * filtering, not as a request variable; the relay always returns every
+     * reaction code at once. Cobalt therefore drops the emoji parameter
+     * suggested by the original task description and surfaces the full
+     * reactions list to the caller.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexFetchNewsletterMessageReactionSenderListJob", exports = "mexFetchNewsletterMessageReactionSenderList",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<FetchNewsletterMessageReactionSenderListMexResponse> queryNewsletterMessageReactionSenders(Jid newsletter, long serverMessageId) {
+        Objects.requireNonNull(newsletter, "newsletter cannot be null");
+        var request = new FetchNewsletterMessageReactionSenderListMexRequest(newsletter.toString(), serverMessageId);
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendNode(request);
+        return FetchNewsletterMessageReactionSenderListMexResponse.of(response);
+    }
+
+    /**
+     * Queries the list of voters on a newsletter poll, optionally narrowed
+     * to a single poll option.
+     *
+     * <p>Newsletter polls track voters per option using a base64-encoded
+     * option hash. Passing a non-{@code null} {@code voteHash} narrows the
+     * response to the senders of that specific option; passing
+     * {@code null} returns voters across every option of the poll.
+     *
+     * <p>Dispatches the
+     * {@link FetchNewsletterPollVotersMexRequest} MEX query.
+     *
+     * @param newsletter      the non-{@code null} newsletter JID hosting
+     *                        the poll
+     * @param serverMessageId the server-assigned id of the poll message
+     * @param limit           the maximum number of voter edges to return
+     * @param voteHash        the base64-encoded option hash to filter on,
+     *                        or {@code null} to return voters across every
+     *                        option
+     * @return an {@link Optional} containing the parsed response, or empty
+     *         if the relay returned no payload
+     * @throws NullPointerException if {@code newsletter} is {@code null}
+     *
+     * @implNote WAWebMexFetchNewsletterPollVotersJob.default: the JS
+     * source renders {@code server_id} as a base-10 string; Cobalt
+     * accepts a {@code long} and the underlying request layer handles
+     * the conversion.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexFetchNewsletterPollVotersJob", exports = "default",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<FetchNewsletterPollVotersMexResponse> queryNewsletterPollVoters(Jid newsletter, long serverMessageId, long limit, String voteHash) {
+        Objects.requireNonNull(newsletter, "newsletter cannot be null");
+        var request = new FetchNewsletterPollVotersMexRequest(newsletter.toString(), limit, serverMessageId, voteHash);
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendNode(request);
+        return FetchNewsletterPollVotersMexResponse.of(response);
+    }
+
+    /**
+     * Transfers ownership of the given newsletter to the supplied user.
+     *
+     * <p>Only the current owner may initiate the transfer. The target user
+     * must already have a registered WhatsApp account. After the mutation
+     * succeeds the original owner is demoted to admin and the supplied
+     * user becomes the sole owner.
+     *
+     * <p>Dispatches the
+     * {@link ChangeNewsletterOwnerMexRequest mexChangeNewsletterOwner}
+     * MEX mutation.
+     *
+     * @param newsletter the non-{@code null} newsletter JID whose ownership
+     *                   is being transferred
+     * @param newOwner   the non-{@code null} JID of the user receiving
+     *                   ownership
+     * @return an {@link Optional} containing the parsed response (which
+     *         echoes the newsletter id on success), or empty if the relay
+     *         returned no payload
+     * @throws NullPointerException if any argument is {@code null}
+     *
+     * @implNote WAWebMexChangeNewsletterOwnerJob.mexChangeNewsletterOwner:
+     * WA Web derives the {@code user_id} variable from the target wid via
+     * {@code WAWebLidMigrationUtils}. Cobalt instead forwards
+     * {@code newOwner.toString()} unchanged because LID migration is
+     * handled centrally by {@link LidMigrationService}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexChangeNewsletterOwnerJob", exports = "mexChangeNewsletterOwner",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<ChangeNewsletterOwnerMexResponse> transferNewsletterOwnership(Jid newsletter, Jid newOwner) {
+        Objects.requireNonNull(newsletter, "newsletter cannot be null");
+        Objects.requireNonNull(newOwner, "newOwner cannot be null");
+        var request = new ChangeNewsletterOwnerMexRequest(newsletter.toString(), newOwner.toString());
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendNode(request);
+        return ChangeNewsletterOwnerMexResponse.of(response);
+    }
+
+    /**
+     * Issues a newsletter administrator invitation to the given user.
+     *
+     * <p>The owner of a newsletter calls this mutation to invite another
+     * user to become a co-administrator. The invitation is recorded
+     * server-side and surfaces to the invitee through
+     * {@link #queryNewsletterPendingInvites}; the invitee can then accept
+     * via {@link #acceptNewsletterAdminInvite} or the inviter can revoke
+     * via {@link #revokeNewsletterAdminInvite}.
+     *
+     * <p>Dispatches the
+     * {@link CreateNewsletterAdminInviteMexRequest createNewsletterAdminInvite}
+     * MEX mutation.
+     *
+     * @param newsletter the non-{@code null} newsletter JID whose admin
+     *                   roster is being expanded
+     * @param invitee    the non-{@code null} JID of the user being invited
+     * @return an {@link Optional} containing the parsed response (carrying
+     *         the invitation expiration time), or empty if the relay
+     *         returned no payload
+     * @throws NullPointerException if any argument is {@code null}
+     *
+     * @implNote WAWebMexCreateNewsletterAdminInviteJob.createNewsletterAdminInvite:
+     * additional optional parameters (e.g. validity duration) suggested by
+     * the original task description are not surfaced by the WA Web JS
+     * source — Cobalt mirrors the two-argument JS function signature.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexCreateNewsletterAdminInviteJob", exports = "createNewsletterAdminInvite",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    public Optional<CreateNewsletterAdminInviteMexResponse> createNewsletterAdminInvite(Jid newsletter, Jid invitee) {
+        Objects.requireNonNull(newsletter, "newsletter cannot be null");
+        Objects.requireNonNull(invitee, "invitee cannot be null");
+        var request = new CreateNewsletterAdminInviteMexRequest(newsletter.toString(), invitee.toString());
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendNode(request);
+        return CreateNewsletterAdminInviteMexResponse.of(response);
+    }
+
+    /**
+     * Attaches the legally-required paid-partnership disclosure label to a
+     * newsletter message.
+     *
+     * <p>Monetised creators must disclose paid partnerships on sponsored
+     * messages. This mutation flags an existing message so the server
+     * renders the disclosure badge alongside it.
+     *
+     * <p>Dispatches the
+     * {@link NewsletterAddPaidPartnershipLabelMexRequest mexNewsletterAddPaidPartnershipLabelJob}
+     * MEX mutation.
+     *
+     * @param newsletter      the non-{@code null} newsletter JID hosting
+     *                        the message being labelled
+     * @param serverMessageId the non-{@code null} server-assigned message
+     *                        id of the post being labelled
+     * @return an {@link Optional} containing the parsed response (echoing
+     *         the newsletter id), or empty if the relay returned no
+     *         payload
+     * @throws NullPointerException if any argument is {@code null}
+     *
+     * @implNote WAWebMexNewsletterAddPaidPartnershipLabelJob.mexNewsletterAddPaidPartnershipLabelJob:
+     * the {@code server_id} variable is sent as a string on the wire to
+     * mirror the JS source; callers should pass the same canonical
+     * representation used elsewhere in the codebase for newsletter server
+     * ids.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexNewsletterAddPaidPartnershipLabelJob", exports = "mexNewsletterAddPaidPartnershipLabelJob",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    public Optional<NewsletterAddPaidPartnershipLabelMexResponse> addNewsletterPaidPartnershipLabel(Jid newsletter, String serverMessageId) {
+        Objects.requireNonNull(newsletter, "newsletter cannot be null");
+        Objects.requireNonNull(serverMessageId, "serverMessageId cannot be null");
+        var request = new NewsletterAddPaidPartnershipLabelMexRequest(newsletter.toString(), serverMessageId);
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendNode(request);
+        return NewsletterAddPaidPartnershipLabelMexResponse.of(response);
+    }
+
+    /**
+     * Logs a batch of newsletter exposure events for attribution and
+     * directory-ranking purposes.
+     *
+     * <p>While the user browses newsletters the client records lightweight
+     * exposure entries (newsletter JID + capability flag) and flushes them
+     * to the relay through this mutation. The backend uses the exposure
+     * signal to improve directory ranking; the client treats the response
+     * as a fire-and-forget acknowledgement.
+     *
+     * <p>Dispatches the
+     * {@link LogNewsletterExposuresMexRequest mexLogNewsletterExposures}
+     * MEX mutation.
+     *
+     * @param exposures the non-{@code null} batch of exposure entries; may
+     *                  be empty, in which case the relay still records
+     *                  the no-op call
+     * @throws NullPointerException            if {@code exposures} is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     *
+     * @implNote WAWebMexLogNewsletterExposuresJob.mexLogNewsletterExposures:
+     * WA Web ignores the response payload entirely (it does not even
+     * {@code return} the awaited value). Cobalt mirrors that contract by
+     * declaring this method {@code void} and dispatching through
+     * {@code sendNodeWithNoResponse}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexLogNewsletterExposuresJob", exports = "mexLogNewsletterExposures",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void logNewsletterExposures(List<NewsletterExposure> exposures) {
+        Objects.requireNonNull(exposures, "exposures cannot be null");
+        var request = new LogNewsletterExposuresMexRequest(exposures);
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        sendNodeWithNoResponse(request);
+    }
+
+    /**
+     * Files an appeal against an enforcement decision (for example a ban
+     * or content removal) recorded on the given report.
+     *
+     * <p>The appeal flow is surfaced to newsletter admins and channel
+     * owners after the server has taken an enforcement action. The reason
+     * is the free-form justification entered by the user; the report id
+     * identifies the underlying decision being contested.
+     *
+     * <p>Dispatches the {@link CreateReportAppealMexRequest createReportAppeal} MEX mutation.
+     *
+     * @param reason   the non-{@code null} free-form appeal justification
+     * @param reportId the non-{@code null} identifier of the report whose
+     *                 enforcement decision is being contested
+     * @return an {@link Optional} containing the parsed appeal record, or
+     *         empty if the relay returned no payload
+     * @throws NullPointerException if any argument is {@code null}
+     *
+     * @implNote WAWebMexCreateReportAppealJob.createReportAppeal: the
+     * mutation reads the {@code xwa2_create_channel_report_appeal_v2}
+     * payload (an {@code XWA2ChannelsReport}) which includes the appeal
+     * record and the nested {@code reported_content_data} channel
+     * metadata.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexCreateReportAppealJob", exports = "createReportAppeal",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<CreateReportAppealMexResponse> createNewsletterReportAppeal(String reason, String reportId) {
+        Objects.requireNonNull(reason, "reason cannot be null");
+        Objects.requireNonNull(reportId, "reportId cannot be null");
+        var request = new CreateReportAppealMexRequest(reason, reportId);
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendNode(request);
+        return CreateReportAppealMexResponse.of(response);
+    }
+
+    /**
+     * Queries the active enforcement actions recorded against the given
+     * newsletter.
+     *
+     * <p>The response groups enforcements by category (profile-picture
+     * deletions, suspensions, violating messages, geographic suspensions),
+     * each carrying the violation metadata, the appeal state and the
+     * localised explanatory copy. Newsletter admins use this query to
+     * inspect pending or resolved enforcement actions taken on their
+     * channel.
+     *
+     * <p>Dispatches the
+     * {@link FetchNewsletterEnforcementsMexRequest mexFetchNewsletterEnforcements}
+     * MEX query.
+     *
+     * @param newsletter the non-{@code null} newsletter JID
+     * @param locale     the BCP-47 locale tag used to localise the
+     *                   explanatory copy, or {@code null} to fall back to
+     *                   the relay's default
+     * @return an {@link Optional} containing the parsed response, or empty
+     *         if the relay returned no payload
+     * @throws NullPointerException if {@code newsletter} is {@code null}
+     *
+     * @implNote WAWebMexFetchNewsletterEnforcementsJob.mexFetchNewsletterEnforcements:
+     * the {@code locale} variable is forwarded as-is; the relay applies
+     * its default locale resolution when it is omitted.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexFetchNewsletterEnforcementsJob", exports = "mexFetchNewsletterEnforcements",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<FetchNewsletterEnforcementsMexResponse> queryNewsletterEnforcements(Jid newsletter, String locale) {
+        Objects.requireNonNull(newsletter, "newsletter cannot be null");
+        var request = new FetchNewsletterEnforcementsMexRequest(locale, newsletter.toString());
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendNode(request);
+        return FetchNewsletterEnforcementsMexResponse.of(response);
+    }
+
+    /**
+     * Queries the list of moderation reports filed against newsletters
+     * owned by this account.
+     *
+     * <p>This query supports the creator self-management surface where the
+     * owner inspects which reports have been filed, their current status
+     * and any associated appeal records. The relay returns every report
+     * filed against newsletters this account has authority over — there is
+     * no per-newsletter scoping variable.
+     *
+     * <p>Dispatches the
+     * {@link FetchNewsletterReportsMexRequest mexFetchNewsletterReports}
+     * MEX query.
+     *
+     * @return an {@link Optional} containing the parsed response, or empty
+     *         if the relay returned no payload
+     *
+     * @implNote WAWebMexFetchNewsletterReportsJob.mexFetchNewsletterReports:
+     * the underlying GraphQL operation accepts no variables — the
+     * authentication token implicitly scopes the query to the caller's
+     * managed newsletters.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexFetchNewsletterReportsJob", exports = "mexFetchNewsletterReports",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<FetchNewsletterReportsMexResponse> queryNewsletterReports() {
+        var request = new FetchNewsletterReportsMexRequest();
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendNode(request);
+        return FetchNewsletterReportsMexResponse.of(response);
+    }
+
+    /**
+     * Queries the analytics insights for the given newsletter.
+     *
+     * <p>Newsletter admins use this query to drive the analytics surface
+     * that exposes per-metric values such as views, reactions and
+     * follower-growth deltas. The metric identifiers follow the WA Web
+     * naming scheme; passing {@code null} requests every metric the relay
+     * is willing to expose to this caller.
+     *
+     * <p>Dispatches the
+     * {@link FetchNewsletterInsightsMexRequest mexFetchNewsletterInsights}
+     * MEX query.
+     *
+     * @param newsletter the non-{@code null} newsletter JID
+     * @param metrics    the list of metric identifiers to fetch values
+     *                   for, or {@code null} to omit the field and let the
+     *                   relay pick the default metric set
+     * @return an {@link Optional} containing the parsed response, or empty
+     *         if the relay returned no payload
+     * @throws NullPointerException if {@code newsletter} is {@code null}
+     *
+     * @implNote WAWebMexFetchNewsletterInsightsJob.mexFetchNewsletterInsights:
+     * Cobalt does not enumerate the metric identifiers as a typed enum —
+     * the JS source treats them as opaque strings and so does Cobalt.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexFetchNewsletterInsightsJob", exports = "mexFetchNewsletterInsights",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    public Optional<FetchNewsletterInsightsMexResponse> queryNewsletterInsights(Jid newsletter, List<String> metrics) {
+        Objects.requireNonNull(newsletter, "newsletter cannot be null");
+        var request = new FetchNewsletterInsightsMexRequest(newsletter.toString(), metrics);
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendNode(request);
+        return FetchNewsletterInsightsMexResponse.of(response);
+    }
+
+    /**
+     * Initiates a Data Subject Request (DSR) — the GDPR-mandated
+     * download/deletion flow — for the given entity (typically a
+     * newsletter the caller administers).
+     *
+     * <p>Despite being a "get info" operation the relay models this as a
+     * GraphQL mutation because submitting the request has side effects
+     * (it kicks off a backend export or deletion job). The response
+     * carries the generated reference number so the caller can later
+     * check progress through privacy-tooling surfaces.
+     *
+     * <p>Dispatches the {@link GetDsbInfoMexRequest mexGetDsbInfo} MEX mutation.
+     *
+     * @param entityId the non-{@code null} identifier of the entity whose
+     *                 DSR is being initiated
+     * @return an {@link Optional} containing the parsed response (carrying
+     *         the reference number), or empty if the relay returned no
+     *         payload
+     * @throws NullPointerException if {@code entityId} is {@code null}
+     *
+     * @implNote WAWebMexGetDsbInfoJob.mexGetDsbInfo: WA Web wraps the
+     * MEX call in the {@code WAWebGetDsbInfoJob.getDsbInfo} non-persisted
+     * UI-action job. Cobalt skips that job-layer wrapper because it only
+     * adds telemetry and a UI spinner, and dispatches the MEX call
+     * directly.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebGetDsbInfoJob", exports = "getDsbInfo",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebMexGetDsbInfoJob", exports = "mexGetDsbInfo",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<GetDsbInfoMexResponse> queryNewsletterDsbInfo(String entityId) {
+        Objects.requireNonNull(entityId, "entityId cannot be null");
+        var request = new GetDsbInfoMexRequest(entityId);
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendNode(request);
+        return GetDsbInfoMexResponse.of(response);
     }
 
     /**
@@ -4856,6 +6435,429 @@ public class WhatsAppClient {
     }
 
     /**
+     * Queries the WhatsApp username currently claimed by the authenticated
+     * account, together with the registration state and the recovery PIN
+     * hash.
+     *
+     * <p>Usernames are an alternative identifier introduced by WhatsApp to
+     * complement phone numbers. The response carries the assigned
+     * {@code username}, the registration {@code state} (such as
+     * {@code PENDING}, {@code ACTIVE}) and the {@code pin} hash used by
+     * recovery flows. The username, when set, is also implicitly published
+     * to peers through the standard MEX usync projection — see
+     * {@link #queryUserUsername(Jid)} for fetching another user's
+     * username.
+     *
+     * <p>Dispatches the {@link GetUsernameMexRequest mexGetUsernameQueryJob}
+     * MEX query.
+     *
+     * @return an {@link Optional} containing the parsed response, or empty
+     *         if the relay returned no payload (for example because no
+     *         username is set on the account)
+     * @throws WhatsAppSessionException.Closed if the socket is no longer
+     *                                         open
+     *
+     * @implNote WAWebMexGetUsernameJob.mexGetUsernameQueryJob: dispatches
+     * the {@code WAWebMexGetUsernameJobQuery} compiled GraphQL operation
+     * with no variables. Cobalt surfaces the parsed
+     * {@link GetUsernameMexResponse.UsernameInfo username_info} record so
+     * callers can inspect both the username string and the verification
+     * state without a second round-trip.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexGetUsernameJob", exports = "mexGetUsernameQueryJob",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<GetUsernameMexResponse> queryUsername() {
+        var request = new GetUsernameMexRequest();
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendNode(request);
+        return GetUsernameMexResponse.of(response);
+    }
+
+    /**
+     * Claims, updates or reserves the WhatsApp username for the
+     * authenticated account.
+     *
+     * <p>Setting a non-empty username assigns it to the account; the relay
+     * returns a status token (typically {@code "SUCCESS"}) which Cobalt
+     * surfaces through {@link SetUsernameMexResponse#isSuccess()}.
+     * Setting an empty or {@code null} input clears the entire variables
+     * payload — mirroring WA Web's
+     * {@code isStringNullOrEmpty(t.input) ? {} : t} short-circuit — and
+     * lets the relay decide how to react (the JS source uses this to issue
+     * the mutation as a probe without committing a username).
+     *
+     * <p>Dispatches the {@link SetUsernameMexRequest mexSetUsernameQueryJob}
+     * MEX mutation.
+     *
+     * @param username  the candidate username to claim, or {@code null} /
+     *                  empty to forward an empty variables payload
+     * @return an {@link Optional} containing the parsed response (whose
+     *         {@link SetUsernameMexResponse#isSuccess() isSuccess()}
+     *         convenience flag matches the WA Web return value), or empty
+     *         if the relay returned no payload
+     * @throws WhatsAppSessionException.Closed if the socket is no longer
+     *                                         open
+     *
+     * @implNote WAWebMexSetUsernameJob.mexSetUsernameQueryJob: WA Web also
+     * threads {@code reserved}, {@code session_id} and {@code source}
+     * variables that scope the mutation to a sign-up reservation flow.
+     * Cobalt's public API only exposes the {@code input} parameter because
+     * the other three are tied to WA Web's internal onboarding surface;
+     * callers that need the full set can construct the
+     * {@link SetUsernameMexRequest} directly and invoke
+     * {@link #sendNode(MexOperation.Request)}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexSetUsernameJob", exports = "mexSetUsernameQueryJob",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SetUsernameMexResponse> changeUsername(String username) {
+        // WAWebMexSetUsernameJob.mexSetUsernameQueryJob: only the input variable is exposed publicly;
+        // the reservation tuple (reserved/session_id/source) is part of the WA Web sign-up surface.
+        var request = new SetUsernameMexRequest(username, null, null, null);
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendNode(request);
+        return SetUsernameMexResponse.of(response);
+    }
+
+    /**
+     * Sets or rotates the recovery PIN attached to the WhatsApp username
+     * claimed by the authenticated account.
+     *
+     * <p>The recovery PIN backs the username so the account can be regained
+     * if the registered phone number becomes unavailable. WhatsApp's
+     * settings UI rotates this PIN through the
+     * {@code Account -> Username PIN} flow; callers that want to mirror
+     * the same affordance dispatch this mutation with the new PIN string.
+     *
+     * <p>Dispatches the
+     * {@link SetUsernameKeyMexRequest mexSetUsernameKeyQueryJob} MEX
+     * mutation.
+     *
+     * @param pin the new recovery PIN to register; {@code null} forwards an
+     *            empty {@code variables} object so the relay clears the PIN
+     * @return an {@link Optional} containing the parsed response, or empty
+     *         if the relay returned no payload
+     * @throws WhatsAppSessionException.Closed if the socket is no longer
+     *                                         open
+     *
+     * @implNote WAWebMexSetUsernameKeyJob.mexSetUsernameKeyQueryJob:
+     * dispatches the {@code WAWebMexSetUsernameKeyJobMutation} with a single
+     * {@code pin} variable. The relay echoes a {@code result} status token
+     * which Cobalt surfaces verbatim through
+     * {@link SetUsernameKeyMexResponse#result()}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexSetUsernameKeyJob", exports = "mexSetUsernameKeyQueryJob",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SetUsernameKeyMexResponse> changeUsernameRecoveryKey(String pin) {
+        var request = new SetUsernameKeyMexRequest(pin);
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendNode(request);
+        return SetUsernameKeyMexResponse.of(response);
+    }
+
+    /**
+     * Checks whether the given candidate username is available for
+     * registration on the WhatsApp relay.
+     *
+     * <p>This is the live-validation probe that powers the username picker
+     * UI: the response carries the wire-level {@code result} status token
+     * (typically {@code "SUCCESS"} when the candidate is free) and a list
+     * of suggested alternatives the relay generates when the candidate is
+     * taken or invalid. Callers that only need the boolean availability
+     * flag can short-circuit through
+     * {@link UsernameAvailabilityMexResponse#isUsernameAvailable()}.
+     *
+     * <p>Dispatches the
+     * {@link UsernameAvailabilityMexRequest mexCheckUsernameAvailabilityQueryJob}
+     * MEX query.
+     *
+     * @param candidate the candidate username to validate; {@code null}
+     *                  forwards an empty {@code variables} object,
+     *                  matching the WA Web behaviour when the input field
+     *                  is empty
+     * @return an {@link Optional} containing the parsed response, or empty
+     *         if the relay returned no payload
+     * @throws WhatsAppSessionException.Closed if the socket is no longer
+     *                                         open
+     *
+     * @implNote WAWebMexUsernameAvailability.mexCheckUsernameAvailabilityQueryJob:
+     * dispatches the {@code WAWebMexUsernameAvailabilityQuery} with the
+     * single {@code input} variable carrying the candidate username.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexUsernameAvailability", exports = "mexCheckUsernameAvailabilityQueryJob",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<UsernameAvailabilityMexResponse> checkUsernameAvailability(String candidate) {
+        var request = new UsernameAvailabilityMexRequest(candidate);
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendNode(request);
+        return UsernameAvailabilityMexResponse.of(response);
+    }
+
+    /**
+     * Publishes the authenticated user's ephemeral text status (the short
+     * "About"-line decoration shown next to the contact's name) and clears
+     * any existing entry when called with empty arguments.
+     *
+     * <p>The text status is the short message — optionally accompanied by
+     * an emoji — that the user broadcasts as their current status. The
+     * status expires automatically after {@code ephemeralDuration} elapses;
+     * passing a {@code null} or {@link Duration#ZERO} duration disables
+     * the auto-expiry.
+     *
+     * <p>Calling with both {@code text} and {@code emoji} {@code null} (or
+     * the text empty) clears the published status entirely; the duration
+     * is silently coerced to zero in that case to mirror the WA Web
+     * normalisation in
+     * {@code WAWebTextStatusParseUtils.createTextStatusObjectForUpdateRequest}.
+     *
+     * <p>Dispatches the
+     * {@link UpdateTextStatusMexRequest mexUpdateTextStatus} MEX mutation.
+     *
+     * @param text              the status body, or {@code null} / empty to
+     *                          clear the existing status
+     * @param emoji             the optional emoji decoration, or
+     *                          {@code null} to publish without an emoji
+     * @param ephemeralDuration the auto-expiry duration; {@code null} or
+     *                          {@link Duration#ZERO} disables auto-expiry.
+     *                          Must not be negative.
+     * @return an {@link Optional} containing the parsed response (whose
+     *         {@link UpdateTextStatusMexResponse#result() result} field
+     *         carries the relay's status token), or empty if the relay
+     *         returned no payload
+     * @throws IllegalArgumentException        if {@code ephemeralDuration}
+     *                                         is negative
+     * @throws WhatsAppSessionException.Closed if the socket is no longer
+     *                                         open
+     *
+     * @implNote WAWebMexUpdateTextStatusJob.mexUpdateTextStatus: WA Web's
+     * {@code WAWebTextStatusAction.setMyTextStatus} wraps this call in a
+     * toast/undo flow and a local cache update through
+     * {@code WAWebUpdateTextStatusForContact.updateTextStatusForContact}.
+     * Cobalt strips the UI side-effects and exposes the bare MEX dispatch;
+     * callers that want to mirror the optimistic local update should
+     * subscribe to the contact text-status listener and apply the same
+     * fields after this call returns success.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexUpdateTextStatusJob", exports = "mexUpdateTextStatus",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebTextStatusAction", exports = "setMyTextStatus",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<UpdateTextStatusMexResponse> changeTextStatus(String text, String emoji, Duration ephemeralDuration) {
+        if (ephemeralDuration != null && ephemeralDuration.isNegative()) {
+            throw new IllegalArgumentException("ephemeralDuration cannot be negative");
+        }
+        // WAWebTextStatusParseUtils.createTextStatusObjectForUpdateRequest: r = textStatusEphemeralDuration ?? 0
+        var seconds = ephemeralDuration == null ? 0L : ephemeralDuration.toSeconds();
+        var request = new UpdateTextStatusMexRequest(text, emoji, seconds);
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendNode(request);
+        return UpdateTextStatusMexResponse.of(response);
+    }
+
+    /**
+     * Fetches the ephemeral text-status entries published by one or more
+     * users on the WhatsApp relay.
+     *
+     * <p>Each returned {@link FetchTextStatusListMexResponse.Item entry}
+     * carries the author JID, the status text, the optional emoji, the
+     * author-relative last-update timestamp and the ephemeral duration so
+     * callers can render the same expiry countdown WA Web shows on the
+     * status surface. Authors that have not published any text status
+     * are omitted from the response.
+     *
+     * <p>Dispatches the
+     * {@link FetchTextStatusListMexRequest WAWebMexFetchTextStatusListJobQuery}
+     * MEX query.
+     *
+     * @param users the user JIDs whose text status should be fetched;
+     *              must not be {@code null} or contain {@code null}
+     *              entries. WA Web only ever batches a single user; this
+     *              overload preserves the wire-level batch shape so callers
+     *              can amortise the round-trip when querying a contact
+     *              roster
+     * @return the list of parsed status entries, never {@code null} and
+     *         empty when the relay returned no payload or none of the
+     *         queried users has a status set
+     * @throws NullPointerException            if {@code users} is
+     *                                         {@code null} or contains a
+     *                                         {@code null} entry
+     * @throws WhatsAppSessionException.Closed if the socket is no longer
+     *                                         open
+     *
+     * @implNote WAWebMexFetchTextStatusListJob.mexGetTextStatusList: WA Web
+     * dispatches a single-element {@code [{jid, last_update_time?,
+     * privacy_token?}]} array per call and surfaces the typed
+     * {@code {id, text, emoji, lastUpdateTime, ephemeralDurationSeconds}}
+     * record. Cobalt accepts a multi-user batch (the wire format already
+     * supports it), drops the privacy-token branch (gated behind
+     * {@code WAWebPrivacyGatingUtils.isProfileScrappingProtectionInMexFetchEnabled}
+     * which is not modelled in Cobalt) and exposes the parsed list
+     * verbatim so callers retain the per-user JID, ephemeral duration and
+     * timestamp without an extra projection.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexFetchTextStatusListJobQuery.graphql", exports = "params.id",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebMexFetchTextStatusListJob", exports = "mexGetTextStatusList",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public List<FetchTextStatusListMexResponse.Item> queryUserTextStatuses(List<Jid> users) {
+        Objects.requireNonNull(users, "users cannot be null");
+        // WAWebMexFetchTextStatusListJob.mexGetTextStatusList:
+        // input is a JSON array of {jid, last_update_time?, privacy_token?} entries.
+        // WA Web sends a single entry per call; Cobalt batches the supplied user list.
+        var inputBuilder = new StringBuilder("[");
+        for (var i = 0; i < users.size(); i++) {
+            var user = Objects.requireNonNull(users.get(i), "users cannot contain null entries");
+            if (i > 0) {
+                inputBuilder.append(',');
+            }
+            inputBuilder.append("{\"jid\":\"").append(user).append("\"}");
+        }
+        inputBuilder.append(']');
+        var request = new FetchTextStatusListMexRequest(inputBuilder.toString());
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendNode(request);
+        return FetchTextStatusListMexResponse.of(response)
+                .map(FetchTextStatusListMexResponse::items)
+                .orElseGet(List::of);
+    }
+
+    /**
+     * Queries the about-status line and update history for the given
+     * WhatsApp user.
+     *
+     * <p>The about status is the short biographical line (for example
+     * {@code "At the movies"} or {@code "Busy"}) that a user sets in their
+     * profile; it is distinct from the ephemeral text status shown on the
+     * status tab. This query returns the current text and, when available,
+     * the update log used to derive the "last updated" timestamp shown in
+     * the profile view.
+     *
+     * <p>Dispatches the
+     * {@link FetchAboutStatusMexRequest mexGetAbout} MEX query.
+     *
+     * @param user the non-{@code null} user JID to query
+     * @return an {@link Optional} containing the parsed response, or empty
+     *         if the relay returned no payload
+     * @throws NullPointerException            if {@code user} is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     *
+     * @implNote WAWebMexFetchAboutStatusJobQuery.graphql: WA Web reads the
+     * {@code items[].updates[]} array from
+     * {@code data.xwa2_users_about_status_query} and exposes the most
+     * recent update through {@code WAWebAboutStatusModel}. Cobalt is a
+     * library and exposes the raw GraphQL envelope; consumers can pick
+     * the entry they want.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexFetchAboutStatusJobQuery.graphql", exports = "params.id",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<FetchAboutStatusMexResponse> fetchAboutStatus(Jid user) {
+        Objects.requireNonNull(user, "user cannot be null");
+        var request = new FetchAboutStatusMexRequest(user.toString());
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendNode(request);
+        return FetchAboutStatusMexResponse.of(response);
+    }
+
+    /**
+     * Queries the privacy preferences (last seen visibility, profile
+     * picture visibility, about visibility, read receipts, etc.) for the
+     * authenticated account.
+     *
+     * <p>The response carries the full privacy settings record. These
+     * values drive the Settings → Privacy screen and are consulted by
+     * outgoing send paths to decide whether receipts and presence should
+     * be emitted.
+     *
+     * <p>Dispatches the
+     * {@link GetPrivacySettingsMexRequest fetchPrivacySettings} MEX query.
+     *
+     * @param input the WA Web {@code input} variable carrying the call
+     *              context; pass {@code null} to forward an empty
+     *              variables payload
+     * @return an {@link Optional} containing the parsed response, or empty
+     *         if the relay returned no payload
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     *
+     * @implNote WAWebMexGetPrivacySettingsQuery.graphql: WA Web's
+     * {@code WAWebMexGetPrivacyList.fetchPrivacyList} uses the same MEX
+     * pipeline. Cobalt exposes the GraphQL envelope and lets consumers
+     * project it into their own privacy-settings model.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexGetPrivacySettingsQuery.graphql", exports = "params.id",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<GetPrivacySettingsMexResponse> queryPrivacySettings(String input) {
+        var request = new GetPrivacySettingsMexRequest(input);
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendNode(request);
+        return GetPrivacySettingsMexResponse.of(response);
+    }
+
+    /**
+     * Retrieves the most recent linked-identity (LID) change for the
+     * authenticated account, returning the previous and current identifier
+     * pair.
+     *
+     * <p>LID is WhatsApp's non-phone account identifier used during the
+     * LID migration rollout. When the server rotates an account's LID,
+     * clients reconcile local storage by issuing this query to learn the
+     * old-to-new mapping so chat references can be updated without losing
+     * history.
+     *
+     * <p>Dispatches the
+     * {@link LidChangeNotificationMexRequest parseLidChangeNotification}
+     * MEX query.
+     *
+     * @return an {@link Optional} containing the parsed response, or empty
+     *         if the relay returned no payload
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     *
+     * @implNote WAWebMexLidChangeNotificationQuery.graphql: WA Web reads
+     * the {@code xwa2_notify_lid_change} record carrying the {@code old}
+     * and {@code new} scalar values; Cobalt exposes both through
+     * {@link LidChangeNotificationMexResponse}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexLidChangeNotificationQuery.graphql", exports = "params.id",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<LidChangeNotificationMexResponse> queryLidChangeNotification() {
+        var request = new LidChangeNotificationMexRequest();
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendNode(request);
+        return LidChangeNotificationMexResponse.of(response);
+    }
+
+    /**
+     * Queries the current OHAI (Oblivious HTTP Authentication for
+     * Initiation) key configuration list issued by the WhatsApp relay.
+     *
+     * <p>OHAI is the HPKE key bundle used to encapsulate ACS (Account
+     * Centre Service) requests sent by the OHAI client. The relay rotates
+     * the key set periodically and clients are expected to refetch the
+     * configuration when their cached value expires.
+     *
+     * <p>Dispatches the
+     * {@link FetchOHAIKeyConfigMexRequest mexFetchOHAIKeyConfig} MEX
+     * query.
+     *
+     * @return an {@link Optional} containing the parsed response, or empty
+     *         if the relay returned no payload
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     *
+     * @implNote WAWebFetchOHAIKeyConfigJob.mexFetchOHAIKeyConfig: WA Web
+     * reduces the returned {@code ohai_configs} array down to the entry
+     * with the earliest {@code expiration_date} before caching it through
+     * {@code WAWebOHAIUserPrefs.setOHAIKeyConfig}. Cobalt is a library
+     * and exposes the full configuration list so callers can pick the
+     * active entry themselves.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebFetchOHAIKeyConfigJob", exports = "mexFetchOHAIKeyConfig",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<FetchOHAIKeyConfigMexResponse> fetchOhaiKeyConfig() {
+        var request = new FetchOHAIKeyConfigMexRequest();
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendNode(request);
+        return FetchOHAIKeyConfigMexResponse.of(response);
+    }
+
+    /**
      * Queries the first page of products listed in the WhatsApp Business
      * catalog owned by the given business JID.
      *
@@ -4871,7 +6873,7 @@ public class WhatsAppClient {
      *
      * @implNote WAWebQueryCatalog: dispatches the
      * {@code WAWebQueryCatalogQuery.graphql} operation through
-     * {@link QueryCatalogMex}. WA Web's owner/guest divergence is not
+     * {@link QueryCatalogMexRequest}. WA Web's owner/guest divergence is not
      * observable at this layer since both paths issue the same GraphQL
      * document and return the same shape.
      */
@@ -4909,7 +6911,7 @@ public class WhatsAppClient {
      * @implNote WAWebQueryCatalog: only the first page is requested; the
      * {@code paging.after} cursor returned by the relay is discarded.
      * Callers wanting full pagination should consume
-     * {@link QueryCatalogMex.Response} directly.
+     * {@link QueryCatalogMexResponse} directly.
      */
     @WhatsAppWebExport(moduleName = "WAWebQueryCatalog", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -4921,7 +6923,7 @@ public class WhatsAppClient {
             throw new IllegalArgumentException("limit must be positive");
         }
         // WAWebQueryCatalog.default: the WA Web request uses the WID's canonical string form as the jid variable
-        var request = new QueryCatalogMex.Request(
+        var request = new QueryCatalogMexRequest(
                 businessJid.toString(),
                 limit,
                 DEFAULT_CATALOG_IMAGE_WIDTH,
@@ -4929,11 +6931,11 @@ public class WhatsAppClient {
                 null
         );
         // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
-        var response = sendMexNode(request.toNode(), QueryCatalogMex.QUERY_ID, "queryCatalog", false);
+        var response = sendNode(request);
         // WAWebCatalogEventLogger.createCatalogEventLogger(GET_CATALOG): emit GraphqlCatalogRequest WAM event based on response
         logGraphqlCatalogRequest(response, GraphqlCatalogEndpoint.GET_CATALOG);
-        return QueryCatalogMex.Response.of(response)
-                .map(QueryCatalogMex.Response::products)
+        return QueryCatalogMexResponse.of(response)
+                .map(QueryCatalogMexResponse::products)
                 .orElseGet(List::of);
     }
 
@@ -4955,7 +6957,7 @@ public class WhatsAppClient {
      *
      * @implNote WAWebQueryProductCollections: dispatches the
      * {@code WAWebQueryProductCollectionsQuery.graphql} operation through
-     * {@link QueryProductCollectionsMex}.
+     * {@link QueryProductCollectionsMexRequest}.
      */
     @WhatsAppWebExport(moduleName = "WAWebQueryProductCollections", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -4973,7 +6975,7 @@ public class WhatsAppClient {
      * {@code xwa_product_catalog_get_collections.collections} array. The
      * {@code item_limit} (inner products per collection) is fixed at the
      * WA Web default of {@code 100}; callers that need a different cap
-     * should instantiate {@link QueryProductCollectionsMex.Request}
+     * should instantiate {@link QueryProductCollectionsMexRequest}
      * directly.
      *
      * @param businessJid the non-{@code null} business JID whose
@@ -4990,7 +6992,7 @@ public class WhatsAppClient {
      * @implNote WAWebQueryProductCollections: only the first page is
      * requested; the {@code paging.after} cursor returned by the relay
      * is discarded. Callers wanting full pagination should consume
-     * {@link QueryProductCollectionsMex.Response} directly.
+     * {@link QueryProductCollectionsMexResponse} directly.
      */
     @WhatsAppWebExport(moduleName = "WAWebQueryProductCollections", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -4999,22 +7001,777 @@ public class WhatsAppClient {
         if (limit <= 0) {
             throw new IllegalArgumentException("limit must be positive");
         }
-        // WAWebQueryProductCollections.default: item_limit defaults to 100 in the WA Web storefront
-        var request = new QueryProductCollectionsMex.Request(
-                businessJid.toString(),
-                limit,
-                PRODUCT_COLLECTION_ITEM_LIMIT,
-                DEFAULT_CATALOG_IMAGE_WIDTH,
-                DEFAULT_CATALOG_IMAGE_HEIGHT,
-                null
+        // WAWebQueryProductCollections.default: item_limit defaults to 100 in the WA Web storefront.
+        // The 10-arg constructor mirrors the JS request.collections object verbatim:
+        //   {biz_jid, collection_limit, item_limit, after, width, height,
+        //    direct_connection_encrypted_info, variant_info_fields,
+        //    variant_thumbnail_height, variant_thumbnail_width}.
+        var request = new QueryProductCollectionsMexRequest(
+                businessJid.toString(),         // biz_jid: a.toString()
+                limit,                           // collection_limit: String(s)
+                PRODUCT_COLLECTION_ITEM_LIMIT,   // item_limit: String(c)
+                null,                            // after: r (no pagination cursor)
+                DEFAULT_CATALOG_IMAGE_WIDTH,     // width: String(_)
+                DEFAULT_CATALOG_IMAGE_HEIGHT,    // height: String(l)
+                null,                            // direct_connection_encrypted_info: i
+                null,                            // variant_info_fields: d
+                null,                            // variant_thumbnail_height: m != null ? String(m) : null
+                null                             // variant_thumbnail_width: p != null ? String(p) : null
         );
         // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
-        var response = sendMexNode(request.toNode(), QueryProductCollectionsMex.QUERY_ID, "queryProductCollections", false);
+        var response = sendNode(request);
         // WAWebCatalogEventLogger.createCatalogEventLogger(GET_COLLECTIONS): emit GraphqlCatalogRequest WAM event based on response
         logGraphqlCatalogRequest(response, GraphqlCatalogEndpoint.GET_COLLECTIONS);
-        return QueryProductCollectionsMex.Response.of(response)
-                .map(QueryProductCollectionsMex.Response::collections)
+        return QueryProductCollectionsMexResponse.of(response)
+                .map(QueryProductCollectionsMexResponse::collections)
                 .orElseGet(List::of);
+    }
+
+    /**
+     * Fetches the freshly-priced detail of a specific subset of products
+     * from a WhatsApp Business catalog.
+     *
+     * <p>WhatsApp Business catalogs are large — full pagination through
+     * {@link #queryBusinessCollections(Jid, int)} is the right approach
+     * when browsing — but interactive flows usually need to refresh just a
+     * handful of products at a time. The classic case is a chat-side
+     * shopping cart: when the user opens a saved cart, the application
+     * looks up only the product ids stored locally and pulls the current
+     * server-side state (price, availability, review status, image,
+     * description) so the cart reflects out-of-stock changes or
+     * post-publish edits the merchant has applied since.
+     *
+     * <p>The returned image dimensions are honoured by the server's CDN,
+     * so callers should pass the exact pixel size they intend to render
+     * the thumbnail at to avoid wasted bandwidth. Products the server
+     * could not resolve (typically because the merchant deleted them or
+     * because the supplied product id was issued by a different catalog)
+     * are silently dropped from the result instead of being surfaced as
+     * placeholder entries.
+     *
+     * @param catalogWid                    the JID of the catalog owner;
+     *                                      never {@code null}
+     * @param productIds                    the product ids to fetch in
+     *                                      server-side order; never
+     *                                      {@code null}, must be non-empty
+     * @param width                         the desired thumbnail width in
+     *                                      pixels
+     * @param height                        the desired thumbnail height
+     *                                      in pixels
+     * @param directConnectionEncryptedInfo the opaque direct-connection
+     *                                      envelope used by merchants who
+     *                                      enrolled in the encrypted
+     *                                      direct-connection feature;
+     *                                      pass {@code null} to fetch the
+     *                                      catalog without a
+     *                                      direct-connection binding
+     * @return the parsed product entries in server order; never
+     *         {@code null}, possibly empty when every requested product
+     *         id was unresolvable
+     * @throws NullPointerException            if any non-nullable
+     *                                         parameter is {@code null}
+     * @throws IllegalArgumentException        if {@code productIds} is
+     *                                         empty
+     * @throws WhatsAppSessionException.Closed if the socket is no longer
+     *                                         open
+     * @throws NoSuchElementException          if the server's reply is
+     *                                         malformed
+     *
+     * @implNote WAWebQueryProductListCatalogJob.QueryProductListCatalog
+     *           dispatches the legacy IQ; the parser walks every
+     *           {@code <product>} child via
+     *           {@code WAWebBizCatalogParseProduct.parseProductNode}
+     *           which fills in the full WA Web product schema (variants,
+     *           compliance, sale price, etc.). Cobalt's
+     *           {@link BusinessCatalogEntry} only exposes a subset of
+     *           fields, so the parsing helper inlined here mirrors the
+     *           exposed-field projection rather than duplicating WA Web's
+     *           full schema. The
+     *           {@code WAWebBizGatingUtils.isGraphQLForGetPublicKeyEnabled}
+     *           and persisted-job branches are intentionally skipped:
+     *           Cobalt always takes the legacy IQ path so calling code
+     *           does not need to negotiate gating or persistence.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebQueryProductListCatalogJob", exports = "QueryProductListCatalog",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public List<BusinessCatalogEntry> queryBusinessCatalogProducts(Jid catalogWid,
+                                                                   List<String> productIds,
+                                                                   int width,
+                                                                   int height,
+                                                                   byte[] directConnectionEncryptedInfo) {
+        Objects.requireNonNull(catalogWid, "catalogWid cannot be null");
+        Objects.requireNonNull(productIds, "productIds cannot be null");
+        if (productIds.isEmpty()) {
+            throw new IllegalArgumentException("productIds must not be empty");
+        }
+        // WAWebQueryProductListCatalogJob.d: builds product children: l.map(e => wap("product", null, wap("id", null, e)))
+        var children = new ArrayList<Node>();
+        for (var productId : productIds) {
+            Objects.requireNonNull(productId, "productIds element cannot be null");
+            var idNode = new NodeBuilder()
+                    .description("id")
+                    .content(productId)
+                    .build();
+            children.add(new NodeBuilder()
+                    .description("product")
+                    .content(idNode)
+                    .build());
+        }
+        // WAWebQueryProductListCatalogJob.d: trailing <width>/<height>/<direct_connection_encrypted_info> filtered via filterNulls
+        children.add(new NodeBuilder()
+                .description("width")
+                .content(Integer.toString(width)) // WAWebQueryProductListCatalogJob: t.wap("width", null, s.toString())
+                .build());
+        children.add(new NodeBuilder()
+                .description("height")
+                .content(Integer.toString(height)) // WAWebQueryProductListCatalogJob: t.wap("height", null, i.toString())
+                .build());
+        if (directConnectionEncryptedInfo != null) {
+            // WAWebQueryProductListCatalogJob.d: a != null ? wap("direct_connection_encrypted_info", null, a) : null
+            children.add(new NodeBuilder()
+                    .description("direct_connection_encrypted_info")
+                    .content(directConnectionEncryptedInfo)
+                    .build());
+        }
+        var productListNode = new NodeBuilder()
+                .description("product_list")
+                .attribute("jid", catalogWid) // WAWebQueryProductListCatalogJob.d: jid: USER_JID(createWid(n))
+                .content(children)
+                .build();
+        var iqNode = new NodeBuilder()
+                .description("iq")
+                .attribute("xmlns", "w:biz:catalog") // WAWebQueryProductListCatalogJob.d: xmlns: "w:biz:catalog"
+                .attribute("to", JidServer.user()) // WAWebQueryProductListCatalogJob.d: to: S_WHATSAPP_NET
+                .attribute("type", "get") // WAWebQueryProductListCatalogJob.d: type: "get"
+                .content(productListNode);
+        var response = sendNode(iqNode);
+        // WAWebQueryProductListCatalogJob.productListResponse: t = e.child("product_list"); forEachChildWithTag("product", ...)
+        var productListResult = response.getChild("product_list")
+                .orElseThrow(() -> new NoSuchElementException("Missing <product_list> in product-list response"));
+        var entries = new ArrayList<BusinessCatalogEntry>();
+        for (var productNode : productListResult.getChildren("product")) {
+            // WAWebQueryProductListCatalogJob.productListResponse:
+            //   if (!product.maybeChild("id")) skip; else if (status === INVALID_PRODUCT_TOKEN) push {id, status} else parseProductNode
+            if (productNode.getChild("id").isEmpty()) {
+                continue;
+            }
+            var status = productNode.getChild("status").flatMap(Node::toContentString).orElse(null);
+            if ("INVALID_PRODUCT_TOKEN".equals(status)) {
+                // ADAPTED: BusinessCatalogEntry has no per-entry status field, so invalid tokens are dropped from the result list.
+                continue;
+            }
+            parseCatalogProductNode(productNode).ifPresent(entries::add);
+        }
+        return Collections.unmodifiableList(entries);
+    }
+
+    /**
+     * Parses a single {@code <product>} child returned by the
+     * product-list IQ into a {@link BusinessCatalogEntry}.
+     *
+     * <p>Mirrors the subset of fields surfaced by
+     * {@link BusinessCatalogEntry}; the WA Web parser additionally
+     * collects variant info, video assets, sale prices, compliance info
+     * and an opaque shimmed-URL signature, none of which are exposed in
+     * Cobalt's catalog model yet.
+     *
+     * @param productNode the {@code <product>} stanza child
+     * @return the parsed entry, or {@link Optional#empty()} when the
+     *         child carried no {@code <id>}
+     *
+     * @implNote WAWebBizCatalogParseProduct.parseProductNode: Cobalt
+     *           keeps only the fields exposed by
+     *           {@link BusinessCatalogEntry} (id, name, description,
+     *           url, retailer_id, currency, price, max_available
+     *           hidden flag, availability, review status and the first
+     *           image). The remaining WA Web fields are intentionally
+     *           dropped to avoid model drift.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebBizCatalogParseProduct", exports = "parseProductNode",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private Optional<BusinessCatalogEntry> parseCatalogProductNode(Node productNode) {
+        var idNode = productNode.getChild("id").orElse(null);
+        if (idNode == null) {
+            return Optional.empty();
+        }
+        var id = idNode.toContentString().orElse("");
+        // WAWebBizCatalogParseProduct.parseProductNode: l = url || ""; the parser falls back to an empty string
+        URI url = null;
+        var urlString = productNode.getChild("url")
+                .flatMap(Node::toContentString)
+                .filter(s -> !s.isEmpty())
+                .orElse(null);
+        if (urlString != null) {
+            try {
+                url = URI.create(urlString);
+            } catch (IllegalArgumentException ignored) {
+                // url stays null
+            }
+        }
+        // WAWebBizCatalogParseProduct.parseProductNode: u = name asserted via child(); content defaults to ""
+        var name = productNode.getChild("name").flatMap(Node::toContentString).orElse("");
+        // WAWebBizCatalogParseProduct.parseProductNode: g = description maybeChild contentString or ""
+        var description = productNode.getChild("description").flatMap(Node::toContentString).orElse("");
+        // WAWebBizCatalogParseProduct.parseProductNode: M = retailer_id maybeChild contentString or ""
+        var retailerId = productNode.getChild("retailer_id").flatMap(Node::toContentString).orElse("");
+        // WAWebBizCatalogParseProduct.parseProductNode: $ = currency maybeChild contentString
+        var currency = productNode.getChild("currency").flatMap(Node::toContentString).orElse(null);
+        // WAWebBizCatalogParseProduct.parseProductNode: N = price maybeChild contentString
+        long price = 0L;
+        var priceString = productNode.getChild("price").flatMap(Node::toContentString).orElse(null);
+        if (priceString != null && !priceString.isEmpty()) {
+            try {
+                price = Long.parseLong(priceString);
+            } catch (NumberFormatException ignored) {
+                // price stays 0L
+            }
+        }
+        // WAWebBizCatalogParseProduct.parseProductNode: A = is_hidden attr === "true"
+        var hidden = productNode.getAttributeAsString("is_hidden").map("true"::equals).orElse(false);
+        // WAWebBizCatalogParseProduct.parseProductNode: d = availability attr or ProductAvailability.UNKNOWN
+        BusinessItemAvailability availability = null;
+        var availabilityRaw = productNode.getAttributeAsString("availability").orElse(null);
+        if (availabilityRaw != null) {
+            availability = BusinessItemAvailability.ofName(availabilityRaw.toLowerCase().replace('_', ' ')).orElse(null);
+        }
+        // WAWebBizCatalogParseProduct.parseProductNode: I = status_info.child("status").contentString() || "APPROVED"
+        BusinessReviewStatus reviewStatus = null;
+        var statusString = productNode.getChild("status_info")
+                .flatMap(statusInfo -> statusInfo.getChild("status"))
+                .flatMap(Node::toContentString)
+                .orElse(null);
+        if (statusString != null) {
+            reviewStatus = BusinessReviewStatus.ofName(statusString).orElse(null);
+        }
+        // WAWebBizCatalogParseProduct.parseProductNode: image_cdn_urls.full = first <image>'s <original_image_url>
+        URI encryptedImage = null;
+        var firstImage = productNode.getChild("media")
+                .flatMap(media -> media.getChild("image"))
+                .orElse(null);
+        if (firstImage != null) {
+            var originalUrl = firstImage.getChild("original_image_url")
+                    .flatMap(Node::toContentString)
+                    .filter(s -> !s.isEmpty())
+                    .orElse(null);
+            if (originalUrl != null) {
+                try {
+                    encryptedImage = URI.create(originalUrl);
+                } catch (IllegalArgumentException ignored) {
+                    // encryptedImage stays null
+                }
+            }
+        }
+        var entry = new BusinessCatalogEntryBuilder()
+                .id(id)
+                .encryptedImage(encryptedImage)
+                .reviewStatus(reviewStatus)
+                .availability(availability)
+                .name(name)
+                .sellerId(retailerId)
+                .uri(url)
+                .description(description)
+                .price(price)
+                .currency(currency)
+                .hidden(hidden)
+                .build();
+        return Optional.of(entry);
+    }
+
+    /**
+     * Asks a WhatsApp Business catalog whether it can fulfil orders to a
+     * given postcode.
+     *
+     * <p>Some merchants restrict shipping or service area to specific
+     * postcodes — a food-delivery business might only operate in certain
+     * neighbourhoods, a courier might decline rural pickups. WhatsApp's
+     * cart UI calls this entry point before letting the buyer commit to a
+     * cart so the user sees an "out of service area" hint immediately
+     * rather than after placing the order. A Cobalt-driven storefront
+     * mirrors that pre-flight check by passing the buyer's postcode
+     * (encrypted into the direct-connection envelope using the merchant's
+     * direct-connection key) and consuming the verdict.
+     *
+     * <p>The verdict is one of {@link BusinessPostcodeVerificationResult#SUCCESS},
+     * {@link BusinessPostcodeVerificationResult#INVALID_POSTCODE} or
+     * {@link BusinessPostcodeVerificationResult#UNSERVICEABLE_LOCATION}; the
+     * accompanying optional {@code encryptedLocationName} carries the
+     * resolved area name (encrypted under the same direct-connection key)
+     * that callers can decrypt and surface as "Delivers to <area>" in the
+     * cart UI.
+     *
+     * @param businessJid                   the JID of the business
+     *                                      whose service area is being
+     *                                      tested; never {@code null}
+     * @param directConnectionEncryptedInfo the opaque direct-connection
+     *                                      envelope carrying the
+     *                                      buyer-side postcode; never
+     *                                      {@code null}
+     * @return the parsed verification verdict and the optional
+     *         encrypted location name; never {@code null}
+     * @throws NullPointerException            if any argument is
+     *                                         {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer
+     *                                         open
+     * @throws NoSuchElementException          if the server returned an
+     *                                         unrecognised verdict
+     *
+     * @implNote WAWebVerifyPostcodeJob.VerifyPostcode dispatches the
+     *           legacy IQ; the parser asserts the verdict against the
+     *           three accepted values and otherwise throws a
+     *           {@code ServerStatusCodeError(500)}. Cobalt drops the
+     *           {@code WAWebBizGatingUtils.isGraphQLForVerifyPostcodeEnabled}
+     *           gate (the persisted-job GraphQL fallback) and always
+     *           takes the legacy IQ branch.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebVerifyPostcodeJob", exports = "VerifyPostcode",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public BusinessPostcodeVerification verifyBusinessPostcode(Jid businessJid, byte[] directConnectionEncryptedInfo) {
+        Objects.requireNonNull(businessJid, "businessJid cannot be null");
+        Objects.requireNonNull(directConnectionEncryptedInfo, "directConnectionEncryptedInfo cannot be null");
+        // WAWebVerifyPostcodeJob.s: wap("verify_postcode", {biz_jid: USER_JID(createWid(n))},
+        //                              wap("direct_connection_encrypted_info", null, a))
+        var directConnectionNode = new NodeBuilder()
+                .description("direct_connection_encrypted_info")
+                .content(directConnectionEncryptedInfo)
+                .build();
+        var verifyPostcodeNode = new NodeBuilder()
+                .description("verify_postcode")
+                .attribute("biz_jid", businessJid) // WAWebVerifyPostcodeJob.s: biz_jid: USER_JID(createWid(n))
+                .content(directConnectionNode)
+                .build();
+        var iqNode = new NodeBuilder()
+                .description("iq")
+                .attribute("xmlns", "w:biz:catalog") // WAWebVerifyPostcodeJob.s: xmlns: "w:biz:catalog"
+                .attribute("to", JidServer.user()) // WAWebVerifyPostcodeJob.s: to: S_WHATSAPP_NET
+                .attribute("type", "get") // WAWebVerifyPostcodeJob.s: type: "get"
+                .content(verifyPostcodeNode);
+        var response = sendNode(iqNode);
+        // WAWebVerifyPostcodeJob.productResponse: t = e.child("result_code"); n = e.maybeChild("encrypted_location_name")
+        var resultCodeNode = response.getChild("result_code")
+                .orElseThrow(() -> new NoSuchElementException("Missing <result_code> in verify-postcode response"));
+        var resultCodeWire = resultCodeNode.toContentString()
+                .orElseThrow(() -> new NoSuchElementException("Empty <result_code> in verify-postcode response"));
+        // WAWebVerifyPostcodeJob.productResponse: !["invalid_postcode","unserviceable_location","success"].includes(a)
+        //                                          -> throw ServerStatusCodeError(500)
+        var result = BusinessPostcodeVerificationResult.ofWire(resultCodeWire)
+                .orElseThrow(() -> new NoSuchElementException("Unrecognised result_code: " + resultCodeWire));
+        var encryptedLocationName = response.getChild("encrypted_location_name")
+                .flatMap(Node::toContentString)
+                .orElse(null);
+        return new BusinessPostcodeVerificationBuilder()
+                .result(result)
+                .encryptedLocationName(encryptedLocationName)
+                .build();
+    }
+
+    /**
+     * Re-prices a business shopping cart against the merchant's current
+     * catalog and returns the authoritative cart total.
+     *
+     * <p>WhatsApp shopping carts are assembled client-side: the user adds
+     * line items from the catalog browser and the cart's local view tracks
+     * each line's price as it was at add time. Before letting the user
+     * place the order, WhatsApp's UI re-runs the cart through this
+     * endpoint so prices, stock counts, sale-price windows and product
+     * availability all reflect the merchant's current state — protecting
+     * both sides from stale-cart confusion when the merchant edits the
+     * catalog between cart assembly and checkout. Cobalt-driven cart UIs
+     * should call this immediately before the "place order" action and
+     * render the freshly-priced total back to the user for confirmation.
+     *
+     * <p>The response includes the updated cart-wide total and one
+     * per-line entry with the rebuilt name, price, currency, media,
+     * remaining stock count and any active sale-price window — enough to
+     * fully re-render the cart without a separate catalog fetch. Lines
+     * whose product was removed from the catalog will surface their
+     * server-side status code (e.g. unavailable) so the UI can grey them
+     * out.
+     *
+     * @param bizJid                        the JID of the business
+     *                                      whose cart is being
+     *                                      refreshed; never {@code null}
+     * @param productIds                    the product ids on the cart
+     *                                      to reprice in server-side
+     *                                      order; never {@code null},
+     *                                      must be non-empty
+     * @param width                         the desired thumbnail width
+     *                                      in pixels
+     * @param height                        the desired thumbnail height
+     *                                      in pixels
+     * @param directConnectionEncryptedInfo the opaque direct-connection
+     *                                      envelope used by merchants
+     *                                      enrolled in the encrypted
+     *                                      direct-connection feature;
+     *                                      pass {@code null} when the
+     *                                      merchant does not require
+     *                                      one
+     * @return the freshly-rebuilt cart, with up-to-date prices and
+     *         availability for every line; never {@code null}
+     * @throws NullPointerException            if any non-nullable
+     *                                         parameter is {@code null}
+     * @throws IllegalArgumentException        if {@code productIds} is
+     *                                         empty
+     * @throws WhatsAppSessionException.Closed if the socket is no longer
+     *                                         open
+     * @throws NoSuchElementException          if the server's reply is
+     *                                         malformed
+     *
+     * @implNote WAWebBizRefreshCartJob.refreshCart dispatches the legacy
+     *           IQ via {@code c(...)}. The
+     *           {@code WAWebBizGatingUtils.commerceFeaturesDisabledBySanctions}
+     *           early-throw and the HTTP 451 error path are intentionally
+     *           skipped: Cobalt's pluggable error-handler model lets the
+     *           caller install a {@link WhatsAppClientErrorHandler} to
+     *           react to those conditions, whereas the WA Web client
+     *           hard-codes the gating in-line. The
+     *           {@code WAWebBizGatingUtils.graphQLForRefreshCartEnabled}
+     *           gate is also collapsed; Cobalt always takes the legacy
+     *           IQ branch.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebBizRefreshCartJob", exports = "refreshCart",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public BusinessRefreshedCart refreshBusinessCart(Jid bizJid,
+                                             List<String> productIds,
+                                             int width,
+                                             int height,
+                                             byte[] directConnectionEncryptedInfo) {
+        Objects.requireNonNull(bizJid, "bizJid cannot be null");
+        Objects.requireNonNull(productIds, "productIds cannot be null");
+        if (productIds.isEmpty()) {
+            throw new IllegalArgumentException("productIds must not be empty");
+        }
+        // WAWebBizRefreshCartJob.c: t.map(e => wap("product", null, wap("id", null, e)))
+        var children = new ArrayList<Node>();
+        for (var productId : productIds) {
+            Objects.requireNonNull(productId, "productIds element cannot be null");
+            var idNode = new NodeBuilder()
+                    .description("id")
+                    .content(productId)
+                    .build();
+            children.add(new NodeBuilder()
+                    .description("product")
+                    .content(idNode)
+                    .build());
+        }
+        // WAWebBizRefreshCartJob.c: wap("image_dimensions", null, wap("width", null, a.toString()), wap("height", null, i.toString()))
+        var imageDimensionsNode = new NodeBuilder()
+                .description("image_dimensions")
+                .content(List.of(
+                        new NodeBuilder().description("width").content(Integer.toString(width)).build(),
+                        new NodeBuilder().description("height").content(Integer.toString(height)).build()
+                ))
+                .build();
+        children.add(imageDimensionsNode);
+        if (directConnectionEncryptedInfo != null) {
+            // WAWebBizRefreshCartJob.c: l != null ? wap("direct_connection_encrypted_info", null, l) : null
+            children.add(new NodeBuilder()
+                    .description("direct_connection_encrypted_info")
+                    .content(directConnectionEncryptedInfo)
+                    .build());
+        }
+        var cartNode = new NodeBuilder()
+                .description("cart")
+                .attribute("op", "refresh") // WAWebBizRefreshCartJob.c: op: CUSTOM_STRING("refresh")
+                .attribute("biz_jid", bizJid) // WAWebBizRefreshCartJob.c: biz_jid: USER_JID(e)
+                .content(children)
+                .build();
+        var iqNode = new NodeBuilder()
+                .description("iq")
+                .attribute("xmlns", "fb:thrift_iq") // WAWebBizRefreshCartJob.c: xmlns: "fb:thrift_iq"
+                .attribute("to", JidServer.user()) // WAWebBizRefreshCartJob.c: to: S_WHATSAPP_NET
+                .attribute("type", "get") // WAWebBizRefreshCartJob.c: type: "get"
+                .content(cartNode);
+        var response = sendNode(iqNode);
+        // WAWebBizRefreshCartJob.refreshCartResponse: t = e.child("cart"); n = t.maybeChild("price")
+        var cartResponse = response.getChild("cart")
+                .orElseThrow(() -> new NoSuchElementException("Missing <cart> in refresh-cart response"));
+        var price = parseCartPrice(cartResponse.getChild("price").orElse(null));
+        var products = new ArrayList<BusinessCartProduct>();
+        for (var productNode : cartResponse.getChildren("product")) {
+            products.add(parseCartProduct(productNode));
+        }
+        return new BusinessRefreshedCartBuilder()
+                .price(price)
+                .products(products)
+                .build();
+    }
+
+    /**
+     * Parses the {@code <price>} grandchild of a refresh-cart response.
+     *
+     * @param priceNode the optional {@code <price>} child; may be
+     *                  {@code null} when the wire omits the block
+     * @return the parsed price summary; all four fields default to
+     *         {@link Optional#empty()} when the input is {@code null}
+     *
+     * @implNote WAWebBizRefreshCartJob.refreshCartResponse:
+     *           {@code r = {}}, then attaches {@code subtotal},
+     *           {@code total}, {@code currency} and {@code price_status}
+     *           via {@code maybeChild}. Cobalt mirrors the all-optional
+     *           shape verbatim.
+     */
+    private BusinessCartPrice parseCartPrice(Node priceNode) {
+        if (priceNode == null) {
+            return new BusinessCartPriceBuilder().build();
+        }
+        var subtotal = priceNode.getChild("subtotal").flatMap(Node::toContentString).orElse(null);
+        var total = priceNode.getChild("total").flatMap(Node::toContentString).orElse(null);
+        var currency = priceNode.getChild("currency").flatMap(Node::toContentString).orElse(null);
+        var priceStatus = priceNode.getChild("price_status").flatMap(Node::toContentString).orElse(null);
+        return new BusinessCartPriceBuilder()
+                .subtotal(subtotal)
+                .total(total)
+                .currency(currency)
+                .priceStatus(priceStatus)
+                .build();
+    }
+
+    /**
+     * Parses a single {@code <product>} child returned by the
+     * refresh-cart response into a {@link BusinessCartProduct}.
+     *
+     * <p>The {@code id} child is required; every other field is read via
+     * {@code maybeChild} on the WhatsApp Web side and exposed as
+     * {@link Optional} here. The {@code max_available} field defaults to
+     * {@code WAWebBizCartConstants.CART_ITEM_MAX_QUANTITY} ({@code 99})
+     * when both the attribute and the child are absent.
+     *
+     * @param productNode the {@code <product>} stanza child
+     * @return the parsed entry
+     *
+     * @implNote WAWebBizRefreshCartJob.refreshCartResponse: each product
+     *           node is parsed into
+     *           {@code {id, name, price, currency, media,
+     *           max_available, sale_price, status}}.
+     */
+    private BusinessCartProduct parseCartProduct(Node productNode) {
+        // WAWebBizRefreshCartJob.refreshCartResponse: r = e.child("id").contentString()
+        var id = productNode.getChild("id")
+                .flatMap(Node::toContentString)
+                .orElseThrow(() -> new NoSuchElementException("Missing <id> in refresh-cart product"));
+        var name = productNode.getChild("name").flatMap(Node::toContentString).orElse(null);
+        var price = productNode.getChild("price").flatMap(Node::toContentString).orElse(null);
+        var currency = productNode.getChild("currency").flatMap(Node::toContentString).orElse(null);
+        // WAWebBizRefreshCartJob.refreshCartResponse: max_available falls back to attr, then child, then CART_ITEM_MAX_QUANTITY
+        int maxAvailable = CART_ITEM_MAX_QUANTITY;
+        var maxAvailableAttr = productNode.getAttributeAsString("max_available").orElse(null);
+        if (maxAvailableAttr != null) {
+            try {
+                maxAvailable = Integer.parseInt(maxAvailableAttr);
+            } catch (NumberFormatException ignored) {
+                // maxAvailable stays at CART_ITEM_MAX_QUANTITY
+            }
+        }
+        var maxAvailableChild = productNode.getChild("max_available").flatMap(Node::toContentString).orElse(null);
+        if (maxAvailableChild != null) {
+            try {
+                maxAvailable = Integer.parseInt(maxAvailableChild);
+            } catch (NumberFormatException ignored) {
+                // maxAvailable keeps the previous value
+            }
+        }
+        // WAWebBizRefreshCartJob.refreshCartResponse: f = e.maybeChild("media"); g = f?.maybeChild("image")
+        BusinessCartProductMedia media = null;
+        var mediaNode = productNode.getChild("media").orElse(null);
+        if (mediaNode != null) {
+            var imageNode = mediaNode.getChild("image").orElse(null);
+            if (imageNode != null) {
+                // WAWebBizRefreshCartJob.refreshCartResponse: image fields gated by hasContent()
+                var imageId = imageNode.getChild("id")
+                        .flatMap(Node::toContentString)
+                        .filter(s -> !s.isEmpty())
+                        .orElse(null);
+                var requestImageUrl = imageNode.getChild("request_image_url")
+                        .flatMap(Node::toContentString)
+                        .filter(s -> !s.isEmpty())
+                        .orElse(null);
+                media = new BusinessCartProductMediaBuilder()
+                        .image(new BusinessCartProductImageBuilder()
+                                .id(imageId)
+                                .requestImageUrl(requestImageUrl)
+                                .build())
+                        .build();
+            } else {
+                media = new BusinessCartProductMediaBuilder().build();
+            }
+        }
+        // WAWebBizRefreshCartJob.refreshCartResponse: b = e.maybeChild("sale_price"); price asserted via child(); start/end optional
+        BusinessCartProductSalePrice salePrice = productNode.getChild("sale_price")
+                .map(saleNode -> {
+                    var salePriceContent = saleNode.getChild("price")
+                            .flatMap(Node::toContentString)
+                            .orElseThrow(() -> new NoSuchElementException("Missing <price> in refresh-cart sale_price"));
+                    var startDate = saleNode.getChild("start_date").flatMap(Node::toContentString).orElse(null);
+                    var endDate = saleNode.getChild("end_date").flatMap(Node::toContentString).orElse(null);
+                    return new BusinessCartProductSalePriceBuilder()
+                            .price(salePriceContent)
+                            .startDate(startDate)
+                            .endDate(endDate)
+                            .build();
+                })
+                .orElse(null);
+        var status = productNode.getChild("status").flatMap(Node::toContentString).orElse(null);
+        return new BusinessCartProductBuilder()
+                .id(id)
+                .name(name)
+                .price(price)
+                .currency(currency)
+                .media(media)
+                .maxAvailable(maxAvailable)
+                .salePrice(salePrice)
+                .status(status)
+                .build();
+    }
+
+    /**
+     * Resolves a click-to-WhatsApp (CTWA) deep link into the originating
+     * ad's metadata.
+     *
+     * <p>"Click-to-WhatsApp" is the Meta-side ad placement that lets
+     * Facebook / Instagram users tap an ad and immediately open a chat
+     * with the advertised business. The chat is opened with a system
+     * "context" message that quotes the ad — its headline, body, image or
+     * video thumbnail, originating page — so the merchant knows exactly
+     * which ad drove the conversation. WhatsApp populates that context by
+     * hitting this endpoint once with the invite code embedded in the deep
+     * link; a Cobalt-driven business client must do the same before
+     * inserting the ad-context bubble at the top of a brand-new chat or
+     * before stamping the next outgoing message's
+     * {@link ContextInfo#externalAdReply()} field.
+     *
+     * <p>The {@code expectedSourceUrl} acts as a confirmation that the
+     * caller really did follow the deep link from the same source that
+     * issued the invite — it lets the server reject replays where the
+     * invite code was lifted out of context and re-used elsewhere. The
+     * returned record carries every ad-side field WhatsApp surfaces in
+     * the in-app context bubble: thumbnail bytes (or a CDN URL), the ad
+     * headline / body, video URL when the ad was a video, source-app
+     * identifier and the WAMO-AGM greeting / payload / image fields used
+     * by AGM-enrolled advertisers.
+     *
+     * @param businessJid       the JID of the business advertised in the
+     *                          ad; never {@code null}
+     * @param inviteCode        the invite code embedded in the
+     *                          click-to-WhatsApp deep link; never
+     *                          {@code null}
+     * @param expectedSourceUrl the deep-link URL the client landed on;
+     *                          replayed back to the server so it can
+     *                          reject mismatched invocations; never
+     *                          {@code null}
+     * @return the parsed ad context; never {@code null}
+     * @throws NullPointerException            if any argument is
+     *                                         {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer
+     *                                         open
+     * @throws NoSuchElementException          if the server returned no
+     *                                         context or an incomplete
+     *                                         response
+     *
+     * @implNote WAWebQueryCtwaContextJob.default emits the same legacy
+     *           IQ; the parser asserts the {@code <source>} grandchildren
+     *           via {@code child(...)} and treats the remaining fields
+     *           via {@code hasChild} or {@code maybeChild}. The WA Web
+     *           {@code <error>} branch (logged as
+     *           {@code "getCtwaContext error"}) is intentionally not
+     *           reproduced — Cobalt lets exceptions surface through the
+     *           configurable {@link WhatsAppClientErrorHandler} instead
+     *           of an inline log + {@code throw err("invalid response")}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebQueryCtwaContextJob", exports = "default",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public BusinessCtwaContext queryCtwaContext(Jid businessJid, String inviteCode, String expectedSourceUrl) {
+        Objects.requireNonNull(businessJid, "businessJid cannot be null");
+        Objects.requireNonNull(inviteCode, "inviteCode cannot be null");
+        Objects.requireNonNull(expectedSourceUrl, "expectedSourceUrl cannot be null");
+        // WAWebQueryCtwaContextJob.d: i = createWid(e).toString({legacy: true})
+        // ADAPTED: Cobalt treats Jid as already canonical for this transport; the legacy-format
+        // toString is the same render Cobalt's Jid.toString() produces for user JIDs.
+        var accountNumberNode = new NodeBuilder()
+                .description("account_number")
+                .content(businessJid.toString()) // WAWebQueryCtwaContextJob.d: wap("account_number", null, i)
+                .build();
+        var codeNode = new NodeBuilder()
+                .description("code")
+                .content(inviteCode) // WAWebQueryCtwaContextJob.d: wap("code", null, t)
+                .build();
+        var expectedSourceUrlNode = new NodeBuilder()
+                .description("expected_source_url")
+                .content(expectedSourceUrl) // WAWebQueryCtwaContextJob.d: wap("expected_source_url", null, n)
+                .build();
+        var iqNode = new NodeBuilder()
+                .description("iq")
+                .attribute("xmlns", "fb:thrift_iq") // WAWebQueryCtwaContextJob.d: xmlns: "fb:thrift_iq"
+                .attribute("to", JidServer.user()) // WAWebQueryCtwaContextJob.d: to: S_WHATSAPP_NET
+                .attribute("type", "get") // WAWebQueryCtwaContextJob.d: type: "get"
+                .content(List.of(accountNumberNode, codeNode, expectedSourceUrlNode));
+        var response = sendNode(iqNode);
+        // WAWebQueryCtwaContextJob.ctwaContext: t = e.child("context"); error branch is logged + thrown.
+        // ADAPTED: Cobalt does not reproduce the in-line logging branch; an absent <context> simply
+        // raises NoSuchElementException through Cobalt's standard error path.
+        var contextNode = response.getChild("context")
+                .orElseThrow(() -> new NoSuchElementException("Missing <context> in CTWA-context response"));
+        // WAWebQueryCtwaContextJob.ctwaContext: required source.{url,id,type}
+        var sourceNode = contextNode.getChild("source")
+                .orElseThrow(() -> new NoSuchElementException("Missing <source> in CTWA-context response"));
+        var sourceUrl = sourceNode.getChild("url")
+                .flatMap(Node::toContentString)
+                .orElseThrow(() -> new NoSuchElementException("Missing <source><url> in CTWA-context response"));
+        var sourceId = sourceNode.getChild("id")
+                .flatMap(Node::toContentString)
+                .orElseThrow(() -> new NoSuchElementException("Missing <source><id> in CTWA-context response"));
+        var sourceType = sourceNode.getChild("type")
+                .flatMap(Node::toContentString)
+                .orElseThrow(() -> new NoSuchElementException("Missing <source><type> in CTWA-context response"));
+        // WAWebQueryCtwaContextJob.ctwaContext: optional headline / body
+        var title = contextNode.getChild("headline").flatMap(Node::toContentString).orElse(null);
+        var description = contextNode.getChild("body").flatMap(Node::toContentString).orElse(null);
+        // WAWebQueryCtwaContextJob.ctwaContext: thumbnail block carries optional URL or inline base64-encoded bytes,
+        //   plus the IMAGE/VIDEO discriminator: VIDEO when <video><url/></video> is present, IMAGE otherwise.
+        String thumbnailUrl = null;
+        byte[] thumbnail = null;
+        String mediaUrl = null;
+        BusinessCtwaMediaType mediaType = null;
+        var thumbnailNode = contextNode.getChild("thumbnail").orElse(null);
+        if (thumbnailNode != null) {
+            thumbnailUrl = thumbnailNode.getChild("url").flatMap(Node::toContentString).orElse(null);
+            // WAWebQueryCtwaContextJob.ctwaContext: thumbnail.bytes are base64-encoded by the parser; Cobalt returns the raw bytes.
+            thumbnail = thumbnailNode.getChild("bytes").flatMap(Node::toContentBytes).orElse(null);
+            var videoNode = contextNode.getChild("video").orElse(null);
+            if (videoNode != null) {
+                mediaUrl = videoNode.getChild("url").flatMap(Node::toContentString).orElse(null);
+                mediaType = BusinessCtwaMediaType.VIDEO; // WAWebQueryCtwaContextJob: ContextInfo$ExternalAdReplyInfo$MediaType.VIDEO
+            } else {
+                mediaType = BusinessCtwaMediaType.IMAGE; // WAWebQueryCtwaContextJob: ContextInfo$ExternalAdReplyInfo$MediaType.IMAGE
+            }
+        }
+        // WAWebQueryCtwaContextJob.ctwaContext: optional <sourceApp>
+        var sourceApp = contextNode.getChild("sourceApp").flatMap(Node::toContentString).orElse(null);
+        // WAWebQueryCtwaContextJob.ctwaContext: WAMO-AGM-gated optional fields are read unconditionally so the
+        //   response shape is preserved regardless of feature flag state.
+        // ADAPTED: WA Web only attaches these when WAWebCtwaAGMUtils.isWamoAGMIntegrationEnabled(sourceApp) is true.
+        var greetingMessageBody = contextNode.getChild("greetingMessageBody").flatMap(Node::toContentString).orElse(null);
+        var automatedGreetingMessageShown = contextNode.getChild("automatedGreetingMessageShown")
+                .flatMap(Node::toContentString)
+                .map("true"::equals)
+                .orElse(null);
+        var ctaPayload = contextNode.getChild("ctaPayload").flatMap(Node::toContentString).orElse(null);
+        var originalImageUrl = contextNode.getChild("originalImageUrl").flatMap(Node::toContentString).orElse(null);
+        return new BusinessCtwaContextBuilder()
+                .sourceUrl(sourceUrl)
+                .sourceId(sourceId)
+                .sourceType(sourceType)
+                .title(title)
+                .description(description)
+                .thumbnailUrl(thumbnailUrl)
+                .thumbnail(thumbnail)
+                .mediaUrl(mediaUrl)
+                .mediaType(mediaType)
+                .sourceApp(sourceApp)
+                .greetingMessageBody(greetingMessageBody)
+                .automatedGreetingMessageShown(automatedGreetingMessageShown)
+                .ctaPayload(ctaPayload)
+                .originalImageUrl(originalImageUrl)
+                .build();
     }
 
     /**
@@ -5514,22 +8271,22 @@ public class WhatsAppClient {
      */
     private byte[] generatePreviewThumbnail(byte[] jpegBytes) {
         try {
-            var src = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(jpegBytes));
+            var src = ImageIO.read(new ByteArrayInputStream(jpegBytes));
             if (src == null) {
                 throw new IllegalArgumentException("Invalid image payload");
             }
-            var thumb = new java.awt.image.BufferedImage(PROFILE_PREVIEW_SIZE, PROFILE_PREVIEW_SIZE, java.awt.image.BufferedImage.TYPE_INT_RGB); // WA Web's profile preview size
+            var thumb = new BufferedImage(PROFILE_PREVIEW_SIZE, PROFILE_PREVIEW_SIZE, BufferedImage.TYPE_INT_RGB); // WA Web's profile preview size
             var g = thumb.createGraphics();
             try {
-                g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
                 g.drawImage(src, 0, 0, PROFILE_PREVIEW_SIZE, PROFILE_PREVIEW_SIZE, null);
             } finally {
                 g.dispose();
             }
-            var out = new java.io.ByteArrayOutputStream();
-            javax.imageio.ImageIO.write(thumb, "jpg", out);
+            var out = new ByteArrayOutputStream();
+            ImageIO.write(thumb, "jpg", out);
             return out.toByteArray();
-        } catch (java.io.IOException e) {
+        } catch (IOException e) {
             throw new IllegalArgumentException("Failed to decode profile picture", e);
         }
     }
@@ -5743,7 +8500,7 @@ public class WhatsAppClient {
      * {@code MessagePreparer} pipeline.
      *
      * <p>Use this overload when the caller has assembled a
-     * {@link ChatMessageInfo} or {@link com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo}
+     * {@link ChatMessageInfo} or {@link NewsletterMessageInfo}
      * with a message id, timestamp, and any extension metadata already
      * populated (for example when rehydrating a draft or re-transmitting
      * a message that failed a previous send).
@@ -5824,7 +8581,7 @@ public class WhatsAppClient {
      * <p>When {@code everyone} is {@code false}, this matches
      * {@code WAWebChatSendMessages.sendDeleteMsgs} in WA Web: the
      * referenced message is removed from the local store and a
-     * {@link com.github.auties00.cobalt.model.sync.action.chat.DeleteMessageForMeAction}
+     * {@link DeleteMessageForMeAction}
      * is published through the REGULAR_HIGH app-state collection so
      * every linked device removes the message too. In this mode the
      * method returns {@code null} because no server-ack path exists.
@@ -5894,7 +8651,7 @@ public class WhatsAppClient {
                             .orElse(null);
             var mediaType = originalInfo == null
                     ? null
-                    : WamMsgUtils.getWamMediaType(originalInfo);
+                    : wamService.getWamMediaType(originalInfo);
             // WAWebRevokeMsgAction._sendRevoke: C = unixTime(); v = C - WAWebMsgGetters.getT(s)
             var sendInstant = Instant.now();
             var revokeSendDelaySeconds = originalInfo == null
@@ -5929,7 +8686,7 @@ public class WhatsAppClient {
         var mediaType = store.findMessageById(parentJid, messageId)
                 .filter(ChatMessageInfo.class::isInstance)
                 .map(ChatMessageInfo.class::cast)
-                .map(WamMsgUtils::getWamMediaType)
+                .map(wamService::getWamMediaType)
                 .orElse(null);
 
         // WAWebChatSendMessages.sendDeleteMsgs: s.forEach(e => e.delete())
@@ -5943,13 +8700,13 @@ public class WhatsAppClient {
         // serialization and the !remote.isUser() && !fromMe participant gate.
         var keySegments = SyncdIndexUtils.constructMsgKeySegmentsFromMsgKey(key);
         var indexJson = SyncdIndexUtils.buildIndex( // WAWebSyncdActionUtils.buildIndex
-                com.github.auties00.cobalt.model.sync.action.chat.DeleteMessageForMeAction.ACTION_NAME, // "deleteMessageForMe"
+                DeleteMessageForMeAction.ACTION_NAME, // "deleteMessageForMe"
                 keySegments.get(0), // WAWebSyncdUtils.constructMsgKeySegments: remote
                 keySegments.get(1), // WAWebSyncdUtils.constructMsgKeySegments: id
                 keySegments.get(2), // WAWebSyncdUtils.constructMsgKeySegments: fromMe
                 keySegments.get(3)  // WAWebSyncdUtils.constructMsgKeySegments: participant
         );
-        var deleteAction = new com.github.auties00.cobalt.model.sync.action.chat.DeleteMessageForMeActionBuilder()
+        var deleteAction = new DeleteMessageForMeActionBuilder()
                 .messageTimestamp(Instant.now()) // WAWebDeleteMessageForMeSync: deleteMessageForMeAction.messageTimestamp
                 .build();
         var value = new SyncActionValueBuilder()
@@ -5961,11 +8718,11 @@ public class WhatsAppClient {
                 value,
                 SyncdOperation.SET,
                 Instant.now(),
-                com.github.auties00.cobalt.model.sync.action.chat.DeleteMessageForMeAction.ACTION_VERSION
+                DeleteMessageForMeAction.ACTION_VERSION
         );
         webAppStateService.pushPatches(
-                com.github.auties00.cobalt.model.sync.action.chat.DeleteMessageForMeAction.COLLECTION_NAME,
-                java.util.List.of(new SyncPendingMutation(mutation, 0))
+                DeleteMessageForMeAction.COLLECTION_NAME,
+                List.of(new SyncPendingMutation(mutation, 0))
         ); // WAWebChatSendMessages.sendDeleteMsgs: WAWebChatSendDeleteMsgsBridge
         // WAWebActionListenerHelpers: if(getIsPSA(e)) for(r=0;r<t.list.length;r++) WAWebWamChatPSALogger.logChatPSADelete(t.list[r])
         logPsaActionIfApplicable(key, PsaMessageActionType.DELETE); // WAWebWamChatPSALogger.logChatPSADelete -> PSA_MESSAGE_ACTION_TYPE.DELETE
@@ -6014,7 +8771,7 @@ public class WhatsAppClient {
      * }).commitAndWaitForFlush()}. Cobalt mirrors the payload using
      * {@link Jid#hasGroupOrCommunityServer()} for {@code isAGroup} (equivalent
      * to {@code WAWebChatGetters.getIsGroup}) and leaves {@code threadId}
-     * unset. The event is committed via {@link WamService#commit(Object)};
+     * unset. The event is committed via {@link WamService#commit(WamEventSpec)};
      * {@code commitAndWaitForFlush} is not needed here because Cobalt's
      * {@code WamService} dispatches commits asynchronously without a separate
      * synchronous flush API.
@@ -6078,8 +8835,8 @@ public class WhatsAppClient {
      * {@code new SendRevokeMessageWamEvent({...}).commit()} sites in
      * {@code WAWebRevokeMsgAction._sendRevoke}. WA Web calls
      * {@code .commit()}; Cobalt routes through
-     * {@link WamService#commit(Object)}. {@code messageType} is derived
-     * from the chat JID via {@link WamMsgUtils#getWamMessageType(Jid)}
+     * {@link WamService#commit(WamEventSpec)}. {@code messageType} is derived
+     * from the chat JID via {@link WamService#getWamMessageType(Jid)}
      * which mirrors the JID-based classification WA Web performs inside
      * {@code getWamMessageType(s)} after resolving {@code s.id.remote}.
      */
@@ -6087,7 +8844,7 @@ public class WhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     private void emitSendRevokeMessageEvent(Jid chatJid, MediaType mediaType, Integer revokeSendDelaySeconds) {
         var builder = new SendRevokeMessageEventBuilder() // WAWebRevokeMsgAction._sendRevoke: new SendRevokeMessageWamEvent({...})
-                .messageType(WamMsgUtils.getWamMessageType(chatJid)); // WAWebRevokeMsgAction._sendRevoke: messageType: getWamMessageType(s)
+                .messageType(wamService.getWamMessageType(chatJid)); // WAWebRevokeMsgAction._sendRevoke: messageType: getWamMessageType(s)
         if (mediaType != null) {
             builder.messageMediaType(mediaType); // WAWebRevokeMsgAction._sendRevoke: messageMediaType: getWamMediaType(s)
         }
@@ -6219,12 +8976,12 @@ public class WhatsAppClient {
     private StatusContentType resolveStatusContentType(MessageContainer content) {
         // WAWebSendStatusMsgAction.y: switch(e){...}
         return switch (content.content()) {
-            case com.github.auties00.cobalt.model.message.text.ExtendedTextMessage ignored -> StatusContentType.TEXT; // "chat" -> TEXT
-            case com.github.auties00.cobalt.model.message.media.ImageMessage ignored -> StatusContentType.PHOTO; // "image" -> PHOTO
-            case com.github.auties00.cobalt.model.message.media.VideoMessage video ->
+            case ExtendedTextMessage ignored -> StatusContentType.TEXT; // "chat" -> TEXT
+            case ImageMessage ignored -> StatusContentType.PHOTO; // "image" -> PHOTO
+            case VideoMessage video ->
                     video.gifPlayback() ? StatusContentType.GIF : StatusContentType.VIDEO; // "gif"/"video"
-            case com.github.auties00.cobalt.model.message.media.StickerMessage ignored -> StatusContentType.GIF; // "sticker" -> GIF
-            case com.github.auties00.cobalt.model.message.media.AudioMessage ignored -> StatusContentType.VOICE; // "ptt"/"audio" -> VOICE
+            case StickerMessage ignored -> StatusContentType.GIF; // "sticker" -> GIF
+            case AudioMessage ignored -> StatusContentType.VOICE; // "ptt"/"audio" -> VOICE
             default -> StatusContentType.PHOTO; // WAWebSendStatusMsgAction.y: default: PHOTO
         };
     }
@@ -6411,7 +9168,10 @@ public class WhatsAppClient {
         var jids = privacyNode.streamChildren("user")
                 .flatMap(userNode -> userNode.streamAttributeAsJid("jid"))
                 .toList();
-        return new StatusPrivacySetting(mode, jids);
+        return new StatusPrivacySettingBuilder()
+                .mode(mode)
+                .jids(jids)
+                .build();
     }
 
     /**
@@ -6438,7 +9198,7 @@ public class WhatsAppClient {
      * while persisting the new config through
      * {@code WAWebUserPrefsStatus.setStatusPrivacyConfig}. Cobalt delegates
      * the mutation construction to
-     * {@link StatusPrivacyHandler#getMutation(Instant, StatusPrivacyAction.StatusDistributionMode, java.util.List)}
+     * {@link StatusPrivacyHandler#getMutation(Instant, StatusPrivacyAction.StatusDistributionMode, List)}
      * and additionally emits a direct {@code xmlns="status"} IQ as required
      * by the task spec.
      */
@@ -6790,14 +9550,14 @@ public class WhatsAppClient {
         );
         webAppStateService.pushPatches(
                 StarAction.COLLECTION_NAME, // WAWebStarMessageSync.collectionName: RegularHigh
-                java.util.List.of(new SyncPendingMutation(mutation, 0))
+                List.of(new SyncPendingMutation(mutation, 0))
         );
 
         // WAWebStarMessageSync.applyMutations: k.star = p (flip local flag eagerly)
         store.findMessageById(parentJid, messageId).ifPresent(info -> {
             switch (info) {
                 case ChatMessageInfo c -> c.setStarred(starred);
-                case com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo n -> n.setStarred(starred);
+                case NewsletterMessageInfo n -> n.setStarred(starred);
                 default -> { /* no-op for unsupported info types */ }
             }
         });
@@ -6884,11 +9644,11 @@ public class WhatsAppClient {
         }
         // WAWebWamChatPSALogger: psaCampaignId: (t = e.campaignId) == null ? void 0 : t.toString()
         var campaignId = chatInfo.statusPsa()
-                .map(com.github.auties00.cobalt.model.message.status.StatusPSA::campaignId)
+                .map(StatusPSA::campaignId)
                 .map(String::valueOf)
                 .orElse(null);
         wamService.commit(new ChatPsaActionEventBuilder() // WAWebWamChatPSALogger: new ChatPsaActionWamEvent({...}).commit()
-                .messageMediaType(WamMsgUtils.getWamMediaType(chatInfo)) // WAWebWamMsgUtils.getWamMediaType(e)
+                .messageMediaType(wamService.getWamMediaType(chatInfo)) // WAWebWamMsgUtils.getWamMediaType(e)
                 .psaCampaignId(campaignId) // WAWebWamChatPSALogger: (t=e.campaignId)==null?void 0:t.toString()
                 .psaMessageActionType(actionType) // WAWebWamChatPSALogger: PSA_MESSAGE_ACTION_TYPE.SAVE/DELETE/FORWARD/MEDIA_PLAY
                 .psaMsgId(messageIdOpt.get()) // WAWebWamChatPSALogger: e.id.id.toString()
@@ -6955,9 +9715,9 @@ public class WhatsAppClient {
         var isForwardedForward = numTimesForwarded > 1;
         var builder = new ForwardSendEventBuilder()
                 // WAWebMsgUtilsBridge.createMessageForwardMetric: messageType: getWamMessageType(t)
-                .messageType(WamMsgUtils.getWamMessageType(destination))
+                .messageType(wamService.getWamMessageType(destination))
                 // WAWebMsgUtilsBridge.createMessageForwardMetric: messageMediaType: getWamMediaType(t)
-                .messageMediaType(WamMsgUtils.getWamMediaType(forwarded))
+                .messageMediaType(wamService.getWamMediaType(forwarded))
                 // WAWebMsgUtilsBridge.createMessageForwardMetric: mediaCaptionPresent: a
                 .mediaCaptionPresent(mediaCaptionPresent)
                 // WAWebMsgUtilsBridge.createMessageForwardMetric: fastForwardEnabled: !0
@@ -7005,9 +9765,9 @@ public class WhatsAppClient {
             return false;
         }
         return switch (container.content()) {
-            case com.github.auties00.cobalt.model.message.media.ImageMessage image -> image.caption().map(s -> !s.isEmpty()).orElse(false);
-            case com.github.auties00.cobalt.model.message.media.VideoMessage video -> video.caption().map(s -> !s.isEmpty()).orElse(false);
-            case com.github.auties00.cobalt.model.message.media.DocumentMessage document -> document.caption().map(s -> !s.isEmpty()).orElse(false);
+            case ImageMessage image -> image.caption().map(s -> !s.isEmpty()).orElse(false);
+            case VideoMessage video -> video.caption().map(s -> !s.isEmpty()).orElse(false);
+            case DocumentMessage document -> document.caption().map(s -> !s.isEmpty()).orElse(false);
             case null, default -> false;
         };
     }
@@ -7051,8 +9811,9 @@ public class WhatsAppClient {
         // WAWebMsgGetters.getNumTimesForwarded: fallback -> isForwarded ? 1 : 0
         return ctx.isForwarded() ? 1 : 0;
     }
+    //</editor-fold>
 
-    //<editor-fold desc="Chat operations">
+    //<editor-fold desc="Chat operations (archive, pin, mute, lock, labels, broadcast)">
     /**
      * Builds a minimal outgoing {@link SyncActionMessageRange} for the given
      * chat covering the chat's most recent message.
@@ -7120,7 +9881,7 @@ public class WhatsAppClient {
         var chatModel = store.findChatByJid(chat).orElse(null); // WAWebSetArchiveChatAction.setArchive: unproxy(e); t.archive lookup
         var messageRange = chatModel != null ? buildOutgoingMessageRange(chatModel) : null; // WAWebArchiveChatSync.getArchiveChatMutation: messageRange: constructMessageRange
         var mutations = ArchiveChatHandler.INSTANCE.getMutationsForArchive(timestamp, archive, chat, messageRange); // WAWebArchiveChatSync.getMutationsForArchive
-        webAppStateService.pushPatches(com.github.auties00.cobalt.model.sync.action.chat.ArchiveChatAction.COLLECTION_NAME, mutations); // WAWebChatArchiveBridge.sendConversationArchive: lockForMessageRangeSync(["chat"], mutations, ...)
+        webAppStateService.pushPatches(ArchiveChatAction.COLLECTION_NAME, mutations); // WAWebChatArchiveBridge.sendConversationArchive: lockForMessageRangeSync(["chat"], mutations, ...)
         if (chatModel != null) { // WAWebChatArchiveBridge.sendConversationArchive: merge(t.toString(), {archive: a, pin: void 0 if archive})
             chatModel.setArchived(archive); // WAWebSetArchiveChatAction.setArchive: t.archive = a
             if (archive) { // WAWebSetArchiveChatAction.setArchive: a && (t.pin = void 0)
@@ -7205,7 +9966,7 @@ public class WhatsAppClient {
         var mutation = MuteChatHandler.INSTANCE.generateMuteMutation(this, chat, muteEndSeconds, null); // WAWebMuteChatSync.generateMuteMutation
         webAppStateService.pushPatches(MuteChatHandler.INSTANCE.collectionName(), List.of(mutation)); // WAWebSyncdActionUtils.buildPendingMutation -> lockForSync
         store.findChatByJid(chat).ifPresent(chatModel -> // WAWebMuteChatSync.applyMutations: C.muteExpiration = g (apply locally for eager consistency)
-                chatModel.setMute(com.github.auties00.cobalt.model.chat.ChatMute.mutedUntil(muteEndSeconds)));
+                chatModel.setMute(ChatMute.mutedUntil(muteEndSeconds)));
         // WAWebActionListener (mute/unmute handler q):
         //   !getIsPSA(t) && !getIsNewsletter(t) && logChatMute(t, e, l) / logChatUnmute(t, g)
         // WAWebChatMuteLogger.logChatMute / logChatUnmute then builds a ChatMuteWamEvent with:
@@ -7527,10 +10288,10 @@ public class WhatsAppClient {
      * predefined-id when applicable (via
      * {@link BusinessLabelConstants#mapLabelNameToPredefinedId(String)}), and
      * issues a {@code getLabelMutation} with {@code deleted=false} and
-     * {@code type=CUSTOM}. Cobalt allocates the next id in-memory against
-     * the current store (one above the highest existing numeric label id,
-     * starting at {@code 1}) because the IndexedDB-backed
-     * {@code getNextLabelId} sequence is not replicated.
+     * {@code type=CUSTOM}. The id is computed as one above the highest
+     * existing numeric label id (starting at {@code 1}), matching WA Web's
+     * client-side {@code getNextLabelId} which does the same {@code max +
+     * parseInt} scan over the label table.
      *
      * @param name       the user-visible display name of the label
      * @param colorIndex the palette colour index
@@ -7544,12 +10305,14 @@ public class WhatsAppClient {
     public String createLabel(String name, int colorIndex) {
         Objects.requireNonNull(name, "name cannot be null"); // ADAPTED: invariant guard; WA Web accepts any string
         var timestamp = Instant.now(); // WAWebBizLabelEditingAction.labelAddAction: var l = unixTime()
-        // ADAPTED: WAWebBizLabelEditingAction.labelAddAction: var i = yield getNextLabelId()
-        // Cobalt has no IndexedDB label-id sequence, so we compute the next id as max(existingNumericIds) + 1, starting at 1.
+        // WAWebBizLabelEditingAction.labelAddAction: var i = yield getNextLabelId() — WAWebDBLabelDatabaseApi.getNextLabelId is max(parseInt(id)) + 1, or 1 when empty
         var nextId = store.labels().stream()
                 .map(Label::id)
-                .mapToInt(id -> { // ADAPTED: WA Web uses String(i) with the server-assigned integer sequence
-                    try { return Integer.parseInt(id); } catch (NumberFormatException ignored) { return 0; }
+                .mapToInt(id -> {
+                    try { return Integer.parseInt(id); }
+                    catch (NumberFormatException e) {
+                        throw new IllegalStateException("getNextLabelId: Invalid label id " + id, e);
+                    }
                 })
                 .max()
                 .orElse(0) + 1;
@@ -7571,7 +10334,7 @@ public class WhatsAppClient {
                 timestamp
         );
         webAppStateService.pushPatches(LabelEditAction.COLLECTION_NAME, List.of(mutation)); // WAWebSyncdCoreApi.lockForSync(["label"], [p], ...)
-        var label = new com.github.auties00.cobalt.model.preference.LabelBuilder() // WAWebBizLabelEditingAction.labelAddAction: LabelCollection.add({id, name, colorIndex, ...})
+        var label = new LabelBuilder() // WAWebBizLabelEditingAction.labelAddAction: LabelCollection.add({id, name, colorIndex, ...})
                 .id(labelId)
                 .name(name)
                 .color(colorIndex)
@@ -7638,7 +10401,7 @@ public class WhatsAppClient {
             existing.setName(name);
             existing.setColor(colorIndex);
         } else { // ADAPTED: insert a stub if the caller edits an unknown label id — keeps local state consistent with the mutation we pushed
-            var label = new com.github.auties00.cobalt.model.preference.LabelBuilder()
+            var label = new LabelBuilder()
                     .id(labelId)
                     .name(name)
                     .color(colorIndex)
@@ -7926,7 +10689,7 @@ public class WhatsAppClient {
                 .max()
                 .orElse(0L) + 1;
         var listId = String.valueOf(nextId);
-        var listJid = Jid.of(listId, com.github.auties00.cobalt.model.jid.JidServer.broadcast()); // ADAPTED: broadcast lists use `<id>@broadcast` as the routing JID
+        var listJid = Jid.of(listId, JidServer.broadcast()); // ADAPTED: broadcast lists use `<id>@broadcast` as the routing JID
         var participants = buildBroadcastParticipants(recipients); // WAWebBroadcastListSync.getBroadcastListMutation: participants: n
         var mutation = BusinessBroadcastListHandler.INSTANCE.getBroadcastListMutation( // WAWebBroadcastListSync.getBroadcastListMutation
                 listId,
@@ -7937,12 +10700,12 @@ public class WhatsAppClient {
         webAppStateService.pushPatches(BusinessBroadcastListAction.COLLECTION_NAME, List.of(mutation));
         // ADAPTED: WA Web seeds the broadcast list storage via updateBroadcastListStorage;
         // Cobalt mirrors the state into the flat store map.
-        var action = new com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastListActionBuilder()
+        var action = new BusinessBroadcastListActionBuilder()
                 .participants(participants)
                 .listName(name)
                 .labelIds(List.of())
                 .build();
-        var current = new java.util.HashMap<>(store.businessBroadcastLists());
+        var current = new HashMap<>(store.businessBroadcastLists());
         current.put(listId, action);
         store.setBusinessBroadcastLists(current);
         return listJid;
@@ -7975,12 +10738,12 @@ public class WhatsAppClient {
                 timestamp
         );
         webAppStateService.pushPatches(BusinessBroadcastListAction.COLLECTION_NAME, List.of(mutation));
-        var action = new com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastListActionBuilder()
+        var action = new BusinessBroadcastListActionBuilder()
                 .participants(participants)
                 .listName(newName)
                 .labelIds(List.of())
                 .build();
-        var current = new java.util.HashMap<>(store.businessBroadcastLists());
+        var current = new HashMap<>(store.businessBroadcastLists());
         current.put(listId, action);
         store.setBusinessBroadcastLists(current);
     }
@@ -8005,7 +10768,7 @@ public class WhatsAppClient {
         var listId = broadcastListId.user();
         var mutation = BusinessBroadcastListHandler.INSTANCE.getDeleteBroadcastListMutation(listId, timestamp); // WAWebBroadcastListSync.getDeleteBroadcastListMutation
         webAppStateService.pushPatches(BusinessBroadcastListAction.COLLECTION_NAME, List.of(mutation));
-        var current = new java.util.HashMap<>(store.businessBroadcastLists());
+        var current = new HashMap<>(store.businessBroadcastLists());
         current.remove(listId); // WAWebBroadcastListStorageUtils.removeBroadcastListStorage
         store.setBusinessBroadcastLists(current);
     }
@@ -8120,7 +10883,7 @@ public class WhatsAppClient {
                 timestamp
         );
         webAppStateService.pushPatches(ChatAssignmentAction.COLLECTION_NAME, List.of(mutation));
-        var states = new java.util.HashMap<>(store.chatAssignmentStates()); // ADAPTED: WAWebChatAssignmentSync.applyMutations writes via bulkCreateOrMerge; Cobalt updates the flat map
+        var states = new HashMap<>(store.chatAssignmentStates()); // ADAPTED: WAWebChatAssignmentSync.applyMutations writes via bulkCreateOrMerge; Cobalt updates the flat map
         if (agentId.isEmpty()) {
             states.remove(chat.toString()); // WAWebChatAssignmentSync.applyMutations: empty agentId drops the assignment
         } else {
@@ -8263,7 +11026,7 @@ public class WhatsAppClient {
      */
     @WhatsAppWebExport(moduleName = "WAWebBizChatAssignmentOpenedAction", exports = "markChatAsOpened",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public void setChatAssignmentOpenedStatus(Jid chat, boolean opened) {
+    public void changeChatAssignmentOpenedStatus(Jid chat, boolean opened) {
         Objects.requireNonNull(chat, "chat cannot be null");
         var agentId = store.chatAssignmentStates().get(chat.toString()); // WAWebBizChatAssignmentOpenedAction.markChatAsOpened: agentId = ChatAssignmentCollection.getCurrentAgentId(e)
         if (agentId == null) { // WAWebBizChatAssignmentOpenedAction.markChatAsOpened: invariant agentId != null
@@ -8277,9 +11040,53 @@ public class WhatsAppClient {
                 timestamp
         );
         webAppStateService.pushPatches(ChatAssignmentOpenedStatusAction.COLLECTION_NAME, List.of(mutation));
-        var states = new java.util.HashMap<>(store.chatAssignmentOpenedStates()); // ADAPTED: WAWebBizChatAssignmentOpenedAction.updateLocalOpenedState writes via bulkCreateOrMerge
+        var states = new HashMap<>(store.chatAssignmentOpenedStates()); // ADAPTED: WAWebBizChatAssignmentOpenedAction.updateLocalOpenedState writes via bulkCreateOrMerge
         states.put(chat + "_" + agentId, opened); // WAWebChatAssignmentOpenedStatusSync.applyMutations: d = s.toJid() + "_" + i
         store.setChatAssignmentOpenedStates(states);
+    }
+
+    /**
+     * Reads the account-wide default disappearing-message timer that new
+     * chats inherit when they are first opened.
+     *
+     * <p>WhatsApp lets each account configure a default expiry that is
+     * applied to every brand-new conversation opened from this device; the
+     * value matches the "Default message timer" entry in the WhatsApp Web
+     * privacy panel and is mirrored across all linked devices. The
+     * accompanying timestamp records when the user last changed the setting
+     * and is useful for ordering local UI against incoming sync mutations.
+     *
+     * <p>Applications typically call this once after login to seed their
+     * "new chat" UI, or to confirm that {@link #changeDefaultDisappearingMode}
+     * actually took effect on the server.
+     *
+     * @return the current default timer paired with the unix-second
+     *         timestamp it was last changed at; never {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     * @throws NoSuchElementException          if the server reply contains
+     *                                         no disappearing-mode entry
+     *
+     * @implNote WAWebQueryDisappearingModeJob.queryDisappearingMode
+     */
+    @WhatsAppWebExport(moduleName = "WAWebQueryDisappearingModeJob", exports = "queryDisappearingMode",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    public AccountDisappearingMode queryDisappearingMode() {
+        // WAWebQueryDisappearingModeJob.queryDisappearingMode: wap("iq", {xmlns: "disappearing_mode", to: S_WHATSAPP_NET, type: "get", id: generateId()})
+        var iqNode = new NodeBuilder()
+                .description("iq")
+                .attribute("xmlns", "disappearing_mode") // WAWebQueryDisappearingModeJob: xmlns: "disappearing_mode"
+                .attribute("to", JidServer.user()) // WAWebQueryDisappearingModeJob: to: S_WHATSAPP_NET
+                .attribute("type", "get"); // WAWebQueryDisappearingModeJob: type: "get"
+        var response = sendNode(iqNode);
+        // WAWebQueryDisappearingModeJob dmParser: e.child("disappearing_mode") -> {duration: attrInt("duration"), t: attrInt("t")}
+        var disappearingNode = response.getChild("disappearing_mode")
+                .orElseThrow(() -> new NoSuchElementException("Missing <disappearing_mode> in disappearing-mode query response"));
+        var seconds = disappearingNode.getAttributeAsInt("duration").orElse(0); // WAWebQueryDisappearingModeJob dmParser: t.attrInt("duration")
+        var timestamp = disappearingNode.getAttributeAsInt("t").orElse(0); // WAWebQueryDisappearingModeJob dmParser: t.attrInt("t")
+        return new AccountDisappearingModeBuilder()
+                .durationSeconds(seconds)
+                .timestamp(Instant.ofEpochSecond(timestamp))
+                .build();
     }
 
     /**
@@ -8312,7 +11119,7 @@ public class WhatsAppClient {
      */
     @WhatsAppWebExport(moduleName = "WAWebChatEphemerality", exports = "setEphemeralSetting",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public void setEphemeralTimer(Jid chat, ChatEphemeralTimer timer) {
+    public void changeEphemeralTimer(Jid chat, ChatEphemeralTimer timer) {
         Objects.requireNonNull(chat, "chat cannot be null");
         Objects.requireNonNull(timer, "timer cannot be null");
         var seconds = timer.periodSeconds(); // ChatEphemeralTimer.periodSeconds -> WAWebEphemeralConstants duration in seconds
@@ -8421,6 +11228,240 @@ public class WhatsAppClient {
         if (count < 4500) return PreciseSizeBucket.LT4500;
         if (count < 5000) return PreciseSizeBucket.LT5000;
         return PreciseSizeBucket.LARGEST_BUCKET;
+    }
+
+    /**
+     * Asks the server which Terms-of-Service / disclosure notices the
+     * current account has accepted.
+     *
+     * <p>WhatsApp shows occasional acceptance prompts (e.g. updated ToS,
+     * business-bot disclosures, broadcast / newsletter producer
+     * disclosures) before unlocking the matching feature. The server
+     * tracks whether each notice id has been acknowledged; this method
+     * returns the latest verdict for every id the caller asks about, so
+     * applications can decide whether to surface a prompt before allowing
+     * the user to use a gated feature.
+     *
+     * <p>The returned {@link TosNotices#refresh()} value is the server's
+     * recommended re-poll cadence — applications that keep a long-running
+     * session typically schedule the next call after that interval
+     * elapses. The interval is clamped to a sane range (two hours to
+     * three days) with a one-day fallback when the server reply is out of
+     * range.
+     *
+     * @param noticeIds the disclosure / ToS identifiers to inspect; never
+     *                  {@code null} but possibly empty (an empty
+     *                  collection still returns the refresh hint)
+     * @return the per-notice acceptance verdicts and the recommended
+     *         re-poll interval; never {@code null}
+     * @throws NullPointerException            if {@code noticeIds} is
+     *                                         {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer
+     *                                         open
+     * @throws NoSuchElementException          if the server reply carries
+     *                                         no {@link TosNotices} entry
+     *
+     * @implNote WAWebTosJob.queryTosState
+     */
+    @WhatsAppWebExport(moduleName = "WAWebTosJob", exports = "queryTosState",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    public TosNotices queryTosNotices(Collection<String> noticeIds) {
+        Objects.requireNonNull(noticeIds, "noticeIds cannot be null");
+        // WAWebTosJob.queryTosState: wap("iq", {xmlns:"tos", id, type:"get", to:S_WHATSAPP_NET}, wap("request", null, e.map(id => wap("notice", {id: CUSTOM_STRING(id)}))))
+        var requestBuilder = new NodeBuilder().description("request");
+        var noticeNodes = new ArrayList<Node>();
+        for (var id : noticeIds) {
+            noticeNodes.add(new NodeBuilder()
+                    .description("notice") // WAWebTosJob.queryTosState: wap("notice", ...)
+                    .attribute("id", id) // WAWebTosJob.queryTosState: id: CUSTOM_STRING(e)
+                    .build());
+        }
+        if (!noticeNodes.isEmpty()) {
+            requestBuilder.content(noticeNodes);
+        }
+        var iqNode = new NodeBuilder()
+                .description("iq")
+                .attribute("xmlns", "tos") // WAWebTosJob.queryTosState: xmlns: "tos"
+                .attribute("to", JidServer.user()) // WAWebTosJob.queryTosState: to: S_WHATSAPP_NET
+                .attribute("type", "get") // WAWebTosJob.queryTosState: type: "get"
+                .content(requestBuilder.build());
+        var response = sendNode(iqNode);
+        // WAWebTosJob.tosNotices parser: t.child("tos") -> {refresh: attrInt("refresh"), notice: [{id, state}]}
+        var tosNode = response.getChild("tos")
+                .orElseThrow(() -> new NoSuchElementException("Missing <tos> in TOS-notices response"));
+        var refreshSeconds = tosNode.getAttributeAsInt("refresh").orElse(0); // WAWebTosJob.tosNotices: r.refresh = n.attrInt("refresh")
+        // WAWebTosJob.tosNotices: r.refresh > 259200 || r.refresh < 7200 -> r.refresh = 86400
+        if (refreshSeconds > 259200 || refreshSeconds < 7200) {
+            refreshSeconds = 86400;
+        }
+        var notices = new ArrayList<TosNotice>();
+        for (var noticeNode : tosNode.getChildren("notice")) {
+            // WAWebTosJob.tosNotices: state = e.maybeAttrString("state") !== "false"
+            var id = noticeNode.getAttributeAsString("id").orElse(null);
+            if (id == null) {
+                continue;
+            }
+            var stateAttr = noticeNode.getAttributeAsString("state").orElse(null);
+            var state = stateAttr == null || !stateAttr.equals("false");
+            notices.add(new TosNoticeBuilder()
+                    .id(id)
+                    .accepted(state)
+                    .build());
+        }
+        return new TosNoticesBuilder()
+                .refreshSeconds(refreshSeconds)
+                .notices(notices)
+                .build();
+    }
+
+    /**
+     * Cancels a previously-submitted "Request account info" GDPR data
+     * export so the server discards it before the report finishes
+     * generating.
+     *
+     * <p>Through the WhatsApp Settings UI, users can request a downloadable
+     * report of their account or newsletter data; the server queues the
+     * job and emails a download link when ready. Once submitted, the user
+     * can call this entry point to abort the pending request — useful when
+     * an application surfaces a "Cancel data export" affordance, or
+     * automatically reverts a request that was issued in error.
+     *
+     * <p>The call is fire-and-forget: the server acknowledges the
+     * cancellation but returns no body, so applications observing the
+     * cancellation success have to re-query the GDPR status separately.
+     *
+     * @param reportType which export to cancel —
+     *                   {@link GdprReportType#ACCOUNT} for the full
+     *                   account report or
+     *                   {@link GdprReportType#NEWSLETTERS} for the
+     *                   newsletter-only variant; never {@code null}
+     * @throws NullPointerException            if {@code reportType} is
+     *                                         {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer
+     *                                         open
+     *
+     * @implNote WAWebDebugGDPR.cancelGDPRRequest
+     */
+    @WhatsAppWebExport(moduleName = "WAWebDebugGDPR", exports = "default.cancelGDPRRequest",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    public void cancelGdprRequest(GdprReportType reportType) {
+        Objects.requireNonNull(reportType, "reportType cannot be null");
+        // WAWebGdprHookUtils.getGdprIq: e (mapping fn) returns null for ACCOUNT, "newsletters" for NEWSLETTERS
+        var gdprBuilder = new NodeBuilder()
+                .description("gdpr") // WAWebGdprHookUtils.getGdprIq: wap("gdpr", ...)
+                .attribute("action", "delete"); // WAWebDebugGDPR.cancelGDPRRequest: action argument is "delete"
+        var wireType = reportType.wireValue();
+        if (wireType != null) {
+            gdprBuilder.attribute("report_type", wireType); // WAWebGdprHookUtils.getGdprIq: a != null branch attaches report_type
+        }
+        var iqNode = new NodeBuilder()
+                .description("iq")
+                .attribute("xmlns", "urn:xmpp:whatsapp:account") // WAWebGdprHookUtils.getGdprIq: xmlns: "urn:xmpp:whatsapp:account"
+                .attribute("to", JidServer.user()) // WAWebGdprHookUtils.getGdprIq: to: S_WHATSAPP_NET
+                .attribute("type", "get") // WAWebGdprHookUtils.getGdprIq: type: "get"
+                .content(gdprBuilder.build());
+        sendNode(iqNode); // WAWebDebugGDPR.cancelGDPRRequest: deprecatedSendIq(n, GdprStatusWapParser)
+    }
+
+    /**
+     * Fetches the WhatsApp Web push-server public key used to encrypt
+     * browser push subscriptions before forwarding them to the server.
+     *
+     * <p>WhatsApp Web's PWA push-notification flow encrypts the
+     * Service-Worker push subscription endpoint and auth secrets with
+     * this key before uploading them so the server can deliver
+     * background pushes without seeing the raw browser-side credentials.
+     * Applications wiring up their own browser-style push delivery — or
+     * mirroring WA Web's PWA install flow — call this once per session
+     * to retrieve the key, then feed it into the encryption step before
+     * registering the subscription.
+     *
+     * <p>Most non-browser embeddings of Cobalt do not need to call this
+     * method; it only matters for clients that actually deliver pushes
+     * through the WA Web push pipeline.
+     *
+     * @return the base-64 encoded public key when the server published
+     *         one; {@link Optional#empty()} when the server returned an
+     *         error (an installed
+     *         {@link WhatsAppClientErrorHandler} can recover the
+     *         underlying error code if richer diagnostics are needed)
+     * @throws WhatsAppSessionException.Closed if the socket is no longer
+     *                                         open
+     *
+     * @implNote WAWebGetPushServerSettingsJob.getPushServerSettings
+     */
+    @WhatsAppWebExport(moduleName = "WAWebGetPushServerSettingsJob", exports = "getPushServerSettings",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<String> queryPushServerKey() {
+        // WAWebGetPushServerSettingsJob: wap("iq", {to: S_WHATSAPP_NET, type: "get", xmlns: "urn:xmpp:whatsapp:push", id}, wap("settings", null))
+        var settingsQuery = new NodeBuilder()
+                .description("settings")
+                .build();
+        var iqNode = new NodeBuilder()
+                .description("iq")
+                .attribute("xmlns", "urn:xmpp:whatsapp:push") // WAWebGetPushServerSettingsJob: xmlns: "urn:xmpp:whatsapp:push"
+                .attribute("to", JidServer.user()) // WAWebGetPushServerSettingsJob: to: S_WHATSAPP_NET
+                .attribute("type", "get") // WAWebGetPushServerSettingsJob: type: "get"
+                .content(settingsQuery);
+        var response = sendNode(iqNode);
+        // WAWebGetPushServerSettingsJob parser: t.hasChild("error") -> error branch; otherwise t.child("settings").attrString("webserverkey")
+        return response.getChild("settings")
+                .flatMap(settingsNode -> settingsNode.getAttributeAsString("webserverkey"));
+    }
+
+    /**
+     * Registers a Windows Notification Service (WNS) push-token binding
+     * for the local account, so the WhatsApp server can deliver
+     * background push notifications to the WhatsApp UWP / Hybrid Windows
+     * client.
+     *
+     * <p>This entry point is only relevant for embeddings that mimic
+     * WhatsApp's native Windows desktop client: the UWP shell obtains a
+     * WNS channel URI from Microsoft, then publishes it here so the
+     * server knows where to fan out new-message notifications when the
+     * client is offline. Other platforms (Android, iOS, web) use
+     * different push registration endpoints and should not call this.
+     *
+     * <p>The channel argument selects which Windows distribution ring the
+     * subscription belongs to, so production and beta builds receive
+     * separate notification streams. The {@link WindowsPushChannel#PUBLIC}
+     * value suppresses the version tag entirely so the server treats the
+     * subscription as the public-release default.
+     *
+     * @param pushTokenId the WNS channel URI / token assigned to the
+     *                    local install; never {@code null}
+     * @param channel     the Windows distribution ring; never {@code null}
+     * @throws NullPointerException            if any argument is
+     *                                         {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer
+     *                                         open
+     *
+     * @implNote WAWebSetWindowsPushConfig.setWindowsPushConfig
+     */
+    @WhatsAppWebExport(moduleName = "WAWebSetWindowsPushConfig", exports = "setWindowsPushConfig",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    public void changeWindowsPushConfig(String pushTokenId, WindowsPushChannel channel) {
+        Objects.requireNonNull(pushTokenId, "pushTokenId cannot be null");
+        Objects.requireNonNull(channel, "channel cannot be null");
+        // WAWebSetWindowsPushConfig.m: e === "uwp_hybrid_dogfooding" -> "uwp_hybrid_dogfooding";
+        //                              e === "uwp_alpha" -> "uwp_alpha";
+        //                              e === "uwp_beta" -> "uwp_beta";
+        //                              e === "uwp_public" -> DROP_ATTR.
+        var wireVersion = channel.wireValue();
+        var configBuilder = new NodeBuilder()
+                .description("config")
+                .attribute("id", pushTokenId) // WAWebSetWindowsPushConfig: id: CUSTOM_STRING(e)
+                .attribute("platform", "wns"); // WAWebSetWindowsPushConfig: platform: "wns"
+        if (wireVersion != null) {
+            configBuilder.attribute("version", wireVersion); // WAWebSetWindowsPushConfig: version: m(t), DROP_ATTR omitted
+        }
+        var iqNode = new NodeBuilder()
+                .description("iq")
+                .attribute("xmlns", "urn:xmpp:whatsapp:push") // WAWebSetWindowsPushConfig: xmlns: "urn:xmpp:whatsapp:push"
+                .attribute("to", JidServer.user()) // WAWebSetWindowsPushConfig: to: S_WHATSAPP_NET
+                .attribute("type", "set") // WAWebSetWindowsPushConfig: type: "set"
+                .content(configBuilder.build());
+        sendNode(iqNode); // WAWebSetWindowsPushConfig: deprecatedSendIq(n, u)
     }
 
     /**
@@ -8615,9 +11656,6 @@ public class WhatsAppClient {
                 userChildren = buildLidPrivacyUsers(excludedOrIncluded, action);
             } catch (Throwable throwable) {
                 // WAWebSetPrivacyJob.p: LOGGER.ERROR("[privacy] setPrivacy: failed to create lid privacy node", ...); fall back to g().
-                LOGGER_PRIVACY.log(System.Logger.Level.WARNING,
-                        "[privacy] changePrivacySetting: failed to create LID privacy node, falling back to PN",
-                        throwable);
                 userChildren = buildPnPrivacyUsers(excludedOrIncluded, action);
                 var category = new NodeBuilder()
                         .description("category")
@@ -8663,14 +11701,6 @@ public class WhatsAppClient {
 
         dispatchPrivacyIq(privacyNode, type, value, excludedOrIncluded);
     }
-
-    /**
-     * Logger reused by the privacy IQ helpers for LID fallback diagnostics.
-     *
-     * @implNote WAWebSetPrivacyJob: {@code WALogger.ERROR} usage on LID-node
-     *           construction failure.
-     */
-    private static final System.Logger LOGGER_PRIVACY = System.getLogger(WhatsAppClient.class.getName() + ".privacy");
 
     /**
      * Sends the privacy IQ and refreshes the local store entry on success.
@@ -8781,6 +11811,673 @@ public class WhatsAppClient {
     }
 
     /**
+     * Toggles whether the local account sends "read" receipts (the blue
+     * double-ticks) to peers.
+     *
+     * <p>Read receipts are a single account-wide privacy switch in
+     * WhatsApp's Settings → Privacy panel: when disabled, peers stop
+     * seeing when this account opens their messages, but in exchange
+     * this account also stops seeing read receipts from them. Enabling
+     * read receipts immediately re-enables both directions.
+     *
+     * <p>This is a convenience shortcut over
+     * {@link #changePrivacySetting(PrivacySettingType, PrivacySettingValue)}
+     * with the read-receipts category. Use it when an application
+     * surfaces a simple on/off toggle rather than the broader privacy
+     * audience picker.
+     *
+     * @param enabled {@code true} to send and receive read receipts;
+     *                {@code false} to disable both directions
+     * @throws WhatsAppSessionException.Closed if the socket is no longer
+     *                                         open
+     *
+     * @implNote WAWebSetReadReceiptJob.default
+     */
+    @WhatsAppWebExport(moduleName = "WAWebSetReadReceiptJob", exports = "default",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void changeReadReceipts(boolean enabled) {
+        // WAWebSetReadReceiptJob: wap("category", {name: "readreceipts", value: t ? "all" : "none"})
+        changePrivacySetting(
+                PrivacySettingType.READ_RECEIPTS,
+                enabled ? PrivacySettingValue.EVERYONE : PrivacySettingValue.NO_ONE);
+    }
+
+    /**
+     * Issues one or more privacy tokens that bind the local account to a
+     * peer's identity.
+     *
+     * <p>Privacy tokens are server-side bindings between two accounts that
+     * survive across either side's device re-pairings. The current concrete
+     * use case is the "trusted contact" workflow: when the local user
+     * explicitly trusts a peer, this call records the bond on the server so
+     * the peer's identity-key changes do not silently invalidate the
+     * relationship and so message-receipt privacy decisions can be
+     * short-circuited for that contact. Subsequent device-list rebuilds and
+     * Signal protocol session resets read the same token back to confirm
+     * the peer is still trusted.
+     *
+     * <p>The {@code timestamp} value is recorded server-side and surfaced
+     * back as the issue time on subsequent token reads — pass the actual
+     * instant the bond was created so the server can sequence multiple
+     * tokens issued for the same peer. Issuing a fresh token for a peer
+     * who already has one of the same type overwrites the previous record.
+     *
+     * @param userJid    the peer whose identity the tokens cover; never
+     *                   {@code null}
+     * @param tokenTypes the token categories to issue; never {@code null},
+     *                   must be non-empty
+     * @param timestamp  the unix-second issue time the server records on
+     *                   each token; must be non-negative
+     * @throws NullPointerException            if any argument is {@code null}
+     * @throws IllegalArgumentException        if {@code tokenTypes} is empty
+     * @throws WhatsAppSessionException.Closed if the socket is no longer
+     *                                         open
+     *
+     * @implNote WAWebSetPrivacyTokensJob.issuePrivacyToken builds one
+     *           {@code <token jid t type/>} child per requested type and
+     *           wraps them in a {@code <tokens>} container. Cobalt mirrors
+     *           the wire shape verbatim; the timestamp is passed through
+     *           as a string per WA Web's {@code CUSTOM_STRING(String(r))}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebSetPrivacyTokensJob", exports = "issuePrivacyToken",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    public void issuePrivacyTokens(Jid userJid, Collection<PrivacyTokenType> tokenTypes, long timestamp) {
+        Objects.requireNonNull(userJid, "userJid cannot be null");
+        Objects.requireNonNull(tokenTypes, "tokenTypes cannot be null");
+        if (tokenTypes.isEmpty()) {
+            throw new IllegalArgumentException("tokenTypes must not be empty");
+        }
+        if (timestamp < 0) {
+            throw new IllegalArgumentException("timestamp must not be negative");
+        }
+        // WAWebSetPrivacyTokensJob.issuePrivacyToken: n.map(e => wap("token", {jid: USER_JID(t), t: CUSTOM_STRING(String(r)), type: CUSTOM_STRING(e)}))
+        var tokenNodes = new ArrayList<Node>(tokenTypes.size());
+        var timestampValue = Long.toString(timestamp);
+        for (var tokenType : tokenTypes) {
+            Objects.requireNonNull(tokenType, "tokenTypes element cannot be null");
+            tokenNodes.add(new NodeBuilder()
+                    .description("token")
+                    .attribute("jid", userJid) // WAWebSetPrivacyTokensJob: jid: USER_JID(t)
+                    .attribute("t", timestampValue) // WAWebSetPrivacyTokensJob: t: CUSTOM_STRING(String(r))
+                    .attribute("type", tokenType.wireValue()) // WAWebSetPrivacyTokensJob: type: CUSTOM_STRING(e)
+                    .build());
+        }
+        var tokensContainer = new NodeBuilder()
+                .description("tokens") // WAWebSetPrivacyTokensJob: wap("tokens", null, i)
+                .content(tokenNodes)
+                .build();
+        var iqNode = new NodeBuilder()
+                .description("iq")
+                .attribute("xmlns", "privacy") // WAWebSetPrivacyTokensJob: xmlns: "privacy"
+                .attribute("to", JidServer.user()) // WAWebSetPrivacyTokensJob: to: S_WHATSAPP_NET
+                .attribute("type", "set") // WAWebSetPrivacyTokensJob: type: "set"
+                .content(tokensContainer);
+        sendNode(iqNode); // WAWebSetPrivacyTokensJob: deprecatedSendIq(_, parser); throws ServerStatusCodeError on !success
+    }
+
+    /**
+     * Reconciles a per-category privacy block-list (e.g. the contacts who
+     * cannot see when this account is online) between the local cache and
+     * the server's authoritative view.
+     *
+     * <p>WhatsApp's "Last seen", "Online", "Profile photo", "About" and
+     * "Status" privacy panels can be set to "My contacts except…", which
+     * exposes a per-category blocklist of contacts. Each linked device
+     * caches its own copy of those lists; this call lets a fresh client
+     * synchronise its cache against the server cheaply: it sends a digest
+     * of the local list and gets back a "match" verdict if the digests
+     * agree, or the full server-side list plus a new digest when they
+     * disagree. Cobalt-driven clients should call this on first connect
+     * for every list category they care about and then refresh whenever a
+     * sync mutation invalidates the cached digest.
+     *
+     * <p>{@link PrivacyDisallowedList#match()} indicates the caller's
+     * cached list is up to date and no further action is required;
+     * {@link PrivacyDisallowedList#mismatch(List, String)} carries the
+     * server-side users and the digest to persist alongside them so the
+     * next reconciliation hits the fast path.
+     *
+     * @param listName the privacy category whose list is being reconciled
+     *                 (e.g. {@code "online"}, {@code "last"},
+     *                 {@code "profile"}); never {@code null}
+     * @return the comparison result; never {@code null}
+     * @throws NullPointerException            if {@code listName} is
+     *                                         {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer
+     *                                         open
+     * @throws NoSuchElementException          if the server reply is
+     *                                         malformed
+     *
+     * @implNote WAWebQueryPrivacyDisallowedListPnJob.queryPrivacyDisallowedListPn
+     *           builds the same IQ and parses the response via
+     *           {@code getPrivacyDisallowedListParser}: a missing
+     *           {@code <list>} child yields {@code {status: "match"}};
+     *           otherwise the parser maps {@code <user jid/>} children into
+     *           user WIDs (after {@code deviceJidToUserWid}) and returns
+     *           {@code {status: "mismatch", users, dhash}}. Cobalt
+     *           preserves both shapes via
+     *           {@link PrivacyDisallowedList}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebQueryPrivacyDisallowedListPnJob",
+            exports = "queryPrivacyDisallowedListPn", adaptation = WhatsAppAdaptation.ADAPTED)
+    public PrivacyDisallowedList queryPrivacyDisallowedList(String listName) {
+        Objects.requireNonNull(listName, "listName cannot be null");
+        // WAWebQueryPrivacyDisallowedListPnJob: wap("list", {name: CUSTOM_STRING(t), value: CUSTOM_STRING("contact_blacklist")})
+        var listNode = new NodeBuilder()
+                .description("list")
+                .attribute("name", listName) // WAWebQueryPrivacyDisallowedListPnJob: name: CUSTOM_STRING(t)
+                .attribute("value", "contact_blacklist") // WAWebQueryPrivacyDisallowedListPnJob: value: CUSTOM_STRING("contact_blacklist")
+                .build();
+        var privacyContainer = new NodeBuilder()
+                .description("privacy")
+                .content(listNode)
+                .build();
+        var iqNode = new NodeBuilder()
+                .description("iq")
+                .attribute("xmlns", "privacy") // WAWebQueryPrivacyDisallowedListPnJob: xmlns: "privacy"
+                .attribute("to", JidServer.user()) // WAWebQueryPrivacyDisallowedListPnJob: to: S_WHATSAPP_NET
+                .attribute("type", "get") // WAWebQueryPrivacyDisallowedListPnJob: type: "get"
+                .content(privacyContainer);
+        var response = sendNode(iqNode);
+        // WAWebQueryPrivacyDisallowedListPnJob.getPrivacyDisallowedListParser: e.child("privacy") -> maybeChild("list")
+        var privacyNode = response.getChild("privacy")
+                .orElseThrow(() -> new NoSuchElementException("Missing <privacy> in disallowed-list response"));
+        var listChild = privacyNode.getChild("list").orElse(null);
+        if (listChild == null) {
+            // WAWebQueryPrivacyDisallowedListPnJob: n == null -> {status: "match"}
+            return new PrivacyDisallowedListBuilder().match(true).users(java.util.List.of()).build();
+        }
+        // WAWebQueryPrivacyDisallowedListPnJob: r = n.mapChildren(e => deviceJidToUserWid(e.attrDeviceJid("jid")))
+        var users = listChild.streamChildren()
+                .flatMap(node -> node.getAttributeAsJid("jid").stream())
+                .map(Jid::toUserJid) // ADAPTED: WA Web uses WAWebJidToWid.deviceJidToUserWid; Cobalt's Jid.toUserJid() is the canonical equivalent.
+                .toList();
+        var dhash = listChild.getAttributeAsString("dhash") // WAWebQueryPrivacyDisallowedListPnJob: dhash: n.attrString("dhash")
+                .orElseThrow(() -> new NoSuchElementException("Missing dhash on <list>"));
+        return new PrivacyDisallowedListBuilder().match(false).users(users).dhash(dhash).build();
+    }
+
+    /**
+     * Reconciles the local cache of a server-side privacy "disallowed list"
+     * via the MEX/GraphQL transport, returning either a {@code match} verdict
+     * or the fresh contact roster paired with the new content digest.
+     *
+     * <p>Privacy disallowed lists are the per-category exclusion rosters that
+     * back the {@link PrivacySettingType#LAST_SEEN}, {@link PrivacySettingType#PROFILE_PIC},
+     * {@link PrivacySettingType#STATUS} and {@link PrivacySettingType#ADD_ME_TO_GROUPS}
+     * audience selectors. Each category maintains its own sliding-digest
+     * (the {@code dhash}) so reconciliation can hit a server-side fast path
+     * when the local cache is up to date. Submit the digest of the locally
+     * cached roster as {@code dhash}; the server returns a
+     * {@link PrivacyDisallowedList#match()} verdict when the digest matches
+     * its own and a {@link PrivacyDisallowedList#mismatch(List, String)}
+     * carrying the fresh contacts plus the new digest otherwise.
+     *
+     * <p>This is the MEX-flavoured counterpart of
+     * {@link #queryPrivacyDisallowedList(String)}; the legacy IQ entry point
+     * uses the {@code privacy} XMPP namespace, while this method goes through
+     * the {@code w:mex} GraphQL pipeline. WA Web reaches for the MEX path
+     * preferentially when {@code WAWebPrivacyGatingUtils.isMexPrivacyContactListEnabled}
+     * is on and a device LID is known; both transports return the same
+     * higher-level reconciliation outcome but the MEX wire format also
+     * surfaces username metadata for each contact via
+     * {@link GetPrivacyListsMexResponse.PrivacyContact#username()}, which
+     * the legacy IQ form omits.
+     *
+     * <p>Applications typically call this on first connect for every
+     * category they care about (with {@code dhash} set to the digest from
+     * the previous run, or {@code ""} on a cold start) and again whenever a
+     * server-side 409 conflict on a privacy-set update signals that the
+     * digest the client carried in the request was already stale.
+     *
+     * @param jid      the requesting user's JID — the MEX query wraps the
+     *                 single user in its {@code query_input} array; never
+     *                 {@code null}
+     * @param dhash    the digest of the locally cached roster used for
+     *                 delta refreshes; pass {@code ""} (or {@code null}) on
+     *                 a cold start so the server returns the full list
+     * @param category the privacy domain identifier in MEX form
+     *                 ({@code "ABOUT"}, {@code "GROUPADD"}, {@code "LAST"},
+     *                 {@code "PROFILE"}); never {@code null}
+     * @param type     the allow/deny polarity ({@code "DENYLIST"} for the
+     *                 standard exclusion roster); never {@code null}
+     * @return the reconciliation verdict; never {@code null}
+     * @throws NullPointerException            if {@code jid}, {@code category}
+     *                                         or {@code type} is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     *
+     * @implNote WAWebQueryPrivacyDisallowedListMexJob.queryPrivacyDisallowedListMex
+     *           dispatches the {@code WAWebMexGetPrivacyList.fetchPrivacyList}
+     *           GraphQL query and walks the
+     *           {@code xwa2_fetch_wa_users[0].privacy_contact_list} projection
+     *           to derive the same {@code {status, users, dhash}} verdict the
+     *           legacy IQ parser produces. Cobalt mirrors that mapping verbatim
+     *           via {@link GetPrivacyListsMexResponse} and exposes the
+     *           outcome through {@link PrivacyDisallowedList} so callers can
+     *           treat both transports as interchangeable.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebQueryPrivacyDisallowedListMexJob",
+            exports = "queryPrivacyDisallowedListMex", adaptation = WhatsAppAdaptation.ADAPTED)
+    public PrivacyDisallowedList queryPrivacyDisallowedListMex(Jid jid, String dhash, String category, String type) {
+        Objects.requireNonNull(jid, "jid cannot be null");
+        Objects.requireNonNull(category, "category cannot be null");
+        Objects.requireNonNull(type, "type cannot be null");
+        // WAWebQueryPrivacyDisallowedListMexJob.queryPrivacyDisallowedListMex:
+        //   WAWebMexGetPrivacyList.fetchPrivacyList({jid:n, dhash:"", category:e(t), type:"DENYLIST"})
+        var request = new GetPrivacyListsMexRequest(jid, dhash == null ? "" : dhash, category, type);
+        var response = sendNode(request);
+        var parsed = GetPrivacyListsMexResponse.of(response);
+        if (parsed.isEmpty()) {
+            // WAWebQueryPrivacyDisallowedListMexJob.queryPrivacyDisallowedListMex:
+            // missing privacy_contact_list -> empty contacts -> {status:"match"}
+            return new PrivacyDisallowedListBuilder().match(true).users(java.util.List.of()).build();
+        }
+        var payload = parsed.get();
+        // WAWebQueryPrivacyDisallowedListMexJob.queryPrivacyDisallowedListMex:
+        //   for (var c of contacts) { var m = c.jid ?? c.pn_jid; ... users.push(createUserWidOrThrow(m)) }
+        var users = payload.contacts()
+                .stream()
+                .map(contact -> {
+                    var canonical = contact.jid();
+                    return canonical.toUserJid();
+                })
+                .toList();
+        if (users.isEmpty()) {
+            // WAWebQueryPrivacyDisallowedListMexJob.queryPrivacyDisallowedListMex:
+            //   users.length === 0 -> {status:"match"}
+            return new PrivacyDisallowedListBuilder().match(true).users(java.util.List.of()).build();
+        }
+        // WAWebQueryPrivacyDisallowedListMexJob.queryPrivacyDisallowedListMex:
+        //   {status:"mismatch", users, dhash: list.dhash ?? ""}
+        var freshDhash = payload.dhash().orElse("");
+        return new PrivacyDisallowedListBuilder().match(false).users(users).dhash(freshDhash).build();
+    }
+
+    /**
+     * Reads the current "reachout timelock" enforcement window applied to the
+     * authenticated account.
+     *
+     * <p>WhatsApp throttles new-chat initiation when an account has been
+     * flagged for spam reports or suspicious outreach: while the timelock is
+     * active the send path is gated and the UI surfaces a cooldown notice.
+     * The query returns whether enforcement is currently active, when the
+     * window ends and which enforcement type applies (soft warning, hard
+     * block, etc.).
+     *
+     * <p>Cobalt invokes this once during the post-login bootstrap so the
+     * server records the same compliance ping WA Web emits at app launch
+     * (see {@code WAWebStartBackend} which calls
+     * {@code WAWebGetReachoutTimelockJob.fetchReachoutTimelock} as part of
+     * the post-success housekeeping). The returned record is currently
+     * surfaced to callers but not persisted on the store; applications that
+     * want to gate their own send path on the timelock should call this
+     * directly and inspect the result.
+     *
+     * @return the parsed timelock verdict, or {@link Optional#empty()} when
+     *         the server returned no payload
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     *
+     * @implNote WAWebMexFetchReachoutTimelockJob.mexFetchReachoutTimelock
+     *           dispatches the {@code WAWebMexFetchReachoutTimelockJobQuery}
+     *           GraphQL query and projects the
+     *           {@code xwa2_fetch_account_reachout_timelock} envelope into a
+     *           {@code {is_active, time_enforcement_ends, enforcement_type}}
+     *           record. Cobalt exposes the same projection via
+     *           {@link FetchReachoutTimelockMexResponse}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexFetchReachoutTimelockJob",
+            exports = "mexFetchReachoutTimelock", adaptation = WhatsAppAdaptation.DIRECT)
+    public Optional<FetchReachoutTimelockMexResponse> queryReachoutTimelock() {
+        // WAWebMexFetchReachoutTimelockJob.mexFetchReachoutTimelock:
+        //   WAWebMexClient.fetchQuery(WAWebMexFetchReachoutTimelockJobQuery.graphql, {})
+        var request = new FetchReachoutTimelockMexRequest();
+        var response = sendNode(request);
+        return FetchReachoutTimelockMexResponse.of(response);
+    }
+
+    /**
+     * Fetches the FMX (first-message-experience) integrity signals the
+     * relay attaches to a peer, exposing whether the peer is a new account
+     * and whether starting a chat with them is flagged as suspicious.
+     *
+     * <p>Integrity signals power the safety nudges WhatsApp shows when a
+     * user starts a conversation with an unfamiliar contact: the
+     * {@code is_new_account} flag drives the "new on WhatsApp" badge while
+     * {@code is_suspicious_start_chat} drives the spam-warning sheet.
+     * Callers integrating their own start-chat surface can call this once
+     * the user composes the first outbound message to drive the same
+     * advisories.
+     *
+     * <p>Dispatches the
+     * {@link FetchIntegritySignalsMexRequest fetchIntegritySignals} MEX
+     * query.
+     *
+     * @param userJid the non-{@code null} user JID whose signals are being
+     *                fetched
+     * @return an {@link Optional} containing the parsed response, or empty
+     *         if the relay returned no payload (for example because the
+     *         peer is not visible to integrity scoring)
+     * @throws NullPointerException            if {@code userJid} is
+     *                                         {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer
+     *                                         open
+     *
+     * @implNote WAWebMexFetchIntegritySignals.fetchIntegritySignals: WA Web
+     * only fires this query when the {@code isExpandFmxMexEnabled} AB
+     * gate is on, scoping the FMX safety surface to a server-side
+     * rollout. Cobalt is a library and exposes the call unconditionally;
+     * consumers that want to mirror the AB-gating should query the prop
+     * themselves and skip the call when it is off. WA Web also wraps the
+     * fetch in defensive {@code try/catch} telemetry that downgrades any
+     * failure to a {@code null} return; Cobalt drops that telemetry side
+     * channel and lets the configured
+     * {@link WhatsAppClientErrorHandler} decide how to handle errors.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexFetchIntegritySignals", exports = "fetchIntegritySignals",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<FetchIntegritySignalsMexResponse> queryUserIntegritySignals(Jid userJid) {
+        Objects.requireNonNull(userJid, "userJid cannot be null");
+        var request = new FetchIntegritySignalsMexRequest(userJid);
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendNode(request);
+        return FetchIntegritySignalsMexResponse.of(response);
+    }
+
+    /**
+     * Reads the current outbound new-chat messaging quota the server enforces
+     * on the authenticated account.
+     *
+     * <p>WhatsApp meters how many brand-new chat threads a user can open per
+     * billing cycle; the response carries the total quota, used quota, the
+     * cycle start/end timestamps and a series of status flags
+     * ({@code oteStatus}, {@code mvStatus}, {@code cappingStatus}) that drive
+     * the throttling UI and per-message warnings on the official clients.
+     *
+     * <p>Cobalt invokes this once during the post-login bootstrap so the
+     * server registers the same compliance ping WA Web emits whenever a new
+     * chat is initiated (the persisted-job
+     * {@code WAWebGetNewChatMessageCappingInfoJob.getNewChatMessageCapping}
+     * delegates to {@code WAWebMexFetchNewChatMessageCappingInfoJob.mexFetchNewChatMessageCapping}).
+     * The returned record is surfaced to callers but not currently persisted
+     * on the store; applications that want to gate their own send path on
+     * the capping verdict should call this directly and inspect the result.
+     *
+     * @return the parsed capping payload, or {@link Optional#empty()} when
+     *         the server returned no envelope
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     *
+     * @implNote WAWebMexFetchNewChatMessageCappingInfoJob.mexFetchNewChatMessageCapping
+     *           dispatches the {@code WAWebMexFetchNewChatMessageCappingInfoJobQuery}
+     *           GraphQL query with the variables
+     *           {@code {input:{type:"INDIVIDUAL_NEW_CHAT_THREAD"}}}. The
+     *           Cobalt {@link FetchNewChatMessageCappingInfoMexRequest}
+     *           accepts a single {@code String} that is forwarded to the
+     *           server as the {@code input} variable; passing the literal
+     *           {@code "INDIVIDUAL_NEW_CHAT_THREAD"} preserves the
+     *           wire-equivalent intent of the JS request without re-shaping
+     *           the generated MEX class.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexFetchNewChatMessageCappingInfoJob",
+            exports = "mexFetchNewChatMessageCapping", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<FetchNewChatMessageCappingInfoMexResponse> queryNewChatMessageCappingInfo() {
+        // WAWebMexFetchNewChatMessageCappingInfoJob.mexFetchNewChatMessageCapping:
+        //   var i = {input: {type: "INDIVIDUAL_NEW_CHAT_THREAD"}}
+        //   WAWebMexClient.fetchQuery(WAWebMexFetchNewChatMessageCappingInfoJobQuery.graphql, i)
+        var request = new FetchNewChatMessageCappingInfoMexRequest("INDIVIDUAL_NEW_CHAT_THREAD");
+        var response = sendNode(request);
+        return FetchNewChatMessageCappingInfoMexResponse.of(response);
+    }
+
+    /**
+     * Submits a passkey-signed integrity challenge response and returns the
+     * relay's verdict on whether the assertion was accepted.
+     *
+     * <p>Server-side integrity challenges are emitted as
+     * {@code <notification type="mex" op_name="NotificationIntegrityChallengeRequest">}
+     * stanzas, observable through Cobalt's MEX notification stream. Once a
+     * caller receives a challenge it signs it with the user's WebAuthn
+     * passkey credential and submits the JSON-serialised assertion through
+     * this entry point. The returned response carries
+     * {@link IntegrityChallengeResponseMexResponse#success() success} and an
+     * optional {@link IntegrityChallengeResponseMexResponse#errorMessage()
+     * errorMessage} that the relay populates on rejection.
+     *
+     * <p>The handshake is initiated by the server, so there is no automatic
+     * post-login invocation: callers wire their own observer on the
+     * {@code NotificationIntegrityChallengeRequest} notification (currently
+     * logged and ignored by {@code NotificationMexStreamHandler}) and invoke
+     * this method when the challenge arrives. The {@code prfAvailable}
+     * argument mirrors WA Web's {@code e.prf_output != null} check on the
+     * WebAuthn assertion.
+     *
+     * @param signedChallenge the JSON-serialised WebAuthn assertion bytes;
+     *                        Cobalt base64-encodes them inline to mirror the
+     *                        JS {@code btoa(JSON.stringify(e))} call; never
+     *                        {@code null}
+     * @param prfAvailable    {@code true} when the assertion carries a
+     *                        {@code prf_output} field
+     * @return the parsed verdict, or {@link Optional#empty()} when the relay
+     *         returned no envelope
+     * @throws NullPointerException            if {@code signedChallenge} is
+     *                                         {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     *
+     * @implNote WAWebMexIntegrityChallengeResponse.mexSubmitPasskeyChallengeResponse
+     *           dispatches the {@code WAWebMexIntegrityChallengeResponseMutation}
+     *           GraphQL mutation. The {@code challenge_type} discriminator is
+     *           hard-coded to {@code "PASSKEY"} on every call; only the
+     *           {@code passkey_response.signed_challenge} (base64) and
+     *           {@code passkey_response.prf_available} variables are
+     *           caller-controlled.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexIntegrityChallengeResponse",
+            exports = "mexSubmitPasskeyChallengeResponse", adaptation = WhatsAppAdaptation.DIRECT)
+    public Optional<IntegrityChallengeResponseMexResponse> submitPasskeyIntegrityChallenge(byte[] signedChallenge, boolean prfAvailable) {
+        Objects.requireNonNull(signedChallenge, "signedChallenge cannot be null");
+        // WAWebMexIntegrityChallengeResponse.mexSubmitPasskeyChallengeResponse:
+        //   variables = {input: {challenge_type:"PASSKEY", passkey_response:{signed_challenge: btoa(JSON.stringify(e)), prf_available: e.prf_output != null}}}
+        var request = new IntegrityChallengeResponseMexRequest(signedChallenge, prfAvailable);
+        var response = sendNode(request);
+        return IntegrityChallengeResponseMexResponse.of(response);
+    }
+
+    /**
+     * Dispatches a USync query through the MEX/GraphQL transport and returns
+     * the parsed response.
+     *
+     * <p>This is the MEX-flavoured counterpart of
+     * {@link #sendNode(UsyncQuery)}; the native variant uses the
+     * legacy {@code <iq xmlns="usync">} envelope, while this method delegates
+     * to the {@code WAWebMexUsyncQuery} GraphQL operation. The MEX path is
+     * preferred when the caller wants the richer per-user projection (about
+     * status, country code and registered username) that
+     * {@link UsyncMexResponse} surfaces, without splitting the round trip
+     * across multiple legacy stanzas.
+     *
+     * <p>The three boolean toggles select which optional projection fields
+     * are populated server-side; passing {@code null} for all three matches
+     * the WA Web "minimal" call site that only resolves JIDs without any
+     * additional metadata. The {@code input} argument is the
+     * pre-serialised batch payload that WA Web obtains from
+     * {@code WAWebMexUsync.serializeUsyncContext} — Cobalt forwards it
+     * verbatim because the input shape is opaque at this layer and depends
+     * on the concrete sub-protocol the caller is exercising.
+     *
+     * @param includeAboutStatus toggles the {@code include_about_status}
+     *                           variable; {@code null} omits the variable
+     * @param includeCountryCode toggles the {@code include_country_code}
+     *                           variable; {@code null} omits the variable
+     * @param includeUsername    toggles the {@code include_username}
+     *                           variable; {@code null} omits the variable
+     * @param input              the pre-serialised input payload, or
+     *                           {@code null} to omit the variable
+     * @return the parsed response, or {@link Optional#empty()} when the
+     *         server returned no envelope
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     *
+     * @implNote WAWebMexUsync.mexUsyncQuery dispatches the
+     *           {@code WAWebMexUsyncQuery.graphql} compiled operation and
+     *           returns the parsed {@code xwa2_fetch_wa_users} array. Cobalt
+     *           mirrors the same projection through {@link UsyncMexResponse}
+     *           and exposes per-protocol convenience helpers
+     *           ({@link #queryUserAboutStatus(Jid)},
+     *           {@link #queryUserCountryCode(Jid)},
+     *           {@link #queryUserUsername(Jid)}) for callers that only
+     *           need a single field.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexUsync", exports = "mexUsyncQuery",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<UsyncMexResponse> executeUsyncMex(Boolean includeAboutStatus,
+                                                       Boolean includeCountryCode,
+                                                       Boolean includeUsername,
+                                                       String input) {
+        // WAWebMexUsync.mexUsyncQuery:
+        //   WAWebMexClient.fetchQuery(WAWebMexUsyncQuery.graphql,
+        //     {include_about_status, include_country_code, include_username, input})
+        var request = new UsyncMexRequest(includeAboutStatus, includeCountryCode, includeUsername, input);
+        var response = sendNode(request);
+        return UsyncMexResponse.of(response);
+    }
+
+    /**
+     * Reads the about/text-status line for a single user through the
+     * MEX/GraphQL transport.
+     *
+     * <p>This is the MEX-flavoured counterpart of {@link #queryAbout(Jid)};
+     * the legacy entry point uses the native USync stanza, while this method
+     * delegates to {@link #executeUsyncMex(Boolean, Boolean, Boolean, String)}
+     * with only the {@code include_about_status} toggle enabled. The MEX
+     * path additionally surfaces the timestamp and {@code status} flag the
+     * server attaches to the about line, but this convenience helper only
+     * returns the text — callers that want the full projection should call
+     * {@link #executeUsyncMex(Boolean, Boolean, Boolean, String)} directly
+     * and walk {@link UsyncMexResponse.Item#aboutStatusInfo()}.
+     *
+     * @param userJid the user JID to query; never {@code null}
+     * @return the about line, or {@link Optional#empty()} when the user has
+     *         no about set or the server returned no item
+     * @throws NullPointerException            if {@code userJid} is
+     *                                         {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     *
+     * @implNote WAWebMexUsersGetAboutStatus.mexUsersGetAboutStatus delegates
+     *           to {@code WAWebMexUsync.mexUsyncQuery} with
+     *           {@code include_about_status=true}. Cobalt routes through
+     *           {@link #executeUsyncMex(Boolean, Boolean, Boolean, String)}
+     *           and projects the first matching item's {@code text} field.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexUsersGetAboutStatus",
+            exports = "mexUsersGetAboutStatus", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<String> queryUserAboutStatus(Jid userJid) {
+        Objects.requireNonNull(userJid, "userJid cannot be null");
+        // WAWebMexUsersGetAboutStatus.mexUsersGetAboutStatus:
+        //   WAWebMexUsync.mexUsyncQuery({include_about_status:true, input: serializeUsyncContext([userJid])})
+        var input = serializeUsyncMexInput(userJid);
+        return executeUsyncMex(Boolean.TRUE, null, null, input)
+                .flatMap(response -> response.items().stream().findFirst())
+                .flatMap(UsyncMexResponse.Item::aboutStatusInfo)
+                .flatMap(UsyncMexResponse.Item.AboutStatusInfo::text)
+                .filter(s -> !s.isEmpty());
+    }
+
+    /**
+     * Reads the registered country code for a single user through the
+     * MEX/GraphQL transport.
+     *
+     * <p>The country code is the two-letter ISO identifier the server
+     * derives from the user's phone-number registration; it is exposed by
+     * the MEX usync projection but has no native USync equivalent. This
+     * method routes through
+     * {@link #executeUsyncMex(Boolean, Boolean, Boolean, String)} with only
+     * the {@code include_country_code} toggle enabled.
+     *
+     * @param userJid the user JID to query; never {@code null}
+     * @return the ISO country code, or {@link Optional#empty()} when the
+     *         server returned no item or no country code
+     * @throws NullPointerException            if {@code userJid} is
+     *                                         {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     *
+     * @implNote WAWebMexUsersGetCountryCode.mexUsersGetCountryCode delegates
+     *           to {@code WAWebMexUsync.mexUsyncQuery} with
+     *           {@code include_country_code=true}. Cobalt projects the first
+     *           matching item's {@code country_code} field.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexUsersGetCountryCode",
+            exports = "mexUsersGetCountryCode", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<String> queryUserCountryCode(Jid userJid) {
+        Objects.requireNonNull(userJid, "userJid cannot be null");
+        // WAWebMexUsersGetCountryCode.mexUsersGetCountryCode:
+        //   WAWebMexUsync.mexUsyncQuery({include_country_code:true, input: serializeUsyncContext([userJid])})
+        var input = serializeUsyncMexInput(userJid);
+        return executeUsyncMex(null, Boolean.TRUE, null, input)
+                .flatMap(response -> response.items().stream().findFirst())
+                .flatMap(UsyncMexResponse.Item::countryCode)
+                .filter(s -> !s.isEmpty());
+    }
+
+    /**
+     * Reads the WhatsApp username claimed by a single user through the
+     * MEX/GraphQL transport.
+     *
+     * <p>WhatsApp now lets users claim a global username distinct from their
+     * phone-number identifier; once claimed, the username is reachable via
+     * the MEX usync projection. This convenience method routes through
+     * {@link #executeUsyncMex(Boolean, Boolean, Boolean, String)} with only
+     * the {@code include_username} toggle enabled and surfaces the
+     * {@code username_info.username} string. Callers that need the full
+     * username envelope (state, pin, status) should call
+     * {@link #executeUsyncMex(Boolean, Boolean, Boolean, String)} directly.
+     *
+     * @param userJid the user JID to query; never {@code null}
+     * @return the claimed username, or {@link Optional#empty()} when the
+     *         user has not claimed one or the server returned no item
+     * @throws NullPointerException            if {@code userJid} is
+     *                                         {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     *
+     * @implNote WAWebMexUsersGetUsername.mexUsersGetUsername delegates to
+     *           {@code WAWebMexUsync.mexUsyncQuery} with
+     *           {@code include_username=true}. Cobalt projects the first
+     *           matching item's {@code username_info.username} field.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexUsersGetUsername",
+            exports = "mexUsersGetUsername", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<String> queryUserUsername(Jid userJid) {
+        Objects.requireNonNull(userJid, "userJid cannot be null");
+        // WAWebMexUsersGetUsername.mexUsersGetUsername:
+        //   WAWebMexUsync.mexUsyncQuery({include_username:true, input: serializeUsyncContext([userJid])})
+        var input = serializeUsyncMexInput(userJid);
+        return executeUsyncMex(null, null, Boolean.TRUE, input)
+                .flatMap(response -> response.items().stream().findFirst())
+                .flatMap(UsyncMexResponse.Item::usernameInfo)
+                .flatMap(UsyncMexResponse.Item.UsernameInfo::username)
+                .filter(s -> !s.isEmpty());
+    }
+
+    /**
+     * Serialises a single-user MEX usync input payload as a JSON string.
+     *
+     * <p>WA Web obtains this payload from
+     * {@code WAWebMexUsync.serializeUsyncContext}, which produces a compact
+     * JSON list of {@code {jid}} entries. Cobalt emits an equivalent
+     * single-element list inline because the convenience helpers only ever
+     * query one JID at a time.
+     *
+     * @param userJid the user JID to encode; never {@code null}
+     * @return the serialised input payload
+     *
+     * @implNote WAWebMexUsync.serializeUsyncContext: builds an opaque
+     *           context string the server interprets as the batch of users
+     *           to project. Cobalt emits a JSON array literal because the
+     *           convenience helpers only ever target one user at a time.
+     */
+    private static String serializeUsyncMexInput(Jid userJid) {
+        // WAWebMexUsync.serializeUsyncContext: serialised batch of {jid} entries
+        return "[{\"jid\":\"" + userJid + "\"}]";
+    }
+
+    /**
      * Sets the default disappearing-message timer for all new chats, via a
      * direct IQ stanza to {@link JidServer#user()}.
      *
@@ -8799,7 +12496,7 @@ public class WhatsAppClient {
      */
     @WhatsAppWebExport(moduleName = "WAWebSetDisappearingModeJob", exports = "setDisappearingMode",
             adaptation = WhatsAppAdaptation.DIRECT)
-    public void setDefaultDisappearingMode(ChatEphemeralTimer timer) {
+    public void changeDefaultDisappearingMode(ChatEphemeralTimer timer) {
         Objects.requireNonNull(timer, "timer cannot be null");
         var seconds = timer.periodSeconds(); // ChatEphemeralTimer.periodSeconds: duration in seconds
         var disappearing = new NodeBuilder()
@@ -8960,6 +12657,259 @@ public class WhatsAppClient {
                 .attribute("type", "set") // WAWebGroupExitJob.leaveGroup: type: "set"
                 .content(leaveNode);
         sendNode(iqNode); // WAWebGroupExitJob.leaveGroup: deprecatedSendIq(i, s)
+    }
+
+    /**
+     * Leaves multiple WhatsApp groups in one request.
+     *
+     * <p>Convenience varargs overload of {@link #leaveGroup(Jid)} that
+     * batches several JIDs into a single {@code <leave>} stanza, mirroring
+     * WA Web's {@code WAWebGroupExitJob} which accepts a list and emits
+     * one {@code <group id="..."/>} per entry.
+     *
+     * @param groups the JIDs of the groups to leave; never {@code null} or
+     *               empty
+     * @throws NullPointerException     if {@code groups} or any element is
+     *                                  {@code null}
+     * @throws IllegalArgumentException if {@code groups} is empty or any
+     *                                  JID is not a group/community
+     */
+    @WhatsAppWebExport(moduleName = "WAWebGroupExitJob", exports = "leaveGroup",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public void leaveGroup(Jid... groups) {
+        Objects.requireNonNull(groups, "groups cannot be null");
+        if (groups.length == 0) {
+            throw new IllegalArgumentException("groups must contain at least one entry");
+        }
+        var groupNodes = new ArrayList<Node>(groups.length);
+        for (var group : groups) {
+            Objects.requireNonNull(group, "group cannot be null");
+            if (!group.hasGroupOrCommunityServer()) {
+                throw new IllegalArgumentException("Expected a group/community");
+            }
+            groupNodes.add(new NodeBuilder()
+                    .description("group")
+                    .attribute("id", group)
+                    .build());
+        }
+        var leaveNode = new NodeBuilder()
+                .description("leave")
+                .content(groupNodes)
+                .build();
+        var iqNode = new NodeBuilder()
+                .description("iq")
+                .attribute("xmlns", "w:g2")
+                .attribute("to", Jid.of(JidServer.groupOrCommunity()))
+                .attribute("type", "set")
+                .content(leaveNode);
+        sendNode(iqNode);
+    }
+
+    /**
+     * Reports whether the given group is flagged as "internal" by the
+     * WhatsApp relay.
+     *
+     * <p>Internal groups are the Meta-side staff or testing groups whose
+     * lifecycle differs from regular consumer groups; the indicator is
+     * surfaced on the four group inline fragments
+     * ({@code XWA2GroupRegularGroup}, {@code XWA2CommunityGroup},
+     * {@code XWA2CommunityDefaultSubGroup}, {@code XWA2CommunitySubGroup})
+     * via the shared {@code properties.internal} scalar.
+     *
+     * <p>Dispatches the
+     * {@link FetchGroupIsInternalMexRequest mexFetchGroupIsInternal} MEX
+     * query.
+     *
+     * @param groupJid the non-{@code null} group JID to query
+     * @return {@code true} if the relay reports the group as internal,
+     *         {@code false} otherwise (including when the relay returned
+     *         no payload)
+     * @throws NullPointerException            if {@code groupJid} is
+     *                                         {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer
+     *                                         open
+     *
+     * @implNote WAWebMexFetchGroupIsInternalJob.mexFetchGroupIsInternal:
+     * WA Web only fires this query when the {@code internal_group_indicator}
+     * AB prop is enabled, gating the badge behind a server-side rollout.
+     * Cobalt is a library and exposes the call unconditionally; consumers
+     * that wish to mirror the AB-gating should check the prop themselves
+     * and skip the call when it is off.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexFetchGroupIsInternalJob", exports = "mexFetchGroupIsInternal",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public boolean isGroupInternal(Jid groupJid) {
+        Objects.requireNonNull(groupJid, "groupJid cannot be null");
+        var request = new FetchGroupIsInternalMexRequest(groupJid.toString());
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendNode(request);
+        return FetchGroupIsInternalMexResponse.of(response)
+                .map(FetchGroupIsInternalMexResponse::isInternal)
+                .orElse(false);
+    }
+
+    /**
+     * Queries the full metadata envelope for a group, including creator,
+     * subject, description, participant edges, group state and the
+     * configurable property block.
+     *
+     * <p>Bot participants are excluded from the participant edge list; use
+     * {@link #queryGroupInfoIncludeBots(Jid, Boolean, String, String)} when
+     * the caller needs the bot-aware variant.
+     *
+     * <p>Dispatches the
+     * {@link FetchGroupInfoMexRequest mexGetGroupInfo} MEX query.
+     *
+     * @param group             the non-{@code null} group JID to query
+     * @param includeUsername   whether to hydrate the {@code username_info}
+     *                          subtree on every participant; {@code null}
+     *                          mirrors WA Web's "field absent" wire shape
+     * @param participantsPhash the participant-list partial hash carried
+     *                          for incremental refreshes; {@code null} on
+     *                          a cold fetch
+     * @param queryContext      the WA Web query-context tag identifying
+     *                          the UI surface that triggered the fetch;
+     *                          {@code null} when no tag applies
+     * @return an {@link Optional} containing the parsed response, or empty
+     *         if the relay returned no payload
+     * @throws NullPointerException            if {@code group} is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     *
+     * @implNote WAWebMexFetchGroupInfoJob.mexGetGroupInfo: WA Web wraps this
+     * MEX call inside the {@code WAWebMexFetchGroupInfoJob._/fetchGetGroupInfo}
+     * helper which performs additional in-memory caching against
+     * {@code WAWebGroupMetadata}. Cobalt collapses the helper into a direct
+     * MEX dispatch and exposes the raw GraphQL envelope so callers can
+     * project it into their own domain model.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexFetchGroupInfoJob", exports = "mexGetGroupInfo",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<FetchGroupInfoMexResponse> queryGroupInfo(Jid group, Boolean includeUsername,
+                                                              String participantsPhash, String queryContext) {
+        Objects.requireNonNull(group, "group cannot be null");
+        var request = new FetchGroupInfoMexRequest(group.toString(), includeUsername, participantsPhash, queryContext);
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendNode(request);
+        return FetchGroupInfoMexResponse.of(response);
+    }
+
+    /**
+     * Queries the full metadata envelope for a group with bot participants
+     * included as regular members.
+     *
+     * <p>Identical in shape to {@link #queryGroupInfo(Jid, Boolean, String, String)}
+     * except that the participant edge list also carries bot accounts.
+     * Used by chat UIs that need to render bots as first-class members.
+     *
+     * <p>Dispatches the
+     * {@link FetchGroupInfoIncludBotsMexRequest mexGetGroupInfoIncludBots}
+     * MEX query.
+     *
+     * @param group             the non-{@code null} group JID to query
+     * @param includeUsername   whether to hydrate the {@code username_info}
+     *                          subtree on every participant; {@code null}
+     *                          mirrors WA Web's "field absent" wire shape
+     * @param participantsPhash the participant-list partial hash carried
+     *                          for incremental refreshes; {@code null} on
+     *                          a cold fetch
+     * @param queryContext      the WA Web query-context tag identifying
+     *                          the UI surface that triggered the fetch;
+     *                          {@code null} when no tag applies
+     * @return an {@link Optional} containing the parsed response, or empty
+     *         if the relay returned no payload
+     * @throws NullPointerException            if {@code group} is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     *
+     * @implNote WAWebMexFetchGroupInfoIncludBotsJob.mexGetGroupInfoIncludBots:
+     * WA Web only fires this variant when bot participants must be surfaced
+     * to the UI. Cobalt exposes both variants unconditionally so callers
+     * can pick the one matching their use case.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexFetchGroupInfoIncludBotsJob", exports = "mexGetGroupInfoIncludBots",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<FetchGroupInfoIncludBotsMexResponse> queryGroupInfoIncludeBots(Jid group, Boolean includeUsername,
+                                                                                    String participantsPhash, String queryContext) {
+        Objects.requireNonNull(group, "group cannot be null");
+        var request = new FetchGroupInfoIncludBotsMexRequest(group.toString(), includeUsername, participantsPhash, queryContext);
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendNode(request);
+        return FetchGroupInfoIncludBotsMexResponse.of(response);
+    }
+
+    /**
+     * Queries the current invite code attached to the given group without
+     * rotating it.
+     *
+     * <p>The invite code is the opaque scalar that backs the shareable
+     * {@code chat.whatsapp.com/<code>} link. To rotate it (invalidating any
+     * previously distributed link) use
+     * {@link #createGroupInviteCode(Jid, String)} instead.
+     *
+     * <p>Dispatches the
+     * {@link FetchGroupInviteCodeMexRequest fetchMexGroupInviteCode} MEX
+     * query.
+     *
+     * @param group        the non-{@code null} group JID to query
+     * @param queryContext the WA Web query-context tag identifying the UI
+     *                     surface that triggered the fetch; {@code null}
+     *                     when no tag applies
+     * @return an {@link Optional} containing the parsed response, or empty
+     *         if the relay returned no payload
+     * @throws NullPointerException            if {@code group} is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     *
+     * @implNote WAWebMexFetchGroupInviteCodeJobQuery.graphql: WA Web reads
+     * the {@code data.xwa2_group_query_by_id.invite_code} scalar; Cobalt
+     * mirrors the same projection through {@link FetchGroupInviteCodeMexResponse}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexFetchGroupInviteCodeJobQuery.graphql", exports = "params.id",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<FetchGroupInviteCodeMexResponse> queryGroupInviteCode(Jid group, String queryContext) {
+        Objects.requireNonNull(group, "group cannot be null");
+        var request = new FetchGroupInviteCodeMexRequest(group.toString(), queryContext);
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendNode(request);
+        return FetchGroupInviteCodeMexResponse.of(response);
+    }
+
+    /**
+     * Rotates the invite code for the given group, community or other
+     * receiver, invalidating any previously distributed
+     * {@code chat.whatsapp.com/<code>} link.
+     *
+     * <p>The relay mints a fresh opaque code which is returned through the
+     * response payload. The {@code entryPoint} telemetry tag is mandatory:
+     * WA Web's sole caller ({@code WAWebOutContactInviteAction.sendInvite})
+     * always forwards a non-{@code null} surface identifier and Cobalt
+     * mirrors the contract at the API boundary.
+     *
+     * <p>Dispatches the
+     * {@link CreateInviteCodeMexRequest mexCreateInviteCode} MEX mutation.
+     *
+     * @param receiver   the non-{@code null} receiver JID the code is being
+     *                   minted for (group, community or contact)
+     * @param entryPoint the non-{@code null} UI-surface telemetry tag
+     *                   identifying what triggered the rotation, e.g.
+     *                   {@code "CHAT_INFO_INVITE_BUTTON"}
+     * @return an {@link Optional} containing the parsed response, or empty
+     *         if the relay returned no payload
+     * @throws NullPointerException            if any argument is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     *
+     * @implNote WAWebMexCreateInviteCodeJob.mexCreateInviteCode: WA Web
+     * unwraps {@code data.xwa2_growth_create_invite_code.code} and returns
+     * the freshly minted scalar. Cobalt exposes the same projection
+     * through {@link CreateInviteCodeMexResponse#code()}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexCreateInviteCodeJob", exports = "mexCreateInviteCode",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<CreateInviteCodeMexResponse> createGroupInviteCode(Jid receiver, String entryPoint) {
+        Objects.requireNonNull(receiver, "receiver cannot be null");
+        Objects.requireNonNull(entryPoint, "entryPoint cannot be null");
+        var request = new CreateInviteCodeMexRequest(receiver.toString(), entryPoint);
+        // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
+        var response = sendNode(request);
+        return CreateInviteCodeMexResponse.of(response);
     }
 
     /**
@@ -9282,7 +13232,7 @@ public class WhatsAppClient {
      *                                  is a group/community
      *
      * @implNote WAWebMexTransferCommunityOwnershipJob.mexTransferCommunityOwnershipJob:
-     * the MEX variables are wrapped by {@link TransferCommunityOwnershipMex.Request}
+     * the MEX variables are wrapped by {@link TransferCommunityOwnershipMexRequest}
      * which serialises the {@code input} object to a JSON string. Cobalt
      * skips the returned {@code lid_migration_state} post-processing; the
      * store refresh is left to the next {@code queryChatMetadata}
@@ -9303,9 +13253,9 @@ public class WhatsAppClient {
                 "group_id", community.toString(),
                 "new_owner_id", newOwner.toString()
         ));
-        var request = new TransferCommunityOwnershipMex.Request(input);
+        var request = new TransferCommunityOwnershipMexRequest(input);
         // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
-        sendMexNodeWithNoResponse(request.toNode(), TransferCommunityOwnershipMex.QUERY_ID, "mexTransferCommunityOwnershipJob", false);
+        sendNodeWithNoResponse(request);
     }
 
     /**
@@ -9314,7 +13264,7 @@ public class WhatsAppClient {
      *
      * <p>Issues the {@code WAWebMexFetchSubgroupSuggestionsJob} MEX query
      * over {@code w:mex} using
-     * {@link FetchSubgroupSuggestionsMex.Request} with
+     * {@link FetchSubgroupSuggestionsMexRequest} with
      * {@code query_context="INTERACTIVE"}.
      *
      * @param community the non-{@code null} community JID to query
@@ -9326,7 +13276,7 @@ public class WhatsAppClient {
      * @implNote WAWebMexFetchSubgroupSuggestionsJob.mexFetchSubgroupSuggestions:
      * reads {@code xwa2_group_query_by_id.sub_group_suggestions.edges[].node.id}.
      * The per-suggestion metadata (creator, subject, participant count,
-     * etc.) is available on {@link FetchSubgroupSuggestionsMex.Response} if
+     * etc.) is available on {@link FetchSubgroupSuggestionsMexResponse} if
      * richer views are required; this convenience returns only the JIDs.
      */
     @WhatsAppWebExport(moduleName = "WAWebMexFetchSubgroupSuggestionsJob", exports = "mexFetchSubgroupSuggestions",
@@ -9336,17 +13286,17 @@ public class WhatsAppClient {
         if (!community.hasGroupOrCommunityServer()) {
             throw new IllegalArgumentException("Expected a group/community");
         }
-        var request = new FetchSubgroupSuggestionsMex.Request(community.toString(), "INTERACTIVE", null);
+        var request = new FetchSubgroupSuggestionsMexRequest(community.toString(), "INTERACTIVE", null);
         // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
-        var response = sendMexNode(request.toNode(), FetchSubgroupSuggestionsMex.QUERY_ID, "mexFetchSubgroupSuggestions", false);
-        return FetchSubgroupSuggestionsMex.Response.of(response)
-                .flatMap(FetchSubgroupSuggestionsMex.Response::subGroupSuggestions)
+        var response = sendNode(request);
+        return FetchSubgroupSuggestionsMexResponse.of(response)
+                .flatMap(FetchSubgroupSuggestionsMexResponse::subGroupSuggestions)
                 .stream()
-                .map(FetchSubgroupSuggestionsMex.Response.SubGroupSuggestions::edges)
+                .map(FetchSubgroupSuggestionsMexResponse.SubGroupSuggestions::edges)
                 .flatMap(Collection::stream)
-                .map(FetchSubgroupSuggestionsMex.Response.SubGroupSuggestions.Edges::node)
+                .map(FetchSubgroupSuggestionsMexResponse.SubGroupSuggestions.Edges::node)
                 .flatMap(Optional::stream)
-                .map(FetchSubgroupSuggestionsMex.Response.SubGroupSuggestions.Edges.Node::id)
+                .map(FetchSubgroupSuggestionsMexResponse.SubGroupSuggestions.Edges.Node::id)
                 .flatMap(Optional::stream)
                 .map(Jid::of)
                 .toList();
@@ -9475,20 +13425,20 @@ public class WhatsAppClient {
         if (!subgroup.hasGroupOrCommunityServer()) {
             throw new IllegalArgumentException("Expected a group/community");
         }
-        var request = new QuerySubgroupParticipantCountMex.Request(subgroup.toString());
+        var request = new QuerySubgroupParticipantCountMexRequest(subgroup.toString());
         // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
-        var response = sendMexNode(request.toNode(), QuerySubgroupParticipantCountMex.QUERY_ID, "mexQuerySubgroupParticipantCount", false);
-        return QuerySubgroupParticipantCountMex.Response.of(response)
-                .flatMap(QuerySubgroupParticipantCountMex.Response::subGroups)
+        var response = sendNode(request);
+        return QuerySubgroupParticipantCountMexResponse.of(response)
+                .flatMap(QuerySubgroupParticipantCountMexResponse::subGroups)
                 .stream()
-                .map(QuerySubgroupParticipantCountMex.Response.SubGroups::edges)
+                .map(QuerySubgroupParticipantCountMexResponse.SubGroups::edges)
                 .flatMap(Collection::stream)
-                .map(QuerySubgroupParticipantCountMex.Response.SubGroups.Edges::node)
+                .map(QuerySubgroupParticipantCountMexResponse.SubGroups.Edges::node)
                 .flatMap(Optional::stream)
                 .filter(entry -> entry.id().map(id -> Objects.equals(id, subgroup.toString()) || Objects.equals(id, subgroup.user())).orElse(false))
-                .map(QuerySubgroupParticipantCountMex.Response.SubGroups.Edges.Node::totalParticipantsCount)
-                .filter(java.util.OptionalLong::isPresent)
-                .mapToLong(java.util.OptionalLong::getAsLong)
+                .map(QuerySubgroupParticipantCountMexResponse.SubGroups.Edges.Node::totalParticipantsCount)
+                .filter(OptionalLong::isPresent)
+                .mapToLong(OptionalLong::getAsLong)
                 .findFirst()
                 .orElse(-1L);
     }
@@ -9497,7 +13447,7 @@ public class WhatsAppClient {
      * Queries the full list of subgroups that belong to a community.
      *
      * <p>Issues the {@code WAWebMexFetchAllSubgroupsJob} MEX query over
-     * {@code w:mex} via {@link FetchAllSubgroupsMex.Request} with
+     * {@code w:mex} via {@link FetchAllSubgroupsMexRequest} with
      * {@code query_context="INTERACTIVE"} and returns every subgroup
      * declared by the response, including the default subgroup.
      *
@@ -9519,10 +13469,10 @@ public class WhatsAppClient {
         if (!community.hasGroupOrCommunityServer()) {
             throw new IllegalArgumentException("Expected a group/community");
         }
-        var request = new FetchAllSubgroupsMex.Request(community.toString(), "INTERACTIVE", null);
+        var request = new FetchAllSubgroupsMexRequest(community.toString(), "INTERACTIVE", null);
         // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
-        var response = sendMexNode(request.toNode(), FetchAllSubgroupsMex.QUERY_ID, "mexCommunityGetSubgroups", false);
-        var parsed = FetchAllSubgroupsMex.Response.of(response);
+        var response = sendNode(request);
+        var parsed = FetchAllSubgroupsMexResponse.of(response);
         var result = new ArrayList<Jid>();
         parsed.ifPresent(entry -> {
             entry.defaultSubGroup()
@@ -9940,10 +13890,10 @@ public class WhatsAppClient {
      *       {@link GroupSetting#MEMBER_LINK_MODE MEMBER_LINK_MODE},
      *       {@link GroupSetting#MEMBER_SHARE_GROUP_HISTORY_MODE MEMBER_SHARE_GROUP_HISTORY_MODE}.</li>
      *   <li>Delegated: {@link GroupSetting#EPHEMERAL EPHEMERAL} forwards to
-     *       {@link #setEphemeralTimer(Jid, ChatEphemeralTimer)}, mapping
+     *       {@link #changeEphemeralTimer(Jid, ChatEphemeralTimer)}, mapping
      *       {@link ChatPolicy#ADMINS} to {@link ChatEphemeralTimer#ONE_WEEK}
      *       and {@link ChatPolicy#ANYONE} to {@link ChatEphemeralTimer#OFF}.
-     *       Call {@code setEphemeralTimer} directly to select a different
+     *       Call {@code changeEphemeralTimer} directly to select a different
      *       duration.</li>
      * </ul>
      *
@@ -10042,7 +13992,7 @@ public class WhatsAppClient {
             case MEMBER_SHARE_GROUP_HISTORY_MODE -> sendMexGroupPropertyUpdate(group,
                     // WAWebSetPropertyGroupAction: {member_share_group_history_mode: a===1?"ALL_MEMBER_SHARE":"ADMIN_SHARE"}. ADMINS policy => ADMIN_SHARE.
                     "{\"member_share_group_history_mode\":\"" + (enabled ? "ADMIN_SHARE" : "ALL_MEMBER_SHARE") + "\"}");
-            case EPHEMERAL -> setEphemeralTimer(group, enabled ? ChatEphemeralTimer.ONE_WEEK : ChatEphemeralTimer.OFF);
+            case EPHEMERAL -> changeEphemeralTimer(group, enabled ? ChatEphemeralTimer.ONE_WEEK : ChatEphemeralTimer.OFF);
         }
     }
 
@@ -10079,10 +14029,10 @@ public class WhatsAppClient {
      * @param updateJson the serialised {@code update} JSON object
      */
     private void sendMexGroupPropertyUpdate(Jid group, String updateJson) {
-        var request = new UpdateGroupPropertyMex.Request(group.toString(), updateJson); // WAWebMexUpdateGroupPropertyJob: variables={group_id, update}
+        var request = new UpdateGroupPropertyMexRequest(group.toString(), updateJson); // WAWebMexUpdateGroupPropertyJob: variables={group_id, update}
         // WAWebMexNativeClient.fetchQuery: telemetry-wrapped MEX dispatch
-        var response = sendMexNode(request.toNode(), UpdateGroupPropertyMex.QUERY_ID, "mexUpdateGroupProperty", false);
-        UpdateGroupPropertyMex.Response.of(response); // WAWebMexUpdateGroupPropertyJob: checks data.xwa2_group_update_property.state
+        var response = sendNode(request);
+        UpdateGroupPropertyMexResponse.of(response); // WAWebMexUpdateGroupPropertyJob: checks data.xwa2_group_update_property.state
     }
 
     /**
@@ -10190,6 +14140,7 @@ public class WhatsAppClient {
         };
     }
 
+    //</editor-fold>
     //<editor-fold desc="Stickers">
     /**
      * Marks a sticker as a favourite on the user's account and propagates the
@@ -10362,32 +14313,30 @@ public class WhatsAppClient {
      * at the creator's message key and whose {@code vote} is an
      * HKDF-derived, AES-256-GCM encrypted list of the SHA-256 digests of the
      * selected option names. The encrypted blob is transported as a
-     * {@link com.github.auties00.cobalt.model.message.poll.PollEncValue}.
+     * {@link PollEncValue}.
      *
-     * <p><strong>Vote encoding is not yet implemented in Cobalt.</strong>
-     * WhatsApp Web derives the poll-encryption key from the original
-     * poll's {@code messageSecret} via HKDF
-     * ({@code WAWebMessageSecretCrypto.getDecryptionInfo}) and encrypts the
-     * option digests with AES-GCM using the sender JID and poll creation
-     * message id as additional authenticated data. The current build emits
-     * an empty {@link com.github.auties00.cobalt.model.message.poll.PollEncValue}
-     * so the stanza shape is correct, but recipients will not be able to
-     * decode the vote. See the TODO below.
+     * <p>The vote payload is HKDF-derived and AES-GCM-encrypted via
+     * {@link EncMessageFactory#encryptPollVote}: the option labels are hashed
+     * with SHA-256, packed into a {@link com.github.auties00.cobalt.model.message.poll.PollVoteMessage},
+     * encrypted under a key derived from the poll creator's
+     * {@code messageSecret}, and emitted as a {@link PollEncValue} that the
+     * server forwards opaquely to the poll creator.
      *
      * @param pollKey          the {@link MessageKey} of the
      *                         {@link PollCreationMessage} being voted on
      * @param selectedOptions  the ordered list of selected option labels
      * @return the server ack result for the vote stanza
      * @throws NullPointerException     if any argument is {@code null}
-     * @throws IllegalArgumentException if {@code pollKey} has no parent JID
+     * @throws IllegalArgumentException if {@code pollKey} has no parent JID,
+     *                                  or the referenced poll-creation message
+     *                                  is missing from the local store, or it
+     *                                  carries no {@code messageSecret}
      *
-     * @implNote WAWebPollsSendVoteMsgAction + WAWebPollsVoteDataUtils —
-     *           ADAPTED with a TODO: vote option hashes are not yet
-     *           HKDF+AES-GCM encrypted. The transport envelope is correct
-     *           (PollUpdateMessage pointing at the poll creation key) but the
-     *           ciphertext is a placeholder. Implementing this requires
-     *           deriving the poll key from the creator's {@code messageSecret}
-     *           which is currently not threaded through the public API.
+     * @implNote WAWebPollsSendVoteMsgAction +
+     *           WAWebPollVoteEncryptMsgData.encryptPollVoteMsgData: encryption
+     *           is delegated to {@link EncMessageFactory#encryptPollVote} which
+     *           mirrors the WA Web flow (HKDF-SHA256 over messageSecret, AES-GCM
+     *           with random 12-byte IV, AAD = poll-creation id ⊕ voter JID).
      */
     @WhatsAppWebExport(moduleName = "WAWebPollsSendVoteMsgAction", exports = "sendVote",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -10396,17 +14345,15 @@ public class WhatsAppClient {
         Objects.requireNonNull(selectedOptions, "selectedOptions cannot be null");
         var parentJid = pollKey.parentJid() // WAWebPollsSendVoteMsgAction: parentMsgKey.remote
                 .orElseThrow(() -> new IllegalArgumentException("pollKey must carry a parentJid"));
-        // TODO: WAWebPollsVoteDataUtils — derive the poll encryption key via
-        //       WAWebMessageSecretCrypto.getDecryptionInfo(creator messageSecret, "Poll Vote", authorJid),
-        //       build the option-hash list (sha256(optionName) truncated),
-        //       AES-GCM-encrypt it with a fresh 12-byte IV using the poll creation
-        //       id + voter JID as AAD, and populate encPayload/encIv here. The
-        //       current PollEncValue is intentionally empty until the messageSecret
-        //       lookup is wired through the store.
-        var vote = new PollEncValueBuilder() // WAWebPollsVoteDataUtils: {encPayload, encIv}
-                .encPayload(new byte[0]) // TODO(ADAPTED): HKDF/AES-GCM encrypted option digests
-                .encIv(new byte[0]) // TODO(ADAPTED): 12-byte random IV
-                .build();
+        // WAWebPollsSendVoteMsgAction: e = parent msg — must be local for messageSecret lookup
+        var pollCreationMessage = store.findMessageByKey(pollKey).orElse(null);
+        if (!(pollCreationMessage instanceof ChatMessageInfo chatPoll)) {
+            throw new IllegalArgumentException("Poll creation message not found in store for key " + pollKey);
+        }
+        var voterJid = store.jid() // WAWebMsgGetters.getSender(t) on the outgoing vote
+                .orElseThrow(() -> new IllegalStateException("votePoll requires a connected user"));
+        // WAWebPollVoteEncryptMsgData.encryptPollVoteMsgData -> WAWebPollsVoteEncryption.encryptVote
+        var vote = EncMessageFactory.encryptPollVote(selectedOptions, chatPoll, voterJid);
         var pollUpdate = new PollUpdateMessageBuilder() // WAWebPollsSendVoteMsgAction: new PollUpdateMessage(...)
                 .pollCreationMessageKey(pollKey) // WAWebPollsSendVoteMsgAction: pollCreationMessageKey
                 .vote(vote) // WAWebPollsSendVoteMsgAction: vote: PollEncValue
@@ -10421,16 +14368,10 @@ public class WhatsAppClient {
                 ? PollActionType.REMOVE_VOTE
                 : PollActionType.VOTE;
         // WAWebPollsSendVoteMsgAction: creationDateInSeconds: e.t, pollOptionsCount: e.pollOptions.length
-        //   Resolve the original poll creation message from the store so we can
-        //   forward its timestamp and options count, matching WA Web's e = parent msg.
-        var pollCreationTimestamp = Instant.now();
+        var pollCreationTimestamp = chatPoll.timestamp().orElse(Instant.now());
         var pollOptionsCount = 0;
-        var pollCreationMessage = store.findMessageByKey(pollKey).orElse(null);
-        if (pollCreationMessage instanceof ChatMessageInfo chatPoll) {
-            pollCreationTimestamp = chatPoll.timestamp().orElse(pollCreationTimestamp);
-            if (chatPoll.message().content() instanceof PollCreationMessage poll) {
-                pollOptionsCount = poll.options().size();
-            }
+        if (chatPoll.message().content() instanceof PollCreationMessage poll) {
+            pollOptionsCount = poll.options().size();
         }
         commitPollsActionsMetric(parentJid, pollAction, pollCreationTimestamp, pollOptionsCount);
         return result;
@@ -10453,7 +14394,7 @@ public class WhatsAppClient {
      *
      * @implNote WAWebPollsSendVoteMsgAction — ADAPTED: close-poll is routed
      *           through a {@link PollUpdateMessage} with an empty
-     *           {@link com.github.auties00.cobalt.model.message.poll.PollEncValue}
+     *           {@link PollEncValue}
      *           because Cobalt does not currently own a distinct
      *           poll-invalidated protocol message; the server treats an empty
      *           vote from the poll creator as the invalidation signal.
@@ -11146,7 +15087,7 @@ public class WhatsAppClient {
      */
     @WhatsAppWebExport(moduleName = "WAWebSendPinMessageAction", exports = "sendPinInChatMsg",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public AckResult pinMessageInChat(MessageKey msgKey) {
+    public AckResult pinMessage(MessageKey msgKey) {
         Objects.requireNonNull(msgKey, "msgKey cannot be null");
         var parentJid = msgKey.parentJid()
                 .orElseThrow(() -> new IllegalArgumentException("msgKey must carry a parentJid"));
@@ -11164,7 +15105,7 @@ public class WhatsAppClient {
      * Removes the pin from the referenced message inside its chat for every
      * participant.
      *
-     * <p>Counterpart to {@link #pinMessageInChat(MessageKey)}: emits the
+     * <p>Counterpart to {@link #pinMessage(MessageKey)}: emits the
      * same message with {@link PinInChatMessage.Type#UNPIN_FOR_ALL}.
      *
      * @param msgKey the key of the message to unpin
@@ -11176,7 +15117,7 @@ public class WhatsAppClient {
      */
     @WhatsAppWebExport(moduleName = "WAWebSendPinMessageAction", exports = "sendPinInChatMsg",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public AckResult unpinMessageInChat(MessageKey msgKey) {
+    public AckResult unpinMessage(MessageKey msgKey) {
         Objects.requireNonNull(msgKey, "msgKey cannot be null");
         var parentJid = msgKey.parentJid()
                 .orElseThrow(() -> new IllegalArgumentException("msgKey must carry a parentJid"));
@@ -11194,8 +15135,8 @@ public class WhatsAppClient {
 
     /**
      * Commits the {@link PinInChatMessageSendEvent} WAM event for a successful
-     * pin or unpin dispatch from {@link #pinMessageInChat(MessageKey)} /
-     * {@link #unpinMessageInChat(MessageKey)}.
+     * pin or unpin dispatch from {@link #pinMessage(MessageKey)} /
+     * {@link #unpinMessage(MessageKey)}.
      *
      * <p>Adapts {@code WAWebPinInChatMetricUtils.logPinInChatMessageSend}
      * ({@code e(e)} in the bundled JS): classifies the chat as a group (or
@@ -11207,7 +15148,7 @@ public class WhatsAppClient {
      * <p>Additional properties WA Web logs from the message models:
      * <ul>
      *   <li>{@code mediaType} &mdash; classification of the pinned parent
-     *       message via {@link WamMsgUtils#getWamMediaType(ChatMessageInfo)};
+     *       message via {@link WamService#getWamMediaType(ChatMessageInfo)};
      *   <li>{@code isSelfParentMessage} &mdash; whether the parent message was
      *       authored by the local account ({@code fromMe()} on the resolved
      *       {@link ChatMessageInfo}); omitted when the parent cannot be
@@ -11264,7 +15205,7 @@ public class WhatsAppClient {
         // WAWebPinInChatMetricUtils: isSelfParentMessage: WAWebMsgGetters.getIsSentByMe(parentMsg)
         store.findMessageByKey(parentMsgKey).ifPresent(parentMessage -> {
             if (parentMessage instanceof ChatMessageInfo chatParent) {
-                builder.mediaType(WamMsgUtils.getWamMediaType(chatParent));
+                builder.mediaType(wamService.getWamMediaType(chatParent));
             }
             builder.isSelfParentMessage(parentMessage.key().fromMe());
         });
@@ -11395,7 +15336,7 @@ public class WhatsAppClient {
      * builds a {@code setting_disableLinkPreviews} mutation through
      * {@link DisableLinkPreviewsHandler#getMutation(Instant, boolean)} and
      * hands it to {@code WAWebSyncdCoreApi.lockForSync}. Cobalt uses
-     * {@link WebAppStateService#pushPatches(SyncPatchType, java.util.SequencedCollection)}
+     * {@link WebAppStateService#pushPatches(SyncPatchType, SequencedCollection)}
      * for the same purpose.
      *
      * <p>The new value is also eagerly written to
@@ -11538,6 +15479,1292 @@ public class WhatsAppClient {
         var mutation = NotificationActivitySettingHandler.INSTANCE.getNotificationActivityMutation(Instant.now(), setting); // NO_WA_BASIS
         webAppStateService.pushPatches(NotificationActivitySettingHandler.INSTANCE.collectionName(), List.of(mutation));
         store.setNotificationActivitySetting(setting); // NO_WA_BASIS: apply locally for eager consistency
+    }
+
+    //</editor-fold>
+    //<editor-fold desc="Smax: biz / account / mdcompanion / message / status">
+
+    /**
+     * Exchanges a CTWA email-recovery verification code for a
+     * Facebook access token and Ads-Manager session cookies.
+     *
+     * <p>Sends the {@link SmaxGetAccessTokenAndSessionCookiesRequest} IQ
+     * carrying the user-supplied verification code under
+     * {@code <iq xmlns="fb:thrift_iq" type="get" to="s.whatsapp.net"/>}
+     * and projects the {@code Success} reply into an access-token /
+     * session-cookies / business-person triple. The dedicated literal
+     * variants ({@code 431 TOO_MANY_ATTEMPTS}, {@code 432
+     * INCORRECT_NONCE}) and any other client/server failure surface as
+     * a {@link WhatsAppServerRuntimeException}.
+     *
+     * @param code        the user-supplied verification code; never
+     *                    {@code null}
+     * @param fromUserJid the optional {@code from} echo; may be
+     *                    {@code null}
+     * @return an {@link Optional} carrying the parsed
+     *         {@link SmaxGetAccessTokenAndSessionCookiesResponse.Success}
+     *         when the relay's reply matches the documented schema, or
+     *         {@link Optional#empty()} when no documented variant
+     *         parsed
+     * @throws NullPointerException        if {@code code} is
+     *                                     {@code null}
+     * @throws WhatsAppServerRuntimeException if the relay rejected the
+     *                                     request with one of the
+     *                                     literal {@code 431}/{@code 432}
+     *                                     codes, a generic 4xx, or a
+     *                                     5xx server failure
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxBizCtwaAdAccountGetAccessTokenAndSessionCookiesRPC",
+            exports = "sendGetAccessTokenAndSessionCookiesRPC",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxGetAccessTokenAndSessionCookiesResponse.Success> queryAccessTokenAndSessionCookies(String code, Jid fromUserJid) {
+        var request = new SmaxGetAccessTokenAndSessionCookiesRequest(code, fromUserJid);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxGetAccessTokenAndSessionCookiesResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxGetAccessTokenAndSessionCookiesResponse.Success success -> Optional.of(success);
+            case SmaxGetAccessTokenAndSessionCookiesResponse.TooManyAttempts ignored ->
+                    throw new WhatsAppServerRuntimeException("Too many attempts on access-token recovery");
+            case SmaxGetAccessTokenAndSessionCookiesResponse.IncorrectNonce ignored ->
+                    throw new WhatsAppServerRuntimeException("Incorrect nonce on access-token recovery");
+            case SmaxGetAccessTokenAndSessionCookiesResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Access-token recovery rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxGetAccessTokenAndSessionCookiesResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Access-token recovery server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Issues an account-binding nonce used by the linking flow to bind
+     * the WhatsApp account to a Facebook business identity.
+     *
+     * <p>Sends the {@link SmaxGetAccountNonceRequest} IQ
+     * under {@code <iq xmlns="fb:thrift_iq" type="get"/>} optionally
+     * carrying an {@code <identifier scope="..."/>} child and projects
+     * the {@code Success} arm into the {@code <nonce>} content plus the
+     * optional echoed {@code <request><id>}.
+     *
+     * @param identifierScope the optional {@code <identifier scope/>}
+     *                        attribute; {@code null} omits the child
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxGetAccountNonceResponse.Success} when the
+     *         relay returned a nonce, or {@link Optional#empty()} on
+     *         no-parse
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the
+     *                                         request with a
+     *                                         documented client / server
+     *                                         error
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxBizLinkingGetAccountNonceRPC",
+            exports = "sendGetAccountNonceRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxGetAccountNonceResponse.Success> queryAccountNonce(String identifierScope) {
+        var request = new SmaxGetAccountNonceRequest(identifierScope);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxGetAccountNonceResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxGetAccountNonceResponse.Success success -> Optional.of(success);
+            case SmaxGetAccountNonceResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Account-nonce request rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxGetAccountNonceResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Account-nonce server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Queries the relay for the current marketing-message /
+     * Meta-Verified / GenAI feature-eligibility status of the local
+     * business account.
+     *
+     * <p>Sends the {@link SmaxGetBusinessEligibilityRequest} IQ under
+     * {@code <iq xmlns="w:biz" type="get"/>} carrying a
+     * {@code <features/>} child whose three optional attributes select
+     * which projections are returned by the relay. Each toggle is
+     * encoded on the wire as {@code "1"} when {@code true} and
+     * {@code "0"} when {@code false}; passing {@code null} omits the
+     * attribute entirely so the server returns no projection for that
+     * feature.
+     *
+     * @param featuresMetaVerified      the optional Meta-Verified
+     *                                  toggle; {@code null} to omit
+     * @param featuresMarketingMessages the optional marketing-messages
+     *                                  toggle; {@code null} to omit
+     * @param featuresGenai             the optional GenAI toggle;
+     *                                  {@code null} to omit
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxGetBusinessEligibilityResponse.Success} when
+     *         the relay returned an eligibility tuple, or
+     *         {@link Optional#empty()} on no-parse
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the
+     *                                         request with a
+     *                                         documented client / server
+     *                                         error
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxBizMarketingMessageGetBusinessEligibilityRPC",
+            exports = "sendGetBusinessEligibilityRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxGetBusinessEligibilityResponse.Success> queryBusinessEligibility(Boolean featuresMetaVerified, Boolean featuresMarketingMessages, Boolean featuresGenai) {
+        var request = new SmaxGetBusinessEligibilityRequest(
+                featuresMetaVerified == null ? null : (featuresMetaVerified ? "1" : "0"),
+                featuresMarketingMessages == null ? null : (featuresMarketingMessages ? "1" : "0"),
+                featuresGenai == null ? null : (featuresGenai ? "1" : "0"));
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxGetBusinessEligibilityResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxGetBusinessEligibilityResponse.Success success -> Optional.of(success);
+            case SmaxGetBusinessEligibilityResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Business-eligibility query rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxGetBusinessEligibilityResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Business-eligibility query server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Lists the Facebook / Instagram / WhatsApp-ad-identity accounts
+     * currently linked to this WhatsApp business account.
+     *
+     * <p>Sends the {@link SmaxGetLinkedAccountsRequest} IQ under
+     * {@code <iq xmlns="fb:thrift_iq" type="get"/>} carrying an empty
+     * {@code <linked_accounts/>} child and projects the relay's
+     * {@code Success} arm carrying optional Facebook page, Facebook
+     * business, Instagram professional, and WhatsApp-ad-identity
+     * sub-tuples.
+     *
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxGetLinkedAccountsResponse.Success} when the
+     *         relay returned a linked-accounts tuple, or
+     *         {@link Optional#empty()} on no-parse
+     * @throws WhatsAppServerRuntimeException  if the relay returned the
+     *                                         literal {@code Forbidden}
+     *                                         arm or any other client /
+     *                                         server error
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxBizLinkingGetLinkedAccountsRPC",
+            exports = "sendGetLinkedAccountsRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxGetLinkedAccountsResponse.Success> queryLinkedAccounts() {
+        var request = new SmaxGetLinkedAccountsRequest();
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxGetLinkedAccountsResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxGetLinkedAccountsResponse.Success success -> Optional.of(success);
+            case SmaxGetLinkedAccountsResponse.Forbidden ignored ->
+                    throw new WhatsAppServerRuntimeException("Linked-accounts query forbidden");
+            case SmaxGetLinkedAccountsResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Linked-accounts query rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxGetLinkedAccountsResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Linked-accounts query server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Fetches the current SMB-data-sharing-with-Meta consent value
+     * stored server-side.
+     *
+     * <p>Sends the {@link SmaxGetPrivacySettingRequest} IQ under
+     * {@code <iq xmlns="w:biz" type="get" to="s.whatsapp.net"/>} with
+     * an empty {@code <privacy/>} body and projects the
+     * {@code <smb_data_sharing_with_meta_consent value="..."/>} grand-child.
+     *
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxGetPrivacySettingResponse.Success} when the
+     *         relay returned a consent value, or
+     *         {@link Optional#empty()} on no-parse
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the
+     *                                         request with a documented
+     *                                         client / server error
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxBizSettingsGetPrivacySettingRPC",
+            exports = "sendGetPrivacySettingRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxGetPrivacySettingResponse.Success> queryBusinessPrivacySetting() {
+        var request = new SmaxGetPrivacySettingRequest();
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxGetPrivacySettingResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxGetPrivacySettingResponse.Success success -> Optional.of(success);
+            case SmaxGetPrivacySettingResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Business privacy-setting query rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxGetPrivacySettingResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Business privacy-setting query server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Persists the SMB-data-sharing-with-Meta consent value
+     * server-side.
+     *
+     * <p>Sends the {@link SmaxSetPrivacySettingRequest} IQ under
+     * {@code <iq xmlns="w:biz" type="set" to="s.whatsapp.net"/>} with
+     * a {@code <privacy>} body that wraps an optional
+     * {@code <smb_data_sharing_with_meta_consent value=...>} child.
+     * Passing {@code null} as {@code dataSharingConsent} clears the
+     * stored choice.
+     *
+     * @param dataSharingConsent the consent value to persist; pass
+     *                           {@code null} to clear the value
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxSetPrivacySettingResponse.Success} when the
+     *         relay accepted the change, or {@link Optional#empty()}
+     *         on no-parse
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the
+     *                                         change with a documented
+     *                                         client / server error
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxBizSettingsSetPrivacySettingRPC",
+            exports = "sendSetPrivacySettingRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxSetPrivacySettingResponse.Success> changeBusinessPrivacySetting(BusinessDataSharingConsent dataSharingConsent) {
+        var request = new SmaxSetPrivacySettingRequest(dataSharingConsent == null ? null : dataSharingConsent.wireValue());
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxSetPrivacySettingResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxSetPrivacySettingResponse.Success success -> Optional.of(success);
+            case SmaxSetPrivacySettingResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Business privacy-setting change rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxSetPrivacySettingResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Business privacy-setting change server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Records a per-contact message-feedback preference (block /
+     * unblock / report and similar opaque actions).
+     *
+     * <p>Sends the {@link SmaxUpdatePreferenceRequest} IQ under
+     * {@code <iq xmlns="w:biz:msg_feedback" type="set"
+     * to="s.whatsapp.net"/>} with a {@code <user_feedback action= jid=
+     * feedback?/>} child.
+     *
+     * @param action   the feedback action verb; never {@code null}
+     * @param jid      the target contact JID; never {@code null}
+     * @param feedback the optional free-form annotation; may be
+     *                 {@code null}
+     * @throws NullPointerException            if {@code action} or
+     *                                         {@code jid} is
+     *                                         {@code null}
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the
+     *                                         change with a documented
+     *                                         client / server error
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxBizMsgUserFeedbackUpdatePreferenceRPC",
+            exports = "sendUpdatePreferenceRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public void updateMessageFeedbackPreference(MessageFeedbackAction action, Jid jid, String feedback) {
+        Objects.requireNonNull(action, "action cannot be null");
+        Objects.requireNonNull(jid, "jid cannot be null");
+        var request = new SmaxUpdatePreferenceRequest(action.wireValue(), jid, feedback);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxUpdatePreferenceResponse.of(response, requestNode.build()).orElse(null);
+        switch (parsed) {
+            case null -> {
+            }
+            case SmaxUpdatePreferenceResponse.Success ignored -> {
+            }
+            case SmaxUpdatePreferenceResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Message-feedback update rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxUpdatePreferenceResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Message-feedback update server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        }
+    }
+
+    /**
+     * Queries the relay-side metered-messaging checkout for the SMB
+     * marketing-messages feature, returning the cost / quota /
+     * eligibility tuple used by the campaign-creation UI.
+     *
+     * <p>Sends the {@link SmaxGetSMBMeteredMessagingCheckoutRequest} IQ
+     * under {@code <iq xmlns="w:biz" type="get"/>} carrying the
+     * {@code <participants/>} payload plus the four optional
+     * markers / projections, then projects the
+     * {@code Success} arm into the cost-quote tuple.
+     *
+     * @param participants     the recipient JIDs (1..2000); never
+     *                         {@code null}
+     * @param useAdAccount     whether to attach the
+     *                         {@code <use_ad_account/>} marker
+     * @param skipDedupe       whether to attach the
+     *                         {@code <skip_dedupe/>} marker
+     * @param offerId          the optional {@code <offer id/>} value;
+     *                         may be {@code null}
+     * @param pendingCampaigns the optional pending-campaign list (max
+     *                         200); may be {@code null}
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxGetSMBMeteredMessagingCheckoutResponse.Success}
+     *         when the relay returned a cost quote, or
+     *         {@link Optional#empty()} on no-parse
+     * @throws NullPointerException            if {@code participants}
+     *                                         is {@code null}
+     * @throws IllegalArgumentException        if {@code participants}
+     *                                         is outside the supported
+     *                                         range or
+     *                                         {@code pendingCampaigns}
+     *                                         exceeds 200 entries
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the
+     *                                         request with a documented
+     *                                         client / server error
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxSmbMeteredMessagingAccountGetSMBMeteredMessagingCheckoutRPC",
+            exports = "sendGetSMBMeteredMessagingCheckoutRPC",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxGetSMBMeteredMessagingCheckoutResponse.Success> queryMeteredMessagingCheckout(List<Jid> participants, boolean useAdAccount, boolean skipDedupe, String offerId, List<SmaxGetSMBMeteredMessagingCheckoutPendingCampaign> pendingCampaigns) {
+        var request = new SmaxGetSMBMeteredMessagingCheckoutRequest(participants, useAdAccount, skipDedupe, offerId, pendingCampaigns);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxGetSMBMeteredMessagingCheckoutResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxGetSMBMeteredMessagingCheckoutResponse.Success success -> Optional.of(success);
+            case SmaxGetSMBMeteredMessagingCheckoutResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Metered-messaging checkout query rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxGetSMBMeteredMessagingCheckoutResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Metered-messaging checkout server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Issues a silent CTWA access-token nonce — a probe used by the
+     * silent-recovery flow to detect whether the local credentials are
+     * still valid before triggering a full recovery prompt.
+     *
+     * <p>Sends the {@link SmaxRequestSilentNonceRequest} IQ under
+     * {@code <iq xmlns="fb:thrift_iq" type="get"
+     * to="s.whatsapp.net"/>} optionally echoing the active user JID
+     * onto the {@code from} attribute. The {@code RecoveryRequired}
+     * arm flags the email address that must be confirmed before the
+     * server will issue further nonces.
+     *
+     * @param fromUserJid the optional {@code from} echo; may be
+     *                    {@code null}
+     * @return an {@link Optional} carrying the parsed
+     *         {@link SmaxRequestSilentNonceResponse} variant, or
+     *         {@link Optional#empty()} on no-parse
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the
+     *                                         request with a documented
+     *                                         client / server error
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxBizAccessTokenRequestSilentNonceRPC",
+            exports = "sendRequestSilentNonceRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxRequestSilentNonceResponse> querySilentNonce(Jid fromUserJid) {
+        var request = new SmaxRequestSilentNonceRequest(fromUserJid);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxRequestSilentNonceResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxRequestSilentNonceResponse.Success success -> Optional.<SmaxRequestSilentNonceResponse>of(success);
+            case SmaxRequestSilentNonceResponse.RecoveryRequired recoveryRequired -> Optional.<SmaxRequestSilentNonceResponse>of(recoveryRequired);
+            case SmaxRequestSilentNonceResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Silent-nonce request rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxRequestSilentNonceResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Silent-nonce request server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Triggers the server to dispatch a CTWA account-recovery nonce
+     * (typically delivered as an out-of-band email).
+     *
+     * <p>Sends the {@link SmaxSendAccountRecoveryNonceRequest} IQ under
+     * {@code <iq xmlns="fb:thrift_iq" type="get"
+     * to="s.whatsapp.net"/>} optionally echoing the active user JID
+     * onto the {@code from} attribute and projects the
+     * {@code Success} arm's {@code <status>} content.
+     *
+     * @param fromUserJid the optional {@code from} echo; may be
+     *                    {@code null}
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxSendAccountRecoveryNonceResponse.Success}
+     *         when the relay accepted the dispatch, or
+     *         {@link Optional#empty()} on no-parse
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the
+     *                                         request with a documented
+     *                                         client / server error
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxBizCtwaAdAccountSendAccountRecoveryNonceRPC",
+            exports = "sendSendAccountRecoveryNonceRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxSendAccountRecoveryNonceResponse.Success> sendAccountRecoveryNonce(Jid fromUserJid) {
+        var request = new SmaxSendAccountRecoveryNonceRequest(fromUserJid);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxSendAccountRecoveryNonceResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxSendAccountRecoveryNonceResponse.Success success -> Optional.of(success);
+            case SmaxSendAccountRecoveryNonceResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Account-recovery-nonce dispatch rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxSendAccountRecoveryNonceResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Account-recovery-nonce dispatch server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Uploads CTWA-ad-media descriptors (id/type pairs) to the
+     * native-ad payload service.
+     *
+     * <p>Sends the {@link SmaxUploadAdMediaRequest} IQ under
+     * {@code <iq xmlns="fb:thrift_iq" type="set"/>} carrying an
+     * optional primary {@code <media id type/>} child plus 0..10
+     * {@code <media_list id type/>} children, and projects the
+     * {@code Success} arm.
+     *
+     * @param media     the optional primary media descriptor; may be
+     *                  {@code null}
+     * @param mediaList the additional media-list entries (0..10);
+     *                  never {@code null}
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxUploadAdMediaResponse.Success} when the relay
+     *         accepted the upload, or {@link Optional#empty()} on
+     *         no-parse
+     * @throws NullPointerException            if {@code mediaList} is
+     *                                         {@code null}
+     * @throws IllegalArgumentException        if {@code mediaList}
+     *                                         exceeds 10 entries
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the
+     *                                         request with a documented
+     *                                         client / server error
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxBizCtwaNativeAdUploadAdMediaRPC",
+            exports = "sendUploadAdMediaRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxUploadAdMediaResponse.Success> uploadAdMedia(SmaxUploadAdMediaMediaEntry media, List<SmaxUploadAdMediaMediaEntry> mediaList) {
+        var request = new SmaxUploadAdMediaRequest(media, mediaList);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxUploadAdMediaResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxUploadAdMediaResponse.Success success -> Optional.of(success);
+            case SmaxUploadAdMediaResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Ad-media upload rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxUploadAdMediaResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Ad-media upload server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Records the user's acceptance of a versioned payments
+     * Terms-of-Service document and returns the relay's confirmation
+     * tuple.
+     *
+     * <p>Sends the {@link SmaxAccountSetPaymentsTOSv3Request} IQ under
+     * {@code <iq xmlns="urn:xmpp:whatsapp:account" type="set"
+     * to="s.whatsapp.net"/>} carrying the
+     * {@code <accept_pay version="3" tos_version=... service=...>}
+     * envelope chosen via the {@code BR}/{@code UPI} consumer variant.
+     *
+     * @param acceptPayTosVersion the integer ToS version being
+     *                            accepted
+     * @param variant             the consumer-variant payload selecting
+     *                            BR / UPI; never {@code null}
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxAccountSetPaymentsTOSv3Response.Success} when
+     *         the relay accepted the consent, or
+     *         {@link Optional#empty()} on no-parse
+     * @throws NullPointerException            if {@code variant} is
+     *                                         {@code null}
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the
+     *                                         consent
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxAccountSetPaymentsTOSv3RPC",
+            exports = "sendSetPaymentsTOSv3RPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxAccountSetPaymentsTOSv3Response.Success> changePaymentsTosV3Acceptance(int acceptPayTosVersion, SmaxAccountSetPaymentsTOSv3ConsumerVariant variant) {
+        var request = new SmaxAccountSetPaymentsTOSv3Request(acceptPayTosVersion, variant);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxAccountSetPaymentsTOSv3Response.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxAccountSetPaymentsTOSv3Response.Success success -> Optional.of(success);
+            case SmaxAccountSetPaymentsTOSv3Response.Error error ->
+                    throw new WhatsAppServerRuntimeException("Payments TOS v3 acceptance rejected: code=" + error.errorCode() + ", text=" + error.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Creates a Brazil-specific custom payment method
+     * ({@code PAYONDELIVERY} or {@code PIXKEY}) for the local
+     * business account and persists the supplied 1..5 metadata
+     * key-value pairs.
+     *
+     * <p>Sends the {@link SmaxBrPaymentCreateCustomPaymentMethodRequest}
+     * IQ under {@code <iq xmlns="w:pay" type="set"
+     * to="s.whatsapp.net"/>} wrapping an
+     * {@code <account action="create-custom-payment-method"
+     * device_id country="BR">} envelope.
+     *
+     * @param accountDeviceId           the opaque device-id for the
+     *                                  enrolment; never {@code null}
+     * @param customPaymentMethodType   one of {@code "PAYONDELIVERY"}
+     *                                  / {@code "PIXKEY"}; never
+     *                                  {@code null}
+     * @param customPaymentMethodUpdate the optional {@code update}
+     *                                  marker; may be {@code null}
+     * @param customPaymentMethodFlow   the optional {@code "P2P"} /
+     *                                  {@code "P2M"} flow; may be
+     *                                  {@code null}
+     * @param metadata                  1..5 metadata pairs; never
+     *                                  {@code null}, never empty
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxBrPaymentCreateCustomPaymentMethodResponse.Success}
+     *         when the relay assigned a credential-id, or
+     *         {@link Optional#empty()} on no-parse
+     * @throws NullPointerException            if any non-nullable
+     *                                         argument is {@code null}
+     * @throws IllegalArgumentException        if {@code metadata} is
+     *                                         empty or has more than 5
+     *                                         entries
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the
+     *                                         create with an IQ-level
+     *                                         error
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxBrPaymentCreateCustomPaymentMethodRPC",
+            exports = "sendCreateCustomPaymentMethodRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxBrPaymentCreateCustomPaymentMethodResponse.Success> createBrazilCustomPaymentMethod(String accountDeviceId, String customPaymentMethodType, String customPaymentMethodUpdate, String customPaymentMethodFlow, Map<String, String> metadata) {
+        var request = new SmaxBrPaymentCreateCustomPaymentMethodRequest(accountDeviceId, customPaymentMethodType, customPaymentMethodUpdate, customPaymentMethodFlow, metadata);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxBrPaymentCreateCustomPaymentMethodResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxBrPaymentCreateCustomPaymentMethodResponse.Success success -> Optional.of(success);
+            case SmaxBrPaymentCreateCustomPaymentMethodResponse.IqError iqError ->
+                    throw new WhatsAppServerRuntimeException("BR custom payment method creation rejected: code=" + iqError.errorCode() + ", text=" + iqError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Sends the companion-side {@code link_code_companion_reg
+     * stage="companion_hello"} IQ that opens the link-code companion
+     * pairing handshake.
+     *
+     * <p>Sends the {@link SmaxMdCompanionHelloRequest} IQ under
+     * {@code <iq xmlns="md" type="set" to="s.whatsapp.net"/>} carrying
+     * the wrapped ephemeral pubkey, the server-auth key, the platform
+     * descriptors, and the optional pairing nonce. The success arm is
+     * the {@code NotifyCompanion} push from the primary device, which
+     * arrives through the notification dispatcher rather than as the
+     * direct reply; this method only validates that the relay accepted
+     * the hello.
+     *
+     * @param linkCodeCompanionRegJid                       the
+     *                                                      companion
+     *                                                      JID; never
+     *                                                      {@code null}
+     * @param linkCodeCompanionRegShouldShowPushNotification the optional
+     *                                                      push-notification
+     *                                                      flag; may be
+     *                                                      {@code null}
+     * @param linkCodePairingWrappedCompanionEphemeralPub   the wrapped
+     *                                                      companion-ephemeral
+     *                                                      pubkey;
+     *                                                      never
+     *                                                      {@code null}
+     * @param companionServerAuthKeyPub                     the
+     *                                                      server-auth
+     *                                                      pubkey;
+     *                                                      never
+     *                                                      {@code null}
+     * @param companionPlatformId                           the
+     *                                                      platform-id
+     *                                                      bytes;
+     *                                                      never
+     *                                                      {@code null}
+     * @param companionPlatformDisplay                      the
+     *                                                      platform-display
+     *                                                      bytes;
+     *                                                      never
+     *                                                      {@code null}
+     * @param linkCodePairingNonce                          the optional
+     *                                                      pairing
+     *                                                      nonce; may
+     *                                                      be
+     *                                                      {@code null}
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxMdCompanionHelloResponse.NotifyCompanion} when
+     *         the relay echoed the {@code NotifyCompanion} reply, or
+     *         {@link Optional#empty()} on no-parse
+     * @throws NullPointerException            if any of the required
+     *                                         arguments is {@code null}
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the
+     *                                         hello with a documented
+     *                                         client / server error
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxMdCompanionHelloRPC",
+            exports = "sendCompanionHelloRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxMdCompanionHelloResponse.NotifyCompanion> sendCompanionHello(Jid linkCodeCompanionRegJid, String linkCodeCompanionRegShouldShowPushNotification, byte[] linkCodePairingWrappedCompanionEphemeralPub, byte[] companionServerAuthKeyPub, byte[] companionPlatformId, byte[] companionPlatformDisplay, byte[] linkCodePairingNonce) {
+        var request = new SmaxMdCompanionHelloRequest(linkCodeCompanionRegJid, linkCodeCompanionRegShouldShowPushNotification, linkCodePairingWrappedCompanionEphemeralPub, companionServerAuthKeyPub, companionPlatformId, companionPlatformDisplay, linkCodePairingNonce);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxMdCompanionHelloResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxMdCompanionHelloResponse.NotifyCompanion notifyCompanion -> Optional.of(notifyCompanion);
+            case SmaxMdCompanionHelloResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Companion-hello rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxMdCompanionHelloResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Companion-hello server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Closes the link-code companion pairing handshake by uploading
+     * the wrapped key bundle plus the companion identity-public key.
+     *
+     * <p>Sends the {@link SmaxMdCompanionFinishRequest} IQ under
+     * {@code <iq xmlns="md" type="set" to="s.whatsapp.net"/>} carrying
+     * the {@code <link_code_companion_reg jid=>} envelope plus the
+     * three opaque-payload children. Cobalt only checks the relay
+     * accepted the finish; the post-finish notify is delivered through
+     * the standard notification dispatcher.
+     *
+     * @param linkCodeCompanionRegJid          the companion JID; never
+     *                                         {@code null}
+     * @param linkCodePairingWrappedKeyBundle  the wrapped key-bundle
+     *                                         bytes; never {@code null}
+     * @param companionIdentityPublic          the identity-public-key
+     *                                         bytes; never {@code null}
+     * @param linkCodePairingRef               the pairing-reference
+     *                                         bytes echoed from the
+     *                                         hello reply; never
+     *                                         {@code null}
+     * @throws NullPointerException            if any argument is
+     *                                         {@code null}
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the
+     *                                         finish
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxMdCompanionFinishRPC",
+            exports = "sendCompanionFinishRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public void sendCompanionFinish(Jid linkCodeCompanionRegJid, byte[] linkCodePairingWrappedKeyBundle, byte[] companionIdentityPublic, byte[] linkCodePairingRef) {
+        var request = new SmaxMdCompanionFinishRequest(linkCodeCompanionRegJid, linkCodePairingWrappedKeyBundle, companionIdentityPublic, linkCodePairingRef);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxMdCompanionFinishResponse.of(response, requestNode.build()).orElse(null);
+        switch (parsed) {
+            case null -> {
+            }
+            case SmaxMdCompanionFinishResponse.Success ignored -> {
+            }
+            case SmaxMdCompanionFinishResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Companion-finish rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxMdCompanionFinishResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Companion-finish server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        }
+    }
+
+    /**
+     * Resolves the relay's view of the local user's ISO-3166 country
+     * code via the link-code companion-registration channel.
+     *
+     * <p>Sends the {@link SmaxMdGetCountryCodeRequest} IQ under
+     * {@code <iq xmlns="md" type="get" to="s.whatsapp.net"/>} with a
+     * single {@code <link_code_companion_reg
+     * stage="get_country_code"/>} body and projects the
+     * {@code Success} arm into the ISO country-code string.
+     *
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxMdGetCountryCodeResponse.Success} when the
+     *         relay returned a country code, or
+     *         {@link Optional#empty()} on no-parse
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the
+     *                                         request with a documented
+     *                                         client / server error
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxMdGetCountryCodeRPC",
+            exports = "sendGetCountryCodeRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxMdGetCountryCodeResponse.Success> queryCompanionCountryCode() {
+        var request = new SmaxMdGetCountryCodeRequest();
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxMdGetCountryCodeResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxMdGetCountryCodeResponse.Success success -> Optional.of(success);
+            case SmaxMdGetCountryCodeResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Companion country-code query rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxMdGetCountryCodeResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Companion country-code query server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Publishes a newsletter post (or edit / question response) to a
+     * newsletter JID and waits for the application-level ack.
+     *
+     * <p>Sends the {@link SmaxMessagePublishNewsletterRequest} stanza
+     * directly as a {@code <message to=NEWSLETTER_JID>} envelope
+     * carrying the chosen {@link SmaxMessagePublishNewsletterPayload}
+     * (server-id-echo or client-id-only) and waits for the
+     * {@code MessageAck} / {@code QuestionResponseAck} reply, mirroring
+     * WA Web's {@code WASmaxMessagePublishNewsletterRPC}.
+     *
+     * @param newsletterJid the target newsletter JID; never
+     *                      {@code null}
+     * @param payload       the publish payload; never {@code null}
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxMessagePublishNewsletterResponse.Success}
+     *         when the relay positively acknowledged the publish, or
+     *         {@link Optional#empty()} on no-parse
+     * @throws NullPointerException            if either argument is
+     *                                         {@code null}
+     * @throws WhatsAppServerRuntimeException  if the relay returned a
+     *                                         negative ack
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxMessagePublishNewsletterRPC",
+            exports = "sendNewsletterRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxMessagePublishNewsletterResponse.Success> publishNewsletterMessage(Jid newsletterJid, SmaxMessagePublishNewsletterPayload payload) {
+        var request = new SmaxMessagePublishNewsletterRequest(newsletterJid, payload);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxMessagePublishNewsletterResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxMessagePublishNewsletterResponse.Success success -> Optional.of(success);
+            case SmaxMessagePublishNewsletterResponse.Negative negative ->
+                    throw new WhatsAppServerRuntimeException("Newsletter publish negative ack: error=" + negative.errorCode() + ", appError=" + negative.applicationError().orElse(null) + ", backoff=" + negative.backoff().orElse(null));
+        };
+    }
+
+    /**
+     * Publishes a newsletter status post to a newsletter JID and waits
+     * for the application-level ack.
+     *
+     * <p>Sends the {@link SmaxStatusPublishPostNewsletterStatusRequest}
+     * stanza directly as a {@code <status to=NEWSLETTER_JID>} envelope
+     * carrying the chosen
+     * {@link SmaxStatusPublishPostNewsletterStatusPayload}
+     * (server-id-echo or client-id-only) and waits for the positive /
+     * negative ack, mirroring WA Web's
+     * {@code WASmaxStatusPublishPostNewsletterStatusRPC}.
+     *
+     * @param newsletterJid the target newsletter JID; never
+     *                      {@code null}
+     * @param payload       the publish payload; never {@code null}
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxStatusPublishPostNewsletterStatusResponse.Success}
+     *         when the relay positively acknowledged the publish, or
+     *         {@link Optional#empty()} on no-parse
+     * @throws NullPointerException            if either argument is
+     *                                         {@code null}
+     * @throws WhatsAppServerRuntimeException  if the relay returned a
+     *                                         negative ack
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxStatusPublishPostNewsletterStatusRPC",
+            exports = "sendPostNewsletterStatusRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxStatusPublishPostNewsletterStatusResponse.Success> publishNewsletterStatus(Jid newsletterJid, SmaxStatusPublishPostNewsletterStatusPayload payload) {
+        var request = new SmaxStatusPublishPostNewsletterStatusRequest(newsletterJid, payload);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxStatusPublishPostNewsletterStatusResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxStatusPublishPostNewsletterStatusResponse.Success success -> Optional.of(success);
+            case SmaxStatusPublishPostNewsletterStatusResponse.Negative negative ->
+                    throw new WhatsAppServerRuntimeException("Newsletter status publish negative ack: error=" + negative.errorCode() + ", appError=" + negative.applicationError().orElse(null) + ", backoff=" + negative.backoff().orElse(null));
+        };
+    }
+
+    //</editor-fold>
+    //<editor-fold desc="Typed legacy IQ wrappers">
+
+    /**
+     * Dispatches the given typed legacy-IQ {@link IqOperation.Request} and
+     * returns the raw response stanza.
+     *
+     * @param request the typed legacy-IQ request; never {@code null}
+     * @return the raw inbound reply node; never {@code null}
+     * @throws NullPointerException            if {@code request} is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     */
+    public Node sendNode(IqOperation.Request request) {
+        Objects.requireNonNull(request, "request cannot be null");
+        return sendNode(request.toNode());
+    }
+
+    /**
+     * Fetches the SMB product-list catalog for a merchant.
+     *
+     * @param catalogJid                    the catalog JID; never {@code null}
+     * @param productIds                    the product ids; never {@code null} or empty
+     * @param width                         the requested image width
+     * @param height                        the requested image height
+     * @param directConnectionEncryptedInfo optional direct-connection blob; may be {@code null}
+     * @return an {@link Optional} carrying the parsed {@link IqQueryProductListCatalogResponse.Success}
+     * @throws NullPointerException            if any required argument is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     * @throws RuntimeException                if the relay returned a client- or server-error variant
+     *
+     * @implNote {@code WAWebQueryProductListCatalogJob}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebQueryProductListCatalogJob",
+            exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<IqQueryProductListCatalogResponse.Success> queryBizProductListCatalog(Jid catalogJid,
+                                                                                          List<String> productIds,
+                                                                                          int width, int height,
+                                                                                          String directConnectionEncryptedInfo) {
+        var request = new IqQueryProductListCatalogRequest(catalogJid, productIds, width, height, directConnectionEncryptedInfo);
+        var requestBuilder = request.toNode();
+        var response = sendNode(requestBuilder);
+        return switch (IqQueryProductListCatalogResponse.of(response, requestBuilder.build()).orElse(null)) {
+            case IqQueryProductListCatalogResponse.Success success -> Optional.of(success);
+            case IqQueryProductListCatalogResponse.ClientError clientError ->
+                    throw new RuntimeException("Query biz product list catalog rejected: " + clientError.errorCode());
+            case IqQueryProductListCatalogResponse.ServerError serverError ->
+                    throw new RuntimeException("Query biz product list catalog server error: " + serverError.errorCode());
+            case null -> Optional.empty();
+        };
+    }
+
+    /**
+     * Sends a SMB business cover-photo upload artefact.
+     *
+     * @param id    the upload id
+     * @param ts    the upload timestamp
+     * @param token the upload token; never {@code null}
+     * @return an {@link Optional} carrying the parsed {@link IqSendCoverPhotoResponse.Success}
+     * @throws NullPointerException            if {@code token} is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     * @throws RuntimeException                if the relay returned a client- or server-error variant
+     *
+     * @implNote {@code WAWebBusinessProfileJob.sendCoverPhoto}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebBusinessProfileJob",
+            exports = "sendCoverPhoto", adaptation = WhatsAppAdaptation.DIRECT)
+    public Optional<IqSendCoverPhotoResponse.Success> uploadBizCoverPhoto(long id, long ts, byte[] token) {
+        var request = new IqSendCoverPhotoRequest(id, ts, token);
+        var requestBuilder = request.toNode();
+        var response = sendNode(requestBuilder);
+        return switch (IqSendCoverPhotoResponse.of(response, requestBuilder.build()).orElse(null)) {
+            case IqSendCoverPhotoResponse.Success success -> Optional.of(success);
+            case IqSendCoverPhotoResponse.ClientError clientError ->
+                    throw new RuntimeException("Upload biz cover photo rejected: " + clientError.errorCode());
+            case IqSendCoverPhotoResponse.ServerError serverError ->
+                    throw new RuntimeException("Upload biz cover photo server error: " + serverError.errorCode());
+            case null -> Optional.empty();
+        };
+    }
+
+    /**
+     * Clears one or more dirty-bit entries.
+     *
+     * @param entries the entries; never {@code null} or empty
+     * @return an {@link Optional} carrying the parsed {@link IqClearDirtyBitsResponse.Success}
+     * @throws NullPointerException            if {@code entries} is {@code null}
+     * @throws IllegalArgumentException        if {@code entries} is empty
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     * @throws RuntimeException                if the relay returned a client- or server-error variant
+     *
+     * @implNote {@code WAWebClearDirtyBitsJob.clearDirtyBits}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebClearDirtyBitsJob",
+            exports = "clearDirtyBits", adaptation = WhatsAppAdaptation.DIRECT)
+    public Optional<IqClearDirtyBitsResponse.Success> clearDirtyBits(List<IqClearDirtyBitsRequest.DirtyEntry> entries) {
+        var request = new IqClearDirtyBitsRequest(entries);
+        var requestBuilder = request.toNode();
+        var response = sendNode(requestBuilder);
+        return switch (IqClearDirtyBitsResponse.of(response, requestBuilder.build()).orElse(null)) {
+            case IqClearDirtyBitsResponse.Success success -> Optional.of(success);
+            case IqClearDirtyBitsResponse.ClientError clientError ->
+                    throw new RuntimeException("Clear dirty bits rejected: " + clientError.errorCode());
+            case IqClearDirtyBitsResponse.ServerError serverError ->
+                    throw new RuntimeException("Clear dirty bits server error: " + serverError.errorCode());
+            case null -> Optional.empty();
+        };
+    }
+
+    /**
+     * Fetches the digest of the local pre-key bundle.
+     *
+     * @return an {@link Optional} carrying the parsed {@link IqDigestKeyResponse.Success}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     * @throws RuntimeException                if the relay returned a client- or server-error variant
+     *
+     * @implNote {@code WAWebDigestKeyJob.digestKey}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebDigestKeyJob",
+            exports = "digestKey", adaptation = WhatsAppAdaptation.DIRECT)
+    public Optional<IqDigestKeyResponse.Success> queryKeyDigest() {
+        var request = new IqDigestKeyRequest();
+        var requestBuilder = request.toNode();
+        var response = sendNode(requestBuilder);
+        return switch (IqDigestKeyResponse.of(response, requestBuilder.build()).orElse(null)) {
+            case IqDigestKeyResponse.Success success -> Optional.of(success);
+            case IqDigestKeyResponse.ClientError clientError ->
+                    throw new RuntimeException("Digest key rejected: " + clientError.errorCode());
+            case IqDigestKeyResponse.ServerError serverError ->
+                    throw new RuntimeException("Digest key server error: " + serverError.errorCode());
+            case null -> Optional.empty();
+        };
+    }
+
+    /**
+     * Fetches identity-public-keys for a list of device JIDs.
+     *
+     * @param deviceJids the devices to query; never {@code null} or empty
+     * @return an {@link Optional} carrying the parsed {@link IqGetIdentityKeysResponse.Success}
+     * @throws NullPointerException            if {@code deviceJids} is {@code null}
+     * @throws IllegalArgumentException        if {@code deviceJids} is empty
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     * @throws RuntimeException                if the relay returned a client- or server-error variant
+     *
+     * @implNote {@code WAWebGetIdentityKeysJob.getAndStoreIdentityKeys}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebGetIdentityKeysJob",
+            exports = "getAndStoreIdentityKeys", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<IqGetIdentityKeysResponse.Success> fetchIdentityKeys(List<Jid> deviceJids) {
+        var request = new IqGetIdentityKeysRequest(deviceJids);
+        var requestBuilder = request.toNode();
+        var response = sendNode(requestBuilder);
+        return switch (IqGetIdentityKeysResponse.of(response, requestBuilder.build()).orElse(null)) {
+            case IqGetIdentityKeysResponse.Success success -> Optional.of(success);
+            case IqGetIdentityKeysResponse.ClientError clientError ->
+                    throw new RuntimeException("Fetch identity keys rejected: " + clientError.errorCode());
+            case IqGetIdentityKeysResponse.ServerError serverError ->
+                    throw new RuntimeException("Fetch identity keys server error: " + serverError.errorCode());
+            case null -> Optional.empty();
+        };
+    }
+
+    /**
+     * Rotates the local signed pre-key.
+     *
+     * @param signedPreKey the new signed pre-key; never {@code null}
+     * @return an {@link Optional} carrying the parsed {@link IqRotateKeyResponse.Success}
+     * @throws NullPointerException            if {@code signedPreKey} is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     * @throws RuntimeException                if the relay returned a client- or server-error variant
+     *
+     * @implNote {@code WAWebRotateKeyJob.rotateKey}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebRotateKeyJob",
+            exports = "rotateKey", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<IqRotateKeyResponse.Success> rotateSignedPreKey(IqUploadPreKeysSignedPreKey signedPreKey) {
+        var request = new IqRotateKeyRequest(signedPreKey);
+        var requestBuilder = request.toNode();
+        var response = sendNode(requestBuilder);
+        return switch (IqRotateKeyResponse.of(response, requestBuilder.build()).orElse(null)) {
+            case IqRotateKeyResponse.Success success -> Optional.of(success);
+            case IqRotateKeyResponse.ClientError clientError ->
+                    throw new RuntimeException("Rotate key rejected: " + clientError.errorCode());
+            case IqRotateKeyResponse.ServerError serverError ->
+                    throw new RuntimeException("Rotate key server error: " + serverError.errorCode());
+            case null -> Optional.empty();
+        };
+    }
+
+    /**
+     * Uploads a fresh batch of one-time pre-keys.
+     *
+     * @param registrationId    the registration id
+     * @param keyBundleType     the key-bundle type marker
+     * @param identityPublicKey the identity public key bytes; never {@code null}
+     * @param preKeys           the one-time pre-keys; never {@code null} or empty
+     * @param signedPreKey      the signed pre-key; never {@code null}
+     * @return an {@link Optional} carrying the parsed {@link IqUploadPreKeysResponse.Success}
+     * @throws NullPointerException            if any reference argument is {@code null}
+     * @throws IllegalArgumentException        if {@code preKeys} is empty
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     * @throws RuntimeException                if the relay returned a client- or server-error variant
+     *
+     * @implNote {@code WAWebUploadPreKeysJob.uploadPreKeys}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebUploadPreKeysJob",
+            exports = "uploadPreKeys", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<IqUploadPreKeysResponse.Success> uploadSignalPreKeys(int registrationId, byte keyBundleType,
+                                                                         byte[] identityPublicKey,
+                                                                         List<IqUploadPreKeysPreKey> preKeys,
+                                                                         IqUploadPreKeysSignedPreKey signedPreKey) {
+        var request = new IqUploadPreKeysRequest(registrationId, keyBundleType, identityPublicKey, preKeys, signedPreKey);
+        var requestBuilder = request.toNode();
+        var response = sendNode(requestBuilder);
+        return switch (IqUploadPreKeysResponse.of(response, requestBuilder.build()).orElse(null)) {
+            case IqUploadPreKeysResponse.Success success -> Optional.of(success);
+            case IqUploadPreKeysResponse.ClientError clientError ->
+                    throw new RuntimeException("Upload pre-keys rejected: " + clientError.errorCode());
+            case IqUploadPreKeysResponse.ServerError serverError ->
+                    throw new RuntimeException("Upload pre-keys server error: " + serverError.errorCode());
+            case null -> Optional.empty();
+        };
+    }
+
+    /**
+     * Uploads a fresh batch of pre-keys during the registration flow.
+     *
+     * @param registrationId    the registration id
+     * @param keyBundleType     the key-bundle type marker
+     * @param identityPublicKey the identity public key bytes; never {@code null}
+     * @param preKeys           the one-time pre-keys; never {@code null} or empty
+     * @param signedPreKey      the signed pre-key; never {@code null}
+     * @return an {@link Optional} carrying the parsed {@link IqUploadPrekeysForRegResponse.Success}
+     * @throws NullPointerException            if any reference argument is {@code null}
+     * @throws IllegalArgumentException        if {@code preKeys} is empty
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     * @throws RuntimeException                if the relay returned a client- or server-error variant
+     *
+     * @implNote {@code WAWebUploadPrekeysForRegTask.uploadPrekeysForReg}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebUploadPrekeysForRegTask",
+            exports = "uploadPrekeysForReg", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<IqUploadPrekeysForRegResponse.Success> uploadRegistrationPreKeys(int registrationId, byte keyBundleType,
+                                                                                     byte[] identityPublicKey,
+                                                                                     List<IqUploadPreKeysPreKey> preKeys,
+                                                                                     IqUploadPreKeysSignedPreKey signedPreKey) {
+        var request = new IqUploadPrekeysForRegRequest(registrationId, keyBundleType, identityPublicKey, preKeys, signedPreKey);
+        var requestBuilder = request.toNode();
+        var response = sendNode(requestBuilder);
+        return switch (IqUploadPrekeysForRegResponse.of(response, requestBuilder.build()).orElse(null)) {
+            case IqUploadPrekeysForRegResponse.Success success -> Optional.of(success);
+            case IqUploadPrekeysForRegResponse.ClientError clientError ->
+                    throw new RuntimeException("Upload registration pre-keys rejected: " + clientError.errorCode());
+            case IqUploadPrekeysForRegResponse.ServerError serverError ->
+                    throw new RuntimeException("Upload registration pre-keys server error: " + serverError.errorCode());
+            case null -> Optional.empty();
+        };
+    }
+
+    /**
+     * Fetches the media-connection routing descriptor.
+     *
+     * @return an {@link Optional} carrying the parsed {@link IqQueryMediaConnsResponse.Success}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     * @throws RuntimeException                if the relay returned a client- or server-error variant
+     *
+     * @implNote {@code WAWebMediaConnJob.queryMediaConn}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMediaConnJob",
+            exports = "queryMediaConn", adaptation = WhatsAppAdaptation.DIRECT)
+    public Optional<IqQueryMediaConnsResponse.Success> queryMediaConns() {
+        var request = new IqQueryMediaConnsRequest();
+        var requestBuilder = request.toNode();
+        var response = sendNode(requestBuilder);
+        return switch (IqQueryMediaConnsResponse.of(response, requestBuilder.build()).orElse(null)) {
+            case IqQueryMediaConnsResponse.Success success -> Optional.of(success);
+            case IqQueryMediaConnsResponse.ClientError clientError ->
+                    throw new RuntimeException("Query media conns rejected: " + clientError.errorCode());
+            case IqQueryMediaConnsResponse.ServerError serverError ->
+                    throw new RuntimeException("Query media conns server error: " + serverError.errorCode());
+            case null -> Optional.empty();
+        };
+    }
+
+    /**
+     * Uploads a fresh group-profile picture artefact.
+     *
+     * @param groupTarget the target group JID; never {@code null}
+     * @param picture     the JPEG bytes; never {@code null}
+     * @return an {@link Optional} carrying the parsed {@link IqSendProfilePictureResponse.Success}
+     * @throws NullPointerException            if any argument is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     * @throws RuntimeException                if the relay returned a client- or server-error variant
+     *
+     * @implNote {@code WAWebSendProfilePictureJob.sendProfilePicture}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebSendProfilePictureJob",
+            exports = "sendProfilePicture", adaptation = WhatsAppAdaptation.DIRECT)
+    public Optional<IqSendProfilePictureResponse.Success> uploadGroupProfilePicture(Jid groupTarget, byte[] picture) {
+        var request = new IqSendProfilePictureRequest(groupTarget, picture);
+        var requestBuilder = request.toNode();
+        var response = sendNode(requestBuilder);
+        return switch (IqSendProfilePictureResponse.of(response, requestBuilder.build()).orElse(null)) {
+            case IqSendProfilePictureResponse.Success success -> Optional.of(success);
+            case IqSendProfilePictureResponse.ClientError clientError ->
+                    throw new RuntimeException("Send profile picture rejected: " + clientError.errorCode());
+            case IqSendProfilePictureResponse.ServerError serverError ->
+                    throw new RuntimeException("Send profile picture server error: " + serverError.errorCode());
+            case null -> Optional.empty();
+        };
+    }
+
+    /**
+     * Issues a private-stats anonymous credential.
+     *
+     * @param blindedCredential the blinded credential bytes; never {@code null}
+     * @param projectName       the project name bytes; never {@code null}
+     * @return an {@link Optional} carrying the parsed {@link IqIssuePrivateStatsTokenResponse.Success}
+     * @throws NullPointerException            if any argument is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     * @throws RuntimeException                if the relay returned a client- or server-error variant
+     *
+     * @implNote {@code WAWebPrivateStatsIssueTokenJob.issuePrivateStatsToken}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebPrivateStatsIssueTokenJob",
+            exports = "issuePrivateStatsToken", adaptation = WhatsAppAdaptation.DIRECT)
+    public Optional<IqIssuePrivateStatsTokenResponse.Success> issuePrivateStatsToken(byte[] blindedCredential, byte[] projectName) {
+        var request = new IqIssuePrivateStatsTokenRequest(blindedCredential, projectName);
+        var requestBuilder = request.toNode();
+        var response = sendNode(requestBuilder);
+        return switch (IqIssuePrivateStatsTokenResponse.of(response, requestBuilder.build()).orElse(null)) {
+            case IqIssuePrivateStatsTokenResponse.Success success -> Optional.of(success);
+            case IqIssuePrivateStatsTokenResponse.ClientError clientError ->
+                    throw new RuntimeException("Issue private stats token rejected: " + clientError.errorCode());
+            case IqIssuePrivateStatsTokenResponse.ServerError serverError ->
+                    throw new RuntimeException("Issue private stats token server error: " + serverError.errorCode());
+            case null -> Optional.empty();
+        };
+    }
+
+    /**
+     * Performs a syncd app-state server sync.
+     *
+     * @param collections the per-collection request entries; never {@code null}
+     * @return an {@link Optional} carrying the parsed {@link IqSyncdServerSyncResponse.Success}
+     * @throws NullPointerException            if {@code collections} is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     * @throws RuntimeException                if the relay returned a client- or server-error variant
+     *
+     * @implNote {@code WAWebSyncdServerSync.serverSync}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebSyncdServerSync",
+            exports = "serverSync", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<IqSyncdServerSyncResponse.Success> syncAppState(List<IqSyncdServerSyncRequestCollection> collections) {
+        var request = new IqSyncdServerSyncRequest(collections);
+        var requestBuilder = request.toNode();
+        var response = sendNode(requestBuilder);
+        return switch (IqSyncdServerSyncResponse.of(response, requestBuilder.build()).orElse(null)) {
+            case IqSyncdServerSyncResponse.Success success -> Optional.of(success);
+            case IqSyncdServerSyncResponse.ClientError clientError ->
+                    throw new RuntimeException("Syncd server sync rejected: " + clientError.errorCode());
+            case IqSyncdServerSyncResponse.ServerError serverError ->
+                    throw new RuntimeException("Syncd server sync server error: " + serverError.errorCode());
+            case null -> Optional.empty();
+        };
+    }
+
+    /**
+     * Acknowledges deletion of a single ToS notice.
+     *
+     * @param noticeId the notice id; never {@code null}
+     * @return an {@link Optional} carrying the parsed {@link IqDeleteTosResponse.Success}
+     * @throws NullPointerException            if {@code noticeId} is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     * @throws RuntimeException                if the relay returned a client- or server-error variant
+     *
+     * @implNote {@code WAWebTosJob.deleteTosNotice}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebTosJob",
+            exports = "deleteTosNotice", adaptation = WhatsAppAdaptation.DIRECT)
+    public Optional<IqDeleteTosResponse.Success> deleteTosNotice(String noticeId) {
+        var request = new IqDeleteTosRequest(noticeId);
+        var requestBuilder = request.toNode();
+        var response = sendNode(requestBuilder);
+        return switch (IqDeleteTosResponse.of(response, requestBuilder.build()).orElse(null)) {
+            case IqDeleteTosResponse.Success success -> Optional.of(success);
+            case IqDeleteTosResponse.ClientError clientError ->
+                    throw new RuntimeException("Delete tos notice rejected: " + clientError.errorCode());
+            case IqDeleteTosResponse.ServerError serverError ->
+                    throw new RuntimeException("Delete tos notice server error: " + serverError.errorCode());
+            case null -> Optional.empty();
+        };
+    }
+
+    /**
+     * Queries one or more ToS notice states.
+     *
+     * @param noticeIds the notice ids; never {@code null}
+     * @return an {@link Optional} carrying the parsed {@link IqQueryTosResponse.Success}
+     * @throws NullPointerException            if {@code noticeIds} is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     * @throws RuntimeException                if the relay returned a client- or server-error variant
+     *
+     * @implNote {@code WAWebTosJob.queryTosState}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebTosJob",
+            exports = "queryTosState", adaptation = WhatsAppAdaptation.DIRECT)
+    public Optional<IqQueryTosResponse.Success> queryTosState(List<String> noticeIds) {
+        var request = new IqQueryTosRequest(noticeIds);
+        var requestBuilder = request.toNode();
+        var response = sendNode(requestBuilder);
+        return switch (IqQueryTosResponse.of(response, requestBuilder.build()).orElse(null)) {
+            case IqQueryTosResponse.Success success -> Optional.of(success);
+            case IqQueryTosResponse.ClientError clientError ->
+                    throw new RuntimeException("Query tos state rejected: " + clientError.errorCode());
+            case IqQueryTosResponse.ServerError serverError ->
+                    throw new RuntimeException("Query tos state server error: " + serverError.errorCode());
+            case null -> Optional.empty();
+        };
+    }
+
+    /**
+     * Acknowledges acceptance of one or more ToS notices.
+     *
+     * @param noticeIds the notice ids; never {@code null}
+     * @return an {@link Optional} carrying the parsed {@link IqUpdateTosResponse.Success}
+     * @throws NullPointerException            if {@code noticeIds} is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     * @throws RuntimeException                if the relay returned a client- or server-error variant
+     *
+     * @implNote {@code WAWebTosJob.acceptTosNotice}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebTosJob",
+            exports = "acceptTosNotice", adaptation = WhatsAppAdaptation.DIRECT)
+    public Optional<IqUpdateTosResponse.Success> acknowledgeTosNotices(List<String> noticeIds) {
+        var request = new IqUpdateTosRequest(noticeIds);
+        var requestBuilder = request.toNode();
+        var response = sendNode(requestBuilder);
+        return switch (IqUpdateTosResponse.of(response, requestBuilder.build()).orElse(null)) {
+            case IqUpdateTosResponse.Success success -> Optional.of(success);
+            case IqUpdateTosResponse.ClientError clientError ->
+                    throw new RuntimeException("Update tos rejected: " + clientError.errorCode());
+            case IqUpdateTosResponse.ServerError serverError ->
+                    throw new RuntimeException("Update tos server error: " + serverError.errorCode());
+            case null -> Optional.empty();
+        };
+    }
+
+    /**
+     * Issues a usync query.
+     *
+     * @param mode      the query mode; never {@code null}
+     * @param context   the context tag; never {@code null}
+     * @param protocols the protocol tags; never {@code null} or empty
+     * @param users     the users to query; never {@code null}
+     * @return an {@link Optional} carrying the parsed {@link IqUsyncResponse.Success}
+     * @throws NullPointerException            if any reference argument is {@code null}
+     * @throws IllegalArgumentException        if {@code protocols} is empty
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     * @throws RuntimeException                if the relay returned a client- or server-error variant
+     *
+     * @implNote {@code WAWebUsync.USyncQuery.execute}.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebUsync",
+            exports = "USyncQuery", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<IqUsyncResponse.Success> queryUsync(IqUsyncMode mode, String context, List<String> protocols,
+                                                        List<IqUsyncRequest.User> users) {
+        var request = new IqUsyncRequest(mode, context, protocols, users);
+        var requestBuilder = request.toNode();
+        var response = sendNode(requestBuilder);
+        return switch (IqUsyncResponse.of(response, requestBuilder.build()).orElse(null)) {
+            case IqUsyncResponse.Success success -> Optional.of(success);
+            case IqUsyncResponse.ClientError clientError ->
+                    throw new RuntimeException("Usync rejected: " + clientError.errorCode());
+            case IqUsyncResponse.ServerError serverError ->
+                    throw new RuntimeException("Usync server error: " + serverError.errorCode());
+            case null -> Optional.empty();
+        };
     }
 
     //</editor-fold>
@@ -11958,4 +17185,2822 @@ public class WhatsAppClient {
             default -> null; // WAWebListsLogging.getListType: switch has no default branch, so other inputs return undefined
         };
     }
+
+    //<editor-fold desc="SMAX: groups, communities, newsletters, AB props, bot, support">
+    // Each method below dispatches a typed Smax<Op>Request from
+    // node/smax/groups/ or node/smax/newsletters/, blocks for the
+    // relay's reply, and unwraps the Smax<Op>Response chain into the
+    // Success projection. ClientError / ServerError variants are
+    // surfaced through WhatsAppServerRuntimeException with the relay's
+    // (code, text) pair embedded.
+
+    /**
+     * Dispatches a group acknowledgement and unwraps the relay's success
+     * acknowledgement.
+     *
+     * <p>Sent after the client has fully ingested a group's metadata
+     * and history snapshot — the relay uses the acknowledgement to
+     * advance its per-group dirty cursors so the next reconnect does
+     * not redeliver the same notification.
+     *
+     * @param group the group JID being acknowledged; never {@code null}
+     * @return an {@link Optional} carrying the success projection, or
+     *         empty when the response could not be parsed
+     * @throws NullPointerException            if {@code group} is
+     *                                         {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no
+     *                                         longer open
+     * @throws WhatsAppServerRuntimeException  when the relay returned
+     *                                         a {@code ClientError} or
+     *                                         {@code ServerError}
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxGroupsAcknowledgeGroupRPC", exports = "sendAcknowledgeGroupRPC",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxGroupsAcknowledgeGroupResponse.Success> acknowledgeGroup(Jid group) {
+        Objects.requireNonNull(group, "group cannot be null");
+        var request = new SmaxGroupsAcknowledgeGroupRequest(group);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxGroupsAcknowledgeGroupResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxGroupsAcknowledgeGroupResponse.Success success -> Optional.of(success);
+            case SmaxGroupsAcknowledgeGroupResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Group acknowledge rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxGroupsAcknowledgeGroupResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Group acknowledge server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Accepts a pending group-add invite and surfaces either the immediate
+     * success or the deferred {@code GroupJoinRequestSuccess} variant
+     * signalling that the caller landed in the membership-approval queue.
+     *
+     * <p>Used when the relay invited the caller to a group whose
+     * membership-approval mode is {@code request_required}: the
+     * accept may either commit the participant outright or move them
+     * into the pending-approval queue.
+     *
+     * @param group            the target group JID; never {@code null}
+     * @param acceptCode       the invite code carried in the original
+     *                         add notification; never {@code null}
+     * @param acceptExpiration the invite expiration timestamp echoed in
+     *                         the accept payload
+     * @param acceptAdmin      the inviting admin's JID; never {@code null}
+     * @return an {@link Optional} carrying the parsed
+     *         {@link SmaxGroupsAcceptGroupAddResponse} variant — either
+     *         {@link SmaxGroupsAcceptGroupAddResponse.Success} or
+     *         {@link SmaxGroupsAcceptGroupAddResponse.GroupJoinRequestSuccess}
+     * @throws NullPointerException            if any required argument is
+     *                                         {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no
+     *                                         longer open
+     * @throws WhatsAppServerRuntimeException  when the relay returned
+     *                                         a {@code ClientError} or
+     *                                         {@code ServerError}
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxGroupsAcceptGroupAddRPC", exports = "sendAcceptGroupAddRPC",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxGroupsAcceptGroupAddResponse> acceptGroupAdd(Jid group, String acceptCode,
+                                                                     long acceptExpiration, Jid acceptAdmin) {
+        Objects.requireNonNull(group, "group cannot be null");
+        Objects.requireNonNull(acceptCode, "acceptCode cannot be null");
+        Objects.requireNonNull(acceptAdmin, "acceptAdmin cannot be null");
+        var request = new SmaxGroupsAcceptGroupAddRequest(group, acceptCode, acceptExpiration, acceptAdmin);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxGroupsAcceptGroupAddResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxGroupsAcceptGroupAddResponse.Success success -> Optional.of(success);
+            case SmaxGroupsAcceptGroupAddResponse.GroupJoinRequestSuccess pending -> Optional.of(pending);
+            case SmaxGroupsAcceptGroupAddResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Accept group add rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxGroupsAcceptGroupAddResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Accept group add server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Queries metadata for many groups in one round trip.
+     *
+     * <p>Used by sync paths that need to refresh metadata for many
+     * groups in one round trip — for example, after a long
+     * disconnect when many group dirty bits accumulated. The success
+     * projection contains one entry per requested JID with the parsed
+     * {@code <group/>} subtree.
+     *
+     * @param groups the group JIDs being queried; never {@code null} or
+     *               empty
+     * @return an {@link Optional} carrying the success projection, or
+     *         empty when the response could not be parsed
+     * @throws NullPointerException            if {@code groups} is
+     *                                         {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no
+     *                                         longer open
+     * @throws WhatsAppServerRuntimeException  when the relay returned
+     *                                         a {@code ClientError} or
+     *                                         {@code ServerError}
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxGroupsBatchGetGroupInfoRPC", exports = "sendBatchGetGroupInfoRPC",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxGroupsBatchGetGroupInfoResponse.Success> batchQueryGroupInfo(Collection<Jid> groups) {
+        Objects.requireNonNull(groups, "groups cannot be null");
+        var request = new SmaxGroupsBatchGetGroupInfoRequest(List.copyOf(groups));
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxGroupsBatchGetGroupInfoResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxGroupsBatchGetGroupInfoResponse.Success success -> Optional.of(success);
+            case SmaxGroupsBatchGetGroupInfoResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Batch get group info rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxGroupsBatchGetGroupInfoResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Batch get group info server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Cancels one or more pending self-issued membership-approval
+     * requests.
+     *
+     * <p>Sent when the local user — having previously asked to join a
+     * closed community sub-group — withdraws the request before an
+     * admin acts on it.
+     *
+     * @param group      the target group JID; never {@code null}
+     * @param applicants the participant JIDs whose pending requests are
+     *                   being cancelled; never {@code null}
+     * @return an {@link Optional} carrying the success projection, or
+     *         empty when the response could not be parsed
+     * @throws NullPointerException            if any argument is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no
+     *                                         longer open
+     * @throws WhatsAppServerRuntimeException  when the relay returned
+     *                                         a {@code ClientError} or
+     *                                         {@code ServerError}
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxGroupsCancelGroupMembershipRequestsRPC", exports = "sendCancelGroupMembershipRequestsRPC",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxGroupsCancelGroupMembershipRequestsResponse.Success> cancelGroupMembershipRequests(Jid group, Collection<Jid> applicants) {
+        Objects.requireNonNull(group, "group cannot be null");
+        Objects.requireNonNull(applicants, "applicants cannot be null");
+        var request = new SmaxGroupsCancelGroupMembershipRequestsRequest(group, List.copyOf(applicants));
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxGroupsCancelGroupMembershipRequestsResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxGroupsCancelGroupMembershipRequestsResponse.Success success -> Optional.of(success);
+            case SmaxGroupsCancelGroupMembershipRequestsResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Cancel membership requests rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxGroupsCancelGroupMembershipRequestsResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Cancel membership requests server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Suggests a brand-new sub-group be created under a parent community.
+     *
+     * <p>Used by the community admin tooling: the admin describes a
+     * sub-group that does not yet exist; the relay reserves a new JID
+     * for the suggestion and returns the
+     * {@link SmaxGroupsCreateSubGroupSuggestionResponse.NewGroupSuggestionSuccess}
+     * variant carrying that JID.
+     *
+     * @param community  the parent community JID; never {@code null}
+     * @param subject    the proposed sub-group's display name; never
+     *                   {@code null}
+     * @param description optional description body; may be {@code null}
+     * @param locked     when {@code true} the suggested sub-group's
+     *                   chat-info edits are admin-only
+     * @param announcement when {@code true} only admins may post in the
+     *                   suggested sub-group
+     * @param hiddenGroup when {@code true} the suggested sub-group is
+     *                   hidden from the community directory
+     * @return an {@link Optional} carrying either the
+     *         {@code NewGroupSuggestionSuccess} or
+     *         {@code ExistingGroupsSuggestionSuccess} variant
+     * @throws NullPointerException            if any non-nullable argument is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     * @throws WhatsAppServerRuntimeException  when the relay returned a
+     *                                         {@code ClientError} or
+     *                                         {@code ServerError}
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxGroupsCreateSubGroupSuggestionRPC", exports = "sendCreateSubGroupSuggestionRPC",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxGroupsCreateSubGroupSuggestionResponse> suggestNewSubgroup(Jid community,
+                                                                                    String subject,
+                                                                                    String description,
+                                                                                    boolean locked,
+                                                                                    boolean announcement,
+                                                                                    boolean hiddenGroup) {
+        Objects.requireNonNull(community, "community cannot be null");
+        Objects.requireNonNull(subject, "subject cannot be null");
+        var suggestion = new SmaxGroupsCreateSubGroupSuggestionSuggestion.NewGroup(
+                subject, description, locked, announcement, hiddenGroup, null, null, null, null);
+        return dispatchSubgroupSuggestion(community, suggestion);
+    }
+
+    /**
+     * Suggests one or more pre-existing groups be linked into a parent
+     * community as sub-groups.
+     *
+     * <p>Sister of {@link #suggestNewSubgroup(Jid, String, String, boolean, boolean, boolean)} —
+     * used when the admin wants to recommend that already-existing
+     * groups be folded into the community rather than spinning up a
+     * fresh one. The relay validates each candidate and returns the
+     * {@code ExistingGroupsSuggestionSuccess} variant on acceptance.
+     *
+     * @param community         the parent community JID; never {@code null}
+     * @param candidateGroups   the JIDs of the candidate sub-groups; never
+     *                          {@code null} and must contain at least one entry
+     * @return an {@link Optional} carrying either the
+     *         {@code ExistingGroupsSuggestionSuccess} or
+     *         {@code NewGroupSuggestionSuccess} variant
+     * @throws NullPointerException            if any non-nullable argument is {@code null}
+     * @throws IllegalArgumentException        if {@code candidateGroups} is empty
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     * @throws WhatsAppServerRuntimeException  when the relay returned a
+     *                                         {@code ClientError} or
+     *                                         {@code ServerError}
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxGroupsCreateSubGroupSuggestionRPC", exports = "sendCreateSubGroupSuggestionRPC",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxGroupsCreateSubGroupSuggestionResponse> suggestExistingSubgroups(Jid community,
+                                                                                          Collection<Jid> candidateGroups) {
+        Objects.requireNonNull(community, "community cannot be null");
+        Objects.requireNonNull(candidateGroups, "candidateGroups cannot be null");
+        if (candidateGroups.isEmpty()) {
+            throw new IllegalArgumentException("candidateGroups cannot be empty");
+        }
+        var candidates = new ArrayList<SmaxGroupsCreateSubGroupSuggestionSuggestion.ExistingGroups.Candidate>(candidateGroups.size());
+        for (var jid : candidateGroups) {
+            Objects.requireNonNull(jid, "candidateGroups entries cannot be null");
+            candidates.add(new SmaxGroupsCreateSubGroupSuggestionSuggestion.ExistingGroups.Candidate(jid, false));
+        }
+        var suggestion = new SmaxGroupsCreateSubGroupSuggestionSuggestion.ExistingGroups(candidates);
+        return dispatchSubgroupSuggestion(community, suggestion);
+    }
+
+    /**
+     * Internal helper dispatching either suggestion variant.
+     *
+     * @param community  the parent community JID; never {@code null}
+     * @param suggestion the prepared suggestion variant; never {@code null}
+     * @return an {@link Optional} carrying either success arm
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     * @throws WhatsAppServerRuntimeException  when the relay returned a
+     *                                         {@code ClientError} or
+     *                                         {@code ServerError}
+     */
+    private Optional<SmaxGroupsCreateSubGroupSuggestionResponse> dispatchSubgroupSuggestion(Jid community,
+                                                                                             SmaxGroupsCreateSubGroupSuggestionSuggestion suggestion) {
+        var request = new SmaxGroupsCreateSubGroupSuggestionRequest(community, suggestion);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxGroupsCreateSubGroupSuggestionResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxGroupsCreateSubGroupSuggestionResponse.NewGroupSuggestionSuccess fresh -> Optional.of(fresh);
+            case SmaxGroupsCreateSubGroupSuggestionResponse.ExistingGroupsSuggestionSuccess existing -> Optional.of(existing);
+            case SmaxGroupsCreateSubGroupSuggestionResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Sub-group suggestion rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxGroupsCreateSubGroupSuggestionResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Sub-group suggestion server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Deactivates (deletes) a community parent group.
+     *
+     * <p>Equivalent in effect to deactivating the entire community —
+     * every linked sub-group is unlinked and converted into a
+     * standalone group.
+     *
+     * @param community the parent community JID; never {@code null}
+     * @return an {@link Optional} carrying the success projection, or
+     *         empty when the response could not be parsed
+     * @throws NullPointerException            if {@code community} is
+     *                                         {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no
+     *                                         longer open
+     * @throws WhatsAppServerRuntimeException  when the relay returned
+     *                                         a {@code ClientError} or
+     *                                         {@code ServerError}
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxGroupsDeleteParentGroupRPC", exports = "sendDeleteParentGroupRPC",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxGroupsDeleteParentGroupResponse.Success> deleteParentGroup(Jid community) {
+        Objects.requireNonNull(community, "community cannot be null");
+        var request = new SmaxGroupsDeleteParentGroupRequest(community);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxGroupsDeleteParentGroupResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxGroupsDeleteParentGroupResponse.Success success -> Optional.of(success);
+            case SmaxGroupsDeleteParentGroupResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Delete parent group rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxGroupsDeleteParentGroupResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Delete parent group server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Queries the per-group profile picture URLs for many groups in one
+     * batch.
+     *
+     * <p>Backs the community-roster and chat-list flows that need to
+     * surface fresh profile pictures for many groups in one batch.
+     *
+     * @param groups the parent-group JIDs being queried; never
+     *               {@code null} or empty
+     * @return an {@link Optional} carrying the success projection, or
+     *         empty when the response could not be parsed
+     * @throws NullPointerException            if {@code groups} is
+     *                                         {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no
+     *                                         longer open
+     * @throws WhatsAppServerRuntimeException  when the relay returned
+     *                                         a {@code ClientError} or
+     *                                         {@code ServerError}
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxGroupsGetGroupProfilePicturesRPC", exports = "sendGetGroupProfilePicturesRPC",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxGroupsGetGroupProfilePicturesResponse.Success> queryGroupProfilePictures(Collection<Jid> groups) {
+        Objects.requireNonNull(groups, "groups cannot be null");
+        var pictures = groups.stream()
+                .map(jid -> new SmaxGroupsGetGroupProfilePicturesRequest.PictureRequest(jid, null, null, null, null))
+                .toList();
+        var request = new SmaxGroupsGetGroupProfilePicturesRequest(null, null, pictures);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxGroupsGetGroupProfilePicturesResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxGroupsGetGroupProfilePicturesResponse.Success success -> Optional.of(success);
+            case SmaxGroupsGetGroupProfilePicturesResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Get group profile pictures rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxGroupsGetGroupProfilePicturesResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Get group profile pictures server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Queries the relay's preview of the group identified by an
+     * invite code.
+     *
+     * <p>Used by the "preview group before joining" UI flow: the
+     * caller supplies an invite code that arrived via a deep link
+     * and the relay returns the group's metadata snapshot without
+     * actually joining the group.
+     *
+     * @param inviteCode the invite code; never {@code null}
+     * @return an {@link Optional} carrying the success projection, or
+     *         empty when the response could not be parsed
+     * @throws NullPointerException            if {@code inviteCode} is
+     *                                         {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no
+     *                                         longer open
+     * @throws WhatsAppServerRuntimeException  when the relay returned
+     *                                         a {@code ClientError} or
+     *                                         {@code ServerError}
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxGroupsGetInviteGroupInfoRPC", exports = "sendGetInviteGroupInfoRPC",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxGroupsGetInviteGroupInfoResponse.Success> queryInviteGroupInfo(String inviteCode) {
+        Objects.requireNonNull(inviteCode, "inviteCode cannot be null");
+        var request = new SmaxGroupsGetInviteGroupInfoRequest(inviteCode);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxGroupsGetInviteGroupInfoResponse.of(response).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxGroupsGetInviteGroupInfoResponse.Success success -> Optional.of(success);
+            case SmaxGroupsGetInviteGroupInfoResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Get invite group info rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxGroupsGetInviteGroupInfoResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Get invite group info server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Returns a single linked-group entry (community parent, default
+     * sub-group, or specific sub-group depending on the
+     * {@code queryLinkedType} attribute).
+     *
+     * <p>Used to resolve the "go to parent community" or
+     * "go to general sub-group" navigation actions in the chat UI.
+     *
+     * @param community       the parent community JID; never {@code null}
+     * @param queryLinkedType the linked-type discriminator
+     *                        ({@code "parent"}, {@code "general"} or
+     *                        {@code "sub_group"}); never {@code null}
+     * @param queryLinkedJid  the optional specific linked-group JID,
+     *                        required when {@code queryLinkedType} is
+     *                        {@code "sub_group"}; may be {@code null}
+     * @return an {@link Optional} carrying the success projection, or
+     *         empty when the response could not be parsed
+     * @throws NullPointerException            if any required argument is
+     *                                         {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no
+     *                                         longer open
+     * @throws WhatsAppServerRuntimeException  when the relay returned
+     *                                         a {@code ClientError} or
+     *                                         {@code ServerError}
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxGroupsGetLinkedGroupRPC", exports = "sendGetLinkedGroupRPC",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxGroupsGetLinkedGroupResponse.Success> queryLinkedGroup(Jid community, String queryLinkedType, Jid queryLinkedJid) {
+        Objects.requireNonNull(community, "community cannot be null");
+        Objects.requireNonNull(queryLinkedType, "queryLinkedType cannot be null");
+        var request = new SmaxGroupsGetLinkedGroupRequest(community, queryLinkedType, queryLinkedJid);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxGroupsGetLinkedGroupResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxGroupsGetLinkedGroupResponse.Success success -> Optional.of(success);
+            case SmaxGroupsGetLinkedGroupResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Get linked group rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxGroupsGetLinkedGroupResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Get linked group server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Returns the union of participants across every group linked to the
+     * given parent community.
+     *
+     * <p>Backs the "@all" mention flow inside community sub-groups,
+     * where the mentioning UI must display the union of every
+     * sub-group participant.
+     *
+     * @param community the parent community JID; never {@code null}
+     * @return an {@link Optional} carrying the success projection, or
+     *         empty when the response could not be parsed
+     * @throws NullPointerException            if {@code community} is
+     *                                         {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no
+     *                                         longer open
+     * @throws WhatsAppServerRuntimeException  when the relay returned
+     *                                         a {@code ClientError} or
+     *                                         {@code ServerError}
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxGroupsGetLinkedGroupsParticipantsRPC", exports = "sendGetLinkedGroupsParticipantsRPC",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxGroupsGetLinkedGroupsParticipantsResponse.Success> queryLinkedGroupsParticipants(Jid community) {
+        Objects.requireNonNull(community, "community cannot be null");
+        var request = new SmaxGroupsGetLinkedGroupsParticipantsRequest(community);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxGroupsGetLinkedGroupsParticipantsResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxGroupsGetLinkedGroupsParticipantsResponse.Success success -> Optional.of(success);
+            case SmaxGroupsGetLinkedGroupsParticipantsResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Get linked groups participants rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxGroupsGetLinkedGroupsParticipantsResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Get linked groups participants server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Returns the list of pending join requests for an admin to review.
+     *
+     * <p>Backs the "Pending requests" tab in the group-info UI.
+     *
+     * @param group the target group JID; never {@code null}
+     * @return an {@link Optional} carrying the success projection, or
+     *         empty when the response could not be parsed
+     * @throws NullPointerException            if {@code group} is
+     *                                         {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no
+     *                                         longer open
+     * @throws WhatsAppServerRuntimeException  when the relay returned
+     *                                         a {@code ClientError} or
+     *                                         {@code ServerError}
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxGroupsGetMembershipApprovalRequestsRPC", exports = "sendGetMembershipApprovalRequestsRPC",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxGroupsGetMembershipApprovalRequestsResponse.Success> queryGroupMembershipApprovalRequests(Jid group) {
+        Objects.requireNonNull(group, "group cannot be null");
+        var request = new SmaxGroupsGetMembershipApprovalRequestsRequest(group);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxGroupsGetMembershipApprovalRequestsResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxGroupsGetMembershipApprovalRequestsResponse.Success success -> Optional.of(success);
+            case SmaxGroupsGetMembershipApprovalRequestsResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Get membership approval requests rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxGroupsGetMembershipApprovalRequestsResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Get membership approval requests server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Returns the relay's snapshot of every group the caller is currently
+     * a participant of.
+     *
+     * <p>Used by initial-sync paths that bootstrap the local chat
+     * list when the persistent store is empty.
+     *
+     * @param includeParticipants whether the response should include the
+     *                            per-group participant edges
+     * @param includeDescription  whether the response should include the
+     *                            per-group description text
+     * @return an {@link Optional} carrying the success projection, or
+     *         empty when the response could not be parsed
+     * @throws WhatsAppSessionException.Closed if the socket is no
+     *                                         longer open
+     * @throws WhatsAppServerRuntimeException  when the relay returned
+     *                                         a {@code ClientError} or
+     *                                         {@code ServerError}
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxGroupsGetParticipatingGroupsRPC", exports = "sendGetParticipatingGroupsRPC",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxGroupsGetParticipatingGroupsResponse.Success> queryParticipatingGroups(boolean includeParticipants, boolean includeDescription) {
+        var request = new SmaxGroupsGetParticipatingGroupsRequest(includeParticipants, includeDescription);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxGroupsGetParticipatingGroupsResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxGroupsGetParticipatingGroupsResponse.Success success -> Optional.of(success);
+            case SmaxGroupsGetParticipatingGroupsResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Get participating groups rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxGroupsGetParticipatingGroupsResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Get participating groups server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Returns the list of in-group messages the caller previously reported
+     * via {@link #reportGroupMessages(Jid, String)}.
+     *
+     * <p>Backs the "View previously reported messages" admin view
+     * which lists each report along with its reporter, target
+     * message and reason.
+     *
+     * @param group the target group JID; never {@code null}
+     * @return an {@link Optional} carrying the success projection, or
+     *         empty when the response could not be parsed
+     * @throws NullPointerException            if {@code group} is
+     *                                         {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no
+     *                                         longer open
+     * @throws WhatsAppServerRuntimeException  when the relay returned
+     *                                         a {@code ClientError} or
+     *                                         {@code ServerError}
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxGroupsGetReportedMessagesRPC", exports = "sendGetReportedMessagesRPC",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxGroupsGetReportedMessagesResponse.Success> queryReportedMessages(Jid group) {
+        Objects.requireNonNull(group, "group cannot be null");
+        var request = new SmaxGroupsGetReportedMessagesRequest(group);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxGroupsGetReportedMessagesResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxGroupsGetReportedMessagesResponse.Success success -> Optional.of(success);
+            case SmaxGroupsGetReportedMessagesResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Get reported messages rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxGroupsGetReportedMessagesResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Get reported messages server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Joins a community sub-group and returns either the immediate
+     * {@link SmaxGroupsJoinLinkedGroupResponse.Success} (the caller was
+     * added) or
+     * {@link SmaxGroupsJoinLinkedGroupResponse.GroupJoinRequestSuccess}
+     * (the request was queued in the membership-approval pipeline).
+     *
+     * <p>Backs the "Join sub-group" flow inside community navigation —
+     * the relay decides whether to add the caller directly or enqueue
+     * a request based on the sub-group's membership-approval mode.
+     *
+     * @param community           the parent community JID; never {@code null}
+     * @param subgroup            the sub-group JID being joined; never {@code null}
+     * @param joinLinkedGroupType the join-type discriminator carried in
+     *                            the request payload; never {@code null}
+     * @return an {@link Optional} carrying the parsed response variant
+     * @throws NullPointerException            if any argument is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no
+     *                                         longer open
+     * @throws WhatsAppServerRuntimeException  when the relay returned
+     *                                         a {@code ClientError} or
+     *                                         {@code ServerError}
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxGroupsJoinLinkedGroupRPC", exports = "sendJoinLinkedGroupRPC",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxGroupsJoinLinkedGroupResponse> joinLinkedGroup(Jid community, Jid subgroup, String joinLinkedGroupType) {
+        Objects.requireNonNull(community, "community cannot be null");
+        Objects.requireNonNull(subgroup, "subgroup cannot be null");
+        Objects.requireNonNull(joinLinkedGroupType, "joinLinkedGroupType cannot be null");
+        var request = new SmaxGroupsJoinLinkedGroupRequest(community, subgroup, joinLinkedGroupType);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxGroupsJoinLinkedGroupResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxGroupsJoinLinkedGroupResponse.Success success -> Optional.of(success);
+            case SmaxGroupsJoinLinkedGroupResponse.GroupJoinRequestSuccess pending -> Optional.of(pending);
+            case SmaxGroupsJoinLinkedGroupResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Join linked group rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxGroupsJoinLinkedGroupResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Join linked group server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Links one or more existing groups under a community parent.
+     *
+     * <p>Backs the community-admin "Add existing group" flow that
+     * promotes a standalone group into a community sub-group. Each
+     * sub-group is linked with its directory-visible flag set; callers
+     * needing the {@code <hidden_group/>} marker should construct the
+     * underlying {@link SmaxGroupsLinkSubGroupsRequest} directly.
+     *
+     * @param community the parent community JID; never {@code null}
+     * @param subgroups the sub-group JIDs being linked; never {@code null}
+     * @return an {@link Optional} carrying the success projection, or
+     *         empty when the response could not be parsed
+     * @throws NullPointerException            if any argument is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no
+     *                                         longer open
+     * @throws WhatsAppServerRuntimeException  when the relay returned
+     *                                         a {@code ClientError} or
+     *                                         {@code ServerError}
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxGroupsLinkSubGroupsRPC", exports = "sendLinkSubGroupsRPC",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxGroupsLinkSubGroupsResponse.Success> linkSubgroups(Jid community, List<Jid> subgroups) {
+        Objects.requireNonNull(community, "community cannot be null");
+        Objects.requireNonNull(subgroups, "subgroups cannot be null");
+        var groups = subgroups.stream()
+                .map(jid -> new SmaxGroupsLinkSubGroupsRequest.RequestedGroup(jid, false))
+                .toList();
+        var request = new SmaxGroupsLinkSubGroupsRequest(community, groups);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxGroupsLinkSubGroupsResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxGroupsLinkSubGroupsResponse.Success success -> Optional.of(success);
+            case SmaxGroupsLinkSubGroupsResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Link sub-groups rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxGroupsLinkSubGroupsResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Link sub-groups server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Removes one or more participants from a group, optionally
+     * cascading the removal across every sub-group of the same
+     * community.
+     *
+     * <p>Returns the same per-row outcome list the relay echoes in the
+     * IQ reply, so callers can surface partial failures (for example
+     * the participant was already gone, or admin permission denied).
+     *
+     * @param group              the target group JID; never {@code null}
+     * @param participants       the participants to remove; never
+     *                           {@code null} and must contain at least
+     *                           one entry
+     * @param removeLinkedGroups when {@code true} the participants are
+     *                           also evicted from every sub-group of
+     *                           the parent community in one round trip
+     * @return an {@link Optional} carrying the success projection, or
+     *         empty when the response could not be parsed
+     * @throws NullPointerException            if any reference argument
+     *                                         is {@code null}
+     * @throws IllegalArgumentException        if {@code participants}
+     *                                         is empty
+     * @throws WhatsAppSessionException.Closed if the socket is no
+     *                                         longer open
+     * @throws WhatsAppServerRuntimeException  when the relay returned
+     *                                         a {@code ClientError} or
+     *                                         {@code ServerError}
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxGroupsRemoveParticipantsRPC", exports = "sendRemoveParticipantsRPC",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxGroupsRemoveParticipantsResponse.Success> removeGroupParticipants(Jid group,
+                                                                                           Collection<Jid> participants,
+                                                                                           boolean removeLinkedGroups) {
+        Objects.requireNonNull(group, "group cannot be null");
+        Objects.requireNonNull(participants, "participants cannot be null");
+        if (participants.isEmpty()) {
+            throw new IllegalArgumentException("participants cannot be empty");
+        }
+        var request = new SmaxGroupsRemoveParticipantsRequest(group, List.copyOf(participants), removeLinkedGroups);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxGroupsRemoveParticipantsResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxGroupsRemoveParticipantsResponse.Success success -> Optional.of(success);
+            case SmaxGroupsRemoveParticipantsResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Remove participants rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxGroupsRemoveParticipantsResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Remove participants server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Reports an in-group message to WhatsApp moderation.
+     *
+     * <p>Backs the "Report message" UI action inside groups; the
+     * report is forwarded to the upstream moderation pipeline and
+     * the relay's success projection echoes the report identifiers.
+     *
+     * @param group     the target group JID; never {@code null}
+     * @param messageId the server id of the offending message; never
+     *                  {@code null}
+     * @return an {@link Optional} carrying the success projection, or
+     *         empty when the response could not be parsed
+     * @throws NullPointerException            if any argument is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no
+     *                                         longer open
+     * @throws WhatsAppServerRuntimeException  when the relay returned
+     *                                         a {@code ClientError} or
+     *                                         {@code ServerError}
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxGroupsReportMessagesRPC", exports = "sendReportMessagesRPC",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxGroupsReportMessagesResponse.Success> reportGroupMessages(Jid group, String messageId) {
+        Objects.requireNonNull(group, "group cannot be null");
+        Objects.requireNonNull(messageId, "messageId cannot be null");
+        var request = new SmaxGroupsReportMessagesRequest(group, messageId);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxGroupsReportMessagesResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxGroupsReportMessagesResponse.Success success -> Optional.of(success);
+            case SmaxGroupsReportMessagesResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Report messages rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxGroupsReportMessagesResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Report messages server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Revokes the per-participant invite codes used by closed groups.
+     *
+     * <p>Backs the admin "Reset invite link" action when running on a
+     * group whose invite mode is the per-participant
+     * {@code request_required} variant.
+     *
+     * @param group        the target group JID; never {@code null}
+     * @param participants the per-participant JIDs whose request codes
+     *                     are being revoked; never {@code null}
+     * @return an {@link Optional} carrying the success projection, or
+     *         empty when the response could not be parsed
+     * @throws NullPointerException            if any argument is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no
+     *                                         longer open
+     * @throws WhatsAppServerRuntimeException  when the relay returned
+     *                                         a {@code ClientError} or
+     *                                         {@code ServerError}
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxGroupsRevokeRequestCodeRPC", exports = "sendRevokeRequestCodeRPC",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxGroupsRevokeRequestCodeResponse.Success> revokeGroupRequestCode(Jid group, List<Jid> participants) {
+        Objects.requireNonNull(group, "group cannot be null");
+        Objects.requireNonNull(participants, "participants cannot be null");
+        var request = new SmaxGroupsRevokeRequestCodeRequest(group, participants);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxGroupsRevokeRequestCodeResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxGroupsRevokeRequestCodeResponse.Success success -> Optional.of(success);
+            case SmaxGroupsRevokeRequestCodeResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Revoke request code rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxGroupsRevokeRequestCodeResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Revoke request code server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Toggles one of a group's binary properties (locked / announcement /
+     * ephemeral / membership-approval / parent / etc.).
+     *
+     * <p>Each boolean argument represents the corresponding wire toggle:
+     * {@code true} emits the property, {@code false} omits it. Optional
+     * scalar fields ({@code ephemeralExpiration}, {@code ephemeralTrigger})
+     * may be {@code null} to leave the existing server-side value intact.
+     *
+     * @param group                              the target group JID; never {@code null}
+     * @param locked                             whether to mark the group as locked
+     * @param announcement                       whether to mark the group as announcement-only
+     * @param noFrequentlyForwarded              whether to disable the frequently-forwarded marker
+     * @param ephemeralExpiration                optional ephemeral-expiration override; may be {@code null}
+     * @param ephemeralTrigger                   optional ephemeral-trigger override; may be {@code null}
+     * @param unlocked                           whether to mark the group as unlocked
+     * @param notAnnouncement                    whether to remove the announcement-only marker
+     * @param frequentlyForwardedOk              whether to allow frequently-forwarded messages
+     * @param notEphemeral                       whether to disable ephemeral mode
+     * @param membershipApprovalGroupJoinMode    optional membership-approval discriminator; may be {@code null}
+     * @param allowAdminReports                  whether to allow admin reports
+     * @param notAllowAdminReports               whether to disallow admin reports
+     * @param allowNonAdminSubGroupCreation      whether to allow non-admin sub-group creation
+     * @param notAllowNonAdminSubGroupCreation   whether to disallow non-admin sub-group creation
+     * @param groupHistory                       whether to enable shared group history
+     * @param noGroupHistory                     whether to disable shared group history
+     * @return an {@link Optional} carrying the success projection, or
+     *         empty when the response could not be parsed
+     * @throws NullPointerException            if {@code group} is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no
+     *                                         longer open
+     * @throws WhatsAppServerRuntimeException  when the relay returned
+     *                                         a {@code ClientError} or
+     *                                         {@code ServerError}
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxGroupsSetPropertyRPC", exports = "sendSetPropertyRPC",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxGroupsSetPropertyResponse.Success> changeGroupProperty(Jid group,
+                                                                               boolean locked,
+                                                                               boolean announcement,
+                                                                               boolean noFrequentlyForwarded,
+                                                                               Integer ephemeralExpiration,
+                                                                               Integer ephemeralTrigger,
+                                                                               boolean unlocked,
+                                                                               boolean notAnnouncement,
+                                                                               boolean frequentlyForwardedOk,
+                                                                               boolean notEphemeral,
+                                                                               String membershipApprovalGroupJoinMode,
+                                                                               boolean allowAdminReports,
+                                                                               boolean notAllowAdminReports,
+                                                                               boolean allowNonAdminSubGroupCreation,
+                                                                               boolean notAllowNonAdminSubGroupCreation,
+                                                                               boolean groupHistory,
+                                                                               boolean noGroupHistory) {
+        Objects.requireNonNull(group, "group cannot be null");
+        var request = new SmaxGroupsSetPropertyRequest(group, locked, announcement, noFrequentlyForwarded,
+                ephemeralExpiration, ephemeralTrigger, unlocked, notAnnouncement, frequentlyForwardedOk,
+                notEphemeral, membershipApprovalGroupJoinMode, allowAdminReports, notAllowAdminReports,
+                allowNonAdminSubGroupCreation, notAllowNonAdminSubGroupCreation, groupHistory, noGroupHistory);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxGroupsSetPropertyResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxGroupsSetPropertyResponse.Success success -> Optional.of(success);
+            case SmaxGroupsSetPropertyResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Set group property rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxGroupsSetPropertyResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Set group property server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Detaches one or more sub-groups from their parent community.
+     *
+     * <p>Inverse of {@link #linkSubgroups(Jid, List)} — the detached
+     * groups become standalone groups again.
+     *
+     * @param community the parent community JID; never {@code null}
+     * @param subgroups the sub-group JIDs being detached; never {@code null}
+     * @return an {@link Optional} carrying the success projection, or
+     *         empty when the response could not be parsed
+     * @throws NullPointerException            if any argument is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no
+     *                                         longer open
+     * @throws WhatsAppServerRuntimeException  when the relay returned
+     *                                         a {@code ClientError} or
+     *                                         {@code ServerError}
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxGroupsUnlinkGroupsRPC", exports = "sendUnlinkGroupsRPC",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxGroupsUnlinkGroupsResponse.Success> unlinkSubgroups(Jid community, List<Jid> subgroups) {
+        Objects.requireNonNull(community, "community cannot be null");
+        Objects.requireNonNull(subgroups, "subgroups cannot be null");
+        // RequestedGroup(jid, removeOrphanedMembers): default false to leave orphaned members in place.
+        var groups = subgroups.stream()
+                .map(jid -> new SmaxGroupsUnlinkGroupsRequest.RequestedGroup(jid, false))
+                .toList();
+        var request = new SmaxGroupsUnlinkGroupsRequest(community, groups);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxGroupsUnlinkGroupsResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxGroupsUnlinkGroupsResponse.Success success -> Optional.of(success);
+            case SmaxGroupsUnlinkGroupsResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Unlink groups rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxGroupsUnlinkGroupsResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Unlink groups server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Returns the windowed list of message-update deltas applied to a
+     * newsletter since the supplied reference timestamp.
+     *
+     * <p>Used by the newsletter sync path that backfills the local
+     * message store after a reconnect — the update stream carries
+     * only the per-message deltas (edits, reactions, deletes) rather
+     * than full message bodies.
+     *
+     * @param newsletter the newsletter JID being queried; never {@code null}
+     * @param count      the per-call cap; must be non-negative
+     * @param since      the reference timestamp delta-cursor; may be {@code null}
+     * @param direction  the optional pagination cursor; may be {@code null}
+     * @return an {@link Optional} carrying the success projection, or
+     *         empty when the response could not be parsed
+     * @throws NullPointerException            if {@code newsletter} is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no
+     *                                         longer open
+     * @throws WhatsAppServerRuntimeException  when the relay returned
+     *                                         a {@code ClientError} or
+     *                                         {@code ServerError}
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxNewslettersGetNewsletterMessageUpdatesRPC", exports = "sendGetNewsletterMessageUpdatesRPC",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxNewslettersGetNewsletterMessageUpdatesResponse.Success> queryNewsletterMessageUpdates(Jid newsletter, int count, Long since, SmaxNewslettersGetNewsletterMessageUpdatesDirection direction) {
+        Objects.requireNonNull(newsletter, "newsletter cannot be null");
+        var request = new SmaxNewslettersGetNewsletterMessageUpdatesRequest(newsletter, count, since, direction);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxNewslettersGetNewsletterMessageUpdatesResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxNewslettersGetNewsletterMessageUpdatesResponse.Success success -> Optional.of(success);
+            case SmaxNewslettersGetNewsletterMessageUpdatesResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Newsletter message updates rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxNewslettersGetNewsletterMessageUpdatesResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Newsletter message updates server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Returns a windowed page of full newsletter messages, addressing the
+     * newsletter by its JID.
+     *
+     * <p>Sister of the simpler {@link #queryNewsletterMessages(Jid, int)} —
+     * used by the newsletter view to backfill the message timeline
+     * before or after a known anchor; the {@code direction} argument
+     * controls which side of the anchor is fetched.
+     *
+     * @param newsletter the newsletter JID; never {@code null}
+     * @param viewRole   optional ACL projection role echoed in the
+     *                   {@code <view_role>} attribute; may be {@code null}
+     * @param count      the per-call cap; must be non-negative
+     * @param direction  the pagination cursor; may be {@code null}
+     * @return an {@link Optional} carrying the success projection, or
+     *         empty when the response could not be parsed
+     * @throws NullPointerException            if {@code newsletter} is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     * @throws WhatsAppServerRuntimeException  when the relay returned a
+     *                                         {@code ClientError} or
+     *                                         {@code ServerError}
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxNewslettersGetNewsletterMessagesRPC", exports = "sendGetNewsletterMessagesRPC",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxNewslettersGetNewsletterMessagesResponse.Success> queryNewsletterMessagesByJid(Jid newsletter,
+                                                                                                       String viewRole,
+                                                                                                       int count,
+                                                                                                       SmaxNewslettersGetNewsletterMessagesDirection direction) {
+        Objects.requireNonNull(newsletter, "newsletter cannot be null");
+        var queryParams = new SmaxNewslettersGetNewsletterMessagesQueryParams.ByJid(newsletter, viewRole);
+        return dispatchNewsletterMessagesPage(count, queryParams, direction);
+    }
+
+    /**
+     * Returns a windowed page of full newsletter messages, addressing the
+     * newsletter by its public invite key.
+     *
+     * <p>Sister of {@link #queryNewsletterMessagesByJid(Jid, String, int, SmaxNewslettersGetNewsletterMessagesDirection)}
+     * for clients holding only the public invite link instead of the JID
+     * (e.g. an external referrer).
+     *
+     * @param inviteKey the newsletter invite key; never {@code null}
+     * @param viewRole  optional ACL projection role; may be {@code null}
+     * @param count     the per-call cap; must be non-negative
+     * @param direction the pagination cursor; may be {@code null}
+     * @return an {@link Optional} carrying the success projection, or
+     *         empty when the response could not be parsed
+     * @throws NullPointerException            if {@code inviteKey} is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     * @throws WhatsAppServerRuntimeException  when the relay returned a
+     *                                         {@code ClientError} or
+     *                                         {@code ServerError}
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxNewslettersGetNewsletterMessagesRPC", exports = "sendGetNewsletterMessagesRPC",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxNewslettersGetNewsletterMessagesResponse.Success> queryNewsletterMessagesByInvite(String inviteKey,
+                                                                                                          String viewRole,
+                                                                                                          int count,
+                                                                                                          SmaxNewslettersGetNewsletterMessagesDirection direction) {
+        Objects.requireNonNull(inviteKey, "inviteKey cannot be null");
+        var queryParams = new SmaxNewslettersGetNewsletterMessagesQueryParams.ByInvite(inviteKey, viewRole);
+        return dispatchNewsletterMessagesPage(count, queryParams, direction);
+    }
+
+    /**
+     * Internal helper dispatching the messages-page query for either
+     * addressing variant.
+     *
+     * @param count       the per-call cap
+     * @param queryParams the addressing parameters; never {@code null}
+     * @param direction   the pagination cursor; may be {@code null}
+     * @return an {@link Optional} carrying the success projection
+     */
+    private Optional<SmaxNewslettersGetNewsletterMessagesResponse.Success> dispatchNewsletterMessagesPage(int count,
+                                                                                                          SmaxNewslettersGetNewsletterMessagesQueryParams queryParams,
+                                                                                                          SmaxNewslettersGetNewsletterMessagesDirection direction) {
+        var request = new SmaxNewslettersGetNewsletterMessagesRequest(count, queryParams, direction);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxNewslettersGetNewsletterMessagesResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxNewslettersGetNewsletterMessagesResponse.Success success -> Optional.of(success);
+            case SmaxNewslettersGetNewsletterMessagesResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Newsletter messages page rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxNewslettersGetNewsletterMessagesResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Newsletter messages page server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Fetches the per-question response set for an interactive newsletter
+     * poll/question message.
+     *
+     * <p>Backs the newsletter-author UI that visualises the
+     * aggregated response distribution; the relay returns one row
+     * per option with the per-option vote count.
+     *
+     * @param newsletter               the newsletter JID; never {@code null}
+     * @param questionResponsesServerId the server id of the question/poll message
+     * @param questionResponsesCount    the per-call cap; must be non-negative
+     * @param questionResponsesBefore   optional anchor for backwards pagination; may be {@code null}
+     * @param filter                    optional filter discriminator; may be {@code null}
+     * @param searchText                optional search string; may be {@code null}
+     * @return an {@link Optional} carrying the success projection, or
+     *         empty when the response could not be parsed
+     * @throws NullPointerException            if {@code newsletter} is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no
+     *                                         longer open
+     * @throws WhatsAppServerRuntimeException  when the relay returned
+     *                                         a {@code ClientError} or
+     *                                         {@code ServerError}
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxNewslettersGetNewsletterResponsesRPC", exports = "sendGetNewsletterResponsesRPC",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxNewslettersGetNewsletterResponsesResponse.Success> queryNewsletterResponses(Jid newsletter, long questionResponsesServerId,
+                                                                                                     int questionResponsesCount, String questionResponsesBefore,
+                                                                                                     SmaxNewslettersGetNewsletterResponsesFilter filter, String searchText) {
+        Objects.requireNonNull(newsletter, "newsletter cannot be null");
+        var request = new SmaxNewslettersGetNewsletterResponsesRequest(newsletter, questionResponsesServerId,
+                questionResponsesCount, questionResponsesBefore, filter, searchText);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxNewslettersGetNewsletterResponsesResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxNewslettersGetNewsletterResponsesResponse.Success success -> Optional.of(success);
+            case SmaxNewslettersGetNewsletterResponsesResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Newsletter responses rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxNewslettersGetNewsletterResponsesResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Newsletter responses server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Retrieves the windowed list of status-update deltas applied to a
+     * newsletter since the supplied reference timestamp.
+     *
+     * <p>Equivalent to
+     * {@link #queryNewsletterMessageUpdates(Jid, int, Long, SmaxNewslettersGetNewsletterMessageUpdatesDirection)}
+     * but scoped to status messages instead of regular messages.
+     *
+     * @param newsletter the newsletter JID; never {@code null}
+     * @param count      the per-call cap; must be non-negative
+     * @param since      the reference timestamp delta-cursor; may be {@code null}
+     * @param direction  the optional pagination cursor; may be {@code null}
+     * @return an {@link Optional} carrying the success projection, or
+     *         empty when the response could not be parsed
+     * @throws NullPointerException            if {@code newsletter} is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no
+     *                                         longer open
+     * @throws WhatsAppServerRuntimeException  when the relay returned
+     *                                         a {@code ClientError} or
+     *                                         {@code ServerError}
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxNewslettersGetNewsletterStatusUpdatesRPC", exports = "sendGetNewsletterStatusUpdatesRPC",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxNewslettersGetNewsletterStatusUpdatesResponse.Success> queryNewsletterStatusUpdates(Jid newsletter, int count, Long since, SmaxNewslettersGetNewsletterStatusUpdatesDirection direction) {
+        Objects.requireNonNull(newsletter, "newsletter cannot be null");
+        var request = new SmaxNewslettersGetNewsletterStatusUpdatesRequest(newsletter, count, since, direction);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxNewslettersGetNewsletterStatusUpdatesResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxNewslettersGetNewsletterStatusUpdatesResponse.Success success -> Optional.of(success);
+            case SmaxNewslettersGetNewsletterStatusUpdatesResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Newsletter status updates rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxNewslettersGetNewsletterStatusUpdatesResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Newsletter status updates server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Fetches a windowed page of full newsletter status messages,
+     * addressing the newsletter by its JID.
+     *
+     * <p>Equivalent to
+     * {@link #queryNewsletterMessagesByJid(Jid, String, int, SmaxNewslettersGetNewsletterMessagesDirection)}
+     * but scoped to status messages instead of regular messages.
+     *
+     * @param newsletter the newsletter JID; never {@code null}
+     * @param viewRole   optional ACL projection role; may be {@code null}
+     * @param count      the per-call cap; must be non-negative
+     * @param direction  the pagination cursor; may be {@code null}
+     * @return an {@link Optional} carrying the success projection, or
+     *         empty when the response could not be parsed
+     * @throws NullPointerException            if {@code newsletter} is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     * @throws WhatsAppServerRuntimeException  when the relay returned a
+     *                                         {@code ClientError} or
+     *                                         {@code ServerError}
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxNewslettersGetNewsletterStatusesRPC", exports = "sendGetNewsletterStatusesRPC",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxNewslettersGetNewsletterStatusesResponse.Success> queryNewsletterStatusesByJid(Jid newsletter,
+                                                                                                       String viewRole,
+                                                                                                       int count,
+                                                                                                       SmaxNewslettersGetNewsletterStatusesDirection direction) {
+        Objects.requireNonNull(newsletter, "newsletter cannot be null");
+        var queryParams = new SmaxNewslettersGetNewsletterMessagesQueryParams.ByJid(newsletter, viewRole);
+        return dispatchNewsletterStatusesPage(count, queryParams, direction);
+    }
+
+    /**
+     * Fetches a windowed page of full newsletter status messages,
+     * addressing the newsletter by its public invite key.
+     *
+     * <p>Sister of {@link #queryNewsletterStatusesByJid(Jid, String, int, SmaxNewslettersGetNewsletterStatusesDirection)}
+     * for clients holding only the public invite link instead of the JID.
+     *
+     * @param inviteKey the newsletter invite key; never {@code null}
+     * @param viewRole  optional ACL projection role; may be {@code null}
+     * @param count     the per-call cap; must be non-negative
+     * @param direction the pagination cursor; may be {@code null}
+     * @return an {@link Optional} carrying the success projection, or
+     *         empty when the response could not be parsed
+     * @throws NullPointerException            if {@code inviteKey} is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no longer open
+     * @throws WhatsAppServerRuntimeException  when the relay returned a
+     *                                         {@code ClientError} or
+     *                                         {@code ServerError}
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxNewslettersGetNewsletterStatusesRPC", exports = "sendGetNewsletterStatusesRPC",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxNewslettersGetNewsletterStatusesResponse.Success> queryNewsletterStatusesByInvite(String inviteKey,
+                                                                                                          String viewRole,
+                                                                                                          int count,
+                                                                                                          SmaxNewslettersGetNewsletterStatusesDirection direction) {
+        Objects.requireNonNull(inviteKey, "inviteKey cannot be null");
+        var queryParams = new SmaxNewslettersGetNewsletterMessagesQueryParams.ByInvite(inviteKey, viewRole);
+        return dispatchNewsletterStatusesPage(count, queryParams, direction);
+    }
+
+    /**
+     * Internal helper dispatching the statuses-page query for either
+     * addressing variant.
+     *
+     * @param count       the per-call cap
+     * @param queryParams the addressing parameters; never {@code null}
+     * @param direction   the pagination cursor; may be {@code null}
+     * @return an {@link Optional} carrying the success projection
+     */
+    private Optional<SmaxNewslettersGetNewsletterStatusesResponse.Success> dispatchNewsletterStatusesPage(int count,
+                                                                                                          SmaxNewslettersGetNewsletterMessagesQueryParams queryParams,
+                                                                                                          SmaxNewslettersGetNewsletterStatusesDirection direction) {
+        var request = new SmaxNewslettersGetNewsletterStatusesRequest(count, queryParams, direction);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxNewslettersGetNewsletterStatusesResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxNewslettersGetNewsletterStatusesResponse.Success success -> Optional.of(success);
+            case SmaxNewslettersGetNewsletterStatusesResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Newsletter statuses page rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxNewslettersGetNewsletterStatusesResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Newsletter statuses page server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Returns the caller's recent reactions to messages of a specific
+     * newsletter.
+     *
+     * <p>Used by the newsletter detail view to surface the "My
+     * recent reactions" panel that pre-populates emoji selectors with
+     * the caller's most-used reactions for that channel.
+     *
+     * @param limit      the per-call cap; must be non-negative
+     * @param newsletter the newsletter JID; never {@code null}
+     * @return an {@link Optional} carrying the success projection, or
+     *         empty when the response could not be parsed
+     * @throws NullPointerException            if {@code newsletter} is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no
+     *                                         longer open
+     * @throws WhatsAppServerRuntimeException  when the relay returned
+     *                                         a {@code ClientError} or
+     *                                         {@code ServerError}
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxNewslettersMyAddOnsRPC", exports = "sendMyAddOnsRPC",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxNewslettersMyAddOnsResponse.Success> queryNewsletterMyAddOns(int limit, Jid newsletter) {
+        Objects.requireNonNull(newsletter, "newsletter cannot be null");
+        var request = new SmaxNewslettersMyAddOnsRequest(limit, newsletter);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxNewslettersMyAddOnsResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxNewslettersMyAddOnsResponse.Success success -> Optional.of(success);
+            case SmaxNewslettersMyAddOnsResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Newsletter my-add-ons rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxNewslettersMyAddOnsResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Newsletter my-add-ons server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Subscribes the connection to real-time updates for a specific
+     * newsletter.
+     *
+     * <p>Once acknowledged the relay starts pushing
+     * {@code <notification type="newsletter">} stanzas — handled
+     * elsewhere by
+     * {@code SmaxNewslettersLiveUpdatesNotificationResponse} — that
+     * carry the live message/status delta stream until the
+     * subscription expires or the socket disconnects.
+     *
+     * @param newsletter the newsletter JID being subscribed to; never {@code null}
+     * @return an {@link Optional} carrying the success projection,
+     *         whose payload is the subscription expiration timestamp
+     *         the relay assigned
+     * @throws NullPointerException            if {@code newsletter} is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is no
+     *                                         longer open
+     * @throws WhatsAppServerRuntimeException  when the relay returned
+     *                                         a {@code ClientError} or
+     *                                         {@code ServerError}
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxNewslettersSubscribeToLiveUpdatesRPC", exports = "sendSubscribeToLiveUpdatesRPC",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxNewslettersSubscribeToLiveUpdatesResponse.Success> subscribeToNewsletterLiveUpdates(Jid newsletter) {
+        Objects.requireNonNull(newsletter, "newsletter cannot be null");
+        var request = new SmaxNewslettersSubscribeToLiveUpdatesRequest(newsletter);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxNewslettersSubscribeToLiveUpdatesResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxNewslettersSubscribeToLiveUpdatesResponse.Success success -> Optional.of(success);
+            case SmaxNewslettersSubscribeToLiveUpdatesResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Newsletter subscribe rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxNewslettersSubscribeToLiveUpdatesResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Newsletter subscribe server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    // -------------------------------------------------------------------
+    // SMAX RPC wirings: abprops, bot, bugreporting, inappcomms,
+    // offlinebatch, passivemode, prekeys, presence (cast), privacy,
+    // privatestats, profilepicture, psa, pushconfig, receipt, stats,
+    // support, unifiedsession, usernotice, voip, waffle.
+    //
+    // Each method instantiates the typed Smax*Request, dispatches it via
+    // sendNode/sendNodeWithNoResponse, and pattern-matches the sealed
+    // Smax*Response variants — surfacing successful payloads as
+    // Optional<Success> and translating documented client/server error
+    // arms into WhatsAppServerRuntimeException. Chatstate is already
+    // wired via changeChatState(...) above so no duplicates are added
+    // here. Receive-only and receive-with-ack flows (clientexpiration,
+    // coexistence, qp, psa reset-timestamp) are handled by notification
+    // dispatchers and require no caller-driven entry point.
+    // -------------------------------------------------------------------
+
+    /**
+     * Fetches the latest A/B-experiment configuration bundle.
+     *
+     * <p>Useful for refreshing the global props cache: the relay either
+     * echoes back the materialised props subtree (when the supplied hash
+     * is stale or absent) or short-circuits to a delta when the cached
+     * snapshot is already current.
+     *
+     * @param propsHash      the client's currently-cached props hash; may
+     *                       be {@code null} on the first fetch
+     * @param propsRefreshId the client's currently-cached refresh id; may
+     *                       be {@code null} on the first fetch
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxAbPropsGetExperimentConfigResponse.Success}, or
+     *         empty on no-parse
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the request
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxAbPropsGetExperimentConfigRPC",
+            exports = "sendGetExperimentConfigRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxAbPropsGetExperimentConfigResponse.Success> fetchExperimentConfig(String propsHash,
+                                                                                          Integer propsRefreshId) {
+        var request = new SmaxAbPropsGetExperimentConfigRequest(propsHash, propsRefreshId);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxAbPropsGetExperimentConfigResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxAbPropsGetExperimentConfigResponse.Success success -> Optional.of(success);
+            case SmaxAbPropsGetExperimentConfigResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Experiment-config request rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxAbPropsGetExperimentConfigResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Experiment-config server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Fetches the per-group A/B-experiment configuration.
+     *
+     * <p>Useful for refreshing group-scoped feature gates after the relay
+     * pushes a {@code <notification type="abprops">} bump that names a
+     * specific group.
+     *
+     * @param group     the non-{@code null} target group JID
+     * @param propsHash the cached group-props hash, or {@code null}
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxAbPropsGetGroupExperimentConfigResponse.Success},
+     *         or empty on no-parse
+     * @throws NullPointerException            if {@code group} is {@code null}
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the request
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxAbPropsGetGroupExperimentConfigRPC",
+            exports = "sendGetGroupExperimentConfigRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxAbPropsGetGroupExperimentConfigResponse.Success> fetchGroupExperimentConfig(Jid group,
+                                                                                                    String propsHash) {
+        Objects.requireNonNull(group, "group cannot be null");
+        var request = new SmaxAbPropsGetGroupExperimentConfigRequest(group, propsHash);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxAbPropsGetGroupExperimentConfigResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxAbPropsGetGroupExperimentConfigResponse.Success success -> Optional.of(success);
+            case SmaxAbPropsGetGroupExperimentConfigResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Group experiment-config rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxAbPropsGetGroupExperimentConfigResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Group experiment-config server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Fetches the bot directory listing.
+     *
+     * <p>Useful for refreshing the curated set of WhatsApp AI bots the
+     * user can interact with. Digest-gated: the cached {@code bhash} is
+     * echoed back so an unchanged listing transfers no payload.
+     *
+     * @param botV     the supported protocol revision (typically
+     *                 {@code "2"} or {@code "3"}); may be {@code null}
+     * @param botBhash the cached directory digest; may be {@code null}
+     * @param botArgs  optional list of bot JIDs to scope the query to
+     * @return an {@link Optional} carrying the parsed
+     *         {@link SmaxBotBotListResponse} variant, or empty on no-parse
+     * @throws NullPointerException            if {@code botArgs} is {@code null}
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the request
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxBotBotListRPC",
+            exports = "sendBotListRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxBotBotListResponse> fetchBotList(String botV, String botBhash, List<Jid> botArgs) {
+        var request = new SmaxBotBotListRequest(botV, botBhash, botArgs);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxBotBotListResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxBotBotListResponse.SuccessV2 success -> Optional.of(success);
+            case SmaxBotBotListResponse.SuccessV3 success -> Optional.of(success);
+            case SmaxBotBotListResponse.Error error ->
+                    throw new WhatsAppServerRuntimeException("Bot-list request error: code=" + error.errorCode() + ", text=" + error.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Submits a bug report to the WhatsApp support backend.
+     *
+     * <p>Useful for surfacing user-reported issues from the in-app
+     * "Contact us" / "Report a problem" flow. Carries a free-form
+     * description, debug-information JSON, an optional pre-uploaded
+     * device-log handle, and an arbitrary number of pre-uploaded media
+     * attachments.
+     *
+     * @param from                 the reporter's own JID
+     * @param description          the user-supplied description
+     * @param debugInformationJson the serialised debug-info blob
+     * @param deviceLogHandle      optional handle for a pre-uploaded device log
+     * @param mediaUploads         optional pre-uploaded attachments
+     * @param title                optional report title
+     * @param category             optional category code
+     * @param clientServerJoinKey  optional ASL join key
+     * @param reproducibility      optional reproducibility tag
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxBugReportingReportBugResponse.Success}, or empty on no-parse
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the request
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxBugReportingReportBugRPC",
+            exports = "sendReportBugRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxBugReportingReportBugResponse.Success> reportBug(Jid from, String description,
+                                                                          String debugInformationJson,
+                                                                          String deviceLogHandle,
+                                                                          List<SmaxBugReportingReportBugMediaUpload> mediaUploads,
+                                                                          String title, String category,
+                                                                          String clientServerJoinKey,
+                                                                          String reproducibility) {
+        var request = new SmaxBugReportingReportBugRequest(from, description, debugInformationJson,
+                deviceLogHandle, mediaUploads, title, category, clientServerJoinKey, reproducibility);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxBugReportingReportBugResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxBugReportingReportBugResponse.Success success -> Optional.of(success);
+            case SmaxBugReportingReportBugResponse.Error error ->
+                    throw new WhatsAppServerRuntimeException("Bug-report rejected: code=" + error.errorCode() + ", text=" + error.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Reports an InAppComms (in-app marketing) event to the relay.
+     *
+     * <p>Useful for attribution of in-app banner / promotion impressions,
+     * clicks, and dismissals. The {@code logdata} field carries an opaque
+     * JSON blob whose schema is owned by the promotion authoring tool.
+     *
+     * @param eventPromotionId  the promotion identifier
+     * @param eventType         the event type code (e.g. impression)
+     * @param eventTimestampSec the event time in seconds since the Unix epoch
+     * @param eventLogdata      the opaque JSON payload
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxInAppCommsEventResponse.Success}, or empty on no-parse
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the request
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxInAppCommsEventRPC",
+            exports = "sendInAppCommsEventRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxInAppCommsEventResponse.Success> reportInAppCommsEvent(String eventPromotionId,
+                                                                                String eventType,
+                                                                                long eventTimestampSec,
+                                                                                String eventLogdata) {
+        var request = new SmaxInAppCommsEventRequest(eventPromotionId, eventType, eventTimestampSec, eventLogdata);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxInAppCommsEventResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxInAppCommsEventResponse.Success success -> Optional.of(success);
+            case SmaxInAppCommsEventResponse.Error error ->
+                    throw new WhatsAppServerRuntimeException("In-app-comms event rejected: code=" + error.errorCode() + ", text=" + error.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Acknowledges the boundary of an offline-batch backfill the server
+     * just delivered.
+     *
+     * <p>While a client is offline the relay queues all stanzas that
+     * would have been pushed to it; on reconnect those stanzas are
+     * re-delivered as a single batch with a known size. After the
+     * client has fully ingested every stanza in the batch, it must
+     * call this method to advance the relay's offline-cursor — without
+     * the acknowledgement the same batch is redelivered on the next
+     * reconnect.
+     *
+     * <p>Fire-and-forget — the relay never replies.
+     *
+     * @param offlineBatchCount the number of stanzas the client has just
+     *                          fully consumed (must match the size the
+     *                          relay announced for this offline batch)
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxOfflineBatchRPC",
+            exports = "castOfflineBatchRPC", adaptation = WhatsAppAdaptation.DIRECT)
+    public void acknowledgeOfflineBatch(int offlineBatchCount) {
+        var request = new SmaxOfflineBatchRequest(offlineBatchCount);
+        sendNodeWithNoResponse(request.toNode().build());
+    }
+
+    /**
+     * Switches this client's WhatsApp session into <em>active</em> mode
+     * — telling the relay this device is the user's primary
+     * foregrounded surface and should receive immediate push of new
+     * stanzas, presence updates, typing indicators, etc.
+     *
+     * <p>Active vs passive is the WhatsApp equivalent of "is this app
+     * window in the foreground?". A multi-device session typically has
+     * one device in active mode at a time; backgrounded companions stay
+     * in passive mode (see {@link #enablePassiveMode()}) so the relay
+     * can suppress non-essential pushes.
+     *
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxPassiveModeActiveIQResponse.Success}, or empty on no-parse
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxPassiveModeActiveIQRPC",
+            exports = "sendActiveIQRPC", adaptation = WhatsAppAdaptation.DIRECT)
+    public Optional<SmaxPassiveModeActiveIQResponse.Success> enableActiveMode() {
+        var request = new SmaxPassiveModeActiveIQRequest();
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxPassiveModeActiveIQResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxPassiveModeActiveIQResponse.Success success -> Optional.of(success);
+        };
+    }
+
+    /**
+     * Switches this client's WhatsApp session into <em>passive</em> mode
+     * — telling the relay this device is backgrounded so non-essential
+     * pushes (typing indicators, presence updates) can be suspended
+     * until the next call to {@link #enableActiveMode()}.
+     *
+     * <p>See {@link #enableActiveMode()} for the active/passive model.
+     *
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxPassiveModePassiveIQResponse.Success}, or empty on no-parse
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxPassiveModePassiveIQRPC",
+            exports = "sendPassiveIQRPC", adaptation = WhatsAppAdaptation.DIRECT)
+    public Optional<SmaxPassiveModePassiveIQResponse.Success> enablePassiveMode() {
+        var request = new SmaxPassiveModePassiveIQRequest();
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxPassiveModePassiveIQResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxPassiveModePassiveIQResponse.Success success -> Optional.of(success);
+        };
+    }
+
+    /**
+     * Fetches Signal pre-key bundles for the supplied users.
+     *
+     * <p>Useful before the local client can send messages to a peer it
+     * has never communicated with — the bundle carries the recipient's
+     * identity key, signed pre-key, and one-time pre-key needed to seed
+     * a Signal session.
+     *
+     * @param users the non-{@code null} list of users to fetch bundles for
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxPreKeysFetchKeyBundlesResponse.Success}, or empty
+     *         on no-parse
+     * @throws NullPointerException            if {@code users} is {@code null}
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the request
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxPreKeysFetchKeyBundlesRPC",
+            exports = "sendFetchKeyBundlesRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxPreKeysFetchKeyBundlesResponse.Success> fetchPreKeyBundles(
+            List<SmaxPreKeysFetchKeyBundlesRequest.UserKeyRequest> users) {
+        Objects.requireNonNull(users, "users cannot be null");
+        var request = new SmaxPreKeysFetchKeyBundlesRequest(users);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxPreKeysFetchKeyBundlesResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxPreKeysFetchKeyBundlesResponse.Success success -> Optional.of(success);
+            case SmaxPreKeysFetchKeyBundlesResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Pre-key-bundles rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxPreKeysFetchKeyBundlesResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Pre-key-bundles server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Fetches additional one-time pre-keys for users whose locally cached
+     * bundles have been exhausted.
+     *
+     * <p>Useful when an outbound message would otherwise reuse a stale
+     * pre-key; the relay returns just the missing one-time keys without
+     * re-sending the long-lived identity material.
+     *
+     * @param users the non-{@code null} list of users to fetch missing pre-keys for
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxPreKeysFetchMissingPreKeysResponse.Success}, or
+     *         empty on no-parse
+     * @throws NullPointerException            if {@code users} is {@code null}
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the request
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxPreKeysFetchMissingPreKeysRPC",
+            exports = "sendFetchMissingPreKeysRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxPreKeysFetchMissingPreKeysResponse.Success> fetchMissingPreKeys(
+            List<SmaxPreKeysFetchMissingPreKeysRequest.UserKeyFetchRequest> users) {
+        Objects.requireNonNull(users, "users cannot be null");
+        var request = new SmaxPreKeysFetchMissingPreKeysRequest(users);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxPreKeysFetchMissingPreKeysResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxPreKeysFetchMissingPreKeysResponse.Success success -> Optional.of(success);
+            case SmaxPreKeysFetchMissingPreKeysResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Missing-pre-keys rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxPreKeysFetchMissingPreKeysResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Missing-pre-keys server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Casts a presence-availability update on behalf of the local user.
+     *
+     * <p>Fire-and-forget — broadcasts the user's availability and optional
+     * display name to subscribed contacts. Only
+     * {@link ContactStatus#AVAILABLE} and {@link ContactStatus#UNAVAILABLE}
+     * are accepted on the wire by this entry point; transient typing /
+     * recording states are routed through dedicated chat-state stanzas.
+     *
+     * @param presenceType the non-{@code null} presence type — must be
+     *                     either {@link ContactStatus#AVAILABLE} or
+     *                     {@link ContactStatus#UNAVAILABLE}
+     * @param presenceName optional display name override; may be {@code null}
+     * @throws NullPointerException            if {@code presenceType} is {@code null}
+     * @throws IllegalArgumentException        if {@code presenceType} is
+     *                                         neither {@code AVAILABLE}
+     *                                         nor {@code UNAVAILABLE}
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxAvailabilityRPC",
+            exports = "castAvailabilityRPC", adaptation = WhatsAppAdaptation.DIRECT)
+    public void updatePresenceAvailability(ContactStatus presenceType, String presenceName) {
+        Objects.requireNonNull(presenceType, "presenceType cannot be null");
+        if (presenceType != ContactStatus.AVAILABLE && presenceType != ContactStatus.UNAVAILABLE) {
+            throw new IllegalArgumentException("presenceType must be AVAILABLE or UNAVAILABLE, got " + presenceType);
+        }
+        var request = new SmaxAvailabilityRequest(presenceType.toString(), presenceName);
+        sendNodeWithNoResponse(request.toNode().build());
+    }
+
+    /**
+     * Casts a presence subscription request scoped under an explicit
+     * context JID.
+     *
+     * <p>Fire-and-forget — sister of the existing
+     * {@link #subscribeToPresence(Jid)} which omits the context. Useful
+     * when the subscription is scoped to a community / group surface
+     * rather than the individual chat.
+     *
+     * @param presenceTo      the non-{@code null} JID to subscribe to
+     * @param presenceName    optional display name; may be {@code null}
+     * @param presenceContext optional context JID; may be {@code null}
+     * @throws NullPointerException            if {@code presenceTo} is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxSubscribeRPC",
+            exports = "castSubscribeRPC", adaptation = WhatsAppAdaptation.DIRECT)
+    public void subscribeToPresence(Jid presenceTo, String presenceName, Jid presenceContext) {
+        Objects.requireNonNull(presenceTo, "presenceTo cannot be null");
+        var request = new SmaxSubscribeRequest(presenceTo, presenceName, presenceContext);
+        sendNodeWithNoResponse(request.toNode().build());
+    }
+
+    /**
+     * Fetches the local user's block list.
+     *
+     * <p>Useful for refreshing the in-app "Blocked contacts" surface and
+     * the outbound message gate.
+     *
+     * @param itemDhash the cached list digest, or {@code null} on first fetch
+     * @return an {@link Optional} carrying the parsed
+     *         {@link SmaxGetBlockListResponse} variant, or empty on no-parse
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxGetBlockListRPC",
+            exports = "sendGetBlockListRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxGetBlockListResponse> fetchBlockList(String itemDhash) {
+        var request = new SmaxGetBlockListRequest(itemDhash);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        return SmaxGetBlockListResponse.of(response, requestNode.build())
+                .map(parsed -> (SmaxGetBlockListResponse) parsed);
+    }
+
+    /**
+     * Fetches the local user's marketing-message opt-out list for a given
+     * category.
+     *
+     * <p>Useful for refreshing the privacy "Don't allow XYZ" toggles.
+     *
+     * @param itemDhash  the cached digest, or {@code null}
+     * @param iqCategory the non-{@code null} category code
+     * @return an {@link Optional} carrying the parsed
+     *         {@link SmaxGetOptOutListResponse} variant, or empty on no-parse
+     * @throws NullPointerException            if {@code iqCategory} is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxGetOptOutListRPC",
+            exports = "sendGetOptOutListRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxGetOptOutListResponse> fetchOptOutList(String itemDhash, String iqCategory) {
+        Objects.requireNonNull(iqCategory, "iqCategory cannot be null");
+        var request = new SmaxGetOptOutListRequest(itemDhash, iqCategory);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        return SmaxGetOptOutListResponse.of(response, requestNode.build())
+                .map(parsed -> (SmaxGetOptOutListResponse) parsed);
+    }
+
+    /**
+     * Fetches the per-category contact blacklist for the given addressing
+     * mode.
+     *
+     * <p>Useful for refreshing the in-app "Blocked" tab and feeding the
+     * outbound message gate. Distinguishes between legacy phone-number
+     * (PN) and modern LID addressing.
+     *
+     * @param categoryName    the non-{@code null} category name
+     * @param addressingMode  the non-{@code null} JID addressing mode
+     * @return an {@link Optional} carrying the parsed
+     *         {@link SmaxGetContactBlacklistResponse} variant, or empty on no-parse
+     * @throws NullPointerException            if any argument is {@code null}
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the request
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxGetContactBlacklistRPC",
+            exports = "sendGetContactBlacklistRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxGetContactBlacklistResponse> fetchContactBlacklist(String categoryName,
+                                                                            SmaxGetContactBlacklistAddressingMode addressingMode) {
+        Objects.requireNonNull(categoryName, "categoryName cannot be null");
+        Objects.requireNonNull(addressingMode, "addressingMode cannot be null");
+        var request = new SmaxGetContactBlacklistRequest(categoryName, addressingMode);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxGetContactBlacklistResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxGetContactBlacklistResponse.Success success -> Optional.of(success);
+            case SmaxGetContactBlacklistResponse.SuccessLID successLid -> Optional.of(successLid);
+            case SmaxGetContactBlacklistResponse.Error error ->
+                    throw new WhatsAppServerRuntimeException("Contact-blacklist error: code=" + error.errorCode() + ", text=" + error.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Adds or removes a contact on the local user's opt-out list.
+     *
+     * <p>Useful as the marketing-messaging counterpart of the higher-level
+     * {@code blockContact}/{@code unblockContact} convenience helpers. The
+     * reason / entry-point / signup-id tuple is forwarded to the relay's
+     * analytics pipeline.
+     *
+     * @param itemJid        the non-{@code null} target JID
+     * @param itemCategory   the non-{@code null} category code
+     * @param itemAction     the non-{@code null} add / remove action code
+     * @param itemDhash      optional digest; may be {@code null}
+     * @param itemReason     optional reason; may be {@code null}
+     * @param itemEntryPoint optional entry-point; may be {@code null}
+     * @param itemSignupId   optional signup id; may be {@code null}
+     * @param itemDuration   optional duration override; may be {@code null}
+     * @return an {@link Optional} carrying the parsed
+     *         {@link SmaxUpdateOptOutListResponse} variant, or empty on no-parse
+     * @throws NullPointerException            if any required argument is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxUpdateOptOutListRPC",
+            exports = "sendUpdateOptOutListRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxUpdateOptOutListResponse> updateOptOutList(Jid itemJid, String itemCategory,
+                                                                    String itemAction, String itemDhash,
+                                                                    String itemReason, String itemEntryPoint,
+                                                                    String itemSignupId, Integer itemDuration) {
+        Objects.requireNonNull(itemJid, "itemJid cannot be null");
+        Objects.requireNonNull(itemCategory, "itemCategory cannot be null");
+        Objects.requireNonNull(itemAction, "itemAction cannot be null");
+        var request = new SmaxUpdateOptOutListRequest(itemJid, itemCategory, itemAction, itemDhash,
+                itemReason, itemEntryPoint, itemSignupId, itemDuration);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        return SmaxUpdateOptOutListResponse.of(response, requestNode.build())
+                .map(parsed -> (SmaxUpdateOptOutListResponse) parsed);
+    }
+
+    /**
+     * Submits a blinded credential token to the WhatsApp anonymous-
+     * attribution signing service and returns the server-signed
+     * counterpart.
+     *
+     * <p>"Private stats" is WhatsApp's anonymous-attribution telemetry
+     * channel — the client blinds a token client-side, the relay's
+     * signing service co-signs it without learning its contents, and
+     * the client later unblinds the result to obtain an
+     * <em>unlinkable</em> credential it can spend to attest to a stats
+     * event without revealing its identity. This is the signing half
+     * of that handshake.
+     *
+     * @param blindedCredentialElementValue the non-{@code null} blinded
+     *                                      credential token to be signed
+     * @param projectNameElementValue       the non-{@code null} signing
+     *                                      project identifier (selects
+     *                                      which signer key the server
+     *                                      uses)
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxPrivatestatsSignCredentialResponse.Success}, or empty on no-parse
+     * @throws NullPointerException            if any argument is {@code null}
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the request
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxPrivatestatsSignCredentialRPC",
+            exports = "sendSignCredentialRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxPrivatestatsSignCredentialResponse.Success> signAnonymousAttributionCredential(byte[] blindedCredentialElementValue,
+                                                                                                       String projectNameElementValue) {
+        Objects.requireNonNull(blindedCredentialElementValue, "blindedCredentialElementValue cannot be null");
+        Objects.requireNonNull(projectNameElementValue, "projectNameElementValue cannot be null");
+        var request = new SmaxPrivatestatsSignCredentialRequest(blindedCredentialElementValue, projectNameElementValue);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxPrivatestatsSignCredentialResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxPrivatestatsSignCredentialResponse.Success success -> Optional.of(success);
+            case SmaxPrivatestatsSignCredentialResponse.ErrorNoRetry clientError ->
+                    throw new WhatsAppServerRuntimeException("Sign-credential rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxPrivatestatsSignCredentialResponse.ErrorRetry serverError ->
+                    throw new WhatsAppServerRuntimeException("Sign-credential server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText());
+        };
+    }
+
+    /**
+     * Queries whether the local user has blocked Public Service
+     * Announcement (PSA) chats.
+     *
+     * <p>PSAs are official chat blasts the WhatsApp team itself posts —
+     * for example launch announcements, safety notices, or feature
+     * tutorials. Each user can opt out of receiving them; this method
+     * surfaces the current opt-out state so the UI can render the
+     * correct toggle position.
+     *
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxPsaChatBlockGetResponse.Success}, or empty on no-parse
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the request
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxPsaChatBlockGetRPC",
+            exports = "sendChatBlockGetRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxPsaChatBlockGetResponse.Success> queryPublicAnnouncementBlocked() {
+        var request = new SmaxPsaChatBlockGetRequest();
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxPsaChatBlockGetResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxPsaChatBlockGetResponse.Success success -> Optional.of(success);
+            case SmaxPsaChatBlockGetResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Psa-chat-block-get error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Updates whether the local user is blocking Public Service
+     * Announcement (PSA) chats. See {@link #queryPublicAnnouncementBlocked()}
+     * for what PSAs are.
+     *
+     * @param blockingAction the non-{@code null} mutation verb to apply
+     *                       to the PSA block list
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxPsaChatBlockSetResponse.Success}, or empty on no-parse
+     * @throws NullPointerException            if {@code blockingAction} is {@code null}
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the request
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxPsaChatBlockSetRPC",
+            exports = "sendChatBlockSetRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxPsaChatBlockSetResponse.Success> changePublicAnnouncementBlocked(PsaChatBlockAction blockingAction) {
+        Objects.requireNonNull(blockingAction, "blockingAction cannot be null");
+        var request = new SmaxPsaChatBlockSetRequest(blockingAction.wireValue());
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxPsaChatBlockSetResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxPsaChatBlockSetResponse.Success success -> Optional.of(success);
+            case SmaxPsaChatBlockSetResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Psa-chat-block-set error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Updates the FCM / APNs push notification configuration registered
+     * with the relay.
+     *
+     * <p>Useful at session bootstrap or when the OS-issued push token
+     * rotates — submits either a fresh configuration (token + platform
+     * metadata) or a clear request that removes the device's push
+     * registration so the relay stops sending wakeup pings.
+     *
+     * @param variant the non-{@code null} push-config payload variant.
+     *                Kept as a typed sealed alternation because the wire
+     *                shape is genuinely a oneof (set vs clear, FCM vs
+     *                APNs vs Web Push) and flattening would require
+     *                exposing every variant's fields as nullable
+     *                parameters
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxPushConfigSetResponse.Success}, or empty on no-parse
+     * @throws NullPointerException            if {@code variant} is {@code null}
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the request
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxPushConfigSetRPC",
+            exports = "sendSetRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxPushConfigSetResponse.Success> changePushConfig(SmaxPushConfigSetSetVariant variant) {
+        Objects.requireNonNull(variant, "variant cannot be null");
+        var request = new SmaxPushConfigSetRequest(variant);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxPushConfigSetResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxPushConfigSetResponse.Success success -> Optional.of(success);
+            case SmaxPushConfigSetResponse.InternalServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Push-config server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText());
+            case SmaxPushConfigSetResponse.Conflict conflict ->
+                    throw new WhatsAppServerRuntimeException("Push-config conflict: code=" + conflict.errorCode() + ", text=" + conflict.errorText());
+        };
+    }
+
+    /**
+     * Publishes a "view" receipt for one or more status posts the local
+     * user just consumed.
+     *
+     * <p>Useful for driving the "Seen by" surface on the publisher's
+     * side. Distinct from a regular read receipt because the wire shape
+     * carries a batch of server-ids under a single posting.
+     *
+     * @param receiptId      the non-{@code null} receipt id
+     * @param to             the non-{@code null} publisher JID
+     * @param hasStatusClass {@code true} for the status namespace,
+     *                       {@code false} for plain
+     * @param itemServerIds  the non-{@code null} list of viewed server-ids
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxReceiptPublishViewResponse.Success}, or empty on no-parse
+     * @throws NullPointerException            if any argument is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxReceiptPublishViewRPC",
+            exports = "sendReceiptPublishViewRPC", adaptation = WhatsAppAdaptation.DIRECT)
+    public Optional<SmaxReceiptPublishViewResponse.Success> publishViewReceipt(String receiptId, Jid to,
+                                                                                boolean hasStatusClass,
+                                                                                List<Integer> itemServerIds) {
+        Objects.requireNonNull(receiptId, "receiptId cannot be null");
+        Objects.requireNonNull(to, "to cannot be null");
+        Objects.requireNonNull(itemServerIds, "itemServerIds cannot be null");
+        var request = new SmaxReceiptPublishViewRequest(receiptId, to, hasStatusClass, itemServerIds);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxReceiptPublishViewResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxReceiptPublishViewResponse.Success success -> Optional.of(success);
+        };
+    }
+
+    /**
+     * Sends a buffered batch of low-priority client-side stats events to
+     * the relay.
+     *
+     * <p>Useful as the counterpart of the WAM stream — the WhatsApp
+     * client keeps a separate stats-buffer for events that are too cheap
+     * to warrant standalone WAM events.
+     *
+     * @param addT            the buffer's add-timestamp
+     * @param addElementValue the non-{@code null} serialised event blob
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxStatsSendBufferResponse.Success}, or empty on no-parse
+     * @throws NullPointerException            if {@code addElementValue} is {@code null}
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the request
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxStatsSendBufferRPC",
+            exports = "sendStatsSendBufferRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxStatsSendBufferResponse.Success> sendStatsBuffer(long addT, byte[] addElementValue) {
+        Objects.requireNonNull(addElementValue, "addElementValue cannot be null");
+        var request = new SmaxStatsSendBufferRequest(addT, addElementValue);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxStatsSendBufferResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxStatsSendBufferResponse.Success success -> Optional.of(success);
+            case SmaxStatsSendBufferResponse.ErrorNoRetry clientError ->
+                    throw new WhatsAppServerRuntimeException("Stats-buffer rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxStatsSendBufferResponse.ErrorRetry serverError ->
+                    throw new WhatsAppServerRuntimeException("Stats-buffer server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText());
+        };
+    }
+
+    /**
+     * Sends a free-form support feedback report.
+     *
+     * <p>Useful for the in-app "Send feedback" surface — surfaces a
+     * quoted message id and a list of feedback kind tags so the support
+     * team can triage.
+     *
+     * @param from          the non-{@code null} reporter JID
+     * @param messageId     the non-{@code null} quoted message id
+     * @param feedbackKinds the non-{@code null} list of feedback kind tags
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxSendFeedbackResponse.Success}, or empty on no-parse
+     * @throws NullPointerException            if any argument is {@code null}
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the request
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxSendFeedbackRPC",
+            exports = "sendSendFeedbackRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxSendFeedbackResponse.Success> sendSupportFeedback(Jid from, String messageId,
+                                                                           List<String> feedbackKinds) {
+        Objects.requireNonNull(from, "from cannot be null");
+        Objects.requireNonNull(messageId, "messageId cannot be null");
+        Objects.requireNonNull(feedbackKinds, "feedbackKinds cannot be null");
+        var request = new SmaxSendFeedbackRequest(from, messageId, feedbackKinds);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxSendFeedbackResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxSendFeedbackResponse.Success success -> Optional.of(success);
+            case SmaxSendFeedbackResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Send-feedback rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxSendFeedbackResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Send-feedback server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Submits a structured "Contact us" form to support.
+     *
+     * <p>Useful for the help-center contact flow — carries a topic,
+     * optional topic id, debug-info JSON, optional uploaded log handle,
+     * and an additional context-flow string for routing within the
+     * support tooling.
+     *
+     * @param from                            the non-{@code null} reporter JID
+     * @param description                     the non-{@code null} description
+     * @param topic                           the non-{@code null} topic string
+     * @param topicId                         optional topic id; may be {@code null}
+     * @param debugInformationJson            optional debug-info JSON; may be {@code null}
+     * @param uploadedLogsId                  optional pre-uploaded log handle; may be {@code null}
+     * @param additionalAttributesContextFlow optional context flow; may be {@code null}
+     * @return an {@link Optional} carrying the parsed
+     *         {@link SmaxContactFormResponse} variant, or empty on no-parse
+     * @throws NullPointerException            if any required argument is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxContactFormRPC",
+            exports = "sendContactFormRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxContactFormResponse> sendSupportContactForm(Jid from, String description, String topic,
+                                                                     String topicId, String debugInformationJson,
+                                                                     String uploadedLogsId,
+                                                                     String additionalAttributesContextFlow) {
+        Objects.requireNonNull(from, "from cannot be null");
+        Objects.requireNonNull(description, "description cannot be null");
+        Objects.requireNonNull(topic, "topic cannot be null");
+        var request = new SmaxContactFormRequest(from, description, topic, topicId, debugInformationJson,
+                uploadedLogsId, additionalAttributesContextFlow);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        return SmaxContactFormResponse.of(response, requestNode.build())
+                .map(parsed -> (SmaxContactFormResponse) parsed);
+    }
+
+    /**
+     * Reports an individual contact for spam.
+     *
+     * <p>Useful for the in-app "Block and report" flow. Sends the
+     * report to WhatsApp's trust-and-safety pipeline alongside the
+     * caller-curated list of offending {@code <message>} stanza
+     * identifiers so the moderator has the conversation context.
+     *
+     * <p>For the rare flows that need to attach FRX (free-form
+     * reporting extension) payloads, biz opt-out / biz-report /
+     * UI-state-set / TC-token children, or report calls and user-
+     * initiated extensions, instantiate {@link SmaxIndividualReportRequest#builder()}
+     * directly and dispatch via the lower-level {@link #sendNode(NodeBuilder)}.
+     *
+     * @param target              the reportee's JID; never {@code null}
+     * @param spamFlow            the WhatsApp spam-flow code identifying which
+     *                            user-visible report flow is being submitted;
+     *                            never {@code null}
+     * @param isKnownChat         optional marker — when non-{@code null} the
+     *                            report carries the {@code is_known_chat}
+     *                            attribute signalling whether the reporter has
+     *                            previously chatted with the reportee
+     * @param reportedMessageIds  zero or more reported {@code <message>} stanza
+     *                            ids attached as evidence; never {@code null}
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxIndividualReportResponse.Success}, or empty on no-parse
+     * @throws NullPointerException            if any non-nullable argument is {@code null}
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the request
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxIndividualReportRPC",
+            exports = "sendIndividualReportRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxIndividualReportResponse.Success> reportIndividualForSpam(Jid target,
+                                                                                   String spamFlow,
+                                                                                   String isKnownChat,
+                                                                                   List<String> reportedMessageIds) {
+        Objects.requireNonNull(target, "target cannot be null");
+        Objects.requireNonNull(spamFlow, "spamFlow cannot be null");
+        Objects.requireNonNull(reportedMessageIds, "reportedMessageIds cannot be null");
+        var builder = SmaxIndividualReportRequest.builder()
+                .spamListJid(target)
+                .spamListSpamFlow(spamFlow);
+        if (isKnownChat != null) {
+            builder.spamListIsKnownChat(isKnownChat);
+        }
+        for (var messageId : reportedMessageIds) {
+            Objects.requireNonNull(messageId, "reportedMessageIds entries cannot be null");
+            builder.addMessageChild(new NodeBuilder()
+                    .description("message")
+                    .attribute("id", messageId)
+                    .build());
+        }
+        var request = builder.build();
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxIndividualReportResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxIndividualReportResponse.Success success -> Optional.of(success);
+            case SmaxIndividualReportResponse.Error error ->
+                    throw new WhatsAppServerRuntimeException("Individual-report rejected: code=" + error.errorCode() + ", text=" + error.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Reports a group chat for spam.
+     *
+     * <p>Group-scoped sister of {@link #reportIndividualForSpam(Jid, String, String, List)}.
+     * Includes the optional {@code adder} JID — the user who originally added the
+     * reporter to the group, useful for surfacing add-spam patterns.
+     *
+     * <p>For the rare flows that need to attach FRX payloads or report
+     * group calls, instantiate {@link SmaxGroupReportRequest#builder()}
+     * directly and dispatch via {@link #sendNode(NodeBuilder)}.
+     *
+     * @param group               the reported group JID; never {@code null}
+     * @param spamFlow            the WhatsApp spam-flow code; never {@code null}
+     * @param adder               the JID of the user who added the reporter to
+     *                            the group, or {@code null} if unknown
+     * @param subject             the group subject string echoed for attribution
+     *                            context, or {@code null}
+     * @param isKnownChat         optional {@code is_known_chat} marker; may be {@code null}
+     * @param reportedMessageIds  zero or more reported {@code <message>} stanza
+     *                            ids attached as evidence; never {@code null}
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxGroupReportResponse.Success}, or empty on no-parse
+     * @throws NullPointerException            if any non-nullable argument is {@code null}
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the request
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxGroupReportRPC",
+            exports = "sendGroupReportRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxGroupReportResponse.Success> reportGroupForSpam(Jid group,
+                                                                         String spamFlow,
+                                                                         Jid adder,
+                                                                         String subject,
+                                                                         String isKnownChat,
+                                                                         List<String> reportedMessageIds) {
+        Objects.requireNonNull(group, "group cannot be null");
+        Objects.requireNonNull(spamFlow, "spamFlow cannot be null");
+        Objects.requireNonNull(reportedMessageIds, "reportedMessageIds cannot be null");
+        var builder = SmaxGroupReportRequest.builder()
+                .spamListJid(group)
+                .spamListSpamFlow(spamFlow);
+        if (adder != null) {
+            builder.spamListSource(adder);
+        }
+        if (subject != null) {
+            builder.spamListSubject(subject);
+        }
+        if (isKnownChat != null) {
+            builder.spamListIsKnownChat(isKnownChat);
+        }
+        for (var messageId : reportedMessageIds) {
+            Objects.requireNonNull(messageId, "reportedMessageIds entries cannot be null");
+            builder.addMessageChild(new NodeBuilder()
+                    .description("message")
+                    .attribute("id", messageId)
+                    .build());
+        }
+        var request = builder.build();
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxGroupReportResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxGroupReportResponse.Success success -> Optional.of(success);
+            case SmaxGroupReportResponse.Error error ->
+                    throw new WhatsAppServerRuntimeException("Group-report rejected: code=" + error.errorCode() + ", text=" + error.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Reports a newsletter (channel) for spam.
+     *
+     * <p>Useful for surfacing newsletter abuse complaints — sends the
+     * newsletter JID and a curated set of reported message receipts so
+     * the trust-and-safety pipeline can attribute the complaint.
+     *
+     * @param spamListJid      the non-{@code null} newsletter JID
+     * @param spamListSpamFlow the non-{@code null} spam-flow code
+     * @param spamListSubject  optional subject; may be {@code null}
+     * @param messages         the non-{@code null} list of reported messages
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxNewsletterReportResponse.Success}, or empty on no-parse
+     * @throws NullPointerException            if any required argument is {@code null}
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the request
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxNewsletterReportRPC",
+            exports = "sendNewsletterReportRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxNewsletterReportResponse.Success> reportNewsletterForSpam(Jid spamListJid, String spamListSpamFlow,
+                                                                                    String spamListSubject,
+                                                                                    List<SmaxNewsletterReportMessageEntry> messages) {
+        Objects.requireNonNull(spamListJid, "spamListJid cannot be null");
+        Objects.requireNonNull(spamListSpamFlow, "spamListSpamFlow cannot be null");
+        Objects.requireNonNull(messages, "messages cannot be null");
+        var request = new SmaxNewsletterReportRequest(spamListJid, spamListSpamFlow, spamListSubject, messages);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxNewsletterReportResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxNewsletterReportResponse.Success success -> Optional.of(success);
+            case SmaxNewsletterReportResponse.Error error ->
+                    throw new WhatsAppServerRuntimeException("Newsletter-report rejected: code=" + error.errorCode() + ", text=" + error.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Submits a v1 status report (legacy).
+     *
+     * <p>Legacy "Report status" flow; superseded by
+     * {@link #reportStatusV2(Jid, String, long, long, String, Node)}
+     * but kept because some flows still emit the v1 wire shape.
+     *
+     * <p>For the rare flows that need to attach FRX, biz-opt-out or
+     * biz-report children, instantiate
+     * {@link SmaxStatusReportRequest#builder()} directly and dispatch
+     * via {@link #sendNode(NodeBuilder)}.
+     *
+     * @param statusOwner       the JID of the user whose status is being
+     *                          reported; never {@code null}
+     * @param spamFlow          the WhatsApp spam-flow code; never {@code null}
+     * @param messageFrom       the sender JID of the offending status
+     *                          message; never {@code null}
+     * @param messageTimestamp  the offending status message timestamp
+     * @param messageId         the offending status stanza id; never
+     *                          {@code null}
+     * @param messageRecipient  optional recipient JID echoed in the
+     *                          {@code <message to>} attribute; may be
+     *                          {@code null}
+     * @param isKnownChat       optional {@code is_known_chat} marker;
+     *                          may be {@code null}
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxStatusReportResponse.Success}, or empty on no-parse
+     * @throws NullPointerException            if any non-nullable argument is {@code null}
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the request
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxStatusReportRPC",
+            exports = "sendStatusReportRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxStatusReportResponse.Success> reportStatus(Jid statusOwner,
+                                                                    String spamFlow,
+                                                                    Jid messageFrom,
+                                                                    long messageTimestamp,
+                                                                    String messageId,
+                                                                    Jid messageRecipient,
+                                                                    String isKnownChat) {
+        Objects.requireNonNull(statusOwner, "statusOwner cannot be null");
+        Objects.requireNonNull(spamFlow, "spamFlow cannot be null");
+        Objects.requireNonNull(messageFrom, "messageFrom cannot be null");
+        Objects.requireNonNull(messageId, "messageId cannot be null");
+        var builder = SmaxStatusReportRequest.builder()
+                .spamListJid(statusOwner)
+                .spamListSpamFlow(spamFlow)
+                .messageFrom(messageFrom)
+                .messageTimestamp(messageTimestamp)
+                .messageId(messageId);
+        if (messageRecipient != null) {
+            builder.messageTo(messageRecipient);
+        }
+        if (isKnownChat != null) {
+            builder.spamListIsKnownChat(isKnownChat);
+        }
+        var request = builder.build();
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxStatusReportResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxStatusReportResponse.Success success -> Optional.of(success);
+            case SmaxStatusReportResponse.Error error ->
+                    throw new WhatsAppServerRuntimeException("Status-report rejected: code=" + error.errorCode() + ", text=" + error.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Submits a v2 status report.
+     *
+     * <p>Useful for the modern "Report status" flow — bundles the
+     * offending status post (server id + timestamp) and an arbitrary
+     * payload child directly inside the report so the trust-and-safety
+     * reviewer can see the exact post being reported.
+     *
+     * @param spamListJid          the non-{@code null} target JID
+     * @param spamListSpamFlow     the non-{@code null} spam-flow code
+     * @param statusServerId       the reported status server id
+     * @param statusTimestamp      the reported status timestamp
+     * @param spamListSubject      optional subject; may be {@code null}
+     * @param statusPayloadContent optional inline status payload; may be {@code null}
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxStatusReportV2Response.Success}, or empty on no-parse
+     * @throws NullPointerException            if any required argument is {@code null}
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the request
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxStatusReportV2RPC",
+            exports = "sendStatusReportV2RPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxStatusReportV2Response.Success> reportStatusV2(Jid spamListJid, String spamListSpamFlow,
+                                                                        long statusServerId, long statusTimestamp,
+                                                                        String spamListSubject,
+                                                                        Node statusPayloadContent) {
+        Objects.requireNonNull(spamListJid, "spamListJid cannot be null");
+        Objects.requireNonNull(spamListSpamFlow, "spamListSpamFlow cannot be null");
+        var request = new SmaxStatusReportV2Request(spamListJid, spamListSpamFlow, statusServerId,
+                statusTimestamp, spamListSubject, statusPayloadContent);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxStatusReportV2Response.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxStatusReportV2Response.Success success -> Optional.of(success);
+            case SmaxStatusReportV2Response.Error error ->
+                    throw new WhatsAppServerRuntimeException("Status-report-v2 rejected: code=" + error.errorCode() + ", text=" + error.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Notifies the relay that this device wants to join a "unified
+     * session" — WhatsApp's cross-device session-fan-out protocol that
+     * shares a single logical chat session across multiple devices
+     * identified by the same id.
+     *
+     * <p>Fire-and-forget. The relay uses the announcement to wire the
+     * device into any in-flight cross-device sync the unified session
+     * is participating in.
+     *
+     * @param unifiedSessionId the non-{@code null} cross-device session id
+     * @throws NullPointerException            if {@code unifiedSessionId} is {@code null}
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxUnifiedSessionShareRPC",
+            exports = "castShareRPC", adaptation = WhatsAppAdaptation.DIRECT)
+    public void joinUnifiedSession(String unifiedSessionId) {
+        Objects.requireNonNull(unifiedSessionId, "unifiedSessionId cannot be null");
+        var request = new SmaxUnifiedSessionShareRequest(unifiedSessionId);
+        sendNodeWithNoResponse(request.toNode().build());
+    }
+
+    /**
+     * Fetches the pending Terms-of-Service / privacy-policy notices the
+     * user has not yet acknowledged.
+     *
+     * <p>"User-notice disclosures" are the modal pop-ups WhatsApp shows
+     * when the Terms of Service, privacy policy, or a regional
+     * compliance notice changes — each entry carries the
+     * locale-appropriate copy plus an id the client uses to record the
+     * dismissal once the user closes the modal.
+     *
+     * @param getUserDisclosuresT the request timestamp, in seconds
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxUserNoticeGetDisclosuresResponse.ClientSuccess},
+     *         or empty on no-parse
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the request
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxUserNoticeGetDisclosuresRPC",
+            exports = "sendGetDisclosuresRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxUserNoticeGetDisclosuresResponse.ClientSuccess> fetchPendingUserNotices(long getUserDisclosuresT) {
+        var request = new SmaxUserNoticeGetDisclosuresRequest(getUserDisclosuresT);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxUserNoticeGetDisclosuresResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxUserNoticeGetDisclosuresResponse.ClientSuccess success -> Optional.of(success);
+            case SmaxUserNoticeGetDisclosuresResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("User-notice-disclosures rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxUserNoticeGetDisclosuresResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("User-notice-disclosures server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Fetches the per-stage acknowledgement state for an explicit list
+     * of user-notice disclosure ids — useful after a refresh to verify
+     * that the local cache matches the server's view of which Terms of
+     * Service / privacy notices the user has acknowledged or dismissed.
+     * See {@link #fetchPendingUserNotices(long)} for what disclosures are.
+     *
+     * @param queries the non-{@code null} list of stage queries
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxUserNoticeGetDisclosureStageByIdsResponse.ClientSuccess},
+     *         or empty on no-parse
+     * @throws NullPointerException            if {@code queries} is {@code null}
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the request
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxUserNoticeGetDisclosureStageByIdsRPC",
+            exports = "sendGetDisclosureStageByIdsRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxUserNoticeGetDisclosureStageByIdsResponse.ClientSuccess> fetchUserNoticeStages(
+            List<SmaxUserNoticeGetDisclosureStageByIdsRequest.DisclosureStageQuery> queries) {
+        Objects.requireNonNull(queries, "queries cannot be null");
+        var request = new SmaxUserNoticeGetDisclosureStageByIdsRequest(queries);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxUserNoticeGetDisclosureStageByIdsResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxUserNoticeGetDisclosureStageByIdsResponse.ClientSuccess success -> Optional.of(success);
+            case SmaxUserNoticeGetDisclosureStageByIdsResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("User-notice-stages rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxUserNoticeGetDisclosureStageByIdsResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("User-notice-stages server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Creates a fresh call link the user can share to invite participants.
+     *
+     * <p>Useful for surfacing the "Share call link" affordance in
+     * one-tap call invites. Surfaces the audio/video media discriminant,
+     * the originating call metadata, and a waiting-room flag.
+     *
+     * @param linkCreateMedia               the non-{@code null} media type
+     *                                      ({@code "audio"} / {@code "video"})
+     * @param linkCreateCallCreator         optional call creator JID
+     * @param linkCreateCallId              optional call id
+     * @param linkCreateLinkCreatorUsername optional username
+     * @param linkCreateWaitingRoomEnabled  {@code true} to gate joins behind a waiting room
+     * @param eventStartTime                optional scheduled-call start instant
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxLinkCreateResponse.Success}, or empty on no-parse
+     * @throws NullPointerException            if {@code linkCreateMedia} is {@code null}
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the request
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxLinkCreateRPC",
+            exports = "sendLinkCreateRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxLinkCreateResponse.Success> createCallLink(String linkCreateMedia, Jid linkCreateCallCreator,
+                                                                    String linkCreateCallId,
+                                                                    String linkCreateLinkCreatorUsername,
+                                                                    boolean linkCreateWaitingRoomEnabled,
+                                                                    Instant eventStartTime) {
+        Objects.requireNonNull(linkCreateMedia, "linkCreateMedia cannot be null");
+        var request = new SmaxLinkCreateRequest(linkCreateMedia, linkCreateCallCreator, linkCreateCallId,
+                linkCreateLinkCreatorUsername, linkCreateWaitingRoomEnabled, eventStartTime);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxLinkCreateResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxLinkCreateResponse.Success success -> Optional.of(success);
+            case SmaxLinkCreateResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Link-create rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Queries metadata for an existing call link.
+     *
+     * <p>Useful for the "Join via link" flow to fetch the link's owner /
+     * media-type / waiting-room state before actually joining.
+     *
+     * @param linkQueryToken  the non-{@code null} link token
+     * @param linkQueryMedia  the non-{@code null} media type
+     * @param linkQueryAction the non-{@code null} action discriminator
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxLinkQueryResponse.Success}, or empty on no-parse
+     * @throws NullPointerException            if any argument is {@code null}
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the request
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxLinkQueryRPC",
+            exports = "sendLinkQueryRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxLinkQueryResponse.Success> queryCallLink(String linkQueryToken, String linkQueryMedia,
+                                                                  String linkQueryAction) {
+        Objects.requireNonNull(linkQueryToken, "linkQueryToken cannot be null");
+        Objects.requireNonNull(linkQueryMedia, "linkQueryMedia cannot be null");
+        Objects.requireNonNull(linkQueryAction, "linkQueryAction cannot be null");
+        var request = new SmaxLinkQueryRequest(linkQueryToken, linkQueryMedia, linkQueryAction);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxLinkQueryResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxLinkQueryResponse.Success success -> Optional.of(success);
+            case SmaxLinkQueryResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Link-query rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Toggles the waiting-room gate on an existing call link.
+     *
+     * @param waitingRoomToggleEnabled   {@code true} to enable the
+     *                                   waiting-room gate, {@code false}
+     *                                   to disable it; encoded on the wire
+     *                                   as {@code "1"} / {@code "0"}
+     * @param waitingRoomToggleLinkToken the non-{@code null} link token
+     * @param waitingRoomToggleMedia     the non-{@code null} call media kind
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxWaitingRoomToggleCallLinkResponse.Success}, or empty on no-parse
+     * @throws NullPointerException            if any reference argument is {@code null}
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the request
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxWaitingRoomToggleCallLinkRPC",
+            exports = "sendToggleCallLinkRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxWaitingRoomToggleCallLinkResponse.Success> changeCallLinkWaitingRoom(boolean waitingRoomToggleEnabled,
+                                                                                              String waitingRoomToggleLinkToken,
+                                                                                              CallLinkMedia waitingRoomToggleMedia) {
+        Objects.requireNonNull(waitingRoomToggleLinkToken, "waitingRoomToggleLinkToken cannot be null");
+        Objects.requireNonNull(waitingRoomToggleMedia, "waitingRoomToggleMedia cannot be null");
+        var request = new SmaxWaitingRoomToggleCallLinkRequest(waitingRoomToggleEnabled ? "1" : "0",
+                waitingRoomToggleLinkToken, waitingRoomToggleMedia.wireValue());
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxWaitingRoomToggleCallLinkResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxWaitingRoomToggleCallLinkResponse.Success success -> Optional.of(success);
+            case SmaxWaitingRoomToggleCallLinkResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Waiting-room-toggle rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+        };
+    }
+    //</editor-fold>
+
+    //<editor-fold desc="Federated identity (Waffle)">
+    //
+    // The "Waffle" (WhatsApp For Facebook Login Engine) RPC family is
+    // WhatsApp's bridge to Meta's federated identity layer — it lets a
+    // WhatsApp account be linked to a Facebook / Instagram identity, and
+    // exchanges encrypted enrolment payloads with the Meta-side bridge.
+    //
+    // Public methods below use the *FederatedIdentity* naming family;
+    // the underlying SMAX types still carry the WA-internal "Waffle"
+    // / "WAEntAC" (WhatsApp Enterprise Authenticated Customer) names.
+    //
+    // Most methods take a SmaxWaffleRsaEncryptionMetadata value — a
+    // four-tuple of (RSA-wrapped key, AES-GCM nonce, ciphertext, tag)
+    // representing the encrypted payload envelope. The metadata is
+    // kept as a typed value object because all four byte arrays are
+    // mandatory and meaningful as a unit; flattening into individual
+    // method parameters would make the call sites unreadable.
+
+    /**
+     * Checks whether the local user already has an active federated-
+     * identity ("Waffle") link to a Meta account.
+     *
+     * <p>The first step of the Meta-SSO linking flow: if state already
+     * exists the client can skip directly to certificate fetch; if
+     * not, the linking handshake starts from
+     * {@link #fetchFederatedIdentityCertificate(long, boolean, boolean)}.
+     *
+     * @param timestamp the request timestamp, in seconds
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxWaffleStateExistsResponse.Success}, or empty on no-parse
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the request
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxWaffleStateExistsRPC",
+            exports = "sendStateExistsRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxWaffleStateExistsResponse.Success> checkFederatedIdentityExists(long timestamp) {
+        var request = new SmaxWaffleStateExistsRequest(timestamp);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxWaffleStateExistsResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxWaffleStateExistsResponse.Success success -> Optional.of(success);
+            case SmaxWaffleStateExistsResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Waffle-state-exists rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxWaffleStateExistsResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Waffle-state-exists server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Pings the federated-identity (Waffle) bridge to keep an in-flight
+     * enrolment alive.
+     *
+     * @param encryptionMetadata the non-{@code null} RSA encryption metadata
+     *                           (kept typed because the four-blob envelope
+     *                           is mandatory and meaningful as a unit)
+     * @param timestamp          the request timestamp, in seconds
+     * @param fbid               the non-{@code null} encrypted Facebook id payload
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxWaffleWFPingResponse.Success}, or empty on no-parse
+     * @throws NullPointerException            if any argument is {@code null}
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the request
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxWaffleWFPingRPC",
+            exports = "sendWFPingRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxWaffleWFPingResponse.Success> sendFederatedIdentityPing(SmaxWaffleRsaEncryptionMetadata encryptionMetadata,
+                                                                                 long timestamp, byte[] fbid) {
+        Objects.requireNonNull(encryptionMetadata, "encryptionMetadata cannot be null");
+        Objects.requireNonNull(fbid, "fbid cannot be null");
+        var request = new SmaxWaffleWFPingRequest(encryptionMetadata, timestamp, fbid);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxWaffleWFPingResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxWaffleWFPingResponse.Success success -> Optional.of(success);
+            case SmaxWaffleWFPingResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Waffle-ping rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxWaffleWFPingResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Waffle-ping server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Fetches the federated-identity (Waffle) certificate bundle the
+     * client uses to encrypt subsequent payloads to the Meta-side
+     * bridge.
+     *
+     * @param timestamp                 the request timestamp, in seconds
+     * @param hasPayloadEncCertificates {@code true} to request the payload-encryption certs
+     * @param hasPasswordPem            {@code true} to request the password PEM bundle
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxWaffleGetCertificateResponse.Success}, or empty on no-parse
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the request
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxWaffleGetCertificateRPC",
+            exports = "sendGetCertificateRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxWaffleGetCertificateResponse.Success> fetchFederatedIdentityCertificate(long timestamp,
+                                                                                                 boolean hasPayloadEncCertificates,
+                                                                                                 boolean hasPasswordPem) {
+        var request = new SmaxWaffleGetCertificateRequest(timestamp, hasPayloadEncCertificates, hasPasswordPem);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxWaffleGetCertificateResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxWaffleGetCertificateResponse.Success success -> Optional.of(success);
+            case SmaxWaffleGetCertificateResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Waffle-certificate rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxWaffleGetCertificateResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Waffle-certificate server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Refreshes the access tokens held inside the federated-identity
+     * (Waffle) bridge.
+     *
+     * @param encryptionMetadata the non-{@code null} RSA encryption metadata
+     * @param timestamp          the request timestamp, in seconds
+     * @param fbid               the non-{@code null} encrypted Facebook id payload
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxWaffleRefreshAccessTokensResponse.Success}, or empty on no-parse
+     * @throws NullPointerException            if any argument is {@code null}
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the request
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxWaffleRefreshAccessTokensRPC",
+            exports = "sendRefreshAccessTokensRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxWaffleRefreshAccessTokensResponse.Success> refreshFederatedIdentityAccessTokens(SmaxWaffleRsaEncryptionMetadata encryptionMetadata,
+                                                                                                         long timestamp, byte[] fbid) {
+        Objects.requireNonNull(encryptionMetadata, "encryptionMetadata cannot be null");
+        Objects.requireNonNull(fbid, "fbid cannot be null");
+        var request = new SmaxWaffleRefreshAccessTokensRequest(encryptionMetadata, timestamp, fbid);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxWaffleRefreshAccessTokensResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxWaffleRefreshAccessTokensResponse.Success success -> Optional.of(success);
+            case SmaxWaffleRefreshAccessTokensResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Waffle-refresh-tokens rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxWaffleRefreshAccessTokensResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Waffle-refresh-tokens server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Submits an arbitrary encrypted action payload to the federated-
+     * identity (Waffle) bridge — the generic catch-all RPC for actions
+     * the bridge can perform on the linked Meta account once the
+     * client holds a valid Waffle session.
+     *
+     * @param encryptionMetadata the non-{@code null} RSA encryption metadata
+     * @param timestamp          the request timestamp, in seconds
+     * @param fbid               the non-{@code null} encrypted Facebook id payload
+     * @param action             the non-{@code null} encrypted action payload
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxWaffleEncryptedPayloadRequestResponse.Success}, or empty on no-parse
+     * @throws NullPointerException            if any argument is {@code null}
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the request
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxWaffleEncryptedPayloadRequestRPC",
+            exports = "sendEncryptedPayloadRequestRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxWaffleEncryptedPayloadRequestResponse.Success> sendFederatedIdentityEncryptedPayload(SmaxWaffleRsaEncryptionMetadata encryptionMetadata,
+                                                                                                              long timestamp, byte[] fbid, byte[] action) {
+        Objects.requireNonNull(encryptionMetadata, "encryptionMetadata cannot be null");
+        Objects.requireNonNull(fbid, "fbid cannot be null");
+        Objects.requireNonNull(action, "action cannot be null");
+        var request = new SmaxWaffleEncryptedPayloadRequestRequest(encryptionMetadata, timestamp, fbid, action);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxWaffleEncryptedPayloadRequestResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxWaffleEncryptedPayloadRequestResponse.Success success -> Optional.of(success);
+            case SmaxWaffleEncryptedPayloadRequestResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Waffle-encrypted-payload rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxWaffleEncryptedPayloadRequestResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Waffle-encrypted-payload server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+
+    /**
+     * Mints a WhatsApp Enterprise Authenticated Customer (WAEntAC) user
+     * record after the user has consented to a specific disclosure.
+     *
+     * <p>The final step of the federated-identity (Waffle) → enterprise
+     * enrolment flow: once the user has accepted disclosure
+     * {@code disclosureId} in their preferred locale, the Meta bridge
+     * mints the enterprise customer record so subsequent business
+     * surfaces (catalog, hosted business account, etc.) can address
+     * the linked enterprise account.
+     *
+     * <p>"WAEntAC" is WA's internal acronym for WhatsApp Enterprise
+     * Authenticated Customer; this is the call site that creates one.
+     *
+     * @param encryptionMetadata the non-{@code null} RSA encryption metadata
+     * @param timestamp          the request timestamp, in seconds
+     * @param disclosureId       the accepted disclosure id
+     * @param disclosureVersion  the non-{@code null} accepted disclosure version
+     * @param disclosureLg       the non-{@code null} disclosure language tag
+     * @param disclosureLc       the non-{@code null} disclosure locale tag
+     * @return an {@link Optional} carrying the
+     *         {@link SmaxWaffleGenerateWAEntACUserResponse.Success}, or empty on no-parse
+     * @throws NullPointerException            if any required argument is {@code null}
+     * @throws WhatsAppServerRuntimeException  if the relay rejected the request
+     * @throws WhatsAppSessionException.Closed if the socket is closed
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxWaffleGenerateWAEntACUserRPC",
+            exports = "sendGenerateWAEntACUserRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<SmaxWaffleGenerateWAEntACUserResponse.Success> createEnterpriseAuthenticatedCustomer(SmaxWaffleRsaEncryptionMetadata encryptionMetadata,
+                                                                                                          long timestamp, int disclosureId,
+                                                                                                          String disclosureVersion,
+                                                                                                          String disclosureLg,
+                                                                                                          String disclosureLc) {
+        Objects.requireNonNull(encryptionMetadata, "encryptionMetadata cannot be null");
+        Objects.requireNonNull(disclosureVersion, "disclosureVersion cannot be null");
+        Objects.requireNonNull(disclosureLg, "disclosureLg cannot be null");
+        Objects.requireNonNull(disclosureLc, "disclosureLc cannot be null");
+        var request = new SmaxWaffleGenerateWAEntACUserRequest(encryptionMetadata, timestamp, disclosureId,
+                disclosureVersion, disclosureLg, disclosureLc);
+        var requestNode = request.toNode();
+        var response = sendNode(requestNode);
+        var parsed = SmaxWaffleGenerateWAEntACUserResponse.of(response, requestNode.build()).orElse(null);
+        return switch (parsed) {
+            case null -> Optional.empty();
+            case SmaxWaffleGenerateWAEntACUserResponse.Success success -> Optional.of(success);
+            case SmaxWaffleGenerateWAEntACUserResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("WAEnt-AC-user rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case SmaxWaffleGenerateWAEntACUserResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("WAEnt-AC-user server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        };
+    }
+    // </editor-fold>
 }

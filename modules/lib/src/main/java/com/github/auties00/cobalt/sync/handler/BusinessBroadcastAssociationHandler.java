@@ -14,6 +14,7 @@ import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastAs
 import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastListAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -139,8 +140,8 @@ public final class BusinessBroadcastAssociationHandler implements WebAppStateAct
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBroadcastListSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: WAWebBroadcastListSync.applyMutations
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: WAWebBroadcastListSync.applyMutations
     }
 
     /**
@@ -191,7 +192,7 @@ public final class BusinessBroadcastAssociationHandler implements WebAppStateAct
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBroadcastListSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) { // NO_WA_BASIS: only SET makes sense for an additive participant action
             return MutationApplicationResult.unsupported();
         }

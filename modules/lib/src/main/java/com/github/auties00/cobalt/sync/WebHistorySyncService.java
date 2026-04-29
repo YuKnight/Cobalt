@@ -13,6 +13,7 @@ import com.github.auties00.cobalt.model.media.MediaProvider;
 import com.github.auties00.cobalt.model.message.system.history.HistorySyncNotification;
 import com.github.auties00.cobalt.model.message.system.history.HistorySyncType;
 import com.github.auties00.cobalt.model.sync.history.HistorySync;
+import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.*;
 import com.github.auties00.cobalt.wam.type.*;
 import it.auties.protobuf.stream.ProtobufInputStream;
@@ -76,16 +77,23 @@ public final class WebHistorySyncService {
     private final LidMigrationService lidMigrationService;
 
     /**
+     * The WAM telemetry service used to commit history-sync events.
+     */
+    private final WamService wamService;
+
+    /**
      * Constructs a new service bound to the given client.
      *
      * @param whatsapp            the WhatsApp client
      * @param lidMigrationService the LID migration service that receives the
      *                            decoded chunks
+     * @param wamService          the WAM telemetry service for committing history-sync events
      * @throws NullPointerException if any argument is {@code null}
      */
-    public WebHistorySyncService(WhatsAppClient whatsapp, LidMigrationService lidMigrationService) {
+    public WebHistorySyncService(WhatsAppClient whatsapp, LidMigrationService lidMigrationService, WamService wamService) {
         this.whatsapp = Objects.requireNonNull(whatsapp, "whatsapp cannot be null");
         this.lidMigrationService = Objects.requireNonNull(lidMigrationService, "lidMigrationService cannot be null");
+        this.wamService = Objects.requireNonNull(wamService, "wamService cannot be null");
     }
 
     /**
@@ -316,7 +324,7 @@ public final class WebHistorySyncService {
         // NO_WA_BASIS: WA Web populates mdSessionId via MdSyncFieldStatsMeta.getMdSessionId()
         // which hashes primary + companion identity keys; Cobalt has no equivalent derivation
         // so mdSessionId is omitted, matching the app-state emission in WebAppStateService.
-        whatsapp.wamService().commit(builder.build());
+        wamService.commit(builder.build());
     }
 
     /**
@@ -465,7 +473,7 @@ public final class WebHistorySyncService {
         // which Cobalt has no equivalent for; mdRegAttemptId / applicationState / appContext*
         // / historySyncRetryRequestId / mdBootstrapPayloadThumbnailsSize / mdHsOldestMessageTimestamp
         // are not populated at any WA Web call site of this event, only declared in the spec.
-        whatsapp.wamService().commit(builder.build());
+        wamService.commit(builder.build());
     }
 
     /**
@@ -571,7 +579,7 @@ public final class WebHistorySyncService {
         //   equivalent for; omitted here to match sibling emissions.
         //   historySyncRetryRequestId is declared in the event spec but never
         //   populated at WA Web's call sites of this event.
-        whatsapp.wamService().commit(builder.build());
+        wamService.commit(builder.build());
     }
 
     /**
@@ -661,7 +669,7 @@ public final class WebHistorySyncService {
         //   DataDownloaded emissions. historySyncRetryRequestId and
         //   mdSyncFailureReason are declared in the event spec but never populated
         //   at WA Web's call site of this event, so they remain empty.
-        whatsapp.wamService().commit(builder.build());
+        wamService.commit(builder.build());
     }
 
     /**
@@ -845,7 +853,7 @@ public final class WebHistorySyncService {
         // md-msg-hist flow (WAWebHandleHistorySyncNotification.handleHistorySyncNotification
         // passes type="md-msg-hist" and origin=MESSAGE_HISTORY_SYNC).
         var overallT = Instant.ofEpochMilli(Duration.between(downloadStart, Instant.now()).toMillis());
-        whatsapp.wamService().commit(new MediaDownload2EventBuilder()
+        wamService.commit(new MediaDownload2EventBuilder()
                 .overallMediaType(MediaType.MD_HISTORY_SYNC)
                 .overallMmsVersion(4)
                 .overallDownloadOrigin(DownloadOriginType.MESSAGE_HISTORY_SYNC)
@@ -897,7 +905,7 @@ public final class WebHistorySyncService {
         if (statusCode != null) {
             builder.downloadHttpCode(statusCode);
         }
-        whatsapp.wamService().commit(builder.build());
+        wamService.commit(builder.build());
     }
 
     /**

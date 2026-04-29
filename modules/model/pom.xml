@@ -30,11 +30,6 @@
                             <artifactId>protobuf-serialization-plugin</artifactId>
                             <version>${protoc.version}</version>
                         </annotationProcessorPath>
-                        <annotationProcessorPath>
-                            <groupId>com.github.auties00</groupId>
-                            <artifactId>cobalt-source-meta</artifactId>
-                            <version>${project.version}</version>
-                        </annotationProcessorPath>
                     </annotationProcessorPaths>
                     <compilerArgs>
                         <compilerArg>--enable-preview</compilerArg>
@@ -45,13 +40,6 @@
     </build>
 
     <dependencies>
-        <!-- Source provenance annotations -->
-        <dependency>
-            <groupId>com.github.auties00</groupId>
-            <artifactId>cobalt-source-meta</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-
         <dependency>
             <groupId>com.github.auties00</groupId>
             <artifactId>protobuf-base</artifactId>

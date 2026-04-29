@@ -37,7 +37,7 @@ import java.util.*;
  *
  * <p>{@code ChatMessageInfo} is used for messages in regular chats (one-to-one
  * conversations, groups, and communities). For newsletter messages, see
- * {@link com.github.auties00.cobalt.model.message.MessageInfo} and its other
+ * {@link MessageInfo} and its other
  * permitted implementations.
  *
  * <p>Messages are identified by a {@link MessageKey} containing the chat JID,

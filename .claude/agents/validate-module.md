@@ -114,9 +114,9 @@ import java.util.function.Function;
 public final class <Module>Validate {
     public static void main(String[] args) throws Exception {
         // 1) Read seed session + input.
-        var seed = JSON.parseObject(java.nio.file.Files.readString(
+        var seed = JSON.parseObject(Files.readString(
             java.nio.file.Path.of("validation/captures/<Module>/session.json")));
-        var input = JSON.parseObject(java.nio.file.Files.readString(
+        var input = JSON.parseObject(Files.readString(
             java.nio.file.Path.of("validation/captures/<Module>/input.json")));
 
         // 2) Build an in-memory store seeded from the live session.
@@ -155,11 +155,8 @@ public final class <Module>Validate {
         out.put("stanzas", captured.stream().map(CaptureJson::canonical).toList());
         out.put("wamEvents", WamCapture.drain(client));   // if WAM is in scope
         out.put("http",      HttpCapture.drain(client));  // if HTTP is in scope
-        java.nio.file.Files.writeString(
-            java.nio.file.Path.of("validation/captures/<Module>/cobalt.json"),
-            JSON.toJSONString(out, com.alibaba.fastjson2.JSONWriter.Feature.PrettyFormat));
-    }
-}
+        Files.writeString(
+          
 ```
 
 Points to get right:

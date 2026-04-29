@@ -4,8 +4,8 @@ import com.github.auties00.cobalt.socket.layer.SocketClientLayer;
 import com.github.auties00.cobalt.socket.layer.SocketClientLayerListener;
 import com.github.auties00.cobalt.socket.layer.tunnel.SocketClientTunnelLayer;
 import com.github.auties00.cobalt.socket.threading.SocketClientLayerContext;
-import com.github.auties00.cobalt.client.WhatsAppClientProxy;
-import com.github.auties00.cobalt.client.WhatsAppClientProxyAuthenticator;
+import com.github.auties00.cobalt.proxy.WhatsAppProxy;
+import com.github.auties00.cobalt.proxy.WhatsAppProxyAuthenticator;
 import com.github.auties00.cobalt.util.DataUtils;
 
 import java.io.IOException;
@@ -29,7 +29,7 @@ import java.nio.charset.StandardCharsets;
  * (typically a tunnel security layer or the layer stack assembly code).
  *
  * @apiNote This layer directly depends on
- * {@link WhatsAppClientProxy.Socks} for proxy configuration.  This
+ * {@link WhatsAppProxy.Socks} for proxy configuration.  This
  * coupling is intentional for this project.  If the socket stack is
  * extracted as a standalone library, a generic proxy configuration
  * interface should be introduced to replace the direct dependency.
@@ -71,7 +71,7 @@ public final class SocksSocketClientTunnelLayer implements SocketClientTunnelLay
     /**
      * The SOCKS proxy configuration.
      */
-    private final WhatsAppClientProxy.Socks proxy;
+    private final WhatsAppProxy.Socks proxy;
 
     /**
      * The inner layer that provides raw I/O.
@@ -94,7 +94,7 @@ public final class SocksSocketClientTunnelLayer implements SocketClientTunnelLay
      * @param proxy      the SOCKS proxy configuration
      * @param innerLayer the layer below (typically a transport layer)
      */
-    public SocksSocketClientTunnelLayer(WhatsAppClientProxy.Socks proxy, SocketClientLayer<?> innerLayer) {
+    public SocksSocketClientTunnelLayer(WhatsAppProxy.Socks proxy, SocketClientLayer<?> innerLayer) {
         this.proxy = proxy;
         this.innerLayer = innerLayer;
     }
@@ -126,10 +126,10 @@ public final class SocksSocketClientTunnelLayer implements SocketClientTunnelLay
         innerLayer.registerLayerContext(new CommonSocketTunnelLayerContext());
 
         switch (proxy) {
-            case WhatsAppClientProxy.Socks.V4.Local v4 -> performSocks4Handshake(v4);
-            case WhatsAppClientProxy.Socks.V4.Remote v4a -> performSocks4aHandshake(v4a);
-            case WhatsAppClientProxy.Socks.V5.Local v5 -> performSocks5Handshake(v5);
-            case WhatsAppClientProxy.Socks.V5.Remote v5h -> performSocks5Handshake(v5h);
+            case WhatsAppProxy.Socks.V4.Local v4 -> performSocks4Handshake(v4);
+            case WhatsAppProxy.Socks.V4.Remote v4a -> performSocks4aHandshake(v4a);
+            case WhatsAppProxy.Socks.V5.Local v5 -> performSocks5Handshake(v5);
+            case WhatsAppProxy.Socks.V5.Remote v5h -> performSocks5Handshake(v5h);
         }
     }
 
@@ -142,7 +142,7 @@ public final class SocksSocketClientTunnelLayer implements SocketClientTunnelLay
      * @throws IOException if DNS resolution fails, the host is not IPv4,
      *                     or the proxy rejects the request
      */
-    private void performSocks4Handshake(WhatsAppClientProxy.Socks.V4.Local v4) throws IOException {
+    private void performSocks4Handshake(WhatsAppProxy.Socks.V4.Local v4) throws IOException {
         var address = InetAddress.getByName(host);
         if (!(address instanceof Inet4Address)) {
             throw new IOException("SOCKS4 only supports IPv4 addresses, but resolved " + host + " to " + address.getHostAddress());
@@ -172,7 +172,7 @@ public final class SocksSocketClientTunnelLayer implements SocketClientTunnelLay
      * @param v4a the SOCKS4a proxy configuration
      * @throws IOException if the proxy rejects the request
      */
-    private void performSocks4aHandshake(WhatsAppClientProxy.Socks.V4.Remote v4a) throws IOException {
+    private void performSocks4aHandshake(WhatsAppProxy.Socks.V4.Remote v4a) throws IOException {
         var userIdBytes = v4a.authenticator()
                 .map(auth -> auth.userId().getBytes(StandardCharsets.ISO_8859_1))
                 .orElse(DataUtils.EMPTY_BYTE_ARRAY);
@@ -234,9 +234,9 @@ public final class SocksSocketClientTunnelLayer implements SocketClientTunnelLay
      * Performs the full SOCKS5 handshake: method negotiation, optional
      * authentication sub-negotiation (RFC 1929), and the CONNECT request.
      *
-     * <p>For {@link WhatsAppClientProxy.Socks.V5.Local}, the host is
+     * <p>For {@link WhatsAppProxy.Socks.V5.Local}, the host is
      * resolved locally and sent as an IPv4 or IPv6 address.  For
-     * {@link WhatsAppClientProxy.Socks.V5.Remote}, the domain name is
+     * {@link WhatsAppProxy.Socks.V5.Remote}, the domain name is
      * sent for remote resolution.
      *
      * @param socks the SOCKS5 proxy configuration
@@ -244,7 +244,7 @@ public final class SocksSocketClientTunnelLayer implements SocketClientTunnelLay
      *                     request fails
      */
     @SuppressWarnings("OptionalIsPresent")
-    private void performSocks5Handshake(WhatsAppClientProxy.Socks.V5 socks) throws IOException {
+    private void performSocks5Handshake(WhatsAppProxy.Socks.V5 socks) throws IOException {
         var authenticatorOpt = socks.authenticator();
         var greeting = authenticatorOpt.isPresent()
                 ? new byte[]{SOCKS_VERSION_5, 2, METHOD_NO_AUTH, (byte) (authenticatorOpt.get()).methodId()}
@@ -272,7 +272,7 @@ public final class SocksSocketClientTunnelLayer implements SocketClientTunnelLay
                 throw new IOException("Proxy selected unsupported authentication method: " + chosenMethod);
             }
             switch (authenticator) {
-                case WhatsAppClientProxyAuthenticator.Socks.V5.UserPassword credentials -> {
+                case WhatsAppProxyAuthenticator.Socks.V5.UserPassword credentials -> {
                     var userBytes = credentials.username().getBytes(StandardCharsets.ISO_8859_1);
                     var passBytes = credentials.password().getBytes(StandardCharsets.ISO_8859_1);
 
@@ -300,9 +300,9 @@ public final class SocksSocketClientTunnelLayer implements SocketClientTunnelLay
         }
 
         var connRequest = switch (proxy) {
-            case WhatsAppClientProxy.Socks.V5.Local _ -> buildResolvedConnectRequest();
-            case WhatsAppClientProxy.Socks.V5.Remote _ -> buildDomainConnectRequest();
-            case WhatsAppClientProxy.Socks.V4.Local _, WhatsAppClientProxy.Socks.V4.Remote _ ->
+            case WhatsAppProxy.Socks.V5.Local _ -> buildResolvedConnectRequest();
+            case WhatsAppProxy.Socks.V5.Remote _ -> buildDomainConnectRequest();
+            case WhatsAppProxy.Socks.V4.Local _, WhatsAppProxy.Socks.V4.Remote _ ->
                     throw new AssertionError("SOCKS4/4a should not reach SOCKS5 handshake");
         };
         innerLayer.sendBinary(connRequest);

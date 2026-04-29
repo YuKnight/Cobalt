@@ -18,6 +18,7 @@ import com.github.auties00.cobalt.model.sync.action.contact.UserStatusMuteAction
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -127,8 +128,8 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebContactSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebContactSync.applyMutations
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebContactSync.applyMutations
     }
 
     /**
@@ -157,7 +158,7 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebContactSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         var indexArray = JSON.parseArray(mutation.index()); // WAWebContactSync.applyMutations: var n = t.indexParts
         var contactJidString = indexArray.getString(1); // WAWebContactSync.applyMutations: var a = n[1]
         if (contactJidString == null || contactJidString.isEmpty()) { // WAWebContactSync.applyMutations: if (r("isStringNullOrEmpty")(a))
@@ -211,7 +212,7 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
 
                 // WAWebContactSync.applyMutations: o("WAWebSyncContactsJob").syncNewContact(i)
                 // SKIPPED: debounced background contact sync refresh; not mirrored in Cobalt.
-                retryOrphanStatusMutes(client, contactJidString); // WAWebContactSync.applyMutations: o("WAWebSyncdOrphan").checkOrphanUserStatusMutes(y.map(...))
+                retryOrphanStatusMutes(client, wamService, contactJidString); // WAWebContactSync.applyMutations: o("WAWebSyncdOrphan").checkOrphanUserStatusMutes(y.map(...))
 
                 return MutationApplicationResult.success(); // WAWebContactSync.applyMutations: {actionState: Success}
             }
@@ -324,10 +325,12 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
      *           WA Web catches errors with {@code .catch()} and logs; Cobalt uses
      *           try/catch and logs via java.util.logging.
      * @param client           the WhatsApp client instance
+     * @param wamService       the WAM telemetry service propagated to the
+     *                         orphan handler's per-mutation classification
      * @param contactJidString the JID string of the contact to check orphans for
      */
     @WhatsAppWebExport(moduleName = "WAWebContactSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    private void retryOrphanStatusMutes(WhatsAppClient client, String contactJidString) {
+    private void retryOrphanStatusMutes(WhatsAppClient client, WamService wamService, String contactJidString) {
         // WAWebContactSync.applyMutations: o("WAWebSyncdOrphan").checkOrphanUserStatusMutes(y.map(function(e) { return e.id }))
         try {
             var entries = client.store().findOrphanMutationsByModel(UserStatusMuteAction.COLLECTION_NAME, contactJidString); // WAWebSyncdOrphan.checkOrphanUserStatusMutes -> getSyncActionsByModelInfosInTransaction
@@ -344,7 +347,7 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
                         entry.timestamp(),
                         entry.actionVersion()
                 );
-                var result = UserStatusMuteHandler.INSTANCE.applyMutationResult(client, orphanMutation); // WAWebSyncdOrphan -> WAWebSyncdCollectionHandler.applyIndividualMutations
+                var result = UserStatusMuteHandler.INSTANCE.applyMutationResult(client, wamService, orphanMutation); // WAWebSyncdOrphan -> WAWebSyncdCollectionHandler.applyIndividualMutations
                 if (result.actionState() == SyncActionState.SUCCESS) {
                     applied.add(entry);
                 }

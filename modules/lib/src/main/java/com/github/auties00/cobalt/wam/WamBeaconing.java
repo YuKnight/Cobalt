@@ -1,15 +1,15 @@
 package com.github.auties00.cobalt.wam;
 
-import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.util.DataUtils;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Map;
 import java.util.OptionalInt;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 /**
  * Manages daily-sampled sequence numbers for WAM event beaconing.
@@ -42,7 +42,7 @@ final class WamBeaconing {
      */
     private static final double ACTIVATION_PROBABILITY = 0.01;
 
-    private final Map<String, ChannelState> states;
+    private final ConcurrentMap<String, ChannelState> states;
 
     /**
      * Constructs a new {@code WamBeaconing} instance with no active

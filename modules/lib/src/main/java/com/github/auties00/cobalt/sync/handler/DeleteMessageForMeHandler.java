@@ -14,6 +14,7 @@ import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.model.sync.action.chat.DeleteMessageForMeActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -109,8 +110,8 @@ public final class DeleteMessageForMeHandler implements WebAppStateActionHandler
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDeleteMessageForMeSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebDeleteMessageForMeSync.applyMutations
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebDeleteMessageForMeSync.applyMutations
     }
 
     /**
@@ -136,7 +137,7 @@ public final class DeleteMessageForMeHandler implements WebAppStateActionHandler
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDeleteMessageForMeSync", exports = {"applyMutations", "getMessageKey"}, adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         // WAWebDeleteMessageForMeSync.applyMutations: if (e.operation === "set") { ... } else { return Unsupported }
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported(); // WAWebDeleteMessageForMeSync.applyMutations: b++, {actionState: Unsupported}

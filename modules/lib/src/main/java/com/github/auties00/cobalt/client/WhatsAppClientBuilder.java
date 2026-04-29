@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.client;
 
-import com.github.auties00.cobalt.client.registration.WhatsAppMobileClientRegistration;
+import com.github.auties00.cobalt.proxy.WhatsAppProxy;
+import com.github.auties00.cobalt.registration.MobileClientRegistration;
 import com.github.auties00.cobalt.model.business.profile.BusinessCategory;
 import com.github.auties00.cobalt.model.device.pairing.ClientAppVersion;
 import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
@@ -11,6 +12,7 @@ import java.io.IOException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 /**
  * A fluent builder that constructs {@link WhatsAppClient} instances.
@@ -29,10 +31,6 @@ import java.util.UUID;
  */
 
 public sealed class WhatsAppClientBuilder {
-    /**
-     * The default message preview handler: preview inference is enabled.
-     */
-    private static final WhatsAppClientMessagePreviewHandler DEFAULT_MESSAGE_PREVIEW_HANDLER = WhatsAppClientMessagePreviewHandler.enabled(true);
     /**
      * The default error handler: prints stack traces to stderr.
      */
@@ -469,10 +467,6 @@ public sealed class WhatsAppClientBuilder {
          */
         final WhatsAppStore store;
         /**
-         * The message preview handler installed on the future client.
-         */
-        WhatsAppClientMessagePreviewHandler messagePreviewHandler;
-        /**
          * The error handler installed on the future client.
          */
         WhatsAppClientErrorHandler errorHandler;
@@ -507,7 +501,7 @@ public sealed class WhatsAppClientBuilder {
          * @param proxy the proxy to use, can be null to use no proxy
          * @return the same instance for chaining
          */
-        public Options proxy(WhatsAppClientProxy proxy) {
+        public Options proxy(WhatsAppProxy proxy) {
             store.setProxy(proxy);
             return this;
         }
@@ -545,17 +539,6 @@ public sealed class WhatsAppClientBuilder {
          */
         public Options clientVersion(ClientAppVersion clientVersion) {
             store.setClientVersion(clientVersion);
-            return this;
-        }
-
-        /**
-         * Sets a handler for message previews
-         *
-         * @param messagePreviewHandler the handler to use, can be null
-         * @return the same instance for chaining
-         */
-        public Options messagePreviewHandler(WhatsAppClientMessagePreviewHandler messagePreviewHandler) {
-            this.messagePreviewHandler = messagePreviewHandler;
             return this;
         }
 
@@ -608,7 +591,7 @@ public sealed class WhatsAppClientBuilder {
              * @return the same instance for chaining
              */
             @Override
-            public Web proxy(WhatsAppClientProxy proxy) {
+            public Web proxy(WhatsAppProxy proxy) {
                 return (Web) super.proxy(proxy);
             }
 
@@ -621,17 +604,6 @@ public sealed class WhatsAppClientBuilder {
             @Override
             public Web device(WhatsAppDevice device) {
                 return (Web) super.device(device);
-            }
-
-            /**
-             * Sets a handler for message previews
-             *
-             * @param messagePreviewHandler the handler to use, can be null
-             * @return the same instance for chaining
-             */
-            @Override
-            public Web messagePreviewHandler(WhatsAppClientMessagePreviewHandler messagePreviewHandler) {
-                return (Web) super.messagePreviewHandler(messagePreviewHandler);
             }
 
             /**
@@ -693,9 +665,8 @@ public sealed class WhatsAppClientBuilder {
              */
             public WhatsAppClient unregistered(WhatsAppClientVerificationHandler.Web.QrCode qrHandler) {
                 Objects.requireNonNull(qrHandler, "qrHandler must not be null");
-                var messagePreviewHandler = Objects.requireNonNullElse(this.messagePreviewHandler, DEFAULT_MESSAGE_PREVIEW_HANDLER);
                 var errorHandler = Objects.requireNonNullElse(this.errorHandler, DEFAULT_ERROR_HANDLER);
-                return new WhatsAppClient(store, qrHandler, messagePreviewHandler, errorHandler);
+                return new WhatsAppClient(store, qrHandler, errorHandler);
             }
 
             /**
@@ -709,9 +680,8 @@ public sealed class WhatsAppClientBuilder {
             public WhatsAppClient unregistered(long phoneNumber, WhatsAppClientVerificationHandler.Web.PairingCode pairingCodeHandler) {
                 Objects.requireNonNull(pairingCodeHandler, "pairingCodeHandler must not be null");
                 store.setPhoneNumber(phoneNumber);
-                var messagePreviewHandler = Objects.requireNonNullElse(this.messagePreviewHandler, DEFAULT_MESSAGE_PREVIEW_HANDLER);
                 var errorHandler = Objects.requireNonNullElse(this.errorHandler, DEFAULT_ERROR_HANDLER);
-                return new WhatsAppClient(store, pairingCodeHandler, messagePreviewHandler, errorHandler);
+                return new WhatsAppClient(store, pairingCodeHandler, errorHandler);
             }
 
             /**
@@ -726,9 +696,8 @@ public sealed class WhatsAppClientBuilder {
                     return Optional.empty();
                 }
 
-                var messagePreviewHandler = Objects.requireNonNullElse(this.messagePreviewHandler, DEFAULT_MESSAGE_PREVIEW_HANDLER);
                 var errorHandler = Objects.requireNonNullElse(this.errorHandler, DEFAULT_ERROR_HANDLER);
-                var result = new WhatsAppClient(store, null, messagePreviewHandler, errorHandler);
+                var result = new WhatsAppClient(store, null, errorHandler);
                 return Optional.of(result);
             }
         }
@@ -749,9 +718,38 @@ public sealed class WhatsAppClientBuilder {
              * at most one of {@link WhatsAppDeviceAttestor.Android} or
              * {@link WhatsAppDeviceAttestor.Ios}; {@code null} means "no
              * attestor configured" and the registration falls back to
-             * the concrete subclass's NOOP.
+             * the concrete subclass's {@code EMPTY_ATTESTOR} default.
              */
-            private WhatsAppDeviceAttestor deviceAttestor;
+            private WhatsAppDeviceAttestor attestor;
+
+            /**
+             * Push client captured by
+             * {@link #devicePushClient(WhatsAppDevicePushClient)} —
+             * the caller-owned variant. The builder treats this
+             * instance as borrowed and never closes it. Mutually
+             * exclusive with {@link #pushClientSupplier}: setting
+             * either overload clears the other.
+             *
+             * <p>{@code null} (together with a {@code null}
+             * {@link #pushClientSupplier}) means "no push client
+             * configured" and the registration falls back to
+             * {@link WhatsAppDevicePushClient#noop()}, which emits
+             * empty {@code push_token} and {@code push_code} form
+             * fields.
+             */
+            private WhatsAppDevicePushClient pushClient;
+
+            /**
+             * Push client supplier captured by
+             * {@link #devicePushClient(Supplier)} — the
+             * builder-owned variant. The supplier is invoked exactly
+             * once at registration time and the produced instance is
+             * closed via {@link WhatsAppDevicePushClient#close()}
+             * after the registration ceremony finishes (success or
+             * failure). Mutually exclusive with {@link #pushClient}:
+             * setting either overload clears the other.
+             */
+            private Supplier<WhatsAppDevicePushClient> pushClientSupplier;
 
             /**
              * Tracks whether the caller has explicitly selected the
@@ -782,7 +780,7 @@ public sealed class WhatsAppClientBuilder {
              * @return the same instance for chaining
              */
             @Override
-            public Mobile proxy(WhatsAppClientProxy proxy) {
+            public Mobile proxy(WhatsAppProxy proxy) {
                 store.setProxy(proxy);
                 return this;
             }
@@ -794,22 +792,28 @@ public sealed class WhatsAppClientBuilder {
              * {@link #deviceAttestor}, the new device's platform is
              * validated against the attestor's sealed sub-type and the
              * call raises {@link IllegalArgumentException} on a
+             * mismatch. If a push client has already been attached via
+             * {@link #devicePushClient}, the new device's platform is
+             * also validated against the client's
+             * {@link WhatsAppDevicePushClient#supportedPlatforms()} set and the
+             * call raises {@link IllegalArgumentException} on a
              * mismatch. The builder also flips an internal flag marking
              * the device as explicitly chosen so that a subsequent
-             * {@code deviceAttestor} call can itself perform the
-             * symmetric check.
+             * {@code deviceAttestor} or {@code devicePushClient} call
+             * can itself perform the symmetric check.
              *
              * @param device the companion device, can be null
              * @return the same instance for chaining
-             * @throws IllegalArgumentException if an attestor is already
-             *                                  set and its platform
-             *                                  does not match
-             *                                  {@code device}
+             * @throws IllegalArgumentException if an attestor or push
+             *                                  client is already set
+             *                                  and its platform does
+             *                                  not match {@code device}
              */
             @Override
             public Mobile device(WhatsAppDevice device) {
                 if (device != null) {
-                    requirePlatformMatches(device, deviceAttestor);
+                    requirePlatformMatches(device, attestor);
+                    requirePushClientSupportsDevice(device, pushClient);
                 }
                 store.setDevice(device);
                 this.deviceExplicitlySet = true;
@@ -818,9 +822,9 @@ public sealed class WhatsAppClientBuilder {
 
             /**
              * Sets the device attestor that produces the Play Integrity
-             * or App Attest payloads (and, on Android, the
-             * TEE-backed body signature) embedded into the upcoming
-             * registration requests.
+             * or App Attest payloads (and, on Android, the TEE-backed
+             * body signature and the install source) embedded into the
+             * upcoming registration requests.
              *
              * <p>If {@link #device(WhatsAppDevice)} has already been
              * called explicitly, the attestor's sealed sub-type is
@@ -834,10 +838,10 @@ public sealed class WhatsAppClientBuilder {
              *
              * <p>Passing {@code null} clears the attestor and brings
              * the registration back to the low-trust lane (the concrete
-             * registration subclass's private NOOP attestor).
+             * registration subclass's private {@code EMPTY_ATTESTOR}
+             * default).
              *
-             * @param attestor the device attestor, or {@code null} to
-             *                 clear
+             * @param attestor the device attestor, or {@code null} to clear
              * @return the same instance for chaining
              * @throws IllegalArgumentException if {@code device(...)}
              *                                  was called explicitly
@@ -849,7 +853,102 @@ public sealed class WhatsAppClientBuilder {
                 if (deviceExplicitlySet && attestor != null) {
                     requirePlatformMatches(store.device(), attestor);
                 }
-                this.deviceAttestor = attestor;
+                this.attestor = attestor;
+                return this;
+            }
+
+            /**
+             * Sets the push client that produces the {@code push_token}
+             * advertised on every attested endpoint and the
+             * {@code push_code} echoed back on {@code /v2/code} when a
+             * push-based verification method is in flight.
+             *
+             * <p>The {@code pushClient} instance stays caller-owned:
+             * the builder treats it as a borrowed reference and
+             * never invokes {@link WhatsAppDevicePushClient#close()}
+             * on it. If you want the builder to own the lifecycle
+             * (for example because the client opens a long-lived TLS
+             * connection that should be released as soon as the
+             * registration ceremony finishes), use the
+             * {@link #devicePushClient(Supplier) supplier-based
+             * overload} instead.
+             *
+             * <p>If {@link #device(WhatsAppDevice)} has already been
+             * called explicitly, the push client's
+             * {@link WhatsAppDevicePushClient#supportedPlatforms()}
+             * set is validated against the stored device's platform
+             * and the call raises {@link IllegalArgumentException} on
+             * a mismatch. When the device is still the factory
+             * default the check is deferred to the terminal methods
+             * ({@link #register} and {@link #registered()}), which
+             * catches the case of a push client set against the
+             * defaulted device.
+             *
+             * <p>Passing {@code null} clears the push client and
+             * brings the registration back to the low-trust lane
+             * ({@link WhatsAppDevicePushClient#noop()}, which emits
+             * empty {@code push_token} and {@code push_code} fields).
+             * Calling this overload also clears any supplier
+             * previously installed via
+             * {@link #devicePushClient(Supplier)}.
+             *
+             * @param pushClient the push client, or {@code null} to clear
+             * @return the same instance for chaining
+             * @throws IllegalArgumentException if {@code device(...)}
+             *                                  was called explicitly
+             *                                  and the stored device's
+             *                                  platform is not in
+             *                                  {@code pushClient.supportedPlatforms()}
+             */
+            public Mobile devicePushClient(WhatsAppDevicePushClient pushClient) {
+                if (deviceExplicitlySet && pushClient != null) {
+                    requirePushClientSupportsDevice(store.device(), pushClient);
+                }
+                this.pushClient = pushClient;
+                this.pushClientSupplier = null;
+                return this;
+            }
+
+            /**
+             * Sets a supplier of the push client that produces the
+             * {@code push_token} and {@code push_code} form fields.
+             *
+             * <p>The supplier is invoked exactly once at registration
+             * time, and the produced
+             * {@link WhatsAppDevicePushClient} instance is owned by
+             * the builder: it is closed via
+             * {@link WhatsAppDevicePushClient#close()} after the
+             * registration ceremony completes (success or failure).
+             * Use this overload for clients that open vendor-side
+             * resources (an FCM MCS stream, an APNS courier
+             * connection) so they are torn down promptly. For
+             * caller-managed clients, prefer
+             * {@link #devicePushClient(WhatsAppDevicePushClient)}.
+             *
+             * <p>Because the supplier may carry side effects (opening
+             * a network connection, generating a fresh device
+             * identifier, etc.) it is not invoked here, which means
+             * no immediate {@link WhatsAppDevicePushClient#supportedPlatforms()}
+             * validation is possible. The terminal {@link #register}
+             * resolves the supplier and validates the produced
+             * client's supported platforms before driving the
+             * registration; mismatches surface as
+             * {@link IllegalArgumentException} at that point.
+             *
+             * <p>Passing {@code null} clears any supplier previously
+             * installed and brings the registration back to the
+             * low-trust lane ({@link WhatsAppDevicePushClient#noop()}).
+             * Calling this overload also clears any caller-owned
+             * client previously installed via
+             * {@link #devicePushClient(WhatsAppDevicePushClient)}.
+             *
+             * @param pushClientSupplier the supplier, or {@code null}
+             *                           to clear
+             * @return the same instance for chaining
+             */
+            public Mobile devicePushClient(Supplier<WhatsAppDevicePushClient> pushClientSupplier) {
+                this.pushClientSupplier = pushClientSupplier;
+                this.pushClient = null;
                 return this;
             }
 
@@ -859,8 +958,8 @@ public sealed class WhatsAppClientBuilder {
              * {@link IllegalArgumentException} if they do not agree.
              *
              * <p>Called by the terminal {@link #register} and
-             * {@link #registered()} methods so that a caller that set an
-             * attestor without also picking a matching device (thus
+             * {@link #registered()} methods so that a caller that set
+             * an attestor without also picking a matching device (thus
              * relying on the factory default) still gets a clear error
              * at the point the mismatch matters.
              *
@@ -870,8 +969,40 @@ public sealed class WhatsAppClientBuilder {
              *                                  platform
              */
             private void validateAttestorMatchesDevice() {
-                if (deviceAttestor != null) {
-                    requirePlatformMatches(store.device(), deviceAttestor);
+                if (attestor != null) {
+                    requirePlatformMatches(store.device(), attestor);
+                }
+            }
+
+            /**
+             * Cross-checks the currently stored device against the
+             * eager push client installed via
+             * {@link #devicePushClient(WhatsAppDevicePushClient)} and
+             * raises {@link IllegalArgumentException} if the device's
+             * platform is not in
+             * {@link WhatsAppDevicePushClient#supportedPlatforms()}.
+             *
+             * <p>Called by the terminal {@link #register} and
+             * {@link #registered()} methods so that a caller that set
+             * a push client without also picking a matching device
+             * (thus relying on the factory default) still gets a clear
+             * error at the point the mismatch matters.
+             *
+             * <p>The supplier-based variant installed via
+             * {@link #devicePushClient(Supplier)} is not handled here:
+             * its platform set is unknown until the supplier is
+             * resolved, so {@link #register} performs the equivalent
+             * check after invoking the supplier.
+             *
+             * @throws IllegalArgumentException if the stored push
+             *                                  client does not list
+             *                                  the stored device's
+             *                                  platform in its
+             *                                  supported set
+             */
+            private void validatePushClientMatchesDevice() {
+                if (pushClient != null) {
+                    requirePushClientSupportsDevice(store.device(), pushClient);
                 }
             }
 
@@ -881,7 +1012,7 @@ public sealed class WhatsAppClientBuilder {
              *
              * <p>A {@code null} attestor is always accepted, because
              * registration will fall back to the concrete subclass's
-             * NOOP attestor.
+             * {@code EMPTY_ATTESTOR} default.
              *
              * @param device the device whose platform the attestor must
              *               match; never {@code null}
@@ -911,6 +1042,37 @@ public sealed class WhatsAppClientBuilder {
                                     "iOS attestor requires an iOS device, got platform: " + platform);
                         }
                     }
+                }
+            }
+
+            /**
+             * Validates that {@code device}'s platform appears in
+             * {@code pushClient.supportedPlatforms()}.
+             *
+             * <p>A {@code null} push client is always accepted, because
+             * registration will fall back to
+             * {@link WhatsAppDevicePushClient#noop()}, which accepts every
+             * platform.
+             *
+             * @param device the device whose platform the push client
+             *               must support; never {@code null}
+             * @param pushClient the push client to validate, or
+             *                   {@code null} to skip the check
+             * @throws IllegalArgumentException if the push client does
+             *                                  not list the device's
+             *                                  platform in its
+             *                                  supported set
+             */
+            private static void requirePushClientSupportsDevice(WhatsAppDevice device, WhatsAppDevicePushClient pushClient) {
+                if (pushClient == null) {
+                    return;
+                }
+                var platform = device.platform();
+                var supported = pushClient.supportedPlatforms();
+                if (!supported.contains(platform)) {
+                    throw new IllegalArgumentException(
+                            "Push client does not support device platform: " + platform
+                                    + " (supported: " + supported + ")");
                 }
             }
 
@@ -1062,17 +1224,22 @@ public sealed class WhatsAppClientBuilder {
              *                                  {@link #deviceAttestor}
              *                                  whose platform does not
              *                                  match the configured
-             *                                  device
+             *                                  device, or if a push
+             *                                  client was attached via
+             *                                  {@link #devicePushClient}
+             *                                  that does not support
+             *                                  the configured device's
+             *                                  platform
              */
             public Optional<WhatsAppClient> registered() {
                 validateAttestorMatchesDevice();
+                validatePushClientMatchesDevice();
                 if (!store.registered()) {
                     return Optional.empty();
                 }
 
-                var messagePreviewHandler = Objects.requireNonNullElse(this.messagePreviewHandler, DEFAULT_MESSAGE_PREVIEW_HANDLER);
                 var errorHandler = Objects.requireNonNullElse(this.errorHandler, DEFAULT_ERROR_HANDLER);
-                var result = new WhatsAppClient(store, null, messagePreviewHandler, errorHandler);
+                var result = new WhatsAppClient(store, null, errorHandler);
                 return Optional.of(result);
             }
 
@@ -1089,6 +1256,7 @@ public sealed class WhatsAppClientBuilder {
             public WhatsAppClient register(long phoneNumber, WhatsAppClientVerificationHandler.Mobile verification) {
                 Objects.requireNonNull(verification, "verification must not be null");
                 validateAttestorMatchesDevice();
+                validatePushClientMatchesDevice();
 
                 var oldPhoneNumber = store.phoneNumber();
                 if(oldPhoneNumber.isPresent() && oldPhoneNumber.getAsLong() != phoneNumber) {
@@ -1098,15 +1266,22 @@ public sealed class WhatsAppClientBuilder {
                 }
 
                 if (!store.registered()) {
-                    try(var registration = WhatsAppMobileClientRegistration.of(
-                            store, verification, deviceAttestor)) {
-                        registration.register();
+                    if (pushClientSupplier != null) {
+                        try (var ownedPushClient = pushClientSupplier.get()) {
+                            requirePushClientSupportsDevice(store.device(), ownedPushClient);
+                            try (var registration = MobileClientRegistration.newRegistration(store, verification, attestor, ownedPushClient)) {
+                                registration.register();
+                            }
+                        }
+                    } else {
+                        try (var registration = MobileClientRegistration.newRegistration(store, verification, attestor, pushClient)) {
+                            registration.register();
+                        }
                     }
                 }
 
-                var messagePreviewHandler = Objects.requireNonNullElse(this.messagePreviewHandler, DEFAULT_MESSAGE_PREVIEW_HANDLER);
                 var errorHandler = Objects.requireNonNullElse(this.errorHandler, DEFAULT_ERROR_HANDLER);
-                return new WhatsAppClient(store, null, messagePreviewHandler, errorHandler);
+                return new WhatsAppClient(store, null, errorHandler);
             }
         }
     }
@@ -1128,10 +1303,6 @@ public sealed class WhatsAppClientBuilder {
          * The externally-supplied store.
          */
         private WhatsAppStore store;
-        /**
-         * The message preview handler to install on the built client.
-         */
-        private WhatsAppClientMessagePreviewHandler messagePreviewHandler;
         /**
          * The error handler to install on the built client.
          */
@@ -1185,17 +1356,6 @@ public sealed class WhatsAppClientBuilder {
         }
 
         /**
-         * Sets a message preview handler for the connection
-         *
-         * @param messagePreviewHandler the handler to use, can be null
-         * @return the same instance for chaining
-         */
-        public Custom messagePreviewHandler(WhatsAppClientMessagePreviewHandler messagePreviewHandler) {
-            this.messagePreviewHandler = messagePreviewHandler;
-            return this;
-        }
-
-        /**
          * Builds a WhatsApp instance with the configured parameters
          *
          * @return a non-null WhatsApp instance
@@ -1208,9 +1368,8 @@ public sealed class WhatsAppClientBuilder {
                 case WEB -> Objects.requireNonNullElse(this.webVerificationHandler, DEFAULT_WEB_VERIFICATION_HANDLER);
                 case MOBILE -> null;
             };
-            var messagePreviewHandler = Objects.requireNonNullElse(this.messagePreviewHandler, DEFAULT_MESSAGE_PREVIEW_HANDLER);
             var errorHandler = Objects.requireNonNullElse(this.errorHandler, DEFAULT_ERROR_HANDLER);
-            return new WhatsAppClient(store, webVerificationHandler, messagePreviewHandler, errorHandler);
+            return new WhatsAppClient(store, webVerificationHandler, errorHandler);
         }
     }
 }

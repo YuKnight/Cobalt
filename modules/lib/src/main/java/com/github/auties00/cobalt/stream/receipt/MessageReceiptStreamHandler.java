@@ -17,6 +17,7 @@ import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.stream.SocketStream;
+import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.MdRetryFromUnknownDeviceEventBuilder;
 import com.github.auties00.cobalt.wam.event.ReceiptStanzaReceiveEventBuilder;
 import com.github.auties00.cobalt.wam.type.DeviceType;
@@ -28,6 +29,7 @@ import com.github.auties00.libsignal.state.SignalPreKeyBundleBuilder;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 
@@ -78,15 +80,22 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
     private final MessageService messageService;
 
     /**
+     * The WAM telemetry service used to commit receipt-related events.
+     */
+    private final WamService wamService;
+
+    /**
      * Constructs a new message receipt stream handler.
      *
      * @param whatsapp       the WhatsApp client instance
      * @param messageService the message service for re-sending on retry
+     * @param wamService     the WAM telemetry service for committing receipt events
      * @implNote WAWebHandleMsgReceipt module-level constructor
      */
-    public MessageReceiptStreamHandler(WhatsAppClient whatsapp, MessageService messageService) {
+    public MessageReceiptStreamHandler(WhatsAppClient whatsapp, MessageService messageService, WamService wamService) {
         this.whatsapp = whatsapp;
         this.messageService = messageService;
+        this.wamService = wamService;
     }
 
     /**
@@ -214,7 +223,7 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
         // WAWebCreateReceiptStanzaReceiveMetric: e.markReceiptStanzaDuration();
         // e.commit()
         builder.stopReceiptStanzaDuration();
-        whatsapp.wamService().commit(builder.build());
+        wamService.commit(builder.build());
     }
 
     /**
@@ -536,7 +545,7 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
 
         var sender = participant != null ? participant.toUserJid() : from != null ? from.toUserJid() : null;
         return sender != null
-                && whatsapp.store().jid().map(self -> java.util.Objects.equals(self.toUserJid(), sender)).orElse(false);
+                && whatsapp.store().jid().map(self -> Objects.equals(self.toUserJid(), sender)).orElse(false);
     }
 
     /**
@@ -723,7 +732,7 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
                 ? DeviceType.PRIMARY
                 : DeviceType.COMPANION;
         // WAWebHandleRetryRequest.E: new MdRetryFromUnknownDeviceWamEvent({offline, senderType}).commit()
-        whatsapp.wamService().commit(new MdRetryFromUnknownDeviceEventBuilder()
+        wamService.commit(new MdRetryFromUnknownDeviceEventBuilder()
                 .offline(offline)
                 .senderType(senderType)
                 .build());
@@ -1202,13 +1211,13 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
             return new ReceiptUpdate(List.of(), List.of());
         }
 
-        var current = new java.util.LinkedHashSet<>(whatsapp.store().findReceiptRecords(messageId));
+        var current = new LinkedHashSet<>(whatsapp.store().findReceiptRecords(messageId));
         if (current.isEmpty()) {
             return new ReceiptUpdate(List.of(), List.of());
         }
 
-        var delivered = new java.util.LinkedHashSet<Jid>();
-        var remaining = new java.util.LinkedHashSet<Jid>();
+        var delivered = new LinkedHashSet<Jid>();
+        var remaining = new LinkedHashSet<Jid>();
         for (var device : current) {
             if (sameUser(device, userJid) && (participantDevice == null || Objects.equals(device, participantDevice))) {
                 delivered.add(device);
@@ -1292,7 +1301,7 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
         }
         target.setPendingDeviceJid(List.copyOf(pendingDevices));
         if (!deliveredDevices.isEmpty()) {
-            var mergedDelivered = new java.util.LinkedHashSet<>(target.deliveredDeviceJid());
+            var mergedDelivered = new LinkedHashSet<>(target.deliveredDeviceJid());
             mergedDelivered.addAll(deliveredDevices);
             target.setDeliveredDeviceJid(List.copyOf(mergedDelivered));
         }

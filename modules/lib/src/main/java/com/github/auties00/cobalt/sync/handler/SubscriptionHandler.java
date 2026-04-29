@@ -10,6 +10,7 @@ import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.device.SubscriptionsSyncV2Action;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -140,8 +141,8 @@ public final class SubscriptionHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSubscriptionsSyncV2Sync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebSubscriptionsSyncV2Sync.applyMutations
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebSubscriptionsSyncV2Sync.applyMutations
     }
 
     /**
@@ -193,7 +194,7 @@ public final class SubscriptionHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSubscriptionsSyncV2Sync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         try { // WAWebSubscriptionsSyncV2Sync.applyMutations: try { e: { ... } } catch(e) { return {actionState: Failed} }
             if (mutation.operation() == SyncdOperation.SET) { // WAWebSubscriptionsSyncV2Sync.applyMutations: t.operation === "set" && "value" in t
                 if (!(mutation.value().action().orElse(null) instanceof SubscriptionsSyncV2Action action)) { // WAWebSubscriptionsSyncV2Sync.applyMutations: var l = n.subscriptionsSyncV2Action; if (!l) return malformedActionValue(a.collectionName)
@@ -274,11 +275,11 @@ public final class SubscriptionHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSubscriptionsSyncV2Sync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public List<MutationApplicationResult> applyMutationBatchResults(WhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
+    public List<MutationApplicationResult> applyMutationBatchResults(WhatsAppClient client, WamService wamService, List<DecryptedMutation.Trusted> mutations) {
         var removeCount = 0; // WAWebSubscriptionsSyncV2Sync.applyMutations: var i = 0
         var results = new ArrayList<MutationApplicationResult>(mutations.size()); // WAWebSubscriptionsSyncV2Sync.applyMutations: var l = yield Promise.all(...)
         for (var mutation : mutations) { // ADAPTED: WAWebSubscriptionsSyncV2Sync.applyMutations uses Promise.all(t.map(...)) — virtual-thread blocking loop
-            var result = applyMutationResult(client, mutation); // WAWebSubscriptionsSyncV2Sync.applyMutations: the per-mutation async generator body
+            var result = applyMutationResult(client, wamService, mutation); // WAWebSubscriptionsSyncV2Sync.applyMutations: the per-mutation async generator body
             if (result.actionState() == SyncActionState.SUCCESS && mutation.operation() == SyncdOperation.REMOVE) { // WAWebSubscriptionsSyncV2Sync.applyMutations: i++ inside the REMOVE branch
                 removeCount++;
             }
@@ -308,8 +309,8 @@ public final class SubscriptionHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSubscriptionsSyncV2Sync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public List<Boolean> applyMutationBatch(WhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
-        var detailed = applyMutationBatchResults(client, mutations); // ADAPTED: delegate to detailed-result override so REMOVE counter logging runs once per batch
+    public List<Boolean> applyMutationBatch(WhatsAppClient client, WamService wamService, List<DecryptedMutation.Trusted> mutations) {
+        var detailed = applyMutationBatchResults(client, wamService, mutations); // ADAPTED: delegate to detailed-result override so REMOVE counter logging runs once per batch
         var results = new ArrayList<Boolean>(detailed.size());
         for (var result : detailed) {
             results.add(result.actionState() == SyncActionState.SUCCESS);

@@ -11,6 +11,7 @@ import com.github.auties00.cobalt.model.sync.action.media.AvatarUpdatedAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 /**
  * Handles {@code avatar_updated_action} app-state sync mutations.
@@ -112,8 +113,8 @@ public final class AvatarUpdatedHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebStickersAvatarUpdatedSyncAction", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: collapses Unsupported/Malformed/Skipped to false
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: collapses Unsupported/Malformed/Skipped to false
     }
 
     /**
@@ -131,7 +132,7 @@ public final class AvatarUpdatedHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebStickersAvatarUpdatedSyncAction", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         // WAWebStickersAvatarUpdatedSyncAction.applyMutations:
         //   if (!WAWebAvatarGatingUtils.avatarsOnWebEnabled())
         //     return mutations.map(() => ({actionState: Unsupported}))
@@ -164,15 +165,11 @@ public final class AvatarUpdatedHandler implements WebAppStateActionHandler {
         //     var u = WATimeUtils.castMilliSecondsToUnixTime(e.timestamp)
         //     if (u <= WATimeUtils.castToUnixTime(s)) return skipped++, {actionState: Skipped}
         //   }
-        //
-        // TODO(MISSING_IN_COBALT): WhatsAppStore exposes no pairingTimestamp accessor and
-        // AbstractWhatsAppStore does not persist the WAMdPairingTimestamp UserPrefs key
-        // (WAWebUserPrefsKeys.BACKEND_ONLY_KEYS.PAIRING_TIMESTAMP). Until those are added,
-        // mutations cannot be filtered against the pairing time. WA Web treats a missing
-        // pairing timestamp as "do not skip", so processing all mutations is the same
-        // permissive default; the only behavioral gap is that mutations created strictly
-        // before the local companion was paired are NOT skipped here.
-        // See validation report: pairing-timestamp store accessor required in WhatsAppStore.
+        var pairingTimestamp = client.store().pairingTimestamp().orElse(null);
+        if (pairingTimestamp != null && !mutation.timestamp().isAfter(pairingTimestamp)) {
+            return MutationApplicationResult.skipped();
+        }
+
         // WAWebStickersAvatarUpdatedSyncAction.applyMutations switch (l):
         //   case CREATED: case UPDATED: WAWebHasAvatar.saveHasAvatarOnTempStorage(true); break
         //   case DELETED: WAWebHasAvatar.saveHasAvatarOnTempStorage(false); break
@@ -189,18 +186,7 @@ public final class AvatarUpdatedHandler implements WebAppStateActionHandler {
 
         // WAWebStickersAvatarUpdatedSyncAction.applyMutations:
         //   WAWebRecentStickerCollectionMd.RecentStickerCollectionMd.removeAllRecentAvatarStickers()
-        //
-        // WAWebRecentStickerCollectionMd.removeAllRecentAvatarStickers:
-        //   var e = this.filter(e => e.sticker.isAvatar === true);
-        //   if (e.length === 0) return [];
-        //   return this.removeAndSave(e);
-        //
-        // TODO(MISSING_IN_COBALT): com.github.auties00.cobalt.model.preference.Sticker has
-        // no `isAvatar` flag, so the recent stickers cache cannot distinguish avatar
-        // stickers from regular stickers. Until that field is added, recent avatar stickers
-        // cannot be removed selectively. The behavioral gap is purely visual on the local
-        // recent stickers tray and does not affect protocol correctness.
-        // See validation report: Sticker.isAvatar field + WhatsAppStore.removeAllRecentAvatarStickers required.
+        client.store().removeAllRecentAvatarStickers();
         return MutationApplicationResult.success(); // WAWebStickersAvatarUpdatedSyncAction.applyMutations: {actionState: Success}
     }
 }

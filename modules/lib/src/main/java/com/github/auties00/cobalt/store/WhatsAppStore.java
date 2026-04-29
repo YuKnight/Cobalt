@@ -8,11 +8,13 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.business.BusinessVerifiedName;
 import com.github.auties00.cobalt.model.business.profile.BusinessCategory;
+import com.github.auties00.cobalt.model.call.CallLog;
 import com.github.auties00.cobalt.model.call.CallOffer;
 import com.github.auties00.cobalt.model.chat.*;
 import com.github.auties00.cobalt.model.contact.Contact;
 import com.github.auties00.cobalt.model.contact.ContactTextStatus;
 import com.github.auties00.cobalt.model.contact.OutContact;
+import com.github.auties00.cobalt.model.device.DeviceCapabilities;
 import com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentity;
 import com.github.auties00.cobalt.model.device.info.DeviceList;
 import com.github.auties00.cobalt.model.device.pairing.ClientAppVersion;
@@ -38,6 +40,7 @@ import com.github.auties00.cobalt.model.sync.*;
 import com.github.auties00.cobalt.model.sync.action.bot.MaibaAIFeaturesControlAction;
 import com.github.auties00.cobalt.model.sync.action.chat.InteractiveMessageAction;
 import com.github.auties00.cobalt.model.sync.action.media.NoteEditAction;
+import com.github.auties00.cobalt.proxy.WhatsAppProxy;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastCampaignAction;
 import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastInsightsAction;
@@ -94,8 +97,8 @@ import java.util.*;
  *   <li>{@code initializeWithoutGKs}: WA Web's per-table {@code addTable()}
  *       fan-out plus {@code WAWebModelStorageUtils.createStorage(...)}
  *       and {@code .initialize()} are replaced by the
- *       {@link WhatsAppStoreFactory#create(com.github.auties00.cobalt.client.WhatsAppClientType, java.util.UUID)
- *       create} / {@link WhatsAppStoreFactory#load(com.github.auties00.cobalt.client.WhatsAppClientType, java.util.UUID)
+ *       {@link WhatsAppStoreFactory#create(WhatsAppClientType, UUID)
+ *       create} / {@link WhatsAppStoreFactory#load(WhatsAppClientType, UUID)
  *       load} factory entry points invoked by the {@code WhatsAppClient}
  *       constructor. Cobalt has no schema-rollout step because every WA
  *       Web {@code WAWebSchema*} table maps to a {@code ConcurrentHashMap}
@@ -1602,7 +1605,7 @@ public interface WhatsAppStore extends SignalProtocolStore {
      *
      * @param threshold the cutoff instant; keys with timestamps at or
      *                  before this value have their timestamp set to
-     *                  {@link java.time.Instant#EPOCH}
+     *                  {@link Instant#EPOCH}
      * @implNote NO_WA_BASIS — phantom helper, not invoked anywhere in
      *           the current codebase.
      */
@@ -1624,7 +1627,7 @@ public interface WhatsAppStore extends SignalProtocolStore {
      *
      * <p>This is a soft-mark expiration, NOT a deletion — keys remain
      * in the store but their timestamp is reset to
-     * {@link java.time.Instant#EPOCH} so subsequent freshness checks
+     * {@link Instant#EPOCH} so subsequent freshness checks
      * treat them as expired.
      *
      * @param epoch the sync key epoch whose keys should be expired
@@ -1823,7 +1826,7 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * {@code bulkGetMissingKeysInTransaction}: that JS export accepts a list
      * of {@code keyHex} strings and returns the matching rows out of the
      * {@code missing-keys} table; Cobalt instead takes the raw key bytes and
-     * encodes them with {@link java.util.HexFormat} to obtain the same
+     * encodes them with {@link HexFormat} to obtain the same
      * {@code keyHex} primary key.
      *
      * @param keyId the raw key identifier bytes to look up
@@ -2588,7 +2591,7 @@ public interface WhatsAppStore extends SignalProtocolStore {
      *
      * @return an {@code Optional} containing the proxy, or empty if not configured
      */
-    Optional<WhatsAppClientProxy> proxy();
+    Optional<WhatsAppProxy> proxy();
 
     /**
      * Sets the proxy for network connections.
@@ -2596,7 +2599,7 @@ public interface WhatsAppStore extends SignalProtocolStore {
      * @param proxy the proxy, may be {@code null} to disable proxy
      * @return this store instance for method chaining
      */
-    WhatsAppStore setProxy(WhatsAppClientProxy proxy);
+    WhatsAppStore setProxy(WhatsAppProxy proxy);
 
     /**
      * Blocks until a media connection is available.
@@ -2808,14 +2811,14 @@ public interface WhatsAppStore extends SignalProtocolStore {
 
     WhatsAppStore setNuxStates(Map<String, Boolean> states);
 
-    Optional<com.github.auties00.cobalt.model.device.DeviceCapabilities> primaryDeviceCapabilities();
+    Optional<DeviceCapabilities> primaryDeviceCapabilities();
 
-    WhatsAppStore setPrimaryDeviceCapabilities(com.github.auties00.cobalt.model.device.DeviceCapabilities capabilities);
+    WhatsAppStore setPrimaryDeviceCapabilities(DeviceCapabilities capabilities);
 
-    Map<String, com.github.auties00.cobalt.model.device.DeviceCapabilities> deviceCapabilitiesStates();
+    Map<String, DeviceCapabilities> deviceCapabilitiesStates();
 
     WhatsAppStore setDeviceCapabilitiesStates(
-            Map<String, com.github.auties00.cobalt.model.device.DeviceCapabilities> states
+            Map<String, DeviceCapabilities> states
     );
 
     Map<String, InteractiveMessageAction> interactiveMessageStates();
@@ -2836,9 +2839,9 @@ public interface WhatsAppStore extends SignalProtocolStore {
 
     WhatsAppStore setHasAvatar(Boolean hasAvatar);
 
-    Map<String, com.github.auties00.cobalt.model.call.CallLog> callLogStates();
+    Map<String, CallLog> callLogStates();
 
-    WhatsAppStore setCallLogStates(Map<String, com.github.auties00.cobalt.model.call.CallLog> states);
+    WhatsAppStore setCallLogStates(Map<String, CallLog> states);
 
     Map<String, Boolean> botWelcomeRequestStates();
 

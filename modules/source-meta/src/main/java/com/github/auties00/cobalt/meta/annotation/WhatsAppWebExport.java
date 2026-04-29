@@ -19,7 +19,7 @@ import java.lang.annotation.*;
  * public Optional<IcdcResult> compute(Jid userJid) { ... }
  * }</pre>
  */
-@Target({ElementType.METHOD, ElementType.CONSTRUCTOR, ElementType.FIELD})
+@Target({ElementType.METHOD, ElementType.CONSTRUCTOR, ElementType.FIELD, ElementType.TYPE})
 @Retention(RetentionPolicy.SOURCE)
 @Repeatable(WhatsAppWebExports.class)
 @Documented

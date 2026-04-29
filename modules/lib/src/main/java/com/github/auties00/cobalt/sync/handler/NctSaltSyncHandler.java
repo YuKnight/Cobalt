@@ -10,6 +10,7 @@ import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.setting.NctSaltSyncAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 import java.util.logging.Logger;
 
@@ -35,7 +36,7 @@ public final class NctSaltSyncHandler implements WebAppStateActionHandler {
      * Logger for this handler.
      *
      * @implNote ADAPTED: WAWebNctSaltSync uses {@code WALogger}; Cobalt uses
-     *           {@link java.util.logging.Logger}
+     *           {@link Logger}
      */
     private static final Logger LOGGER = Logger.getLogger(NctSaltSyncHandler.class.getName()); // ADAPTED: WAWebNctSaltSync — WALogger
 
@@ -116,8 +117,8 @@ public final class NctSaltSyncHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebNctSaltSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebNctSaltSync.applyMutations: countWhere(i, e => e.actionState === Success)
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebNctSaltSync.applyMutations: countWhere(i, e => e.actionState === Success)
     }
 
     /**
@@ -151,7 +152,7 @@ public final class NctSaltSyncHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebNctSaltSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.DIRECT)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         // WAWebNctSaltSync.$NctSaltSync$p_1: if (e.operation === "remove")
         if (mutation.operation() == SyncdOperation.REMOVE) {
             LOGGER.fine("[nct-salt-sync] Removing stored NCT salt"); // WAWebNctSaltSync.$NctSaltSync$p_1: WALogger.LOG("[nct-salt-sync] Removing stored NCT salt")

@@ -14,6 +14,7 @@ import com.github.auties00.cobalt.model.sync.action.chat.InteractiveMessageActio
 import com.github.auties00.cobalt.model.sync.action.chat.InteractiveMessageActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -110,8 +111,8 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebInteractiveMessageSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebInteractiveMessageSync.applyMutations
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebInteractiveMessageSync.applyMutations
     }
 
     /**
@@ -161,7 +162,7 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebInteractiveMessageSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         try {
             // WAWebInteractiveMessageSync.applyMutations: if (e.operation === "set") { ... } return b++, {actionState: Unsupported}
             if (mutation.operation() != SyncdOperation.SET) {

@@ -100,7 +100,7 @@ public final class UsyncDeviceProtocol implements UsyncProtocol {
                     var out = new ArrayList<DeviceResult.Device>();
                     list.streamChildren("device").forEach(d -> {
                         int id = d.getRequiredAttributeAsInt("id");
-                        var ki = d.getAttributeAsInt("key-index").stream().boxed().findFirst().orElse(null);
+                        var ki = d.getAttributeAsInt("key-index", null);
                         var hosted = d.getAttributeAsBool("is_hosted", false);
                         out.add(new DeviceResult.Device(id, ki, hosted));
                     });

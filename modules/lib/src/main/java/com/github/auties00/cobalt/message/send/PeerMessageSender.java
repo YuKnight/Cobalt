@@ -13,6 +13,7 @@ import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.MessageContainerSpec;
 import com.github.auties00.cobalt.node.NodeBuilder;
+import com.github.auties00.cobalt.wam.WamService;
 
 import java.util.List;
 import java.util.Objects;
@@ -73,6 +74,7 @@ final class PeerMessageSender extends MessageSender<ChatMessageInfo> {
      * @param client        the WhatsApp client for sending stanzas
      * @param encryption    the message encryption service
      * @param deviceService the device service for session management
+     * @param wamService    the WAM telemetry service inherited by the base sender
      *
      * @implNote ADAPTED: WAWebSendAppStateSyncMsgJob uses module-level
      * imports; Cobalt uses constructor-based DI instead.
@@ -82,9 +84,10 @@ final class PeerMessageSender extends MessageSender<ChatMessageInfo> {
     PeerMessageSender(
             WhatsAppClient client,
             MessageEncryption encryption,
-            DeviceService deviceService
+            DeviceService deviceService,
+            WamService wamService
     ) {
-        super(client);
+        super(client, wamService);
         this.encryption = Objects.requireNonNull(encryption, "encryption");
         this.deviceService = Objects.requireNonNull(deviceService, "deviceService");
     }

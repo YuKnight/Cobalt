@@ -1,11 +1,14 @@
 package com.github.auties00.cobalt.stream.notification.business;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.business.profile.BusinessProfile;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.stream.SocketStream;
+
+import java.util.HashMap;
 
 /**
  * Handles incoming business notification stanzas from WhatsApp.
@@ -17,6 +20,7 @@ import com.github.auties00.cobalt.stream.SocketStream;
  *
  * @implNote WAWebHandleBusinessNotification (module-level handler)
  */
+@WhatsAppWebModule(moduleName = "WAWebHandleBusinessNotification")
 public final class NotificationBusinessStreamHandler implements SocketStream.Handler {
 
     /**
@@ -484,7 +488,7 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
     private void handleSubscriptions(Node node) {
         // WAWebParseSubscriptionNotification.parseSubscriptionsAndFeatureFlags:
         // feature_flags are a direct child of the notification, not of the subscriptions child
-        var flags = new java.util.HashMap<>(whatsapp.store().businessFeatureFlags());
+        var flags = new HashMap<>(whatsapp.store().businessFeatureFlags());
         node.getChild("feature_flags").ifPresent(featureFlagsNode -> {
             // WAWebParseSubscriptionNotification: o.forEachChildWithTag("feature_flag", ...)
             featureFlagsNode.getChildren("feature_flag").forEach(featureFlag -> {
@@ -497,9 +501,9 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
         });
 
         // WAWebParseSubscriptionNotification: i.forEachChildWithTag("subscription", ...)
-        var statuses = new java.util.HashMap<>(whatsapp.store().businessSubscriptionStatuses());
-        var expirations = new java.util.HashMap<>(whatsapp.store().businessSubscriptionExpirations());
-        var creationTimes = new java.util.HashMap<>(whatsapp.store().businessSubscriptionCreationTimes());
+        var statuses = new HashMap<>(whatsapp.store().businessSubscriptionStatuses());
+        var expirations = new HashMap<>(whatsapp.store().businessSubscriptionExpirations());
+        var creationTimes = new HashMap<>(whatsapp.store().businessSubscriptionCreationTimes());
         node.getChild("subscriptions").ifPresent(subscriptionsNode -> {
             subscriptionsNode.getChildren("subscription").forEach(subscription -> {
                 var id = subscription.getAttributeAsString("id", null);
@@ -629,7 +633,7 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
         // ADAPTED: WA Web emits to marketingCampaignNotificationEmitter with
         // adCreativeId, adGroupId, adId, status, timestamp, backgroundSendHandling=false.
         // Cobalt stores the campaign status in the store.
-        var statuses = new java.util.HashMap<>(whatsapp.store().businessCampaignStatuses());
+        var statuses = new HashMap<>(whatsapp.store().businessCampaignStatuses());
         if (status != null) {
             statuses.put(adCreativeId, status);
             whatsapp.store().setBusinessCampaignStatuses(statuses);

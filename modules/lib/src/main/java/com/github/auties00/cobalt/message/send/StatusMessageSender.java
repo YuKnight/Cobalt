@@ -24,6 +24,7 @@ import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
 import com.github.auties00.cobalt.model.privacy.PrivacySettingType;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
+import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.PrekeysDepletionEventBuilder;
 import com.github.auties00.cobalt.wam.type.MessageType;
 import com.github.auties00.cobalt.wam.type.PrekeysFetchContext;
@@ -106,6 +107,7 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
      * @param senderKeyDistribution the sender-key distribution service
      * @param metaStanza            the meta stanza builder
      * @param reportingStanza       the reporting stanza builder
+     * @param wamService            the WAM telemetry service for committing send events
      *
      * @implNote ADAPTED: WAWebEncryptAndSendStatusMsg uses module-level
      * imports; Cobalt uses constructor-based DI instead.
@@ -118,9 +120,10 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
             DeviceService deviceService,
             SenderKeyDistribution senderKeyDistribution,
             MetaStanza metaStanza,
-            ReportingStanza reportingStanza
+            ReportingStanza reportingStanza,
+            WamService wamService
     ) {
-        super(client);
+        super(client, wamService);
         this.encryption = Objects.requireNonNull(encryption, "encryption");
         this.deviceService = Objects.requireNonNull(deviceService, "deviceService");
         this.senderKeyDistribution = Objects.requireNonNull(senderKeyDistribution, "senderKeyDistribution");
@@ -514,7 +517,7 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
         var bucket = deviceCount == null ? null : WamSizeBuckets.numberToSizeBucket(deviceCount);
         // WAWebPostPrekeysDepletionMetric.maybePostPrekeysDepletionMetric: for (var e=0;e<t;e++) commit()
         for (var i = 0; i < depletedPrekeyCount; i++) {
-            client.wamService().commit(new PrekeysDepletionEventBuilder()
+            wamService.commit(new PrekeysDepletionEventBuilder()
                     .prekeysFetchReason(PrekeysFetchContext.SEND_MESSAGE)
                     .messageType(messageType)
                     .deviceSizeBucket(bucket)

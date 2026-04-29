@@ -18,6 +18,7 @@ import com.github.auties00.cobalt.model.sync.action.chat.DeleteChatAction;
 import com.github.auties00.cobalt.model.sync.action.chat.DeleteChatActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 import java.time.Instant;
 import java.util.List;
@@ -119,8 +120,8 @@ public final class DeleteChatHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDeleteChatSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebDeleteChatSync.applyMutations
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebDeleteChatSync.applyMutations
     }
 
     /**
@@ -152,7 +153,7 @@ public final class DeleteChatHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDeleteChatSync", exports = {"applyMutations", "getMessageRange", "$DeleteChatSync$p_1", "deleteChat"}, adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) { // WAWebDeleteChatSync.applyMutations: e.operation === "set" check, else return Unsupported
             return MutationApplicationResult.unsupported(); // WAWebDeleteChatSync.applyMutations: l++, {actionState: Unsupported}
         }
@@ -334,7 +335,7 @@ public final class DeleteChatHandler implements WebAppStateActionHandler {
      * IndexedDB concern). The WAM telemetry commit
      * ({@code MdSyncdDogfoodingFeatureUsageWamEvent}) is performed at the caller
      * ({@code WhatsAppClient.deleteChat}) since this method has no
-     * {@link com.github.auties00.cobalt.wam.WamService} handle.
+     * {@link WamService} handle.
      *
      * @implNote WAWebDeleteChatSync.getDeleteChatMutation,
      *           WAWebDeleteChatSync.buildDeleteChatMutation,

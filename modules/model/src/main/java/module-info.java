@@ -1,5 +1,4 @@
 module com.github.auties00.cobalt.model {
-    requires static com.github.auties00.cobalt.meta;
     requires it.auties.protobuf.base;
     requires com.github.auties00.collections;
     requires com.github.auties00.libsignal;
@@ -77,4 +76,9 @@ module com.github.auties00.cobalt.model {
     exports com.github.auties00.cobalt.model.sync.action.setting;
     exports com.github.auties00.cobalt.model.sync.data;
     exports com.github.auties00.cobalt.model.sync.history;
+    exports com.github.auties00.cobalt.model.business.cart;
+    exports com.github.auties00.cobalt.model.business.order;
+    exports com.github.auties00.cobalt.model.business.ctwa;
+    exports com.github.auties00.cobalt.model.business.compliance;
+    exports com.github.auties00.cobalt.model.business.postcode;
 }

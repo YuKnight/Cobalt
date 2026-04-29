@@ -7,6 +7,7 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
+import com.github.auties00.cobalt.model.sync.SyncActionMessageRange;
 import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
@@ -15,6 +16,7 @@ import com.github.auties00.cobalt.model.sync.action.chat.LockChatAction;
 import com.github.auties00.cobalt.model.sync.action.chat.LockChatActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -125,8 +127,8 @@ public final class LockChatHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebLockChatSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebLockChatSync.applyMutations
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebLockChatSync.applyMutations
     }
 
     /**
@@ -174,7 +176,7 @@ public final class LockChatHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebLockChatSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) { // WAWebLockChatSync.applyMutations: if (e.operation !== "set") return {actionState: Unsupported}
             return MutationApplicationResult.unsupported(); // WAWebLockChatSync.applyMutations: l++, {actionState: SyncActionState.Unsupported}
         }
@@ -313,7 +315,7 @@ public final class LockChatHandler implements WebAppStateActionHandler {
             Instant timestamp,
             boolean locked,
             Jid chatJid,
-            com.github.auties00.cobalt.model.sync.SyncActionMessageRange messageRange
+            SyncActionMessageRange messageRange
     ) {
         var mutations = new ArrayList<SyncPendingMutation>(); // WAWebLockChatSync.sendLockMutation: var l = []
         if (locked) { // WAWebLockChatSync.sendLockMutation: if (a) l.push(...)

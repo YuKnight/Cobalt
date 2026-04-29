@@ -1,0 +1,220 @@
+package com.github.auties00.cobalt.registration.push.apns;
+
+import com.github.auties00.cobalt.registration.push.apns.activation.ApnsActivationCrypto;
+import com.github.auties00.cobalt.registration.push.apns.activation.ApnsActivationInfo;
+import com.github.auties00.cobalt.registration.push.apns.plist.Plist;
+import com.github.auties00.cobalt.registration.push.apns.plist.value.PlistDictionaryValue;
+
+import java.io.IOException;
+import java.lang.System.Logger;
+import java.lang.System.Logger.Level;
+import java.net.InetSocketAddress;
+import java.net.ProxySelector;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.Base64;
+import java.util.UUID;
+import java.util.regex.Pattern;
+
+/**
+ * Drives the FairPlay-signed device activation handshake against
+ * {@code albert.apple.com}, mutating an {@link ApnsSession} in place
+ * with the RSA keypair and Apple-signed device certificate it
+ * acquires.
+ *
+ * <p>The handshake is the same flow a freshly-flashed iOS device
+ * performs on first boot:
+ * <ol>
+ *   <li>generate a 2048-bit RSA keypair via
+ *       {@link ApnsActivationCrypto#newRsaKeyPair()};</li>
+ *   <li>encode a PKCS#10 CSR for that keypair and wrap it in an
+ *       {@code ActivationInfo} plist;</li>
+ *   <li>sign the plist bytes with the leaked FairPlay private key;</li>
+ *   <li>POST the signed bundle to
+ *       {@code albert.apple.com/.../deviceActivation};</li>
+ *   <li>extract the {@code DeviceCertificate} from the
+ *       {@code <Protocol>} block of the response.</li>
+ * </ol>
+ *
+ * <p>The resulting cert is valid for ~3 years; subsequent runs
+ * restore the saved cert plus keypair via
+ * {@link ApnsClient#loadSession(ApnsSession)} and skip the round-trip
+ * entirely.
+ */
+final class ApnsActivation {
+    /**
+     * Logger shared with the rest of the APNS client — same logger
+     * name {@code cobalt.apns} so consumers can configure verbosity
+     * uniformly.
+     */
+    private static final Logger LOG = System.getLogger("cobalt.apns");
+
+    /**
+     * Endpoint that signs the device CSR. Must be hit over HTTPS;
+     * the response is a plist whose {@code <Protocol>} element holds
+     * the signed device certificate.
+     */
+    private static final String ACTIVATION_URL = "https://albert.apple.com/WebObjects/ALUnbrick.woa/wa/deviceActivation";
+
+    /**
+     * Regex that pulls the inner {@code <Protocol>} plist out of the
+     * activation response. Uses {@link Pattern#MULTILINE} because
+     * Apple wraps the inner blob between literal {@code <Protocol>}
+     * markers without surrounding whitespace, so anchoring to the
+     * line start is unsafe.
+     */
+    private static final Pattern PROTOCOL_PATTERN = Pattern.compile(
+            "<Protocol>([^*]+)</Protocol>", Pattern.MULTILINE);
+
+    /**
+     * Connect / request timeout applied to the activation HTTP call.
+     */
+    private static final Duration HTTP_TIMEOUT = Duration.ofSeconds(30);
+
+    /**
+     * Hard-coded FairPlay certificate chain leaked from a real iOS
+     * device. {@code albert.apple.com} validates the activation
+     * request against this chain and the {@code FairPlaySignature}
+     * signed by {@link ApnsActivationCrypto#signActivationInfo(byte[])}.
+     */
+    private static final byte[] FAIRPLAY_CERT_CHAIN = Base64.getDecoder().decode(
+            "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");
+
+    /**
+     * HTTP client used for the single activation POST. Built once
+     * with the configured proxy and reused if {@link #activate} is
+     * called repeatedly.
+     */
+    private final HttpClient http;
+
+    /**
+     * Constructs a new activation helper bound to the given proxy.
+     *
+     * @param proxy proxy URI ({@code http(s)://...},
+     *              {@code socks://...}), or {@code null} to dial
+     *              {@code albert.apple.com} directly
+     */
+    ApnsActivation(URI proxy) {
+        this.http = newHttpClient(proxy);
+    }
+
+    /**
+     * Runs the activation handshake unless {@code session} is already
+     * fully populated. On success the session carries a fresh RSA
+     * keypair and the Apple-signed device certificate.
+     *
+     * @param session the session to mutate
+     * @throws IOException on any HTTP failure or if the response is
+     *                     missing the {@code <Protocol>} block
+     */
+    void activate(ApnsSession session) throws IOException {
+        if (session.deviceCertificate().length > 0
+                && session.privateKeyDer().length > 0
+                && session.publicKeyDer().length > 0) {
+            return;
+        }
+        LOG.log(Level.INFO, () -> "APNS activation -> " + ACTIVATION_URL);
+        var keyPair = ApnsActivationCrypto.newRsaKeyPair();
+        var csr = ApnsActivationCrypto.generateCsr(keyPair);
+        var activationXml = buildActivationInfoXml(csr);
+        var signature = ApnsActivationCrypto.signActivationInfo(activationXml);
+        var body = buildOuterActivationBody(activationXml, signature);
+
+        var request = HttpRequest.newBuilder()
+                .uri(URI.create(ACTIVATION_URL))
+                .timeout(HTTP_TIMEOUT)
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .POST(HttpRequest.BodyPublishers.ofString(
+                        "device=Windows&activation-info="
+                                + URLEncoder.encode(body, StandardCharsets.UTF_8)))
+                .build();
+        try {
+            var response = http.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            if (response.statusCode() / 100 != 2) {
+                throw new IOException("APNS activation HTTP " + response.statusCode() + ": " + response.body());
+            }
+            var matcher = PROTOCOL_PATTERN.matcher(response.body());
+            if (!matcher.find()) {
+                throw new IOException("activation response missing <Protocol> block: " + response.body());
+            }
+            var protocol = matcher.group(1).getBytes(StandardCharsets.UTF_8);
+            var info = ApnsActivationInfo.ofPlist(protocol);
+            session.setPrivateKeyDer(keyPair.getPrivate().getEncoded());
+            session.setPublicKeyDer(keyPair.getPublic().getEncoded());
+            session.setDeviceCertificate(info.deviceCertificate());
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            throw new IOException("APNS activation interrupted", ie);
+        }
+    }
+
+    /**
+     * Builds the inner plist describing the device, signed and
+     * embedded in the outer activation request. Returned as UTF-8
+     * bytes because Apple computes the FairPlay signature over the
+     * exact byte sequence we later embed verbatim in the outer body.
+     *
+     * @param csr the PEM-encoded CSR returned by
+     *            {@link ApnsActivationCrypto#generateCsr}
+     * @return the UTF-8 plist bytes
+     */
+    private static byte[] buildActivationInfoXml(byte[] csr) {
+        var dict = PlistDictionaryValue.builder()
+                .put("ActivationRandomness", UUID.randomUUID().toString())
+                .put("ActivationState", "Unactivated")
+                .put("BuildVersion", "10.6.4")
+                .put("DeviceCertRequest", csr)
+                .put("DeviceClass", "Windows")
+                .put("ProductType", "windows1,1")
+                .put("ProductVersion", "10.6.4")
+                .put("SerialNumber", "WindowSerial")
+                .put("UniqueDeviceID", UUID.randomUUID().toString())
+                .build();
+        return Plist.writeXml(dict);
+    }
+
+    /**
+     * Wraps the inner activation plist plus its FairPlay signature in
+     * the outer plist {@code albert.apple.com} expects as the request
+     * body.
+     *
+     * @param activationXml the inner plist bytes
+     * @param signature     the SHA-1-RSA FairPlay signature over
+     *                      {@code activationXml}
+     * @return the XML plist string for the request body
+     */
+    private static String buildOuterActivationBody(byte[] activationXml, byte[] signature) {
+        var dict = PlistDictionaryValue.builder()
+                .put("ActivationInfoComplete", true)
+                .put("ActivationInfoXML", activationXml)
+                .put("FairPlayCertChain", FAIRPLAY_CERT_CHAIN)
+                .put("FairPlaySignature", signature)
+                .build();
+        return new String(Plist.writeXml(dict), StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Builds an {@link HttpClient} configured with
+     * {@link #HTTP_TIMEOUT} and the optional caller-supplied proxy.
+     * The default proxy port falls back to {@code 8080} when
+     * {@code proxy.getPort()} returns {@code -1}.
+     *
+     * @param proxy proxy URI, or {@code null} for direct
+     * @return a configured HTTP client
+     */
+    private static HttpClient newHttpClient(URI proxy) {
+        var builder = HttpClient.newBuilder()
+                .connectTimeout(HTTP_TIMEOUT)
+                .followRedirects(HttpClient.Redirect.NORMAL);
+        if (proxy != null && proxy.getHost() != null) {
+            var port = proxy.getPort() == -1 ? 8080 : proxy.getPort();
+            builder.proxy(ProxySelector.of(new InetSocketAddress(proxy.getHost(), port)));
+        }
+        return builder.build();
+    }
+}

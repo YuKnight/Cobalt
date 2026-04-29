@@ -366,7 +366,7 @@ public final class SyncKeyUtils {
      * @param keys the available sync keys
      * @return the newest key, or {@code null} if none exist
      * @implNote WAWebSyncdKeyManagement.getNewestKeyPair (function h) —
-     *           helper extracted so both {@link com.github.auties00.cobalt.sync.key.SyncKeyRotationService#getNewestKeyPair()}
+     *           helper extracted so both {@link SyncKeyRotationService#getNewestKeyPair()}
      *           and the upload path ({@code MutationRequestBuilder.buildPatchProtobuf})
      *           share identical max-epoch / min-deviceId selection semantics.
      */

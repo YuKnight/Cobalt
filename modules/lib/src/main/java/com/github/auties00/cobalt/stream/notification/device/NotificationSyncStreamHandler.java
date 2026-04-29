@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.stream.notification.device;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.jid.JidServer;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.node.Node;
@@ -30,6 +31,7 @@ import java.util.stream.Collectors;
  * @implNote WAWebHandleServerSyncNotification.handleServerSyncNotification (f),
  *           WAWebHandleServerSyncNotification._ (helper)
  */
+@WhatsAppWebModule(moduleName = "WAWebHandleServerSyncNotification")
 public final class NotificationSyncStreamHandler implements SocketStream.Handler {
     /**
      * Logger for this handler.

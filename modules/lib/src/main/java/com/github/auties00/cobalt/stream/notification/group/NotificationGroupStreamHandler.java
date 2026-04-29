@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.stream.notification.group;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.chat.Chat;
 import com.github.auties00.cobalt.model.chat.ChatEphemeralTimer;
 import com.github.auties00.cobalt.model.chat.ChatMetadata;
@@ -12,7 +13,9 @@ import com.github.auties00.cobalt.model.chat.group.GroupParticipantBuilder;
 import com.github.auties00.cobalt.model.chat.group.GroupPartipantRole;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
+import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.stream.SocketStream;
+import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.GroupJoinCEventBuilder;
 
 import java.time.Instant;
@@ -32,6 +35,7 @@ import java.util.LinkedHashSet;
  * @implNote WAWebHandleGroupNotification.handleGroupNotification,
  *     WAWebHandleGroupNotification.handleParsedGroupNotification
  */
+@WhatsAppWebModule(moduleName = "WAWebHandleGroupNotification")
 public final class NotificationGroupStreamHandler implements SocketStream.Handler {
 
     /**
@@ -51,14 +55,21 @@ public final class NotificationGroupStreamHandler implements SocketStream.Handle
     private final WhatsAppClient whatsapp;
 
     /**
+     * The WAM telemetry service used to commit group-join events.
+     */
+    private final WamService wamService;
+
+    /**
      * Constructs a new handler with the given WhatsApp client.
      *
-     * @param whatsapp the non-{@code null} client instance
+     * @param whatsapp   the non-{@code null} client instance
+     * @param wamService the WAM telemetry service used to commit group-join events
      * @implNote WAWebHandleGroupNotification: constructor DI replaces
      *     module-level imports
      */
-    public NotificationGroupStreamHandler(WhatsAppClient whatsapp) {
+    public NotificationGroupStreamHandler(WhatsAppClient whatsapp, WamService wamService) {
         this.whatsapp = whatsapp;
+        this.wamService = wamService;
     }
 
     /**
@@ -271,7 +282,7 @@ public final class NotificationGroupStreamHandler implements SocketStream.Handle
         if (notificationAuthor == null
                 || mePnUser == null
                 || !notificationAuthor.toUserJid().equals(mePnUser.toUserJid())) {
-            whatsapp.wamService().commit(new GroupJoinCEventBuilder().build()); // WAWebHandleGroupCreation: new GroupJoinCWamEvent().commit()
+            wamService.commit(new GroupJoinCEventBuilder().build()); // WAWebHandleGroupCreation: new GroupJoinCWamEvent().commit()
         }
 
         // WAWebHandleGroupNotification.I: subject
@@ -281,7 +292,8 @@ public final class NotificationGroupStreamHandler implements SocketStream.Handle
         }
 
         // WAWebHandleGroupNotification.I: creation, owner
-        chat.setCreatedAt(groupNode.getAttributeAsLong("creation", (Long) null));
+        var creation = groupNode.getAttributeAsLong("creation", (Long) null);
+        chat.setCreatedAt(creation == null ? null : Instant.ofEpochSecond(creation));
         chat.setCreatedBy(groupNode.getAttributeAsString("creator", null));
         // WAWebHandleGroupNotification.I: desc via g(d) -> description > body
         chat.setDescription(resolveCreateDescriptionBody(groupNode));
@@ -1238,7 +1250,7 @@ public final class NotificationGroupStreamHandler implements SocketStream.Handle
         }
 
         // WAWebHandleGroupNotification.x: ack with class=notification, type=w:gp2
-        whatsapp.sendNodeWithNoResponse(new com.github.auties00.cobalt.node.NodeBuilder()
+        whatsapp.sendNodeWithNoResponse(new NodeBuilder()
                 .description("ack")
                 .attribute("id", stanzaId)
                 .attribute("class", "notification") // WAWebHandleGroupNotification.x: hardcoded

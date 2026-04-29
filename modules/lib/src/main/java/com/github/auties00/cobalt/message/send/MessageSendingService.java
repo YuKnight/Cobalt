@@ -21,9 +21,11 @@ import com.github.auties00.cobalt.model.message.MessageKey;
 import com.github.auties00.cobalt.model.message.context.ContextualMessage;
 import com.github.auties00.cobalt.model.message.media.DocumentMessage;
 import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
+import com.github.auties00.cobalt.model.message.text.ExtendedTextMessage;
 import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
+import com.github.auties00.cobalt.message.preview.LinkPreviewService;
 import com.github.auties00.cobalt.props.ABPropsService;
-import com.github.auties00.cobalt.wam.WamMsgUtils;
+import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.WebcMessageSendEventBuilder;
 
 import java.util.Objects;
@@ -121,10 +123,8 @@ public final class MessageSendingService {
 
     /**
      * The WhatsApp client used by this service to access the shared
-     * {@code WamService} for outbound telemetry emissions triggered at
-     * the top of the send pipeline (currently the
-     * {@code SendDocumentEvent} commit performed when a
-     * {@link DocumentMessage} enters the service).
+     * services for outbound telemetry emissions triggered at the top of
+     * the send pipeline.
      *
      * @implNote ADAPTED: WA Web's {@code WAWebProcessRawMedia} calls the
      * document-send WAM logger via a module-level import. Cobalt does not
@@ -135,12 +135,18 @@ public final class MessageSendingService {
     private final WhatsAppClient client;
 
     /**
+     * The WAM telemetry service used to commit per-send WAM events.
+     */
+    private final WamService wamService;
+
+    /**
      * Creates a new message sending service.
      *
      * @param client         the WhatsApp client for sending stanzas
      * @param encryption     the message encryption service
      * @param deviceService  the device service for device list resolution
      * @param abPropsService the AB props service for feature gating
+     * @param wamService     the WAM telemetry service for per-send events
      *
      * @implNote ADAPTED: WAWebSendMsgJob uses module-level imports for all
      * dependencies; Cobalt uses constructor-based DI and creates all sub-senders.
@@ -151,14 +157,17 @@ public final class MessageSendingService {
             WhatsAppClient client,
             MessageEncryption encryption,
             DeviceService deviceService,
-            ABPropsService abPropsService
+            ABPropsService abPropsService,
+            WamService wamService
     ) {
         Objects.requireNonNull(client, "client");
         Objects.requireNonNull(encryption, "encryption");
         Objects.requireNonNull(deviceService, "deviceService");
         Objects.requireNonNull(abPropsService, "abPropsService");
+        Objects.requireNonNull(wamService, "wamService");
 
         this.client = client;
+        this.wamService = wamService;
         var store = client.store();
         this.preparer = new MessagePreparer(store);
         this.messageDedup = new MessageDedup();
@@ -172,11 +181,11 @@ public final class MessageSendingService {
         var tcTokenStanza = new TcTokenStanza(store, abPropsService);
 
         this.userSender = new UserMessageSender(client, encryption, deviceService, abPropsService,
-                botStanza, bizStanza, metaStanza, reportingStanza, ctwaStanza, tcTokenStanza);
-        this.groupSender = new GroupMessageSender(client, encryption, deviceService, abPropsService, skDistribution, botStanza, bizStanza, metaStanza, reportingStanza);
-        this.statusSender = new StatusMessageSender(client, encryption, deviceService, skDistribution, metaStanza, reportingStanza);
-        this.newsletterSender = new NewsletterMessageSender(client);
-        this.peerSender = new PeerMessageSender(client, encryption, deviceService);
+                botStanza, bizStanza, metaStanza, reportingStanza, ctwaStanza, tcTokenStanza, wamService);
+        this.groupSender = new GroupMessageSender(client, encryption, deviceService, abPropsService, skDistribution, botStanza, bizStanza, metaStanza, reportingStanza, wamService);
+        this.statusSender = new StatusMessageSender(client, encryption, deviceService, skDistribution, metaStanza, reportingStanza, wamService);
+        this.newsletterSender = new NewsletterMessageSender(client, wamService);
+        this.peerSender = new PeerMessageSender(client, encryption, deviceService, wamService);
     }
 
     /**
@@ -211,6 +220,12 @@ public final class MessageSendingService {
     public AckResult send(Jid chatJid, MessageContainer container) {
         Objects.requireNonNull(chatJid, "chatJid");
         Objects.requireNonNull(container, "container");
+
+        // WAWebLinkPreviewChatAction: enrich extended-text bodies with a link
+        // preview before the message enters the encryption / fanout pipeline.
+        if (container.content() instanceof ExtendedTextMessage extended) {
+            LinkPreviewService.forClient(client).decorate(chatJid, extended);
+        }
 
         MessageInfo prepared;
         if (chatJid.hasServer(JidServer.newsletter())) {
@@ -265,8 +280,7 @@ public final class MessageSendingService {
         // and fires once per outbound DocumentMessage send.
         if (messageInfo.message() != null
                 && messageInfo.message().content() instanceof DocumentMessage document) {
-            WamMsgUtils.logSendDocumentEvent(
-                    client.wamService(),
+            wamService.logSendDocumentEvent(
                     document.fileName().orElse(null),
                     document.mediaSize().orElse(0L));
         }
@@ -305,7 +319,7 @@ public final class MessageSendingService {
             // branch. WA Web's catch blocks drop the event; Cobalt mirrors that by only committing
             // when the send path returns normally.
             if (sendEvent != null) {
-                client.wamService().commit(sendEvent.stopMessageSendT().build());
+                wamService.commit(sendEvent.stopMessageSendT().build());
             }
             return result;
         } finally {
@@ -329,7 +343,7 @@ public final class MessageSendingService {
      *       maps to {@link ProtocolMessage.Type#REVOKE} in Cobalt), matching
      *       WA Web's {@code h} guard.</li>
      *   <li>Otherwise the builder is populated with {@code messageType} /
-     *       {@code messageMediaType} from {@link WamMsgUtils},
+     *       {@code messageMediaType} from {@link WamService},
      *       {@code messageIsForward} from the optional
      *       {@link ContextualMessage#contextInfo()}, and
      *       {@link WebcMessageSendEventBuilder#startMessageSendT()} is called
@@ -367,9 +381,9 @@ public final class MessageSendingService {
                 && contextual.contextInfo().map(ctx -> ctx.isForwarded()).orElse(false);
         return new WebcMessageSendEventBuilder()
                 // WAWebSendMsgRecordAction.sendMsgRecord: messageType = WAWebWamMsgUtils.getWamMessageType(i)
-                .messageType(WamMsgUtils.getWamMessageType(chatMessage))
+                .messageType(wamService.getWamMessageType(chatMessage))
                 // WAWebSendMsgRecordAction.sendMsgRecord: messageMediaType = WAWebWamMsgUtils.getWamMediaType(i)
-                .messageMediaType(WamMsgUtils.getWamMediaType(chatMessage))
+                .messageMediaType(wamService.getWamMediaType(chatMessage))
                 // WAWebSendMsgRecordAction.sendMsgRecord: messageIsForward = !!i.isForwarded
                 .messageIsForward(isForwarded)
                 // WAWebSendMsgRecordAction.sendMsgRecord: the event starts timing at construction

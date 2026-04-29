@@ -14,6 +14,7 @@ import com.github.auties00.cobalt.model.message.MessageInfo;
 import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.props.ABPropsService;
+import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.libsignal.SignalSessionCipher;
 import com.github.auties00.libsignal.groups.SignalGroupCipher;
 
@@ -80,6 +81,7 @@ public final class MessageService {
      *                       device lists before fanout
      * @param abPropsService the AB props service used to gate optional
      *                       protocol behaviour
+     * @param wamService     the WAM telemetry service forwarded to the sending pipeline
      * @throws NullPointerException if any argument is {@code null}
      */
     public MessageService(
@@ -87,18 +89,20 @@ public final class MessageService {
             SignalSessionCipher sessionCipher,
             SignalGroupCipher groupCipher,
             DeviceService deviceService,
-            ABPropsService abPropsService
+            ABPropsService abPropsService,
+            WamService wamService
     ) {
         Objects.requireNonNull(client, "client");
         Objects.requireNonNull(sessionCipher, "sessionCipher");
         Objects.requireNonNull(groupCipher, "groupCipher");
         Objects.requireNonNull(deviceService, "deviceService");
         Objects.requireNonNull(abPropsService, "abPropsService");
+        Objects.requireNonNull(wamService, "wamService");
 
         var store = client.store();
         var encryption = new MessageEncryption(store, sessionCipher, groupCipher);
         var decryption = new MessageDecryption(store, sessionCipher, groupCipher);
-        this.sendingService = new MessageSendingService(client, encryption, deviceService, abPropsService);
+        this.sendingService = new MessageSendingService(client, encryption, deviceService, abPropsService, wamService);
         this.receivingService = new MessageReceivingService(store, decryption);
     }
 

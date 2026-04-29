@@ -7,6 +7,7 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
+import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
@@ -14,6 +15,7 @@ import com.github.auties00.cobalt.model.sync.action.bot.BotWelcomeRequestAction;
 import com.github.auties00.cobalt.model.sync.action.bot.BotWelcomeRequestActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 import java.time.Instant;
 import java.util.HashMap;
@@ -104,7 +106,7 @@ public final class BotWelcomeRequestHandler implements WebAppStateActionHandler 
      * Applies a bot welcome request mutation to local state.
      *
      * <p>Delegates to {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
-     * and returns {@code true} if the result is {@link com.github.auties00.cobalt.model.sync.SyncActionState#SUCCESS}.
+     * and returns {@code true} if the result is {@link SyncActionState#SUCCESS}.
      *
      * @implNote WAWebBotWelcomeRequestSync.applyMutations — per-mutation inner logic,
      *           success check on the returned {@code SyncActionState}
@@ -114,8 +116,8 @@ public final class BotWelcomeRequestHandler implements WebAppStateActionHandler 
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBotWelcomeRequestSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == com.github.auties00.cobalt.model.sync.SyncActionState.SUCCESS; // WAWebBotWelcomeRequestSync.applyMutations
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebBotWelcomeRequestSync.applyMutations
     }
 
     /**
@@ -143,7 +145,7 @@ public final class BotWelcomeRequestHandler implements WebAppStateActionHandler 
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBotWelcomeRequestSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         // WAWebBotWelcomeRequestSync.applyMutations: match on operation
         if (mutation.operation() == SyncdOperation.REMOVE) { // WAWebBotWelcomeRequestSync.applyMutations: e.operation === "remove" -> i++, {actionState: Unsupported}
             return MutationApplicationResult.unsupported();

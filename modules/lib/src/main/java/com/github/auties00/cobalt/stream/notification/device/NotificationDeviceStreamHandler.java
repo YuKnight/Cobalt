@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.stream.notification.device;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceService;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
@@ -34,6 +35,7 @@ import java.util.List;
  * offline-mode gating and the "NO_ACK" deferred-ack path are intentionally not replicated:
  * Cobalt sends the ack unconditionally and does not maintain an offline pending-device cache.
  */
+@WhatsAppWebModule(moduleName = "WAWebHandleDeviceNotification")
 public final class NotificationDeviceStreamHandler implements SocketStream.Handler {
 
     /**

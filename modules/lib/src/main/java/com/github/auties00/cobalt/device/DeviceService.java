@@ -39,6 +39,7 @@ import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.store.WhatsAppStore;
 import com.github.auties00.cobalt.sync.WebAppStateService;
+import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.CoexPrivacySysMsgEventBuilder;
 import com.github.auties00.cobalt.wam.event.ContactSyncEventEventBuilder;
 import com.github.auties00.cobalt.wam.type.CoexSysMsgStateTransitionAttempt;
@@ -66,7 +67,7 @@ import java.util.stream.Stream;
  * <p>Every outgoing message and every decrypted PKMSG routes through this service so the
  * client maintains a consistent view of each peer's companion devices and each peer's
  * identity keys. It also schedules a daily ADV expiration check via
- * {@link com.github.auties00.cobalt.device.adv.DeviceADVChecker} to invalidate stale device
+ * {@link DeviceADVChecker} to invalidate stale device
  * records and trigger proactive syncs.
  *
  * <p>This service is the single entry-point that the message send pipeline uses to decide
@@ -277,6 +278,11 @@ public final class DeviceService {
     private final Set<Jid> offlineBizHostedSenderICDCProcessedCache;
 
     /**
+     * The WAM telemetry service used to commit device-related events.
+     */
+    private final WamService wamService;
+
+    /**
      * Creates a new device service and its owned helpers.
      *
      * <p>Instantiates the ADV validator, fanout calculator, phash calculator, ICDC computer,
@@ -287,6 +293,7 @@ public final class DeviceService {
      * @param client         the WhatsApp client providing store and network access
      * @param abPropsService the AB props service for feature gating
      * @param sessionCipher  the Signal session cipher used by the pre-key handler
+     * @param wamService     the WAM telemetry service for committing device events
      * @implNote ADAPTED: WA Web wires these modules via module-level imports; Cobalt groups
      * their construction here so a single {@link DeviceService} instance owns and can
      * deterministically tear down the background ADV scheduler.
@@ -294,7 +301,7 @@ public final class DeviceService {
     @WhatsAppWebExport(moduleName = "WAWebAdvSyncDeviceListApi",
             exports = "syncDeviceList",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public DeviceService(WhatsAppClient client, WebAppStateService webAppStateService, ABPropsService abPropsService, SignalSessionCipher sessionCipher) {
+    public DeviceService(WhatsAppClient client, WebAppStateService webAppStateService, ABPropsService abPropsService, SignalSessionCipher sessionCipher, WamService wamService) {
         this.client = client;
         this.webAppStateService = webAppStateService;
         this.store = client.store();
@@ -306,10 +313,11 @@ public final class DeviceService {
         this.phashCalculator = new DevicePhashCalculator(abPropsService);
         this.usyncResponseParser = new DeviceUSyncResponseParser(advValidator);
         this.pendingFetches = new ConcurrentHashMap<>();
-        this.advCheckScheduler = new DeviceADVChecker(client, this, abPropsService);
+        this.advCheckScheduler = new DeviceADVChecker(client, this, abPropsService, wamService);
         this.deviceUpdateLock = new ReentrantLock();
         this.hostedSystemMsgDedupCache = new ConcurrentHashMap<>();
         this.offlineBizHostedSenderICDCProcessedCache = ConcurrentHashMap.newKeySet();
+        this.wamService = wamService;
     }
 
     /**
@@ -1053,8 +1061,7 @@ public final class DeviceService {
     private static final int CONTACT_SYNC_REQUEST_ORIGIN_DEVICE_REQUEST = 48;
 
     /**
-     * Error-protocol code used as the 429 fallback when a device-sync USync
-     * fails, matching {@link com.github.auties00.cobalt.wam.type.ContactSyncErrorCode#DEVICE_SYNC}.
+     * Error-protocol code used as the 429 fallback when a device-sync USync fails
      *
      * @implNote WAWebContactSyncErrorCodes.DEVICE_SYNC: {@code 1300}. The
      * constant is duplicated here as a plain {@code int} because the WAM
@@ -1123,7 +1130,7 @@ public final class DeviceService {
                                         Instant syncStartTimestamp, boolean includeUsernameProtocol,
                                         int deviceResponseNew) {
         var endTimestamp = Instant.now();
-        client.wamService().commit(new ContactSyncEventEventBuilder()
+        wamService.commit(new ContactSyncEventEventBuilder()
                 // WAWebContactSyncLogger.getSyncTypeString: (context + "_query").toUpperCase()
                 .contactSyncType((context + "_query").toUpperCase(Locale.ROOT))
                 // WAWebContactSyncLogger SYNC_REQUEST_ORIGIN.DEVICE_REQUEST
@@ -1168,7 +1175,7 @@ public final class DeviceService {
                                         int serverErrorCode, int fallbackErrorCode) {
         var endTimestamp = Instant.now();
         var errorCode = serverErrorCode == 429 ? fallbackErrorCode : serverErrorCode;
-        client.wamService().commit(new ContactSyncEventEventBuilder()
+        wamService.commit(new ContactSyncEventEventBuilder()
                 .contactSyncType((context + "_query").toUpperCase(Locale.ROOT))
                 .contactSyncRequestOrigin(CONTACT_SYNC_REQUEST_ORIGIN_DEVICE_REQUEST)
                 .contactSyncSuccess(false)
@@ -1399,7 +1406,7 @@ public final class DeviceService {
         // WAWebBizCoexUtils.C emission path: channel is left unset for the
         // sendWamCoexPrivacySysMsgInsertSuccess (bulkApplyDeviceUpdate / clearDeviceRecord)
         // call site; only the history-sync entrypoint populates HISTORY_SYNC.
-        client.wamService().commit(builder.build());
+        wamService.commit(builder.build());
     }
 
     /**
@@ -1945,7 +1952,7 @@ public final class DeviceService {
 
             // WAWebSendGroupSkmsgJob.encryptAndSendSenderKeyMsg: phash is computed on
             // [].concat(M, [F]) where M = filteredDevices and F = sender's own device JID
-            var phashDevices = new java.util.HashSet<>(filteredDevices);
+            var phashDevices = new HashSet<>(filteredDevices);
             phashDevices.add(senderDeviceJid); // WAWebSendGroupSkmsgJob: concat(M, [F])
             var phash = phashCalculator.calculate(phashDevices, DevicePhashVersion.V2, true);
             return new DeviceGroupFanoutResult(filteredDevices, phash);
@@ -1982,7 +1989,7 @@ public final class DeviceService {
      * @return the number of devices in the server response for which the one-time
      *         pre-key pool was depleted (no {@code <key>} element returned for a
      *         non-bot device); callers should pass this count to
-     *         {@link com.github.auties00.cobalt.wam.WamService#commit} via
+     *         {@link WamService#commit} via
      *         {@link com.github.auties00.cobalt.wam.event.PrekeysDepletionEventBuilder}
      *         to mirror {@code WAWebPostPrekeysDepletionMetric.maybePostPrekeysDepletionMetric}.
      *
@@ -2903,9 +2910,10 @@ public final class DeviceService {
             // WAWebApiDeviceList.getDeviceIds: var i=e.reduce(...) — alternate JIDs for user JIDs only
             var alternateJids = new ArrayList<Jid>();
             for (var jid : userJids) {
-                if (!jid.isUser()) {
+                if (!jid.hasUserServer() && !jid.hasLidServer() && !jid.hasBotServer() && !jid.hasHostedServer() && !jid.hasHostedLidServer()) {
                     continue;
                 }
+
                 var alternate = findAlternateUserWid(jid.toUserJid());
                 if (alternate != null) {
                     alternateJids.add(alternate);

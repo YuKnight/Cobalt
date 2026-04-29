@@ -1,0 +1,738 @@
+package com.github.auties00.cobalt.node.mex.json.newsletter;
+
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONArray;
+import com.alibaba.fastjson2.JSONObject;
+import com.alibaba.fastjson2.JSONWriter;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
+import com.github.auties00.cobalt.node.mex.MexOperation;
+import com.github.auties00.cobalt.node.Node;
+import com.github.auties00.cobalt.node.NodeBuilder;
+import java.io.IOException;
+import java.io.StringWriter;
+import java.io.UncheckedIOException;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * The response variant of {@link UpdateNewsletterMexResponse} that exposes the data
+ * returned by the server after a successful mutation.
+ *
+ * @implNote WAWebMexUpdateNewsletterJob: adapts the JSON root returned by the GraphQL
+ * mutation into a Java value object.
+ */
+@WhatsAppWebModule(moduleName = "WAWebMexUpdateNewsletterJob")
+public final class UpdateNewsletterMexResponse implements MexOperation.Response.Json {
+    private final String id;
+    private final State state;
+    private final ThreadMetadata threadMetadata;
+
+    private UpdateNewsletterMexResponse(String id, State state, ThreadMetadata threadMetadata) {
+        this.id = id;
+        this.state = state;
+        this.threadMetadata = threadMetadata;
+    }
+
+    /**
+     * Parses a MEX response from the given IQ response node.
+     *
+     * @implNote WAWebMexUpdateNewsletterJob.mexUpdateNewsletter: WA Web relies on the
+     * GraphQL client to unwrap the response. Cobalt performs the
+     * unwrapping manually from the IQ {@code <result>} child.
+     * @param node the IQ response node received from the relay
+     * @return an {@link Optional} containing the parsed response, or
+     *         empty if the node is missing a result payload
+     */
+    public static Optional<UpdateNewsletterMexResponse> of(Node node) {
+        return node.getChild("result")
+                .flatMap(Node::toContentBytes)
+                .flatMap(UpdateNewsletterMexResponse::of);
+    }
+
+    /**
+     * Returns the {@code id} field.
+     *
+     * @return an {@link Optional} containing the value, or empty if absent
+     */
+    public Optional<String> id() {
+        return Optional.ofNullable(id);
+    }
+
+    /**
+     * Returns the {@code state} field.
+     *
+     * @return an {@link Optional} containing the value, or empty if absent
+     */
+    public Optional<State> state() {
+        return Optional.ofNullable(state);
+    }
+
+    /**
+     * Returns the {@code thread_metadata} field.
+     *
+     * @return an {@link Optional} containing the value, or empty if absent
+     */
+    public Optional<ThreadMetadata> threadMetadata() {
+        return Optional.ofNullable(threadMetadata);
+    }
+
+    /**
+     * A parsed {@code State} object.
+     */
+    public static final class State {
+        private final String type;
+
+        private State(String type) {
+            this.type = type;
+        }
+
+        /**
+         * Returns the {@code type} field.
+         *
+         * @return an {@link Optional} containing the value, or empty if absent
+         */
+        public Optional<String> type() {
+            return Optional.ofNullable(type);
+        }
+
+        /**
+         * Parses a {@code State} from the given JSON object.
+         *
+         * @param obj the JSON object to parse
+         * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+         */
+        static Optional<State> of(JSONObject obj) {
+            if (obj == null) {
+                return Optional.empty();
+            }
+
+            var type = obj.getString("type");
+            return Optional.of(new State(type));
+        }
+
+        /**
+         * Parses a list of {@code State} from the given JSON array.
+         *
+         * @param arr the JSON array to parse
+         * @return the list of parsed results, empty if {@code arr} is {@code null}
+         */
+        static List<State> ofArray(JSONArray arr) {
+            if (arr == null) {
+                return List.of();
+            }
+
+            var result = new ArrayList<State>(arr.size());
+            for (var i = 0; i < arr.size(); i++) {
+                of(arr.getJSONObject(i)).ifPresent(result::add);
+            }
+            return result;
+        }
+    }
+
+    /**
+     * A parsed {@code ThreadMetadata} object.
+     */
+    public static final class ThreadMetadata {
+        private final Name name;
+        private final Description description;
+        private final Picture picture;
+        private final Preview preview;
+        private final String invite;
+        private final String handle;
+        private final String verification;
+        private final Long creationTime;
+        private final Settings settings;
+
+        private ThreadMetadata(Name name, Description description, Picture picture, Preview preview, String invite, String handle, String verification, Long creationTime, Settings settings) {
+            this.name = name;
+            this.description = description;
+            this.picture = picture;
+            this.preview = preview;
+            this.invite = invite;
+            this.handle = handle;
+            this.verification = verification;
+            this.creationTime = creationTime;
+            this.settings = settings;
+        }
+
+        /**
+         * Returns the {@code name} field.
+         *
+         * @return an {@link Optional} containing the value, or empty if absent
+         */
+        public Optional<Name> name() {
+            return Optional.ofNullable(name);
+        }
+
+        /**
+         * Returns the {@code description} field.
+         *
+         * @return an {@link Optional} containing the value, or empty if absent
+         */
+        public Optional<Description> description() {
+            return Optional.ofNullable(description);
+        }
+
+        /**
+         * Returns the {@code picture} field.
+         *
+         * @return an {@link Optional} containing the value, or empty if absent
+         */
+        public Optional<Picture> picture() {
+            return Optional.ofNullable(picture);
+        }
+
+        /**
+         * Returns the {@code preview} field.
+         *
+         * @return an {@link Optional} containing the value, or empty if absent
+         */
+        public Optional<Preview> preview() {
+            return Optional.ofNullable(preview);
+        }
+
+        /**
+         * Returns the {@code invite} field.
+         *
+         * @return an {@link Optional} containing the value, or empty if absent
+         */
+        public Optional<String> invite() {
+            return Optional.ofNullable(invite);
+        }
+
+        /**
+         * Returns the {@code handle} field.
+         *
+         * @return an {@link Optional} containing the value, or empty if absent
+         */
+        public Optional<String> handle() {
+            return Optional.ofNullable(handle);
+        }
+
+        /**
+         * Returns the {@code verification} field.
+         *
+         * @return an {@link Optional} containing the value, or empty if absent
+         */
+        public Optional<String> verification() {
+            return Optional.ofNullable(verification);
+        }
+
+        /**
+         * Returns the {@code creation_time} field.
+         *
+         * @return an {@link Optional} containing the value as an {@link Instant}, or empty if absent
+         */
+        public Optional<Instant> creationTime() {
+            return Optional.ofNullable(creationTime).map(Instant::ofEpochSecond);
+        }
+
+        /**
+         * Returns the {@code settings} field.
+         *
+         * @return an {@link Optional} containing the value, or empty if absent
+         */
+        public Optional<Settings> settings() {
+            return Optional.ofNullable(settings);
+        }
+
+        /**
+         * A parsed {@code Name} object.
+         */
+        public static final class Name {
+            private final String id;
+            private final String text;
+            private final Long updateTime;
+
+            private Name(String id, String text, Long updateTime) {
+                this.id = id;
+                this.text = text;
+                this.updateTime = updateTime;
+            }
+
+            /**
+             * Returns the {@code id} field.
+             *
+             * @return an {@link Optional} containing the value, or empty if absent
+             */
+            public Optional<String> id() {
+                return Optional.ofNullable(id);
+            }
+
+            /**
+             * Returns the {@code text} field.
+             *
+             * @return an {@link Optional} containing the value, or empty if absent
+             */
+            public Optional<String> text() {
+                return Optional.ofNullable(text);
+            }
+
+            /**
+             * Returns the {@code update_time} field.
+             *
+             * @return an {@link Optional} containing the value as an {@link Instant}, or empty if absent
+             */
+            public Optional<Instant> updateTime() {
+                return Optional.ofNullable(updateTime).map(Instant::ofEpochSecond);
+            }
+
+            /**
+             * Parses a {@code Name} from the given JSON object.
+             *
+             * @param obj the JSON object to parse
+             * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+             */
+            static Optional<Name> of(JSONObject obj) {
+                if (obj == null) {
+                    return Optional.empty();
+                }
+
+                var id = obj.getString("id");
+                var text = obj.getString("text");
+                var updateTime = obj.getLong("update_time");
+                return Optional.of(new Name(id, text, updateTime));
+            }
+
+            /**
+             * Parses a list of {@code Name} from the given JSON array.
+             *
+             * @param arr the JSON array to parse
+             * @return the list of parsed results, empty if {@code arr} is {@code null}
+             */
+            static List<Name> ofArray(JSONArray arr) {
+                if (arr == null) {
+                    return List.of();
+                }
+
+                var result = new ArrayList<Name>(arr.size());
+                for (var i = 0; i < arr.size(); i++) {
+                    of(arr.getJSONObject(i)).ifPresent(result::add);
+                }
+                return result;
+            }
+        }
+
+        /**
+         * A parsed {@code Description} object.
+         */
+        public static final class Description {
+            private final String id;
+            private final String text;
+            private final Long updateTime;
+
+            private Description(String id, String text, Long updateTime) {
+                this.id = id;
+                this.text = text;
+                this.updateTime = updateTime;
+            }
+
+            /**
+             * Returns the {@code id} field.
+             *
+             * @return an {@link Optional} containing the value, or empty if absent
+             */
+            public Optional<String> id() {
+                return Optional.ofNullable(id);
+            }
+
+            /**
+             * Returns the {@code text} field.
+             *
+             * @return an {@link Optional} containing the value, or empty if absent
+             */
+            public Optional<String> text() {
+                return Optional.ofNullable(text);
+            }
+
+            /**
+             * Returns the {@code update_time} field.
+             *
+             * @return an {@link Optional} containing the value as an {@link Instant}, or empty if absent
+             */
+            public Optional<Instant> updateTime() {
+                return Optional.ofNullable(updateTime).map(Instant::ofEpochSecond);
+            }
+
+            /**
+             * Parses a {@code Description} from the given JSON object.
+             *
+             * @param obj the JSON object to parse
+             * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+             */
+            static Optional<Description> of(JSONObject obj) {
+                if (obj == null) {
+                    return Optional.empty();
+                }
+
+                var id = obj.getString("id");
+                var text = obj.getString("text");
+                var updateTime = obj.getLong("update_time");
+                return Optional.of(new Description(id, text, updateTime));
+            }
+
+            /**
+             * Parses a list of {@code Description} from the given JSON array.
+             *
+             * @param arr the JSON array to parse
+             * @return the list of parsed results, empty if {@code arr} is {@code null}
+             */
+            static List<Description> ofArray(JSONArray arr) {
+                if (arr == null) {
+                    return List.of();
+                }
+
+                var result = new ArrayList<Description>(arr.size());
+                for (var i = 0; i < arr.size(); i++) {
+                    of(arr.getJSONObject(i)).ifPresent(result::add);
+                }
+                return result;
+            }
+        }
+
+        /**
+         * A parsed {@code Picture} object.
+         */
+        public static final class Picture {
+            private final String id;
+            private final String type;
+            private final String directPath;
+
+            private Picture(String id, String type, String directPath) {
+                this.id = id;
+                this.type = type;
+                this.directPath = directPath;
+            }
+
+            /**
+             * Returns the {@code id} field.
+             *
+             * @return an {@link Optional} containing the value, or empty if absent
+             */
+            public Optional<String> id() {
+                return Optional.ofNullable(id);
+            }
+
+            /**
+             * Returns the {@code type} field.
+             *
+             * @return an {@link Optional} containing the value, or empty if absent
+             */
+            public Optional<String> type() {
+                return Optional.ofNullable(type);
+            }
+
+            /**
+             * Returns the {@code direct_path} field.
+             *
+             * @return an {@link Optional} containing the value, or empty if absent
+             */
+            public Optional<String> directPath() {
+                return Optional.ofNullable(directPath);
+            }
+
+            /**
+             * Parses a {@code Picture} from the given JSON object.
+             *
+             * @param obj the JSON object to parse
+             * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+             */
+            static Optional<Picture> of(JSONObject obj) {
+                if (obj == null) {
+                    return Optional.empty();
+                }
+
+                var id = obj.getString("id");
+                var type = obj.getString("type");
+                var directPath = obj.getString("direct_path");
+                return Optional.of(new Picture(id, type, directPath));
+            }
+
+            /**
+             * Parses a list of {@code Picture} from the given JSON array.
+             *
+             * @param arr the JSON array to parse
+             * @return the list of parsed results, empty if {@code arr} is {@code null}
+             */
+            static List<Picture> ofArray(JSONArray arr) {
+                if (arr == null) {
+                    return List.of();
+                }
+
+                var result = new ArrayList<Picture>(arr.size());
+                for (var i = 0; i < arr.size(); i++) {
+                    of(arr.getJSONObject(i)).ifPresent(result::add);
+                }
+                return result;
+            }
+        }
+
+        /**
+         * A parsed {@code Preview} object.
+         */
+        public static final class Preview {
+            private final String id;
+            private final String type;
+            private final String directPath;
+
+            private Preview(String id, String type, String directPath) {
+                this.id = id;
+                this.type = type;
+                this.directPath = directPath;
+            }
+
+            /**
+             * Returns the {@code id} field.
+             *
+             * @return an {@link Optional} containing the value, or empty if absent
+             */
+            public Optional<String> id() {
+                return Optional.ofNullable(id);
+            }
+
+            /**
+             * Returns the {@code type} field.
+             *
+             * @return an {@link Optional} containing the value, or empty if absent
+             */
+            public Optional<String> type() {
+                return Optional.ofNullable(type);
+            }
+
+            /**
+             * Returns the {@code direct_path} field.
+             *
+             * @return an {@link Optional} containing the value, or empty if absent
+             */
+            public Optional<String> directPath() {
+                return Optional.ofNullable(directPath);
+            }
+
+            /**
+             * Parses a {@code Preview} from the given JSON object.
+             *
+             * @param obj the JSON object to parse
+             * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+             */
+            static Optional<Preview> of(JSONObject obj) {
+                if (obj == null) {
+                    return Optional.empty();
+                }
+
+                var id = obj.getString("id");
+                var type = obj.getString("type");
+                var directPath = obj.getString("direct_path");
+                return Optional.of(new Preview(id, type, directPath));
+            }
+
+            /**
+             * Parses a list of {@code Preview} from the given JSON array.
+             *
+             * @param arr the JSON array to parse
+             * @return the list of parsed results, empty if {@code arr} is {@code null}
+             */
+            static List<Preview> ofArray(JSONArray arr) {
+                if (arr == null) {
+                    return List.of();
+                }
+
+                var result = new ArrayList<Preview>(arr.size());
+                for (var i = 0; i < arr.size(); i++) {
+                    of(arr.getJSONObject(i)).ifPresent(result::add);
+                }
+                return result;
+            }
+        }
+
+        /**
+         * A parsed {@code Settings} object.
+         */
+        public static final class Settings {
+            private final ReactionCodes reactionCodes;
+
+            private Settings(ReactionCodes reactionCodes) {
+                this.reactionCodes = reactionCodes;
+            }
+
+            /**
+             * Returns the {@code reaction_codes} field.
+             *
+             * @return an {@link Optional} containing the value, or empty if absent
+             */
+            public Optional<ReactionCodes> reactionCodes() {
+                return Optional.ofNullable(reactionCodes);
+            }
+
+            /**
+             * A parsed {@code ReactionCodes} object.
+             */
+            public static final class ReactionCodes {
+                private final String value;
+
+                private ReactionCodes(String value) {
+                    this.value = value;
+                }
+
+                /**
+                 * Returns the {@code value} field.
+                 *
+                 * @return an {@link Optional} containing the value, or empty if absent
+                 */
+                public Optional<String> value() {
+                    return Optional.ofNullable(value);
+                }
+
+                /**
+                 * Parses a {@code ReactionCodes} from the given JSON object.
+                 *
+                 * @param obj the JSON object to parse
+                 * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+                 */
+                static Optional<ReactionCodes> of(JSONObject obj) {
+                    if (obj == null) {
+                        return Optional.empty();
+                    }
+
+                    var value = obj.getString("value");
+                    return Optional.of(new ReactionCodes(value));
+                }
+
+                /**
+                 * Parses a list of {@code ReactionCodes} from the given JSON array.
+                 *
+                 * @param arr the JSON array to parse
+                 * @return the list of parsed results, empty if {@code arr} is {@code null}
+                 */
+                static List<ReactionCodes> ofArray(JSONArray arr) {
+                    if (arr == null) {
+                        return List.of();
+                    }
+
+                    var result = new ArrayList<ReactionCodes>(arr.size());
+                    for (var i = 0; i < arr.size(); i++) {
+                        of(arr.getJSONObject(i)).ifPresent(result::add);
+                    }
+                    return result;
+                }
+            }
+
+            /**
+             * Parses a {@code Settings} from the given JSON object.
+             *
+             * @param obj the JSON object to parse
+             * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+             */
+            static Optional<Settings> of(JSONObject obj) {
+                if (obj == null) {
+                    return Optional.empty();
+                }
+
+                var reactionCodes = ReactionCodes.of(obj.getJSONObject("reaction_codes")).orElse(null);
+                return Optional.of(new Settings(reactionCodes));
+            }
+
+            /**
+             * Parses a list of {@code Settings} from the given JSON array.
+             *
+             * @param arr the JSON array to parse
+             * @return the list of parsed results, empty if {@code arr} is {@code null}
+             */
+            static List<Settings> ofArray(JSONArray arr) {
+                if (arr == null) {
+                    return List.of();
+                }
+
+                var result = new ArrayList<Settings>(arr.size());
+                for (var i = 0; i < arr.size(); i++) {
+                    of(arr.getJSONObject(i)).ifPresent(result::add);
+                }
+                return result;
+            }
+        }
+
+        /**
+         * Parses a {@code ThreadMetadata} from the given JSON object.
+         *
+         * @param obj the JSON object to parse
+         * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+         */
+        static Optional<ThreadMetadata> of(JSONObject obj) {
+            if (obj == null) {
+                return Optional.empty();
+            }
+
+            var name = Name.of(obj.getJSONObject("name")).orElse(null);
+            var description = Description.of(obj.getJSONObject("description")).orElse(null);
+            var picture = Picture.of(obj.getJSONObject("picture")).orElse(null);
+            var preview = Preview.of(obj.getJSONObject("preview")).orElse(null);
+            var invite = obj.getString("invite");
+            var handle = obj.getString("handle");
+            var verification = obj.getString("verification");
+            var creationTime = obj.getLong("creation_time");
+            var settings = Settings.of(obj.getJSONObject("settings")).orElse(null);
+            return Optional.of(new ThreadMetadata(name, description, picture, preview, invite, handle, verification, creationTime, settings));
+        }
+
+        /**
+         * Parses a list of {@code ThreadMetadata} from the given JSON array.
+         *
+         * @param arr the JSON array to parse
+         * @return the list of parsed results, empty if {@code arr} is {@code null}
+         */
+        static List<ThreadMetadata> ofArray(JSONArray arr) {
+            if (arr == null) {
+                return List.of();
+            }
+
+            var result = new ArrayList<ThreadMetadata>(arr.size());
+            for (var i = 0; i < arr.size(); i++) {
+                of(arr.getJSONObject(i)).ifPresent(result::add);
+            }
+            return result;
+        }
+    }
+
+    /**
+     * Parses a {@link UpdateNewsletterMexResponse} from the raw JSON bytes of the
+     * {@code <result>} child.
+     *
+     * @implNote WAWebMexUpdateNewsletterJob.mexUpdateNewsletter: mirrors the implicit
+     * unwrapping that WA Web performs on the GraphQL response,
+     * extracting the {@code xwa2_newsletter_update} root.
+     * @param json the UTF-8 encoded JSON payload
+     * @return an {@link Optional} containing the parsed response, or
+     *         empty if the envelope is missing expected fields
+     */
+    private static Optional<UpdateNewsletterMexResponse> of(byte[] json) {
+        // WAWebMexUpdateNewsletterJob.mexUpdateNewsletter
+        // Parses the raw JSON payload, bailing out if fastjson2 returns null
+        var jsonObject = JSON.parseObject(json);
+        if (jsonObject == null) {
+            return Optional.empty();
+        }
+
+        // WAWebMexUpdateNewsletterJob.mexUpdateNewsletter
+        // Descends into the standard GraphQL "data" envelope
+        var data = jsonObject.getJSONObject("data");
+        if (data == null) {
+            return Optional.empty();
+        }
+
+        // WAWebMexUpdateNewsletterJob.mexUpdateNewsletter
+        // Extracts the operation-specific root keyed by xwa2_newsletter_update
+        var root = data.getJSONObject("xwa2_newsletter_update");
+        if (root == null) {
+            return Optional.empty();
+        }
+
+        var id = root.getString("id");
+        var state = State.of(root.getJSONObject("state")).orElse(null);
+        var threadMetadata = ThreadMetadata.of(root.getJSONObject("thread_metadata")).orElse(null);
+
+        return Optional.of(new UpdateNewsletterMexResponse(id, state, threadMetadata));
+    }
+}

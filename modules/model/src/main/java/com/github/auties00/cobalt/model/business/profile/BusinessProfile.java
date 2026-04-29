@@ -27,7 +27,7 @@ import java.util.Optional;
  * automated at all.
  *
  * <p>This profile is queried from the WhatsApp server and is associated with a specific
- * business account identified by its {@link com.github.auties00.cobalt.model.jid.Jid}.
+ * business account identified by its {@link Jid}.
  */
 @ProtobufMessage
 public final class BusinessProfile {

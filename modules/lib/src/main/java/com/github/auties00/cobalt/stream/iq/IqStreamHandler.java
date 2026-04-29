@@ -17,11 +17,13 @@ import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.stream.SocketStream;
 import com.github.auties00.cobalt.sync.SnapshotRecoveryService;
 import com.github.auties00.cobalt.util.DataUtils;
+import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.Lid11MigrationLifecycleEventBuilder;
 import com.github.auties00.cobalt.wam.event.MdLinkDeviceCompanionEventBuilder;
 import com.github.auties00.cobalt.wam.type.MdLinkDeviceCompanionStage;
 import com.github.auties00.cobalt.wam.type.MigrationStageEnum;
 
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
@@ -136,12 +138,19 @@ public final class IqStreamHandler implements SocketStream.Handler {
     private ScheduledFuture<?> rotationTask;
 
     /**
+     * The WAM telemetry service used to commit IQ-level events.
+     */
+    private final WamService wamService;
+
+    /**
      * Creates a new IQ stream handler.
      *
      * @param whatsapp                the WhatsApp client, must not be {@code null}
      * @param webVerificationHandler  the web verification handler for delivering QR/pairing codes, must not be {@code null}
      * @param deviceService           the device service for ADV validation, must not be {@code null}
      * @param snapshotRecoveryService the snapshot recovery service, must not be {@code null}
+     * @param deviceLinkingService    the alt-device-linking service used to gate {@code pair-device} notifications, must not be {@code null}
+     * @param wamService              the WAM telemetry service used to commit IQ-level events
      * @implNote ADAPTED: WAWebHandleStanzaCommon, WAWebHandlePairDevice, WAWebHandlePairSuccess use module-level imports
      */
     public IqStreamHandler(
@@ -149,13 +158,15 @@ public final class IqStreamHandler implements SocketStream.Handler {
             WhatsAppClientVerificationHandler.Web webVerificationHandler,
             DeviceService deviceService,
             SnapshotRecoveryService snapshotRecoveryService,
-            CompanionPairingService deviceLinkingService
+            CompanionPairingService deviceLinkingService,
+            WamService wamService
     ) {
         this.whatsapp = whatsapp;
         this.webVerificationHandler = Objects.requireNonNull(webVerificationHandler, "webVerificationHandler cannot be null");
         this.deviceService = Objects.requireNonNull(deviceService, "deviceService cannot be null");
         this.snapshotRecoveryService = Objects.requireNonNull(snapshotRecoveryService, "snapshotRecoveryService cannot be null");
         this.deviceLinkingService = Objects.requireNonNull(deviceLinkingService, "altDeviceLinkingService cannot be null");
+        this.wamService = Objects.requireNonNull(wamService, "wamService cannot be null");
         this.rotationLock = new Object();
         this.rotationExecutor = Executors.newSingleThreadScheduledExecutor(runnable ->
                 Thread.ofPlatform()
@@ -554,14 +565,15 @@ public final class IqStreamHandler implements SocketStream.Handler {
                         // Cobalt routes the isChatDbLidMigrated flag through the migration service and
                         // mirrors WA Web's unconditional WAM commit with the post-setIsLidMigrated read.
                         if (props.isChatDbLidMigrated()) {
-                            whatsapp.wamService().commit(new Lid11MigrationLifecycleEventBuilder()
+                            wamService.commit(new Lid11MigrationLifecycleEventBuilder()
                                     .migrationStage(MigrationStageEnum.COMPANION_MIGRATED_ON_NEW_PAIRING)
                                     .webClientDidPairingStanzaIndicated1x1MigrationThisSession(true)
                                     .isLocally1x1MigratedFromDb(whatsapp.lidMigrationService().isLidMigrated())
                                     .build());
                         }
                     });
-            store.setRegistered(true); // WAWebHandlePairSuccess: setPairingTimestamp(a), marks as registered
+            store.setPairingTimestamp(Instant.ofEpochSecond(regStartSeconds)); // WAWebHandlePairSuccess: setPairingTimestamp(a)
+            store.setRegistered(true); // WAWebHandlePairSuccess: marks the local companion as registered
             store.setOnline(true); // ADAPTED: Cobalt sets online flag
             safeSave("pair-success"); // ADAPTED: Cobalt persists store
         } catch (RuntimeException exception) {
@@ -656,7 +668,7 @@ public final class IqStreamHandler implements SocketStream.Handler {
             if (mdSessionId != null) {
                 builder.mdSessionId(mdSessionId); // WAWebWamDeviceLinkReporter.R: mdSessionId: r.sessionId
             }
-            whatsapp.wamService().commit(builder.build()); // WAWebWamDeviceLinkReporter.R: l.commitAndWaitForFlush(true)
+            wamService.commit(builder.build()); // WAWebWamDeviceLinkReporter.R: l.commitAndWaitForFlush(true)
         } catch (RuntimeException wamException) {
             // Telemetry emission must never disrupt the pairing flow: log and swallow.
             LOGGER.log(System.Logger.Level.WARNING, "Cannot commit MdLinkDeviceCompanion event: {0}", wamException.getMessage());
@@ -872,7 +884,7 @@ public final class IqStreamHandler implements SocketStream.Handler {
             return Optional.empty();
         }
 
-        var decoded = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
+        var decoded = new String(bytes, StandardCharsets.UTF_8);
         return decoded.isBlank() ? Optional.empty() : Optional.of(decoded);
     }
 

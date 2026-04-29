@@ -114,7 +114,7 @@ abstract class MediaInputStream extends InputStream {
      * the IV between chunks.
      *
      * @implNote WAMediaCrypto.CBC_BLOCK_SIZE: module constant {@code C = 16}.
-     * Cobalt also exposes this value at runtime via {@link javax.crypto.Cipher#getBlockSize()}
+     * Cobalt also exposes this value at runtime via {@link Cipher#getBlockSize()}
      * on the AES cipher instance; the two are guaranteed to match for
      * {@code AES/CBC/PKCS5Padding}.
      */

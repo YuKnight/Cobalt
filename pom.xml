@@ -71,13 +71,11 @@
         <junit.version>5.10.0-M1</junit.version>
         <libsignal.version>0.0.5</libsignal.version>
         <curve25519.version>3.0.1</curve25519.version>
-        <lazysodium.version>5.1.4</lazysodium.version>
         <linkpreview.version>2.3</linkpreview.version>
         <vcard.version>0.12.1</vcard.version>
         <qr.terminal.version>2.2</qr.terminal.version>
         <libphonenumber.version>9.0.4</libphonenumber.version>
         <maven.versions.version>2.15.0</maven.versions.version>
-        <plist.version>1.27</plist.version>
         <sl4j.version>2.0.13</sl4j.version>
         <apk.parser.version>2.6.10</apk.parser.version>
         <collections.version>1.0.0</collections.version>

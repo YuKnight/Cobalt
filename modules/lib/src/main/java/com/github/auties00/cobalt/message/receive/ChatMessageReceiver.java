@@ -21,6 +21,7 @@ import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
 import com.github.auties00.cobalt.model.message.MessageContainer;
 import com.github.auties00.cobalt.model.message.MessageStatus;
+import com.github.auties00.cobalt.model.message.MessageThreadId;
 import com.github.auties00.cobalt.model.message.system.DeviceSentMessage;
 import com.github.auties00.cobalt.model.message.text.HighlyStructuredMessage;
 import com.github.auties00.cobalt.node.Node;
@@ -28,6 +29,7 @@ import com.github.auties00.cobalt.store.WhatsAppStore;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -913,13 +915,13 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
 
         // WAWebDeviceSentMessageProtoUtils.unwrapDeviceSentMessage
         // threadId: inner preferred when non-empty, outer fallback, else empty list
-        java.util.List<com.github.auties00.cobalt.model.message.MessageThreadId> threadId;
+        List<MessageThreadId> threadId;
         if (innerCtx != null && !innerCtx.threadId().isEmpty()) {
             threadId = innerCtx.threadId();
         } else if (outerCtx != null) {
             threadId = outerCtx.threadId();
         } else {
-            threadId = java.util.List.of();
+            threadId = List.of();
         }
         mergedCtx.threadId(threadId);
 

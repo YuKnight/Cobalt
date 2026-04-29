@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.socket;
 
-import com.github.auties00.cobalt.client.WhatsAppClientProxy;
+import com.github.auties00.cobalt.proxy.WhatsAppProxy;
 import com.github.auties00.cobalt.client.WhatsAppWebClientHistory;
 import com.github.auties00.cobalt.exception.WhatsAppSessionException;
 import com.github.auties00.cobalt.exception.WhatsAppStreamException;
@@ -149,15 +149,15 @@ public sealed abstract class WhatsAppSocketClient {
 
     private static SocketClientLayer<?> createTunnelSecurity(SocketClientLayer<?> transport, WhatsAppStore store, WhatsAppSslEngineFactory engineFactory) {
         return switch (store.proxy().orElse(null)) {
-            case WhatsAppClientProxy.Http.Secure _ -> SocketClientSecurityLayer.newTls(transport, engineFactory);
+            case WhatsAppProxy.Http.Secure _ -> SocketClientSecurityLayer.newTls(transport, engineFactory);
             case null, default -> SocketClientSecurityLayer.newPlain(transport);
         };
     }
 
     private static SocketClientLayer<?> createTunnel(SocketClientLayer<?> tunnelSecurity, WhatsAppStore store) {
         return switch (store.proxy().orElse(null)) {
-            case WhatsAppClientProxy.Http http -> SocketClientTunnelLayer.newHttpTunnel(http, tunnelSecurity);
-            case WhatsAppClientProxy.Socks socks -> SocketClientTunnelLayer.newSocksTunnel(socks, tunnelSecurity);
+            case WhatsAppProxy.Http http -> SocketClientTunnelLayer.newHttpTunnel(http, tunnelSecurity);
+            case WhatsAppProxy.Socks socks -> SocketClientTunnelLayer.newSocksTunnel(socks, tunnelSecurity);
             case null -> SocketClientTunnelLayer.newDirectTunnel(tunnelSecurity);
         };
     }

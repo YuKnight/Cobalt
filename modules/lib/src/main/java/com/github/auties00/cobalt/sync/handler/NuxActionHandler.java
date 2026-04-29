@@ -14,6 +14,7 @@ import com.github.auties00.cobalt.model.sync.action.device.NuxAction;
 import com.github.auties00.cobalt.model.sync.action.device.NuxActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 import java.time.Instant;
 import java.util.HashMap;
@@ -118,8 +119,8 @@ public final class NuxActionHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebNuxSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebNuxSync.applyMutations -> SyncActionState.Success
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebNuxSync.applyMutations -> SyncActionState.Success
     }
 
     /**
@@ -169,7 +170,7 @@ public final class NuxActionHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebNuxSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) { // WAWebNuxSync.applyMutations: if (e.operation !== "set") return {actionState: Unsupported}
             return MutationApplicationResult.unsupported(); // WAWebNuxSync.applyMutations: {actionState: SyncActionState.Unsupported}
         }

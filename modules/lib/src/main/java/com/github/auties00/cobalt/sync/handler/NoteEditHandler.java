@@ -15,6 +15,7 @@ import com.github.auties00.cobalt.model.sync.action.media.NoteEditActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -134,8 +135,8 @@ public final class NoteEditHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebNoteSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebNoteSync.applyMutations
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebNoteSync.applyMutations
     }
 
     /**
@@ -169,7 +170,7 @@ public final class NoteEditHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebNoteSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         try { // WAWebNoteSync.applyMutations: try { ... } catch(e) { return {actionState: Failed} }
             // WAWebNoteSync.applyMutations: if (e.operation !== "set") return a++, {actionState: Unsupported}
             if (mutation.operation() != SyncdOperation.SET) {
@@ -263,7 +264,7 @@ public final class NoteEditHandler implements WebAppStateActionHandler {
             var record = new NoteEditActionBuilder()
                     .type(type) // WAWebNoteSync.applyMutations: type: m === UNSTRUCTURED ? "unstructured" : "structured"
                     .chatJid(resolvedChatJid) // WAWebNoteSync.applyMutations: chatJid: L
-                    .createdAt(createdAtOpt.orElse(0L)) // WAWebNoteSync.applyMutations: createdAt: Math.floor((f != null ? f : 0) / 1000)
+                    .createdAt(createdAtOpt.orElse(Instant.EPOCH)) // WAWebNoteSync.applyMutations: createdAt: Math.floor((f != null ? f : 0) / 1000)
                     .deleted(false) // ADAPTED: explicit false for the non-deleted branch
                     .unstructuredContent(content != null ? content : "") // WAWebNoteSync.applyMutations: content: p != null ? p : ""
                     .build();
@@ -370,7 +371,7 @@ public final class NoteEditHandler implements WebAppStateActionHandler {
                 .type(NoteEditAction.NoteType.UNSTRUCTURED) // WAWebNoteSync.applyMutations: type: UNSTRUCTURED
                 .chatJid(chatJid) // WAWebNoteSync.applyMutations: chatJid: c
                 // WAWebNoteSync.getNoteMutation: createdAt: e.createdAt * 1e3 (wire is milliseconds)
-                .createdAt(timestamp.toEpochMilli())
+                .createdAt(timestamp)
                 .deleted(deleted) // ADAPTED: WAWebNoteSync.getNoteMutation does not set deleted; Cobalt overloads this builder for the deletion path consumed by applyMutations (u.deleted === true)
                 .unstructuredContent(content == null ? "" : content) // WAWebNoteSync.applyMutations: unstructuredContent
                 .build();

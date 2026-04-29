@@ -34,12 +34,14 @@ import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
+import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.AddressingModeMismatchEventBuilder;
 import com.github.auties00.cobalt.wam.event.MdDeviceSyncAckEventBuilder;
 import com.github.auties00.cobalt.wam.event.MdGroupParticipantMissAckEventBuilder;
 import com.github.auties00.cobalt.wam.event.PrekeysDepletionEventBuilder;
 import com.github.auties00.cobalt.wam.type.AddressingMode;
 import com.github.auties00.cobalt.wam.type.ClientGroupSizeBucket;
+import com.github.auties00.cobalt.wam.type.E2eDestination;
 import com.github.auties00.cobalt.wam.type.MessageType;
 import com.github.auties00.cobalt.wam.type.MismatchOriginType;
 import com.github.auties00.cobalt.wam.type.PrekeysFetchContext;
@@ -174,6 +176,7 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
      * @param bizStanza             the business stanza builder
      * @param metaStanza            the meta stanza builder
      * @param reportingStanza       the reporting stanza builder
+     * @param wamService            the WAM telemetry service for committing send events
      *
      * @implNote ADAPTED: WAWebSendGroupMsgJob uses module-level imports;
      * Cobalt uses constructor-based DI.
@@ -189,9 +192,10 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
             BotStanza botStanza,
             BizStanza bizStanza,
             MetaStanza metaStanza,
-            ReportingStanza reportingStanza
+            ReportingStanza reportingStanza,
+            WamService wamService
     ) {
-        super(client);
+        super(client, wamService);
         this.encryption = Objects.requireNonNull(encryption, "encryption");
         this.deviceService = Objects.requireNonNull(deviceService, "deviceService");
         this.abPropsService = Objects.requireNonNull(abPropsService, "abPropsService");
@@ -364,14 +368,14 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
                         // with e2eSuccessful=true from the finally-committed event.
                         emitE2eMessageSendSenderKeyEvent(
                                 groupJid, container,
-                                com.github.auties00.cobalt.wam.type.E2eDestination.GROUP,
+                                E2eDestination.GROUP,
                                 isLidAddressingMode, true);
                     } catch (RuntimeException skmsgError) {
                         // WAWebEncryptMsgProtobuf.encryptMsgSenderKey: on failure flips
                         // e2eSuccessful=false and sets weight=1 before the finally commit.
                         emitE2eMessageSendSenderKeyEvent(
                                 groupJid, container,
-                                com.github.auties00.cobalt.wam.type.E2eDestination.GROUP,
+                                E2eDestination.GROUP,
                                 isLidAddressingMode, false);
                         throw skmsgError;
                     }
@@ -509,7 +513,7 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
                         // emit AddressingModeMismatch (id 4750) before migrating so that
                         // mismatches observed on outgoing group SKMSG acks are reported
                         // with MISMATCH_ORIGIN_TYPE.ACK_OUTGOING_MESSAGE.
-                        client.wamService().commit(new AddressingModeMismatchEventBuilder()
+                        wamService.commit(new AddressingModeMismatchEventBuilder()
                                 .localAddressingMode(wamAddressingMode(addressingMode))
                                 .serverAddressingMode(wamAddressingMode(serverMode))
                                 .mismatchOrigin(MismatchOriginType.ACK_OUTGOING_MESSAGE)
@@ -842,7 +846,7 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
             // a primitive boolean so the mapping is unconditional here.
             localWamMode = gm.isLidAddressingMode() ? AddressingMode.LID : AddressingMode.PN;
         }
-        client.wamService().commit(new MdDeviceSyncAckEventBuilder()
+        wamService.commit(new MdDeviceSyncAckEventBuilder()
                 .revoke(UserMessageSender.isRevokeMessage(messageInfo))
                 .chatType(UserMessageSender.chatTypeFromJid(groupJid))
                 .isLid(senderIsLid)
@@ -1036,7 +1040,7 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
 
         // WAWebMaybePostMdGroupSyncMetrics: messageIsRevoke =
         // WAWebSendMsgCommonApi.isRevokeMsg(msgProtobuf)
-        client.wamService().commit(new MdGroupParticipantMissAckEventBuilder()
+        wamService.commit(new MdGroupParticipantMissAckEventBuilder()
                 .messageIsRevoke(UserMessageSender.isRevokeMessage(messageInfo))
                 .groupSizeBucket(groupSizeBucket)
                 .typeOfGroup(typeOfGroup)
@@ -1245,7 +1249,7 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
         var bucket = deviceCount == null ? null : WamSizeBuckets.numberToSizeBucket(deviceCount);
         // WAWebPostPrekeysDepletionMetric.maybePostPrekeysDepletionMetric: for (var e=0;e<t;e++) commit()
         for (var i = 0; i < depletedPrekeyCount; i++) {
-            client.wamService().commit(new PrekeysDepletionEventBuilder()
+            wamService.commit(new PrekeysDepletionEventBuilder()
                     .prekeysFetchReason(PrekeysFetchContext.SEND_MESSAGE)
                     .messageType(messageType)
                     .deviceSizeBucket(bucket)

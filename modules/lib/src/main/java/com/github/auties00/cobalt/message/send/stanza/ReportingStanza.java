@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.message.send.stanza;
 
 import com.github.auties00.cobalt.message.send.token.ReportingToken;
+import com.github.auties00.cobalt.message.send.token.ReportingTokenContent;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -119,15 +120,11 @@ public final class ReportingStanza {
             return null;
         }
 
-        // TODO: Implement proper reporting token content extraction.
-        //  WA Web uses WAWebReportingTokenContent.ReportingTokenContentCalculator
-        //  which builds a sparse copy of the Message protobuf containing only
-        //  the fields specified by WAWebReportingTokenConfig for the given version,
-        //  then serializes that sparse copy. The config is a base64-encoded protobuf
-        //  (REPORTING_TOKEN_CONFIG_BASE64) mapping field numbers to extraction rules.
-        //  Currently we use the full serialized protobuf, which causes server-side
-        //  HMAC verification to fail.
-        var serializedProto = MessageContainerSpec.encode(messageInfo.message());
+        // WAWebReportingTokenContent.ReportingTokenContentCalculator.getReportingTokenContent:
+        // build the sparse copy of the encoded MessageContainer containing only the field numbers
+        // whitelisted by REPORTING_TOKEN_CONFIG_BASE64 for senderVersion.
+        var fullProto = MessageContainerSpec.encode(messageInfo.message());
+        var serializedProto = ReportingTokenContent.compute(fullProto, senderVersion);
 
         var id = messageInfo.key().id();
         if(id.isEmpty()) {
@@ -169,7 +166,7 @@ public final class ReportingStanza {
      *
      * <p>A value of {@code 0} (or less) disables reporting-token generation.
      * The actual integer is consumed by
-     * {@link com.github.auties00.cobalt.message.send.token.ReportingToken#generate}
+     * {@link ReportingToken#generate}
      * to select the HMAC key-derivation scheme used for the token.
      *
      * @return the sender reporting token version from

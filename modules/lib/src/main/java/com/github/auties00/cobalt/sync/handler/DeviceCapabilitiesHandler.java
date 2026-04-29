@@ -14,6 +14,7 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 import com.github.auties00.cobalt.wam.event.Lid11MigrationLifecycleEventBuilder;
 import com.github.auties00.cobalt.wam.type.MigrationStageEnum;
+import com.github.auties00.cobalt.wam.WamService;
 
 import java.util.HashMap;
 import java.util.Objects;
@@ -171,8 +172,8 @@ public final class DeviceCapabilitiesHandler implements WebAppStateActionHandler
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDeviceCapabilitiesSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS;
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -212,7 +213,7 @@ public final class DeviceCapabilitiesHandler implements WebAppStateActionHandler
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDeviceCapabilitiesSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) { // WAWebDeviceCapabilitiesSync.applyMutations: if (e.operation === "set")
             return MutationApplicationResult.success(); // WAWebDeviceCapabilitiesSync.applyMutations: return {actionState: Success}
         }
@@ -275,7 +276,7 @@ public final class DeviceCapabilitiesHandler implements WebAppStateActionHandler
                         // WA Web always passes the post-check value which is false at this point;
                         // Cobalt keeps the same read so the wire payload stays byte-identical.
                         if (!client.lidMigrationService().isLidMigrated()) {
-                            client.wamService().commit(new Lid11MigrationLifecycleEventBuilder()
+                            wamService.commit(new Lid11MigrationLifecycleEventBuilder()
                                     .migrationStage(MigrationStageEnum.COMPANION_RECEIVED_DEVICE_CAPABILITY)
                                     .isLocally1x1MigratedFromDb(client.lidMigrationService().isLidMigrated())
                                     .build());

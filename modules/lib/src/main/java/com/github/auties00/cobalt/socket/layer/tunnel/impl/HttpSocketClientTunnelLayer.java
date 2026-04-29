@@ -1,10 +1,11 @@
 package com.github.auties00.cobalt.socket.layer.tunnel.impl;
 
+import com.github.auties00.cobalt.proxy.WhatsAppProxyAuthenticator;
 import com.github.auties00.cobalt.socket.layer.SocketClientLayer;
 import com.github.auties00.cobalt.socket.layer.SocketClientLayerListener;
 import com.github.auties00.cobalt.socket.layer.tunnel.SocketClientTunnelLayer;
 import com.github.auties00.cobalt.socket.threading.SocketClientLayerContext;
-import com.github.auties00.cobalt.client.WhatsAppClientProxy;
+import com.github.auties00.cobalt.proxy.WhatsAppProxy;
 import com.github.auties00.cobalt.util.HttpResponseReader;
 
 import java.io.IOException;
@@ -28,7 +29,7 @@ import java.util.List;
  * security layer above.
  *
  * <p>Authentication is supported via the proxy's configured
- * {@link com.github.auties00.cobalt.client.WhatsAppClientProxyAuthenticator.Http
+ * {@link WhatsAppProxyAuthenticator.Http
  * authenticator}.  Redirects (3xx) to alternate proxy servers within the
  * same scheme are followed up to {@value #MAX_REDIRECTS} times.
  *
@@ -53,7 +54,7 @@ import java.util.List;
  * </ul>
  *
  * @apiNote This layer directly depends on
- * {@link WhatsAppClientProxy.Http} for proxy configuration.  This
+ * {@link WhatsAppProxy.Http} for proxy configuration.  This
  * coupling is intentional for this project.  If the socket stack is
  * extracted as a standalone library, a generic proxy configuration
  * interface should be introduced to replace the direct dependency.
@@ -75,7 +76,7 @@ public final class HttpSocketClientTunnelLayer implements SocketClientTunnelLaye
     /**
      * The original proxy configuration.
      */
-    private final WhatsAppClientProxy.Http proxy;
+    private final WhatsAppProxy.Http proxy;
 
     /**
      * The inner layer that provides raw I/O.
@@ -103,7 +104,7 @@ public final class HttpSocketClientTunnelLayer implements SocketClientTunnelLaye
      * @param proxy      the HTTP proxy configuration
      * @param innerLayer the layer below (transport or TLS-over-transport)
      */
-    public HttpSocketClientTunnelLayer(WhatsAppClientProxy.Http proxy, SocketClientLayer<?> innerLayer) {
+    public HttpSocketClientTunnelLayer(WhatsAppProxy.Http proxy, SocketClientLayer<?> innerLayer) {
         this.proxy = proxy;
         this.innerLayer = innerLayer;
         this.responseReader = new HttpResponseReader(
@@ -176,7 +177,7 @@ public final class HttpSocketClientTunnelLayer implements SocketClientTunnelLaye
      * @throws IOException if the handshake fails, times out, or
      *                     authentication is rejected
      */
-    private WhatsAppClientProxy.Http authenticate(WhatsAppClientProxy.Http currentProxy, long deadline) throws IOException {
+    private WhatsAppProxy.Http authenticate(WhatsAppProxy.Http currentProxy, long deadline) throws IOException {
         var authenticator = currentProxy.authenticator();
 
         responseReader.checkDeadline(deadline);
@@ -380,7 +381,7 @@ public final class HttpSocketClientTunnelLayer implements SocketClientTunnelLaye
 
     /**
      * Scans response headers for the first {@code Location} value and
-     * parses it directly into a {@link WhatsAppClientProxy.Http} redirect
+     * parses it directly into a {@link WhatsAppProxy.Http} redirect
      * target.
      *
      * <p>Two parsing tiers avoid ever materialising the full URI:
@@ -388,7 +389,7 @@ public final class HttpSocketClientTunnelLayer implements SocketClientTunnelLaye
      *   <li><b>Fast path</b> (value in buffer — the common case): the
      *       value is extracted into an exact-sized {@code byte[]} and
      *       parsed with direct array indexing via
-     *       {@link #parseRedirectUri(byte[], int, WhatsAppClientProxy.Http)}.</li>
+     *       {@link #parseRedirectUri(byte[], int, WhatsAppProxy.Http)}.</li>
      *   <li><b>Slow path</b> (value spans buffers): a streaming state
      *       machine in {@link #parseRedirectUriStreaming} reads host
      *       bytes into a fixed {@code byte[253]} and port digits into
@@ -409,11 +410,11 @@ public final class HttpSocketClientTunnelLayer implements SocketClientTunnelLaye
      *                     size limit, the connection closes, or the
      *                     deadline is exceeded
      */
-    private WhatsAppClientProxy.Http consumeLocationRedirect(WhatsAppClientProxy.Http currentProxy, int statusCode, long deadline) throws IOException {
+    private WhatsAppProxy.Http consumeLocationRedirect(WhatsAppProxy.Http currentProxy, int statusCode, long deadline) throws IOException {
         responseReader.startHeaderSection();
         responseReader.skipToEndOfLine(deadline);
 
-        WhatsAppClientProxy.Http result = null;
+        WhatsAppProxy.Http result = null;
         outer:
         while (innerLayer.isConnected()) {
             var b = responseReader.nextHeaderByte(deadline);
@@ -499,7 +500,7 @@ public final class HttpSocketClientTunnelLayer implements SocketClientTunnelLaye
      * @return the parsed redirect proxy configuration
      * @throws IOException if the URI is malformed
      */
-    private WhatsAppClientProxy.Http parseRedirectUri(byte[] value, int valueLen, WhatsAppClientProxy.Http currentProxy) throws IOException {
+    private WhatsAppProxy.Http parseRedirectUri(byte[] value, int valueLen, WhatsAppProxy.Http currentProxy) throws IOException {
         if (valueLen < 7
             || (value[0] | 0x20) != 'h'
             || (value[1] | 0x20) != 't'
@@ -570,8 +571,8 @@ public final class HttpSocketClientTunnelLayer implements SocketClientTunnelLaye
 
         var authenticator = currentProxy.authenticator().orElse(null);
         return isHttps
-                ? WhatsAppClientProxy.ofHttps(redirectHost, redirectPort, authenticator)
-                : WhatsAppClientProxy.ofHttp(redirectHost, redirectPort, authenticator);
+                ? WhatsAppProxy.ofHttps(redirectHost, redirectPort, authenticator)
+                : WhatsAppProxy.ofHttp(redirectHost, redirectPort, authenticator);
     }
 
     /**
@@ -597,7 +598,7 @@ public final class HttpSocketClientTunnelLayer implements SocketClientTunnelLaye
      * @return the parsed redirect proxy configuration
      * @throws IOException if the URI is malformed
      */
-    private WhatsAppClientProxy.Http parseRedirectUriStreaming(byte firstByte, WhatsAppClientProxy.Http currentProxy, long deadline) throws IOException {
+    private WhatsAppProxy.Http parseRedirectUriStreaming(byte firstByte, WhatsAppProxy.Http currentProxy, long deadline) throws IOException {
         // Parse scheme
         if ((firstByte | 0x20) != 'h') {
             throw new IOException("Invalid redirect URI: missing scheme");
@@ -664,8 +665,8 @@ public final class HttpSocketClientTunnelLayer implements SocketClientTunnelLaye
                 : currentProxy.host();
         var authenticator = currentProxy.authenticator().orElse(null);
         return isHttps
-                ? WhatsAppClientProxy.ofHttps(redirectHost, redirectPort, authenticator)
-                : WhatsAppClientProxy.ofHttp(redirectHost, redirectPort, authenticator);
+                ? WhatsAppProxy.ofHttps(redirectHost, redirectPort, authenticator)
+                : WhatsAppProxy.ofHttp(redirectHost, redirectPort, authenticator);
     }
 
     /**

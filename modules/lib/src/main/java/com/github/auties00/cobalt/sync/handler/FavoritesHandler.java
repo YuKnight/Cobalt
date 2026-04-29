@@ -16,6 +16,7 @@ import com.github.auties00.cobalt.model.sync.action.media.FavoritesActionBuilder
 import com.github.auties00.cobalt.model.sync.action.media.FavoritesActionFavoriteBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -116,8 +117,8 @@ public final class FavoritesHandler implements WebAppStateActionHandler {
      */
     @WhatsAppWebExport(moduleName = "WAWebFavoritesSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     @Override
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: WAWebFavoritesSync.applyMutations — single-mutation convenience
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: WAWebFavoritesSync.applyMutations — single-mutation convenience
     }
 
     /**
@@ -140,7 +141,7 @@ public final class FavoritesHandler implements WebAppStateActionHandler {
      */
     @WhatsAppWebExport(moduleName = "WAWebFavoritesSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     @Override
-    public List<MutationApplicationResult> applyMutationBatchResults(WhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
+    public List<MutationApplicationResult> applyMutationBatchResults(WhatsAppClient client, WamService wamService, List<DecryptedMutation.Trusted> mutations) {
         DecryptedMutation.Trusted latest = null; // WAWebFavoritesSync.applyMutations: var i
         var unsupportedCount = 0; // WAWebFavoritesSync.applyMutations: var l = 0
         var malformedCount = 0; // WAWebFavoritesSync.applyMutations: var d = 0
@@ -194,7 +195,7 @@ public final class FavoritesHandler implements WebAppStateActionHandler {
      */
     @WhatsAppWebExport(moduleName = "WAWebFavoritesSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     @Override
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) { // WAWebFavoritesSync.applyMutations: e.operation !== "set"
             return malformedActionValue(); // WAWebFavoritesSync.applyMutations: return o("WAWebSyncdIndexUtils").malformedActionValue(r.collectionName)
         }

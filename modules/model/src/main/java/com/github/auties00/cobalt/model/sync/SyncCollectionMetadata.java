@@ -1,169 +1,293 @@
 package com.github.auties00.cobalt.model.sync;
 
-import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.model.mixin.InstantMillisMixin;
+import it.auties.protobuf.annotation.ProtobufMessage;
+import it.auties.protobuf.annotation.ProtobufProperty;
+import it.auties.protobuf.model.ProtobufType;
 
-import java.util.Arrays;
-import java.util.Objects;
+import java.time.Instant;
+import java.util.Optional;
 
 /**
- * Bookkeeping record describing the local state of a single app state sync
- * collection.
+ * Per-collection bookkeeping container for app-state sync.
  *
- * <p>App state data is partitioned across a fixed set of collections (see
- * {@link SyncPatchType}), each with its own monotonically increasing version
- * number and integrity hash. This record gathers the metadata tracked per
- * collection: its name, current version, 128 byte LT-Hash, last sync and
- * error timestamps, current state in the sync lifecycle, retry counter,
- * persistent MAC mismatch flag, and a bootstrapped flag that distinguishes
- * a collection that has never been synced from one that has synced and is
- * simply empty.
- *
- * @implNote The {@code bootstrapped} component adapts WA Web's
- *           {@code WAWebSyncdCollectionUtils.isBootstrap(n)} predicate, which
- *           returns {@code n == null} (i.e. no local version recorded yet).
- *           Cobalt represents this as an explicit boolean field with inverted
- *           polarity ({@code bootstrapped == true} means a sync round has
- *           settled, equivalent to {@code !isBootstrap}). The check is
- *           inlined at each call site rather than exposed as a separate
- *           predicate method.
- * @param name the identifier of the collection
- * @param version the current version counter, monotonically increasing as
- *                mutations are applied
- * @param ltHash the current 128 byte LT-Hash used to detect tampering or
- *               missed mutations against the server hash
- * @param lastSyncTimestamp the wall clock time in epoch milliseconds of the
- *                          most recent successful sync
- * @param state the current state in the collection sync lifecycle
- * @param retryCount the number of consecutive retry attempts made after the
- *                   last error
- * @param lastErrorTimestamp the wall clock time in epoch milliseconds of
- *                           the most recent error
- * @param macMismatch whether a snapshot MAC mismatch has been observed on
- *                    this collection; once set, the flag persists across
- *                    state transitions so that the mismatch is remembered
- *                    for future diagnostics
- * @param bootstrapped whether this collection has completed at least one
- *                     sync round; a fresh collection is considered not
- *                     bootstrapped until the first sync settles, which is
- *                     distinct from a synced but empty collection at
- *                     version zero. Adapts WA Web
- *                     {@code WAWebSyncdCollectionUtils.isBootstrap} with
- *                     inverted polarity.
+ * <p>App-state mutations are partitioned across a fixed family of
+ * collections (see {@link SyncPatchType}). For each collection the
+ * client maintains a small set of bookkeeping fields used to drive the
+ * sync state machine: the current monotonic version counter, the
+ * 128-byte LT-Hash that lets the server detect tampering or missed
+ * mutations, the timestamps of the last successful sync and the last
+ * observed error, the current lifecycle {@link SyncCollectionState}, a
+ * retry counter, a sticky MAC-mismatch flag, and a "bootstrapped" flag
+ * that lets the client tell apart "never synced yet" from "synced and
+ * empty".
  */
-@WhatsAppWebModule(moduleName = "WAWebSyncdCollectionUtils")
-public record SyncCollectionMetadata(
-        SyncPatchType name,
-        long version,
-        byte[] ltHash,
-        long lastSyncTimestamp,
-        SyncCollectionState state,
-        int retryCount,
-        long lastErrorTimestamp,
-        boolean macMismatch,
-        boolean bootstrapped
-) {
+@ProtobufMessage
+public final class SyncCollectionMetadata {
     /**
-     * Canonical constructor that validates the argument values.
-     *
-     * @throws NullPointerException if {@code name}, {@code ltHash}, or
-     *                              {@code state} is {@code null}
-     * @throws IllegalArgumentException if {@code version} or
-     *                                  {@code retryCount} is negative, or
-     *                                  if {@code ltHash} is not exactly
-     *                                  128 bytes long
+     * The identifier of the collection this metadata describes.
      */
-    public SyncCollectionMetadata {
-        if (name == null) {
-            throw new NullPointerException("Collection name cannot be null");
-        }
-        if (ltHash == null) {
-            throw new NullPointerException("LT-Hash cannot be null");
-        }
-        if (state == null) {
-            throw new NullPointerException("Collection state cannot be null");
-        }
-        if (version < 0) {
-            throw new IllegalArgumentException("Version cannot be negative: " + version);
-        }
-        if (ltHash.length != 128) {
-            throw new IllegalArgumentException("LT-Hash must be 128 bytes, got " + ltHash.length);
-        }
-        if (retryCount < 0) {
-            throw new IllegalArgumentException("Retry count cannot be negative: " + retryCount);
-        }
+    @ProtobufProperty(index = 1, type = ProtobufType.ENUM)
+    SyncPatchType name;
+
+    /**
+     * The current version counter, monotonically increasing as
+     * mutations are applied.
+     */
+    @ProtobufProperty(index = 2, type = ProtobufType.INT64)
+    long version;
+
+    /**
+     * The current 128-byte LT-Hash used for tamper detection against
+     * the server hash.
+     */
+    @ProtobufProperty(index = 3, type = ProtobufType.BYTES)
+    byte[] ltHash;
+
+    /**
+     * The instant of the most recent successful sync. Encoded on the
+     * wire as a 64-bit millisecond epoch via
+     * {@link InstantMillisMixin}.
+     */
+    @ProtobufProperty(index = 4, type = ProtobufType.INT64, mixins = InstantMillisMixin.class)
+    Instant lastSyncTimestamp;
+
+    /**
+     * The current state in the collection sync lifecycle.
+     */
+    @ProtobufProperty(index = 5, type = ProtobufType.ENUM)
+    SyncCollectionState state;
+
+    /**
+     * The number of consecutive retry attempts since the last error.
+     */
+    @ProtobufProperty(index = 6, type = ProtobufType.INT32)
+    int retryCount;
+
+    /**
+     * The instant of the most recent observed error. Encoded on the
+     * wire as a 64-bit millisecond epoch via
+     * {@link InstantMillisMixin}.
+     */
+    @ProtobufProperty(index = 7, type = ProtobufType.INT64, mixins = InstantMillisMixin.class)
+    Instant lastErrorTimestamp;
+
+    /**
+     * Whether a snapshot MAC mismatch has been observed; sticky across
+     * state transitions.
+     */
+    @ProtobufProperty(index = 8, type = ProtobufType.BOOL)
+    boolean macMismatch;
+
+    /**
+     * Whether this collection has completed at least one sync round.
+     */
+    @ProtobufProperty(index = 9, type = ProtobufType.BOOL)
+    boolean bootstrapped;
+
+    /**
+     * Constructs a new {@code SyncCollectionMetadata} with the supplied
+     * field values.
+     *
+     * @param name               the identifier of the collection
+     * @param version            the current version counter
+     * @param ltHash             the current 128-byte LT-Hash
+     * @param lastSyncTimestamp  the instant of the most recent
+     *                           successful sync, or {@code null} if
+     *                           never synced
+     * @param state              the current sync lifecycle state
+     * @param retryCount         the consecutive retry attempt count
+     * @param lastErrorTimestamp the instant of the most recent observed
+     *                           error, or {@code null} if no error has
+     *                           been observed
+     * @param macMismatch        the sticky MAC-mismatch flag
+     * @param bootstrapped       the bootstrapped flag
+     */
+    SyncCollectionMetadata(SyncPatchType name, long version, byte[] ltHash, Instant lastSyncTimestamp, SyncCollectionState state, int retryCount, Instant lastErrorTimestamp, boolean macMismatch, boolean bootstrapped) {
+        this.name = name;
+        this.version = version;
+        this.ltHash = ltHash;
+        this.lastSyncTimestamp = lastSyncTimestamp;
+        this.state = state;
+        this.retryCount = retryCount;
+        this.lastErrorTimestamp = lastErrorTimestamp;
+        this.macMismatch = macMismatch;
+        this.bootstrapped = bootstrapped;
     }
 
     /**
-     * Returns a copy of this metadata with the retry counter incremented by
-     * one and the last error timestamp set to the current wall clock time.
+     * Returns the identifier of the collection this metadata describes.
      *
-     * @return a new metadata instance reflecting an additional retry
-     *         attempt
+     * @return the collection identifier
      */
-    public SyncCollectionMetadata incrementRetry() {
-        return new SyncCollectionMetadata(
-                name,
-                version,
-                ltHash,
-                lastSyncTimestamp,
-                state,
-                retryCount + 1,
-                System.currentTimeMillis(),
-                macMismatch,
-                bootstrapped
-        );
+    public SyncPatchType name() {
+        return name;
     }
 
     /**
-     * Returns a copy of this metadata with the retry counter reset to zero
-     * and the last error timestamp cleared.
+     * Returns the current version counter, monotonically increasing as
+     * mutations are applied.
      *
-     * @return a new metadata instance reflecting a cleared error state
+     * @return the current version counter
      */
-    public SyncCollectionMetadata resetRetry() {
-        return new SyncCollectionMetadata(
-                name,
-                version,
-                ltHash,
-                lastSyncTimestamp,
-                state,
-                0,
-                0,
-                macMismatch,
-                bootstrapped
-        );
+    public long version() {
+        return version;
     }
 
     /**
-     * Compares this metadata with another object for equality, using
-     * deep equality for the LT-Hash byte array.
+     * Returns the current 128-byte LT-Hash used for tamper detection
+     * against the server hash.
      *
-     * @param o the other object to compare with
-     * @return {@code true} if the other object is a
-     *         {@link SyncCollectionMetadata} with the same component values
+     * @return the LT-Hash bytes
      */
-    @Override
-    public boolean equals(Object o) {
-        return o instanceof SyncCollectionMetadata(var thatName, var thatVersion, var thatHash, var thatSyncTimestamp, var thatState, var thatCount, var thatErrorTimestamp, var thatMacMismatch, var thatBootstrapped)
-               && version == thatVersion
-               && retryCount == thatCount
-               && lastSyncTimestamp == thatSyncTimestamp
-               && lastErrorTimestamp == thatErrorTimestamp
-               && macMismatch == thatMacMismatch
-               && bootstrapped == thatBootstrapped
-               && Objects.equals(name, thatName)
-               && Objects.deepEquals(ltHash, thatHash)
-               && state == thatState;
+    public byte[] ltHash() {
+        return ltHash;
     }
 
     /**
-     * Returns a hash code consistent with {@link #equals(Object)}, using
-     * the array hash of the LT-Hash bytes.
+     * Returns the instant of the most recent successful sync, if any.
      *
-     * @return the hash code
+     * @return an {@code Optional} containing the last sync instant, or
+     *         empty if this collection has never synced
      */
-    @Override
-    public int hashCode() {
-        return Objects.hash(name, version, Arrays.hashCode(ltHash), lastSyncTimestamp, state, retryCount, lastErrorTimestamp, macMismatch, bootstrapped);
+    public Optional<Instant> lastSyncTimestamp() {
+        return Optional.ofNullable(lastSyncTimestamp);
+    }
+
+    /**
+     * Returns the current state in the collection sync lifecycle.
+     *
+     * @return the current sync state
+     */
+    public SyncCollectionState state() {
+        return state;
+    }
+
+    /**
+     * Returns the number of consecutive retry attempts since the last
+     * error.
+     *
+     * @return the retry attempt counter
+     */
+    public int retryCount() {
+        return retryCount;
+    }
+
+    /**
+     * Returns the instant of the most recent observed error, if any.
+     *
+     * @return an {@code Optional} containing the last error instant, or
+     *         empty if no error has been observed
+     */
+    public Optional<Instant> lastErrorTimestamp() {
+        return Optional.ofNullable(lastErrorTimestamp);
+    }
+
+    /**
+     * Returns whether a snapshot MAC mismatch has been observed for
+     * this collection.
+     *
+     * @return {@code true} if a MAC mismatch is sticky on this
+     *         collection, {@code false} otherwise
+     */
+    public boolean macMismatch() {
+        return macMismatch;
+    }
+
+    /**
+     * Returns whether this collection has completed at least one sync
+     * round.
+     *
+     * @return {@code true} if the collection has been bootstrapped,
+     *         {@code false} otherwise
+     */
+    public boolean bootstrapped() {
+        return bootstrapped;
+    }
+
+    /**
+     * Sets the identifier of the collection this metadata describes.
+     *
+     * @param name the new collection identifier
+     */
+    public void setName(SyncPatchType name) {
+        this.name = name;
+    }
+
+    /**
+     * Sets the current version counter.
+     *
+     * @param version the new version counter value
+     */
+    public void setVersion(long version) {
+        this.version = version;
+    }
+
+    /**
+     * Sets the current 128-byte LT-Hash bytes.
+     *
+     * @param ltHash the new LT-Hash bytes
+     */
+    public void setLtHash(byte[] ltHash) {
+        this.ltHash = ltHash;
+    }
+
+    /**
+     * Sets the instant of the most recent successful sync.
+     *
+     * @param lastSyncTimestamp the new last-sync instant, or
+     *                          {@code null} to clear it
+     */
+    public void setLastSyncTimestamp(Instant lastSyncTimestamp) {
+        this.lastSyncTimestamp = lastSyncTimestamp;
+    }
+
+    /**
+     * Sets the current state in the collection sync lifecycle.
+     *
+     * @param state the new sync lifecycle state
+     */
+    public void setState(SyncCollectionState state) {
+        this.state = state;
+    }
+
+    /**
+     * Sets the number of consecutive retry attempts since the last
+     * error.
+     *
+     * @param retryCount the new retry attempt count
+     */
+    public void setRetryCount(int retryCount) {
+        this.retryCount = retryCount;
+    }
+
+    /**
+     * Sets the instant of the most recent observed error.
+     *
+     * @param lastErrorTimestamp the new last-error instant, or
+     *                           {@code null} to clear it
+     */
+    public void setLastErrorTimestamp(Instant lastErrorTimestamp) {
+        this.lastErrorTimestamp = lastErrorTimestamp;
+    }
+
+    /**
+     * Sets whether a snapshot MAC mismatch has been observed for this
+     * collection.
+     *
+     * @param macMismatch the new MAC-mismatch flag
+     */
+    public void setMacMismatch(boolean macMismatch) {
+        this.macMismatch = macMismatch;
+    }
+
+    /**
+     * Sets whether this collection has completed at least one sync
+     * round.
+     *
+     * @param bootstrapped the new bootstrapped flag
+     */
+    public void setBootstrapped(boolean bootstrapped) {
+        this.bootstrapped = bootstrapped;
     }
 }

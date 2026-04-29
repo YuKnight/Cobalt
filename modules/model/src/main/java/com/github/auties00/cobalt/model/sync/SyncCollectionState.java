@@ -1,5 +1,7 @@
 package com.github.auties00.cobalt.model.sync;
 
+import it.auties.protobuf.annotation.ProtobufEnum;
+
 /**
  * State in the lifecycle of an app state sync collection on the local
  * device.
@@ -23,6 +25,7 @@ package com.github.auties00.cobalt.model.sync;
  *       or a snapshot recovery</li>
  * </ul>
  */
+@ProtobufEnum
 public enum SyncCollectionState {
     /**
      * Collection is fully synchronised with the server: the local version

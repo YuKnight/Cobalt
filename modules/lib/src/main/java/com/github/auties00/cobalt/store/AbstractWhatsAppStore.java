@@ -1,22 +1,26 @@
 package com.github.auties00.cobalt.store;
 
 import com.github.auties00.cobalt.client.*;
-import com.github.auties00.cobalt.client.info.WhatsAppClientInfo;
+import com.github.auties00.cobalt.info.WhatsAppClientInfo;
 import com.github.auties00.cobalt.media.MediaConnection;
 import com.github.auties00.cobalt.model.business.BusinessVerifiedName;
 import com.github.auties00.cobalt.model.business.profile.BusinessCategory;
+import com.github.auties00.cobalt.model.call.CallLog;
 import com.github.auties00.cobalt.model.call.CallOffer;
 import com.github.auties00.cobalt.model.chat.Chat;
 import com.github.auties00.cobalt.model.chat.ChatEphemeralTimer;
+import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.chat.ChatMetadata;
 import com.github.auties00.cobalt.model.chat.ChatMute;
 import com.github.auties00.cobalt.model.contact.Contact;
 import com.github.auties00.cobalt.model.contact.ContactBuilder;
 import com.github.auties00.cobalt.model.contact.ContactTextStatus;
 import com.github.auties00.cobalt.model.contact.OutContact;
+import com.github.auties00.cobalt.model.device.DeviceCapabilities;
 import com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentity;
 import com.github.auties00.cobalt.model.device.info.DeviceList;
 import com.github.auties00.cobalt.model.device.pairing.ClientAppVersion;
+import com.github.auties00.cobalt.model.device.pairing.ClientPayload;
 import com.github.auties00.cobalt.model.device.pairing.ClientPayload.ClientReleaseChannel;
 import com.github.auties00.cobalt.model.device.sync.MissingDeviceSyncKey;
 import com.github.auties00.cobalt.model.device.sync.PendingDeviceSync;
@@ -45,6 +49,9 @@ import com.github.auties00.cobalt.model.privacy.PrivacySettingType;
 import com.github.auties00.cobalt.model.setting.ChatLockSettings;
 import com.github.auties00.cobalt.model.sync.*;
 import com.github.auties00.cobalt.model.sync.action.bot.MaibaAIFeaturesControlAction;
+import com.github.auties00.cobalt.model.sync.action.chat.InteractiveMessageAction;
+import com.github.auties00.cobalt.model.sync.action.media.NoteEditAction;
+import com.github.auties00.cobalt.proxy.WhatsAppProxy;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastCampaignAction;
 import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastInsightsAction;
@@ -61,6 +68,7 @@ import com.github.auties00.cobalt.model.sync.action.payment.PaymentTosAction;
 import com.github.auties00.cobalt.model.sync.action.privacy.PrivateProcessingSettingAction;
 import com.github.auties00.cobalt.model.sync.action.setting.NotificationActivitySettingAction;
 import com.github.auties00.cobalt.sync.crypto.MutationLTHash;
+import com.github.auties00.cobalt.sync.key.SyncKeyUtils;
 import com.github.auties00.cobalt.util.DataUtils;
 import com.github.auties00.collections.ConcurrentLinkedHashMap;
 import com.github.auties00.libsignal.SignalProtocolAddress;
@@ -102,7 +110,7 @@ import static java.util.Objects.requireNonNullElseGet;
  *       pairing metadata and so on</li>
  * </ul>
  * All of these are exposed as {@code ConcurrentHashMap} fields,
- * {@link com.github.auties00.collections.ConcurrentLinkedHashMap} caches,
+ * {@link ConcurrentLinkedHashMap} caches,
  * or plain scalar fields on this class, so that a concrete subclass only
  * needs to decide how to serialise/load the aggregate.
  *
@@ -115,7 +123,7 @@ import static java.util.Objects.requireNonNullElseGet;
  * module ({@code WAWebSchema*}) maps to a corresponding field or map on
  * this class. The WA Web collection modules ({@code WAWebChatCollection},
  * {@code WAWebContactCollection}, {@code WAWebCallsCollection}, ...) are
- * represented by the {@link java.util.concurrent.ConcurrentHashMap} fields
+ * represented by the {@link ConcurrentHashMap} fields
  * and accessor methods. The Signal storage module
  * {@code WAWebSignalStorage} is absorbed through the {@code SignalProtocol}
  * fields. The UserPrefs module {@code WAWebUserPrefsBase} corresponds to
@@ -131,7 +139,7 @@ import static java.util.Objects.requireNonNullElseGet;
  *       {@code WhatsAppStoreFactory.create(...)} /
  *       {@code WhatsAppStoreFactory.load(...)}. Each WA Web
  *       {@code WAWebSchema*.addTable()} call corresponds to one of the
- *       {@link java.util.concurrent.ConcurrentHashMap} fields declared on
+ *       {@link ConcurrentHashMap} fields declared on
  *       this class; the maps are unconditionally allocated, so there is
  *       no rollout / column-packing branch
  *       ({@code WAWebDbRolloutUtil.loadSchemaVersions} and
@@ -741,7 +749,7 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
 
     protected final AtomicLong encryptionSequence;
 
-    protected WhatsAppClientProxy proxy;
+    protected WhatsAppProxy proxy;
 
     protected final KeySetView<WhatsAppClientListener, Boolean> listeners;
 
@@ -875,19 +883,19 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
 
     protected Map<String, Boolean> nuxStates;
 
-    protected com.github.auties00.cobalt.model.device.DeviceCapabilities primaryDeviceCapabilities;
+    protected DeviceCapabilities primaryDeviceCapabilities;
 
-    protected Map<String, com.github.auties00.cobalt.model.device.DeviceCapabilities> deviceCapabilitiesStates;
+    protected Map<String, DeviceCapabilities> deviceCapabilitiesStates;
 
-    protected Map<String, com.github.auties00.cobalt.model.sync.action.chat.InteractiveMessageAction> interactiveMessageStates;
+    protected Map<String, InteractiveMessageAction> interactiveMessageStates;
 
-    protected Map<String, com.github.auties00.cobalt.model.sync.action.media.NoteEditAction> noteStates;
+    protected Map<String, NoteEditAction> noteStates;
 
     protected Map<String, Instant> newsletterPinStates;
 
     protected Boolean hasAvatar;
 
-    protected Map<String, com.github.auties00.cobalt.model.call.CallLog> callLogStates;
+    protected Map<String, CallLog> callLogStates;
 
     protected Map<String, Boolean> botWelcomeRequestStates;
 
@@ -917,11 +925,11 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
 
     protected Instant pairingTimestamp;
 
-    protected final ConcurrentMap<String, com.github.auties00.cobalt.model.chat.ChatMessageInfo> peerMessages;
+    protected final ConcurrentMap<String, ChatMessageInfo> peerMessages;
 
     protected final System.Logger logger;
 
-    AbstractWhatsAppStore(java.util.UUID uuid, java.lang.Long phoneNumber, com.github.auties00.cobalt.client.WhatsAppClientType clientType, java.time.Instant initializationTimeStamp, com.github.auties00.cobalt.client.WhatsAppDevice device, com.github.auties00.cobalt.model.device.pairing.ClientPayload.ClientReleaseChannel releaseChannel, boolean online, java.lang.String locale, java.lang.String name, java.lang.String verifiedName, java.net.URI profilePicture, java.lang.String about, com.github.auties00.cobalt.model.jid.Jid jid, com.github.auties00.cobalt.model.jid.Jid lid, java.lang.String businessAddress, java.lang.Double businessLongitude, java.lang.Double businessLatitude, java.lang.String businessDescription, java.lang.String businessWebsite, java.lang.String businessEmail, com.github.auties00.cobalt.model.business.profile.BusinessCategory businessCategory, java.util.concurrent.ConcurrentHashMap<com.github.auties00.cobalt.model.jid.Jid,com.github.auties00.cobalt.model.contact.Contact> contacts, java.util.concurrent.ConcurrentHashMap<java.lang.String,com.github.auties00.cobalt.model.call.CallOffer> calls, java.util.concurrent.ConcurrentHashMap<com.github.auties00.cobalt.model.privacy.PrivacySettingType,com.github.auties00.cobalt.model.privacy.PrivacySettingEntry> privacySettings, boolean unarchiveChats, boolean twentyFourHourFormat, com.github.auties00.cobalt.model.chat.ChatEphemeralTimer newChatsEphemeralTimer, com.github.auties00.cobalt.client.WhatsAppWebClientHistory webHistoryPolicy, boolean automaticPresenceUpdates, boolean automaticMessageReceipts, boolean checkPatchMacs, boolean syncedChats, boolean syncedContacts, boolean syncedNewsletters, boolean syncedStatus, boolean syncedWebAppState, boolean syncedBusinessCertificate, java.lang.Integer registrationId, com.github.auties00.libsignal.key.SignalIdentityKeyPair noiseKeyPair, com.github.auties00.libsignal.key.SignalIdentityKeyPair identityKeyPair, com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentity signedDeviceIdentity, com.github.auties00.libsignal.key.SignalSignedKeyPair signedKeyPair, java.util.LinkedHashMap<java.lang.Integer,com.github.auties00.libsignal.key.SignalPreKeyPair> preKeys, java.util.UUID fdid, byte[] deviceId, java.util.UUID advertisingId, byte[] identityId, byte[] backupToken, java.util.concurrent.ConcurrentMap<com.github.auties00.libsignal.groups.SignalSenderKeyName,com.github.auties00.libsignal.groups.state.SignalSenderKeyRecord> senderKeys, java.util.LinkedHashMap<java.lang.String,com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKey> appStateKeys, java.util.concurrent.ConcurrentMap<com.github.auties00.libsignal.SignalProtocolAddress,com.github.auties00.libsignal.state.SignalSessionRecord> sessions, java.util.concurrent.ConcurrentMap<com.github.auties00.cobalt.model.sync.SyncPatchType,com.github.auties00.cobalt.model.sync.SyncHashValue> hashStates, boolean registered, boolean showSecurityNotifications, java.util.concurrent.ConcurrentMap<java.lang.String,com.github.auties00.cobalt.model.preference.Sticker> recentStickers, java.util.concurrent.ConcurrentMap<java.lang.String,com.github.auties00.cobalt.model.preference.Sticker> favouriteStickers, java.util.concurrent.ConcurrentMap<java.lang.String,com.github.auties00.cobalt.model.preference.QuickReply> quickReplies, java.util.concurrent.ConcurrentMap<java.lang.String,com.github.auties00.cobalt.model.preference.Label> labels, com.github.auties00.cobalt.model.device.pairing.ClientAppVersion clientVersion, com.github.auties00.cobalt.model.device.pairing.ClientAppVersion companionVersion, java.time.Instant lastAdvCheckTime, java.util.concurrent.ConcurrentMap<com.github.auties00.libsignal.SignalProtocolAddress,com.github.auties00.libsignal.key.SignalIdentityPublicKey> remoteIdentities, java.util.concurrent.ConcurrentMap<java.lang.String,com.github.auties00.cobalt.model.device.sync.MissingDeviceSyncKey> missingSyncKeys, byte[] advSecretKey, java.util.concurrent.ConcurrentMap<com.github.auties00.cobalt.model.jid.Jid,com.github.auties00.cobalt.model.business.BusinessVerifiedName> verifiedBusinessNames, java.nio.file.Path directory, boolean primaryDeviceSupportsSyncdRecovery, boolean disableLinkPreviews, boolean relayAllCalls, boolean externalWebBeta, com.github.auties00.cobalt.model.setting.ChatLockSettings chatLockSettings, java.util.List<com.github.auties00.cobalt.model.jid.Jid> favoriteChats, java.util.List<java.lang.String> primaryFeatures, java.util.concurrent.ConcurrentMap<com.github.auties00.cobalt.model.jid.Jid,com.github.auties00.cobalt.model.chat.ChatMute> mentionEveryoneMuteExpirations, java.util.concurrent.ConcurrentMap<com.github.auties00.cobalt.model.sync.SyncPatchType,com.github.auties00.cobalt.store.AbstractWhatsAppStore.OrphanMutationEntries> orphanMutationEntries, java.util.concurrent.ConcurrentHashMap<com.github.auties00.cobalt.model.jid.Jid,com.github.auties00.cobalt.model.contact.OutContact> outContacts, long clockSkewSeconds, java.time.Instant groupAbPropsEmergencyPushTimestamp, java.lang.String abPropsAbKey, java.lang.String abPropsHash, long abPropsRefresh, java.time.Instant abPropsLastSyncTime, long abPropsRefreshId, long abPropsWebRefreshId, long groupAbPropsRefreshId, java.util.concurrent.ConcurrentMap<java.lang.String, byte[]> baseKeys) {
+    AbstractWhatsAppStore(UUID uuid, Long phoneNumber, WhatsAppClientType clientType, Instant initializationTimeStamp, WhatsAppDevice device, ClientPayload.ClientReleaseChannel releaseChannel, boolean online, String locale, String name, String verifiedName, URI profilePicture, String about, Jid jid, Jid lid, String businessAddress, Double businessLongitude, Double businessLatitude, String businessDescription, String businessWebsite, String businessEmail, BusinessCategory businessCategory, ConcurrentHashMap<Jid, Contact> contacts, ConcurrentHashMap<String, CallOffer> calls, ConcurrentHashMap<PrivacySettingType, PrivacySettingEntry> privacySettings, boolean unarchiveChats, boolean twentyFourHourFormat, ChatEphemeralTimer newChatsEphemeralTimer, WhatsAppWebClientHistory webHistoryPolicy, boolean automaticPresenceUpdates, boolean automaticMessageReceipts, boolean checkPatchMacs, boolean syncedChats, boolean syncedContacts, boolean syncedNewsletters, boolean syncedStatus, boolean syncedWebAppState, boolean syncedBusinessCertificate, Integer registrationId, SignalIdentityKeyPair noiseKeyPair, SignalIdentityKeyPair identityKeyPair, ADVSignedDeviceIdentity signedDeviceIdentity, SignalSignedKeyPair signedKeyPair, LinkedHashMap<Integer, SignalPreKeyPair> preKeys, UUID fdid, byte[] deviceId, UUID advertisingId, byte[] identityId, byte[] backupToken, ConcurrentMap<SignalSenderKeyName, SignalSenderKeyRecord> senderKeys, LinkedHashMap<String, AppStateSyncKey> appStateKeys, ConcurrentMap<SignalProtocolAddress, SignalSessionRecord> sessions, ConcurrentMap<SyncPatchType, SyncHashValue> hashStates, boolean registered, boolean showSecurityNotifications, ConcurrentMap<String, Sticker> recentStickers, ConcurrentMap<String, Sticker> favouriteStickers, ConcurrentMap<String, QuickReply> quickReplies, ConcurrentMap<String, Label> labels, ClientAppVersion clientVersion, ClientAppVersion companionVersion, Instant lastAdvCheckTime, ConcurrentMap<SignalProtocolAddress, SignalIdentityPublicKey> remoteIdentities, ConcurrentMap<String, MissingDeviceSyncKey> missingSyncKeys, byte[] advSecretKey, ConcurrentMap<Jid, BusinessVerifiedName> verifiedBusinessNames, Path directory, boolean primaryDeviceSupportsSyncdRecovery, boolean disableLinkPreviews, boolean relayAllCalls, boolean externalWebBeta, ChatLockSettings chatLockSettings, List<Jid> favoriteChats, List<String> primaryFeatures, ConcurrentMap<Jid, ChatMute> mentionEveryoneMuteExpirations, ConcurrentMap<SyncPatchType, AbstractWhatsAppStore.OrphanMutationEntries> orphanMutationEntries, ConcurrentHashMap<Jid, OutContact> outContacts, long clockSkewSeconds, Instant groupAbPropsEmergencyPushTimestamp, String abPropsAbKey, String abPropsHash, long abPropsRefresh, Instant abPropsLastSyncTime, long abPropsRefreshId, long abPropsWebRefreshId, long groupAbPropsRefreshId, ConcurrentMap<String, byte[]> baseKeys) {
         this.uuid = Objects.requireNonNull(uuid, "uuid cannot be null");
         this.phoneNumber = phoneNumber;
         this.clientType = Objects.requireNonNull(clientType, "clientType cannot be null");
@@ -1635,12 +1643,12 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
     }
 
     @Override
-    public Optional<WhatsAppClientProxy> proxy() {
+    public Optional<WhatsAppProxy> proxy() {
         return Optional.ofNullable(proxy);
     }
 
     @Override
-    public WhatsAppStore setProxy(WhatsAppClientProxy proxy) {
+    public WhatsAppStore setProxy(WhatsAppProxy proxy) {
         this.proxy = proxy;
         return this;
     }
@@ -2665,7 +2673,7 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
     public void expireAppStateKeysByEpoch(int epoch) {
         for (var key : appStateKeys.values()) {
             // WAWebSyncdDb.expireSyncKey: getSyncKeysTable().equals(["keyEpoch"], e) — Cobalt scans values, no secondary index.
-            if (com.github.auties00.cobalt.sync.key.SyncKeyUtils.getKeyEpoch(key) != epoch) {
+            if (SyncKeyUtils.getKeyEpoch(key) != epoch) {
                 continue;
             }
 
@@ -2866,7 +2874,7 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
     }
 
     @Override
-    public void addPeerMessage(String id, com.github.auties00.cobalt.model.chat.ChatMessageInfo message) {
+    public void addPeerMessage(String id, ChatMessageInfo message) {
         peerMessages.put(id, message);
     }
 
@@ -3055,131 +3063,131 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
     public void markWebAppStateDirty(SyncPatchType collectionName) { // WAWebSyncdCollectionsStateMachine.moveCollectionsToDirty
         webAppStateCollections.compute(collectionName, (_, current) -> {
             if (current == null) {
-                return new SyncCollectionMetadata(
-                        collectionName,
-                        0,
-                        MutationLTHash.copy(MutationLTHash.EMPTY_HASH),
-                        0, // WAWebSyncdCollectionsStateMachine.moveCollectionsToDirty: no lastSyncTimestamp field in WA Web state entry
-                        SyncCollectionState.DIRTY, // WAWebSyncdCollectionsStateMachine.moveCollectionsToDirty: state = Dirty
-                        0,
-                        0, // WAWebSyncdCollectionsStateMachine.moveCollectionsToDirty: finiteFailureStartTime = undefined for new entries
-                        false,
-                        false
-                );
+                return new SyncCollectionMetadataBuilder()
+                        .name(collectionName)
+                        .version(0)
+                        .ltHash(MutationLTHash.copy(MutationLTHash.EMPTY_HASH))
+                        .lastSyncTimestamp(null) // WAWebSyncdCollectionsStateMachine.moveCollectionsToDirty: no lastSyncTimestamp field in WA Web state entry
+                        .state(SyncCollectionState.DIRTY) // WAWebSyncdCollectionsStateMachine.moveCollectionsToDirty: state = Dirty
+                        .retryCount(0)
+                        .lastErrorTimestamp(null) // WAWebSyncdCollectionsStateMachine.moveCollectionsToDirty: finiteFailureStartTime = undefined for new entries
+                        .macMismatch(false)
+                        .bootstrapped(false)
+                        .build();
             }
-            return new SyncCollectionMetadata(
-                    current.name(),
-                    current.version(),
-                    current.ltHash(), // ADAPTED: Cobalt shares record reference, no copy needed
-                    current.lastSyncTimestamp(), // WAWebSyncdCollectionsStateMachine.moveCollectionsToDirty: WA Web does not update lastSyncTimestamp
-                    SyncCollectionState.DIRTY, // WAWebSyncdCollectionsStateMachine.moveCollectionsToDirty: state = Dirty
-                    current.retryCount(), // ADAPTED: retryCount preserved (WA Web tracks retries via global counter W in WAWebSyncd)
-                    current.lastErrorTimestamp(), // WAWebSyncdCollectionsStateMachine.moveCollectionsToDirty: unconditionally preserves finiteFailureStartTime
-                    current.macMismatch(),
-                    current.bootstrapped()
-            );
+            return new SyncCollectionMetadataBuilder()
+                    .name(current.name())
+                    .version(current.version())
+                    .ltHash(current.ltHash()) // ADAPTED: Cobalt shares record reference, no copy needed
+                    .lastSyncTimestamp(current.lastSyncTimestamp().orElse(null)) // WAWebSyncdCollectionsStateMachine.moveCollectionsToDirty: WA Web does not update lastSyncTimestamp
+                    .state(SyncCollectionState.DIRTY) // WAWebSyncdCollectionsStateMachine.moveCollectionsToDirty: state = Dirty
+                    .retryCount(current.retryCount()) // ADAPTED: retryCount preserved (WA Web tracks retries via global counter W in WAWebSyncd)
+                    .lastErrorTimestamp(current.lastErrorTimestamp().orElse(null)) // WAWebSyncdCollectionsStateMachine.moveCollectionsToDirty: unconditionally preserves finiteFailureStartTime
+                    .macMismatch(current.macMismatch())
+                    .bootstrapped(current.bootstrapped())
+                    .build();
         });
     }
 
     @Override
     public void markWebAppStateInFlight(SyncPatchType collectionName) { // NO_WA_BASIS: InFlight is a Cobalt-only state (WA Web uses in-memory Set A for inflight tracking)
         webAppStateCollections.computeIfPresent(collectionName, (_, current) ->
-                new SyncCollectionMetadata(
-                        current.name(),
-                        current.version(),
-                        current.ltHash(),
-                        current.lastSyncTimestamp(),
-                        SyncCollectionState.IN_FLIGHT,
-                        current.retryCount(),
-                        current.lastErrorTimestamp(),
-                        current.macMismatch(),
-                        current.bootstrapped()
-                )
+                new SyncCollectionMetadataBuilder()
+                        .name(current.name())
+                        .version(current.version())
+                        .ltHash(current.ltHash())
+                        .lastSyncTimestamp(current.lastSyncTimestamp().orElse(null))
+                        .state(SyncCollectionState.IN_FLIGHT)
+                        .retryCount(current.retryCount())
+                        .lastErrorTimestamp(current.lastErrorTimestamp().orElse(null))
+                        .macMismatch(current.macMismatch())
+                        .bootstrapped(current.bootstrapped())
+                        .build()
         );
     }
 
     @Override
     public void markWebAppStateUpToDate(SyncPatchType collectionName) { // WAWebSyncdCollectionsStateMachine.moveCollectionsToUpToDate
         webAppStateCollections.computeIfPresent(collectionName, (_, current) ->
-                new SyncCollectionMetadata(
-                        current.name(),
-                        current.version(),
-                        current.ltHash(),
-                        System.currentTimeMillis(),
-                        SyncCollectionState.UP_TO_DATE, // WAWebSyncdCollectionsStateMachine.moveCollectionsToUpToDate: state = UpToDate
-                        0, // ADAPTED: reset retry count (WA Web uses global counter W)
-                        0, // WAWebSyncdCollectionsStateMachine.moveCollectionsToUpToDate: finiteFailureStartTime = undefined
-                        current.macMismatch(),
-                        current.bootstrapped()
-                )
+                new SyncCollectionMetadataBuilder()
+                        .name(current.name())
+                        .version(current.version())
+                        .ltHash(current.ltHash())
+                        .lastSyncTimestamp(Instant.now())
+                        .state(SyncCollectionState.UP_TO_DATE) // WAWebSyncdCollectionsStateMachine.moveCollectionsToUpToDate: state = UpToDate
+                        .retryCount(0) // ADAPTED: reset retry count (WA Web uses global counter W)
+                        .lastErrorTimestamp(null) // WAWebSyncdCollectionsStateMachine.moveCollectionsToUpToDate: finiteFailureStartTime = undefined
+                        .macMismatch(current.macMismatch())
+                        .bootstrapped(current.bootstrapped())
+                        .build()
         );
     }
 
     @Override
     public void markWebAppStatePending(SyncPatchType collectionName) { // NO_WA_BASIS: Pending is a Cobalt-only state (WA Web uses in-memory Set F for pending tracking)
         webAppStateCollections.computeIfPresent(collectionName, (_, current) ->
-                new SyncCollectionMetadata(
-                        current.name(),
-                        current.version(),
-                        current.ltHash(),
-                        current.lastSyncTimestamp(),
-                        SyncCollectionState.PENDING,
-                        current.retryCount(),
-                        current.lastErrorTimestamp(),
-                        current.macMismatch(),
-                        current.bootstrapped()
-                )
+                new SyncCollectionMetadataBuilder()
+                        .name(current.name())
+                        .version(current.version())
+                        .ltHash(current.ltHash())
+                        .lastSyncTimestamp(current.lastSyncTimestamp().orElse(null))
+                        .state(SyncCollectionState.PENDING)
+                        .retryCount(current.retryCount())
+                        .lastErrorTimestamp(current.lastErrorTimestamp().orElse(null))
+                        .macMismatch(current.macMismatch())
+                        .bootstrapped(current.bootstrapped())
+                        .build()
         );
     }
 
     @Override
     public void markWebAppStateBlocked(SyncPatchType collectionName) { // WAWebSyncdCollectionsStateMachine.moveCollectionsToBlocked
         webAppStateCollections.computeIfPresent(collectionName, (_, current) ->
-                new SyncCollectionMetadata(
-                        current.name(),
-                        current.version(),
-                        current.ltHash(),
-                        current.lastSyncTimestamp(),
-                        SyncCollectionState.BLOCKED, // WAWebSyncdCollectionsStateMachine.moveCollectionsToBlocked: state = Blocked
-                        current.retryCount(),
-                        current.lastErrorTimestamp(), // WAWebSyncdCollectionsStateMachine.moveCollectionsToBlocked: preserves finiteFailureStartTime
-                        current.macMismatch(),
-                        current.bootstrapped()
-                )
+                new SyncCollectionMetadataBuilder()
+                        .name(current.name())
+                        .version(current.version())
+                        .ltHash(current.ltHash())
+                        .lastSyncTimestamp(current.lastSyncTimestamp().orElse(null))
+                        .state(SyncCollectionState.BLOCKED) // WAWebSyncdCollectionsStateMachine.moveCollectionsToBlocked: state = Blocked
+                        .retryCount(current.retryCount())
+                        .lastErrorTimestamp(current.lastErrorTimestamp().orElse(null)) // WAWebSyncdCollectionsStateMachine.moveCollectionsToBlocked: preserves finiteFailureStartTime
+                        .macMismatch(current.macMismatch())
+                        .bootstrapped(current.bootstrapped())
+                        .build()
         );
     }
 
     @Override
     public void markWebAppStateErrorRetry(SyncPatchType collectionName) { // WAWebSyncdCollectionsStateMachine.moveCollectionsToFiniteRetry
         webAppStateCollections.computeIfPresent(collectionName, (_, current) ->
-                new SyncCollectionMetadata(
-                        current.name(),
-                        current.version(),
-                        current.ltHash(),
-                        current.lastSyncTimestamp(),
-                        SyncCollectionState.ERROR_RETRY, // WAWebSyncdCollectionsStateMachine.moveCollectionsToFiniteRetry: state = FailingFiniteRetry
-                        current.retryCount() + 1, // ADAPTED: per-collection retry count (WA Web uses global W counter in WAWebSyncd)
-                        current.lastErrorTimestamp() > 0 ? current.lastErrorTimestamp() : System.currentTimeMillis(), // WAWebSyncdCollectionsStateMachine.moveCollectionsToFiniteRetry: finiteFailureStartTime ?? unixTimeMs()
-                        current.macMismatch(),
-                        current.bootstrapped()
-                )
+                new SyncCollectionMetadataBuilder()
+                        .name(current.name())
+                        .version(current.version())
+                        .ltHash(current.ltHash())
+                        .lastSyncTimestamp(current.lastSyncTimestamp().orElse(null))
+                        .state(SyncCollectionState.ERROR_RETRY) // WAWebSyncdCollectionsStateMachine.moveCollectionsToFiniteRetry: state = FailingFiniteRetry
+                        .retryCount(current.retryCount() + 1) // ADAPTED: per-collection retry count (WA Web uses global W counter in WAWebSyncd)
+                        .lastErrorTimestamp(current.lastErrorTimestamp().orElseGet(Instant::now)) // WAWebSyncdCollectionsStateMachine.moveCollectionsToFiniteRetry: finiteFailureStartTime ?? unixTimeMs()
+                        .macMismatch(current.macMismatch())
+                        .bootstrapped(current.bootstrapped())
+                        .build()
         );
     }
 
     @Override
     public void markWebAppStateErrorFatal(SyncPatchType collectionName) { // WAWebSyncdCollectionsStateMachine.moveCollectionsToFatal
         webAppStateCollections.computeIfPresent(collectionName, (_, current) ->
-                new SyncCollectionMetadata(
-                        current.name(),
-                        current.version(),
-                        current.ltHash(),
-                        current.lastSyncTimestamp(),
-                        SyncCollectionState.ERROR_FATAL, // WAWebSyncdCollectionsStateMachine.moveCollectionsToFatal: state = Fatal
-                        current.retryCount(),
-                        0, // WAWebSyncdCollectionsStateMachine.moveCollectionsToFatal: does not include finiteFailureStartTime (undefined)
-                        current.macMismatch(),
-                        current.bootstrapped()
-                )
+                new SyncCollectionMetadataBuilder()
+                        .name(current.name())
+                        .version(current.version())
+                        .ltHash(current.ltHash())
+                        .lastSyncTimestamp(current.lastSyncTimestamp().orElse(null))
+                        .state(SyncCollectionState.ERROR_FATAL) // WAWebSyncdCollectionsStateMachine.moveCollectionsToFatal: state = Fatal
+                        .retryCount(current.retryCount())
+                        .lastErrorTimestamp(null) // WAWebSyncdCollectionsStateMachine.moveCollectionsToFatal: does not include finiteFailureStartTime (undefined)
+                        .macMismatch(current.macMismatch())
+                        .bootstrapped(current.bootstrapped())
+                        .build()
         );
     }
 
@@ -3209,17 +3217,17 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
         // Per WA Web: isCollectionInMacMismatchFatal is a persistent boolean
         // that survives all state transitions, not a state enum value
         webAppStateCollections.computeIfPresent(collectionName, (_, current) ->
-                new SyncCollectionMetadata(
-                        current.name(),
-                        current.version(),
-                        current.ltHash(),
-                        current.lastSyncTimestamp(),
-                        current.state(),
-                        current.retryCount(),
-                        current.lastErrorTimestamp(),
-                        true,
-                        current.bootstrapped()
-                )
+                new SyncCollectionMetadataBuilder()
+                        .name(current.name())
+                        .version(current.version())
+                        .ltHash(current.ltHash())
+                        .lastSyncTimestamp(current.lastSyncTimestamp().orElse(null))
+                        .state(current.state())
+                        .retryCount(current.retryCount())
+                        .lastErrorTimestamp(current.lastErrorTimestamp().orElse(null))
+                        .macMismatch(true)
+                        .bootstrapped(current.bootstrapped())
+                        .build()
         );
     }
 
@@ -3231,17 +3239,17 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
     ) // WAWebSyncdCollectionsStateMachine.getCollectionState
     public SyncCollectionMetadata findWebAppState(SyncPatchType collectionName) { // WAWebSyncdCollectionsStateMachine.getCollectionState
         return webAppStateCollections.computeIfAbsent(collectionName, key -> // WAWebSyncdCollectionsStateMachine.getCollectionState: missing -> moveCollectionsToUpToDate, return UpToDate
-                new SyncCollectionMetadata(
-                        key,
-                        0,
-                        MutationLTHash.copy(MutationLTHash.EMPTY_HASH),
-                        0,
-                        SyncCollectionState.UP_TO_DATE, // WAWebSyncdCollectionsStateMachine.getCollectionState: default = UpToDate
-                        0,
-                        0, // WAWebSyncdCollectionsStateMachine.moveCollectionsToUpToDate: finiteFailureStartTime = undefined
-                        false,
-                        false
-                )
+                new SyncCollectionMetadataBuilder()
+                        .name(key)
+                        .version(0)
+                        .ltHash(MutationLTHash.copy(MutationLTHash.EMPTY_HASH))
+                        .lastSyncTimestamp(null)
+                        .state(SyncCollectionState.UP_TO_DATE) // WAWebSyncdCollectionsStateMachine.getCollectionState: default = UpToDate
+                        .retryCount(0)
+                        .lastErrorTimestamp(null) // WAWebSyncdCollectionsStateMachine.moveCollectionsToUpToDate: finiteFailureStartTime = undefined
+                        .macMismatch(false)
+                        .bootstrapped(false)
+                        .build()
         );
     }
 
@@ -3256,17 +3264,17 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
         // Per WA Web: update both collection metadata and hash state atomically
         // to prevent inconsistent state on crash between writes
         webAppStateCollections.compute(collectionName, (_, current) ->
-                new SyncCollectionMetadata(
-                        collectionName,
-                        newVersion,
-                        copiedHash,
-                        System.currentTimeMillis(),
-                        current != null ? current.state() : SyncCollectionState.UP_TO_DATE,
-                        0,  // Reset retry count on successful update
-                        0,  // Reset error timestamp
-                        current != null && current.macMismatch(),
-                        true  // Collection has been synced at least once
-                )
+                new SyncCollectionMetadataBuilder()
+                        .name(collectionName)
+                        .version(newVersion)
+                        .ltHash(copiedHash)
+                        .lastSyncTimestamp(Instant.now())
+                        .state(current != null ? current.state() : SyncCollectionState.UP_TO_DATE)
+                        .retryCount(0)  // Reset retry count on successful update
+                        .lastErrorTimestamp(null)  // Reset error timestamp
+                        .macMismatch(current != null && current.macMismatch())
+                        .bootstrapped(true)  // Collection has been synced at least once
+                        .build()
         );
         var hashState = new SyncHashValue(collectionName);
         hashState.setVersion(newVersion);
@@ -3936,7 +3944,7 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
     @Override
     public SequencedCollection<Jid> broadcasts() {
         return businessBroadcastLists.keySet().stream()
-                .map(id -> Jid.of(id, com.github.auties00.cobalt.model.jid.JidServer.broadcast())) // ADAPTED: map stored string ids to broadcast-server JIDs
+                .map(id -> Jid.of(id, JidServer.broadcast())) // ADAPTED: map stored string ids to broadcast-server JIDs
                 .toList();
     }
 
@@ -3985,49 +3993,49 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
     }
 
     @Override
-    public Optional<com.github.auties00.cobalt.model.device.DeviceCapabilities> primaryDeviceCapabilities() {
+    public Optional<DeviceCapabilities> primaryDeviceCapabilities() {
         return Optional.ofNullable(primaryDeviceCapabilities);
     }
 
     @Override
-    public WhatsAppStore setPrimaryDeviceCapabilities(com.github.auties00.cobalt.model.device.DeviceCapabilities capabilities) {
+    public WhatsAppStore setPrimaryDeviceCapabilities(DeviceCapabilities capabilities) {
         this.primaryDeviceCapabilities = capabilities;
         return this;
     }
 
     @Override
-    public Map<String, com.github.auties00.cobalt.model.device.DeviceCapabilities> deviceCapabilitiesStates() {
+    public Map<String, DeviceCapabilities> deviceCapabilitiesStates() {
         return Collections.unmodifiableMap(deviceCapabilitiesStates);
     }
 
     @Override
     public WhatsAppStore setDeviceCapabilitiesStates(
-            Map<String, com.github.auties00.cobalt.model.device.DeviceCapabilities> states
+            Map<String, DeviceCapabilities> states
     ) {
         this.deviceCapabilitiesStates = new ConcurrentHashMap<>(Objects.requireNonNull(states, "states cannot be null"));
         return this;
     }
 
     @Override
-    public Map<String, com.github.auties00.cobalt.model.sync.action.chat.InteractiveMessageAction> interactiveMessageStates() {
+    public Map<String, InteractiveMessageAction> interactiveMessageStates() {
         return Collections.unmodifiableMap(interactiveMessageStates);
     }
 
     @Override
     public WhatsAppStore setInteractiveMessageStates(
-            Map<String, com.github.auties00.cobalt.model.sync.action.chat.InteractiveMessageAction> states
+            Map<String, InteractiveMessageAction> states
     ) {
         this.interactiveMessageStates = new ConcurrentHashMap<>(Objects.requireNonNull(states, "states cannot be null"));
         return this;
     }
 
     @Override
-    public Map<String, com.github.auties00.cobalt.model.sync.action.media.NoteEditAction> noteStates() {
+    public Map<String, NoteEditAction> noteStates() {
         return Collections.unmodifiableMap(noteStates);
     }
 
     @Override
-    public WhatsAppStore setNoteStates(Map<String, com.github.auties00.cobalt.model.sync.action.media.NoteEditAction> states) {
+    public WhatsAppStore setNoteStates(Map<String, NoteEditAction> states) {
         this.noteStates = new ConcurrentHashMap<>(Objects.requireNonNull(states, "states cannot be null"));
         return this;
     }
@@ -4055,12 +4063,12 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
     }
 
     @Override
-    public Map<String, com.github.auties00.cobalt.model.call.CallLog> callLogStates() {
+    public Map<String, CallLog> callLogStates() {
         return Collections.unmodifiableMap(callLogStates);
     }
 
     @Override
-    public WhatsAppStore setCallLogStates(Map<String, com.github.auties00.cobalt.model.call.CallLog> states) {
+    public WhatsAppStore setCallLogStates(Map<String, CallLog> states) {
         this.callLogStates = new ConcurrentHashMap<>(Objects.requireNonNull(states, "states cannot be null"));
         return this;
     }

@@ -12,7 +12,7 @@ import java.util.Optional;
  *     {@code {text?, emoji?, ephemeralDurationSeconds?, lastUpdateTime?}}.
  */
 @WhatsAppWebModule(moduleName = "WAWebUsyncTextStatus")
-public final class TextStatusResult implements UsyncProtocolResult {
+public final class TextStatusResult implements UsyncProtocolResponse {
     /**
      * The status text, or {@code null} when absent.
      */

@@ -19,6 +19,7 @@ import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyR
 import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyRequestBuilder;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.MdBootstrapAppStateCriticalDataProcessingEventBuilder;
 import com.github.auties00.cobalt.wam.type.BootstrapAppStateDataStageCode;
 
@@ -49,7 +50,7 @@ import java.util.*;
  * call in a NonPersistedJob with BEST_EFFORT priority and 30-second timeout, then
  * schedules {@code setMissingKeyTimeoutInTransaction} after 20 seconds. In Cobalt,
  * the periodic scheduling is in {@link MissingSyncKeyTimeoutScheduler#startPeriodicReRequestJob()}
- * and the core request logic is in {@link #reRequestMissingKeys(java.util.Collection)}.
+ * and the core request logic is in {@link #reRequestMissingKeys(Collection)}.
  *
  * @implNote WAWebSyncdHandleMissingKeys (handleMissingKeys, handleMissingKeysInSnapshot,
  *     handleMissingKeysInPatches, requestAllMissingKeys),
@@ -84,7 +85,7 @@ public final class MissingSyncKeyRequestService {
 
     /**
      * The timeout scheduler used to (re)schedule the missing-key timeout check
-     * inline at the end of {@link #trackMissingKeys(java.util.Collection, java.util.Set)},
+     * inline at the end of {@link #trackMissingKeys(Collection, Set)},
      * mirroring WA Web's {@code addMissingKeys} which calls
      * {@code setMissingKeyTimeoutInTransaction} as its final step.
      *
@@ -97,15 +98,22 @@ public final class MissingSyncKeyRequestService {
     private MissingSyncKeyTimeoutScheduler timeoutScheduler;
 
     /**
+     * The WAM telemetry service used to commit critical bootstrap stage events.
+     */
+    private final WamService wamService;
+
+    /**
      * Creates a new missing sync key request service.
      *
-     * @param client the WhatsApp client instance
+     * @param client     the WhatsApp client instance
+     * @param wamService the WAM telemetry service for committing critical bootstrap events
      * @implNote WAWebSyncdHandleMissingKeys (module-level dependencies: WAWebGetSyncKey, WAWebGetMissingKey,
      *     WAWebSyncdKeyCallbacksApi, WAWebSyncdStoreMissingKeys, WAWebOfflineHandler)
      */
-    public MissingSyncKeyRequestService(WhatsAppClient client) {
+    public MissingSyncKeyRequestService(WhatsAppClient client, WamService wamService) {
         this.client = client;
         this.store = client.store();
+        this.wamService = wamService;
     }
 
     /**
@@ -381,7 +389,7 @@ public final class MissingSyncKeyRequestService {
         if (store.findWebAppState(SyncPatchType.CRITICAL_BLOCK).bootstrapped()) {
             return;
         }
-        client.wamService().commit(new MdBootstrapAppStateCriticalDataProcessingEventBuilder()
+        wamService.commit(new MdBootstrapAppStateCriticalDataProcessingEventBuilder()
                 .bootstrapAppStateDataStage(stage) // WAWebSyncdCriticalBootstrapProcessingApi: bootstrapAppStateDataStage: e
                 .mdTimestamp((int) System.currentTimeMillis()) // WAWebSyncdCriticalBootstrapProcessingApi: mdTimestamp: unixTimeMs()
                 .build());

@@ -12,6 +12,7 @@ import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 /**
  * Handles the {@code shareOwnPn} app state sync action.
@@ -141,8 +142,8 @@ public final class ShareOwnPnHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebShareOwnPnSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebShareOwnPnSync.applyMutations: {actionState: SyncActionState.Success}
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebShareOwnPnSync.applyMutations: {actionState: SyncActionState.Success}
     }
 
     /**
@@ -187,7 +188,7 @@ public final class ShareOwnPnHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebShareOwnPnSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         // WAWebShareOwnPnSync.applyMutations: if (getABPropConfigValue("share_own_pn_sync") !== true) return t.map(() => ({actionState: Unsupported}))
         if (!client.abPropsService().getBool(ABProp.SHARE_OWN_PN_SYNC)) {
             return MutationApplicationResult.unsupported(); // WAWebShareOwnPnSync.applyMutations: WALogger.WARN("share_own_pn sync: operation not supported"); return Unsupported batch

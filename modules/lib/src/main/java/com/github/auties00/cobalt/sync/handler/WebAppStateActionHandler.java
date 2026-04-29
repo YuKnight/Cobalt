@@ -9,9 +9,11 @@ import com.github.auties00.cobalt.model.sync.ConflictResolutionState;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Interface for handling specific action types in app state sync.
@@ -129,11 +131,12 @@ public interface WebAppStateActionHandler {
      *
      * @implNote WAWeb*Sync.applyMutations — per-mutation application logic within
      *           the batch handler. Returns {@code true} on success, {@code false} on orphan.
-     * @param client   the WhatsAppClient instance linked to the mutation
-     * @param mutation the mutation to apply
+     * @param client     the WhatsAppClient instance linked to the mutation
+     * @param wamService the WAM telemetry service used for committing per-mutation telemetry events
+     * @param mutation   the mutation to apply
      * @return {@code true} if the mutation was applied successfully, {@code false} otherwise
      */
-    boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation);
+    boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation);
 
     /**
      * Applies a batch of mutations to local state.
@@ -145,20 +148,21 @@ public interface WebAppStateActionHandler {
      * mutation sequentially.
      *
      * <p>The default implementation processes mutations one by one via
-     * {@link #applyMutation(WhatsAppClient, DecryptedMutation.Trusted)}.
+     * {@link #applyMutation(WhatsAppClient, WamService, DecryptedMutation.Trusted)}.
      * Handlers that need batch-level deduplication should override this method.
      *
      * @implNote WAWeb*Sync.applyMutations — the main entry point for batch mutation
      *           application in each handler
-     * @param client    the WhatsAppClient instance linked to the mutations
-     * @param mutations the batch of mutations to apply (already version-gated)
+     * @param client     the WhatsAppClient instance linked to the mutations
+     * @param wamService the WAM telemetry service used for committing per-mutation telemetry events
+     * @param mutations  the batch of mutations to apply (already version-gated)
      * @return a list of results parallel to the input, where {@code true}
      *         means applied/acknowledged and {@code false} means orphan
      */
-    default List<Boolean> applyMutationBatch(WhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
+    default List<Boolean> applyMutationBatch(WhatsAppClient client, WamService wamService, List<DecryptedMutation.Trusted> mutations) {
         var results = new ArrayList<Boolean>(mutations.size());
         for (var mutation : mutations) {
-            results.add(applyMutation(client, mutation));
+            results.add(applyMutation(client, wamService, mutation));
         }
         return results;
     }
@@ -172,15 +176,17 @@ public interface WebAppStateActionHandler {
      * @implNote ADAPTED: WAWeb*Sync.applyMutations — WA Web returns
      *           {@code WASyncdConst.SyncActionState} values directly; Cobalt wraps them
      *           in {@link MutationApplicationResult} for type safety
-     * @param client the WhatsApp client
-     * @param mutation the mutation to apply
+     * @param client     the WhatsApp client
+     * @param wamService the WAM telemetry service used for committing per-mutation telemetry events
+     * @param mutation   the mutation to apply
      * @return the detailed application result
      */
     default MutationApplicationResult applyMutationResult(
             WhatsAppClient client,
+            WamService wamService,
             DecryptedMutation.Trusted mutation
     ) {
-        return applyMutation(client, mutation)
+        return applyMutation(client, wamService, mutation)
                 ? MutationApplicationResult.success()
                 : MutationApplicationResult.orphan();
     }
@@ -194,15 +200,17 @@ public interface WebAppStateActionHandler {
      * @implNote ADAPTED: WAWeb*Sync.applyMutations — WA Web returns per-mutation
      *           {@code WASyncdConst.SyncActionState} values; Cobalt wraps them in
      *           {@link MutationApplicationResult} for type safety
-     * @param client the WhatsApp client
-     * @param mutations the mutations to apply
+     * @param client     the WhatsApp client
+     * @param wamService the WAM telemetry service used for committing per-mutation telemetry events
+     * @param mutations  the mutations to apply
      * @return the detailed application results
      */
     default List<MutationApplicationResult> applyMutationBatchResults(
             WhatsAppClient client,
+            WamService wamService,
             List<DecryptedMutation.Trusted> mutations
     ) {
-        var legacy = applyMutationBatch(client, mutations);
+        var legacy = applyMutationBatch(client, wamService, mutations);
         var results = new ArrayList<MutationApplicationResult>(legacy.size());
         for (var applied : legacy) {
             results.add(applied
@@ -257,7 +265,7 @@ public interface WebAppStateActionHandler {
     @WhatsAppWebExport(moduleName = "WAWebSyncdAction", exports = "ChatMessageRangeSyncdActionBase", adaptation = WhatsAppAdaptation.DIRECT)
     default boolean dropMutationDueToCrossIndexConflict(
             DecryptedMutation.Trusted remoteMutation,
-            java.util.Map<String, DecryptedMutation.Trusted> pendingByIndex
+            Map<String, DecryptedMutation.Trusted> pendingByIndex
     ) {
         return false;
     }

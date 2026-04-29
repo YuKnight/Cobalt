@@ -1,8 +1,5 @@
 package com.github.auties00.cobalt.model.sync;
 
-import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
-import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
-import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import it.auties.protobuf.annotation.ProtobufEnum;
 import it.auties.protobuf.annotation.ProtobufEnumIndex;
 
@@ -14,54 +11,55 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Partitions the app state sync stream into independent collections, each
- * with its own version counter and integrity hash.
+ * Identifies the partition (or "patch type") of an app-state mutation.
  *
- * <p>WhatsApp groups sync mutations into a small fixed set of collections
- * so that critical mutations (such as a block list change) can be fetched
- * first without being blocked by bulkier regular mutations. The names of
- * these collections, represented by the constants on this enum, are part
- * of the wire protocol and are used as keys in sync messages and requests.
+ * <p>App-state mutations are split across a small fixed family of
+ * collections so that critical changes (block-list updates, unblock
+ * follow-ups) can be fetched ahead of bulkier non-critical changes
+ * during bootstrap. The five collections also act as the unit of
+ * version/integrity tracking: each one keeps its own monotonic version
+ * counter and LT-Hash, persisted separately by the sync state machine.
  *
- * <p>The {@code toString()} form uses the lowercase name (for example
- * {@code "critical_block"}) because this is the form accepted by the
- * server; {@link #toBytes()} caches the byte encoding of that form for
- * reuse on hot paths.
+ * <p>The lowercase form of each constant name (for example
+ * {@code "critical_block"}) is the wire token used by the relay; the
+ * byte encoding of that token is cached at construction so hot paths do
+ * not repeatedly allocate.
  */
 @ProtobufEnum
-@WhatsAppWebModule(moduleName = "WASyncdConst")
-@WhatsAppWebModule(moduleName = "WAWebSyncdCollectionUtils")
 public enum SyncPatchType {
     /**
-     * Critical collection dedicated to block list related mutations, which
-     * must be applied before regular collections to enforce the user's
-     * privacy choices as early as possible after login.
+     * Critical collection dedicated to block-list mutations. Applied
+     * first during bootstrap so the user's privacy choices are enforced
+     * before any other state.
      */
     CRITICAL_BLOCK(0),
 
     /**
-     * Critical collection dedicated to low priority critical mutations
-     * that still need to be applied before the regular collections.
+     * Critical collection holding low-priority unblock-follow-up
+     * mutations that still need to be applied before the regular
+     * collections.
      */
     CRITICAL_UNBLOCK_LOW(1),
 
     /**
-     * Regular collection carrying high priority non critical mutations.
+     * Non-critical collection carrying high-priority mutations that
+     * should converge quickly across companion devices.
      */
     REGULAR_HIGH(2),
 
     /**
-     * Regular collection carrying low priority non critical mutations.
+     * Non-critical collection carrying bulky low-priority mutations
+     * that may be deferred without user-visible impact.
      */
     REGULAR_LOW(3),
 
     /**
-     * Regular collection carrying the bulk of non critical mutations.
+     * Non-critical collection carrying the bulk of regular mutations.
      */
     REGULAR(4);
 
     /**
-     * Lookup table mapping the lowercase name string to the corresponding
+     * Lookup table mapping the lowercase name string to the matching
      * enum constant, used by {@link #of(String)}.
      */
     private static final Map<String, SyncPatchType> BY_NAME = Arrays.stream(values())
@@ -73,7 +71,7 @@ public enum SyncPatchType {
     final int index;
 
     /**
-     * Cached byte encoding of the lowercase name, reused to avoid
+     * Cached byte encoding of the lowercase wire name, reused to avoid
      * allocating on every serialisation.
      */
     private final byte[] bytes;
@@ -100,9 +98,10 @@ public enum SyncPatchType {
     /**
      * Resolves a collection by its lowercase wire name.
      *
-     * @param name the lowercase name, or {@code null}
-     * @return an optional containing the matching constant, empty if the
-     *         name is {@code null} or does not match a known collection
+     * @param name the lowercase wire name, or {@code null}
+     * @return an optional containing the matching constant, or empty
+     *         when {@code name} is {@code null} or does not match a
+     *         known collection
      */
     public static Optional<SyncPatchType> of(String name) {
         return name == null ? Optional.empty() : Optional.ofNullable(BY_NAME.get(name));
@@ -119,10 +118,8 @@ public enum SyncPatchType {
     }
 
     /**
-     * Returns the cached byte encoding of the lowercase wire name.
-     *
-     * <p>The returned array is the cached buffer; callers must not mutate
-     * it.
+     * Returns the cached byte encoding of the lowercase wire name. The
+     * returned array is the cached buffer; callers must not mutate it.
      *
      * @return the cached name bytes
      */
@@ -134,20 +131,14 @@ public enum SyncPatchType {
      * Returns whether this collection is classified as a critical
      * collection.
      *
-     * <p>During bootstrap, only critical collections
+     * <p>During bootstrap only critical collections
      * ({@link #CRITICAL_BLOCK} and {@link #CRITICAL_UNBLOCK_LOW}) are
-     * processed from server sync notifications so that privacy and safety
-     * related mutations are applied before the rest of the app state.
+     * processed from server sync notifications so that privacy and
+     * safety related mutations are applied before the rest of the app
+     * state.
      *
-     * @implNote WA Web's {@code isCriticalCollection} throws an
-     *           exhaustive-match error for unknown names; in Cobalt the
-     *           enum itself encodes the closed domain, so the wildcard
-     *           branch is unreachable and omitted.
      * @return {@code true} if this is a critical collection
      */
-    @WhatsAppWebExport(moduleName = "WAWebSyncdCollectionUtils",
-            exports = "isCriticalCollection",
-            adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean isCritical() {
         return this == CRITICAL_BLOCK || this == CRITICAL_UNBLOCK_LOW;
     }

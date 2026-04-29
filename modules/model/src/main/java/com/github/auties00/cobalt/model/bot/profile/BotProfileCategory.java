@@ -1,86 +1,46 @@
 package com.github.auties00.cobalt.model.bot.profile;
 
-import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
-import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
-import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import it.auties.protobuf.annotation.ProtobufDeserializer;
 import it.auties.protobuf.annotation.ProtobufSerializer;
 
 /**
- * Represents the character category of a WhatsApp AI bot's persona,
- * indicating the nature of the character the bot portrays.
+ * Represents the character category of a WhatsApp AI bot persona.
  *
- * <p>WhatsApp classifies bot personas into categories so that users
- * understand what kind of character they are interacting with. Four
- * categories are currently defined:
- * <ul>
- * <li>{@link Synthetic} - a fully artificial persona with no real-world
- *     counterpart (e.g. Meta AI)
- * <li>{@link Living} - a persona modeled after a currently living person
- * <li>{@link Fictional} - a persona modeled after a fictional character
- * <li>{@link Historical} - a persona modeled after a historical figure
- * </ul>
+ * <p>WhatsApp surfaces a wide range of AI bot personas in chat (Meta AI,
+ * celebrity-modeled bots, fictional-character bots, historical-figure bots,
+ * etc.) and tags each persona with a category so the user understands what
+ * kind of character they are interacting with. This sealed interface enumerates
+ * the four officially defined categories and adds an {@link Unknown} variant
+ * for forward compatibility with values added by the server in the future.
  *
- * <p>An {@link Unknown} variant is provided for forward compatibility with
- * values that may be added by the server in the future. Instances are
- * obtained via the {@link #of(String)} factory method, which maps
- * wire-format strings to the appropriate variant.
+ * <p>Use {@link #of(String)} to translate the wire-format token sent by the
+ * server into the corresponding variant. Each variant exposes its wire token
+ * via {@link #value()} for round-tripping back onto the wire.
  *
- * @implNote WAWebBotProfileCategory.BotProfileCategory:
- * {@code n("$InternalEnum")({SYNTHETIC:"synthetic",LIVING:"living",
- * FICTIONAL:"fictional",HISTORICAL:"historical"})}. WA Web exposes a
- * plain string-valued enum with four members. Cobalt adapts it to a
- * sealed interface of record singletons so that an {@link Unknown}
- * variant can carry forward-compatible unrecognised wire values without
- * breaking deserialization; the four canonical singletons preserve the
- * exact lowercase wire strings.
  * @see BotProfile#category()
  */
-@WhatsAppWebModule(moduleName = "WAWebBotProfileCategory")
 public sealed interface BotProfileCategory {
     /**
-     * Singleton for a fully synthetic or artificial bot persona with no
-     * real-world counterpart, such as Meta AI.
-     *
-     * @implNote WAWebBotProfileCategory.BotProfileCategory.SYNTHETIC with on-wire
-     * value {@code "synthetic"}.
+     * Singleton variant for a fully synthetic or artificial bot persona with
+     * no real-world counterpart, such as Meta AI itself.
      */
-    @WhatsAppWebExport(moduleName = "WAWebBotProfileCategory",
-            exports = "BotProfileCategory.SYNTHETIC",
-            adaptation = WhatsAppAdaptation.ADAPTED)
     BotProfileCategory SYNTHETIC = new Synthetic();
 
     /**
-     * Singleton for a bot persona modeled after a currently living person.
-     *
-     * @implNote WAWebBotProfileCategory.BotProfileCategory.LIVING with on-wire
-     * value {@code "living"}.
+     * Singleton variant for a bot persona modeled after a currently living
+     * person.
      */
-    @WhatsAppWebExport(moduleName = "WAWebBotProfileCategory",
-            exports = "BotProfileCategory.LIVING",
-            adaptation = WhatsAppAdaptation.ADAPTED)
     BotProfileCategory LIVING = new Living();
 
     /**
-     * Singleton for a bot persona modeled after a fictional character.
-     *
-     * @implNote WAWebBotProfileCategory.BotProfileCategory.FICTIONAL with on-wire
-     * value {@code "fictional"}.
+     * Singleton variant for a bot persona modeled after a fictional
+     * character.
      */
-    @WhatsAppWebExport(moduleName = "WAWebBotProfileCategory",
-            exports = "BotProfileCategory.FICTIONAL",
-            adaptation = WhatsAppAdaptation.ADAPTED)
     BotProfileCategory FICTIONAL = new Fictional();
 
     /**
-     * Singleton for a bot persona modeled after a historical figure.
-     *
-     * @implNote WAWebBotProfileCategory.BotProfileCategory.HISTORICAL with on-wire
-     * value {@code "historical"}.
+     * Singleton variant for a bot persona modeled after a historical figure.
      */
-    @WhatsAppWebExport(moduleName = "WAWebBotProfileCategory",
-            exports = "BotProfileCategory.HISTORICAL",
-            adaptation = WhatsAppAdaptation.ADAPTED)
     BotProfileCategory HISTORICAL = new Historical();
 
     /**
@@ -88,8 +48,10 @@ public sealed interface BotProfileCategory {
      * value.
      *
      * <p>Recognized values are {@code "synthetic"}, {@code "living"},
-     * {@code "fictional"}, and {@code "historical"} (case-sensitive). Any
-     * other non-{@code null} value yields an {@link Unknown} instance.
+     * {@code "fictional"} and {@code "historical"} (case-sensitive). Any other
+     * non-{@code null} value yields an {@link Unknown} instance carrying the
+     * raw token, so callers can still round-trip categories that the client
+     * does not yet model explicitly.
      *
      * @param value the wire-format string, or {@code null}
      * @return the corresponding category, or {@code null} if {@code value}
@@ -112,7 +74,8 @@ public sealed interface BotProfileCategory {
     /**
      * Returns the wire-format string representation of this category.
      *
-     * @return the category value as sent over the wire (e.g. {@code "synthetic"})
+     * @return the category value as sent over the wire (for example
+     *         {@code "synthetic"})
      */
     @ProtobufSerializer
     String value();
@@ -123,7 +86,7 @@ public sealed interface BotProfileCategory {
      */
     record Synthetic() implements BotProfileCategory {
         /**
-         * {@inheritDoc}
+         * Returns the wire token for the synthetic category.
          *
          * @return {@code "synthetic"}
          */
@@ -139,7 +102,7 @@ public sealed interface BotProfileCategory {
      */
     record Living() implements BotProfileCategory {
         /**
-         * {@inheritDoc}
+         * Returns the wire token for the living-person category.
          *
          * @return {@code "living"}
          */
@@ -154,7 +117,7 @@ public sealed interface BotProfileCategory {
      */
     record Fictional() implements BotProfileCategory {
         /**
-         * {@inheritDoc}
+         * Returns the wire token for the fictional-character category.
          *
          * @return {@code "fictional"}
          */
@@ -169,7 +132,7 @@ public sealed interface BotProfileCategory {
      */
     record Historical() implements BotProfileCategory {
         /**
-         * {@inheritDoc}
+         * Returns the wire token for the historical-figure category.
          *
          * @return {@code "historical"}
          */
@@ -181,8 +144,7 @@ public sealed interface BotProfileCategory {
 
     /**
      * Variant representing an unrecognized category value, provided for
-     * forward compatibility with values that may be added by the server
-     * in the future.
+     * forward compatibility with values added by the server in the future.
      *
      * @param value the raw wire-format string returned by the server
      */

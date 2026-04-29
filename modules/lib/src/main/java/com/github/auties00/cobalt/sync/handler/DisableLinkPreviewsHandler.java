@@ -14,6 +14,7 @@ import com.github.auties00.cobalt.model.sync.action.privacy.PrivacySettingDisabl
 import com.github.auties00.cobalt.model.sync.action.privacy.PrivacySettingDisableLinkPreviewsActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -106,8 +107,8 @@ public final class DisableLinkPreviewsHandler implements WebAppStateActionHandle
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDisableLinkPreviewsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: WAWebDisableLinkPreviewsSync.applyMutations
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: WAWebDisableLinkPreviewsSync.applyMutations
     }
 
     /**
@@ -129,7 +130,7 @@ public final class DisableLinkPreviewsHandler implements WebAppStateActionHandle
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDisableLinkPreviewsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public List<MutationApplicationResult> applyMutationBatchResults(WhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
+    public List<MutationApplicationResult> applyMutationBatchResults(WhatsAppClient client, WamService wamService, List<DecryptedMutation.Trusted> mutations) {
         if (mutations.isEmpty()) {
             return List.of();
         }
@@ -179,7 +180,7 @@ public final class DisableLinkPreviewsHandler implements WebAppStateActionHandle
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDisableLinkPreviewsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) { // WAWebDisableLinkPreviewsSync.applyMutations: if (e.operation !== "set")
             return MutationApplicationResult.unsupported(); // WAWebDisableLinkPreviewsSync.applyMutations: {actionState: SyncActionState.Unsupported}
         }

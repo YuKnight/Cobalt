@@ -1,8 +1,11 @@
 package com.github.auties00.cobalt.stream.notification.device;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.WhatsAppClientListener;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
+import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.pairing.CompanionPairingService;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.newsletter.Newsletter;
@@ -12,9 +15,11 @@ import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.model.sync.action.device.WaffleAccountLinkStateAction;
 import com.github.auties00.cobalt.stream.SocketStream;
 import com.github.auties00.cobalt.util.DataUtils;
+import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.ChatMessageCountsEventBuilder;
 
 import java.util.Set;
+import java.util.function.Consumer;
 
 /**
  * Handles linking-related and miscellaneous notification stanzas dispatched by
@@ -38,6 +43,16 @@ import java.util.Set;
  *     WAWebHandleWaChat,
  *     WAWebHandleNewsletterNotification
  */
+@WhatsAppWebModule(moduleName = "WAWebHandleCompanionReqRefreshNotification")
+@WhatsAppWebModule(moduleName = "WAWebAltDeviceLinkingHandleNotification")
+@WhatsAppWebModule(moduleName = "WAWebAccountLinkingNotificationHandler")
+@WhatsAppWebModule(moduleName = "WAWebHandleHostedNotification")
+@WhatsAppWebModule(moduleName = "WAWebHandleGrowthNotification")
+@WhatsAppWebModule(moduleName = "WAWebHandlePsa")
+@WhatsAppWebModule(moduleName = "WAWebHandleQPSurfacesNotification")
+@WhatsAppWebModule(moduleName = "WAWebHandleQPPrefetchTimestampNotification")
+@WhatsAppWebModule(moduleName = "WAWebHandleWaChat")
+@WhatsAppWebModule(moduleName = "WAWebHandleNewsletterNotification")
 final class NotificationLinkingStreamHandler implements SocketStream.Handler {
 
     /**
@@ -119,18 +134,26 @@ final class NotificationLinkingStreamHandler implements SocketStream.Handler {
     private final CompanionPairingService deviceLinkingService;
 
     /**
+     * The WAM telemetry service used to commit linking-related events.
+     */
+    private final WamService wamService;
+
+    /**
      * Creates a new linking notification stream handler.
      *
-     * @param whatsapp                the WhatsApp client instance, must not be {@code null}
+     * @param whatsapp             the WhatsApp client instance, must not be {@code null}
      * @param deviceLinkingService the shared alt-device-linking service
+     * @param wamService           the WAM telemetry service used to commit linking-related events
      * @implNote NO_WA_BASIS
      */
     NotificationLinkingStreamHandler(
             WhatsAppClient whatsapp,
-            CompanionPairingService deviceLinkingService
+            CompanionPairingService deviceLinkingService,
+            WamService wamService
     ) {
         this.whatsapp = whatsapp;
         this.deviceLinkingService = deviceLinkingService;
+        this.wamService = wamService;
     }
 
     /**
@@ -396,7 +419,7 @@ final class NotificationLinkingStreamHandler implements SocketStream.Handler {
         // WAWebHandleGrowthNotification: new ChatMessageCountsWamEvent({isInviteCreatedThread:true}).commit()
         // emitted after the fresh invite chat is created.
         if (chatCreated) {
-            whatsapp.wamService().commit(new ChatMessageCountsEventBuilder()
+            wamService.commit(new ChatMessageCountsEventBuilder()
                     .isInviteCreatedThread(true)
                     .build());
         }
@@ -573,7 +596,7 @@ final class NotificationLinkingStreamHandler implements SocketStream.Handler {
      * @param consumer the listener callback to fire
      * @implNote NO_WA_BASIS
      */
-    private void fireListeners(java.util.function.Consumer<com.github.auties00.cobalt.client.WhatsAppClientListener> consumer) {
+    private void fireListeners(Consumer<WhatsAppClientListener> consumer) {
         for (var listener : whatsapp.store().listeners()) {
             Thread.startVirtualThread(() -> consumer.accept(listener));
         }
@@ -598,7 +621,7 @@ final class NotificationLinkingStreamHandler implements SocketStream.Handler {
             return;
         }
 
-        whatsapp.sendNodeWithNoResponse(new com.github.auties00.cobalt.node.NodeBuilder()
+        whatsapp.sendNodeWithNoResponse(new NodeBuilder()
                 .description("ack")
                 .attribute("id", stanzaId)
                 .attribute("class", "notification") // WAWebHandleCompanionReqRefreshNotification, WAWebHandlePsa, WAWebHandleGrowthNotification: hardcoded "notification"

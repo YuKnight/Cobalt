@@ -1,0 +1,721 @@
+package com.github.auties00.cobalt.node.smax.groups;
+
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
+import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.node.Node;
+import com.github.auties00.cobalt.node.NodeBuilder;
+import com.github.auties00.cobalt.node.smax.SmaxOperation;
+import com.github.auties00.cobalt.node.smax.util.SmaxBaseServerErrorMixin;
+import com.github.auties00.cobalt.node.smax.util.SmaxIqResultResponseMixin;
+import java.util.ArrayList;
+import java.util.Objects;
+import java.util.Optional;
+
+/**
+ * Sealed family of inbound reply variants produced by the relay in
+ * response to a {@link SmaxGroupsSetPropertyRequest}.
+ *
+ * @implNote {@code WASmaxGroupsSetPropertyRPC.sendSetPropertyRPC} tries
+ *           {@code Success} → {@code ClientError} → {@code ServerError}
+ *           in order and throws on no-match. Cobalt returns
+ *           {@link Optional#empty()} on no-match.
+ */
+public sealed interface SmaxGroupsSetPropertyResponse extends SmaxOperation.Response
+        permits SmaxGroupsSetPropertyResponse.Success, SmaxGroupsSetPropertyResponse.ClientError, SmaxGroupsSetPropertyResponse.ServerError {
+
+    /**
+     * Tries each {@link SmaxGroupsSetPropertyResponse} variant in priority order and
+     * returns the first that parses cleanly.
+     *
+     * @param node    the inbound IQ stanza received from the relay;
+     *                never {@code null}
+     * @param request the original outbound stanza — used to validate
+     *                echoed identifiers; never {@code null}
+     * @return an {@link Optional} carrying the parsed variant, or
+     *         {@link Optional#empty()} when no documented variant
+     *         matched the stanza shape
+     * @throws NullPointerException if either argument is {@code null}
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxGroupsSetPropertyRPC",
+            exports = "sendSetPropertyRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    static Optional<? extends SmaxGroupsSetPropertyResponse> of(Node node, Node request) {
+        Objects.requireNonNull(node, "node cannot be null");
+        Objects.requireNonNull(request, "request cannot be null");
+        var success = Success.of(node, request);
+        if (success.isPresent()) {
+            return success;
+        }
+        var clientError = ClientError.of(node, request);
+        if (clientError.isPresent()) {
+            return clientError;
+        }
+        return ServerError.of(node, request);
+    }
+
+    /**
+     * The {@code Success} reply variant — the relay accepted the
+     * mutation and echoed back which toggles were applied.
+     *
+     * <p>Each toggle is exposed as a typed accessor; the
+     * {@code <ephemeral/>} echo is decomposed into its {@code expiration}
+     * and {@code trigger} attributes, and the membership-approval echo
+     * is exposed as the raw join-mode string.
+     *
+     * @implNote {@code WASmaxInGroupsSetPropertyResponseSuccess.parseSetPropertyResponseSuccess}
+     *           validates the IQ result envelope, scans for each
+     *           toggle child, and emits
+     *           {@code hasLocked}/{@code hasAnnouncement}/etc.
+     *           presence flags plus typed values for the
+     *           {@code <ephemeral/>} and
+     *           {@code <membership_approval_mode/>} children. Cobalt
+     *           preserves the same shape with typed accessors.
+     */
+    @WhatsAppWebModule(moduleName = "WASmaxInGroupsSetPropertyResponseSuccess")
+    final class Success implements SmaxGroupsSetPropertyResponse {
+        /**
+         * Whether the relay echoed a {@code <locked/>} child.
+         */
+        private final boolean locked;
+
+        /**
+         * Whether the relay echoed an {@code <announcement/>} child.
+         */
+        private final boolean announcement;
+
+        /**
+         * Whether the relay echoed a
+         * {@code <no_frequently_forwarded/>} child.
+         */
+        private final boolean noFrequentlyForwarded;
+
+        /**
+         * The optional ephemeral-message expiration echoed by the
+         * relay. May be {@code null} when the request did not toggle
+         * ephemerality.
+         */
+        private final Integer ephemeralExpiration;
+
+        /**
+         * The optional ephemeral-message trigger echoed by the relay.
+         * May be {@code null}.
+         */
+        private final Integer ephemeralTrigger;
+
+        /**
+         * Whether the relay echoed an {@code <unlocked/>} child.
+         */
+        private final boolean unlocked;
+
+        /**
+         * Whether the relay echoed a {@code <not_announcement/>} child.
+         */
+        private final boolean notAnnouncement;
+
+        /**
+         * Whether the relay echoed a {@code <frequently_forwarded_ok/>}
+         * child.
+         */
+        private final boolean frequentlyForwardedOk;
+
+        /**
+         * Whether the relay echoed a {@code <not_ephemeral/>} child.
+         */
+        private final boolean notEphemeral;
+
+        /**
+         * The optional membership-approval mode echoed by the relay.
+         * May be {@code null} when the request did not toggle
+         * membership approval.
+         */
+        private final String membershipApprovalGroupJoinMode;
+
+        /**
+         * Whether the relay echoed an {@code <allow_admin_reports/>}
+         * child.
+         */
+        private final boolean allowAdminReports;
+
+        /**
+         * Whether the relay echoed a {@code <not_allow_admin_reports/>}
+         * child.
+         */
+        private final boolean notAllowAdminReports;
+
+        /**
+         * Whether the relay echoed an
+         * {@code <allow_non_admin_sub_group_creation/>} child.
+         */
+        private final boolean allowNonAdminSubGroupCreation;
+
+        /**
+         * Whether the relay echoed a
+         * {@code <not_allow_non_admin_sub_group_creation/>} child.
+         */
+        private final boolean notAllowNonAdminSubGroupCreation;
+
+        /**
+         * Whether the relay echoed a {@code <group_history/>} child.
+         */
+        private final boolean groupHistory;
+
+        /**
+         * Whether the relay echoed a {@code <no_group_history/>} child.
+         */
+        private final boolean noGroupHistory;
+
+        /**
+         * Constructs a new successful reply.
+         *
+         * @param locked                            see
+         *                                          {@link #locked()}
+         * @param announcement                      see
+         *                                          {@link #announcement()}
+         * @param noFrequentlyForwarded             see
+         *                                          {@link #noFrequentlyForwarded()}
+         * @param ephemeralExpiration               optional ephemeral
+         *                                          expiration echo;
+         *                                          may be {@code null}
+         * @param ephemeralTrigger                  optional ephemeral
+         *                                          trigger echo; may
+         *                                          be {@code null}
+         * @param unlocked                          see
+         *                                          {@link #unlocked()}
+         * @param notAnnouncement                   see
+         *                                          {@link #notAnnouncement()}
+         * @param frequentlyForwardedOk             see
+         *                                          {@link #frequentlyForwardedOk()}
+         * @param notEphemeral                      see
+         *                                          {@link #notEphemeral()}
+         * @param membershipApprovalGroupJoinMode   optional
+         *                                          membership-approval
+         *                                          mode echo; may be
+         *                                          {@code null}
+         * @param allowAdminReports                 see
+         *                                          {@link #allowAdminReports()}
+         * @param notAllowAdminReports              see
+         *                                          {@link #notAllowAdminReports()}
+         * @param allowNonAdminSubGroupCreation     see
+         *                                          {@link #allowNonAdminSubGroupCreation()}
+         * @param notAllowNonAdminSubGroupCreation  see
+         *                                          {@link #notAllowNonAdminSubGroupCreation()}
+         * @param groupHistory                      see
+         *                                          {@link #groupHistory()}
+         * @param noGroupHistory                    see
+         *                                          {@link #noGroupHistory()}
+         */
+        public Success(boolean locked,
+                       boolean announcement,
+                       boolean noFrequentlyForwarded,
+                       Integer ephemeralExpiration,
+                       Integer ephemeralTrigger,
+                       boolean unlocked,
+                       boolean notAnnouncement,
+                       boolean frequentlyForwardedOk,
+                       boolean notEphemeral,
+                       String membershipApprovalGroupJoinMode,
+                       boolean allowAdminReports,
+                       boolean notAllowAdminReports,
+                       boolean allowNonAdminSubGroupCreation,
+                       boolean notAllowNonAdminSubGroupCreation,
+                       boolean groupHistory,
+                       boolean noGroupHistory) {
+            this.locked = locked;
+            this.announcement = announcement;
+            this.noFrequentlyForwarded = noFrequentlyForwarded;
+            this.ephemeralExpiration = ephemeralExpiration;
+            this.ephemeralTrigger = ephemeralTrigger;
+            this.unlocked = unlocked;
+            this.notAnnouncement = notAnnouncement;
+            this.frequentlyForwardedOk = frequentlyForwardedOk;
+            this.notEphemeral = notEphemeral;
+            this.membershipApprovalGroupJoinMode = membershipApprovalGroupJoinMode;
+            this.allowAdminReports = allowAdminReports;
+            this.notAllowAdminReports = notAllowAdminReports;
+            this.allowNonAdminSubGroupCreation = allowNonAdminSubGroupCreation;
+            this.notAllowNonAdminSubGroupCreation = notAllowNonAdminSubGroupCreation;
+            this.groupHistory = groupHistory;
+            this.noGroupHistory = noGroupHistory;
+        }
+
+        /**
+         * Returns whether the relay echoed a {@code <locked/>} child.
+         *
+         * @return {@code true} when the toggle was applied
+         */
+        public boolean locked() {
+            return locked;
+        }
+
+        /**
+         * Returns whether the relay echoed an
+         * {@code <announcement/>} child.
+         *
+         * @return {@code true} when the toggle was applied
+         */
+        public boolean announcement() {
+            return announcement;
+        }
+
+        /**
+         * Returns whether the relay echoed a
+         * {@code <no_frequently_forwarded/>} child.
+         *
+         * @return {@code true} when the toggle was applied
+         */
+        public boolean noFrequentlyForwarded() {
+            return noFrequentlyForwarded;
+        }
+
+        /**
+         * Returns the optional ephemeral-message expiration echoed by
+         * the relay.
+         *
+         * @return an {@link Optional} carrying the expiration in
+         *         seconds, or empty when the relay did not echo the
+         *         {@code <ephemeral/>} child
+         */
+        public Optional<Integer> ephemeralExpiration() {
+            return Optional.ofNullable(ephemeralExpiration);
+        }
+
+        /**
+         * Returns the optional ephemeral-message trigger echoed by the
+         * relay.
+         *
+         * @return an {@link Optional} carrying the trigger, or empty
+         *         when the relay omitted it
+         */
+        public Optional<Integer> ephemeralTrigger() {
+            return Optional.ofNullable(ephemeralTrigger);
+        }
+
+        /**
+         * Returns whether the relay echoed an {@code <unlocked/>}
+         * child.
+         *
+         * @return {@code true} when the toggle was applied
+         */
+        public boolean unlocked() {
+            return unlocked;
+        }
+
+        /**
+         * Returns whether the relay echoed a
+         * {@code <not_announcement/>} child.
+         *
+         * @return {@code true} when the toggle was applied
+         */
+        public boolean notAnnouncement() {
+            return notAnnouncement;
+        }
+
+        /**
+         * Returns whether the relay echoed a
+         * {@code <frequently_forwarded_ok/>} child.
+         *
+         * @return {@code true} when the toggle was applied
+         */
+        public boolean frequentlyForwardedOk() {
+            return frequentlyForwardedOk;
+        }
+
+        /**
+         * Returns whether the relay echoed a {@code <not_ephemeral/>}
+         * child.
+         *
+         * @return {@code true} when the toggle was applied
+         */
+        public boolean notEphemeral() {
+            return notEphemeral;
+        }
+
+        /**
+         * Returns the optional membership-approval mode echoed by the
+         * relay.
+         *
+         * @return an {@link Optional} carrying the join-mode value, or
+         *         empty when the relay did not echo the
+         *         {@code <membership_approval_mode/>} child
+         */
+        public Optional<String> membershipApprovalGroupJoinMode() {
+            return Optional.ofNullable(membershipApprovalGroupJoinMode);
+        }
+
+        /**
+         * Returns whether the relay echoed an
+         * {@code <allow_admin_reports/>} child.
+         *
+         * @return {@code true} when the toggle was applied
+         */
+        public boolean allowAdminReports() {
+            return allowAdminReports;
+        }
+
+        /**
+         * Returns whether the relay echoed a
+         * {@code <not_allow_admin_reports/>} child.
+         *
+         * @return {@code true} when the toggle was applied
+         */
+        public boolean notAllowAdminReports() {
+            return notAllowAdminReports;
+        }
+
+        /**
+         * Returns whether the relay echoed an
+         * {@code <allow_non_admin_sub_group_creation/>} child.
+         *
+         * @return {@code true} when the toggle was applied
+         */
+        public boolean allowNonAdminSubGroupCreation() {
+            return allowNonAdminSubGroupCreation;
+        }
+
+        /**
+         * Returns whether the relay echoed a
+         * {@code <not_allow_non_admin_sub_group_creation/>} child.
+         *
+         * @return {@code true} when the toggle was applied
+         */
+        public boolean notAllowNonAdminSubGroupCreation() {
+            return notAllowNonAdminSubGroupCreation;
+        }
+
+        /**
+         * Returns whether the relay echoed a {@code <group_history/>}
+         * child.
+         *
+         * @return {@code true} when the toggle was applied
+         */
+        public boolean groupHistory() {
+            return groupHistory;
+        }
+
+        /**
+         * Returns whether the relay echoed a
+         * {@code <no_group_history/>} child.
+         *
+         * @return {@code true} when the toggle was applied
+         */
+        public boolean noGroupHistory() {
+            return noGroupHistory;
+        }
+
+        /**
+         * Tries to parse a {@link Success} variant from the given
+         * inbound stanza.
+         *
+         * @param node    the inbound IQ stanza
+         * @param request the original outbound request
+         * @return an {@link Optional} carrying the parsed variant, or
+         *         empty when the stanza does not match the success
+         *         schema
+         */
+        @WhatsAppWebExport(moduleName = "WASmaxInGroupsSetPropertyResponseSuccess",
+                exports = "parseSetPropertyResponseSuccess",
+                adaptation = WhatsAppAdaptation.ADAPTED)
+        public static Optional<Success> of(Node node, Node request) {
+            if (!SmaxIqResultResponseMixin.validate(node, request)) {
+                return Optional.empty();
+            }
+            var hasLocked = node.getChild("locked").isPresent();
+            var hasAnnouncement = node.getChild("announcement").isPresent();
+            var hasNoFrequentlyForwarded = node.getChild("no_frequently_forwarded").isPresent();
+            var ephemeral = node.getChild("ephemeral").orElse(null);
+            Integer ephemeralExpiration = null;
+            Integer ephemeralTrigger = null;
+            if (ephemeral != null) {
+                ephemeralExpiration = ephemeral.getAttributeAsInt("expiration").orElse(0);
+                if (ephemeral.getAttributeAsInt("trigger").isPresent()) {
+                    ephemeralTrigger = ephemeral.getAttributeAsInt("trigger").getAsInt();
+                }
+            }
+            var hasUnlocked = node.getChild("unlocked").isPresent();
+            var hasNotAnnouncement = node.getChild("not_announcement").isPresent();
+            var hasFrequentlyForwardedOk = node.getChild("frequently_forwarded_ok").isPresent();
+            var hasNotEphemeral = node.getChild("not_ephemeral").isPresent();
+            var membershipApprovalMode = node.getChild("membership_approval_mode").orElse(null);
+            String membershipApprovalJoinMode = null;
+            if (membershipApprovalMode != null) {
+                membershipApprovalJoinMode = membershipApprovalMode.getAttributeAsString("group_join_mode").orElse(null);
+            }
+            var hasAllowAdminReports = node.getChild("allow_admin_reports").isPresent();
+            var hasNotAllowAdminReports = node.getChild("not_allow_admin_reports").isPresent();
+            var hasAllowNonAdminSubGroupCreation = node.getChild("allow_non_admin_sub_group_creation").isPresent();
+            var hasNotAllowNonAdminSubGroupCreation = node.getChild("not_allow_non_admin_sub_group_creation").isPresent();
+            var hasGroupHistory = node.getChild("group_history").isPresent();
+            var hasNoGroupHistory = node.getChild("no_group_history").isPresent();
+            var success = new Success(
+                    hasLocked,
+                    hasAnnouncement,
+                    hasNoFrequentlyForwarded,
+                    ephemeralExpiration,
+                    ephemeralTrigger,
+                    hasUnlocked,
+                    hasNotAnnouncement,
+                    hasFrequentlyForwardedOk,
+                    hasNotEphemeral,
+                    membershipApprovalJoinMode,
+                    hasAllowAdminReports,
+                    hasNotAllowAdminReports,
+                    hasAllowNonAdminSubGroupCreation,
+                    hasNotAllowNonAdminSubGroupCreation,
+                    hasGroupHistory,
+                    hasNoGroupHistory);
+            return Optional.of(success);
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (obj == this) {
+                return true;
+            }
+            if (obj == null || obj.getClass() != this.getClass()) {
+                return false;
+            }
+            var that = (Success) obj;
+            return this.locked == that.locked
+                    && this.announcement == that.announcement
+                    && this.noFrequentlyForwarded == that.noFrequentlyForwarded
+                    && this.unlocked == that.unlocked
+                    && this.notAnnouncement == that.notAnnouncement
+                    && this.frequentlyForwardedOk == that.frequentlyForwardedOk
+                    && this.notEphemeral == that.notEphemeral
+                    && this.allowAdminReports == that.allowAdminReports
+                    && this.notAllowAdminReports == that.notAllowAdminReports
+                    && this.allowNonAdminSubGroupCreation == that.allowNonAdminSubGroupCreation
+                    && this.notAllowNonAdminSubGroupCreation == that.notAllowNonAdminSubGroupCreation
+                    && this.groupHistory == that.groupHistory
+                    && this.noGroupHistory == that.noGroupHistory
+                    && Objects.equals(this.ephemeralExpiration, that.ephemeralExpiration)
+                    && Objects.equals(this.ephemeralTrigger, that.ephemeralTrigger)
+                    && Objects.equals(this.membershipApprovalGroupJoinMode, that.membershipApprovalGroupJoinMode);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(locked, announcement, noFrequentlyForwarded, ephemeralExpiration, ephemeralTrigger,
+                    unlocked, notAnnouncement, frequentlyForwardedOk, notEphemeral,
+                    membershipApprovalGroupJoinMode, allowAdminReports, notAllowAdminReports,
+                    allowNonAdminSubGroupCreation, notAllowNonAdminSubGroupCreation, groupHistory, noGroupHistory);
+        }
+
+        @Override
+        public String toString() {
+            return "SmaxGroupsSetPropertyResponse.Success[locked=" + locked
+                    + ", announcement=" + announcement
+                    + ", noFrequentlyForwarded=" + noFrequentlyForwarded
+                    + ", ephemeralExpiration=" + ephemeralExpiration
+                    + ", ephemeralTrigger=" + ephemeralTrigger
+                    + ", unlocked=" + unlocked
+                    + ", notAnnouncement=" + notAnnouncement
+                    + ", frequentlyForwardedOk=" + frequentlyForwardedOk
+                    + ", notEphemeral=" + notEphemeral
+                    + ", membershipApprovalGroupJoinMode=" + membershipApprovalGroupJoinMode
+                    + ", allowAdminReports=" + allowAdminReports
+                    + ", notAllowAdminReports=" + notAllowAdminReports
+                    + ", allowNonAdminSubGroupCreation=" + allowNonAdminSubGroupCreation
+                    + ", notAllowNonAdminSubGroupCreation=" + notAllowNonAdminSubGroupCreation
+                    + ", groupHistory=" + groupHistory
+                    + ", noGroupHistory=" + noGroupHistory
+                    + ']';
+        }
+    }
+
+    /**
+     * The {@code ClientError} reply variant — the relay rejected the
+     * request as malformed (mutually exclusive toggles, empty
+     * payload), unauthorised, or referencing a non-existent group.
+     *
+     * @implNote {@code WASmaxInGroupsSetPropertyResponseClientError.parseSetPropertyResponseClientError}
+     *           parses the {@code <error code text/>} child and routes
+     *           it through the per-RPC client-error enum. Cobalt
+     *           collapses to the raw {@code (code, text)} pair.
+     */
+    @WhatsAppWebModule(moduleName = "WASmaxInGroupsSetPropertyResponseClientError")
+    final class ClientError implements SmaxGroupsSetPropertyResponse {
+        /**
+         * The numeric server-side error code.
+         */
+        private final int errorCode;
+
+        /**
+         * The human-readable error text, when the relay supplied one.
+         */
+        private final String errorText;
+
+        /**
+         * Constructs a new client-error reply.
+         *
+         * @param errorCode the numeric error code
+         * @param errorText the optional human-readable text; may be
+         *                  {@code null}
+         */
+        public ClientError(int errorCode, String errorText) {
+            this.errorCode = errorCode;
+            this.errorText = errorText;
+        }
+
+        /**
+         * Returns the numeric error code.
+         *
+         * @return the error code
+         */
+        public int errorCode() {
+            return errorCode;
+        }
+
+        /**
+         * Returns the optional human-readable error text.
+         *
+         * @return an {@link Optional} carrying the error text, or
+         *         empty when the relay omitted it
+         */
+        public Optional<String> errorText() {
+            return Optional.ofNullable(errorText);
+        }
+
+        /**
+         * Tries to parse a {@link ClientError} variant from the given
+         * inbound stanza.
+         *
+         * @param node    the inbound IQ stanza
+         * @param request the original outbound request
+         * @return an {@link Optional} carrying the parsed variant, or
+         *         empty when the stanza does not match the
+         *         client-error schema
+         */
+        @WhatsAppWebExport(moduleName = "WASmaxInGroupsSetPropertyResponseClientError",
+                exports = "parseSetPropertyResponseClientError",
+                adaptation = WhatsAppAdaptation.ADAPTED)
+        public static Optional<ClientError> of(Node node, Node request) {
+            var envelope = SmaxBaseServerErrorMixin.parseClientError(node, request).orElse(null);
+            if (envelope == null) {
+                return Optional.empty();
+            }
+            return Optional.of(new ClientError(envelope.code(), envelope.text()));
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (obj == this) {
+                return true;
+            }
+            if (obj == null || obj.getClass() != this.getClass()) {
+                return false;
+            }
+            var that = (ClientError) obj;
+            return this.errorCode == that.errorCode && Objects.equals(this.errorText, that.errorText);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(errorCode, errorText);
+        }
+
+        @Override
+        public String toString() {
+            return "SmaxGroupsSetPropertyResponse.ClientError[errorCode=" + errorCode
+                    + ", errorText=" + errorText + ']';
+        }
+    }
+
+    /**
+     * The {@code ServerError} reply variant — the relay encountered a
+     * transient internal failure while processing the request.
+     *
+     * @implNote {@code WASmaxInGroupsSetPropertyResponseServerError.parseSetPropertyResponseServerError}
+     *           delegates to {@code WASmaxInGroupsBaseServerErrorMixin}
+     *           which Cobalt has consolidated under
+     *           {@link SmaxBaseServerErrorMixin}.
+     */
+    @WhatsAppWebModule(moduleName = "WASmaxInGroupsSetPropertyResponseServerError")
+    final class ServerError implements SmaxGroupsSetPropertyResponse {
+        /**
+         * The numeric server-side error code.
+         */
+        private final int errorCode;
+
+        /**
+         * The human-readable error text, when the relay supplied one.
+         */
+        private final String errorText;
+
+        /**
+         * Constructs a new server-error reply.
+         *
+         * @param errorCode the numeric error code
+         * @param errorText the optional human-readable text; may be
+         *                  {@code null}
+         */
+        public ServerError(int errorCode, String errorText) {
+            this.errorCode = errorCode;
+            this.errorText = errorText;
+        }
+
+        /**
+         * Returns the numeric error code.
+         *
+         * @return the error code
+         */
+        public int errorCode() {
+            return errorCode;
+        }
+
+        /**
+         * Returns the optional human-readable error text.
+         *
+         * @return an {@link Optional} carrying the error text, or
+         *         empty when the relay omitted it
+         */
+        public Optional<String> errorText() {
+            return Optional.ofNullable(errorText);
+        }
+
+        /**
+         * Tries to parse a {@link ServerError} variant from the given
+         * inbound stanza.
+         *
+         * @param node    the inbound IQ stanza
+         * @param request the original outbound request
+         * @return an {@link Optional} carrying the parsed variant, or
+         *         empty when the stanza does not match the
+         *         server-error schema
+         */
+        @WhatsAppWebExport(moduleName = "WASmaxInGroupsSetPropertyResponseServerError",
+                exports = "parseSetPropertyResponseServerError",
+                adaptation = WhatsAppAdaptation.ADAPTED)
+        public static Optional<ServerError> of(Node node, Node request) {
+            var envelope = SmaxBaseServerErrorMixin.parseServerError(node, request).orElse(null);
+            if (envelope == null) {
+                return Optional.empty();
+            }
+            return Optional.of(new ServerError(envelope.code(), envelope.text()));
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (obj == this) {
+                return true;
+            }
+            if (obj == null || obj.getClass() != this.getClass()) {
+                return false;
+            }
+            var that = (ServerError) obj;
+            return this.errorCode == that.errorCode && Objects.equals(this.errorText, that.errorText);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(errorCode, errorText);
+        }
+
+        @Override
+        public String toString() {
+            return "SmaxGroupsSetPropertyResponse.ServerError[errorCode=" + errorCode
+                    + ", errorText=" + errorText + ']';
+        }
+    }
+}

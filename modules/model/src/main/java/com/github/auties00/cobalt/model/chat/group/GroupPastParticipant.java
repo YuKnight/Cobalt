@@ -1,8 +1,5 @@
 package com.github.auties00.cobalt.model.chat.group;
 
-import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
-import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
-import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.mixin.InstantSecondsMixin;
 import it.auties.protobuf.annotation.ProtobufEnum;
@@ -16,17 +13,19 @@ import java.time.Instant;
 import java.util.Optional;
 
 /**
- * Represents a user who was previously a participant in a WhatsApp group but
- * has since left or been removed.
+ * Represents a user who used to be a participant of a WhatsApp group but is
+ * no longer in it.
  *
- * <p>WhatsApp groups maintain a history of past participants so that features
- * like the "member updates" panel can display who left or was removed and
- * when. Each record captures the participant's JID, the reason they left, and
- * a timestamp of their departure.
+ * <p>WhatsApp keeps a record of every member who recently left or was removed
+ * from a group so that the "members updates" panel can show who has departed
+ * and when. Each record captures the participant's JID, the reason they left
+ * (voluntary departure or removal by an administrator) and the moment at
+ * which the departure happened.
  *
- * <p>Past participant records have a limited lifespan. The {@link #isExpired()}
- * method checks whether the record is older than the configured expiration
- * duration and should be pruned from storage.
+ * <p>Past-participant records are not retained forever: the client prunes
+ * records older than a fixed expiration window. {@link #isExpired()} reports
+ * whether a record has aged past that window and may be safely discarded
+ * during periodic cleanup.
  *
  * @see GroupPastParticipants
  * @see GroupMetadata
@@ -34,28 +33,30 @@ import java.util.Optional;
 @ProtobufMessage(name = "PastParticipant")
 public final class GroupPastParticipant {
     /**
-     * The duration after which past participant records are considered expired
-     * and eligible for pruning from the local store.
+     * The maximum age of a past-participant record before it is considered
+     * expired and eligible for pruning from the local store.
      */
     private static final Duration EXPIRATION = Duration.ofDays(60);
 
     /**
-     * The JID of the user who left or was removed from the group, or
-     * {@code null} if not available.
+     * The JID of the user who left or was removed from the group. Populated
+     * for every record received from the server; may be {@code null} only on
+     * partially constructed instances.
      */
     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
     Jid userJid;
 
     /**
-     * The reason the participant left the group, or {@code null} if the
-     * reason is not known.
+     * The reason the participant departed: voluntary leave or admin removal.
+     * May be {@code null} when the server does not report a reason.
      */
     @ProtobufProperty(index = 2, type = ProtobufType.ENUM)
     LeaveReason leaveReason;
 
     /**
-     * The instant at which the participant left or was removed, or
-     * {@code null} if the timestamp is not available.
+     * The instant at which the participant left or was removed from the
+     * group. Populated for every record received from the server; may be
+     * {@code null} only on partially constructed instances.
      */
     @ProtobufProperty(index = 3, type = ProtobufType.UINT64, mixins = InstantSecondsMixin.class)
     Instant timestamp;
@@ -76,8 +77,7 @@ public final class GroupPastParticipant {
     }
 
     /**
-     * Returns the JID of the user who left or was removed from the group,
-     * if available.
+     * Returns the JID of the user who left or was removed from the group.
      *
      * @return an {@code Optional} containing the user JID, or empty if not
      *         available
@@ -87,7 +87,7 @@ public final class GroupPastParticipant {
     }
 
     /**
-     * Returns the reason the participant left the group, if known.
+     * Returns the reason the participant left the group.
      *
      * @return an {@code Optional} containing the leave reason, or empty if
      *         not known
@@ -97,8 +97,8 @@ public final class GroupPastParticipant {
     }
 
     /**
-     * Returns the instant at which the participant left or was removed, if
-     * available.
+     * Returns the instant at which the participant left or was removed from
+     * the group.
      *
      * @return an {@code Optional} containing the departure timestamp, or
      *         empty if not available
@@ -136,11 +136,8 @@ public final class GroupPastParticipant {
     }
 
     /**
-     * Returns whether this past participant record has expired and should be
-     * pruned from the local store.
-     *
-     * <p>Records older than the configured expiration duration (60 days) are
-     * considered stale and can be safely removed during periodic cleanup.
+     * Returns whether this past-participant record has aged past the
+     * expiration window (60 days) and may be safely discarded.
      *
      * @return {@code true} if the record is older than the expiration
      *         threshold, {@code false} otherwise
@@ -153,33 +150,19 @@ public final class GroupPastParticipant {
     /**
      * Represents the reason a participant departed from a WhatsApp group.
      *
-     * <p>A participant can leave a group voluntarily ({@link #LEFT}) or be
-     * removed by an administrator ({@link #REMOVED}).
-     *
-     * @implNote This enum fills two roles that WA Web keeps separate. It is
-     *           the protobuf enum {@code PastParticipant.LeaveReason} defined
-     *           in {@code WAWebProtobufsHistorySync.pb} (integer-valued
-     *           {@code LEFT=0}, {@code REMOVED=1}), and it also adapts the
-     *           client-side string mirror {@code WAWebLeaveReasonType.LeaveReason}
-     *           (string-valued {@code "Left"}, {@code "Removed"}). WA Web
-     *           translates between the two in
-     *           {@code WAWebHistorySyncNotificationUtils}; Cobalt collapses
-     *           them because Java's enum type system already provides the
-     *           symbolic mirror that the JS string enum was emulating.
+     * <p>A participant may either leave the group voluntarily ({@link #LEFT})
+     * or be removed by an administrator ({@link #REMOVED}).
      */
-    @WhatsAppWebModule(moduleName = "WAWebLeaveReasonType")
     @ProtobufEnum(name = "PastParticipant.LeaveReason")
     public static enum LeaveReason {
         /**
-         * The participant voluntarily left the group.
+         * The participant left the group voluntarily.
          */
-        @WhatsAppWebExport(moduleName = "WAWebLeaveReasonType", exports = "LeaveReason", adaptation = WhatsAppAdaptation.ADAPTED)
         LEFT(0),
 
         /**
          * The participant was removed from the group by an administrator.
          */
-        @WhatsAppWebExport(moduleName = "WAWebLeaveReasonType", exports = "LeaveReason", adaptation = WhatsAppAdaptation.ADAPTED)
         REMOVED(1);
 
         /**

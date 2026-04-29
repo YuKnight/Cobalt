@@ -6,6 +6,7 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.stream.SocketStream;
 import com.github.auties00.cobalt.stream.call.CallReceiptStreamHandler;
+import com.github.auties00.cobalt.wam.WamService;
 
 /**
  * Dispatches incoming {@code <receipt>} stanzas to the appropriate specialised
@@ -81,10 +82,11 @@ public final class ReceiptStreamHandler implements SocketStream.Handler {
      *                       and access the local store
      * @param messageService the message service used by the message-receipt
      *                       handler to propagate state changes
+     * @param wamService     the WAM telemetry service forwarded to the message-receipt handler
      */
-    public ReceiptStreamHandler(WhatsAppClient whatsapp, MessageService messageService) {
+    public ReceiptStreamHandler(WhatsAppClient whatsapp, MessageService messageService, WamService wamService) {
         this.callReceiptHandler = new CallReceiptStreamHandler(whatsapp);
-        this.messageReceiptHandler = new MessageReceiptStreamHandler(whatsapp, messageService);
+        this.messageReceiptHandler = new MessageReceiptStreamHandler(whatsapp, messageService, wamService);
     }
 
     /**

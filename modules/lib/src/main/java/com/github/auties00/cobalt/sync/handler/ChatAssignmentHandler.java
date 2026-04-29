@@ -15,6 +15,7 @@ import com.github.auties00.cobalt.model.sync.action.chat.ChatAssignmentActionBui
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 import java.time.Instant;
 import java.util.HashMap;
@@ -109,8 +110,8 @@ public final class ChatAssignmentHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebChatAssignmentSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebChatAssignmentSync.applyMutations
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebChatAssignmentSync.applyMutations
     }
 
     /**
@@ -136,7 +137,7 @@ public final class ChatAssignmentHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebChatAssignmentSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         try { // WAWebChatAssignmentSync.applyMutations: try { ... } catch(e) { return {actionState: Failed} }
             var indexArray = JSON.parseArray(mutation.index()); // WAWebChatAssignmentSync.applyMutations: var t = e.indexParts
             var chatJidString = indexArray.getString(1); // WAWebChatAssignmentSync.applyMutations: n = t[1]

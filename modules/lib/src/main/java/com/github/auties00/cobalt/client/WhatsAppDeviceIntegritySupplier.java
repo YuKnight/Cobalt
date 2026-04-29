@@ -19,7 +19,7 @@ import com.github.auties00.cobalt.store.WhatsAppStore;
  *   <li>{@link Ios} produces Apple App Attest results.</li>
  * </ul>
  * Both sub-interfaces are {@code non-sealed} so embedders can implement
- * them freely, and both are {@link java.lang.FunctionalInterface
+ * them freely, and both are {@link FunctionalInterface
  * functional interfaces} so a target-typed lambda expression is enough
  * to supply one. Because each sub-interface narrows the return type of
  * {@link #mint(WhatsAppStore)} covariantly, a lambda that returns a

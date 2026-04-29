@@ -18,6 +18,7 @@ import com.github.auties00.cobalt.model.sync.action.chat.ClearChatAction;
 import com.github.auties00.cobalt.model.sync.action.chat.ClearChatActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 import java.time.Instant;
 import java.util.List;
@@ -131,8 +132,8 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebClearChatSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebClearChatSync.applyMutations
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebClearChatSync.applyMutations
     }
 
     /**
@@ -166,7 +167,7 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebClearChatSync", exports = {"applyMutations", "getMessageRange"}, adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) { // WAWebClearChatSync.applyMutations: e.operation === "set" check, else return Unsupported
             return MutationApplicationResult.unsupported(); // WAWebClearChatSync.applyMutations: c++, {actionState: Unsupported}
         }
@@ -356,7 +357,7 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
      * without any messages. The WAM telemetry commit
      * ({@code MdSyncdDogfoodingFeatureUsageWamEvent}) is performed at the caller
      * ({@code WhatsAppClient.clearChat}) since this method has no
-     * {@link com.github.auties00.cobalt.wam.WamService} handle.
+     * {@link WamService} handle.
      *
      * @implNote WAWebClearChatSync.getClearChatMutation,
      *           WAWebSyncdActionUtils.buildPendingMutation

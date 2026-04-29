@@ -7,6 +7,7 @@ import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.bot.UGCBotAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 /**
  * Handles UGC (user-generated-content) bot sync actions.
@@ -136,8 +137,8 @@ public final class UGCBotHandler implements WebAppStateActionHandler {
      * @return {@code true} if the mutation was applied successfully
      */
     @Override
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // NO_WA_BASIS: shared Cobalt success-check adapter
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // NO_WA_BASIS: shared Cobalt success-check adapter
     }
 
     /**
@@ -166,7 +167,7 @@ public final class UGCBotHandler implements WebAppStateActionHandler {
      * @return the detailed application result
      */
     @Override
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) { // NO_WA_BASIS: shared Cobalt convention - non-SET ops are unsupported
             return MutationApplicationResult.unsupported();
         }

@@ -15,6 +15,7 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -175,7 +176,7 @@ public final class CsTokenStanza {
         try {
             // WAWebSendMsgCreateFanoutStanza.genCsTokenBody: salt cache check
             // If the salt changed, clear the HMAC cache
-            if (cachedSalt == null || !java.util.Arrays.equals(cachedSalt, salt)) {
+            if (cachedSalt == null || !Arrays.equals(cachedSalt, salt)) {
                 cachedSalt = salt;
                 hmacCache.clear();
             }

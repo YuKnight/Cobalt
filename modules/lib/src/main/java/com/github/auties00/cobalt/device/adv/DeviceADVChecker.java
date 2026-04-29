@@ -14,6 +14,7 @@ import com.github.auties00.cobalt.model.device.sync.PendingDeviceSync;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
+import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.AdvStoredTimestampExpiredEventBuilder;
 
 import java.lang.System.Logger.Level;
@@ -100,6 +101,11 @@ public final class DeviceADVChecker implements AutoCloseable {
     private final ABPropsService abPropsService;
 
     /**
+     * The WAM telemetry service used to commit ADV check events.
+     */
+    private final WamService wamService;
+
+    /**
      * The scheduled executor for periodic ADV checks, or {@code null} if not started.
      *
      * @implNote ADAPTED: WAWebAdvDeviceInfoCheckJob.scheduleAdvDeviceInfoCheck:
@@ -117,14 +123,16 @@ public final class DeviceADVChecker implements AutoCloseable {
      * @param client        the WhatsApp client
      * @param deviceService the device service for sync operations
      * @param abPropsService the AB props service for thresholds
+     * @param wamService    the WAM telemetry service for committing ADV check events
      */
     @WhatsAppWebExport(moduleName = "WAWebAdvDeviceInfoCheckJob",
             exports = "runAdvDeviceInfoCheck",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public DeviceADVChecker(WhatsAppClient client, DeviceService deviceService, ABPropsService abPropsService) {
+    public DeviceADVChecker(WhatsAppClient client, DeviceService deviceService, ABPropsService abPropsService, WamService wamService) {
         this.client = client;
         this.deviceService = deviceService;
         this.abPropsService = abPropsService;
+        this.wamService = wamService;
     }
 
     /**
@@ -460,7 +468,6 @@ public final class DeviceADVChecker implements AutoCloseable {
         if (expiredLists.isEmpty()) {
             return;
         }
-        var wamService = client.wamService();
         for (var expiredList : expiredLists) {
             // WAWebAdvDeviceInfoCheckJob.sendADVStoredTimestampExpiredEvents:
             // r = now - (t.timestamp + expiryDays*DAY_SECONDS)

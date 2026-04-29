@@ -10,6 +10,7 @@ import com.github.auties00.cobalt.model.chat.ChatDisappearingMode;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.chat.ChatMetadata;
 import com.github.auties00.cobalt.model.chat.ChatMute;
+import com.github.auties00.cobalt.model.chat.group.GroupMetadata;
 import com.github.auties00.cobalt.model.sync.history.HistorySync;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.migration.LIDMigrationMapping;
@@ -21,6 +22,7 @@ import com.github.auties00.cobalt.model.setting.GlobalSettings;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.Lid11MigrationLifecycleEventBuilder;
 import com.github.auties00.cobalt.wam.type.MigrationStageEnum;
 import com.github.auties00.cobalt.wam.type.StageFailureReasonEnum;
@@ -173,6 +175,11 @@ public final class LidMigrationService {
     private final ABPropsService abPropsService;
 
     /**
+     * The WAM telemetry service used to commit migration lifecycle events.
+     */
+    private final WamService wamService;
+
+    /**
      * Current position in the migration pipeline.
      *
      * <p>WA Web encodes the same information across several UserPrefs keys
@@ -263,11 +270,13 @@ public final class LidMigrationService {
      *           constructor DI so tests can swap the collaborators.
      * @param whatsapp       the WhatsApp client that owns this service
      * @param abPropsService the AB props service used for reading feature flags
+     * @param wamService     the WAM telemetry service for migration lifecycle events
      */
-    public LidMigrationService(WhatsAppClient whatsapp, ABPropsService abPropsService) {
+    public LidMigrationService(WhatsAppClient whatsapp, ABPropsService abPropsService, WamService wamService) {
         this.whatsapp = whatsapp;
         this.store = whatsapp.store();
         this.abPropsService = abPropsService;
+        this.wamService = wamService;
         this.state = new AtomicReference<>(LidMigrationState.NOT_STARTED);
         this.primaryPnToAssignedLidCache = new ConcurrentHashMap<>();
         this.primaryPnToLatestLidCache = new ConcurrentHashMap<>();
@@ -416,7 +425,7 @@ public final class LidMigrationService {
                             //   stageFailureReason: COMPANION_TIMEOUT_BASED_ON_DEVICE_CAPABILITY,
                             //   isLocally1x1MigratedFromDb: Lid1X1MigrationUtils.isLidMigrated()
                             // }).commitAndWaitForFlush(true)
-                            whatsapp.wamService().commit(new Lid11MigrationLifecycleEventBuilder()
+                            wamService.commit(new Lid11MigrationLifecycleEventBuilder()
                                     .migrationStage(MigrationStageEnum.COMPANION_LOCAL_MIGRATION_FAILED)
                                     .stageFailureReason(StageFailureReasonEnum.COMPANION_TIMEOUT_BASED_ON_DEVICE_CAPABILITY)
                                     .isLocally1x1MigratedFromDb(isLidMigrated())
@@ -483,7 +492,7 @@ public final class LidMigrationService {
             //     migrationStage: COMPANION_LOCAL_MIGRATION_FAILED,
             //     stageFailureReason: MALFORMED_PEER_MESSAGE
             //   }).commitAndWaitForFlush(true)
-            whatsapp.wamService().commit(new Lid11MigrationLifecycleEventBuilder()
+            wamService.commit(new Lid11MigrationLifecycleEventBuilder()
                     .migrationStage(MigrationStageEnum.COMPANION_LOCAL_MIGRATION_FAILED)
                     .stageFailureReason(StageFailureReasonEnum.MALFORMED_PEER_MESSAGE)
                     .build());
@@ -515,7 +524,7 @@ public final class LidMigrationService {
             // WAWebLid1X1ThreadAccountMigrations.setLidMigrationMappings:
             //   new Lid11MigrationLifecycleWamEvent({migrationStage: COMPANION_RECEIVED_PEER_MESSAGE}).commit()
             // Emitted unconditionally when a peer-mapping sync arrives (even when the mapping list is empty).
-            whatsapp.wamService().commit(new Lid11MigrationLifecycleEventBuilder()
+            wamService.commit(new Lid11MigrationLifecycleEventBuilder()
                     .migrationStage(MigrationStageEnum.COMPANION_RECEIVED_PEER_MESSAGE)
                     .build());
 
@@ -834,7 +843,7 @@ public final class LidMigrationService {
         //     mappingCount: lidPnMigrationPrimaryCache.getAllPnLidMappings().length
         //   }).commit()
         // WA Web counts the flat list of PN->LID mappings; Cobalt mirrors this with the assigned-LID cache size.
-        whatsapp.wamService().commit(new Lid11MigrationLifecycleEventBuilder()
+        wamService.commit(new Lid11MigrationLifecycleEventBuilder()
                 .migrationStage(MigrationStageEnum.COMPANION_LOCAL_MIGRATION_STARTED)
                 .mappingCount(primaryPnToAssignedLidCache.size())
                 .build());
@@ -846,7 +855,7 @@ public final class LidMigrationService {
             //     migrationStage: COMPANION_LOCAL_MIGRATION_FAILED,
             //     stageFailureReason: COMPANION_UNSUPPORTED_VERSION
             //   }).commitAndWaitForFlush(true)
-            whatsapp.wamService().commit(new Lid11MigrationLifecycleEventBuilder()
+            wamService.commit(new Lid11MigrationLifecycleEventBuilder()
                     .migrationStage(MigrationStageEnum.COMPANION_LOCAL_MIGRATION_FAILED)
                     .stageFailureReason(StageFailureReasonEnum.COMPANION_UNSUPPORTED_VERSION)
                     .build());
@@ -940,7 +949,7 @@ public final class LidMigrationService {
             //     latestMappingCount: c
             //   }).commit()
             var latestMappingCount = primaryPnToLatestLidCache.size();
-            whatsapp.wamService().commit(new Lid11MigrationLifecycleEventBuilder()
+            wamService.commit(new Lid11MigrationLifecycleEventBuilder()
                     .migrationStage(MigrationStageEnum.COMPANION_LOCAL_MIGRATION_ENDED)
                     .mappingCount(primaryPnToAssignedLidCache.size())
                     .migratedThreadCount(migratedThreadCount)
@@ -957,7 +966,7 @@ public final class LidMigrationService {
             //   }).commitAndWaitForFlush(true)
             // resolveThread throws (PrimaryMappingsObsolete / NoLidAvailable / SplitThreadMismatch) map to the
             // WA Web logoutReason returned from getResolvedThreadAccountLid that drives this failure emission.
-            whatsapp.wamService().commit(new Lid11MigrationLifecycleEventBuilder()
+            wamService.commit(new Lid11MigrationLifecycleEventBuilder()
                     .migrationStage(MigrationStageEnum.COMPANION_LOCAL_MIGRATION_FAILED)
                     .stageFailureReason(StageFailureReasonEnum.INITIATED_LOGOUT_BASED_ON_MAPPING)
                     .build());
@@ -968,7 +977,7 @@ public final class LidMigrationService {
             //     migrationStage: COMPANION_LOCAL_MIGRATION_FAILED,
             //     stageFailureReason: INTERNAL_ERROR
             //   }).commitAndWaitForFlush(true)
-            whatsapp.wamService().commit(new Lid11MigrationLifecycleEventBuilder()
+            wamService.commit(new Lid11MigrationLifecycleEventBuilder()
                     .migrationStage(MigrationStageEnum.COMPANION_LOCAL_MIGRATION_FAILED)
                     .stageFailureReason(StageFailureReasonEnum.INTERNAL_ERROR)
                     .build());
@@ -2307,7 +2316,7 @@ public final class LidMigrationService {
         // Identifies Community Announcement Groups by group server and default-subgroup metadata
         var chatMetadata = store.findChatMetadata(chatJid).orElse(null);
         var isGroup = chatJid.hasGroupOrCommunityServer();
-        var isCAG = isGroup && chatMetadata instanceof com.github.auties00.cobalt.model.chat.group.GroupMetadata gm
+        var isCAG = isGroup && chatMetadata instanceof GroupMetadata gm
                 && gm.isDefaultSubgroup();
 
         // WAWebLidMigrationUtils.getMeUserLidOrJidForChat

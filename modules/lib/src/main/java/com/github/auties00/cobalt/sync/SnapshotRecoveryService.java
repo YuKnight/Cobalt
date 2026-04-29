@@ -22,6 +22,7 @@ import com.github.auties00.cobalt.model.sync.data.SyncdSnapshotRecovery;
 import com.github.auties00.cobalt.model.sync.data.SyncdSnapshotRecoverySpec;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
+import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.NonMessagePeerDataRequestEventBuilder;
 import com.github.auties00.cobalt.wam.type.PeerDataRequestType;
 import it.auties.protobuf.stream.ProtobufInputStream;
@@ -68,12 +69,17 @@ import java.util.zip.GZIPInputStream;
  */
 @WhatsAppWebModule(moduleName = "WAWebRequestSyncdSnapshotRecovery")
 @WhatsAppWebModule(moduleName = "WAWebSyncdSnapshotRecoveryGatingUtils")
+@WhatsAppWebModule(moduleName = "WAWebSendNonMessageDataRequest")
 public final class SnapshotRecoveryService {
     private static final Logger LOGGER = Logger.getLogger(SnapshotRecoveryService.class.getName());
     private static final long RECOVERY_TIMEOUT_MS = 60_000; // WAWebRequestSyncdSnapshotRecovery: var p = 6e4
 
     private final WhatsAppClient client; // ADAPTED: WAWebRequestSyncdSnapshotRecovery constructor DI
     private final ABPropsService abPropsService; // ADAPTED: WAWebSyncdSnapshotRecoveryGatingUtils uses WAWebABProps directly
+    /**
+     * The WAM telemetry service used to commit recovery-request events.
+     */
+    private final WamService wamService;
     private final Map<SyncPatchType, CompletableFuture<SyncdSnapshotRecovery>> pendingRecoveries; // ADAPTED: WAWebRequestSyncdSnapshotRecovery: this.recoveryPromise = new Map — holds the decoded snapshot to avoid double-decoding
     private final Semaphore recoverySemaphore; // ADAPTED: WAWebRequestSyncdSnapshotRecovery: this.recoveryInflight (Resolvable)
 
@@ -82,12 +88,14 @@ public final class SnapshotRecoveryService {
      *
      * @param client         the WhatsApp client for sending messages
      * @param abPropsService the AB props service for gating checks
+     * @param wamService     the WAM telemetry service for committing events
      * @implNote WAWebRequestSyncdSnapshotRecovery: constructor of class _
      */
     @WhatsAppWebExport(moduleName = "WAWebRequestSyncdSnapshotRecovery", exports = "SyncdSnapshotRecoveryModule", adaptation = WhatsAppAdaptation.ADAPTED)
-    public SnapshotRecoveryService(WhatsAppClient client, ABPropsService abPropsService) {
+    public SnapshotRecoveryService(WhatsAppClient client, ABPropsService abPropsService, WamService wamService) {
         this.client = client; // ADAPTED: WAWebRequestSyncdSnapshotRecovery constructor DI
         this.abPropsService = abPropsService; // ADAPTED: WAWebSyncdSnapshotRecoveryGatingUtils uses WAWebABProps directly
+        this.wamService = wamService;
         this.pendingRecoveries = new ConcurrentHashMap<>(); // WAWebRequestSyncdSnapshotRecovery: this.recoveryPromise = new Map
         this.recoverySemaphore = new Semaphore(1); // ADAPTED: WAWebRequestSyncdSnapshotRecovery: this.recoveryInflight = null
     }
@@ -333,7 +341,7 @@ public final class SnapshotRecoveryService {
         // COMPANION_SYNCD_SNAPSHOT_FATAL_RECOVERY WAWebNonMessageDataRequestLoggingUtils.d returns 1,
         // WAWebNonMessageDataRequestLoggingUtils.m maps to PEER_DATA_REQUEST_TYPE.SYNCD_SNAPSHOT_RECOVERY,
         // and peerDataRequestSessionId is the outbound peer message key id (t.id.id).
-        client.wamService().commit(new NonMessagePeerDataRequestEventBuilder()
+        wamService.commit(new NonMessagePeerDataRequestEventBuilder()
                 .peerDataRequestCount(1)
                 .peerDataRequestType(PeerDataRequestType.SYNCD_SNAPSHOT_RECOVERY)
                 .peerDataRequestSessionId(peerMessageId)

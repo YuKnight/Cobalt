@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.stream.notification.device;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.client.WhatsAppClientListener;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.media.MediaProvider;
 import com.github.auties00.cobalt.model.media.MediaRetryNotificationSpec;
@@ -10,6 +11,7 @@ import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.stream.SocketStream;
+import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.WaOldCodeEventBuilder;
 
 import javax.crypto.Cipher;
@@ -39,6 +41,12 @@ import java.util.function.Consumer;
  *           WAWebHandleMediaRetryNotification.default, WAWebHandleServerNotification.handleServerNotification,
  *           WAWebHandleDeviceSwitchingNotification.default, WAWebHandleDigestKey.default
  */
+@WhatsAppWebModule(moduleName = "WAWebHandlePreKeyLow")
+@WhatsAppWebModule(moduleName = "WAWebHandleIdentityChange")
+@WhatsAppWebModule(moduleName = "WAWebHandleMediaRetryNotification")
+@WhatsAppWebModule(moduleName = "WAWebHandleServerNotification")
+@WhatsAppWebModule(moduleName = "WAWebHandleDeviceSwitchingNotification")
+@WhatsAppWebModule(moduleName = "WAWebHandleDigestKey")
 final class NotificationServerCryptoStreamHandler implements SocketStream.Handler {
     /**
      * Logger for this handler.
@@ -87,15 +95,22 @@ final class NotificationServerCryptoStreamHandler implements SocketStream.Handle
     private final Set<String> preKeyUploadGuard;
 
     /**
+     * The WAM telemetry service used to commit server-crypto events.
+     */
+    private final WamService wamService;
+
+    /**
      * Constructs a new handler for server-crypto notifications.
      *
      * @param whatsapp       the WhatsApp client instance
      * @param abPropsService the AB props synchronization service
+     * @param wamService     the WAM telemetry service used to commit server-crypto events
      * @implNote WAWebHandlePreKeyLow.default, WAWebHandleServerNotification.handleServerNotification
      */
-    NotificationServerCryptoStreamHandler(WhatsAppClient whatsapp, ABPropsService abPropsService) {
+    NotificationServerCryptoStreamHandler(WhatsAppClient whatsapp, ABPropsService abPropsService, WamService wamService) {
         this.whatsapp = whatsapp;
         this.abPropsService = abPropsService;
+        this.wamService = wamService;
         this.preKeyUploadGuard = ConcurrentHashMap.newKeySet();
     }
 
@@ -391,7 +406,7 @@ final class NotificationServerCryptoStreamHandler implements SocketStream.Handle
                 .map(Jid::device)
                 .map(String::valueOf)
                 .orElse(null);
-        whatsapp.wamService().commit(new WaOldCodeEventBuilder()
+        wamService.commit(new WaOldCodeEventBuilder()
                 .deviceId(meDeviceId)
                 .build());
     }

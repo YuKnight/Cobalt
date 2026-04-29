@@ -1,8 +1,5 @@
 package com.github.auties00.cobalt.model.message.system.history;
 
-import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
-import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
-import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.message.Message;
 
 import java.time.Instant;
@@ -16,31 +13,26 @@ import java.util.Optional;
 import java.util.OptionalLong;
 
 /**
- * Describes the contents of a shared message history bundle in terms of
+ * Describes the contents of a shared message-history bundle in terms of
  * recipients, time range and size.
  *
- * <p>When a user shares a chat's history with another participant (for example
- * when adding someone to an existing group or forwarding a conversation), the
- * client packages the matching messages into a {@link MessageHistoryBundle}
- * and attaches this metadata so that both sides can display a preview such as
- * "N messages since T have been shared with X, Y, Z" before the recipient
- * opens the bundle.
- *
- * @implNote Mirrors the {@code Message$MessageHistoryMetadata} protobuf spec
- * declared in {@code WAWebProtobufsE2E.pb} and populated by
- * {@code WAWebGenerateMessageHistoryNoticeProto} from the
- * {@code groupHistoryBundleMetadata} of the source message.
+ * <p>When a user shares a chat's history with another participant (for
+ * example when adding someone to an existing group or forwarding a
+ * conversation), the client packages the matching messages into a history
+ * bundle and attaches this metadata so that both sides can display a preview
+ * such as "N messages since T have been shared with X, Y, Z" before the
+ * recipient opens the bundle. The metadata distinguishes between the preview
+ * window (what the recipient sees in the banner) and the actual bundle
+ * contents (which may extend further back in time than the preview window).
  */
 @ProtobufMessage(name = "Message.MessageHistoryMetadata")
-@WhatsAppWebModule(moduleName = "WAWebProtobufsE2E.pb")
-@WhatsAppWebModule(moduleName = "WAWebGenerateMessageHistoryNoticeProto")
 public final class MessageHistoryMetadata implements Message {
     /**
      * The display strings of the participants who are receiving the shared
-     * history, used to render the preview banner.
+     * history, used to render the preview banner that lists who will see the
+     * back-filled messages.
      */
     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
-    @WhatsAppWebExport(moduleName = "WAWebProtobufsE2E.pb", exports = "Message$MessageHistoryMetadataSpec.historyReceivers", adaptation = WhatsAppAdaptation.DIRECT)
     List<String> historyReceivers;
 
     /**
@@ -49,46 +41,43 @@ public final class MessageHistoryMetadata implements Message {
      * visible as part of the history banner).
      */
     @ProtobufProperty(index = 2, type = ProtobufType.INT64, mixins = InstantSecondsMixin.class)
-    @WhatsAppWebExport(moduleName = "WAWebProtobufsE2E.pb", exports = "Message$MessageHistoryMetadataSpec.oldestMessageTimestampInWindow", adaptation = WhatsAppAdaptation.DIRECT)
     Instant oldestMessageTimestampInWindow;
 
     /**
-     * The total number of messages contained in the shared history bundle.
+     * The total number of messages contained in the shared history bundle,
+     * shown as the "N" in preview banners such as
+     * "N messages since T have been shared with...".
      */
     @ProtobufProperty(index = 3, type = ProtobufType.INT64)
-    @WhatsAppWebExport(moduleName = "WAWebProtobufsE2E.pb", exports = "Message$MessageHistoryMetadataSpec.messageCount", adaptation = WhatsAppAdaptation.DIRECT)
     Long messageCount;
 
     /**
      * The display strings of participants who are not receiving the shared
-     * history but are listed for context (for example participants already in
-     * the chat at the time of sharing).
+     * history but are listed for context (for example, participants already
+     * present in the chat at the time of sharing). Used by the banner to
+     * give the recipient a complete view of the chat membership.
      */
     @ProtobufProperty(index = 4, type = ProtobufType.STRING)
-    @WhatsAppWebExport(moduleName = "WAWebProtobufsE2E.pb", exports = "Message$MessageHistoryMetadataSpec.nonHistoryReceivers", adaptation = WhatsAppAdaptation.DIRECT)
     List<String> nonHistoryReceivers;
 
     /**
      * The timestamp of the earliest message actually packaged into the
-     * accompanying history bundle (which may extend further back in time than
-     * the preview window reported by {@link #oldestMessageTimestampInWindow}).
+     * accompanying history bundle, which may extend further back in time
+     * than the preview window reported by
+     * {@link #oldestMessageTimestampInWindow}.
      */
     @ProtobufProperty(index = 5, type = ProtobufType.INT64, mixins = InstantSecondsMixin.class)
-    @WhatsAppWebExport(moduleName = "WAWebProtobufsE2E.pb", exports = "Message$MessageHistoryMetadataSpec.oldestMessageTimestampInBundle", adaptation = WhatsAppAdaptation.DIRECT)
     Instant oldestMessageTimestampInBundle;
 
 
     /**
-     * Constructs a new history metadata payload.
+     * Constructs a new history-metadata payload.
      *
-     * @param historyReceivers               the list of history receivers
-     * @param oldestMessageTimestampInWindow the timestamp of the earliest
-     *                                       message in the preview window
-     * @param messageCount                   the total number of shared
-     *                                       messages
-     * @param nonHistoryReceivers            the list of non-history receivers
-     * @param oldestMessageTimestampInBundle the timestamp of the earliest
-     *                                       message in the packaged bundle
+     * @param historyReceivers               the list of history receivers, or {@code null}
+     * @param oldestMessageTimestampInWindow the timestamp of the earliest message in the preview window, or {@code null}
+     * @param messageCount                   the total number of shared messages, or {@code null}
+     * @param nonHistoryReceivers            the list of non-history receivers, or {@code null}
+     * @param oldestMessageTimestampInBundle the timestamp of the earliest message in the packaged bundle, or {@code null}
      */
     MessageHistoryMetadata(List<String> historyReceivers,
                            Instant oldestMessageTimestampInWindow,
@@ -106,8 +95,7 @@ public final class MessageHistoryMetadata implements Message {
      * Returns an unmodifiable view of the display strings that identify the
      * recipients of the shared history.
      *
-     * @return the list of recipients, or an empty list when none were
-     *         provided
+     * @return the list of recipients, or an empty list when none were provided
      */
     public List<String> historyReceivers() {
         return historyReceivers == null ? List.of() : Collections.unmodifiableList(historyReceivers);
@@ -139,8 +127,7 @@ public final class MessageHistoryMetadata implements Message {
      * participants who are not receiving the shared history but are listed
      * for context.
      *
-     * @return the list of non-history recipients, or an empty list when none
-     *         were provided
+     * @return the list of non-history recipients, or an empty list when none were provided
      */
     public List<String> nonHistoryReceivers() {
         return nonHistoryReceivers == null ? List.of() : Collections.unmodifiableList(nonHistoryReceivers);
@@ -158,8 +145,7 @@ public final class MessageHistoryMetadata implements Message {
     }
 
     /**
-     * Sets the display strings that identify the recipients of the shared
-     * history.
+     * Sets the display strings that identify the recipients of the shared history.
      *
      * @param historyReceivers the new list of recipients, may be {@code null}
      */
@@ -171,8 +157,7 @@ public final class MessageHistoryMetadata implements Message {
      * Sets the timestamp of the earliest message included in the preview
      * window shown to the recipient.
      *
-     * @param oldestMessageTimestampInWindow the new timestamp, may be
-     *                                       {@code null}
+     * @param oldestMessageTimestampInWindow the new timestamp, may be {@code null}
      */
     public void setOldestMessageTimestampInWindow(Instant oldestMessageTimestampInWindow) {
         this.oldestMessageTimestampInWindow = oldestMessageTimestampInWindow;
@@ -191,8 +176,7 @@ public final class MessageHistoryMetadata implements Message {
      * Sets the display strings that identify participants who are not
      * receiving the shared history.
      *
-     * @param nonHistoryReceivers the new list of non-history recipients, may
-     *                            be {@code null}
+     * @param nonHistoryReceivers the new list of non-history recipients, may be {@code null}
      */
     public void setNonHistoryReceivers(List<String> nonHistoryReceivers) {
         this.nonHistoryReceivers = nonHistoryReceivers;
@@ -202,8 +186,7 @@ public final class MessageHistoryMetadata implements Message {
      * Sets the timestamp of the earliest message actually packaged into the
      * accompanying history bundle.
      *
-     * @param oldestMessageTimestampInBundle the new timestamp, may be
-     *                                       {@code null}
+     * @param oldestMessageTimestampInBundle the new timestamp, may be {@code null}
      */
     public void setOldestMessageTimestampInBundle(Instant oldestMessageTimestampInBundle) {
         this.oldestMessageTimestampInBundle = oldestMessageTimestampInBundle;

@@ -161,17 +161,18 @@ public final class SocketStream {
         // WAWebHandleReportServerSyncNotification: shared between the server_sync notification
         // handler (producer) and the info-bulletin offline handler (consumer/flush) to mirror
         // WA Web's module-scoped offlineNotificationsCount map.
-        var offlineNotificationsReporter = new OfflineNotificationsReporter(whatsapp);
+        var offlineNotificationsReporter = new OfflineNotificationsReporter(whatsapp, wamService);
         var result = new HashMap<String, Handler>();
-        addHandler(result, "iq", new IqStreamHandler(whatsapp, webVerificationHandler, deviceService, snapshotRecoveryService, companionPairingService));
+        addHandler(result, "iq", new IqStreamHandler(whatsapp, webVerificationHandler, deviceService, snapshotRecoveryService, companionPairingService, wamService));
         addHandler(result, "message", new MessageStreamHandler(
                 whatsapp,
                 messageService,
                 snapshotRecoveryService,
                 webAppStateService,
-                lidMigrationService
+                lidMigrationService,
+                wamService
         ));
-        addHandler(result, "receipt", new ReceiptStreamHandler(whatsapp, messageService));
+        addHandler(result, "receipt", new ReceiptStreamHandler(whatsapp, messageService, wamService));
         addHandler(result, "presence", new PresenceStreamHandler(whatsapp));
         addHandler(result, "chatstate", new ChatStateStreamHandler(whatsapp));
         addHandler(result, "call", new CallStreamHandler(whatsapp));
@@ -181,9 +182,10 @@ public final class SocketStream {
                 lidMigrationService,
                 abPropsService,
                 deviceService,
-                offlineNotificationsReporter
+                offlineNotificationsReporter,
+                wamService
         ));
-        addHandler(result, "ib", new InfoBulletinStreamHandler(whatsapp, webAppStateService, offlineNotificationsReporter));
+        addHandler(result, "ib", new InfoBulletinStreamHandler(whatsapp, webAppStateService, offlineNotificationsReporter, wamService));
         addHandler(result, "success", new SuccessStreamHandler(
                 whatsapp,
                 abPropsService,

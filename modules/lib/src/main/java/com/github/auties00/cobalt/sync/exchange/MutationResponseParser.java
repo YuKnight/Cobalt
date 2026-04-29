@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.SequencedCollection;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
@@ -473,7 +474,7 @@ public final class MutationResponseParser {
 
     /**
      * Decodes and logs the {@code clientDebugData} field of a {@link SyncdPatch} for
-     * diagnostic purposes when the {@link Logger} is enabled at {@link java.util.logging.Level#FINE FINE}.
+     * diagnostic purposes when the {@link Logger} is enabled at {@link Level#FINE FINE}.
      *
      * <p>Mirrors WhatsApp Web's {@code _applyPatch} which logs the decoded
      * {@code currentLthash} and {@code newLthash} from the patch debug data so that
@@ -486,7 +487,7 @@ public final class MutationResponseParser {
      * @param patch the patch whose debug data should be logged, never {@code null}
      */
     private void logClientDebugData(SyncdPatch patch) {
-        if (!LOGGER.isLoggable(java.util.logging.Level.FINE)) {
+        if (!LOGGER.isLoggable(Level.FINE)) {
             return;
         }
         patch.decodedClientDebugData().ifPresent(debug -> {

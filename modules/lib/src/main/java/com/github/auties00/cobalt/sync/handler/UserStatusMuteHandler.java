@@ -17,6 +17,7 @@ import com.github.auties00.cobalt.model.sync.action.contact.UserStatusMuteAction
 import com.github.auties00.cobalt.model.sync.action.contact.UserStatusMuteActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 import java.time.Instant;
 import java.util.List;
@@ -111,8 +112,8 @@ public final class UserStatusMuteHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUserStatusMuteSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebUserStatusMuteSync.applyMutations
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebUserStatusMuteSync.applyMutations
     }
 
     /**
@@ -151,7 +152,7 @@ public final class UserStatusMuteHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUserStatusMuteSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) { // WAWebUserStatusMuteSync.applyMutations: if (e.operation === "set") ... else { _++; return {actionState: Unsupported} }
             return MutationApplicationResult.unsupported(); // WAWebUserStatusMuteSync.applyMutations: {actionState: Unsupported}
         }

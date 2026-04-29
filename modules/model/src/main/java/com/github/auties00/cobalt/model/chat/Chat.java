@@ -18,25 +18,27 @@ import java.time.Instant;
 import java.util.*;
 
 /**
- * Represents a WhatsApp conversation (chat) and all of its associated state.
+ * Represents a single conversation (chat) inside WhatsApp and the entire set
+ * of state attached to it.
  *
- * <p>A chat is the central entity that models a one-to-one conversation, a group,
- * a community, a broadcast list, or a newsletter. It is identified by a
- * {@link Jid} and carries all metadata that WhatsApp synchronizes across devices
- * via history sync, including the message list, mute and pin state, ephemeral
- * settings, participant list (for groups), wallpaper customization, and privacy
- * controls such as limit sharing.
+ * <p>A chat is the central entity of the WhatsApp model: it can describe a
+ * one-to-one conversation, a group, a community sub-group, a broadcast list
+ * or a newsletter, and is uniquely identified by a {@link Jid}. Each chat
+ * carries the metadata that WhatsApp synchronizes across a user's devices
+ * via history sync, including the message list, unread counters, mute and
+ * pin state, the disappearing-messages timer, the participant list (for
+ * groups), wallpaper customization, and privacy controls such as limit
+ * sharing and chat lock.
  *
- * <p>This is an abstract class because the message storage strategy is determined
- * by the concrete subclass. The abstract methods {@link #messages()},
- * {@link #addMessage(ChatMessageInfo)}, {@link #removeMessage(String)},
- * {@link #removeMessages()}, {@link #getMessageById(String)},
- * {@link #newestMessage()}, and {@link #oldestMessage()} allow different
- * implementations to choose between in-memory collections, database-backed
- * stores, or other strategies.
- *
- * <p>The protobuf wire name is {@code Conversation}, matching the
- * {@code Conversation} message in the WhatsApp history sync protocol.
+ * <p>This class is abstract because the storage strategy for the message
+ * list is left to concrete subclasses: history-sync payloads use a backing
+ * map of envelopes, the in-memory store uses a sequenced collection, and
+ * other implementations may delegate to a database. The abstract methods
+ * {@link #messages()}, {@link #addMessage(ChatMessageInfo)},
+ * {@link #removeMessage(String)}, {@link #removeMessages()},
+ * {@link #getMessageById(String)}, {@link #newestMessage()} and
+ * {@link #oldestMessage()} let each subclass plug its own storage in
+ * without forcing a particular collection type onto the protocol layer.
  *
  * @see ChatMessageInfo
  * @see ChatMute
@@ -45,176 +47,176 @@ import java.util.*;
 @ProtobufMessage(name = "Conversation")
 public non-sealed abstract class Chat implements JidProvider {
     /**
-     * The JID that uniquely identifies this chat. For one-to-one chats this is
-     * the contact's phone number JID; for groups it is the group JID (ending in
-     * {@code @g.us}); for newsletters it ends in {@code @newsletter}.
+     * The JID that uniquely identifies this chat. For one-to-one chats this
+     * is the contact's phone-number JID; for groups it is a JID ending in
+     * {@code @g.us}; for newsletters it ends in {@code @newsletter}.
      */
     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
     private Jid jid;
 
-    // Messages are not deserialized by defualt because it's up to the implementation class to decide how to do so
+    // Messages are not deserialized by default because it's up to the implementation class to decide how to do so
     // @ProtobufProperty(index = 2, type = ProtobufType.MESSAGE)
     // private ... messages;
 
     /**
-     * The new JID assigned to this chat after a JID migration (for example,
-     * when a contact changes their phone number). If present, messages should
-     * be associated with this JID going forward.
+     * The new JID assigned to this chat after a JID migration (for example
+     * when a contact changes phone number). When present, future messages
+     * should be associated with this JID.
      */
     @ProtobufProperty(index = 3, type = ProtobufType.STRING)
     private Jid newJid;
 
     /**
-     * The previous JID of this chat before a JID migration. Retained so that
-     * messages sent to the old JID can still be correlated with this conversation.
+     * The previous JID this chat held before a JID migration. Retained so
+     * that messages directed at the old JID can still be correlated with
+     * this conversation.
      */
     @ProtobufProperty(index = 4, type = ProtobufType.STRING)
     private Jid oldJid;
 
     /**
-     * The timestamp (in epoch milliseconds) of the most recent message in this
-     * chat. Used for sorting conversations in the chat list.
+     * The instant of the most recent message in this chat. Used to sort
+     * conversations in the chat list.
      */
     @ProtobufProperty(index = 5, type = ProtobufType.UINT64, mixins = InstantMillisMixin.class)
     private Instant lastMsgTimestamp;
 
     /**
-     * The number of unread messages in this chat. A value of {@code 0} means
-     * the chat has been fully read.
+     * The number of unread messages in this chat. {@code 0} means the chat
+     * has been fully read.
      */
     @ProtobufProperty(index = 6, type = ProtobufType.UINT32)
     private Integer unreadCount;
 
     /**
      * Whether this chat is read-only, meaning the current user cannot send
-     * messages to it. This is typically true for certain system chats or
+     * messages to it. Typically set on certain system chats and on
      * newsletter channels where the user is only a subscriber.
      */
     @ProtobufProperty(index = 7, type = ProtobufType.BOOL)
     private Boolean readOnly;
 
     /**
-     * Whether the history sync transfer for this chat has completed. When
-     * {@code true}, the companion device has received all available history
-     * for this conversation.
+     * Whether the history-sync transfer for this chat has completed. When
+     * {@code true}, the companion device has already received all available
+     * history for this conversation.
      */
     @ProtobufProperty(index = 8, type = ProtobufType.BOOL)
     private Boolean endOfHistoryTransfer;
 
     /**
-     * The disappearing messages timer for this chat. Determines how long
+     * The disappearing-messages timer for this chat. Determines how long
      * messages persist before being automatically deleted.
      */
     @ProtobufProperty(index = 9, type = ProtobufType.UINT32)
     private ChatEphemeralTimer ephemeralExpiration;
 
     /**
-     * The timestamp (in epoch milliseconds) at which the ephemeral messages
-     * setting was last changed for this chat.
+     * The instant at which the disappearing-messages setting was last
+     * changed for this chat.
      */
     @ProtobufProperty(index = 10, type = ProtobufType.INT64, mixins = InstantMillisMixin.class)
     private Instant ephemeralSettingTimestamp;
 
     /**
-     * The type of history transfer completion for this chat, indicating
-     * whether more messages remain on the primary device or whether the
-     * transfer is fully complete.
+     * The completion state of the history transfer for this chat: complete
+     * with or without more messages remaining on the primary device,
+     * incomplete, or omitted from the sync entirely.
      */
     @ProtobufProperty(index = 11, type = ProtobufType.ENUM)
     private EndOfHistoryTransferType endOfHistoryTransferType;
 
     /**
-     * The timestamp (in epoch milliseconds) of the most recent activity in
-     * this conversation. This may differ from {@link #lastMsgTimestamp} as
-     * it can include non-message events.
+     * The instant of the most recent activity in this conversation. May
+     * differ from {@link #lastMsgTimestamp} as it can include
+     * non-message events.
      */
     @ProtobufProperty(index = 12, type = ProtobufType.UINT64, mixins = InstantMillisMixin.class)
     private Instant conversationTimestamp;
 
     /**
-     * The server-provided name for this chat. For groups, this is the group
-     * subject; for contacts, this may be the push name or saved contact name.
+     * The server-provided name for this chat. For groups this is the group
+     * subject; for contacts it may be the saved contact name or push name.
      */
     @ProtobufProperty(index = 13, type = ProtobufType.STRING)
     private String name;
 
     /**
-     * A hash of the chat's participant list, used to detect changes in group
-     * membership without comparing the full participant list.
+     * A hash of the chat's participant list, used by the server to detect
+     * changes in group membership without comparing the full list.
      */
     @ProtobufProperty(index = 14, type = ProtobufType.STRING)
     private String pHash;
 
     /**
-     * Whether this chat has been explicitly marked as "not spam" by the user.
-     * When {@code true}, the chat bypasses spam detection heuristics.
+     * Whether this chat has been explicitly marked as not spam by the user.
+     * When {@code true} the chat bypasses spam-detection heuristics.
      */
     @ProtobufProperty(index = 15, type = ProtobufType.BOOL)
     private Boolean notSpam;
 
     /**
-     * Whether this chat is archived. Archived chats are hidden from the main
-     * chat list but are not deleted.
+     * Whether this chat is archived. Archived chats are hidden from the
+     * main chat list but are not deleted.
      */
     @ProtobufProperty(index = 16, type = ProtobufType.BOOL)
     private Boolean archived;
 
     /**
-     * The disappearing mode metadata for this chat, describing who initiated
-     * the disappearing messages setting and what triggered the change.
+     * The disappearing-mode metadata for this chat: who initiated the
+     * disappearing-messages setting and what triggered the change.
      */
     @ProtobufProperty(index = 17, type = ProtobufType.MESSAGE)
     private ChatDisappearingMode disappearingMode;
 
     /**
-     * The number of unread messages in this chat that mention the current user.
-     * Used to display a separate mention badge in the chat list.
+     * The number of unread messages in this chat that mention the current
+     * user, used to render a separate mention badge in the chat list.
      */
     @ProtobufProperty(index = 18, type = ProtobufType.UINT32)
     private Integer unreadMentionCount;
 
     /**
-     * Whether this chat has been manually marked as unread by the user,
-     * regardless of whether there are actually unread messages. This persists
-     * until the user opens the chat or marks it as read.
+     * Whether the user has manually marked this chat as unread, regardless
+     * of whether unread messages actually exist. Persists until the user
+     * opens the chat or marks it as read.
      */
     @ProtobufProperty(index = 19, type = ProtobufType.BOOL)
     private Boolean markedAsUnread;
 
     /**
-     * The list of participants in this group chat. For one-to-one chats this
-     * list is empty. Each participant includes the member's JID and their
-     * admin status.
+     * The participant list for this group chat. Empty for one-to-one chats.
+     * Each entry includes the member's JID and their admin status.
      */
     @ProtobufProperty(index = 20, type = ProtobufType.MESSAGE)
     private List<GroupParticipant> participant;
 
     /**
-     * An opaque token used for trust and compliance (T&C) verification of
-     * this chat. Provided by the server and must be echoed back in certain
-     * protocol exchanges.
+     * An opaque token used by the server for trust and compliance (T&C)
+     * verification of this chat. Must be echoed back in certain protocol
+     * exchanges.
      */
     @ProtobufProperty(index = 21, type = ProtobufType.BYTES)
     private byte[] tcToken;
 
     /**
-     * The timestamp (in epoch milliseconds) at which the trust and compliance
-     * token was issued.
+     * The instant at which the trust-and-compliance token was issued.
      */
     @ProtobufProperty(index = 22, type = ProtobufType.UINT64, mixins = InstantMillisMixin.class)
     private Instant tcTokenTimestamp;
 
     /**
-     * The primary identity key of the contact in this one-to-one chat. Used
-     * for Signal Protocol identity verification and safety number computation.
+     * The primary Signal-protocol identity key of the contact in this
+     * one-to-one chat, used for safety-number computation and identity
+     * verification.
      */
     @ProtobufProperty(index = 23, type = ProtobufType.BYTES)
     private byte[] contactPrimaryIdentityKey;
 
     /**
-     * The timestamp (in epoch seconds) at which this chat was pinned. When
-     * present, the chat appears in the pinned section at the top of the chat
-     * list. A {@code null} value means the chat is not pinned.
+     * The instant at which this chat was pinned. When non-{@code null} the
+     * chat appears in the pinned section at the top of the chat list;
+     * {@code null} means the chat is not pinned.
      */
     @ProtobufProperty(index = 24, type = ProtobufType.UINT32, mixins = InstantSecondsMixin.class)
     private Instant pinnedTimestamp;
@@ -227,49 +229,51 @@ public non-sealed abstract class Chat implements JidProvider {
     private ChatMute mute;
 
     /**
-     * The custom wallpaper settings for this chat. When present, overrides
-     * the global wallpaper preference for this conversation.
+     * The custom wallpaper settings for this chat. Overrides the global
+     * wallpaper preference when present.
      */
     @ProtobufProperty(index = 26, type = ProtobufType.MESSAGE)
     private WallpaperSettings wallpaper;
 
     /**
-     * The media visibility setting for this chat, controlling whether media
-     * from this conversation appears in the device gallery or media picker.
+     * The media-visibility setting for this chat, controlling whether
+     * media from this conversation appears in the device gallery or
+     * media picker.
      */
     @ProtobufProperty(index = 27, type = ProtobufType.ENUM)
     private MediaVisibility mediaVisibility;
 
     /**
-     * The timestamp (in epoch milliseconds) at which the trust and compliance
-     * token was sent by the message sender.
+     * The instant at which the trust-and-compliance token was sent by the
+     * message sender.
      */
     @ProtobufProperty(index = 28, type = ProtobufType.UINT64, mixins = InstantMillisMixin.class)
     private Instant tcTokenSenderTimestamp;
 
     /**
-     * Whether this group chat is suspended. A suspended group is temporarily
-     * disabled and members cannot send or receive messages in it.
+     * Whether this group chat is suspended. Members of a suspended group
+     * cannot send or receive messages.
      */
     @ProtobufProperty(index = 29, type = ProtobufType.BOOL)
     private Boolean suspended;
 
     /**
-     * Whether this group chat is terminated. A terminated group has been
+     * Whether this group chat is terminated. Terminated groups are
      * permanently closed and can no longer be used.
      */
     @ProtobufProperty(index = 30, type = ProtobufType.BOOL)
     private Boolean terminated;
 
     /**
-     * The creation timestamp of this chat, expressed as an epoch value. For
-     * groups, this is when the group was created on the server.
+     * The instant at which this chat was created on the server. For groups
+     * this is the group-creation moment; carried as epoch seconds on the
+     * wire.
      */
-    @ProtobufProperty(index = 31, type = ProtobufType.UINT64)
-    private Long createdAt;
+    @ProtobufProperty(index = 31, type = ProtobufType.UINT64, mixins = InstantSecondsMixin.class)
+    private Instant createdAt;
 
     /**
-     * The JID or name of the user who created this group chat.
+     * The JID or display name of the user who created this group chat.
      */
     @ProtobufProperty(index = 32, type = ProtobufType.STRING)
     private String createdBy;
@@ -281,77 +285,79 @@ public non-sealed abstract class Chat implements JidProvider {
     private String description;
 
     /**
-     * Whether this is a WhatsApp support chat. Support chats have special
-     * handling in the UI and may use different message processing rules.
+     * Whether this is a WhatsApp support chat. Support chats receive
+     * special handling in the UI and may use different message-processing
+     * rules.
      */
     @ProtobufProperty(index = 34, type = ProtobufType.BOOL)
     private Boolean support;
 
     /**
-     * Whether this group is a parent group of a WhatsApp Community. Parent
-     * groups serve as the top-level container that links multiple sub-groups.
+     * Whether this group is the parent group of a WhatsApp Community.
+     * Parent groups serve as the top-level container that links multiple
+     * sub-groups.
      */
     @ProtobufProperty(index = 35, type = ProtobufType.BOOL)
     private Boolean isParentGroup;
 
     /**
-     * The identifier of the parent group (community) that this sub-group
+     * The identifier of the parent community group that this sub-group
      * belongs to. Only present for sub-groups within a community.
      */
     @ProtobufProperty(index = 37, type = ProtobufType.STRING)
     private String parentGroupId;
 
     /**
-     * Whether this group is the default sub-group of a community. The default
-     * sub-group is the "General" group that all community members are
-     * automatically added to.
+     * Whether this group is the default sub-group of a community (the
+     * "General" group that all community members are automatically added
+     * to).
      */
     @ProtobufProperty(index = 36, type = ProtobufType.BOOL)
     private Boolean isDefaultSubgroup;
 
     /**
-     * A display name for this chat, typically set by the server. This may
+     * A display name for this chat, typically set by the server. May
      * differ from the contact name or group subject.
      */
     @ProtobufProperty(index = 38, type = ProtobufType.STRING)
     private String displayName;
 
     /**
-     * The phone number JID associated with this chat. In LID-based chats,
-     * this provides the phone number identity alongside the LID.
+     * The phone-number JID associated with this chat. Provides the
+     * phone-number identity alongside the LID in LID-based chats.
      */
     @ProtobufProperty(index = 39, type = ProtobufType.STRING)
     private Jid phoneNumberJid;
 
     /**
      * Whether the current user's phone number should be shared with the
-     * other participant in this LID-based chat. This flag is a wire-protocol
-     * carrier from the history sync payload and is typically propagated to
-     * the corresponding contact record rather than being used directly from
+     * other participant in this LID-based chat. Acts as a wire-protocol
+     * carrier from the history-sync payload and is typically propagated
+     * to the corresponding contact record rather than read directly from
      * the chat.
      */
     @ProtobufProperty(index = 40, type = ProtobufType.BOOL)
     private Boolean shareOwnPhoneNumber;
 
     /**
-     * Whether this chat has a duplicate LID thread associated with the same
-     * phone number. Indicates that both a phone-number-based and a LID-based
-     * conversation exist for the same contact.
+     * Whether this chat has a duplicate LID thread associated with the
+     * same phone number, indicating that both a phone-number-based and a
+     * LID-based conversation exist for the same contact.
      */
     @ProtobufProperty(index = 41, type = ProtobufType.BOOL)
     private Boolean phoneNumberhDuplicateLidThread;
 
     /**
      * The Linked Identity (LID) JID for this chat. LIDs are an alternative
-     * identity system that WhatsApp uses alongside phone numbers to identify
-     * users in privacy-sensitive contexts.
+     * identity system that WhatsApp uses alongside phone numbers in
+     * privacy-sensitive contexts.
      */
     @ProtobufProperty(index = 42, type = ProtobufType.STRING)
     private Jid lid;
 
     /**
-     * The username associated with this chat, if the contact or group uses
-     * WhatsApp's username feature.
+     * The username associated with this chat, when the contact or group
+     * uses WhatsApp's username feature.
      */
     @ProtobufProperty(index = 43, type = ProtobufType.STRING)
     private String username;
@@ -365,22 +371,23 @@ public non-sealed abstract class Chat implements JidProvider {
 
     /**
      * The number of comments on this chat. Applicable to newsletter posts
-     * or other message types that support threaded comments.
+     * and other message types that support threaded comments.
      */
     @ProtobufProperty(index = 45, type = ProtobufType.UINT32)
     private Integer commentsCount;
 
     /**
-     * Whether this chat is locked behind the Chat Lock feature. Locked chats
-     * require biometric authentication or a device passcode to access.
+     * Whether this chat is locked behind WhatsApp's Chat Lock feature.
+     * Locked chats require biometric authentication or a device passcode
+     * to access.
      */
     @ProtobufProperty(index = 46, type = ProtobufType.BOOL)
     private Boolean locked;
 
     /**
-     * A privacy system message that should be inserted into this chat. Used
-     * to display informational banners about privacy changes such as
-     * encryption status transitions or phone number hiding.
+     * A privacy system message to insert into this chat, used to display
+     * informational banners about privacy changes such as encryption
+     * transitions or phone-number hiding.
      */
     @ProtobufProperty(index = 47, type = ProtobufType.ENUM)
     private PrivacySystemMessage systemMessageToInsert;
@@ -394,8 +401,8 @@ public non-sealed abstract class Chat implements JidProvider {
     private Boolean capiCreatedGroup;
 
     /**
-     * The account-level LID associated with the current user for this chat.
-     * This represents the user's own LID identity in the context of this
+     * The account-level LID associated with the current user for this
+     * chat. Represents the user's own LID identity in the context of this
      * conversation.
      */
     @ProtobufProperty(index = 49, type = ProtobufType.STRING)
@@ -410,29 +417,29 @@ public non-sealed abstract class Chat implements JidProvider {
     private Boolean limitSharing;
 
     /**
-     * The timestamp (in epoch milliseconds) at which the limit sharing
-     * setting was last changed for this chat.
+     * The instant at which the limit-sharing setting was last changed for
+     * this chat.
      */
     @ProtobufProperty(index = 51, type = ProtobufType.INT64, mixins = InstantMillisMixin.class)
     private Instant limitSharingSettingTimestamp;
 
     /**
-     * The trigger that caused the limit sharing state to be set for this
+     * The trigger that caused the limit-sharing state to be set for this
      * chat.
      */
     @ProtobufProperty(index = 52, type = ProtobufType.ENUM)
     private ChatLimitSharing.TriggerType limitSharingTrigger;
 
     /**
-     * Whether the current user is the one who initiated the limit sharing
-     * change for this chat.
+     * Whether the current user initiated the limit-sharing change for this
+     * chat.
      */
     @ProtobufProperty(index = 53, type = ProtobufType.BOOL)
     private Boolean limitSharingInitiatedByMe;
 
     /**
      * Whether the Meta AI (Maiba) bot thread is enabled for this chat,
-     * allowing the Meta AI assistant to participate in the conversation.
+     * letting the Meta AI assistant participate in the conversation.
      */
     @ProtobufProperty(index = 54, type = ProtobufType.BOOL)
     private Boolean maibaAiThreadEnabled;
@@ -495,7 +502,7 @@ public non-sealed abstract class Chat implements JidProvider {
      * @param maibaAiThreadEnabled           whether the AI thread is enabled, or {@code null}
      * @throws NullPointerException if {@code jid} is {@code null}
      */
-    protected Chat(Jid jid, Jid newJid, Jid oldJid, Instant lastMsgTimestamp, Integer unreadCount, Boolean readOnly, Boolean endOfHistoryTransfer, ChatEphemeralTimer ephemeralExpiration, Instant ephemeralSettingTimestamp, EndOfHistoryTransferType endOfHistoryTransferType, Instant conversationTimestamp, String name, String pHash, Boolean notSpam, Boolean archived, ChatDisappearingMode disappearingMode, Integer unreadMentionCount, Boolean markedAsUnread, List<GroupParticipant> participant, byte[] tcToken, Instant tcTokenTimestamp, byte[] contactPrimaryIdentityKey, Instant pinnedTimestamp, ChatMute mute, WallpaperSettings wallpaper, MediaVisibility mediaVisibility, Instant tcTokenSenderTimestamp, Boolean suspended, Boolean terminated, Long createdAt, String createdBy, String description, Boolean support, Boolean isParentGroup, String parentGroupId, Boolean isDefaultSubgroup, String displayName, Jid phoneNumberJid, Boolean shareOwnPhoneNumber, Boolean phoneNumberhDuplicateLidThread, Jid lid, String username, String lidOriginType, Integer commentsCount, Boolean locked, PrivacySystemMessage systemMessageToInsert, Boolean capiCreatedGroup, Jid accountLid, Boolean limitSharing, Instant limitSharingSettingTimestamp, ChatLimitSharing.TriggerType limitSharingTrigger, Boolean limitSharingInitiatedByMe, Boolean maibaAiThreadEnabled) {
+    protected Chat(Jid jid, Jid newJid, Jid oldJid, Instant lastMsgTimestamp, Integer unreadCount, Boolean readOnly, Boolean endOfHistoryTransfer, ChatEphemeralTimer ephemeralExpiration, Instant ephemeralSettingTimestamp, EndOfHistoryTransferType endOfHistoryTransferType, Instant conversationTimestamp, String name, String pHash, Boolean notSpam, Boolean archived, ChatDisappearingMode disappearingMode, Integer unreadMentionCount, Boolean markedAsUnread, List<GroupParticipant> participant, byte[] tcToken, Instant tcTokenTimestamp, byte[] contactPrimaryIdentityKey, Instant pinnedTimestamp, ChatMute mute, WallpaperSettings wallpaper, MediaVisibility mediaVisibility, Instant tcTokenSenderTimestamp, Boolean suspended, Boolean terminated, Instant createdAt, String createdBy, String description, Boolean support, Boolean isParentGroup, String parentGroupId, Boolean isDefaultSubgroup, String displayName, Jid phoneNumberJid, Boolean shareOwnPhoneNumber, Boolean phoneNumberhDuplicateLidThread, Jid lid, String username, String lidOriginType, Integer commentsCount, Boolean locked, PrivacySystemMessage systemMessageToInsert, Boolean capiCreatedGroup, Jid accountLid, Boolean limitSharing, Instant limitSharingSettingTimestamp, ChatLimitSharing.TriggerType limitSharingTrigger, Boolean limitSharingInitiatedByMe, Boolean maibaAiThreadEnabled) {
         this.jid = Objects.requireNonNull(jid);
         this.newJid = newJid;
         this.oldJid = oldJid;
@@ -896,13 +903,13 @@ public non-sealed abstract class Chat implements JidProvider {
     }
 
     /**
-     * Returns the creation timestamp of this chat as a raw epoch value.
+     * Returns the creation instant of this chat.
      *
-     * @return an {@link OptionalLong} containing the creation timestamp, or
-     *         empty if not available
+     * @return an {@link Optional} containing the creation timestamp, or empty
+     *         if not available
      */
-    public OptionalLong createdAt() {
-        return createdAt == null ? OptionalLong.empty() : OptionalLong.of(createdAt);
+    public Optional<Instant> createdAt() {
+        return Optional.ofNullable(createdAt);
     }
 
     /**
@@ -1410,11 +1417,11 @@ public non-sealed abstract class Chat implements JidProvider {
     }
 
     /**
-     * Sets the creation timestamp of this chat.
+     * Sets the creation instant of this chat.
      *
      * @param createdAt the timestamp, or {@code null} to clear
      */
-    public void setCreatedAt(Long createdAt) {
+    public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
     }
 
@@ -1633,54 +1640,48 @@ public non-sealed abstract class Chat implements JidProvider {
     }
 
     /**
-     * Describes the state of history sync transfer completion for a chat.
+     * Describes the state of history-sync transfer completion for a chat.
      *
-     * <p>When a companion device joins a WhatsApp account, it receives chat
-     * history from the primary device. This enum indicates whether the transfer
-     * has completed and whether more messages remain available on the primary
-     * device.
-     *
-     * @implNote Mirrors the {@code ConversationEndOfHistoryTransferModelPropType}
-     *           enum exported from the {@code WAWebChatConstants} JavaScript
-     *           module. The wire indexes must remain aligned with WhatsApp's
-     *           protobuf definition since values are serialized over history
-     *           sync.
+     * <p>When a companion device joins a WhatsApp account it receives chat
+     * history from the primary device. This enum reports whether that
+     * transfer has completed for the chat and whether more messages remain
+     * available on the primary device.
      */
     @ProtobufEnum(name = "Conversation.EndOfHistoryTransferType")
     public enum EndOfHistoryTransferType {
         /**
-         * The transfer is complete, but additional older messages remain on the
-         * primary device and may be fetched on demand.
+         * The transfer is complete, but additional older messages still
+         * remain on the primary device and may be fetched on demand.
          */
         COMPLETE_BUT_MORE_MESSAGES_REMAIN_ON_PRIMARY(0),
 
         /**
-         * The transfer is complete and no more messages remain on the primary
-         * device. The companion device has all available history.
+         * The transfer is complete and no more messages remain on the
+         * primary device. The companion device has all available history.
          */
         COMPLETE_AND_NO_MORE_MESSAGE_REMAIN_ON_PRIMARY(1),
 
         /**
-         * The history sync transfer did not finish and is still in progress or
-         * was interrupted.
+         * The history-sync transfer did not finish; it is still in progress
+         * or was interrupted.
          */
         INCOMPLETE(2),
 
         /**
-         * The chat was not included in the history sync payload at all.
+         * The chat was not included in the history-sync payload at all.
          */
         NOT_INCLUDED_IN_HIST_SYNC(3),
 
         /**
-         * An on-demand sync chunk has been transferred, but more messages still
-         * remain on the primary device.
+         * An on-demand sync chunk has been transferred, but more messages
+         * still remain on the primary device.
          */
         COMPLETE_ON_DEMAND_SYNC_BUT_MORE_MSG_REMAIN_ON_PRIMARY(4),
 
         /**
-         * An on-demand sync chunk has been transferred, more messages exist on
-         * the primary device, but the companion cannot access them (for example,
-         * due to an older primary app version).
+         * An on-demand sync chunk has been transferred and more messages
+         * exist on the primary device, but the companion cannot access them
+         * (for example because the primary is on an older app version).
          */
         COMPLETE_ON_DEMAND_SYNC_WITH_MORE_MSG_ON_PRIMARY_BUT_NO_ACCESS(5);
 

@@ -10,6 +10,7 @@ import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.stream.SocketStream;
 import com.github.auties00.cobalt.stream.control.OfflineNotificationsReporter;
+import com.github.auties00.cobalt.wam.WamService;
 
 /**
  * Routes inbound device-category notification stanzas to specialised
@@ -64,17 +65,20 @@ public final class NotificationDeviceDispatcher implements SocketStream.Handler 
      *                                     offline {@code server_sync} notification counts for the
      *                                     {@code MdAppStateOfflineNotifications} WAM event; forwarded to
      *                                     the server-sync handler
+     * @param wamService                   the WAM telemetry service forwarded to the linking and
+     *                                     server-crypto handlers
      */
     public NotificationDeviceDispatcher(
             WhatsAppClient whatsapp,
             CompanionPairingService deviceLinkingService,
             ABPropsService abPropsService,
             DeviceService deviceService,
-            OfflineNotificationsReporter offlineNotificationsReporter
+            OfflineNotificationsReporter offlineNotificationsReporter,
+            WamService wamService
     ) {
         this.notificationDeviceHandler = new NotificationDeviceStreamHandler(whatsapp, deviceService);
-        this.notificationLinkingHandler = new NotificationLinkingStreamHandler(whatsapp, deviceLinkingService);
-        this.notificationServerCryptoHandler = new NotificationServerCryptoStreamHandler(whatsapp, abPropsService);
+        this.notificationLinkingHandler = new NotificationLinkingStreamHandler(whatsapp, deviceLinkingService, wamService);
+        this.notificationServerCryptoHandler = new NotificationServerCryptoStreamHandler(whatsapp, abPropsService, wamService);
         this.notificationSyncHandler = new NotificationSyncStreamHandler(whatsapp, offlineNotificationsReporter);
     }
 

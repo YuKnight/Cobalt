@@ -12,6 +12,7 @@ import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -117,8 +118,8 @@ public final class ChatLockSettingsHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebChatLockSettingsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebChatLockSettingsSync.applyMutations -> SyncActionState.Success
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebChatLockSettingsSync.applyMutations -> SyncActionState.Success
     }
 
     /**
@@ -149,7 +150,7 @@ public final class ChatLockSettingsHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebChatLockSettingsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) { // WAWebChatLockSettingsSync.applyMutations: if (e.operation !== "set")
             return MutationApplicationResult.unsupported(); // WAWebChatLockSettingsSync.applyMutations: {actionState: SyncActionState.Unsupported}
         }
@@ -195,7 +196,7 @@ public final class ChatLockSettingsHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebChatLockSettingsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.DIRECT)
-    public List<MutationApplicationResult> applyMutationBatchResults(WhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
+    public List<MutationApplicationResult> applyMutationBatchResults(WhatsAppClient client, WamService wamService, List<DecryptedMutation.Trusted> mutations) {
         ChatLockSettings pending = null; // WAWebChatLockSettingsSync.applyMutations: var r
         var results = new ArrayList<MutationApplicationResult>(mutations.size()); // WAWebChatLockSettingsSync.applyMutations: t.map(function(e) {...})
         for (var mutation : mutations) { // WAWebChatLockSettingsSync.applyMutations: t.map(function(e) {...})

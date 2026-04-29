@@ -14,9 +14,6 @@ import com.github.auties00.cobalt.model.message.MessageKey;
 import com.github.auties00.cobalt.model.message.system.appstate.AppStateFatalExceptionNotification;
 import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyRequest;
 import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyShare;
-import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
-import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
-import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.message.system.history.HistorySyncNotification;
 import com.github.auties00.cobalt.model.message.system.peer.PeerDataOperationRequestMessage;
 import com.github.auties00.cobalt.model.message.system.peer.PeerDataOperationRequestResponseMessage;
@@ -33,21 +30,24 @@ import java.util.Optional;
 import java.util.OptionalInt;
 
 /**
- * A multiplexed envelope for all system-level, non-user-visible messages that
- * the WhatsApp protocol exchanges inside the conversation pipeline.
+ * A multiplexed envelope for all system-level, non-user-visible messages
+ * that the WhatsApp protocol exchanges inside the conversation pipeline.
  *
  * <p>While regular chat messages carry text or media, a large number of
- * internal events ride on the same message infrastructure: revocations,
- * disappearing-message settings, history-sync notifications, app-state sync
- * key exchanges, edits, peer-device operations, bot feedback, media uploads,
- * Cloud API handoffs, LID migration syncs, and a growing set of AI and
- * community-related flows. Each of these events is carried as a
- * {@code ProtocolMessage} whose {@link Type} field disambiguates the active
- * variant and tells the reader which of the sibling fields to inspect.
+ * internal events ride on the same end-to-end-encrypted message
+ * infrastructure: revocations, message edits, disappearing-message setting
+ * changes, history-sync notifications, app-state sync key exchanges,
+ * peer-device data operations, bot feedback, media-ready notifications,
+ * Cloud API thread-control handoffs, LID migration syncs, and a growing
+ * set of AI and community-related flows. Each such event is carried as a
+ * {@code ProtocolMessage} whose {@link Type} field disambiguates the
+ * active variant and tells the reader which of the sibling fields to
+ * inspect.
  *
- * <p>Most fields of this class are mutually exclusive in practice: only the
- * one matching the {@link Type} carries data. Consumers should always branch
- * on {@link #type()} first and then read the single relevant accessor.
+ * <p>Most fields of this class are mutually exclusive in practice: only
+ * the one matching the {@link Type} carries data. Consumers should always
+ * branch on {@link #type()} first and then read the single relevant
+ * accessor.
  */
 @ProtobufMessage(name = "Message.ProtocolMessage")
 public final class ProtocolMessage implements Message {
@@ -59,188 +59,218 @@ public final class ProtocolMessage implements Message {
     MessageKey key;
 
     /**
-     * The variant discriminator identifying which protocol event this message
-     * carries.
+     * The variant discriminator identifying which protocol event this
+     * message carries. Consumers should branch on this value before
+     * reading any of the payload fields.
      */
     @ProtobufProperty(index = 2, type = ProtobufType.ENUM)
     Type type;
 
     /**
-     * The new ephemeral-message expiration, in seconds, when the event is
-     * {@link Type#EPHEMERAL_SETTING}.
+     * The new ephemeral-message expiration, expressed as a duration in
+     * seconds, when the event is {@link Type#EPHEMERAL_SETTING}. A value
+     * of {@code 0} disables the timer; otherwise the value indicates how
+     * long messages should live before being deleted automatically.
      */
     @ProtobufProperty(index = 4, type = ProtobufType.UINT32)
     Integer ephemeralExpiration;
 
     /**
-     * The timestamp at which the ephemeral-message setting was last modified.
+     * The timestamp at which the ephemeral-message setting was last
+     * modified, used by clients to resolve concurrent setting updates.
      */
     @ProtobufProperty(index = 5, type = ProtobufType.INT64, mixins = InstantSecondsMixin.class)
     Instant ephemeralSettingTimestamp;
 
     /**
-     * The attached payload for a {@link Type#HISTORY_SYNC_NOTIFICATION} event.
+     * The attached payload for a {@link Type#HISTORY_SYNC_NOTIFICATION}
+     * event, indicating that a new history-sync blob is available for
+     * download by the recipient device.
      */
     @ProtobufProperty(index = 6, type = ProtobufType.MESSAGE)
     HistorySyncNotification historySyncNotification;
 
     /**
-     * The attached payload for an {@link Type#APP_STATE_SYNC_KEY_SHARE} event,
-     * carrying the keys delivered to the requester.
+     * The attached payload for an {@link Type#APP_STATE_SYNC_KEY_SHARE}
+     * event, carrying the keys delivered to the requester.
      */
     @ProtobufProperty(index = 7, type = ProtobufType.MESSAGE)
     AppStateSyncKeyShare appStateSyncKeyShare;
 
     /**
      * The attached payload for an {@link Type#APP_STATE_SYNC_KEY_REQUEST}
-     * event, enumerating which keys the sender is missing.
+     * event, enumerating which keys the sender is missing and would like
+     * to receive from peer devices.
      */
     @ProtobufProperty(index = 8, type = ProtobufType.MESSAGE)
     AppStateSyncKeyRequest appStateSyncKeyRequest;
 
     /**
      * The attached payload for an
-     * {@link Type#INITIAL_SECURITY_NOTIFICATION_SETTING_SYNC} event.
+     * {@link Type#INITIAL_SECURITY_NOTIFICATION_SETTING_SYNC} event, used
+     * when synchronising the initial value of the security-notification
+     * preference to a newly linked device.
      */
     @ProtobufProperty(index = 9, type = ProtobufType.MESSAGE)
     InitialSecurityNotificationSettingSync initialSecurityNotificationSettingSync;
 
     /**
      * The attached payload for an
-     * {@link Type#APP_STATE_FATAL_EXCEPTION_NOTIFICATION} event, describing a
-     * non-recoverable app-state sync failure that requires user intervention.
+     * {@link Type#APP_STATE_FATAL_EXCEPTION_NOTIFICATION} event,
+     * describing a non-recoverable app-state sync failure that requires
+     * user intervention.
      */
     @ProtobufProperty(index = 10, type = ProtobufType.MESSAGE)
     AppStateFatalExceptionNotification appStateFatalExceptionNotification;
 
     /**
      * The disappearing-message configuration carried by
-     * {@link Type#EPHEMERAL_SETTING} events.
+     * {@link Type#EPHEMERAL_SETTING} events, encoding both the new timer
+     * value and the initiator of the change.
      */
     @ProtobufProperty(index = 11, type = ProtobufType.MESSAGE)
     ChatDisappearingMode disappearingMode;
 
     /**
-     * The replacement payload for a {@link Type#MESSAGE_EDIT} event, holding
-     * the edited message body.
+     * The replacement payload for a {@link Type#MESSAGE_EDIT} event,
+     * holding the edited body that must replace the message identified by
+     * {@link #key}.
      */
     @ProtobufProperty(index = 14, type = ProtobufType.MESSAGE)
     MessageContainer editedMessageContainer;
 
     /**
-     * The timestamp, in milliseconds, at which this protocol event was issued.
+     * The timestamp, in milliseconds, at which this protocol event was
+     * issued, used for ordering and conflict resolution.
      */
     @ProtobufProperty(index = 15, type = ProtobufType.INT64, mixins = InstantMillisMixin.class)
     Instant timestampMs;
 
     /**
      * The attached payload for a
-     * {@link Type#PEER_DATA_OPERATION_REQUEST_MESSAGE} event.
+     * {@link Type#PEER_DATA_OPERATION_REQUEST_MESSAGE} event, describing
+     * an operation that a peer device should perform on the user's behalf
+     * (for example a historical message lookup).
      */
     @ProtobufProperty(index = 16, type = ProtobufType.MESSAGE)
     PeerDataOperationRequestMessage peerDataOperationRequestMessage;
 
     /**
      * The attached payload for a
-     * {@link Type#PEER_DATA_OPERATION_REQUEST_RESPONSE_MESSAGE} event.
+     * {@link Type#PEER_DATA_OPERATION_REQUEST_RESPONSE_MESSAGE} event,
+     * delivering the result of a previously requested peer data
+     * operation.
      */
     @ProtobufProperty(index = 17, type = ProtobufType.MESSAGE)
     PeerDataOperationRequestResponseMessage peerDataOperationRequestResponseMessage;
 
     /**
-     * The attached payload for a {@link Type#BOT_FEEDBACK_MESSAGE} event.
+     * The attached payload for a {@link Type#BOT_FEEDBACK_MESSAGE} event,
+     * carrying user feedback (such as a thumbs-up/down rating) about a
+     * previous bot response.
      */
     @ProtobufProperty(index = 18, type = ProtobufType.MESSAGE)
     BotFeedbackMessage botFeedbackMessage;
 
     /**
      * The {@link Jid} of the participant that invoked this protocol event,
-     * when relevant.
+     * when relevant (for example, the user who triggered an AI flow or a
+     * group action).
      */
     @ProtobufProperty(index = 19, type = ProtobufType.STRING)
     Jid invokerJid;
 
     /**
-     * The attached payload for a {@link Type#REQUEST_WELCOME_MESSAGE} event.
+     * The attached payload for a {@link Type#REQUEST_WELCOME_MESSAGE}
+     * event, requesting the delivery of a welcome message for a chat.
      */
     @ProtobufProperty(index = 20, type = ProtobufType.MESSAGE)
     RequestWelcomeMessageMetadata requestWelcomeMessageMetadata;
 
     /**
-     * The attached payload for a {@link Type#MEDIA_NOTIFY_MESSAGE} event.
+     * The attached payload for a {@link Type#MEDIA_NOTIFY_MESSAGE} event,
+     * notifying peer devices that a media upload has completed and is
+     * ready for download.
      */
     @ProtobufProperty(index = 21, type = ProtobufType.MESSAGE)
     MediaNotifyMessage mediaNotifyMessage;
 
     /**
      * The attached payload for a
-     * {@link Type#CLOUD_API_THREAD_CONTROL_NOTIFICATION} event.
+     * {@link Type#CLOUD_API_THREAD_CONTROL_NOTIFICATION} event,
+     * communicating a Cloud API thread-control handoff between
+     * integrations.
      */
     @ProtobufProperty(index = 22, type = ProtobufType.MESSAGE)
     CloudAPIThreadControlNotification cloudApiThreadControlNotification;
 
     /**
      * The attached payload for a {@link Type#LID_MIGRATION_MAPPING_SYNC}
-     * event, informing devices of newly created LID-to-PN mappings.
+     * event, informing devices of newly created LID-to-phone-number
+     * mappings.
      */
     @ProtobufProperty(index = 23, type = ProtobufType.MESSAGE)
     LIDMigrationMappingSyncMessage lidMigrationMappingSyncMessage;
 
     /**
-     * The attached payload for a {@link Type#LIMIT_SHARING} event, describing
-     * forwarding and sharing restrictions applied to a chat.
+     * The attached payload for a {@link Type#LIMIT_SHARING} event,
+     * describing forwarding and sharing restrictions applied to a chat.
      */
     @ProtobufProperty(index = 24, type = ProtobufType.MESSAGE)
     ChatLimitSharing limitSharing;
 
     /**
      * Raw AI private-set-intersection metadata carried by the
-     * {@link Type#AI_PSI_METADATA} event.
+     * {@link Type#AI_PSI_METADATA} event. The bytes are opaque to the
+     * client and forwarded verbatim between peers.
      */
     @ProtobufProperty(index = 25, type = ProtobufType.BYTES)
     byte[] aiPsiMetadata;
 
     /**
-     * The attached payload for an {@link Type#AI_QUERY_FANOUT} event.
+     * The attached payload for an {@link Type#AI_QUERY_FANOUT} event,
+     * fanning out an AI query to multiple endpoints.
      */
     @ProtobufProperty(index = 26, type = ProtobufType.MESSAGE)
     AIQueryFanout aiQueryFanout;
 
     /**
-     * The attached payload for a {@link Type#GROUP_MEMBER_LABEL_CHANGE} event.
+     * The attached payload for a {@link Type#GROUP_MEMBER_LABEL_CHANGE}
+     * event, recording a label change applied to a group member.
      */
     @ProtobufProperty(index = 27, type = ProtobufType.MESSAGE)
     GroupParticipantLabel participantLabel;
 
 
     /**
-     * Constructs a new protocol message. All fields are optional and only the
-     * subset matching the event {@link Type} is expected to carry data.
+     * Constructs a new protocol message. All fields are optional and only
+     * the subset matching the event {@link Type} is expected to carry
+     * data.
      *
-     * @param key                                       the target message key
-     * @param type                                      the protocol event discriminator
-     * @param ephemeralExpiration                       the new ephemeral expiration in seconds
-     * @param ephemeralSettingTimestamp                 the ephemeral setting update timestamp
-     * @param historySyncNotification                   the history sync payload
-     * @param appStateSyncKeyShare                      the app-state key share payload
-     * @param appStateSyncKeyRequest                    the app-state key request payload
-     * @param initialSecurityNotificationSettingSync    the initial security notification sync payload
-     * @param appStateFatalExceptionNotification        the app-state fatal exception payload
-     * @param disappearingMode                          the disappearing mode configuration
-     * @param editedMessageContainer                    the replacement payload for an edit event
-     * @param timestampMs                               the event timestamp in milliseconds
-     * @param peerDataOperationRequestMessage           the peer data operation request payload
-     * @param peerDataOperationRequestResponseMessage   the peer data operation response payload
-     * @param botFeedbackMessage                        the bot feedback payload
-     * @param invokerJid                                the invoker JID
-     * @param requestWelcomeMessageMetadata             the request welcome message metadata
-     * @param mediaNotifyMessage                        the media notify payload
-     * @param cloudApiThreadControlNotification         the Cloud API thread control notification payload
-     * @param lidMigrationMappingSyncMessage            the LID migration mapping sync payload
-     * @param limitSharing                              the chat limit sharing configuration
-     * @param aiPsiMetadata                             the raw AI PSI metadata
-     * @param aiQueryFanout                             the AI query fanout payload
-     * @param participantLabel                          the group participant label payload
+     * @param key                                       the target message key, or {@code null}
+     * @param type                                      the protocol event discriminator, or {@code null}
+     * @param ephemeralExpiration                       the new ephemeral expiration in seconds, or {@code null}
+     * @param ephemeralSettingTimestamp                 the ephemeral setting update timestamp, or {@code null}
+     * @param historySyncNotification                   the history-sync payload, or {@code null}
+     * @param appStateSyncKeyShare                      the app-state key share payload, or {@code null}
+     * @param appStateSyncKeyRequest                    the app-state key request payload, or {@code null}
+     * @param initialSecurityNotificationSettingSync    the initial security-notification sync payload, or {@code null}
+     * @param appStateFatalExceptionNotification        the app-state fatal exception payload, or {@code null}
+     * @param disappearingMode                          the disappearing-mode configuration, or {@code null}
+     * @param editedMessageContainer                    the replacement payload for an edit event, or {@code null}
+     * @param timestampMs                               the event timestamp in milliseconds, or {@code null}
+     * @param peerDataOperationRequestMessage           the peer data operation request payload, or {@code null}
+     * @param peerDataOperationRequestResponseMessage   the peer data operation response payload, or {@code null}
+     * @param botFeedbackMessage                        the bot feedback payload, or {@code null}
+     * @param invokerJid                                the invoker JID, or {@code null}
+     * @param requestWelcomeMessageMetadata             the request welcome message metadata, or {@code null}
+     * @param mediaNotifyMessage                        the media-notify payload, or {@code null}
+     * @param cloudApiThreadControlNotification         the Cloud API thread-control notification payload, or {@code null}
+     * @param lidMigrationMappingSyncMessage            the LID migration mapping sync payload, or {@code null}
+     * @param limitSharing                              the chat limit-sharing configuration, or {@code null}
+     * @param aiPsiMetadata                             the raw AI PSI metadata, or {@code null}
+     * @param aiQueryFanout                             the AI query fanout payload, or {@code null}
+     * @param participantLabel                          the group-participant label payload, or {@code null}
      */
     ProtocolMessage(MessageKey key, Type type, Integer ephemeralExpiration, Instant ephemeralSettingTimestamp, HistorySyncNotification historySyncNotification, AppStateSyncKeyShare appStateSyncKeyShare, AppStateSyncKeyRequest appStateSyncKeyRequest, InitialSecurityNotificationSettingSync initialSecurityNotificationSettingSync, AppStateFatalExceptionNotification appStateFatalExceptionNotification, ChatDisappearingMode disappearingMode, MessageContainer editedMessageContainer, Instant timestampMs, PeerDataOperationRequestMessage peerDataOperationRequestMessage, PeerDataOperationRequestResponseMessage peerDataOperationRequestResponseMessage, BotFeedbackMessage botFeedbackMessage, Jid invokerJid, RequestWelcomeMessageMetadata requestWelcomeMessageMetadata, MediaNotifyMessage mediaNotifyMessage, CloudAPIThreadControlNotification cloudApiThreadControlNotification, LIDMigrationMappingSyncMessage lidMigrationMappingSyncMessage, ChatLimitSharing limitSharing, byte[] aiPsiMetadata, AIQueryFanout aiQueryFanout, GroupParticipantLabel participantLabel) {
         this.key = key;
@@ -280,8 +310,8 @@ public final class ProtocolMessage implements Message {
     }
 
     /**
-     * Returns the variant discriminator identifying which protocol event this
-     * message carries.
+     * Returns the variant discriminator identifying which protocol event
+     * this message carries.
      *
      * @return an {@link Optional} containing the event type, or
      *         {@link Optional#empty()} if no type is set
@@ -302,8 +332,8 @@ public final class ProtocolMessage implements Message {
     }
 
     /**
-     * Returns the timestamp at which the ephemeral-message setting was last
-     * modified.
+     * Returns the timestamp at which the ephemeral-message setting was
+     * last modified.
      *
      * @return an {@link Optional} containing the timestamp, or
      *         {@link Optional#empty()} if it is not set
@@ -343,8 +373,8 @@ public final class ProtocolMessage implements Message {
     }
 
     /**
-     * Returns the initial security-notification setting sync payload attached
-     * to this message.
+     * Returns the initial security-notification setting sync payload
+     * attached to this message.
      *
      * @return an {@link Optional} containing the payload, or
      *         {@link Optional#empty()} if it is not set
@@ -354,8 +384,8 @@ public final class ProtocolMessage implements Message {
     }
 
     /**
-     * Returns the app-state fatal exception notification payload attached to
-     * this message.
+     * Returns the app-state fatal exception notification payload attached
+     * to this message.
      *
      * @return an {@link Optional} containing the payload, or
      *         {@link Optional#empty()} if it is not set
@@ -420,8 +450,8 @@ public final class ProtocolMessage implements Message {
     /**
      * Returns the bot feedback payload attached to this message.
      *
-     * @return an {@link Optional} containing the {@link BotFeedbackMessage}, or
-     *         {@link Optional#empty()} if no payload is set
+     * @return an {@link Optional} containing the {@link BotFeedbackMessage},
+     *         or {@link Optional#empty()} if no payload is set
      */
     public Optional<BotFeedbackMessage> botFeedbackMessage() {
         return Optional.ofNullable(botFeedbackMessage);
@@ -438,7 +468,7 @@ public final class ProtocolMessage implements Message {
     }
 
     /**
-     * Returns the request welcome message metadata attached to this message.
+     * Returns the request-welcome-message metadata attached to this message.
      *
      * @return an {@link Optional} containing the metadata, or
      *         {@link Optional#empty()} if it is not set
@@ -448,18 +478,18 @@ public final class ProtocolMessage implements Message {
     }
 
     /**
-     * Returns the media notify payload attached to this message.
+     * Returns the media-notify payload attached to this message.
      *
-     * @return an {@link Optional} containing the {@link MediaNotifyMessage}, or
-     *         {@link Optional#empty()} if no payload is set
+     * @return an {@link Optional} containing the {@link MediaNotifyMessage},
+     *         or {@link Optional#empty()} if no payload is set
      */
     public Optional<MediaNotifyMessage> mediaNotifyMessage() {
         return Optional.ofNullable(mediaNotifyMessage);
     }
 
     /**
-     * Returns the Cloud API thread control notification payload attached to
-     * this message.
+     * Returns the Cloud API thread-control notification payload attached
+     * to this message.
      *
      * @return an {@link Optional} containing the notification, or
      *         {@link Optional#empty()} if it is not set
@@ -479,7 +509,7 @@ public final class ProtocolMessage implements Message {
     }
 
     /**
-     * Returns the chat limit sharing configuration attached to this message.
+     * Returns the chat limit-sharing configuration attached to this message.
      *
      * @return an {@link Optional} containing the {@link ChatLimitSharing},
      *         or {@link Optional#empty()} if it is not set
@@ -510,7 +540,7 @@ public final class ProtocolMessage implements Message {
     }
 
     /**
-     * Returns the group participant label payload attached to this message.
+     * Returns the group-participant label payload attached to this message.
      *
      * @return an {@link Optional} containing the {@link GroupParticipantLabel},
      *         or {@link Optional#empty()} if it is not set
@@ -585,8 +615,8 @@ public final class ProtocolMessage implements Message {
     }
 
     /**
-     * Sets the initial security-notification setting sync payload attached to
-     * this message.
+     * Sets the initial security-notification setting sync payload attached
+     * to this message.
      *
      * @param initialSecurityNotificationSettingSync the new payload, or {@code null} to clear it
      */
@@ -623,8 +653,8 @@ public final class ProtocolMessage implements Message {
     }
 
     /**
-     * Sets the timestamp, in milliseconds, at which this protocol event was
-     * issued.
+     * Sets the timestamp, in milliseconds, at which this protocol event
+     * was issued.
      *
      * @param timestampMs the new timestamp, or {@code null} to clear it
      */
@@ -669,7 +699,7 @@ public final class ProtocolMessage implements Message {
     }
 
     /**
-     * Sets the request welcome message metadata.
+     * Sets the request-welcome-message metadata.
      *
      * @param requestWelcomeMessageMetadata the new metadata, or {@code null} to clear it
      */
@@ -678,7 +708,7 @@ public final class ProtocolMessage implements Message {
     }
 
     /**
-     * Sets the media notify payload.
+     * Sets the media-notify payload.
      *
      * @param mediaNotifyMessage the new payload, or {@code null} to clear it
      */
@@ -687,7 +717,7 @@ public final class ProtocolMessage implements Message {
     }
 
     /**
-     * Sets the Cloud API thread control notification payload.
+     * Sets the Cloud API thread-control notification payload.
      *
      * @param cloudApiThreadControlNotification the new payload, or {@code null} to clear it
      */
@@ -705,7 +735,7 @@ public final class ProtocolMessage implements Message {
     }
 
     /**
-     * Sets the chat limit sharing configuration.
+     * Sets the chat limit-sharing configuration.
      *
      * @param limitSharing the new configuration, or {@code null} to clear it
      */
@@ -732,7 +762,7 @@ public final class ProtocolMessage implements Message {
     }
 
     /**
-     * Sets the group participant label payload.
+     * Sets the group-participant label payload.
      *
      * @param participantLabel the new payload, or {@code null} to clear it
      */
@@ -744,28 +774,11 @@ public final class ProtocolMessage implements Message {
      * Enumerates every protocol event variant that can be carried by a
      * {@link ProtocolMessage}.
      *
-     * <p>The value of this enum determines which of the sibling fields on the
-     * enclosing message is meaningful: all other fields are expected to be
-     * empty for a given event.
-     *
-     * @implNote WA Web exposes a small {@code PARSED_PROTOCOL_MESSAGE_TYPE}
-     *           frozen-object constant (in module {@code WAWebParsedProtocolMsgType})
-     *           whose five string values ({@code "history"},
-     *           {@code "appStateSyncKeyShare"}, {@code "appStateSyncKeyRequest"},
-     *           {@code "peerDataOperationRequestResponseMessage"},
-     *           {@code "peerDataOperationRequestMessage"}) act as the
-     *           discriminator returned by the JS {@code parseProtocolMessage}
-     *           helper when dispatching to deferred / foreground protocol-message
-     *           handlers. Cobalt collapses that parallel discriminator into the
-     *           full {@link Type} protobuf enum, so the consumers simply branch
-     *           on {@link ProtocolMessage#type()} directly; the corresponding
-     *           five enum constants are annotated with
-     *           {@code @WhatsAppWebExport(moduleName = "WAWebParsedProtocolMsgType",
-     *           exports = "PARSED_PROTOCOL_MESSAGE_TYPE")} to record the
-     *           mapping.
+     * <p>The value of this enum determines which of the sibling fields on
+     * the enclosing message is meaningful: all other fields are expected
+     * to be empty for a given event.
      */
     @ProtobufEnum(name = "Message.ProtocolMessage.Type")
-    @WhatsAppWebModule(moduleName = "WAWebParsedProtocolMsgType")
     public static enum Type {
         /**
          * Revokes (deletes for everyone) a previously sent message
@@ -782,43 +795,21 @@ public final class ProtocolMessage implements Message {
          */
         EPHEMERAL_SYNC_RESPONSE(4),
         /**
-         * Notifies the client that a new history sync blob is available for
-         * download.
-         *
-         * @implNote Maps to the WA Web dispatcher value
-         *           {@code PARSED_PROTOCOL_MESSAGE_TYPE.HISTORY}
-         *           ({@code "history"}) surfaced by {@code WAWebParsedProtocolMsgType}.
+         * Notifies the client that a new history-sync blob is available
+         * for download.
          */
-        @WhatsAppWebExport(moduleName = "WAWebParsedProtocolMsgType",
-                exports = "PARSED_PROTOCOL_MESSAGE_TYPE",
-                adaptation = WhatsAppAdaptation.ADAPTED)
         HISTORY_SYNC_NOTIFICATION(5),
         /**
          * Delivers requested app-state sync keys to a peer device.
-         *
-         * @implNote Maps to the WA Web dispatcher value
-         *           {@code PARSED_PROTOCOL_MESSAGE_TYPE.APP_STATE_SYNC_KEY_SHARE}
-         *           ({@code "appStateSyncKeyShare"}) surfaced by
-         *           {@code WAWebParsedProtocolMsgType}.
          */
-        @WhatsAppWebExport(moduleName = "WAWebParsedProtocolMsgType",
-                exports = "PARSED_PROTOCOL_MESSAGE_TYPE",
-                adaptation = WhatsAppAdaptation.ADAPTED)
         APP_STATE_SYNC_KEY_SHARE(6),
         /**
          * Requests specific app-state sync keys from peer devices.
-         *
-         * @implNote Maps to the WA Web dispatcher value
-         *           {@code PARSED_PROTOCOL_MESSAGE_TYPE.APP_STATE_SYNC_KEY_REQUEST}
-         *           ({@code "appStateSyncKeyRequest"}) surfaced by
-         *           {@code WAWebParsedProtocolMsgType}.
          */
-        @WhatsAppWebExport(moduleName = "WAWebParsedProtocolMsgType",
-                exports = "PARSED_PROTOCOL_MESSAGE_TYPE",
-                adaptation = WhatsAppAdaptation.ADAPTED)
         APP_STATE_SYNC_KEY_REQUEST(7),
         /**
-         * Requests a backfill of a message fanout to recover missed messages.
+         * Requests a backfill of a message fanout to recover missed
+         * messages.
          */
         MSG_FANOUT_BACKFILL_REQUEST(8),
         /**
@@ -827,7 +818,8 @@ public final class ProtocolMessage implements Message {
          */
         INITIAL_SECURITY_NOTIFICATION_SETTING_SYNC(9),
         /**
-         * Signals that an unrecoverable app-state sync failure has occurred.
+         * Signals that an unrecoverable app-state sync failure has
+         * occurred.
          */
         APP_STATE_FATAL_EXCEPTION_NOTIFICATION(10),
         /**
@@ -841,27 +833,11 @@ public final class ProtocolMessage implements Message {
         /**
          * Requests a peer device to perform a data operation such as
          * historical message lookup.
-         *
-         * @implNote Maps to the WA Web dispatcher value
-         *           {@code PARSED_PROTOCOL_MESSAGE_TYPE.PEER_DATA_OPERATION_REQUEST_MESSAGE}
-         *           ({@code "peerDataOperationRequestMessage"}) surfaced by
-         *           {@code WAWebParsedProtocolMsgType}.
          */
-        @WhatsAppWebExport(moduleName = "WAWebParsedProtocolMsgType",
-                exports = "PARSED_PROTOCOL_MESSAGE_TYPE",
-                adaptation = WhatsAppAdaptation.ADAPTED)
         PEER_DATA_OPERATION_REQUEST_MESSAGE(16),
         /**
          * Delivers the response to a peer data operation request.
-         *
-         * @implNote Maps to the WA Web dispatcher value
-         *           {@code PARSED_PROTOCOL_MESSAGE_TYPE.PEER_DATA_OPERATION_REQUEST_RESPONSE_MESSAGE}
-         *           ({@code "peerDataOperationRequestResponseMessage"}) surfaced
-         *           by {@code WAWebParsedProtocolMsgType}.
          */
-        @WhatsAppWebExport(moduleName = "WAWebParsedProtocolMsgType",
-                exports = "PARSED_PROTOCOL_MESSAGE_TYPE",
-                adaptation = WhatsAppAdaptation.ADAPTED)
         PEER_DATA_OPERATION_REQUEST_RESPONSE_MESSAGE(17),
         /**
          * Requests the delivery of a welcome message for a chat.
@@ -872,12 +848,13 @@ public final class ProtocolMessage implements Message {
          */
         BOT_FEEDBACK_MESSAGE(19),
         /**
-         * Notifies peer devices that media has been uploaded and is ready
-         * for download.
+         * Notifies peer devices that media has been uploaded and is
+         * ready for download.
          */
         MEDIA_NOTIFY_MESSAGE(20),
         /**
-         * Communicates a Cloud API thread-control handoff between integrations.
+         * Communicates a Cloud API thread-control handoff between
+         * integrations.
          */
         CLOUD_API_THREAD_CONTROL_NOTIFICATION(21),
         /**

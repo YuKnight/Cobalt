@@ -9,35 +9,34 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Enumerates optional features that may be enabled for a newsletter.
+ * Enumerates the optional features that can be activated on a WhatsApp
+ * Channel (the underlying entity that powers a "newsletter").
  *
- * <p>The server reports an arbitrary subset of these constants per
- * newsletter, allowing clients to hide or show the corresponding UI
- * affordances. Admins use these flags to opt the newsletter into premium
- * or experimental features such as analytics, polls, quizzes, and music
- * sharing.
+ * <p>Channels are one-to-many broadcast surfaces in which an admin pushes
+ * announcements to a roster of followers. Beyond the basic publish flow,
+ * the server selectively turns on extra features for individual channels:
+ * insights dashboards, polls, quizzes, music attachments, status producer
+ * APIs, contextual onboarding cards, sticker pack sharing, and more.
+ * Whenever the relay describes a channel, it returns a list of the
+ * capability tokens currently enabled for it; the client uses those tokens
+ * to reveal or hide the matching UI affordances.
  *
- * @implNote WA Web's {@code WAWebCommonNewsletterEnums.NewsletterCapability}
- *           is a zero-indexed numeric enum with no {@code UNKNOWN} sentinel.
- *           Cobalt adds {@code UNKNOWN} as a defensive fallback for
- *           unrecognized server values; this shifts the wire indices by one
- *           relative to WA Web. String-based {@link #of(String)} lookups are
- *           unaffected because they key off the constant name.
+ * <p>Each constant is paired with a stable protobuf wire index so the
+ * enum can be persisted in serialized state. {@link #of(String)} performs
+ * a case-insensitive lookup against the constant name and falls back to
+ * {@link #UNKNOWN} when the relay returns a token this client does not
+ * yet recognise.
  */
 @ProtobufEnum
 public enum NewsletterCapability {
     /**
      * The capability was not reported by the server or is not recognized
      * by this version of the client.
-     *
-     * @implNote NO_WA_BASIS: defensive sentinel added by Cobalt; not present
-     *           in {@code WAWebCommonNewsletterEnums.NewsletterCapability}.
      */
     UNKNOWN(0),
 
     /**
-     * The newsletter exposes analytics and insights dashboards to its
-     * admins.
+     * The channel exposes analytics and insights dashboards to its admins.
      */
     INSIGHTS(1),
 
@@ -48,18 +47,18 @@ public enum NewsletterCapability {
 
     /**
      * Admins may publish question posts that collect text responses from
-     * subscribers.
+     * followers.
      */
     QUESTIONS(3),
 
     /**
-     * The newsletter receives admin-targeted notifications.
+     * The channel receives admin-targeted server notifications.
      */
     ADMIN_NOTIFICATIONS(4),
 
     /**
      * The admin UI surfaces a dedicated button for inviting additional
-     * admins.
+     * admins to the channel.
      */
     INVITE_ADMINS_BUTTON(5),
 
@@ -89,18 +88,18 @@ public enum NewsletterCapability {
     ADMIN_CONTEXT_CARD_3(10),
 
     /**
-     * Admins may share sticker packs directly into the newsletter.
+     * Admins may share sticker packs directly into the channel.
      */
     SHARE_STICKER_PACKS(11),
 
     /**
-     * The initial admin onboarding flow is enabled for this newsletter.
+     * The initial admin onboarding flow is enabled for this channel.
      */
     ADMIN_ONBOARDING(12),
 
     /**
      * The second-iteration admin onboarding flow is enabled for this
-     * newsletter.
+     * channel.
      */
     ADMIN_ONBOARDING_2(13),
 
@@ -122,18 +121,18 @@ public enum NewsletterCapability {
     PINNING_NUDGE(16),
 
     /**
-     * The client surfaces the thread-menu feature inside the newsletter
-     * view.
+     * The client surfaces the thread-menu feature inside the channel view.
      */
     THREAD_MENU(17),
 
     /**
-     * The newsletter exposes the admin-profile attribution feature.
+     * The channel exposes the admin-profile attribution feature, which
+     * surfaces the human admin behind a post.
      */
     ADMIN_PROFILE(18),
 
     /**
-     * The newsletter exposes the channel-status producer feature, letting
+     * The channel exposes the channel-status producer feature, letting
      * admins publish ephemeral status updates tied to the channel.
      */
     CHANNEL_STATUS_PRODUCER(19);

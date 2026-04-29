@@ -10,6 +10,7 @@ import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.stream.SocketStream;
 import com.github.auties00.cobalt.sync.WebAppStateService;
+import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.MdAppStateDirtyBitsEventBuilder;
 
 import java.time.Instant;
@@ -231,6 +232,11 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
     private final OfflineNotificationsReporter offlineNotificationsReporter;
 
     /**
+     * The WAM telemetry service used to commit the dirty-bits event.
+     */
+    private final WamService wamService;
+
+    /**
      * Constructs a new info bulletin stream handler bound to the supplied
      * client and web app-state service.
      *
@@ -241,6 +247,8 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
      *                                     accumulated offline {@code server_sync}
      *                                     notification counts as a WAM event when the
      *                                     offline bulletin arrives, must not be {@code null}
+     * @param wamService                   the WAM telemetry service used to commit the
+     *                                     dirty-bits event, must not be {@code null}
      * @implNote WAWebHandleInfoBulletin.default: the handler is registered
      * by {@code WADeprecatedWapParser("infoBulletinParser", ...)}; Cobalt
      * registers handlers as {@link SocketStream.Handler} implementations
@@ -248,10 +256,11 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleInfoBulletin", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public InfoBulletinStreamHandler(WhatsAppClient whatsapp, WebAppStateService webAppStateService, OfflineNotificationsReporter offlineNotificationsReporter) {
+    public InfoBulletinStreamHandler(WhatsAppClient whatsapp, WebAppStateService webAppStateService, OfflineNotificationsReporter offlineNotificationsReporter, WamService wamService) {
         this.whatsapp = whatsapp;
         this.webAppStateService = webAppStateService;
         this.offlineNotificationsReporter = offlineNotificationsReporter;
+        this.wamService = wamService;
     }
 
     /**
@@ -475,7 +484,7 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
             // In Cobalt pullWebAppState is synchronous (virtual thread) and returns the
             // Cobalt equivalent of `e.some(...)` directly.
             var hasAppStateChanges = whatsapp.pullWebAppState(collectionsToSync.toArray(SyncPatchType[]::new));
-            whatsapp.wamService().commit(new MdAppStateDirtyBitsEventBuilder() // WAWebHandleDirtyBits.p: new MdAppStateDirtyBitsWamEvent({dirtyBitsFalsePositive: !t}).commit()
+            wamService.commit(new MdAppStateDirtyBitsEventBuilder() // WAWebHandleDirtyBits.p: new MdAppStateDirtyBitsWamEvent({dirtyBitsFalsePositive: !t}).commit()
                     .dirtyBitsFalsePositive(!hasAppStateChanges)
                     .build());
         }

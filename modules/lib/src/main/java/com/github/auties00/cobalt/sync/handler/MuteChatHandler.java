@@ -17,6 +17,7 @@ import com.github.auties00.cobalt.model.sync.action.chat.MuteActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 import java.time.Instant;
 import java.util.List;
@@ -120,8 +121,8 @@ public final class MuteChatHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebMuteChatSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebMuteChatSync.applyMutations
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebMuteChatSync.applyMutations
     }
 
     /**
@@ -167,7 +168,7 @@ public final class MuteChatHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebMuteChatSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) { // WAWebMuteChatSync.applyMutations: if (e.operation === "set") { ... } l++; return {actionState: Unsupported}
             return MutationApplicationResult.unsupported(); // WAWebMuteChatSync.applyMutations: {actionState: Unsupported}
         }
@@ -201,7 +202,7 @@ public final class MuteChatHandler implements WebAppStateActionHandler {
             }
 
             // WAWebMuteChatSync.applyMutations: var f = m != null ? m : 0 — muteEndMillis, defaulting to 0
-            var muteEndMillis = action.muteEndTimestamp().map(java.time.Instant::toEpochMilli).orElse(0L);
+            var muteEndMillis = action.muteEndTimestamp().map(Instant::toEpochMilli).orElse(0L);
             // WAWebMuteChatSync.applyMutations: var g = f > 0 && f < unixTimeMs() ? 0 : Math.floor(f / 1e3)
             var muteEndSeconds = muteEndMillis > 0 && muteEndMillis < System.currentTimeMillis()
                     ? 0L

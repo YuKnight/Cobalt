@@ -7,6 +7,7 @@ import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.chat.UsernameChatStartModeAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 /**
  * Applies {@code usernameChatStartMode} mutations decoded from app state sync.
@@ -149,8 +150,8 @@ public final class UsernameChatStartModeHandler implements WebAppStateActionHand
      * @return {@code true} if the apply succeeded, {@code false} otherwise
      */
     @Override
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: sibling WAWeb*Sync.applyMutations return SyncActionState directly
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: sibling WAWeb*Sync.applyMutations return SyncActionState directly
     }
 
     /**
@@ -172,7 +173,7 @@ public final class UsernameChatStartModeHandler implements WebAppStateActionHand
      *       express the same guard as
      *       {@code var n = e.value, a = n.someAction; if (!a) { i++; return malformedActionValue(this.collectionName) }}.
      *       Cobalt collapses the equivalent
-     *       {@link com.github.auties00.cobalt.sync.handler.SyncdIndexUtils#malformedActionValue}
+     *       {@link SyncdIndexUtils#malformedActionValue}
      *       contract into {@link MutationApplicationResult#malformed()}.</li>
      *   <li><b>Apply the new setting</b> &mdash; persists the decoded enum
      *       into {@link com.github.auties00.cobalt.store.WhatsAppStore#setUsernameChatStartMode}.
@@ -199,7 +200,7 @@ public final class UsernameChatStartModeHandler implements WebAppStateActionHand
      *         {@link MutationApplicationResult#success()} otherwise
      */
     @Override
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         // ADAPTED: sibling WAWeb*Sync.applyMutations: if (e.operation === "set") { ... } p++; return {actionState: Unsupported}
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();

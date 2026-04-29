@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.misc;
 
-import com.github.auties00.cobalt.client.WhatsAppClientProxy;
+import com.github.auties00.cobalt.proxy.WhatsAppProxy;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
@@ -33,7 +33,7 @@ import java.util.concurrent.Executors;
  *
  * <p>Implementations support HTTP CONNECT, HTTPS CONNECT, SOCKS4, and
  * SOCKS5.  Each proxy runs on a random ephemeral port and can be
- * converted to the corresponding {@link WhatsAppClientProxy} via
+ * converted to the corresponding {@link WhatsAppProxy} via
  * {@link #toProxy()}.
  *
  * <p>Call {@link #close()} to shut down the server and release the port.
@@ -70,12 +70,12 @@ public sealed abstract class ProxyServer implements Closeable {
     }
 
     /**
-     * Returns the {@link WhatsAppClientProxy} configuration pointing
+     * Returns the {@link WhatsAppProxy} configuration pointing
      * at this local server.
      *
      * @return the proxy configuration
      */
-    public abstract WhatsAppClientProxy toProxy();
+    public abstract WhatsAppProxy toProxy();
 
     @Override
     public void close() throws IOException {
@@ -221,8 +221,8 @@ public sealed abstract class ProxyServer implements Closeable {
         }
 
         @Override
-        public WhatsAppClientProxy toProxy() {
-            return WhatsAppClientProxy.ofHttp("127.0.0.1", port());
+        public WhatsAppProxy toProxy() {
+            return WhatsAppProxy.ofHttp("127.0.0.1", port());
         }
 
         @Override
@@ -271,8 +271,8 @@ public sealed abstract class ProxyServer implements Closeable {
         }
 
         @Override
-        public WhatsAppClientProxy toProxy() {
-            return WhatsAppClientProxy.ofHttps("127.0.0.1", port());
+        public WhatsAppProxy toProxy() {
+            return WhatsAppProxy.ofHttps("127.0.0.1", port());
         }
 
         @Override
@@ -324,8 +324,8 @@ public sealed abstract class ProxyServer implements Closeable {
         }
 
         @Override
-        public WhatsAppClientProxy toProxy() {
-            return WhatsAppClientProxy.ofSocks4("127.0.0.1", port());
+        public WhatsAppProxy toProxy() {
+            return WhatsAppProxy.ofSocks4("127.0.0.1", port());
         }
 
         @Override
@@ -388,8 +388,8 @@ public sealed abstract class ProxyServer implements Closeable {
         }
 
         @Override
-        public WhatsAppClientProxy toProxy() {
-            return WhatsAppClientProxy.ofSocks5("127.0.0.1", port());
+        public WhatsAppProxy toProxy() {
+            return WhatsAppProxy.ofSocks5("127.0.0.1", port());
         }
 
         @Override

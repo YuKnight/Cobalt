@@ -108,7 +108,7 @@ public final class WamAnnotations {
         // Check for default value
         for (var method : mirror.getAnnotationType().asElement().getEnclosedElements()) {
             if (method.getSimpleName().contentEquals(attribute)) {
-                if (method instanceof javax.lang.model.element.ExecutableElement exec) {
+                if (method instanceof ExecutableElement exec) {
                     return exec.getDefaultValue();
                 }
             }

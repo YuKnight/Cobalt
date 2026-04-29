@@ -4,6 +4,7 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.model.chat.Chat;
 import com.github.auties00.cobalt.model.contact.ContactTextStatus;
@@ -32,6 +33,7 @@ import java.util.Set;
  *
  * @implNote WAWebHandleMexNotification
  */
+@WhatsAppWebModule(moduleName = "WAWebHandleMexNotification")
 final class NotificationMexStreamHandler implements SocketStream.Handler {
     /**
      * Logger instance for this handler.
@@ -485,10 +487,20 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
      * Handles a LID change notification by migrating the old LID to the new LID
      * across contacts, chats, and the LID migration service.
      *
+     * <p>The MEX notification carries the same {@code xwa2_notify_lid_change}
+     * envelope projected by
+     * {@link com.github.auties00.cobalt.node.mex.json.user.LidChangeNotificationMexResponse};
+     * because the notification stream presents the JSON body inline (rather
+     * than wrapped in an IQ {@code <result>} child) the typed parser is not
+     * directly applicable, so the {@code old}/{@code new} fields are read
+     * straight off the {@link JSONObject}.
+     *
      * @implNote WAWebMexLidChangeNotificationHandler.mexHandleLidChangeNotification
      * @param payload the parsed JSON payload
      */
     private void handleLidChange(JSONObject payload) {
+        // WAWebMexLidChangeNotificationHandler.mexHandleLidChangeNotification:
+        //   pulls the same {old, new} pair LidChangeNotificationMexResponse surfaces
         var root = payload.getJSONObject("xwa2_notify_lid_change");
         if (root == null) {
             return;

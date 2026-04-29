@@ -15,8 +15,10 @@ import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastLi
 import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastListActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.logging.Logger;
@@ -120,8 +122,8 @@ public final class BusinessBroadcastListHandler implements WebAppStateActionHand
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBroadcastListSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: WAWebBroadcastListSync.applyMutations
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: WAWebBroadcastListSync.applyMutations
     }
 
     /**
@@ -153,7 +155,7 @@ public final class BusinessBroadcastListHandler implements WebAppStateActionHand
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBroadcastListSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         try { // WAWebBroadcastListSync.applyMutations: try { ... } catch(e) { return {actionState: Failed} }
             var indexArray = JSON.parseArray(mutation.index()); // ADAPTED: WAWebBroadcastListSync.applyMutations: var t = e.indexParts (pre-parsed in WA Web)
             var listId = indexArray.getString(1); // WAWebBroadcastListSync.applyMutations: n = t[1]
@@ -216,11 +218,11 @@ public final class BusinessBroadcastListHandler implements WebAppStateActionHand
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBroadcastListSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public List<Boolean> applyMutationBatch(WhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
+    public List<Boolean> applyMutationBatch(WhatsAppClient client, WamService wamService, List<DecryptedMutation.Trusted> mutations) {
         var malformedCount = 0; // WAWebBroadcastListSync.applyMutations: var a = 0
-        var results = new java.util.ArrayList<Boolean>(mutations.size());
+        var results = new ArrayList<Boolean>(mutations.size());
         for (var mutation : mutations) { // ADAPTED: WAWebBroadcastListSync.applyMutations uses yield Promise.all(t.map(...))
-            var result = applyMutationResult(client, mutation);
+            var result = applyMutationResult(client, wamService, mutation);
             if (result.actionState() == SyncActionState.MALFORMED) { // WAWebBroadcastListSync.applyMutations: a++ on malformedActionValue
                 malformedCount++;
             }

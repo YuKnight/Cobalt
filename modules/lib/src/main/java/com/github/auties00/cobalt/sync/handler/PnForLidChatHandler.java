@@ -13,6 +13,7 @@ import com.github.auties00.cobalt.model.sync.action.chat.PnForLidChatAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 /**
  * Handles the {@code pn_for_lid_chat} app state sync action, which carries a
@@ -115,8 +116,8 @@ public final class PnForLidChatHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPnForLidChatSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebPnForLidChatSync.applyMutations: {actionState: SyncActionState.Success}
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebPnForLidChatSync.applyMutations: {actionState: SyncActionState.Success}
     }
 
     /**
@@ -158,7 +159,7 @@ public final class PnForLidChatHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPnForLidChatSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         // WAWebPnForLidChatSync.applyMutations: if (getABPropConfigValue("pnh_pn_for_lid_chat_sync") !== true) return all Unsupported
         if (!client.abPropsService().getBool(ABProp.PNH_PN_FOR_LID_CHAT_SYNC)) {
             return MutationApplicationResult.unsupported(); // WAWebPnForLidChatSync: {actionState: SyncActionState.Unsupported}

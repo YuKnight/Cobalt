@@ -1,0 +1,626 @@
+package com.github.auties00.cobalt.node.mex.json.community;
+
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONArray;
+import com.alibaba.fastjson2.JSONObject;
+import com.alibaba.fastjson2.JSONWriter;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
+import com.github.auties00.cobalt.node.mex.MexOperation;
+import com.github.auties00.cobalt.node.Node;
+import com.github.auties00.cobalt.node.NodeBuilder;
+import java.io.IOException;
+import java.io.StringWriter;
+import java.io.UncheckedIOException;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.OptionalLong;
+
+/**
+ * The parsed response carrying the community's default subgroup and all
+ * regular subgroups.
+ */
+public final class FetchAllSubgroupsMexResponse implements MexOperation.Response.Json {
+    private final String id;
+    private final DefaultSubGroup defaultSubGroup;
+    private final SubGroups subGroups;
+
+    private FetchAllSubgroupsMexResponse(String id, DefaultSubGroup defaultSubGroup, SubGroups subGroups) {
+        this.id = id;
+        this.defaultSubGroup = defaultSubGroup;
+        this.subGroups = subGroups;
+    }
+
+    /**
+     * Parses the MEX response carried by an inbound IQ stanza.
+     *
+     * @implNote WAWebMexFetchAllSubgroupsJob.mexFetchAllSubgroups: WA Web
+     * accesses {@code l.xwa2_group_query_by_id.default_sub_group} and
+     * {@code l.xwa2_group_query_by_id.sub_groups.edges} directly on the
+     * relay response; Cobalt extracts the {@code <result>} child bytes
+     * and delegates to the private {@code of(byte[])} parser.
+     * @param node the inbound IQ stanza carrying the {@code <result>} child
+     * @return the parsed response, or {@code Optional.empty()} if the
+     *         expected JSON shape is absent
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexFetchAllSubgroupsJob", exports = "mexFetchAllSubgroups",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public static Optional<FetchAllSubgroupsMexResponse> of(Node node) {
+        return node.getChild("result")
+                .flatMap(Node::toContentBytes)
+                .flatMap(FetchAllSubgroupsMexResponse::of);
+    }
+
+    /**
+     * Returns the {@code id} field.
+     *
+     * @return an {@link Optional} containing the value, or empty if absent
+     */
+    public Optional<String> id() {
+        return Optional.ofNullable(id);
+    }
+
+    /**
+     * Returns the {@code default_sub_group} field.
+     *
+     * @return an {@link Optional} containing the value, or empty if absent
+     */
+    public Optional<DefaultSubGroup> defaultSubGroup() {
+        return Optional.ofNullable(defaultSubGroup);
+    }
+
+    /**
+     * Returns the {@code sub_groups} field.
+     *
+     * @return an {@link Optional} containing the value, or empty if absent
+     */
+    public Optional<SubGroups> subGroups() {
+        return Optional.ofNullable(subGroups);
+    }
+
+    /**
+     * A parsed {@code DefaultSubGroup} object.
+     */
+    public static final class DefaultSubGroup {
+        private final String id;
+        private final Subject subject;
+
+        private DefaultSubGroup(String id, Subject subject) {
+            this.id = id;
+            this.subject = subject;
+        }
+
+        /**
+         * Returns the {@code id} field.
+         *
+         * @return an {@link Optional} containing the value, or empty if absent
+         */
+        public Optional<String> id() {
+            return Optional.ofNullable(id);
+        }
+
+        /**
+         * Returns the {@code subject} field.
+         *
+         * @return an {@link Optional} containing the value, or empty if absent
+         */
+        public Optional<Subject> subject() {
+            return Optional.ofNullable(subject);
+        }
+
+        /**
+         * A parsed {@code Subject} object.
+         */
+        public static final class Subject {
+            private final String value;
+            private final Long creationTime;
+
+            private Subject(String value, Long creationTime) {
+                this.value = value;
+                this.creationTime = creationTime;
+            }
+
+            /**
+             * Returns the {@code value} field.
+             *
+             * @return an {@link Optional} containing the value, or empty if absent
+             */
+            public Optional<String> value() {
+                return Optional.ofNullable(value);
+            }
+
+            /**
+             * Returns the {@code creation_time} field.
+             *
+             * @return an {@link Optional} containing the value as an {@link Instant}, or empty if absent
+             */
+            public Optional<Instant> creationTime() {
+                return Optional.ofNullable(creationTime).map(Instant::ofEpochSecond);
+            }
+
+            /**
+             * Parses a {@code Subject} from the given JSON object.
+             *
+             * @param obj the JSON object to parse
+             * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+             */
+            static Optional<Subject> of(JSONObject obj) {
+                if (obj == null) {
+                    return Optional.empty();
+                }
+
+                var value = obj.getString("value");
+                var creationTime = obj.getLong("creation_time");
+                return Optional.of(new Subject(value, creationTime));
+            }
+
+            /**
+             * Parses a list of {@code Subject} from the given JSON array.
+             *
+             * @param arr the JSON array to parse
+             * @return the list of parsed results, empty if {@code arr} is {@code null}
+             */
+            static List<Subject> ofArray(JSONArray arr) {
+                if (arr == null) {
+                    return List.of();
+                }
+
+                var result = new ArrayList<Subject>(arr.size());
+                for (var i = 0; i < arr.size(); i++) {
+                    of(arr.getJSONObject(i)).ifPresent(result::add);
+                }
+                return result;
+            }
+        }
+
+        /**
+         * Parses a {@code DefaultSubGroup} from the given JSON object.
+         *
+         * @param obj the JSON object to parse
+         * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+         */
+        static Optional<DefaultSubGroup> of(JSONObject obj) {
+            if (obj == null) {
+                return Optional.empty();
+            }
+
+            var id = obj.getString("id");
+            var subject = Subject.of(obj.getJSONObject("subject")).orElse(null);
+            return Optional.of(new DefaultSubGroup(id, subject));
+        }
+
+        /**
+         * Parses a list of {@code DefaultSubGroup} from the given JSON array.
+         *
+         * @param arr the JSON array to parse
+         * @return the list of parsed results, empty if {@code arr} is {@code null}
+         */
+        static List<DefaultSubGroup> ofArray(JSONArray arr) {
+            if (arr == null) {
+                return List.of();
+            }
+
+            var result = new ArrayList<DefaultSubGroup>(arr.size());
+            for (var i = 0; i < arr.size(); i++) {
+                of(arr.getJSONObject(i)).ifPresent(result::add);
+            }
+            return result;
+        }
+    }
+
+    /**
+     * A parsed {@code SubGroups} object.
+     */
+    public static final class SubGroups {
+        private final List<Edges> edges;
+
+        private SubGroups(List<Edges> edges) {
+            this.edges = edges;
+        }
+
+        /**
+         * Returns the {@code edges} field.
+         *
+         * @return the list of values, empty if absent
+         */
+        public List<Edges> edges() {
+            return edges;
+        }
+
+        /**
+         * A parsed {@code Edges} object.
+         */
+        public static final class Edges {
+            private final Node node;
+
+            private Edges(Node node) {
+                this.node = node;
+            }
+
+            /**
+             * Returns the {@code node} field.
+             *
+             * @return an {@link Optional} containing the value, or empty if absent
+             */
+            public Optional<Node> node() {
+                return Optional.ofNullable(node);
+            }
+
+            /**
+             * A parsed {@code Node} object.
+             */
+            public static final class Node {
+                private final String id;
+                private final Subject subject;
+                private final Properties properties;
+                private final MembershipApprovalRequests membershipApprovalRequests;
+
+                private Node(String id, Subject subject, Properties properties, MembershipApprovalRequests membershipApprovalRequests) {
+                    this.id = id;
+                    this.subject = subject;
+                    this.properties = properties;
+                    this.membershipApprovalRequests = membershipApprovalRequests;
+                }
+
+                /**
+                 * Returns the {@code id} field.
+                 *
+                 * @return an {@link Optional} containing the value, or empty if absent
+                 */
+                public Optional<String> id() {
+                    return Optional.ofNullable(id);
+                }
+
+                /**
+                 * Returns the {@code subject} field.
+                 *
+                 * @return an {@link Optional} containing the value, or empty if absent
+                 */
+                public Optional<Subject> subject() {
+                    return Optional.ofNullable(subject);
+                }
+
+                /**
+                 * Returns the {@code properties} field.
+                 *
+                 * @return an {@link Optional} containing the value, or empty if absent
+                 */
+                public Optional<Properties> properties() {
+                    return Optional.ofNullable(properties);
+                }
+
+                /**
+                 * Returns the {@code membership_approval_requests} field.
+                 *
+                 * @return an {@link Optional} containing the value, or empty if absent
+                 */
+                public Optional<MembershipApprovalRequests> membershipApprovalRequests() {
+                    return Optional.ofNullable(membershipApprovalRequests);
+                }
+
+                /**
+                 * A parsed {@code Subject} object.
+                 */
+                public static final class Subject {
+                    private final String value;
+                    private final Long creationTime;
+
+                    private Subject(String value, Long creationTime) {
+                        this.value = value;
+                        this.creationTime = creationTime;
+                    }
+
+                    /**
+                     * Returns the {@code value} field.
+                     *
+                     * @return an {@link Optional} containing the value, or empty if absent
+                     */
+                    public Optional<String> value() {
+                        return Optional.ofNullable(value);
+                    }
+
+                    /**
+                     * Returns the {@code creation_time} field.
+                     *
+                     * @return an {@link Optional} containing the value as an {@link Instant}, or empty if absent
+                     */
+                    public Optional<Instant> creationTime() {
+                        return Optional.ofNullable(creationTime).map(Instant::ofEpochSecond);
+                    }
+
+                    /**
+                     * Parses a {@code Subject} from the given JSON object.
+                     *
+                     * @param obj the JSON object to parse
+                     * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+                     */
+                    static Optional<Subject> of(JSONObject obj) {
+                        if (obj == null) {
+                            return Optional.empty();
+                        }
+
+                        var value = obj.getString("value");
+                        var creationTime = obj.getLong("creation_time");
+                        return Optional.of(new Subject(value, creationTime));
+                    }
+
+                    /**
+                     * Parses a list of {@code Subject} from the given JSON array.
+                     *
+                     * @param arr the JSON array to parse
+                     * @return the list of parsed results, empty if {@code arr} is {@code null}
+                     */
+                    static List<Subject> ofArray(JSONArray arr) {
+                        if (arr == null) {
+                            return List.of();
+                        }
+
+                        var result = new ArrayList<Subject>(arr.size());
+                        for (var i = 0; i < arr.size(); i++) {
+                            of(arr.getJSONObject(i)).ifPresent(result::add);
+                        }
+                        return result;
+                    }
+                }
+
+                /**
+                 * A parsed {@code Properties} object.
+                 */
+                public static final class Properties {
+                    private final String generalChat;
+                    private final Boolean membershipApprovalModeEnabled;
+                    private final String hiddenGroup;
+
+                    private Properties(String generalChat, Boolean membershipApprovalModeEnabled, String hiddenGroup) {
+                        this.generalChat = generalChat;
+                        this.membershipApprovalModeEnabled = membershipApprovalModeEnabled;
+                        this.hiddenGroup = hiddenGroup;
+                    }
+
+                    /**
+                     * Returns the {@code general_chat} field.
+                     *
+                     * @return an {@link Optional} containing the value, or empty if absent
+                     */
+                    public Optional<String> generalChat() {
+                        return Optional.ofNullable(generalChat);
+                    }
+
+                    /**
+                     * Returns the {@code membership_approval_mode_enabled} field.
+                     *
+                     * @return {@code true} if the value is present and true, {@code false} otherwise
+                     */
+                    public boolean membershipApprovalModeEnabled() {
+                        return membershipApprovalModeEnabled != null && membershipApprovalModeEnabled;
+                    }
+
+                    /**
+                     * Returns the {@code hidden_group} field.
+                     *
+                     * @return an {@link Optional} containing the value, or empty if absent
+                     */
+                    public Optional<String> hiddenGroup() {
+                        return Optional.ofNullable(hiddenGroup);
+                    }
+
+                    /**
+                     * Parses a {@code Properties} from the given JSON object.
+                     *
+                     * @param obj the JSON object to parse
+                     * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+                     */
+                    static Optional<Properties> of(JSONObject obj) {
+                        if (obj == null) {
+                            return Optional.empty();
+                        }
+
+                        var generalChat = obj.getString("general_chat");
+                        var membershipApprovalModeEnabled = obj.getBoolean("membership_approval_mode_enabled");
+                        var hiddenGroup = obj.getString("hidden_group");
+                        return Optional.of(new Properties(generalChat, membershipApprovalModeEnabled, hiddenGroup));
+                    }
+
+                    /**
+                     * Parses a list of {@code Properties} from the given JSON array.
+                     *
+                     * @param arr the JSON array to parse
+                     * @return the list of parsed results, empty if {@code arr} is {@code null}
+                     */
+                    static List<Properties> ofArray(JSONArray arr) {
+                        if (arr == null) {
+                            return List.of();
+                        }
+
+                        var result = new ArrayList<Properties>(arr.size());
+                        for (var i = 0; i < arr.size(); i++) {
+                            of(arr.getJSONObject(i)).ifPresent(result::add);
+                        }
+                        return result;
+                    }
+                }
+
+                /**
+                 * A parsed {@code MembershipApprovalRequests} object.
+                 */
+                public static final class MembershipApprovalRequests {
+                    private final Long totalCount;
+
+                    private MembershipApprovalRequests(Long totalCount) {
+                        this.totalCount = totalCount;
+                    }
+
+                    /**
+                     * Returns the {@code total_count} field.
+                     *
+                     * @return an {@link OptionalLong} containing the value, or empty if absent
+                     */
+                    public OptionalLong totalCount() {
+                        return totalCount != null ? OptionalLong.of(totalCount) : OptionalLong.empty();
+                    }
+
+                    /**
+                     * Parses a {@code MembershipApprovalRequests} from the given JSON object.
+                     *
+                     * @param obj the JSON object to parse
+                     * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+                     */
+                    static Optional<MembershipApprovalRequests> of(JSONObject obj) {
+                        if (obj == null) {
+                            return Optional.empty();
+                        }
+
+                        var totalCount = obj.getLong("total_count");
+                        return Optional.of(new MembershipApprovalRequests(totalCount));
+                    }
+
+                    /**
+                     * Parses a list of {@code MembershipApprovalRequests} from the given JSON array.
+                     *
+                     * @param arr the JSON array to parse
+                     * @return the list of parsed results, empty if {@code arr} is {@code null}
+                     */
+                    static List<MembershipApprovalRequests> ofArray(JSONArray arr) {
+                        if (arr == null) {
+                            return List.of();
+                        }
+
+                        var result = new ArrayList<MembershipApprovalRequests>(arr.size());
+                        for (var i = 0; i < arr.size(); i++) {
+                            of(arr.getJSONObject(i)).ifPresent(result::add);
+                        }
+                        return result;
+                    }
+                }
+
+                /**
+                 * Parses a {@code Node} from the given JSON object.
+                 *
+                 * @param obj the JSON object to parse
+                 * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+                 */
+                static Optional<Node> of(JSONObject obj) {
+                    if (obj == null) {
+                        return Optional.empty();
+                    }
+
+                    var id = obj.getString("id");
+                    var subject = Subject.of(obj.getJSONObject("subject")).orElse(null);
+                    var properties = Properties.of(obj.getJSONObject("properties")).orElse(null);
+                    var membershipApprovalRequests = MembershipApprovalRequests.of(obj.getJSONObject("membership_approval_requests")).orElse(null);
+                    return Optional.of(new Node(id, subject, properties, membershipApprovalRequests));
+                }
+
+                /**
+                 * Parses a list of {@code Node} from the given JSON array.
+                 *
+                 * @param arr the JSON array to parse
+                 * @return the list of parsed results, empty if {@code arr} is {@code null}
+                 */
+                static List<Node> ofArray(JSONArray arr) {
+                    if (arr == null) {
+                        return List.of();
+                    }
+
+                    var result = new ArrayList<Node>(arr.size());
+                    for (var i = 0; i < arr.size(); i++) {
+                        of(arr.getJSONObject(i)).ifPresent(result::add);
+                    }
+                    return result;
+                }
+            }
+
+            /**
+             * Parses a {@code Edges} from the given JSON object.
+             *
+             * @param obj the JSON object to parse
+             * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+             */
+            static Optional<Edges> of(JSONObject obj) {
+                if (obj == null) {
+                    return Optional.empty();
+                }
+
+                var node = Node.of(obj.getJSONObject("node")).orElse(null);
+                return Optional.of(new Edges(node));
+            }
+
+            /**
+             * Parses a list of {@code Edges} from the given JSON array.
+             *
+             * @param arr the JSON array to parse
+             * @return the list of parsed results, empty if {@code arr} is {@code null}
+             */
+            static List<Edges> ofArray(JSONArray arr) {
+                if (arr == null) {
+                    return List.of();
+                }
+
+                var result = new ArrayList<Edges>(arr.size());
+                for (var i = 0; i < arr.size(); i++) {
+                    of(arr.getJSONObject(i)).ifPresent(result::add);
+                }
+                return result;
+            }
+        }
+
+        /**
+         * Parses a {@code SubGroups} from the given JSON object.
+         *
+         * @param obj the JSON object to parse
+         * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+         */
+        static Optional<SubGroups> of(JSONObject obj) {
+            if (obj == null) {
+                return Optional.empty();
+            }
+
+            var edges = Edges.ofArray(obj.getJSONArray("edges"));
+            return Optional.of(new SubGroups(edges));
+        }
+
+        /**
+         * Parses a list of {@code SubGroups} from the given JSON array.
+         *
+         * @param arr the JSON array to parse
+         * @return the list of parsed results, empty if {@code arr} is {@code null}
+         */
+        static List<SubGroups> ofArray(JSONArray arr) {
+            if (arr == null) {
+                return List.of();
+            }
+
+            var result = new ArrayList<SubGroups>(arr.size());
+            for (var i = 0; i < arr.size(); i++) {
+                of(arr.getJSONObject(i)).ifPresent(result::add);
+            }
+            return result;
+        }
+    }
+
+    private static Optional<FetchAllSubgroupsMexResponse> of(byte[] json) {
+        var jsonObject = JSON.parseObject(json);
+        if (jsonObject == null) {
+            return Optional.empty();
+        }
+
+        var data = jsonObject.getJSONObject("data");
+        if (data == null) {
+            return Optional.empty();
+        }
+
+        var root = data.getJSONObject("xwa2_group_query_by_id");
+        if (root == null) {
+            return Optional.empty();
+        }
+
+        var id = root.getString("id");
+        var defaultSubGroup = DefaultSubGroup.of(root.getJSONObject("default_sub_group")).orElse(null);
+        var subGroups = SubGroups.of(root.getJSONObject("sub_groups")).orElse(null);
+
+        return Optional.of(new FetchAllSubgroupsMexResponse(id, defaultSubGroup, subGroups));
+    }
+}

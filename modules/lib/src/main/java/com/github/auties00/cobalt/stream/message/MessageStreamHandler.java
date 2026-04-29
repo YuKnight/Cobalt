@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.stream.message;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.exception.WhatsAppMessageException;
+import com.github.auties00.cobalt.message.MessageEncryptionType;
 import com.github.auties00.cobalt.message.MessageService;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
@@ -23,6 +24,7 @@ import com.github.auties00.cobalt.model.message.system.ProtocolMessageBuilder;
 import com.github.auties00.cobalt.model.message.system.appstate.*;
 import com.github.auties00.cobalt.model.message.system.peer.PeerDataOperationRequestResponseMessage;
 import com.github.auties00.cobalt.model.message.system.peer.PeerDataOperationRequestType;
+import com.github.auties00.cobalt.model.message.text.CommentMessage;
 import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
 import com.github.auties00.cobalt.model.payment.OrphanPaymentNotificationBuilder;
 import com.github.auties00.cobalt.model.payment.PaymentInfo;
@@ -36,7 +38,7 @@ import com.github.auties00.cobalt.sync.SnapshotRecoveryService;
 import com.github.auties00.cobalt.sync.WebAppStateService;
 import com.github.auties00.cobalt.sync.WebHistorySyncService;
 import com.github.auties00.cobalt.sync.key.SyncKeyRotationService;
-import com.github.auties00.cobalt.wam.WamMsgUtils;
+import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.IncomingMessageDropEventBuilder;
 import com.github.auties00.cobalt.wam.event.MdBadDeviceSentMessageEventBuilder;
 import com.github.auties00.cobalt.wam.event.MessageHighRetryCountEventBuilder;
@@ -226,6 +228,11 @@ public final class MessageStreamHandler implements SocketStream.Handler {
     private final WebHistorySyncService webHistorySyncService;
 
     /**
+     * The WAM telemetry service used to commit incoming-message-related events.
+     */
+    private final WamService wamService;
+
+    /**
      * Constructs a new message stream handler with the specified
      * dependencies.
      *
@@ -235,6 +242,7 @@ public final class MessageStreamHandler implements SocketStream.Handler {
      * @param webAppStateService      the web app state service (provides
      *                                the sync key rotation service)
      * @param lidMigrationService     the LID migration service
+     * @param wamService              the WAM telemetry service for committing inbound message events
      * @implNote ADAPTED: constructor-based DI instead of module-level
      * imports.  The handler only depends on the key rotation service
      * exposed by WebAppStateService; the parameter type is kept as
@@ -245,7 +253,8 @@ public final class MessageStreamHandler implements SocketStream.Handler {
             MessageService messageService,
             SnapshotRecoveryService snapshotRecoveryService,
             WebAppStateService webAppStateService,
-            LidMigrationService lidMigrationService
+            LidMigrationService lidMigrationService,
+            WamService wamService
     ) {
         this.whatsapp = whatsapp;
         this.messageService = Objects.requireNonNull(messageService, "messageService cannot be null");
@@ -253,7 +262,8 @@ public final class MessageStreamHandler implements SocketStream.Handler {
         this.snapshotRecoveryService = Objects.requireNonNull(snapshotRecoveryService, "snapshotRecoveryService cannot be null");
         this.syncKeyRotationService = Objects.requireNonNull(webAppStateService, "webAppStateService cannot be null").syncKeyRotationService();
         this.lidMigrationService = Objects.requireNonNull(lidMigrationService, "lidMigrationService cannot be null");
-        this.webHistorySyncService = new WebHistorySyncService(whatsapp, lidMigrationService);
+        this.wamService = Objects.requireNonNull(wamService, "wamService cannot be null");
+        this.webHistorySyncService = new WebHistorySyncService(whatsapp, lidMigrationService, wamService);
     }
 
     /**
@@ -422,7 +432,7 @@ public final class MessageStreamHandler implements SocketStream.Handler {
             // WAWebHandleNewsletterMsgLogger.handleNewsletterMsgError: fires
             // IncomingMessageDropWamEvent with messageDropReason = INVALID_PROTOBUF and
             // e2eDestination = CHANNEL whenever a newsletter message fails MessageValidationError.
-            whatsapp.wamService().commit(new IncomingMessageDropEventBuilder()
+            wamService.commit(new IncomingMessageDropEventBuilder()
                     .messageDropReason(MessageDropReasonType.INVALID_PROTOBUF)
                     .e2eDestination(E2eDestination.CHANNEL)
                     .build());
@@ -504,11 +514,11 @@ public final class MessageStreamHandler implements SocketStream.Handler {
      *   <li>{@code retryCount}: the new retry attempt number.</li>
      *   <li>{@code messageType}: normalised from the parser-level
      *       stanza type via
-     *       {@link WamMsgUtils#getWamMessageTypeFromStanzaType(
+     *       {@link WamService#getWamMessageTypeFromStanzaType(
      *       com.github.auties00.cobalt.message.receive.stanza.MessageType)}.</li>
      *   <li>{@code e2eSenderType}: classification of the sender JID
      *       relative to the current account, computed by
-     *       {@link WamMsgUtils#getWamE2eSenderType(Jid, Jid)}.</li>
+     *       {@link WamService#getWamE2eSenderType(Jid, Jid)}.</li>
      *   <li>{@code encryptionType}: forced to
      *       {@link EncryptionTypeCode#COEX} when the sender JID is on a
      *       hosted server, mirroring WA Web's
@@ -543,11 +553,11 @@ public final class MessageStreamHandler implements SocketStream.Handler {
 
         var builder = new MessageHighRetryCountEventBuilder()
                 .retryCount(retryCount) // WAWebPostMessageHighRetryCountMetric: retryCount: t
-                .messageType(WamMsgUtils.getWamMessageTypeFromStanzaType(stanza.messageType())); // WAWebPostMessageHighRetryCountMetric: messageType: getMessageTypeFromMsgInfoType(n.type)
+                .messageType(wamService.getWamMessageTypeFromStanzaType(stanza.messageType())); // WAWebPostMessageHighRetryCountMetric: messageType: getMessageTypeFromMsgInfoType(n.type)
 
         // WAWebPostMessageHighRetryCountMetric: var a = getWamE2eSenderType(n.author); a != null && (r.e2eSenderType = a);
         var selfJid = whatsapp.store().jid().orElse(null);
-        var senderType = WamMsgUtils.getWamE2eSenderType(stanza.senderJid(), selfJid);
+        var senderType = wamService.getWamE2eSenderType(stanza.senderJid(), selfJid);
         if (senderType != null) {
             builder.e2eSenderType(senderType);
         }
@@ -561,7 +571,7 @@ public final class MessageStreamHandler implements SocketStream.Handler {
         // WAWebWamGroupMetricCache.getGroupMetrics which Cobalt does not track; WA Web also
         // skips the field when the cached metric is absent, so omission is parity-preserving.
 
-        whatsapp.wamService().commit(builder.build());
+        wamService.commit(builder.build());
     }
 
     /**
@@ -584,10 +594,10 @@ public final class MessageStreamHandler implements SocketStream.Handler {
      *       and {@code vote}) via
      *       {@link #mapEncMediaTypeToWamMediaType(String, String, String)}.</li>
      *   <li>{@code messageType}: from
-     *       {@link WamMsgUtils#getWamMessageTypeFromStanzaType(com.github.auties00.cobalt.message.receive.stanza.MessageType)}
+     *       {@link WamService#getWamMessageTypeFromStanzaType(com.github.auties00.cobalt.message.receive.stanza.MessageType)}
      *       when non-null (mirroring WA Web's null-guarded assignment).</li>
      *   <li>{@code e2eSenderType}: from
-     *       {@link WamMsgUtils#getWamE2eSenderType(Jid, Jid)} when
+     *       {@link WamService#getWamE2eSenderType(Jid, Jid)} when
      *       non-null.</li>
      *   <li>{@code encryptionType}: {@link EncryptionTypeCode#COEX} when
      *       the sender JID is on a hosted server.</li>
@@ -647,14 +657,14 @@ public final class MessageStreamHandler implements SocketStream.Handler {
         }
 
         // WAWebMaybePostOfflineCountTooHighMetric: var c = getMessageTypeFromMsgInfoType(a.type); c != null && (u.messageType = c);
-        var messageType = WamMsgUtils.getWamMessageTypeFromStanzaType(stanza.messageType());
+        var messageType = wamService.getWamMessageTypeFromStanzaType(stanza.messageType());
         if (messageType != null) {
             builder.messageType(messageType);
         }
 
         // WAWebMaybePostOfflineCountTooHighMetric: var m = getWamE2eSenderType(d = getFrom(a)); m != null && (u.e2eSenderType = m);
         var selfJid = whatsapp.store().jid().orElse(null);
-        var senderType = WamMsgUtils.getWamE2eSenderType(stanza.senderJid(), selfJid);
+        var senderType = wamService.getWamE2eSenderType(stanza.senderJid(), selfJid);
         if (senderType != null) {
             builder.e2eSenderType(senderType);
         }
@@ -665,7 +675,7 @@ public final class MessageStreamHandler implements SocketStream.Handler {
         }
 
         // WAWebMaybePostOfflineCountTooHighMetric: u.commitAndWaitForFlush().catch(...)
-        whatsapp.wamService().commit(builder.build());
+        wamService.commit(builder.build());
     }
 
     /**
@@ -791,7 +801,7 @@ public final class MessageStreamHandler implements SocketStream.Handler {
             builder.offline(false);
         }
 
-        whatsapp.wamService().commit(builder.build());
+        wamService.commit(builder.build());
     }
 
     /**
@@ -815,7 +825,7 @@ public final class MessageStreamHandler implements SocketStream.Handler {
     private void emitUnknownStanzaMetric(Node node) {
         // WAWebPostUnknownStanzaMetric: unknownStanzaTag = e.tag
         // WAWebPostUnknownStanzaMetric: unknownStanzaType = e.attrs.type?.toString()
-        whatsapp.wamService().commit(new UnknownStanzaEventBuilder()
+        wamService.commit(new UnknownStanzaEventBuilder()
                 .unknownStanzaTag(node.description())
                 .unknownStanzaType(node.getAttributeAsString("type", null))
                 .build());
@@ -923,7 +933,7 @@ public final class MessageStreamHandler implements SocketStream.Handler {
         // MessageValidationError. Cobalt does not track an e2eFailureReason on its
         // exception hierarchy today, so the field is left absent.
 
-        whatsapp.wamService().commit(builder.build());
+        wamService.commit(builder.build());
     }
 
     /**
@@ -989,7 +999,7 @@ public final class MessageStreamHandler implements SocketStream.Handler {
         };
 
         // WAWebHandleMsgError.DeviceSentMessageError
-        whatsapp.wamService().commit(new MdBadDeviceSentMessageEventBuilder()
+        wamService.commit(new MdBadDeviceSentMessageEventBuilder()
                 .peerType(peerType)
                 .dsmError(dsmError)
                 .build());
@@ -1042,11 +1052,11 @@ public final class MessageStreamHandler implements SocketStream.Handler {
     ) {
         var builder = new MessageReceiveEventBuilder();
 
-        // WAWebLogReceivedMessages: messageType: WAWebWamMsgUtils.getWamMessageType(e)
-        builder.messageType(WamMsgUtils.getWamMessageType(info));
+        // WAWebLogReceivedMessages: messageType: WAWebwamService.getWamMessageType(e)
+        builder.messageType(wamService.getWamMessageType(info));
 
-        // WAWebLogReceivedMessages: messageMediaType: WAWebWamMsgUtils.getWamMediaType(e)
-        builder.messageMediaType(WamMsgUtils.getWamMediaType(info));
+        // WAWebLogReceivedMessages: messageMediaType: WAWebwamService.getWamMediaType(e)
+        builder.messageMediaType(wamService.getWamMediaType(info));
 
         // WAWebLogReceivedMessages: messageIsOffline: d != null (d = offline)
         builder.messageIsOffline(stanza.isOffline());
@@ -1095,7 +1105,7 @@ public final class MessageStreamHandler implements SocketStream.Handler {
         }
 
         // WAWebLogReceivedMessages: isAComment: WAWebMsgGetters.getType(e) === MSG_TYPE.COMMENT
-        builder.isAComment(info.message().content() instanceof com.github.auties00.cobalt.model.message.text.CommentMessage);
+        builder.isAComment(info.message().content() instanceof CommentMessage);
 
         // WAWebLogReceivedMessages: chatOrigins: LID_CTWA when a.isLid() else OTHERS
         builder.chatOrigins(stanza.chatJid().hasLidServer()
@@ -1125,9 +1135,9 @@ public final class MessageStreamHandler implements SocketStream.Handler {
         builder.messageReceiveT1(Instant.ofEpochMilli(0));
         builder.messageReceiveT2(Instant.ofEpochMilli(0));
 
-        // WAWebLogReceivedMessages: e2eSenderType: WAWebWamMsgUtils.getWamE2eSenderType(senderWithDevice)
+        // WAWebLogReceivedMessages: e2eSenderType: WAWebwamService.getWamE2eSenderType(senderWithDevice)
         var selfJid = whatsapp.store().jid().orElse(null);
-        var senderType = WamMsgUtils.getWamE2eSenderType(stanza.senderJid(), selfJid);
+        var senderType = wamService.getWamE2eSenderType(stanza.senderJid(), selfJid);
         if (senderType != null) {
             builder.e2eSenderType(senderType);
         }
@@ -1154,7 +1164,7 @@ public final class MessageStreamHandler implements SocketStream.Handler {
         // "local" variant is the worker-side decision. The builder leaves localAddressingMode
         // absent when Cobalt has no independent source, matching WA Web when that argument is null.
 
-        whatsapp.wamService().commit(builder.build());
+        wamService.commit(builder.build());
     }
 
     /**
@@ -1260,7 +1270,7 @@ public final class MessageStreamHandler implements SocketStream.Handler {
         // those helpers, and WA Web also omits the field when its helpers yield null/undefined, so
         // the emission leaves messageClassAttributes absent rather than fabricating a partial JSON.
 
-        whatsapp.wamService().commit(builder.build());
+        wamService.commit(builder.build());
     }
 
     /**
@@ -1294,10 +1304,10 @@ public final class MessageStreamHandler implements SocketStream.Handler {
 
         // WAWebLogReceivedMessages: messageType resolves to CHANNEL for newsletter JIDs via the isNewsletter branch
         var parent = info.key().parentJid().orElse(null);
-        builder.messageType(WamMsgUtils.getWamMessageType(parent));
+        builder.messageType(wamService.getWamMessageType(parent));
 
-        // WAWebLogReceivedMessages: messageMediaType: WAWebWamMsgUtils.getWamMediaType(e)
-        builder.messageMediaType(WamMsgUtils.getWamMediaType(info.message()));
+        // WAWebLogReceivedMessages: messageMediaType: WAWebwamService.getWamMediaType(e)
+        builder.messageMediaType(wamService.getWamMediaType(info.message()));
 
         // WAWebLogReceivedMessages: messageIsOffline: d != null (the newsletter call site passes
         // the offline argument straight through, so false here matches the default)
@@ -1323,7 +1333,7 @@ public final class MessageStreamHandler implements SocketStream.Handler {
         builder.messageReceiveT1(Instant.ofEpochMilli(0));
         builder.messageReceiveT2(Instant.ofEpochMilli(0));
 
-        whatsapp.wamService().commit(builder.build());
+        wamService.commit(builder.build());
     }
 
     /**
@@ -1590,7 +1600,7 @@ public final class MessageStreamHandler implements SocketStream.Handler {
     }
 
     /**
-     * Maps a {@link com.github.auties00.cobalt.message.MessageEncryptionType}
+     * Maps a {@link MessageEncryptionType}
      * to the corresponding WAM {@link E2eCiphertextType}.
      *
      * @param type the Signal ciphertext type
@@ -1603,7 +1613,7 @@ public final class MessageStreamHandler implements SocketStream.Handler {
     @WhatsAppWebExport(moduleName = "WAWebBackendJobsCommon", exports = "getMetricE2eCiphertextType",
             adaptation = WhatsAppAdaptation.DIRECT)
     private static E2eCiphertextType mapCiphertextTypeForDrop(
-            com.github.auties00.cobalt.message.MessageEncryptionType type
+            MessageEncryptionType type
     ) {
         return switch (type) {
             case MSG -> E2eCiphertextType.MESSAGE;
@@ -2389,7 +2399,7 @@ public final class MessageStreamHandler implements SocketStream.Handler {
             // WAWebNonMessageDataRequestHandler.c: catch branch emits
             // logNonMessagePeerDataResponse(COMPANION_SYNCD_SNAPSHOT_FATAL_RECOVERY, t, 0,0,0,1,0)
             // when the initial snapshot-recovery handling throws; errorCount=1.
-            whatsapp.wamService().commit(new NonMessagePeerDataOperationResponseEventBuilder()
+            wamService.commit(new NonMessagePeerDataOperationResponseEventBuilder()
                     .peerDataRequestType(PeerDataRequestType.SYNCD_SNAPSHOT_RECOVERY)
                     .peerDataRequestSessionId(sessionId)
                     .peerDataResponseCount(0)
@@ -2408,7 +2418,7 @@ public final class MessageStreamHandler implements SocketStream.Handler {
         // WAWebNonMessageDataRequestHandler.m: success path emits
         // logNonMessagePeerDataResponse(COMPANION_SYNCD_SNAPSHOT_FATAL_RECOVERY, t, 1,1,1,0,0)
         // after resolveRecoveryPromise; responseCount=1, successResponseCount=1, successProcessCount=1.
-        whatsapp.wamService().commit(new NonMessagePeerDataOperationResponseEventBuilder()
+        wamService.commit(new NonMessagePeerDataOperationResponseEventBuilder()
                 .peerDataRequestType(PeerDataRequestType.SYNCD_SNAPSHOT_RECOVERY)
                 .peerDataRequestSessionId(sessionId)
                 .peerDataResponseCount(1)

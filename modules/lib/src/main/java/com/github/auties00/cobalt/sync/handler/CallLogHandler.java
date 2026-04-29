@@ -15,6 +15,7 @@ import com.github.auties00.cobalt.model.sync.action.call.CallLogAction;
 import com.github.auties00.cobalt.model.sync.action.call.CallLogActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 import com.alibaba.fastjson2.JSON;
 
@@ -120,8 +121,8 @@ public final class CallLogHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebCallLogSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebCallLogSync.applyMutations
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebCallLogSync.applyMutations
     }
 
     /**
@@ -162,7 +163,7 @@ public final class CallLogHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebCallLogSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         try { // WAWebCallLogSync.applyMutations: try/catch wrapping per-mutation logic
             if (mutation.operation() == SyncdOperation.SET) { // WAWebCallLogSync.applyMutations: if (e.operation === "set")
                 if (!(mutation.value().action().orElse(null) instanceof CallLogAction action)) { // WAWebCallLogSync.applyMutations: var n = e.value, s = (t = n.callLogAction) != null ? t : {}

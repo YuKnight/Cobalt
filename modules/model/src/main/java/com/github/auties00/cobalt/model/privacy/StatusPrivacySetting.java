@@ -1,37 +1,94 @@
 package com.github.auties00.cobalt.model.privacy;
 
 import com.github.auties00.cobalt.model.jid.Jid;
+import it.auties.protobuf.annotation.ProtobufMessage;
+import it.auties.protobuf.annotation.ProtobufProperty;
+import it.auties.protobuf.model.ProtobufType;
 
-import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
+import java.util.Optional;
 
 /**
- * Describes the user's Status privacy configuration as exposed by the
- * WhatsApp server over the {@code xmlns="status"} IQ stanza.
+ * The local user's Status privacy configuration: who can and who cannot see
+ * the 24-hour Status updates the user posts.
  *
- * <p>The DTO pairs a {@link StatusPrivacyMode} with the optional JID list
- * applied in allow/deny mode. The list is empty for
- * {@link StatusPrivacyMode#CONTACTS}.
+ * <p>Pairs a {@link StatusPrivacyMode} (the audience selector) with the
+ * companion JID list whose meaning depends on the mode:
+ * {@link StatusPrivacyMode#WHITELIST} treats it as the allowlist,
+ * {@link StatusPrivacyMode#CONTACTS_EXCEPT} treats it as the blocklist,
+ * and {@link StatusPrivacyMode#CONTACTS} ignores it (the list is empty).
  *
- * @param mode the selected distribution mode; never {@code null}
- * @param jids the JIDs applied by {@link StatusPrivacyMode#WHITELIST} or
- *             {@link StatusPrivacyMode#CONTACTS_EXCEPT}; never {@code null},
- *             unmodifiable, possibly empty
- *
- * @implNote WAWebUserPrefsStatus.getStatusPrivacySetting: returns
- * {@code {setting, list}} from user preferences. Cobalt exposes the same
- * pairing as an immutable record.
+ * <p>This DTO is the user-prefs-level view of the Status privacy setting
+ * exposed by the WhatsApp server through the {@code <iq xmlns="status">}
+ * IQ.
  */
-public record StatusPrivacySetting(StatusPrivacyMode mode, List<Jid> jids) {
+@ProtobufMessage
+public final class StatusPrivacySetting {
     /**
-     * Canonical constructor applying defensive copies and null validation.
+     * The selected distribution mode that determines how the paired JID
+     * list is interpreted (allowlist vs. blocklist vs. unused).
+     */
+    @ProtobufProperty(index = 1, type = ProtobufType.ENUM)
+    StatusPrivacyMode mode;
+
+    /**
+     * The JIDs paired with the mode: the allowlist for
+     * {@link StatusPrivacyMode#WHITELIST}, the blocklist for
+     * {@link StatusPrivacyMode#CONTACTS_EXCEPT}, and unused (empty) for
+     * {@link StatusPrivacyMode#CONTACTS}.
+     */
+    @ProtobufProperty(index = 2, type = ProtobufType.STRING)
+    List<Jid> jids;
+
+    /**
+     * Constructs a new {@code StatusPrivacySetting} with the supplied mode
+     * and paired JID list.
      *
      * @param mode the distribution mode
-     * @param jids the paired JID list, possibly empty
+     * @param jids the paired JID list; {@code null} is treated as an empty
+     *             list
      */
-    public StatusPrivacySetting {
-        Objects.requireNonNull(mode, "mode cannot be null");
-        jids = jids == null ? List.of() : Collections.unmodifiableList(List.copyOf(jids));
+    StatusPrivacySetting(StatusPrivacyMode mode, List<Jid> jids) {
+        this.mode = mode;
+        this.jids = jids == null ? List.of() : jids;
+    }
+
+    /**
+     * Returns the selected distribution mode.
+     *
+     * @return an {@code Optional} containing the mode, or empty if not set
+     */
+    public Optional<StatusPrivacyMode> mode() {
+        return Optional.ofNullable(mode);
+    }
+
+    /**
+     * Returns the JIDs paired with the mode (allowlist, blocklist, or
+     * empty depending on the mode).
+     *
+     * @return an unmodifiable list of JIDs; never {@code null}, possibly
+     *         empty
+     */
+    public List<Jid> jids() {
+        return jids;
+    }
+
+    /**
+     * Sets the selected distribution mode.
+     *
+     * @param mode the mode to set, or {@code null} to clear
+     */
+    public void setMode(StatusPrivacyMode mode) {
+        this.mode = mode;
+    }
+
+    /**
+     * Sets the JIDs paired with the mode.
+     *
+     * @param jids the JID list to set; {@code null} is treated as an empty
+     *             list
+     */
+    public void setJids(List<Jid> jids) {
+        this.jids = jids == null ? List.of() : jids;
     }
 }

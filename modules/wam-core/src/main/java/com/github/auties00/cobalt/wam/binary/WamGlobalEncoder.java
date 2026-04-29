@@ -78,7 +78,7 @@ public final class WamGlobalEncoder {
         throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
     }
 
-    // ---- mnc (3, int) ----
+    // mnc (3, int)
     /**
      * Returns the number of bytes required to encode the mobile network
      * code global.
@@ -107,7 +107,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeInt(MNC, GLOBAL, value, output, offset);
     }
 
-    // ---- mcc (5, int) ----
+    // mcc (5, int)
     /**
      * Returns the number of bytes required to encode the mobile country
      * code global.
@@ -136,7 +136,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeInt(MCC, GLOBAL, value, output, offset);
     }
 
-    // ---- generic null global ----
+    // generic null global
     /**
      * Returns the number of bytes required to encode a null global
      * entry for the given field identifier.
@@ -165,7 +165,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeNull(fieldId, GLOBAL, output, offset);
     }
 
-    // ---- platform (11, int) ----
+    // platform (11, int)
     /**
      * Returns the number of bytes required to encode the platform global.
      *
@@ -189,7 +189,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeInt(PLATFORM, GLOBAL, value, output, offset);
     }
 
-    // ---- deviceName (13, string) ----
+    // deviceName (13, string)
     /**
      * Returns the number of bytes required to encode the device name
      * global.
@@ -213,7 +213,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeString(DEVICE_NAME, GLOBAL, value, output, offset);
     }
 
-    // ---- osVersion (15, string) ----
+    // osVersion (15, string)
     /**
      * Returns the number of bytes required to encode the OS version
      * global.
@@ -237,7 +237,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeString(OS_VERSION, GLOBAL, value, output, offset);
     }
 
-    // ---- appVersion (17, string) ----
+    // appVersion (17, string)
     /**
      * Returns the number of bytes required to encode the app version
      * global.
@@ -264,7 +264,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeString(APP_VERSION, GLOBAL, value, output, offset);
     }
 
-    // ---- appIsBetaRelease (21, bool as int) ----
+    // appIsBetaRelease (21, bool as int)
     /**
      * Returns the number of bytes required to encode the app-is-beta
      * global.
@@ -288,7 +288,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeInt(APP_IS_BETA_RELEASE, GLOBAL, value ? 1 : 0, output, offset);
     }
 
-    // ---- networkIsWifi (23, bool as int) ----
+    // networkIsWifi (23, bool as int)
     /**
      * Returns the number of bytes required to encode the network-is-wifi
      * global.
@@ -312,7 +312,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeInt(NETWORK_IS_WIFI, GLOBAL, value ? 1 : 0, output, offset);
     }
 
-    // ---- commitTime (47, int) ----
+    // commitTime (47, int)
     /**
      * Returns the number of bytes required to encode the commit-time
      * global written before each event.
@@ -337,7 +337,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeInt(COMMIT_TIME, GLOBAL, epochSeconds, output, offset);
     }
 
-    // ---- browserVersion (295, string) ----
+    // browserVersion (295, string)
     /**
      * Returns the number of bytes required to encode the browser version
      * global.
@@ -361,7 +361,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeString(BROWSER_VERSION, GLOBAL, value, output, offset);
     }
 
-    // ---- webcEnv (633, int enum) ----
+    // webcEnv (633, int enum)
     /**
      * Returns the number of bytes required to encode the web client
      * environment global.
@@ -386,7 +386,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeInt(WEBC_ENV, GLOBAL, value, output, offset);
     }
 
-    // ---- memClass (655, int) ----
+    // memClass (655, int)
     /**
      * Returns the number of bytes required to encode the memory class
      * global.
@@ -410,7 +410,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeInt(MEM_CLASS, GLOBAL, value, output, offset);
     }
 
-    // ---- yearClass (689, int) ----
+    // yearClass (689, int)
     /**
      * Returns the number of bytes required to encode the year class
      * global.
@@ -439,7 +439,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeInt(YEAR_CLASS, GLOBAL, value, output, offset);
     }
 
-    // ---- webcPhonePlatform (707, int enum) ----
+    // webcPhonePlatform (707, int enum)
     /**
      * Returns the number of bytes required to encode the phone platform
      * global.
@@ -466,7 +466,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeInt(WEBC_PHONE_PLATFORM, GLOBAL, value, output, offset);
     }
 
-    // ---- browser (779, string) ----
+    // browser (779, string)
     /**
      * Returns the number of bytes required to encode the browser global.
      *
@@ -489,7 +489,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeString(BROWSER, GLOBAL, value, output, offset);
     }
 
-    // ---- webcPhoneCharging (783, bool as int) ----
+    // webcPhoneCharging (783, bool as int)
     /**
      * Returns the number of bytes required to encode the phone-charging
      * global.
@@ -513,7 +513,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeInt(WEBC_PHONE_CHARGING, GLOBAL, value ? 1 : 0, output, offset);
     }
 
-    // ---- webcPhoneDeviceManufacturer (829, string) ----
+    // webcPhoneDeviceManufacturer (829, string)
     /**
      * Returns the number of bytes required to encode the phone device
      * manufacturer global.
@@ -538,7 +538,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeString(WEBC_PHONE_DEVICE_MANUFACTURER, GLOBAL, value, output, offset);
     }
 
-    // ---- webcPhoneDeviceModel (831, string) ----
+    // webcPhoneDeviceModel (831, string)
     /**
      * Returns the number of bytes required to encode the phone device
      * model global.
@@ -563,7 +563,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeString(WEBC_PHONE_DEVICE_MODEL, GLOBAL, value, output, offset);
     }
 
-    // ---- webcPhoneOsBuildNumber (833, string) ----
+    // webcPhoneOsBuildNumber (833, string)
     /**
      * Returns the number of bytes required to encode the phone OS build
      * number global.
@@ -588,7 +588,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeString(WEBC_PHONE_OS_BUILD_NUMBER, GLOBAL, value, output, offset);
     }
 
-    // ---- webcPhoneOsVersion (835, string) ----
+    // webcPhoneOsVersion (835, string)
     /**
      * Returns the number of bytes required to encode the phone OS
      * version global.
@@ -613,7 +613,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeString(WEBC_PHONE_OS_VERSION, GLOBAL, value, output, offset);
     }
 
-    // ---- webcBucket (875, string) ----
+    // webcBucket (875, string)
     /**
      * Returns the number of bytes required to encode the web bucket
      * global.
@@ -637,7 +637,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeString(WEBC_BUCKET, GLOBAL, value, output, offset);
     }
 
-    // ---- webcWebPlatform (899, int enum) ----
+    // webcWebPlatform (899, int enum)
     /**
      * Returns the number of bytes required to encode the web platform
      * type global.
@@ -662,7 +662,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeInt(WEBC_WEB_PLATFORM, GLOBAL, value, output, offset);
     }
 
-    // ---- webcPhoneAppVersion (1005, string) ----
+    // webcPhoneAppVersion (1005, string)
     /**
      * Returns the number of bytes required to encode the phone app
      * version global.
@@ -690,7 +690,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeString(WEBC_PHONE_APP_VERSION, GLOBAL, value, output, offset);
     }
 
-    // ---- webcNativeBetaUpdates (1007, bool as int) ----
+    // webcNativeBetaUpdates (1007, bool as int)
     /**
      * Returns the number of bytes required to encode the native beta
      * updates global.
@@ -716,7 +716,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeInt(WEBC_NATIVE_BETA_UPDATES, GLOBAL, value ? 1 : 0, output, offset);
     }
 
-    // ---- webcNativeAutolaunch (1009, bool as int) ----
+    // webcNativeAutolaunch (1009, bool as int)
     /**
      * Returns the number of bytes required to encode the native
      * autolaunch global.
@@ -742,7 +742,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeInt(WEBC_NATIVE_AUTOLAUNCH, GLOBAL, value ? 1 : 0, output, offset);
     }
 
-    // ---- appBuild (1657, int enum) ----
+    // appBuild (1657, int enum)
     /**
      * Returns the number of bytes required to encode the app build type
      * global.
@@ -766,7 +766,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeInt(APP_BUILD, GLOBAL, value, output, offset);
     }
 
-    // ---- yearClass2016 (2617, int) ----
+    // yearClass2016 (2617, int)
     /**
      * Returns the number of bytes required to encode the year class 2016
      * global.
@@ -793,7 +793,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeInt(YEAR_CLASS_2016, GLOBAL, value, output, offset);
     }
 
-    // ---- datacenter (2795, string) ----
+    // datacenter (2795, string)
     /**
      * Returns the number of bytes required to encode the datacenter
      * global.
@@ -820,7 +820,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeString(DATACENTER, GLOBAL, value, output, offset);
     }
 
-    // ---- beaconSessionId (3433, int) ----
+    // beaconSessionId (3433, int)
     /**
      * Returns the number of bytes required to encode the beacon session
      * ID global written per-event when beaconing is active.
@@ -850,7 +850,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeInt(BEACON_SESSION_ID, GLOBAL, value, output, offset);
     }
 
-    // ---- streamId (3543, int) ----
+    // streamId (3543, int)
     /**
      * Returns the number of bytes required to encode the stream ID
      * global.
@@ -874,7 +874,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeInt(STREAM_ID, GLOBAL, value, output, offset);
     }
 
-    // ---- webcTabId (3727, string) ----
+    // webcTabId (3727, string)
     /**
      * Returns the number of bytes required to encode the tab ID global.
      *
@@ -897,7 +897,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeString(WEBC_TAB_ID, GLOBAL, value, output, offset);
     }
 
-    // ---- abKey2 (4473, string) ----
+    // abKey2 (4473, string)
     /**
      * Returns the number of bytes required to encode the AB key 2
      * global.
@@ -921,7 +921,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeString(AB_KEY_2, GLOBAL, value, output, offset);
     }
 
-    // ---- deviceVersion (4505, string) ----
+    // deviceVersion (4505, string)
     /**
      * Returns the number of bytes required to encode the device version
      * global.
@@ -945,7 +945,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeString(DEVICE_VERSION, GLOBAL, value, output, offset);
     }
 
-    // ---- expoKey (5029, string) ----
+    // expoKey (5029, string)
     /**
      * Returns the number of bytes required to encode the exposure key
      * global.
@@ -972,7 +972,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeString(EXPO_KEY, GLOBAL, value, output, offset);
     }
 
-    // ---- psId (6005, string) ----
+    // psId (6005, string)
     /**
      * Returns the number of bytes required to encode the private stats
      * identifier global.
@@ -1001,7 +1001,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeString(PS_ID, GLOBAL, value, output, offset);
     }
 
-    // ---- ocVersion (6251, int) ----
+    // ocVersion (6251, int)
     /**
      * Returns the number of bytes required to encode the official client
      * version global.
@@ -1026,7 +1026,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeInt(OC_VERSION, GLOBAL, value, output, offset);
     }
 
-    // ---- webcWebDeviceManufacturer (6599, string) ----
+    // webcWebDeviceManufacturer (6599, string)
     /**
      * Returns the number of bytes required to encode the web device
      * manufacturer global.
@@ -1051,7 +1051,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeString(WEBC_WEB_DEVICE_MANUFACTURER, GLOBAL, value, output, offset);
     }
 
-    // ---- webcWebDeviceModel (6601, string) ----
+    // webcWebDeviceModel (6601, string)
     /**
      * Returns the number of bytes required to encode the web device
      * model global.
@@ -1076,7 +1076,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeString(WEBC_WEB_DEVICE_MODEL, GLOBAL, value, output, offset);
     }
 
-    // ---- webcWebOsReleaseNumber (6603, string) ----
+    // webcWebOsReleaseNumber (6603, string)
     /**
      * Returns the number of bytes required to encode the web OS release
      * number global.
@@ -1101,7 +1101,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeString(WEBC_WEB_OS_RELEASE_NUMBER, GLOBAL, value, output, offset);
     }
 
-    // ---- webcWebArch (6605, string) ----
+    // webcWebArch (6605, string)
     /**
      * Returns the number of bytes required to encode the web
      * architecture global.
@@ -1126,7 +1126,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeString(WEBC_WEB_ARCH, GLOBAL, value, output, offset);
     }
 
-    // ---- psCountryCode (6833, string) ----
+    // psCountryCode (6833, string)
     /**
      * Returns the number of bytes required to encode the private stats
      * country code global.
@@ -1154,7 +1154,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeString(PS_COUNTRY_CODE, GLOBAL, value, output, offset);
     }
 
-    // ---- numCpu (10317, int) ----
+    // numCpu (10317, int)
     /**
      * Returns the number of bytes required to encode the CPU count
      * global.
@@ -1178,7 +1178,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeInt(NUM_CPU, GLOBAL, value, output, offset);
     }
 
-    // ---- serviceImprovementOptOut (13293, bool as int) ----
+    // serviceImprovementOptOut (13293, bool as int)
     /**
      * Returns the number of bytes required to encode the service
      * improvement opt-out global.
@@ -1204,7 +1204,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeInt(SERVICE_IMPROVEMENT_OPT_OUT, GLOBAL, value ? 1 : 0, output, offset);
     }
 
-    // ---- deviceClassification (14507, int) ----
+    // deviceClassification (14507, int)
     /**
      * Returns the number of bytes required to encode the device
      * classification global.
@@ -1230,7 +1230,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeInt(DEVICE_CLASSIFICATION, GLOBAL, value, output, offset);
     }
 
-    // ---- wametaLoggerTestFilter (15881, string) ----
+    // wametaLoggerTestFilter (15881, string)
     /**
      * Returns the number of bytes required to encode the WAMeta logger
      * test filter global.
@@ -1255,7 +1255,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeString(WAMETA_LOGGER_TEST_FILTER, GLOBAL, value, output, offset);
     }
 
-    // ---- webcRevision (18491, int) ----
+    // webcRevision (18491, int)
     /**
      * Returns the number of bytes required to encode the web client
      * revision global.
@@ -1280,7 +1280,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeInt(WEBC_REVISION, GLOBAL, value, output, offset);
     }
 
-    // ---- isInCohort (19129, bool as int) ----
+    // isInCohort (19129, bool as int)
     /**
      * Returns the number of bytes required to encode the is-in-cohort
      * global.
@@ -1304,7 +1304,7 @@ public final class WamGlobalEncoder {
         return WamEncoder.writeInt(IS_IN_COHORT, GLOBAL, value ? 1 : 0, output, offset);
     }
 
-    // ---- dynamic dispatch for dirty-tracking ----
+    // dynamic dispatch for dirty-tracking
     /**
      * Returns the number of bytes required to encode a global attribute
      * whose type is determined at runtime from the value's class.

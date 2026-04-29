@@ -1,0 +1,115 @@
+package com.github.auties00.cobalt.node.mex.json.group;
+
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONWriter;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
+import com.github.auties00.cobalt.node.mex.MexOperation;
+import com.github.auties00.cobalt.node.Node;
+import com.github.auties00.cobalt.node.NodeBuilder;
+import java.io.IOException;
+import java.io.StringWriter;
+import java.io.UncheckedIOException;
+import java.util.Optional;
+
+/**
+ * The parsed response for this MEX mutation.
+ */
+public final class UpdateGroupPropertyMexResponse implements MexOperation.Response.Json {
+    /**
+     * The group id echoed back by the {@code xwa2_group_update_property}
+     * payload.
+     */
+    private final String id;
+
+    /**
+     * The resulting group state reported by the relay; expected to be
+     * {@code "ACTIVE"} on success.
+     */
+    private final String state;
+
+    /**
+     * Constructs a new response from the parsed scalar fields of the
+     * {@code xwa2_group_update_property} envelope.
+     *
+     * @param id    the echoed group id, or {@code null} if absent
+     * @param state the resulting group state, or {@code null} if absent
+     */
+    private UpdateGroupPropertyMexResponse(String id, String state) {
+        this.id = id;
+        this.state = state;
+    }
+
+    /**
+     * Parses the MEX response carried by an inbound IQ stanza.
+     *
+     * @implNote WAWebMexUpdateGroupPropertyJobMutation.graphql: mirrors
+     * the compiled mutation's {@code selections} on the
+     * {@code xwa2_group_update_property} linked field, exposing the
+     * {@code id} and {@code state} scalar fields the relay returns.
+     * @param node the inbound IQ stanza carrying the {@code <result>} child
+     * @return the parsed response, or {@code Optional.empty()} if the
+     *         expected JSON shape is absent
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexUpdateGroupPropertyJobMutation.graphql", exports = "selections",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public static Optional<UpdateGroupPropertyMexResponse> of(Node node) {
+        return node.getChild("result")
+                .flatMap(Node::toContentBytes)
+                .flatMap(UpdateGroupPropertyMexResponse::of);
+    }
+
+    /**
+     * Returns the {@code id} field.
+     *
+     * @return an {@link Optional} containing the value, or empty if absent
+     */
+    public Optional<String> id() {
+        return Optional.ofNullable(id);
+    }
+
+    /**
+     * Returns the {@code state} field.
+     *
+     * @return an {@link Optional} containing the value, or empty if absent
+     */
+    public Optional<String> state() {
+        return Optional.ofNullable(state);
+    }
+
+    /**
+     * Parses the JSON payload carried by the {@code <result>} child of
+     * the inbound IQ stanza into a {@link UpdateGroupPropertyMexResponse}.
+     *
+     * @implNote WAWebMexUpdateGroupPropertyJob.mexUpdateGroupPropertyJob:
+     * mirrors the JS access pattern
+     * {@code (n = a.xwa2_group_update_property) != null ? n : {}} by
+     * returning {@link Optional#empty()} when the envelope is missing.
+     * @param json the UTF-8 encoded JSON payload
+     * @return an {@link Optional} containing the parsed response, or
+     *         empty if the {@code data.xwa2_group_update_property}
+     *         envelope is absent
+     */
+    private static Optional<UpdateGroupPropertyMexResponse> of(byte[] json) {
+        var jsonObject = JSON.parseObject(json);
+        if (jsonObject == null) {
+            return Optional.empty();
+        }
+
+        var data = jsonObject.getJSONObject("data");
+        if (data == null) {
+            return Optional.empty();
+        }
+
+        var root = data.getJSONObject("xwa2_group_update_property");
+        if (root == null) {
+            return Optional.empty();
+        }
+
+        var id = root.getString("id");
+        var state = root.getString("state");
+
+        return Optional.of(new UpdateGroupPropertyMexResponse(id, state));
+    }
+}

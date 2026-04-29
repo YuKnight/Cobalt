@@ -14,6 +14,7 @@ import com.github.auties00.cobalt.model.sync.action.privacy.PrivacySettingRelayA
 import com.github.auties00.cobalt.model.sync.action.privacy.PrivacySettingRelayAllCallsBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 import java.time.Instant;
 import java.util.List;
@@ -106,8 +107,8 @@ public final class VoipRelayAllCallsHandler implements WebAppStateActionHandler 
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebVoipRelayAllCallsSettingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: WAWebVoipRelayAllCallsSettingSync.applyMutations
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: WAWebVoipRelayAllCallsSettingSync.applyMutations
     }
 
     /**
@@ -142,7 +143,7 @@ public final class VoipRelayAllCallsHandler implements WebAppStateActionHandler 
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebVoipRelayAllCallsSettingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) { // WAWebVoipRelayAllCallsSettingSync.applyMutations: if (e.operation === "set") ... else l++, return {actionState: Unsupported}
             return MutationApplicationResult.unsupported(); // WAWebVoipRelayAllCallsSettingSync.applyMutations: {actionState: SyncActionState.Unsupported}
         }

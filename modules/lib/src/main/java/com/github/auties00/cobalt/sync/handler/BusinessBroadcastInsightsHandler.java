@@ -11,6 +11,7 @@ import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastInsightsAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -113,8 +114,8 @@ public final class BusinessBroadcastInsightsHandler implements WebAppStateAction
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBusinessBroadcastInsightsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebBusinessBroadcastInsightsSync.applyMutations
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebBusinessBroadcastInsightsSync.applyMutations
     }
 
     /**
@@ -143,7 +144,7 @@ public final class BusinessBroadcastInsightsHandler implements WebAppStateAction
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBusinessBroadcastInsightsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         try { // WAWebBusinessBroadcastInsightsSync.applyMutations: try { ... } catch(e) { return {actionState: Failed} }
             var indexArray = JSON.parseArray(mutation.index()); // ADAPTED: WAWebBusinessBroadcastInsightsSync uses e.indexParts (pre-parsed); Cobalt parses from JSON string
             var campaignId = indexArray.getString(1); // WAWebBusinessBroadcastInsightsSync.applyMutations: var n = t[1]
@@ -199,7 +200,7 @@ public final class BusinessBroadcastInsightsHandler implements WebAppStateAction
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBusinessBroadcastInsightsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public List<Boolean> applyMutationBatch(WhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
+    public List<Boolean> applyMutationBatch(WhatsAppClient client, WamService wamService, List<DecryptedMutation.Trusted> mutations) {
         // ADAPTED: WAWebBusinessBroadcastInsightsSync.applyMutations checks isBizBroadcastSendWebEnabledNoExposure()
         // and returns all Unsupported if false — Cobalt omits AB prop gating
         var malformedCount = 0; // WAWebBusinessBroadcastInsightsSync.applyMutations: var a = 0
@@ -207,7 +208,7 @@ public final class BusinessBroadcastInsightsHandler implements WebAppStateAction
         var removeCount = 0; // WAWebBusinessBroadcastInsightsSync.applyMutations: var d = 0
         var results = new ArrayList<Boolean>(mutations.size());
         for (var mutation : mutations) { // ADAPTED: WAWebBusinessBroadcastInsightsSync.applyMutations uses Promise.all(t.map(...))
-            var result = applyMutationResult(client, mutation);
+            var result = applyMutationResult(client, wamService, mutation);
             // WAWebBusinessBroadcastInsightsSync.applyMutations: `a` is incremented ONLY inside the SET branch
             // when `p` (businessBroadcastInsightsAction) is missing — i.e. malformedActionValue path.
             // The malformedActionIndex path (missing indexParts[1]) returns without bumping `a`.

@@ -17,6 +17,7 @@ import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 import com.github.auties00.cobalt.wam.event.MdBootstrapAppStateCriticalDataProcessingEventBuilder;
 import com.github.auties00.cobalt.wam.type.BootstrapAppStateDataStageCode;
+import com.github.auties00.cobalt.wam.WamService;
 
 import java.time.Instant;
 import java.util.List;
@@ -143,8 +144,8 @@ public final class PushNameSettingHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPushNameSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: WAWebPushNameSync.applyMutations
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: WAWebPushNameSync.applyMutations
     }
 
     /**
@@ -232,7 +233,7 @@ public final class PushNameSettingHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPushNameSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         // WAWebPushNameSync.applyMutations: if (e.operation === "set") { ... } i++; return {actionState: Unsupported}
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
@@ -248,7 +249,7 @@ public final class PushNameSettingHandler implements WebAppStateActionHandler {
         String name;
         if (resolvedName == null || resolvedName.isEmpty()) {
             // WAWebPushNameSync.applyMutations: _ || (a++, logCriticalBootstrapStageIfNecessary(PUSHNAME_INVALID), _ = "")
-            logCriticalBootstrapStageIfNecessary(client, BootstrapAppStateDataStageCode.PUSHNAME_INVALID);
+            logCriticalBootstrapStageIfNecessary(client, wamService, BootstrapAppStateDataStageCode.PUSHNAME_INVALID);
             name = "";
         } else {
             name = resolvedName;
@@ -284,7 +285,7 @@ public final class PushNameSettingHandler implements WebAppStateActionHandler {
         }
 
         // WAWebPushNameSync.applyMutations: yield logCriticalBootstrapStageIfNecessary(PUSHNAME_APPLIED)
-        logCriticalBootstrapStageIfNecessary(client, BootstrapAppStateDataStageCode.PUSHNAME_APPLIED);
+        logCriticalBootstrapStageIfNecessary(client, wamService, BootstrapAppStateDataStageCode.PUSHNAME_APPLIED);
 
         // NO_WA_BASIS: the following WA Web telemetry/logging is intentionally dropped:
         //   - a/i counters and the trailing WALogger.LOG/WARN calls
@@ -355,20 +356,21 @@ public final class PushNameSettingHandler implements WebAppStateActionHandler {
      * the event is gated on
      * {@code WAWebSyncBootstrap.isSyncDCriticalDataSyncInProcess()}. In Cobalt that
      * global state machine is approximated by checking whether the
-     * {@link com.github.auties00.cobalt.model.sync.SyncPatchType#CRITICAL_BLOCK}
+     * {@link SyncPatchType#CRITICAL_BLOCK}
      * collection has been bootstrapped yet, matching
      * {@link com.github.auties00.cobalt.sync.WebAppStateService}.
      *
      * @implNote WAWebSyncdCriticalBootstrapProcessingApi.logCriticalBootstrapStageIfNecessary
-     * @param client the WhatsApp client whose store is queried and whose WAM service commits the event
-     * @param stage  the bootstrap stage reached; never {@code null}
+     * @param client     the WhatsApp client whose store is queried for bootstrap state
+     * @param wamService the WAM telemetry service used to commit the bootstrap stage event
+     * @param stage      the bootstrap stage reached; never {@code null}
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdCriticalBootstrapProcessingApi", exports = "logCriticalBootstrapStageIfNecessary", adaptation = WhatsAppAdaptation.ADAPTED)
-    private void logCriticalBootstrapStageIfNecessary(WhatsAppClient client, BootstrapAppStateDataStageCode stage) {
+    private void logCriticalBootstrapStageIfNecessary(WhatsAppClient client, WamService wamService, BootstrapAppStateDataStageCode stage) {
         if (client.store().findWebAppState(SyncPatchType.CRITICAL_BLOCK).bootstrapped()) {
             return;
         }
-        client.wamService().commit(new MdBootstrapAppStateCriticalDataProcessingEventBuilder()
+        wamService.commit(new MdBootstrapAppStateCriticalDataProcessingEventBuilder()
                 .bootstrapAppStateDataStage(stage) // WAWebSyncdCriticalBootstrapProcessingApi: bootstrapAppStateDataStage: e
                 .mdTimestamp((int) System.currentTimeMillis()) // WAWebSyncdCriticalBootstrapProcessingApi: mdTimestamp: unixTimeMs()
                 .build());

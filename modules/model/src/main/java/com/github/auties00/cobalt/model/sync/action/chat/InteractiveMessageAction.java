@@ -9,6 +9,7 @@ import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
 
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Sync action that records a user's interaction with an interactive message
@@ -102,11 +103,11 @@ public final class InteractiveMessageAction implements SyncAction<InteractiveMes
      * Returns the agent-generated message identifier targeted by this
      * interaction.
      *
-     * @return an {@link java.util.Optional} containing the identifier, or an
+     * @return an {@link Optional} containing the identifier, or an
      *         empty {@code Optional} when no identifier was set
      */
-    public java.util.Optional<String> agmId() {
-        return java.util.Optional.ofNullable(agmId);
+    public Optional<String> agmId() {
+        return Optional.ofNullable(agmId);
     }
 
     /**

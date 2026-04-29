@@ -17,8 +17,10 @@ import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.ClockSkewDifferenceTEventBuilder;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 
 /**
  * Handles the {@code <success>} stanza received from the WhatsApp server after
@@ -408,6 +410,34 @@ public final class SuccessStreamHandler implements SocketStream.Handler {
         // sequence in lockstep with WA Web.
         sendActiveModeIq();
 
+        // WAWebStartBackend post-launch housekeeping ->
+        //   WAWebGetReachoutTimelockJob.fetchReachoutTimelock(): probes the
+        //   account-level reachout timelock so the server records the same
+        //   compliance ping the official client emits at app launch. Cobalt
+        //   has no store slot for the response yet; the call is fire-and-log
+        //   so the server-observable behaviour matches WA Web.
+        runComplianceProbe("reachout timelock", whatsapp::queryReachoutTimelock);
+
+        // WAWebGetNewChatMessageCappingInfoJob.getNewChatMessageCapping ->
+        //   WAWebMexFetchNewChatMessageCappingInfoJob.mexFetchNewChatMessageCapping:
+        //   probes the new-chat messaging quota so the server registers the
+        //   same compliance ping the official client emits at app launch.
+        //   Cobalt has no store slot for the response yet; the call is
+        //   fire-and-log so the server-observable behaviour matches WA Web.
+        runComplianceProbe("new-chat capping info", whatsapp::queryNewChatMessageCappingInfo);
+
+        // WAWebAccountSyncJob.updatePrivacySettings ->
+        //   WAWebSyncPrivacyDisallowedLists.syncPrivacyDisallowedLists:
+        //   reconciles the per-category privacy disallowed lists through the
+        //   MEX/GraphQL transport. WA Web invokes this for the four
+        //   PrivacyDisallowedListType enum values (ABOUT, GROUPADD, LAST,
+        //   PROFILE) so the server records the same compliance ping the
+        //   official client emits at app launch. Cobalt currently has no
+        //   store slot for the per-category dhash, so the local cache digest
+        //   is sent as the empty string on every probe; the result is logged
+        //   and discarded.
+        syncPrivacyDisallowedListsMex();
+
         // ADAPTED: WAWebHandleSuccess.default -> Cobalt notifies registered
         // listeners; WA Web has no equivalent {@code onLoggedIn} callback
         // because consumers of the JS code are inside the same bundle and
@@ -474,6 +504,95 @@ public final class SuccessStreamHandler implements SocketStream.Handler {
         } catch (Exception ignored) {
             // Best-effort: the server will start streaming after its own
             // passive timeout even if the active iq never reaches it.
+        }
+    }
+
+    /**
+     * Logger reused by the post-success compliance probes so failures are
+     * surfaced as warnings without aborting the bootstrap.
+     *
+     * @implNote ADAPTED: WA Web's {@code WALogger.ERROR} is the canonical
+     *           sink for the equivalent
+     *           {@code WAWebGetReachoutTimelockJob.fetchReachoutTimelock}
+     *           and {@code WAWebGetNewChatMessageCappingInfoJob.getNewChatMessageCapping}
+     *           failures. Cobalt routes them through a class-scoped
+     *           {@link System.Logger} instead.
+     */
+    private static final System.Logger LOGGER_COMPLIANCE = System.getLogger(SuccessStreamHandler.class.getName() + ".compliance");
+
+    /**
+     * Runs a single post-success MEX compliance probe, logging any failure
+     * without re-throwing.
+     *
+     * <p>The probes mirror the housekeeping the official client emits at
+     * app launch (reachout timelock, new-chat capping). They are
+     * fire-and-forget on Cobalt because the responses have no store slot
+     * yet; only the server-observable round trip matters for compliance.
+     *
+     * @param probeName the human-readable name of the probe for log output
+     * @param probe     the probe to run; never {@code null}
+     *
+     * @implNote ADAPTED: WA Web wraps each probe in a persisted job
+     *           ({@code WAWebGetReachoutTimelockJob},
+     *           {@code WAWebGetNewChatMessageCappingInfoJob}) that retries
+     *           on failure. Cobalt fires them inline once during the
+     *           bootstrap; retry is left to the caller because no store
+     *           slot consumes the result yet.
+     */
+    private static void runComplianceProbe(String probeName, Supplier<?> probe) {
+        try {
+            probe.get();
+        } catch (Throwable throwable) {
+            LOGGER_COMPLIANCE.log(System.Logger.Level.WARNING,
+                    "Cannot run {0} compliance probe: {1}",
+                    probeName,
+                    throwable.getMessage());
+        }
+    }
+
+    /**
+     * Reconciles the four privacy disallowed lists through the MEX/GraphQL
+     * transport, mirroring the WA Web post-success privacy sync.
+     *
+     * <p>WA Web's
+     * {@code WAWebSyncPrivacyDisallowedLists.syncPrivacyDisallowedLists}
+     * fans out one
+     * {@code WAWebQueryPrivacyDisallowedListMexJob.queryPrivacyDisallowedListMex}
+     * call per
+     * {@code PrivacyDisallowedListType} enum value (ABOUT, GROUPADD, LAST,
+     * PROFILE) so the server records the same compliance ping the official
+     * client emits at app launch. Cobalt has no per-category dhash store
+     * slot yet, so the local cache digest is sent as the empty string on
+     * every probe; the server therefore always returns the full roster (or
+     * {@code match} when empty), but the round trip itself is sufficient
+     * for compliance. The reply is logged and discarded.
+     *
+     * @implNote WAWebSyncPrivacyDisallowedLists.syncPrivacyDisallowedLists
+     */
+    @WhatsAppWebExport(moduleName = "WAWebSyncPrivacyDisallowedLists",
+            exports = "syncPrivacyDisallowedLists", adaptation = WhatsAppAdaptation.ADAPTED)
+    private void syncPrivacyDisallowedListsMex() {
+        var meLid = whatsapp.store().lid().orElse(null);
+        if (meLid == null) {
+            // WAWebQueryPrivacyDisallowedListUtil.queryPrivacyDisallowedList:
+            //   getMaybeMeDeviceLid() == null -> skip MEX path entirely
+            return;
+        }
+        // WAWebQueryPrivacyDisallowedListMexJob: maps the JS PrivacyDisallowedListType
+        //   enum to the MEX category strings:
+        //     About -> "ABOUT", GroupAdd -> "GROUPADD",
+        //     LastSeen -> "LAST", ProfilePicture -> "PROFILE"
+        var categories = List.of("ABOUT", "GROUPADD", "LAST", "PROFILE");
+        for (var category : categories) {
+            try {
+                // WAWebMexGetPrivacyList.fetchPrivacyList({jid, dhash:"", category, type:"DENYLIST"})
+                whatsapp.queryPrivacyDisallowedListMex(meLid, "", category, "DENYLIST");
+            } catch (Throwable throwable) {
+                LOGGER_COMPLIANCE.log(System.Logger.Level.WARNING,
+                        "Cannot reconcile privacy disallowed list {0}: {1}",
+                        category,
+                        throwable.getMessage());
+            }
         }
     }
 }

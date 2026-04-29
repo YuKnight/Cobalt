@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.stream.notification.account;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.chat.ChatEphemeralTimer;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
@@ -20,6 +21,7 @@ import java.time.Instant;
  *
  * @implNote WAWebHandleDisappearingModeNotification.handleDisappearingModeNotificationJob
  */
+@WhatsAppWebModule(moduleName = "WAWebHandleDisappearingModeNotification")
 final class NotificationDisappearingModeStreamHandler implements SocketStream.Handler {
     /**
      * The logger used to record diagnostic messages for this handler.

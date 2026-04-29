@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.stream.notification.account;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.contact.ContactTextStatus;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
@@ -35,6 +36,8 @@ import java.util.Objects;
  *
  * @implNote WAWebHandleProfilePicNotification, WAWebHandleAboutNotification
  */
+@WhatsAppWebModule(moduleName = "WAWebHandleProfilePicNotification")
+@WhatsAppWebModule(moduleName = "WAWebHandleAboutNotification")
 public final class NotificationProfileStreamHandler implements SocketStream.Handler {
 
     /**

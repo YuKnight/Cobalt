@@ -1,67 +1,57 @@
 package com.github.auties00.cobalt.model.sync.action.media;
 
 import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.model.mixin.InstantMillisMixin;
 import com.github.auties00.cobalt.model.sync.SyncAction;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import it.auties.protobuf.annotation.ProtobufEnum;
+import it.auties.protobuf.annotation.ProtobufEnumIndex;
+import it.auties.protobuf.annotation.ProtobufMessage;
+import it.auties.protobuf.annotation.ProtobufProperty;
+import it.auties.protobuf.model.ProtobufType;
 
-import it.auties.protobuf.annotation.*;
-import it.auties.protobuf.model.*;
+import java.time.Instant;
 import java.util.Optional;
-import java.util.OptionalLong;
 
 /**
- * A sync action that propagates the creation, editing, or deletion of a
- * chat-scoped note across linked devices.
+ * App-state sync action that propagates the creation, editing, or
+ * deletion of a chat-scoped note across linked devices.
  *
- * <p>Notes are short pieces of text the user attaches to a specific chat, such
- * as reminders about a contact or ongoing conversation. The action carries
- * both the note content (or its absence, in case of deletion) and the chat it
- * is attached to. The target note is identified by the identifier carried in
- * the associated {@link NoteEditActionArgs}.
+ * <p>Notes are short pieces of text the user attaches to a specific
+ * chat as a personal aide-memoire (for example, "remember to ask about
+ * the contract" on a colleague's chat). They live entirely on the user's
+ * own devices and never reach other participants. Each mutation carries
+ * either the new note body (for create or edit) or the deletion flag
+ * (for removal); the target note is identified by the identifier
+ * carried in the associated {@link NoteEditActionArgs}.
+ *
+ * <p>The action lives in the {@link SyncPatchType#REGULAR_LOW} bucket
+ * so that bulky note edits do not stall higher-priority mutations.
  */
 @ProtobufMessage(name = "SyncActionValue.NoteEditAction")
 public final class NoteEditAction implements SyncAction<NoteEditActionArgs> {
     /**
-     * The app-state action name that identifies this action type on the wire.
+     * Canonical app-state action name that identifies this action type
+     * on the wire.
      */
     public static final String ACTION_NAME = "note_edit";
 
     /**
-     * The app-state action version that identifies this action revision on the
-     * wire.
+     * Schema version advertised by this action, used by sync handlers to
+     * gate deserialisation and handling of newer payload shapes.
      */
     public static final int ACTION_VERSION = 7;
 
     /**
-     * The app-state collection that stores this action type.
+     * Collection this action belongs to, used by the sync protocol to
+     * route the mutation into the correct replication stream.
      */
     public static final SyncPatchType COLLECTION_NAME = SyncPatchType.REGULAR_LOW;
 
     /**
-     * Returns the action name used to route this action through the app-state
-     * sync pipeline.
-     *
-     * @return the canonical action name
-     */
-    @Override
-    public String actionName() {
-        return ACTION_NAME;
-    }
-
-    /**
-     * Returns the action version used to route this action through the
-     * app-state sync pipeline.
-     *
-     * @return the canonical action version
-     */
-    @Override
-    public int actionVersion() {
-        return ACTION_VERSION;
-    }
-
-
-    /**
-     * The structural category of the note payload.
+     * The structural category of the note payload (free-text vs.
+     * structured), governing how {@link #unstructuredContent} is
+     * interpreted.
      */
     @ProtobufProperty(index = 1, type = ProtobufType.ENUM)
     NoteType type;
@@ -73,45 +63,64 @@ public final class NoteEditAction implements SyncAction<NoteEditActionArgs> {
     Jid chatJid;
 
     /**
-     * The epoch-millisecond timestamp at which the note was created.
-     *
-     * @implNote WAWebNoteEditSync carries this value as an {@code INT64}
-     *           epoch-millisecond on the wire; Cobalt preserves the raw
-     *           millisecond value to round-trip against WA Web.
+     * The instant at which the note was created. Encoded on the wire as
+     * a 64-bit millisecond epoch via {@link InstantMillisMixin}.
      */
-    @ProtobufProperty(index = 3, type = ProtobufType.INT64)
-    Long createdAt;
+    @ProtobufProperty(index = 3, type = ProtobufType.INT64, mixins = InstantMillisMixin.class)
+    Instant createdAt;
 
     /**
-     * Whether this action represents a deletion of the target note rather
-     * than a create or update.
+     * Whether this action represents a deletion of the target note
+     * rather than a create or update.
      */
     @ProtobufProperty(index = 4, type = ProtobufType.BOOL)
     Boolean deleted;
 
     /**
-     * The note body for {@link NoteType#UNSTRUCTURED} notes.
+     * The free-text note body for {@link NoteType#UNSTRUCTURED} notes.
+     * Ignored for {@link NoteType#STRUCTURED}.
      */
     @ProtobufProperty(index = 5, type = ProtobufType.STRING)
     String unstructuredContent;
 
-
     /**
-     * Constructs a new {@code NoteEditAction} carrying the supplied note
-     * fields.
+     * Constructs a new {@code NoteEditAction} carrying the supplied
+     * note fields.
      *
      * @param type                the structural category of the note
      * @param chatJid             the chat the note is attached to
-     * @param createdAt           the epoch-millisecond creation timestamp
+     * @param createdAt           the creation instant of the note
      * @param deleted             whether the action deletes the note
-     * @param unstructuredContent the free-text body for unstructured notes
+     * @param unstructuredContent the free-text body for unstructured
+     *                            notes
      */
-    NoteEditAction(NoteType type, Jid chatJid, Long createdAt, Boolean deleted, String unstructuredContent) {
+    NoteEditAction(NoteType type, Jid chatJid, Instant createdAt, Boolean deleted, String unstructuredContent) {
         this.type = type;
         this.chatJid = chatJid;
         this.createdAt = createdAt;
         this.deleted = deleted;
         this.unstructuredContent = unstructuredContent;
+    }
+
+    /**
+     * Returns the canonical action name for every
+     * {@code NoteEditAction}.
+     *
+     * @return the constant {@link #ACTION_NAME}
+     */
+    @Override
+    public String actionName() {
+        return ACTION_NAME;
+    }
+
+    /**
+     * Returns the schema version for every {@code NoteEditAction}.
+     *
+     * @return the constant {@link #ACTION_VERSION}
+     */
+    @Override
+    public int actionVersion() {
+        return ACTION_VERSION;
     }
 
     /**
@@ -133,25 +142,29 @@ public final class NoteEditAction implements SyncAction<NoteEditActionArgs> {
     }
 
     /**
-     * Returns the epoch-millisecond timestamp at which the note was created.
+     * Returns the instant at which the note was created.
      *
-     * @return the creation timestamp, or {@link OptionalLong#empty()} if unset
+     * @return the creation instant, or {@link Optional#empty()} if
+     *         unset
      */
-    public OptionalLong createdAt() {
-        return createdAt == null ? OptionalLong.empty() : OptionalLong.of(createdAt);
+    public Optional<Instant> createdAt() {
+        return Optional.ofNullable(createdAt);
     }
 
     /**
-     * Returns whether this action represents a deletion of the target note.
+     * Returns whether this action represents a deletion of the target
+     * note.
      *
-     * @return {@code true} if the note is being deleted, {@code false} otherwise
+     * @return {@code true} if the note is being deleted, {@code false}
+     *         otherwise
      */
     public boolean deleted() {
         return deleted != null && deleted;
     }
 
     /**
-     * Returns the free-text body for {@link NoteType#UNSTRUCTURED} notes.
+     * Returns the free-text body for {@link NoteType#UNSTRUCTURED}
+     * notes.
      *
      * @return the note body, or {@link Optional#empty()} if unset
      */
@@ -178,16 +191,18 @@ public final class NoteEditAction implements SyncAction<NoteEditActionArgs> {
     }
 
     /**
-     * Sets the epoch-millisecond timestamp at which the note was created.
+     * Sets the instant at which the note was created.
      *
-     * @param createdAt the new creation timestamp, or {@code null} to clear it
+     * @param createdAt the new creation instant, or {@code null} to
+     *                  clear it
      */
-    public void setCreatedAt(Long createdAt) {
+    public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
     }
 
     /**
-     * Sets whether this action represents a deletion of the target note.
+     * Sets whether this action represents a deletion of the target
+     * note.
      *
      * @param deleted the new deletion flag, or {@code null} to clear it
      */
@@ -198,45 +213,46 @@ public final class NoteEditAction implements SyncAction<NoteEditActionArgs> {
     /**
      * Sets the free-text body for {@link NoteType#UNSTRUCTURED} notes.
      *
-     * @param unstructuredContent the new note body, or {@code null} to clear it
+     * @param unstructuredContent the new note body, or {@code null} to
+     *                            clear it
      */
     public void setUnstructuredContent(String unstructuredContent) {
         this.unstructuredContent = unstructuredContent;
     }
 
     /**
-     * The structural category of a chat note payload.
-     *
-     * <p>Notes come in two flavours: a simple free-text body or a structured
-     * representation whose exact shape is defined outside this action.
+     * The structural category of a chat note payload, distinguishing a
+     * simple free-text body from a richer structured representation
+     * defined outside this action.
      */
     @ProtobufEnum(name = "SyncActionValue.NoteEditAction.NoteType")
-    public static enum NoteType {
+    public enum NoteType {
         /**
-         * A note whose body is a single free-form text string carried in
-         * {@link NoteEditAction#unstructuredContent()}.
+         * A note whose body is a single free-form text string carried
+         * in {@link NoteEditAction#unstructuredContent()}.
          */
         UNSTRUCTURED(1),
+
         /**
-         * A note with a richer, structured payload defined outside the scope
-         * of this action.
+         * A note with a richer, structured payload defined outside the
+         * scope of this action.
          */
         STRUCTURED(2);
 
         /**
-         * Constructs a new {@code NoteType} constant with the supplied wire
-         * index.
+         * The protobuf wire index for this constant.
+         */
+        final int index;
+
+        /**
+         * Constructs a new {@code NoteType} constant with the supplied
+         * wire index.
          *
          * @param index the protobuf wire index
          */
         NoteType(@ProtobufEnumIndex int index) {
             this.index = index;
         }
-
-        /**
-         * The protobuf wire index for this constant.
-         */
-        final int index;
 
         /**
          * Returns the protobuf wire index for this constant.
@@ -247,6 +263,4 @@ public final class NoteEditAction implements SyncAction<NoteEditActionArgs> {
             return this.index;
         }
     }
-
-
 }

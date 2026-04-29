@@ -13,42 +13,43 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Controls which emoji reactions subscribers are allowed to post on messages
- * published in a newsletter.
+ * Per-channel configuration that controls which emoji reactions
+ * followers may post on messages published in a channel.
  *
- * <p>A newsletter admin may choose between four policies exposed by
- * {@link Type}:
- * <ul>
- *   <li>{@link Type#ALL} admits every emoji</li>
- *   <li>{@link Type#BASIC} restricts reactions to a small curated set</li>
- *   <li>{@link Type#NONE} disables reactions entirely</li>
- *   <li>{@link Type#BLOCKLIST} admits every emoji except those listed in
- *       {@link #blockedCodes()}</li>
- * </ul>
+ * <p>Channel admins choose between four policies exposed by {@link Type}:
+ * accept every emoji ({@link Type#ALL}), accept only a curated set of
+ * basic emojis ({@link Type#BASIC}), disable reactions entirely
+ * ({@link Type#NONE}), or admit every emoji except those listed in
+ * {@link #blockedCodes()} ({@link Type#BLOCKLIST}). The blocked list is
+ * authored from the admin settings sheet and is meaningful only for the
+ * blocklist policy; for any other policy the field is ignored.
  *
- * <p>The {@linkplain #enabledTimestampSeconds() enabled timestamp} records
- * when the current policy was activated, allowing clients to invalidate
- * locally cached reaction aggregates that predate the change.
+ * <p>The activation timestamp records when the current policy was
+ * applied so that clients can invalidate locally cached reaction
+ * aggregates that predate the change. The timestamp is wire-encoded as a
+ * UNIX seconds value via {@link InstantSecondsMixin} but exposed
+ * client-side as an {@link Instant}.
  */
 @ProtobufMessage
 public final class NewsletterReactionSettings {
     /**
-     * The active reaction policy. Defaults to {@link Type#UNKNOWN} when not
-     * set.
+     * The active reaction policy. Defaults to {@link Type#UNKNOWN} when
+     * the wire value is missing or unrecognised.
      */
     @ProtobufProperty(index = 1, type = ProtobufType.ENUM)
     Type value;
 
     /**
-     * The emoji codes that are explicitly blocked when the policy is
-     * {@link Type#BLOCKLIST}. Ignored for all other policies.
+     * The emoji codes explicitly blocked when the policy is
+     * {@link Type#BLOCKLIST}. Ignored for every other policy.
      */
     @ProtobufProperty(index = 2, type = ProtobufType.STRING)
     List<String> blockedCodes;
 
     /**
      * The moment at which the current policy was last activated, used to
-     * invalidate stale client-side caches.
+     * invalidate stale client-side reaction caches. Wire-encoded as
+     * UNIX seconds.
      */
     @ProtobufProperty(index = 3, type = ProtobufType.UINT64, mixins = InstantSecondsMixin.class)
     Instant enabledTimestamp;
@@ -59,8 +60,8 @@ public final class NewsletterReactionSettings {
      *
      * @param value            the reaction policy, defaulted to
      *                         {@link Type#UNKNOWN} when {@code null}
-     * @param blockedCodes     the blocked emoji codes, defaulted to an
-     *                         empty mutable list when {@code null}
+     * @param blockedCodes     the blocked emoji codes, defaulted to a
+     *                         fresh mutable list when {@code null}
      * @param enabledTimestamp the moment the current policy was activated,
      *                         may be {@code null}
      */
@@ -80,34 +81,36 @@ public final class NewsletterReactionSettings {
     }
 
     /**
-     * Sets the active reaction policy.
+     * Sets the active reaction policy. {@code null} is normalised to
+     * {@link Type#UNKNOWN}.
      *
-     * @param value the new policy, defaulted to {@link Type#UNKNOWN} when
-     *              {@code null}
+     * @param value the new policy, or {@code null} to fall back to
+     *              {@link Type#UNKNOWN}
      */
     public void setValue(Type value) {
         this.value = Objects.requireNonNullElse(value, Type.UNKNOWN);
     }
 
     /**
-     * Returns the emoji codes that are currently blocked.
+     * Returns the emoji codes currently blocked.
      *
      * <p>The returned list is meaningful only when the policy is
-     * {@link Type#BLOCKLIST}; for every other policy clients should ignore
-     * it.
+     * {@link Type#BLOCKLIST}; for every other policy clients should
+     * ignore it.
      *
      * @return an unmodifiable list of blocked emoji codes, never
      *         {@code null}
      */
     public List<String> blockedCodes() {
-        return blockedCodes == null ? List.of(): Collections.unmodifiableList(blockedCodes);
+        return blockedCodes == null ? List.of() : Collections.unmodifiableList(blockedCodes);
     }
 
     /**
-     * Sets the emoji codes that are blocked when the policy is
+     * Sets the emoji codes blocked when the policy is
      * {@link Type#BLOCKLIST}.
      *
-     * @param blockedCodes the new blocked codes list, or {@code null}
+     * @param blockedCodes the new blocked codes list, or {@code null} to
+     *                     clear
      */
     public void setBlockedCodes(List<String> blockedCodes) {
         this.blockedCodes = blockedCodes;
@@ -116,10 +119,10 @@ public final class NewsletterReactionSettings {
     /**
      * Returns the moment at which the current policy was last activated.
      *
-     * @return an {@link Optional} holding the activation instant, or empty
-     *         if it is unknown
+     * @return an {@link Optional} holding the activation instant, or
+     *         empty when not set
      */
-    public Optional<Instant> enabledTimestampSeconds() {
+    public Optional<Instant> enabledTimestamp() {
         return Optional.ofNullable(enabledTimestamp);
     }
 
@@ -127,18 +130,19 @@ public final class NewsletterReactionSettings {
      * Sets the moment at which the current policy was activated.
      *
      * @param enabledTimestamp the new activation instant, or {@code null}
+     *                         to clear
      */
     public void setEnabledTimestamp(Instant enabledTimestamp) {
         this.enabledTimestamp = enabledTimestamp;
     }
 
     /**
-     * Returns whether these settings equal the supplied object.
+     * Compares these settings with another object for equality.
      *
      * @param o the object to compare against
      * @return {@code true} if {@code o} is a
-     *         {@code NewsletterReactionSettings} whose fields are all equal
-     *         to this one's
+     *         {@code NewsletterReactionSettings} whose fields all match
+     *         this one's
      */
     @Override
     public boolean equals(Object o) {
@@ -160,15 +164,8 @@ public final class NewsletterReactionSettings {
 
     /**
      * Enumerates the four reaction policies that may be configured for a
-     * newsletter.
-     *
-     * @implNote WA Web's
-     *           {@code WAWebCommonNewsletterEnums.NewsletterReactionCodesSetting}
-     *           assigns {@code All:0}, {@code Basic:1}, {@code Blocklist:2},
-     *           {@code None:3}. Cobalt preserves these wire indices exactly
-     *           and appends an {@code UNKNOWN} sentinel at {@code -1}-like
-     *           wire index {@code 4} to cover unrecognised server values
-     *           without disturbing existing indices.
+     * channel, plus an {@link #UNKNOWN} fallback for unrecognised wire
+     * values.
      */
     @ProtobufEnum
     public enum Type {
@@ -194,18 +191,14 @@ public final class NewsletterReactionSettings {
         NONE(3),
 
         /**
-         * The policy was not reported by the server or is unrecognized by
-         * this version of the client.
-         *
-         * @implNote NO_WA_BASIS: defensive sentinel added by Cobalt; not
-         *           present in
-         *           {@code WAWebCommonNewsletterEnums.NewsletterReactionCodesSetting}.
+         * The policy was not reported by the server or is unrecognized
+         * by this version of the client.
          */
         UNKNOWN(4);
 
         /**
-         * Lookup table from the lowercase enum name to the constant, used
-         * by {@link #of(String)} for case-insensitive parsing.
+         * Lookup table from the lowercase enum name to the constant,
+         * used by {@link #of(String)} for case-insensitive parsing.
          */
         private static final Map<String, Type> BY_NAME = Arrays.stream(values())
                 .collect(Collectors.toUnmodifiableMap(key -> key.name().toLowerCase(), Function.identity()));

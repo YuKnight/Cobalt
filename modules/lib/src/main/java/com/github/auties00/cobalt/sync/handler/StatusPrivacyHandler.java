@@ -6,6 +6,7 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.model.jid.JidServer;
 import com.github.auties00.cobalt.model.privacy.PrivacySettingEntry;
 import com.github.auties00.cobalt.model.privacy.PrivacySettingEntryBuilder;
 import com.github.auties00.cobalt.model.privacy.PrivacySettingType;
@@ -19,6 +20,7 @@ import com.github.auties00.cobalt.model.sync.action.media.StatusPrivacyAction;
 import com.github.auties00.cobalt.model.sync.action.media.StatusPrivacyActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -148,8 +150,8 @@ public final class StatusPrivacyHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebStatusPrivacySettingSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: single-path adapter for batch-only WA Web entry
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: single-path adapter for batch-only WA Web entry
     }
 
     /**
@@ -181,7 +183,7 @@ public final class StatusPrivacyHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebStatusPrivacySettingSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public List<MutationApplicationResult> applyMutationBatchResults(WhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
+    public List<MutationApplicationResult> applyMutationBatchResults(WhatsAppClient client, WamService wamService, List<DecryptedMutation.Trusted> mutations) {
         if (mutations.size() != 1) { // WAWebStatusPrivacySettingSync.applyMutations: if (t.length !== 1)
             // WAWebStatusPrivacySettingSync.applyMutations: WALogger.ERROR("[syncd] unexpected mutation count %s for status privacy sync", t.length) — telemetry skipped
             var malformed = new ArrayList<MutationApplicationResult>(mutations.size()); // WAWebStatusPrivacySettingSync.applyMutations: return t.map(function() { return {actionState: Malformed} })
@@ -241,7 +243,7 @@ public final class StatusPrivacyHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebStatusPrivacySettingSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) { // WAWebStatusPrivacySettingSync.applyMutations: if (a.operation === "set") { ... } return [{actionState: Unsupported}]
             return MutationApplicationResult.unsupported(); // WAWebStatusPrivacySettingSync.applyMutations: return [{actionState: SyncActionState.Unsupported}]
         }
@@ -385,12 +387,12 @@ public final class StatusPrivacyHandler implements WebAppStateActionHandler {
     @WhatsAppWebExport(moduleName = "WAWebWid", exports = "isUser", adaptation = WhatsAppAdaptation.DIRECT)
     private static boolean isUserWid(Jid jid) {
         var type = jid.server().type(); // WAWebWid.Wid.prototype.isUser: this.server
-        return type == com.github.auties00.cobalt.model.jid.JidServer.Type.USER // WAWebWid.Wid.prototype.isUser: includes "s.whatsapp.net" via WA_USER_JID_SUFFIX in static t.isUser
-                || type == com.github.auties00.cobalt.model.jid.JidServer.Type.LEGACY_USER // WAWebWid.Wid.prototype.isUser: this.server === "c.us"
-                || type == com.github.auties00.cobalt.model.jid.JidServer.Type.LID // WAWebWid.Wid.prototype.isUser: this.server === "lid"
-                || type == com.github.auties00.cobalt.model.jid.JidServer.Type.BOT // WAWebWid.Wid.prototype.isUser: this.server === "bot"
-                || type == com.github.auties00.cobalt.model.jid.JidServer.Type.HOSTED // WAWebWid.Wid.prototype.isUser: this.server === "hosted"
-                || type == com.github.auties00.cobalt.model.jid.JidServer.Type.HOSTED_LID; // WAWebWid.Wid.prototype.isUser: this.server === "hosted.lid"
+        return type == JidServer.Type.USER // WAWebWid.Wid.prototype.isUser: includes "s.whatsapp.net" via WA_USER_JID_SUFFIX in static t.isUser
+                || type == JidServer.Type.LEGACY_USER // WAWebWid.Wid.prototype.isUser: this.server === "c.us"
+                || type == JidServer.Type.LID // WAWebWid.Wid.prototype.isUser: this.server === "lid"
+                || type == JidServer.Type.BOT // WAWebWid.Wid.prototype.isUser: this.server === "bot"
+                || type == JidServer.Type.HOSTED // WAWebWid.Wid.prototype.isUser: this.server === "hosted"
+                || type == JidServer.Type.HOSTED_LID; // WAWebWid.Wid.prototype.isUser: this.server === "hosted.lid"
     }
 
     /**

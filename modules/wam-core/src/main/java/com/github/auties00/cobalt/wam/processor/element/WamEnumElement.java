@@ -4,6 +4,7 @@ import com.github.auties00.cobalt.wam.processor.WamAnnotations;
 import com.palantir.javapoet.ClassName;
 
 import javax.annotation.processing.ProcessingEnvironment;
+import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.util.ElementFilter;
@@ -61,6 +62,6 @@ public record WamEnumElement(
     }
 
     private static boolean isEnumConstant(VariableElement field) {
-        return field.getKind() == javax.lang.model.element.ElementKind.ENUM_CONSTANT;
+        return field.getKind() == ElementKind.ENUM_CONSTANT;
     }
 }

@@ -4,6 +4,7 @@ import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.device.icdc.IcdcResult;
 import com.github.auties00.cobalt.exception.WhatsAppCorruptedStoreException;
 import com.github.auties00.cobalt.exception.WhatsAppMessageException;
+import com.github.auties00.cobalt.message.MessageEncryptionType;
 import com.github.auties00.cobalt.message.send.ack.AckResult;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryptedPayload;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
@@ -14,6 +15,7 @@ import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.chat.ChatKeepType;
 import com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentitySpec;
 import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.model.jid.JidServer;
 import com.github.auties00.cobalt.model.message.EmptyMessage;
 import com.github.auties00.cobalt.model.message.MessageContainer;
 import com.github.auties00.cobalt.model.message.MessageContainerSpec;
@@ -45,6 +47,7 @@ import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.E2eMessageSendEventBuilder;
 import com.github.auties00.cobalt.wam.type.AddressingMode;
 import com.github.auties00.cobalt.wam.type.AgentEngagementEnumType;
@@ -101,16 +104,26 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
     final WhatsAppStore store;
 
     /**
+     * The WAM telemetry service used to commit per-send WAM events.
+     *
+     * @implNote ADAPTED: WA Web senders read the WAM module from a
+     * module-level import; Cobalt injects the service via the constructor.
+     */
+    final WamService wamService;
+
+    /**
      * Creates a new message sender with the specified client.
      *
-     * @param client the WhatsApp client for stanza dispatch
+     * @param client     the WhatsApp client for stanza dispatch
+     * @param wamService the WAM telemetry service for committing send events
      *
      * @implNote ADAPTED: WA Web senders use module-level imports;
      * Cobalt uses constructor-based DI.
      */
-    MessageSender(WhatsAppClient client) {
+    MessageSender(WhatsAppClient client, WamService wamService) {
         this.client = Objects.requireNonNull(client, "client");
         this.store = client.store();
+        this.wamService = Objects.requireNonNull(wamService, "wamService");
     }
 
     /**
@@ -600,11 +613,11 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
             exports = {"postSuccessDirectE2eMessageSendMetric", "postFailureDirectE2eMessageSendMetric"},
             adaptation = WhatsAppAdaptation.ADAPTED)
     void emitE2eMessageSendEvent(Jid device, MessageContainer container, boolean success,
-                                 com.github.auties00.cobalt.message.MessageEncryptionType ciphertextType,
+                                 MessageEncryptionType ciphertextType,
                                  int retryCount) {
         var builder = new E2eMessageSendEventBuilder()
                 // WAWebPostE2eMessageSendMetric: e2eCiphertextVersion = CIPHERTEXT_VERSION
-                .e2eCiphertextVersion(com.github.auties00.cobalt.message.send.crypto.MessageEncryption.CIPHERTEXT_VERSION)
+                .e2eCiphertextVersion(MessageEncryption.CIPHERTEXT_VERSION)
                 // WAWebPostE2eMessageSendMetric: isLid = to.isLid()
                 .isLid(device.hasLidServer())
                 // WAWebPostE2eMessageSendMetric: retryCount = n
@@ -617,7 +630,7 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
                 // WAWebPostE2eMessageSendMetric: flipped to !success on failure, weight=1
                 .e2eSuccessful(success);
         // WAWebPostE2eMessageSendMetric: t.isHosted() && (s.encryptionType = COEX)
-        if (device.hasServer(com.github.auties00.cobalt.model.jid.JidServer.hosted())) {
+        if (device.hasServer(JidServer.hosted())) {
             builder.encryptionType(EncryptionTypeCode.COEX);
         }
         // WAWebPostE2eMessageSendMetric: r != null && (s.e2eCiphertextType = getMetricE2eCiphertextType(r))
@@ -638,7 +651,7 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
                 builder.agentEngagementType(AgentEngagementEnumType.INVOKED);
             }
         }
-        client.wamService().commit(builder.build());
+        wamService.commit(builder.build());
     }
 
     /**
@@ -683,7 +696,7 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
                 // WAWebEncryptMsgProtobuf.encryptMsgSenderKey: e2eCiphertextType = SENDER_KEY_MESSAGE
                 .e2eCiphertextType(E2eCiphertextType.SENDER_KEY_MESSAGE)
                 // WAWebEncryptMsgProtobuf.encryptMsgSenderKey: e2eCiphertextVersion = CIPHERTEXT_VERSION
-                .e2eCiphertextVersion(com.github.auties00.cobalt.message.send.crypto.MessageEncryption.CIPHERTEXT_VERSION)
+                .e2eCiphertextVersion(MessageEncryption.CIPHERTEXT_VERSION)
                 // WAWebEncryptMsgProtobuf.encryptMsgSenderKey: e2eDestination hard-coded to GROUP,
                 // but the status fanout reuses the same encryption helper and maps to STATUS in Cobalt
                 .e2eDestination(destination)
@@ -701,11 +714,11 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
                 builder.messageMediaType(mediaType);
             }
         }
-        client.wamService().commit(builder.build());
+        wamService.commit(builder.build());
     }
 
     /**
-     * Maps a {@link com.github.auties00.cobalt.message.MessageEncryptionType}
+     * Maps a {@link MessageEncryptionType}
      * to the corresponding WAM {@link E2eCiphertextType}.
      *
      * @param type the Signal ciphertext type
@@ -717,7 +730,7 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      */
     @WhatsAppWebExport(moduleName = "WAWebBackendJobsCommon", exports = "getMetricE2eCiphertextType",
             adaptation = WhatsAppAdaptation.DIRECT)
-    private static E2eCiphertextType mapCiphertextType(com.github.auties00.cobalt.message.MessageEncryptionType type) {
+    private static E2eCiphertextType mapCiphertextType(MessageEncryptionType type) {
         return switch (type) {
             case MSG -> E2eCiphertextType.MESSAGE;
             case PKMSG -> E2eCiphertextType.PREKEY_MESSAGE;

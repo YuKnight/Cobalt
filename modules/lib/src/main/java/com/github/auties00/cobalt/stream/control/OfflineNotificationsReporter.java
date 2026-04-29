@@ -5,6 +5,7 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.MdAppStateOfflineNotificationsEventBuilder;
 
 import java.util.Objects;
@@ -42,8 +43,8 @@ import java.util.concurrent.ConcurrentMap;
 @WhatsAppWebModule(moduleName = "WAWebHandleReportServerSyncNotification")
 public final class OfflineNotificationsReporter {
     /**
-     * The WhatsApp client used to reach {@link WhatsAppClient#wamService()}
-     * when flushing the accumulated counts.
+     * The WhatsApp client retained for parity with sibling reporters; the
+     * actual WAM commit is routed through {@link #wamService}.
      *
      * @implNote WAWebHandleReportServerSyncNotification: the module closes
      * over the return value of {@code o("WAWebMdAppStateOfflineNotificationsWamEvent")}
@@ -51,6 +52,11 @@ public final class OfflineNotificationsReporter {
      * client-scoped {@code WamService} instead.
      */
     private final WhatsAppClient whatsapp;
+
+    /**
+     * The WAM telemetry service used to commit the offline notifications event.
+     */
+    private final WamService wamService;
 
     /**
      * Per-collection observation count for offline server-sync notifications
@@ -67,16 +73,19 @@ public final class OfflineNotificationsReporter {
     /**
      * Constructs a new reporter bound to the given client.
      *
-     * @param whatsapp the WhatsApp client whose WAM service will receive
-     *                 flushed events, must not be {@code null}
+     * @param whatsapp   the WhatsApp client retained for parity with sibling reporters,
+     *                   must not be {@code null}
+     * @param wamService the WAM telemetry service used to commit the offline notifications event,
+     *                   must not be {@code null}
      * @implNote WAWebHandleReportServerSyncNotification: module
      * initialisation creates the empty map; Cobalt does the same inside
      * the constructor.
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleReportServerSyncNotification",
             exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public OfflineNotificationsReporter(WhatsAppClient whatsapp) {
+    public OfflineNotificationsReporter(WhatsAppClient whatsapp, WamService wamService) {
         this.whatsapp = Objects.requireNonNull(whatsapp, "whatsapp cannot be null");
+        this.wamService = Objects.requireNonNull(wamService, "wamService cannot be null");
         this.offlineNotificationsCount = new ConcurrentHashMap<>();
     }
 
@@ -143,7 +152,7 @@ public final class OfflineNotificationsReporter {
 
         // WAWebHandleReportServerSyncNotification.reportOfflineNotifications:
         // new MdAppStateOfflineNotificationsWamEvent({redundantCount: t}).commit()
-        whatsapp.wamService().commit(new MdAppStateOfflineNotificationsEventBuilder()
+        wamService.commit(new MdAppStateOfflineNotificationsEventBuilder()
                 .redundantCount(redundantCount)
                 .build());
 

@@ -44,6 +44,33 @@ Call `mcp__whatsapp__web_live_status`. If `running=false`, call `mcp__whatsapp__
 
 If login is needed, drive it yourself via the `web_live_login_with_phone_number` flow, not via an agent. Agents assume the session is already up.
 
+### Regenerate Auto-Generatable Catalogs
+
+Two Cobalt catalogs are derived from the live WA Web bundle and checked in as plain Java. Regenerate both before validation begins so per-module agents validate against the freshest source-of-truth, not a stale snapshot:
+
+1. **WAM events and enums** → `com.github.auties00.cobalt.wam` (`wam/event/`, `wam/type/`):
+   ```bash
+   cd tooling/web-wam-codegen && npm start
+   ```
+2. **AB props** → `com.github.auties00.cobalt.props`:
+   ```bash
+   cd tooling/web-ab-props-codegen && npm start
+   ```
+
+Both tools are Playwright-based and may take a few minutes each. Run sequentially. If either fails, stop and surface the error to the user — do NOT continue against a stale catalog.
+
+Once regenerated, the WAM and AB-props **definitions** (the catalog files themselves: `cobalt.wam.event/*Event.java`, `cobalt.wam.type/*.java`, `cobalt.props/ABProp.java`) are **guaranteed correct by codegen** and are NOT re-validated by Phase 3 per-module agents — the WA modules that produced them are SKIPPED (see SKIPPED criteria 10–11 below).
+
+**Their *usages* are NOT guaranteed correct.** When a per-module agent validates a handwritten module that emits a WAM event (`wamService.commit(SomeEvent...)`) or reads an AB prop (`ABProp.X.value()`), the agent must still verify that:
+- the right event class / prop key is referenced,
+- it's invoked at the equivalent code path WA Web uses,
+- the field values populated on the event match WA Web,
+- the prop's default and read-path semantics match.
+
+Codegen only proves the catalog *shapes* are right. Whether Cobalt *uses* them correctly is part of normal per-module validation for the consumer.
+
+SMAX (`cobalt.node.smax`), MEX (`cobalt.node.mex`), legacy IQ (`cobalt.node.iq`), and USync (`cobalt.node.usync`) are NOT auto-generatable — they are handwritten and go through normal Phase 3 validation.
+
 ## Output Layout
 
 ```
@@ -51,18 +78,13 @@ validation/
   scope.md                 # Phase 1 scope report (for the user to review)
   manifest.json            # Whole-universe module-to-owner mapping
   plan.md                  # Topologically ordered agent list
-  reports/<Module>.md      # Per-module reports — outcome is VALIDATED, SKIPPED, or DEFERRED
+  reports/<Module>.md      # Per-module reports — outcome is VALIDATED or SKIPPED
   captures/<Module>/       # Live captures + Cobalt captures + diffs (persist across runs)
     live.json              # Captured real WA Web stanzas / WAM / HTTP
     cobalt.json            # Captured Cobalt output from the scratch file
     session.json           # Seed data (keys, device) pulled from the live session
     input.json             # Input used for both sides
     diff.md                # Rendered diff + verdict
-  sweep-wam.md             # Phase 3.5 WAM call-site sweep
-  sweep-smax.md            # Phase 3.6 SMAX call-site sweep
-  sweep-mex.md             # Phase 3.7 MEX call-site sweep
-  sweep-abprop.md          # Phase 3.8 AB-prop / capability-gate sweep
-  sweep-legacy-iq.md       # Phase 3.9 legacy WADeprecatedSendIq sweep
   feature-tree.md          # Phase 3.11.1 feature taxonomy
   features/<F>/<S>/        # Phase 3.11 per-feature artefacts
     scenario.json          #   inputs + preconditions + expected observables
@@ -88,7 +110,7 @@ Call `mcp__whatsapp__list_modules` with no `platform` argument. The tool returns
 
 Do NOT read `manifest.json` files from disk — the MCP tool is the source of truth and stays in sync with the active snapshot. Do NOT use `search_modules` for enumeration — it's fuzzy and capped.
 
-The result is a de-duplicated set of `{platform, name, dependencies, exports, sourceBytes}` tuples. Expect ~10,000 modules. This is the raw universe — every module gets a manifest entry. **No upfront filtering.** Each per-module agent decides for itself in Phase 3 whether to validate, skip, or defer to a call-site phase, using the skip criteria embedded in its prompt.
+The result is a de-duplicated set of `{platform, name, dependencies, exports, sourceBytes}` tuples. Expect ~10,000 modules. This is the raw universe — every module gets a manifest entry. **No upfront filtering.** Each per-module agent decides for itself in Phase 3 whether to validate or skip, using the skip criteria embedded in its prompt.
 
 ### Step 1.2: Map WA Modules to Cobalt Owners
 
@@ -114,12 +136,11 @@ Present:
 - Orphan Cobalt files (claim a WA module that does not exist in the snapshot) — list them for user review.
 - The first and last 20 entries of the topological order.
 
-Note in scope.md that there is **no upfront skip list**. Each per-module agent in Phase 3 reads its module's source and decides one of three outcomes:
+Note in scope.md that there is **no upfront skip list**. Each per-module agent in Phase 3 reads its module's source and decides one of two outcomes:
 - `VALIDATED` — Cobalt has a counterpart; per-module deep validation runs.
 - `SKIPPED` — module is irrelevant to a headless Java client (UI / browser-only / vendored / generated / locale data / platform-specific shell). Agent records the reason in one line.
-- `DEFERRED` — module belongs to an auto-generated catalog (WAM / SMAX / MEX / AB-prop / legacy IQ). Agent records which call-site phase will sweep it; the catalog itself is auto-generated and trusted.
 
-Ask the user to confirm or to amend the skip / defer criteria in the agent prompt. Do NOT proceed to Phase 2 until they say go.
+Ask the user to confirm or to amend the skip criteria in the agent prompt. Do NOT proceed to Phase 2 until they say go.
 
 ---
 
@@ -183,7 +204,7 @@ For each module in topological order:
 3. Wait for completion.
 4. Read `validation/reports/<Module>.md`.
 5. If the report declares MISMATCH or MISSING and the agent applied fixes, record the fact but do not re-compile (user runs the IDE). Move on.
-6. If the agent declares LIVE_MISMATCH that it could not fix in this pass (e.g. needs a change in a not-yet-validated consumer), record it for Phase 3.5.
+6. If the agent declares LIVE_MISMATCH that it could not fix in this pass (e.g. needs a change in a not-yet-validated consumer), record it for Phase 3.12 (cross-cutting flow).
 7. Continue until the last module.
 
 ### Prompt Template (exact fields the agent receives)
@@ -217,7 +238,7 @@ validation/reports/{waModule}.md
 
 ## Decide the module's outcome BEFORE validating
 
-Read the module source. Pick exactly one of three outcomes and write it as the
+Read the module source. Pick exactly one of two outcomes and write it as the
 first line of the report:
 
 ### A. SKIPPED — Cobalt is a headless Java client; this module has no counterpart
@@ -249,29 +270,28 @@ Mark SKIPPED if any of these apply:
    `WAWebTP3P*` third-party-bridge wrappers, `WAWebCanonical*` browser-recovery,
    `WAWebStorage*` browser-storage manager, `WAWebApi*` / `WAWebCmd*`
    frontend-bridge, `*Mutator` Backbone mutators, `*Loadable` lazy entries.
+10. **WAM (codegen-guaranteed)** — `WAWebWam*` / `*WamEvent` / `WAWebWamEnum*`.
+    The counterparts under `cobalt.wam.event/` and `cobalt.wam.type/` are
+    regenerated by `web-wam-codegen` in the prerequisites step and are
+    guaranteed correct by codegen — do not re-validate. Reason line:
+    "codegen-guaranteed (web-wam-codegen)".
+11. **AB-props (codegen-guaranteed)** — `WAWebAbProps*` / `WAWebFeatureGate*` /
+    `WAWebCapability*`. The counterparts under `cobalt.props/` are regenerated
+    by `web-ab-props-codegen` in the prerequisites step and are guaranteed
+    correct by codegen — do not re-validate. Reason line:
+    "codegen-guaranteed (web-ab-props-codegen)".
 
 If you decide SKIPPED, write a one-line reason and stop. Do NOT validate exports.
 
-### B. DEFERRED — module belongs to an auto-generated catalog
+### B. VALIDATED — Cobalt has a handwritten counterpart; do the full pass
 
-The catalog itself is auto-generated and trusted; Cobalt's *usage* of it is
-validated by a separate Phase 3.5–3.9 call-site sweep. Mark DEFERRED and
-record the destination phase if any of these apply:
+This is the default outcome for every module that isn't SKIPPED. Examples of
+catalog families that go through normal per-module validation here:
 
-- `WAWebWam*` / `*WamEvent` / `WAWebWamEnum*` → **Phase 3.5 (WAM call sites)**
-- `WASmax*` (any sub-shape: RPC / In* / Out* / *Mixin / *Enums) → **Phase 3.6 (SMAX call sites)**
-- `WAWebMex*` (the framework itself, not the protocol behind it) → **Phase 3.7 (MEX call sites)**
-- `WAWebAbProps*` / `WAWebFeatureGate*` / `WAWebCapability*` → **Phase 3.8 (AB-prop / capability call sites)**
-- `WADeprecatedSendIq` and modules that import it → **Phase 3.9 (legacy IQ call sites)**
-
-`WAWebUsync*` modules are **NOT** auto-generated — they are handwritten Java
-under `node/usync/`. They follow the regular VALIDATED path (per-module deep
-validation) like any other handwritten module.
-
-If you decide DEFERRED, write the destination phase and stop. Do NOT validate
-exports — they will be exercised through call-site parity in the named phase.
-
-### C. VALIDATED — Cobalt has a handwritten counterpart; do the full pass
+- `WASmax*` — handwritten Java under `cobalt.node.smax/`.
+- `WAWebMex*` — handwritten Java under `cobalt.node.mex/`.
+- `WADeprecatedSendIq` and consumers — handwritten Java under `cobalt.node.iq/`.
+- `WAWebUsync*` — handwritten Java under `cobalt.node.usync/`.
 
 For every export, produce one of these statuses:
 - MATCH (DIRECT) — Cobalt's logic is byte-equivalent to WA Web's.
@@ -325,67 +345,13 @@ files without editing. Write the report.
 
 ---
 
-## Phases 3.5 – 3.9: Auto-Generated Catalog Call-Site Sweeps
-
-The catalogs validated in these phases are produced by the autogen pipeline and
-trusted to be schema-correct. Each phase sweeps Cobalt for every call site that
-*uses* the catalog and confirms parity with the corresponding WA Web call site.
-Per-module agents in Phase 3 marked the relevant modules as `DEFERRED` to one
-of these phases — that's a record, not a dependency. These phases sweep the
-Cobalt codebase directly, not the deferred-module list.
-
-Each sweep is one agent invocation. They are independent — run them in
-parallel (background agents) since each axis is disjoint.
-
-### Phase 3.5: WAM Call-Site Sweep
-
-Walk Cobalt for every `wamService.commit(...)` call. For each call, look up the
-event class against the WAM catalog (auto-generated `wam/event/*Event.java`),
-then confirm WA Web emits the same event at the equivalent code path.
-
-Output: `validation/sweep-wam.md`.
-
-### Phase 3.6: SMAX Call-Site Sweep
-
-Walk Cobalt for every typed-stanza RPC call (whatever Cobalt's analogue to
-`WASmax{Domain}{Op}RPC` is — usually `*Sender.send(...)` invoking a request
-node + parsing the response node). For each, confirm the stanza shape matches
-the SMAX schema for the corresponding `WASmax*` module.
-
-Output: `validation/sweep-smax.md`.
-
-### Phase 3.7: MEX Call-Site Sweep
-
-Walk Cobalt for every `MexJsonOperation` / `MexArgoOperation` invocation. For
-each, confirm the GraphQL operation id, variables shape, and response parser
-align with the corresponding `WAWebMex*` module.
-
-Output: `validation/sweep-mex.md`.
-
-### Phase 3.8: AB-Prop / Capability-Gate Call-Site Sweep
-
-Walk Cobalt for every `ABProp.X.value()` and capability-gate read. For each,
-confirm the prop ID, default value, and read path match the WA Web feature-
-gate definition.
-
-Output: `validation/sweep-abprop.md`.
-
-### Phase 3.9: Legacy `WADeprecatedSendIq` Call-Site Sweep
-
-Walk Cobalt for every legacy IQ send (the analogues of WA Web modules that
-import `WADeprecatedSendIq`). For each, confirm the IQ shape matches.
-
-Output: `validation/sweep-legacy-iq.md`.
-
----
-
 ## Phase 3.11: Feature-Level Functional Validation
 
-Phase 3 + Phase 3.5–3.9 prove **structural** parity (shapes, schemas, call
-sites). They do **not** prove **functional** parity — that an end-to-end user
-flow produces the same observable outcome in Cobalt as in WhatsApp Web. A poll
-can pass per-module validation, every WAM call site can match, and yet the
-"vote on poll" flow can still be broken because Cobalt's poll-update receiver
+Phase 3 proves **structural** parity (shapes, schemas, per-module exports). It
+does **not** prove **functional** parity — that an end-to-end user flow
+produces the same observable outcome in Cobalt as in WhatsApp Web. A poll can
+pass per-module validation, every WAM event class can match, and yet the "vote
+on poll" flow can still be broken because Cobalt's poll-update receiver
 forgets to refresh the chat list.
 
 This phase closes that gap.
@@ -505,11 +471,11 @@ verdict and (for FIXED) a one-line root-cause summary.
 
 ## Phase 3.12: Cross-Cutting Flow Validation
 
-After every Phase 3 module has a verdict and every Phase 3.5–3.9 sweep has
-completed, spawn a single `validate-flow` agent for cross-file issues
-(delegation misses, type mismatches across module boundaries, per-call vs
-batched patterns). The agent reads every Phase 3 report's "Issues in Context
-Files" section plus any deferred LIVE_MISMATCH carried forward.
+After every Phase 3 module has a verdict, spawn a single `validate-flow` agent
+for cross-file issues (delegation misses, type mismatches across module
+boundaries, per-call vs batched patterns). The agent reads every Phase 3
+report's "Issues in Context Files" section plus any deferred LIVE_MISMATCH
+carried forward.
 
 Output: `validation/flow-report.md`.
 
@@ -525,12 +491,9 @@ code. Same contract as before. Output: `validation/phantom-report.md`.
 ### Step 4.1: Completeness Check
 
 For every WA module in the universe, confirm its manifest entry has a Phase 3
-outcome (one of `VALIDATED`, `SKIPPED`, `DEFERRED`). For every VALIDATED export,
-confirm its status is one of MATCH, MISMATCH (fixed), MISSING_IN_COBALT
-(implemented), ADAPTED, LIVE_MATCH, LIVE_MISMATCH (fixed), or SKIPPED_PURE.
-
-For every Phase 3.5–3.9 sweep, confirm the corresponding `sweep-*.md` exists
-and lists every Cobalt call site checked.
+outcome (one of `VALIDATED`, `SKIPPED`). For every VALIDATED export, confirm
+its status is one of MATCH, MISMATCH (fixed), MISSING_IN_COBALT (implemented),
+ADAPTED, LIVE_MATCH, LIVE_MISMATCH (fixed), or SKIPPED_PURE.
 
 For every (sub-)feature in `feature-tree.md`, confirm a row in
 `feature-summary.md` with a verdict in {`FUNCTIONAL_PARITY`,
@@ -552,8 +515,7 @@ If any agent applied fixes, re-run Phase 3 from the first module that depended (
 ## Summary
 - Modules in universe: N (web: X, desktop_windows: Y, desktop_macos: Z, ios: W)
 - VALIDATED: N (per-module deep validation completed)
-- SKIPPED:   N (irrelevant to a headless Java client — UI / browser / vendored / generated / locale / platform-specific shell)
-- DEFERRED:  N (auto-generated catalog — covered by a Phase 3.5–3.9 sweep)
+- SKIPPED:   N (irrelevant to a headless Java client, or covered by codegen — see breakdown)
 - MATCH (DIRECT):     N
 - MATCH (ADAPTED):    N
 - MISMATCH (fixed):   N
@@ -562,8 +524,9 @@ If any agent applied fixes, re-run Phase 3 from the first module that depended (
 - LIVE_MISMATCH (fixed): N
 - SKIPPED_PURE:  N
 
-## Auto-Gen Sweep Outcomes
-Per-sweep call-site count + parity verdict — WAM / SMAX / MEX / AB-prop / legacy IQ.
+## SKIPPED Breakdown
+- UI / browser / vendored / generated / locale / platform-specific shell: N
+- Codegen-guaranteed (WAM / AB-props, regenerated in prerequisites): N
 
 ## Feature-Level Functional Outcomes
 | Feature | Sub-Feature | Modules | Verdict | Root cause (if FIXED) |
@@ -597,6 +560,6 @@ Modules where Cobalt intentionally diverges, with reason.
 - **Captures persist.** `validation/captures/<Module>/` survives across runs. Agents reuse existing captures.
 - **Exhaustiveness.** Every kept WA module has a verdict. Every export has a status.
 - **Live session is shared.** Start once in Phase 1, reuse for every agent, stop in Phase 4.3.
-- **Skip transparency.** Every per-module agent records its outcome (`VALIDATED` / `SKIPPED` / `DEFERRED`) on the first line of the report, with a one-line reason for SKIPPED and a destination phase for DEFERRED. There is no upfront `skip-list.json`.
+- **Skip transparency.** Every per-module agent records its outcome (`VALIDATED` / `SKIPPED`) on the first line of the report, with a one-line reason for SKIPPED. There is no upfront `skip-list.json`.
 - **Topological order is mandatory.** Leaves first. Every leaf must be complete against WA Web, regardless of current consumer needs.
 - **Every issue must be fixed, not only reported.**

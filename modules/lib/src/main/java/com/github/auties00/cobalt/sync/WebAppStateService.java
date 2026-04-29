@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync;
 
 import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONArray;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.exception.WhatsAppMediaException;
 import com.github.auties00.cobalt.exception.WhatsAppWebAppStateSyncException;
@@ -42,6 +43,7 @@ import com.github.auties00.cobalt.sync.key.MissingSyncKeyTimeoutScheduler;
 import com.github.auties00.cobalt.sync.key.SyncKeyRotationService;
 import com.github.auties00.cobalt.sync.handler.SyncdIndexUtils;
 import com.github.auties00.cobalt.util.SchedulerUtils;
+import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.MdAppStateMessageRangeEventBuilder;
 import com.github.auties00.cobalt.wam.event.MdAppStateSyncMutationStatsEventBuilder;
 import com.github.auties00.cobalt.wam.event.SyncdKeyCountEventBuilder;
@@ -65,13 +67,17 @@ import com.github.auties00.cobalt.wam.type.MutationOperationType;
 import com.github.auties00.cobalt.wam.type.SyncdCollectionType;
 import it.auties.protobuf.stream.ProtobufInputStream;
 
+import javax.crypto.Mac;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BooleanSupplier;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 
@@ -123,7 +129,7 @@ import java.util.logging.Logger;
  *     completion through return of the public sync entry points;
  *     {@code handleSyncDelayApplyingPatchUntilUIUnblocks} is N/A — Cobalt has no UI blocking,
  *     {@code waitForOfflineDeliveryEnd} is awaited directly at call sites (see
- *     {@link com.github.auties00.cobalt.store.WhatsAppStore#waitForOfflineDeliveryEnd});
+ *     {@link WhatsAppStore#waitForOfflineDeliveryEnd});
  *     {@code handleSyncdFatal} is handled by {@link #handleSyncError} (fatal branch);
  *     {@code writeSyncdLog}/{@code printSyncdLog} are pass-throughs to {@code WAWebSyncdLogs}
  *     and are folded into {@link Logger} calls at relevant sites (see
@@ -166,6 +172,10 @@ public final class WebAppStateService {
     private final SyncKeyRotationService syncKeyRotationService;
     private final ABPropsService abPropsService;
     private final SnapshotRecoveryService snapshotRecoveryService;
+    /**
+     * The WAM telemetry service used to commit app-state sync events.
+     */
+    private final WamService wamService;
     private volatile CompletableFuture<?> periodicSyncJob;
     /**
      * Handle of the currently scheduled daily syncd stats reporting job, or
@@ -190,24 +200,26 @@ public final class WebAppStateService {
      * @param whatsapp               the WhatsApp client instance for store access and node sending
      * @param abPropsService         the AB props service for configuration values
      * @param snapshotRecoveryService the snapshot recovery service for peer recovery
+     * @param wamService             the WAM telemetry service for committing sync events
      */
-    public WebAppStateService(WhatsAppClient whatsapp, ABPropsService abPropsService, SnapshotRecoveryService snapshotRecoveryService) {
+    public WebAppStateService(WhatsAppClient whatsapp, ABPropsService abPropsService, SnapshotRecoveryService snapshotRecoveryService, WamService wamService) {
         this.whatsapp = whatsapp;
         this.store = whatsapp.store();
         this.abPropsService = abPropsService;
-        this.requestBuilder = new MutationRequestBuilder(whatsapp, abPropsService);
+        this.wamService = wamService;
+        this.requestBuilder = new MutationRequestBuilder(whatsapp, abPropsService, wamService);
         this.responseParser = new MutationResponseParser();
         this.handlerRegistry = new WebAppStateHandlerRegistry();
         this.integrityVerifier = new MutationIntegrityVerifier(store);
         this.retryScheduler = new WebAppStateBackoffScheduler();
-        this.missingSyncKeyRequestService = new MissingSyncKeyRequestService(whatsapp);
+        this.missingSyncKeyRequestService = new MissingSyncKeyRequestService(whatsapp, wamService);
         this.missingSyncKeyTimeoutScheduler = new MissingSyncKeyTimeoutScheduler(whatsapp, abPropsService, missingSyncKeyRequestService);
         // Wire the back-edge after both collaborators exist so that
         // MissingSyncKeyRequestService.trackMissingKeys can call
         // missingSyncKeyTimeoutScheduler.scheduleTimeoutCheck() inline,
         // mirroring WAWebSyncdStoreMissingKeys.addMissingKeys.
         this.missingSyncKeyRequestService.setTimeoutScheduler(missingSyncKeyTimeoutScheduler);
-        this.syncKeyRotationService = new SyncKeyRotationService(whatsapp, this, abPropsService);
+        this.syncKeyRotationService = new SyncKeyRotationService(whatsapp, this, abPropsService, wamService);
         this.snapshotRecoveryService = snapshotRecoveryService;
     }
 
@@ -1451,7 +1463,7 @@ public final class WebAppStateService {
         var now = System.currentTimeMillis();
         // WAWebSyncdCollectionHandler.applyAppStateSyncResponse: O = floor(performance.now() - h)
         var duration = (int) (now - applyStartTs);
-        whatsapp.wamService().commit(new MdBootstrapDataAppliedEventBuilder()
+        wamService.commit(new MdBootstrapDataAppliedEventBuilder()
                 // WAWebCollectionHandlerWamMutation.logMetricsForDataApplied:
                 //   mdBootstrapPayloadType: MD_BOOTSTRAP_PAYLOAD_TYPE.NON_CRITICAL
                 .mdBootstrapPayloadType(MdBootstrapPayloadType.NON_CRITICAL)
@@ -1609,7 +1621,7 @@ public final class WebAppStateService {
                 : Base64.getUrlEncoder().withoutPadding().encodeToString(patchMac); // WABase64.encodeB64UrlSafe
         for (var mutation : mutations) {
             // WAWebSyncdActionUtils.getMutationNameFromIndex: parseIndex(e, t)?.[0]
-            var mutationName = com.github.auties00.cobalt.sync.handler.SyncdIndexUtils
+            var mutationName = SyncdIndexUtils
                     .getMutationNameFromIndex(null, mutation.index());
             if (mutationName == null || mutationName.isBlank()) {
                 mutationName = "no-mutation-name"; // WAWebSyncdWamReportingUtils.syncReportMutationToWam: a != null ? a : "no-mutation-name"
@@ -1621,7 +1633,7 @@ public final class WebAppStateService {
             var mutationOperation = mutation.operation() == SyncdOperation.REMOVE
                     ? MutationOperationType.REMOVE
                     : MutationOperationType.SET;
-            whatsapp.wamService().commit(new MdSyncdMutationEventBuilder() // WAWebMdSyncdMutationWamEvent.MdSyncdMutationWamEvent
+            wamService.commit(new MdSyncdMutationEventBuilder() // WAWebMdSyncdMutationWamEvent.MdSyncdMutationWamEvent
                     .contentLength(0) // WAWebSyncdWamReportingUtils.syncReportMutationToWam: contentLength:0 (literal)
                     .isInBootstrap(false) // WAWebSyncdWamReportingUtils.syncReportMutationToWam: isInBootstrap:!1 (literal)
                     .isUsingLid(false) // WAWebSyncdWamReportingUtils.syncReportMutationToWam: isUsingLid:!1 (literal)
@@ -1677,7 +1689,7 @@ public final class WebAppStateService {
         var syncdCollection = mapSyncdCollectionType(collectionName);
         var seqNumberInt = (int) seqNumber;
         for (var mutation : mutations) {
-            var mutationName = com.github.auties00.cobalt.sync.handler.SyncdIndexUtils
+            var mutationName = SyncdIndexUtils
                     .getMutationNameFromIndex(null, mutation.actionIndex());
             if (mutationName == null || mutationName.isBlank()) {
                 mutationName = "no-mutation-name"; // WAWebSyncdWamReportingUtils.syncReportMutationToWam: a != null ? a : "no-mutation-name"
@@ -1686,7 +1698,7 @@ public final class WebAppStateService {
             var mutationOperation = mutation.operation() == SyncdOperation.REMOVE
                     ? MutationOperationType.REMOVE
                     : MutationOperationType.SET;
-            whatsapp.wamService().commit(new MdSyncdMutationEventBuilder() // WAWebMdSyncdMutationWamEvent.MdSyncdMutationWamEvent
+            wamService.commit(new MdSyncdMutationEventBuilder() // WAWebMdSyncdMutationWamEvent.MdSyncdMutationWamEvent
                     .contentLength(0) // WAWebSyncdWamReportingUtils.syncReportMutationToWam: contentLength:0 (literal)
                     .isInBootstrap(false) // WAWebSyncdWamReportingUtils.syncReportMutationToWam: isInBootstrap:!1 (literal)
                     .isUsingLid(false) // WAWebSyncdWamReportingUtils.syncReportMutationToWam: isUsingLid:!1 (literal)
@@ -1918,7 +1930,7 @@ public final class WebAppStateService {
      * {@code bulkGetCollectionVersionsInTransaction} / {@code getAllCollectionVersionsInTransaction}
      * (batched). Cobalt flattens the per-collection IDB store into the in-memory
      * {@code webAppStateCollections} map on the store,
-     * so bulk lookups are inlined as per-item calls to {@link com.github.auties00.cobalt.store.WhatsAppStore#findWebAppState}
+     * so bulk lookups are inlined as per-item calls to {@link WhatsAppStore#findWebAppState}
      * by the consumers (e.g. {@link #resumeAfterRestart} iterates {@code SyncPatchType.values()}).
      *
      * @implNote WAWebGetCollectionVersion.getCollectionVersionInTransaction — the
@@ -1972,7 +1984,7 @@ public final class WebAppStateService {
      *           step (required-field validation on {@code SyncdSnapshot.version},
      *           {@code mac}, {@code keyId}, and each {@code SyncdRecord}'s {@code index}/{@code value}/
      *           {@code keyId}) is absorbed by the protobuf library's required-field enforcement
-     *           during {@link SyncdSnapshotSpec#decode(it.auties.protobuf.stream.ProtobufInputStream)};
+     *           during {@link SyncdSnapshotSpec#decode(ProtobufInputStream)};
      *           the snapshot-level {@code version} presence check is performed by the caller
      *           ({@link #handleSyncResponse}) and the snapshot MAC verification (which WA Web does
      *           outside of {@code downloadSnapshot} as well) is performed by
@@ -2107,12 +2119,12 @@ public final class WebAppStateService {
                     .orElseThrow(() -> new WhatsAppWebAppStateSyncException.MissingKey(keyId));
 
             try (var keys = MutationKeys.ofSyncKey(syncKeyData)) {
-                var indexMac = javax.crypto.Mac.getInstance("HmacSHA256");
+                var indexMac = Mac.getInstance("HmacSHA256");
                 indexMac.init(keys.indexKey());
                 var indexMacResult = indexMac.doFinal(indexBytes);
 
                 // Populate sync action entry store for future LT-Hash computations
-                var indexString = new String(indexBytes, java.nio.charset.StandardCharsets.UTF_8);
+                var indexString = new String(indexBytes, StandardCharsets.UTF_8);
                 store.putSyncActionEntry(collectionName, indexMacResult, new SyncActionEntryBuilder()
                         .indexMac(indexMacResult)
                         .valueMac(valueMac)
@@ -2134,7 +2146,7 @@ public final class WebAppStateService {
                         timestamp, // NO_WA_BASIS: Cobalt extracts timestamp eagerly for the Trusted record; WA Web keeps it inside binarySyncData
                         actionVersion // WAWebSyncdCollectionHandlerTypesConverter.syncActionsToDecryptedMutation: version: e.version
                 ));
-            } catch (java.security.GeneralSecurityException e) {
+            } catch (GeneralSecurityException e) {
                 throw new WhatsAppWebAppStateSyncException.DecryptionFailed(e);
             }
         }
@@ -2174,7 +2186,7 @@ public final class WebAppStateService {
      *           {@code mutations.map(t => validateMutationProtobuf(collectionName, t))}. In Cobalt the
      *           per-mutation required-field validation (on {@code operation}, {@code record.index.blob},
      *           {@code record.value.blob}, {@code record.keyId}) is absorbed by the protobuf library
-     *           during {@link SyncdMutationsSpec#decode(it.auties.protobuf.stream.ProtobufInputStream)},
+     *           during {@link SyncdMutationsSpec#decode(ProtobufInputStream)},
      *           and additional semantic checks are performed downstream by {@link #decryptMutations}.
      *           The {@code downloadSyncBlob} and {@code decodeSyncdMutations} steps are split across
      *           the helpers {@link #downloadExternalMutation} and {@link #decodeExternalMutation};
@@ -2255,7 +2267,7 @@ public final class WebAppStateService {
             adaptation = WhatsAppAdaptation.ADAPTED)
     private void commitMediaDownload2Success(Instant downloadStart) {
         var overallT = Instant.ofEpochMilli(Duration.between(downloadStart, Instant.now()).toMillis());
-        whatsapp.wamService().commit(new MediaDownload2EventBuilder()
+        wamService.commit(new MediaDownload2EventBuilder()
                 .overallMediaType(MediaType.MD_APP_STATE)
                 .overallMmsVersion(4)
                 .overallDownloadOrigin(DownloadOriginType.MESSAGE_HISTORY_SYNC)
@@ -2302,7 +2314,7 @@ public final class WebAppStateService {
         if (statusCode != null) {
             builder.downloadHttpCode(statusCode);
         }
-        whatsapp.wamService().commit(builder.build());
+        wamService.commit(builder.build());
     }
 
     /**
@@ -2617,7 +2629,7 @@ public final class WebAppStateService {
                 continue;
             }
             // WAWebCollectionHandlerWamMutation.logMetricsForMutationLength: new MdAppStateMessageRangeWamEvent({additionalMessagesCount: e}).commit()
-            whatsapp.wamService().commit(new MdAppStateMessageRangeEventBuilder()
+            wamService.commit(new MdAppStateMessageRangeEventBuilder()
                     .additionalMessagesCount(messageRange.messages().size())
                     .build());
         }
@@ -2665,7 +2677,7 @@ public final class WebAppStateService {
         //   }).commit()
         // ADAPTED: Cobalt has no equivalent of genCurrentSessionId (which hashes
         // primary + companion identity keys), so mdSessionId is omitted.
-        whatsapp.wamService().commit(new MdBootstrapAppStateCriticalDataProcessingEventBuilder()
+        wamService.commit(new MdBootstrapAppStateCriticalDataProcessingEventBuilder()
                 .bootstrapAppStateDataStage(stage) // WAWebSyncdCriticalBootstrapProcessingApi: bootstrapAppStateDataStage: e
                 .mdTimestamp((int) System.currentTimeMillis()) // WAWebSyncdCriticalBootstrapProcessingApi: mdTimestamp: unixTimeMs()
                 .build());
@@ -2746,7 +2758,7 @@ public final class WebAppStateService {
         // in case a future WA Web revision starts populating mdSyncFailureReason at
         // this callsite.
         assert failure == null || result == MdBootstrapStepResult.FAILURE;
-        whatsapp.wamService().commit(builder.build()); // WAWebCollectionHandlerWamSyncUtil.commitBootstrapAppStateDownloadMetric: i.commit()
+        wamService.commit(builder.build()); // WAWebCollectionHandlerWamSyncUtil.commitBootstrapAppStateDownloadMetric: i.commit()
     }
 
     /**
@@ -2899,7 +2911,7 @@ public final class WebAppStateService {
             List<MutationApplicationResult> batchResults = null; // WAWebSyncdCollectionHandler.Xe
             var handlerFailed = false; // WAWebSyncdCollectionHandler.Xe: k flag
             try {
-                batchResults = handler.get().applyMutationBatchResults(whatsapp, versionGated); // WAWebSyncdCollectionHandler.Xe
+                batchResults = handler.get().applyMutationBatchResults(whatsapp, wamService, versionGated); // WAWebSyncdCollectionHandler.Xe
             } catch (WhatsAppWebAppStateSyncException exception) { // WAWebSyncdCollectionHandler.Xe
                 if (exception.isFatal() || collectionName == SyncPatchType.CRITICAL_BLOCK) { // WAWebSyncdCollectionHandler.Xe
                     throw exception;
@@ -2996,7 +3008,7 @@ public final class WebAppStateService {
             }
 
             try {
-                var result = handler.get().applyMutationResult(whatsapp, mutation);
+                var result = handler.get().applyMutationResult(whatsapp, wamService, mutation);
                 if (result.isOrphan()) {
                     store.addOrphanMutation(collectionName, orphan);
                 } else {
@@ -3076,7 +3088,7 @@ public final class WebAppStateService {
      */
     private String resolveActionName(DecryptedMutation.Trusted mutation) {
         // WAWebSyncdCollectionHandler.it: var n = parseIndex(e, t); if (n == null) throw SyncdFatalError
-        com.alibaba.fastjson2.JSONArray indexArray; // WAWebSyncdActionUtils.parseIndex
+        JSONArray indexArray; // WAWebSyncdActionUtils.parseIndex
         try {
             indexArray = JSON.parseArray(mutation.index()); // WAWebSyncdActionUtils.parseIndex: JSON.parse(n)
         } catch (Throwable throwable) {
@@ -3105,7 +3117,7 @@ public final class WebAppStateService {
      * Used in non-fatal paths like orphan retry, logging, and model ID extraction.
      *
      * <p>Delegates to
-     * {@link com.github.auties00.cobalt.sync.handler.SyncdIndexUtils#getMutationNameFromIndex(String, String)};
+     * {@link SyncdIndexUtils#getMutationNameFromIndex(String, String)};
      * additionally treats a blank action name as {@code null} (the JS check
      * {@code n == null} collapses to {@code undefined} in WA Web since a
      * zero-element array cannot reach this branch; Cobalt keeps the blank
@@ -3117,7 +3129,7 @@ public final class WebAppStateService {
      */
     private String resolveActionNameSafe(DecryptedMutation.Trusted mutation) {
         // WAWebSyncdActionUtils.getMutationNameFromIndex: var n = parseIndex(e, t); return n == null ? void 0 : n[0]
-        var actionName = com.github.auties00.cobalt.sync.handler.SyncdIndexUtils
+        var actionName = SyncdIndexUtils
                 .getMutationNameFromIndex(null, mutation.index());
         if (actionName == null || actionName.isBlank()) { // ADAPTED: blank guard preserves existing Cobalt behavior
             return null; // WAWebSyncdActionUtils.getMutationNameFromIndex: n == null -> return undefined
@@ -3137,7 +3149,7 @@ public final class WebAppStateService {
      */
     private String extractModelId(String mutationIndex) {
         // WAWebSyncdActionUtils.parseIndex: JSON.parse(n); element 1 is the model ID
-        var indexArray = com.github.auties00.cobalt.sync.handler.SyncdIndexUtils
+        var indexArray = SyncdIndexUtils
                 .parseIndex(null, mutationIndex);
         if (indexArray != null && indexArray.size() >= 2) {
             return indexArray.getString(1);
@@ -3246,7 +3258,7 @@ public final class WebAppStateService {
             }
 
             try {
-                var result = handler.get().applyMutationResult(whatsapp, mutation);
+                var result = handler.get().applyMutationResult(whatsapp, wamService, mutation);
                 recordMutationState(collectionName, mutation, actionName, result);
                 if (result.isOrphan()) {
                     store.addOrphanMutation(collectionName, buildOrphanEntry(
@@ -3526,16 +3538,16 @@ public final class WebAppStateService {
             try { // WAWebSyncdFatal.handleFatalError: try { yield sendAppStateFatalExceptionNotification(n) }
                 sendAppStateFatalExceptionNotification(collectionNames); // WAWebSyncdFatal.handleFatalError: yield sendAppStateFatalExceptionNotification(n)
             } catch (Throwable notifyError) { // WAWebSyncdFatal.handleFatalError: catch(e) ERROR("syncd: error when sending fatal message to primary").sendLogs("syncd: could not send fatal to primary")
-                LOGGER.log(java.util.logging.Level.SEVERE, "syncd: error when sending fatal message to primary", notifyError);
+                LOGGER.log(Level.SEVERE, "syncd: error when sending fatal message to primary", notifyError);
             }
             // ADAPTED: WAWebSyncdFatal.handleFatalError calls socketLogout(LogoutReason.SyncdFailure);
             // Cobalt routes through pluggable error handler instead of hardcoded logout
             whatsapp.handleFailure(syncEx);
         } else {
             // WAWebSyncdServerSync.S: catch (retryable) -> ErrorRetry with serverBackoff
-            var firstFailureTimestamp = metadata.lastErrorTimestamp() > 0
-                    ? metadata.lastErrorTimestamp()
-                    : System.currentTimeMillis();
+            var firstFailureTimestamp = metadata.lastErrorTimestamp()
+                    .map(Instant::toEpochMilli)
+                    .orElseGet(System::currentTimeMillis);
             // WAWebSyncd.ee: i.length > 0 && (q = i[0].serverBackoff || 0, W = 0)
             // When server returns ErrorRetry with backoff, reset the global attempt counter
             var serverBackoffMs = error instanceof WhatsAppWebAppStateSyncException.RetryableServerError retryable
@@ -3835,7 +3847,7 @@ public final class WebAppStateService {
         for (var entry : counts.entrySet()) {
             var actionName = entry.getKey();
             var stats = entry.getValue();
-            whatsapp.wamService().commit(new MdAppStateSyncMutationStatsEventBuilder()
+            wamService.commit(new MdAppStateSyncMutationStatsEventBuilder()
                     .syncdAction(actionName)                           // WAWebSyncdReportSyncdStatJob: syncdAction: t.action
                     .applied(convertToBucket(stats.applied))           // WAWebSyncdReportSyncdStatJob: applied: n.convertToBucket(t.applied)
                     .invalid(convertToBucket(stats.invalid))           // WAWebSyncdReportSyncdStatJob: invalid: n.convertToBucket(t.invalid)
@@ -3959,7 +3971,7 @@ public final class WebAppStateService {
         if (sessionLengthDays != null) { // WAWebSyncdReportKeyStatsJob.reportSyncdKeyStatsJob: e.syncdSessionLengthDays != null && (t.syncdSessionLengthDays = e.syncdSessionLengthDays)
             event.syncdSessionLengthDays(sessionLengthDays);
         }
-        whatsapp.wamService().commit(event.build()); // WAWebSyncdReportKeyStatsJob: new SyncdKeyCountWamEvent(t).commit()
+        wamService.commit(event.build()); // WAWebSyncdReportKeyStatsJob: new SyncdKeyCountWamEvent(t).commit()
     }
 
     /**

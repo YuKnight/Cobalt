@@ -15,6 +15,7 @@ import com.github.auties00.cobalt.stream.notification.device.NotificationDeviceD
 import com.github.auties00.cobalt.stream.notification.group.NotificationGroupStreamHandler;
 import com.github.auties00.cobalt.stream.SocketStream;
 import com.github.auties00.cobalt.node.Node;
+import com.github.auties00.cobalt.wam.WamService;
 
 /**
  * Routes incoming {@code <notification>} stanzas to the appropriate
@@ -101,6 +102,8 @@ public final class NotificationStreamHandler implements SocketStream.Handler {
      *                                       for the {@code MdAppStateOfflineNotifications}
      *                                       WAM event; forwarded to the device dispatcher
      *                                       for consumption by the server-sync handler
+     * @param wamService                     the WAM telemetry service forwarded to sub-dispatchers
+     *                                       that commit notification-driven events
      */
     public NotificationStreamHandler(
             WhatsAppClient whatsapp,
@@ -108,12 +111,13 @@ public final class NotificationStreamHandler implements SocketStream.Handler {
             LidMigrationService lidMigrationService,
             ABPropsService abPropsService,
             DeviceService deviceService,
-            OfflineNotificationsReporter offlineNotificationsReporter
+            OfflineNotificationsReporter offlineNotificationsReporter,
+            WamService wamService
     ) {
         this.accountHandler = new NotificationAccountDispatcher(whatsapp, deviceService);
         this.businessHandler = new NotificationBusinessDispatcher(whatsapp, lidMigrationService);
-        this.deviceHandler = new NotificationDeviceDispatcher(whatsapp, deviceLinkingService, abPropsService, deviceService, offlineNotificationsReporter);
-        this.groupHandler = new NotificationGroupStreamHandler(whatsapp);
+        this.deviceHandler = new NotificationDeviceDispatcher(whatsapp, deviceLinkingService, abPropsService, deviceService, offlineNotificationsReporter, wamService);
+        this.groupHandler = new NotificationGroupStreamHandler(whatsapp, wamService);
     }
 
     /**

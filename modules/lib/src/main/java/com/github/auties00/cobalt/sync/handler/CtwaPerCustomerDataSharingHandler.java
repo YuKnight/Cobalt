@@ -15,6 +15,7 @@ import com.github.auties00.cobalt.model.sync.action.business.CtwaPerCustomerData
 import com.github.auties00.cobalt.model.sync.action.business.CtwaPerCustomerDataSharingActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 import java.time.Instant;
 import java.util.List;
@@ -116,8 +117,8 @@ public final class CtwaPerCustomerDataSharingHandler implements WebAppStateActio
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebCtwaPerCustomerDataSharingSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebCtwaPerCustomerDataSharingSync.applyMutations
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebCtwaPerCustomerDataSharingSync.applyMutations
     }
 
     /**
@@ -149,7 +150,7 @@ public final class CtwaPerCustomerDataSharingHandler implements WebAppStateActio
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebCtwaPerCustomerDataSharingSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         var indexArray = JSON.parseArray(mutation.index()); // WAWebCtwaPerCustomerDataSharingSync.applyMutations — indexParts
         var accountLid = indexArray.getString(1); // WAWebCtwaPerCustomerDataSharingSync.applyMutations — u = n[1]
 

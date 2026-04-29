@@ -13,6 +13,7 @@ import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.contact.OutContactAction;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 import java.util.logging.Logger;
 
@@ -129,8 +130,8 @@ public final class OutContactHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebOutContactSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebOutContactSync.applyMutations
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebOutContactSync.applyMutations
     }
 
     /**
@@ -182,7 +183,7 @@ public final class OutContactHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebOutContactSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         // WAWebOutContactSync.applyMutations: if (!o("WAWebOutContactInviteGating").isOutContactInviteEnabled())
         //     return t.map(function() { return {actionState: Unsupported} })
         var gateValue = client.abPropsService().getInt(ABProp.OUT_CONTACT_INVITES_ENABLED); // WAWebOutContactInviteGating.isOutContactInviteEnabled: getABPropConfigValue("out_contact_invites_enabled")

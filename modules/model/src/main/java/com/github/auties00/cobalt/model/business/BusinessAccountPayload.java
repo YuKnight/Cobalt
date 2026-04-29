@@ -1,57 +1,64 @@
 package com.github.auties00.cobalt.model.business;
 
 import com.github.auties00.cobalt.model.mixin.InstantSecondsMixin;
-import it.auties.protobuf.annotation.*;
-import it.auties.protobuf.model.*;
+
+import it.auties.protobuf.annotation.ProtobufEnum;
+import it.auties.protobuf.annotation.ProtobufEnumIndex;
+import it.auties.protobuf.annotation.ProtobufMessage;
+import it.auties.protobuf.annotation.ProtobufProperty;
+import it.auties.protobuf.model.ProtobufType;
 
 import java.time.Instant;
 import java.util.Optional;
 import java.util.OptionalLong;
 
 /**
- * Bundles a {@link BusinessVerifiedNameCertificate} together with the serialized
- * account-link information for a WhatsApp Business account.
+ * Provisioning envelope returned by WhatsApp when a business account is linked
+ * or registered, bundling a {@link BusinessVerifiedNameCertificate} together
+ * with the serialized account-link record that ties the WhatsApp number to a
+ * Facebook Business entity.
  *
- * <p>During business account provisioning, WhatsApp transmits both the
- * verified-name certificate and the raw bytes of an {@link AccountLinkInfo}
- * inside a single protobuf envelope. The certificate attests to the business's
- * verified name, while the account-link info describes the association between
- * a WhatsApp phone number and a Facebook Business ID.
+ * <p>Whenever a phone number is registered as a WhatsApp Business account, the
+ * server emits this envelope so the client can simultaneously persist the
+ * verified-name certificate (used to prove the business's display name to chat
+ * peers) and the account-link blob (used to prove ownership of the linked
+ * Facebook Business Manager account). The two fields are independent and
+ * either may be absent depending on the registration path.
  *
- * <p>Callers typically deserialize the {@link #accountLinkInfo()} bytes into an
- * {@link AccountLinkInfo} message to inspect the linked Facebook Business ID,
- * phone number, and hosting configuration.
- *
- * @see BusinessVerifiedNameCertificate
- * @see AccountLinkInfo
+ * <p>The {@link #accountLinkInfo()} bytes are the protobuf-serialized form of
+ * an {@link AccountLinkInfo} message and should be deserialized by callers
+ * that need to inspect the Facebook Business ID, the linked phone number, the
+ * issuance time, the hosting infrastructure, or the business account tier.
  */
 @ProtobufMessage(name = "BizAccountPayload")
 public final class BusinessAccountPayload {
     /**
-     * The verified-name certificate for this business account, containing the
-     * business's attested name, client signature, and server signature.
-     *
-     * <p>May be absent if the payload was constructed without certificate data.
+     * Verified-name certificate for the business account, attesting the
+     * business's approved display name and carrying the client and server
+     * signatures that prove its authenticity. Populated whenever the
+     * registration flow includes a verified-name issuance step; absent when
+     * the payload only carries account-link data.
      */
     @ProtobufProperty(index = 1, type = ProtobufType.MESSAGE)
     BusinessVerifiedNameCertificate verifiedNameCertificate;
 
     /**
-     * The serialized protobuf bytes of the {@link AccountLinkInfo} message that
-     * links this WhatsApp account to its corresponding Facebook Business account.
-     *
-     * <p>Deserialize these bytes into an {@link AccountLinkInfo} to access the
-     * Facebook Business ID, phone number, issue time, and hosting configuration.
+     * Serialized protobuf bytes of an {@link AccountLinkInfo} message
+     * describing the link between this WhatsApp account and a Facebook
+     * Business account. Populated whenever the registration flow established
+     * or refreshed the Facebook link; callers must deserialize the bytes
+     * separately to access the structured fields.
      */
     @ProtobufProperty(index = 2, type = ProtobufType.BYTES)
     byte[] accountLinkInfo;
 
     /**
-     * Constructs a new {@code BusinessAccountPayload}.
+     * Constructs a new {@code BusinessAccountPayload} bundling a verified-name
+     * certificate and a serialized account-link blob. Either argument may be
+     * {@code null} when the corresponding wire field is absent.
      *
-     * @param verifiedNameCertificate the verified-name certificate, or {@code null} if absent
-     * @param accountLinkInfo         the serialized {@link AccountLinkInfo} bytes,
-     *                                or {@code null} if absent
+     * @param verifiedNameCertificate the verified-name certificate, or {@code null}
+     * @param accountLinkInfo         the serialized {@link AccountLinkInfo} bytes, or {@code null}
      */
     BusinessAccountPayload(BusinessVerifiedNameCertificate verifiedNameCertificate, byte[] accountLinkInfo) {
         this.verifiedNameCertificate = verifiedNameCertificate;
@@ -59,27 +66,29 @@ public final class BusinessAccountPayload {
     }
 
     /**
-     * Returns the verified-name certificate for this business account.
+     * Returns the verified-name certificate attesting the business's approved
+     * display name.
      *
      * @return an {@code Optional} containing the {@link BusinessVerifiedNameCertificate},
-     *         or empty if no certificate is present
+     *         or empty when the payload did not include certificate data
      */
     public Optional<BusinessVerifiedNameCertificate> verifiedNameCertificate() {
         return Optional.ofNullable(verifiedNameCertificate);
     }
 
     /**
-     * Returns the serialized {@link AccountLinkInfo} bytes.
+     * Returns the serialized protobuf bytes of the {@link AccountLinkInfo}
+     * message describing the Facebook Business link for this account.
      *
-     * @return an {@code Optional} containing the raw protobuf bytes,
-     *         or empty if no account-link info is present
+     * @return an {@code Optional} containing the raw protobuf bytes, or empty
+     *         when the payload did not include account-link data
      */
     public Optional<byte[]> accountLinkInfo() {
         return Optional.ofNullable(accountLinkInfo);
     }
 
     /**
-     * Sets the verified-name certificate for this business account.
+     * Sets the verified-name certificate for this account payload.
      *
      * @param verifiedNameCertificate the certificate to set, or {@code null} to clear
      */
@@ -88,7 +97,7 @@ public final class BusinessAccountPayload {
     }
 
     /**
-     * Sets the serialized {@link AccountLinkInfo} bytes.
+     * Sets the serialized {@link AccountLinkInfo} bytes for this account payload.
      *
      * @param accountLinkInfo the raw protobuf bytes to set, or {@code null} to clear
      */
@@ -97,70 +106,73 @@ public final class BusinessAccountPayload {
     }
 
     /**
-     * Describes the association between a WhatsApp phone number and a Facebook
-     * Business account.
+     * Describes the association between a WhatsApp Business phone number and
+     * the Facebook Business account that owns it.
      *
      * <p>This message records the Facebook Business ID (FBID) that owns the
-     * WhatsApp Business account, the phone number linked to it, the timestamp
-     * when the link was established, and the infrastructure and account type
-     * configuration. These fields are used during business verification and
-     * provisioning to confirm that a WhatsApp number is legitimately operated
-     * by a specific Facebook Business entity.
-     *
-     * @see BusinessAccountPayload
+     * WhatsApp Business account, the registered phone number, the moment the
+     * link was established, and the hosting and tier configuration of the
+     * business account. WhatsApp uses these fields during business
+     * verification, provisioning, and policy enforcement to confirm that a
+     * given WhatsApp number is legitimately operated by a specific Facebook
+     * Business entity.
      */
     @ProtobufMessage(name = "BizAccountLinkInfo")
     public static final class AccountLinkInfo {
         /**
-         * The Facebook Business ID (FBID) of the linked business account.
-         *
-         * <p>This is the unique numeric identifier assigned by Meta to the
-         * business entity, for example {@code 123456789012345}. It establishes
-         * the ownership relationship between the Facebook Business Manager
-         * and this WhatsApp Business account.
+         * Numeric Facebook Business ID (FBID) of the linked business account,
+         * for example {@code 123456789012345}. This is the unique identifier
+         * assigned by Meta to the business entity in Business Manager and
+         * establishes the ownership relationship between the Facebook
+         * organization and this WhatsApp Business account.
          */
         @ProtobufProperty(index = 1, type = ProtobufType.UINT64)
         Long facebookBusinessId;
 
         /**
-         * The WhatsApp phone number associated with this business account,
-         * in E.164-like format without the leading plus sign (for example
-         * {@code "15551234567"}).
+         * WhatsApp phone number registered as the business account, in
+         * E.164-like form without the leading plus sign (for example
+         * {@code "15551234567"}). The number is the public messaging address
+         * that customers use to contact the business.
          */
         @ProtobufProperty(index = 2, type = ProtobufType.STRING)
         String phoneNumber;
 
         /**
-         * The timestamp at which the account link was established, represented
-         * as an {@link Instant} converted from epoch seconds via
+         * Moment at which the link between this WhatsApp number and the
+         * Facebook Business account was established. The wire encoding is
+         * seconds since the Unix epoch, converted to {@link Instant} via
          * {@link InstantSecondsMixin}.
          */
         @ProtobufProperty(index = 3, type = ProtobufType.UINT64, mixins = InstantSecondsMixin.class)
         Instant issueTime;
 
         /**
-         * The type of infrastructure hosting the business data, indicating
-         * whether the data resides on the business's own servers or on
-         * Meta's infrastructure.
+         * Type of infrastructure that hosts the business's data and message
+         * processing, distinguishing on-premises deployments from
+         * Meta-hosted Cloud API deployments.
          */
         @ProtobufProperty(index = 4, type = ProtobufType.ENUM)
         HostStorageType hostStorage;
 
         /**
-         * The type of business account, indicating the tier of the WhatsApp
-         * Business product being used (for example, enterprise API accounts).
+         * Tier of the WhatsApp Business product this account belongs to,
+         * which determines the kind of API access and feature set available
+         * to the business.
          */
         @ProtobufProperty(index = 5, type = ProtobufType.ENUM)
         AccountType accountType;
 
         /**
-         * Constructs a new {@code AccountLinkInfo}.
+         * Constructs a new {@code AccountLinkInfo} with the given Facebook
+         * link parameters. Any argument may be {@code null} to represent a
+         * field that was absent on the wire.
          *
-         * @param facebookBusinessId the Facebook Business ID, or {@code null} if absent
-         * @param phoneNumber        the WhatsApp phone number, or {@code null} if absent
-         * @param issueTime          the time the link was established, or {@code null} if absent
-         * @param hostStorage        the hosting infrastructure type, or {@code null} if absent
-         * @param accountType        the business account type, or {@code null} if absent
+         * @param facebookBusinessId the Facebook Business ID, or {@code null}
+         * @param phoneNumber        the registered WhatsApp phone number, or {@code null}
+         * @param issueTime          the time the link was established, or {@code null}
+         * @param hostStorage        the hosting infrastructure type, or {@code null}
+         * @param accountType        the business account tier, or {@code null}
          */
         AccountLinkInfo(Long facebookBusinessId, String phoneNumber, Instant issueTime, HostStorageType hostStorage, AccountType accountType) {
             this.facebookBusinessId = facebookBusinessId;
@@ -171,130 +183,136 @@ public final class BusinessAccountPayload {
         }
 
         /**
-         * Returns the Facebook Business ID (FBID) of the linked business account.
+         * Returns the Facebook Business ID (FBID) of the linked business
+         * account.
          *
-         * @return the FBID as an {@code OptionalLong}, or empty if not set
+         * @return an {@code OptionalLong} containing the FBID, or empty when
+         *         the wire omitted the field
          */
         public OptionalLong facebookBusinessId() {
             return facebookBusinessId == null ? OptionalLong.empty() : OptionalLong.of(facebookBusinessId);
         }
 
         /**
-         * Returns the WhatsApp phone number associated with this business account.
+         * Returns the WhatsApp phone number registered as this business
+         * account.
          *
          * @return an {@code Optional} containing the phone number string
-         *         (for example {@code "15551234567"}), or empty if not set
+         *         (for example {@code "15551234567"}), or empty when the wire
+         *         omitted the field
          */
         public Optional<String> phoneNumber() {
             return Optional.ofNullable(phoneNumber);
         }
 
         /**
-         * Returns the timestamp at which the account link was established.
+         * Returns the moment at which the link between this WhatsApp number
+         * and the Facebook Business account was established.
          *
-         * @return an {@code Optional} containing the issue time as an {@link Instant},
-         *         or empty if not set
+         * @return an {@code Optional} containing the issue time as an
+         *         {@link Instant}, or empty when the wire omitted the field
          */
         public Optional<Instant> issueTime() {
             return Optional.ofNullable(issueTime);
         }
 
         /**
-         * Returns the type of infrastructure hosting the business data.
+         * Returns the type of infrastructure that hosts the business's data
+         * and processes its messages.
          *
          * @return an {@code Optional} containing the {@link HostStorageType},
-         *         or empty if not set
+         *         or empty when the wire omitted the field
          */
         public Optional<HostStorageType> hostStorage() {
             return Optional.ofNullable(hostStorage);
         }
 
         /**
-         * Returns the type of business account.
+         * Returns the tier of the WhatsApp Business product that this
+         * account belongs to.
          *
-         * @return an {@code Optional} containing the {@link AccountType},
-         *         or empty if not set
+         * @return an {@code Optional} containing the {@link AccountType}, or
+         *         empty when the wire omitted the field
          */
         public Optional<AccountType> accountType() {
             return Optional.ofNullable(accountType);
         }
 
         /**
-         * Sets the Facebook Business ID.
+         * Sets the Facebook Business ID for this account link.
          *
          * @param facebookBusinessId the FBID to set, or {@code null} to clear
          */
         public void setFacebookBusinessId(Long facebookBusinessId) {
             this.facebookBusinessId = facebookBusinessId;
-    }
+        }
 
         /**
-         * Sets the WhatsApp phone number.
+         * Sets the registered WhatsApp phone number for this account link.
          *
          * @param phoneNumber the phone number to set, or {@code null} to clear
          */
         public void setPhoneNumber(String phoneNumber) {
             this.phoneNumber = phoneNumber;
-    }
+        }
 
         /**
-         * Sets the timestamp at which the account link was established.
+         * Sets the moment at which the account link was established.
          *
          * @param issueTime the issue time to set, or {@code null} to clear
          */
-        public void setsueTime(Instant issueTime) {
+        public void setIssueTime(Instant issueTime) {
             this.issueTime = issueTime;
-    }
+        }
 
         /**
-         * Sets the hosting infrastructure type.
+         * Sets the hosting infrastructure type for this account link.
          *
          * @param hostStorage the {@link HostStorageType} to set, or {@code null} to clear
          */
         public void setHostStorage(HostStorageType hostStorage) {
             this.hostStorage = hostStorage;
-    }
+        }
 
         /**
-         * Sets the business account type.
+         * Sets the business account tier for this account link.
          *
          * @param accountType the {@link AccountType} to set, or {@code null} to clear
          */
         public void setAccountType(AccountType accountType) {
             this.accountType = accountType;
-    }
+        }
 
         /**
-         * Enumerates the tiers of WhatsApp Business accounts used in account
-         * link information.
-         *
-         * <p>Currently, only the {@link #ENTERPRISE} tier is defined, which
-         * corresponds to businesses using the WhatsApp Business API (Cloud API
-         * or On-Premises API).
+         * Enumerates the tiers of WhatsApp Business products that an
+         * {@link AccountLinkInfo} can identify. The tier dictates the level
+         * of API access available to the business and the way it can
+         * automate or delegate messaging.
          */
         @ProtobufEnum(name = "BizAccountLinkInfo.AccountType")
         public enum AccountType {
             /**
-             * An enterprise-tier WhatsApp Business account, typically using the
-             * WhatsApp Business API (Cloud API or On-Premises API) for
-             * programmatic messaging at scale.
+             * Enterprise-tier business account, typically using the WhatsApp
+             * Business API (Cloud API or On-Premises API) for programmatic
+             * messaging at scale through a Business Solution Provider or via
+             * Meta's hosted infrastructure.
              */
             ENTERPRISE(0);
 
             /**
-             * Constructs an {@code AccountType} enum constant with the given
-             * protobuf index.
+             * Protobuf wire index for this enum constant.
+             */
+            final int index;
+
+            /**
+             * Constructs an {@code AccountType} enum constant bound to the
+             * given protobuf wire index.
              *
              * @param index the protobuf wire index
              */
             AccountType(@ProtobufEnumIndex int index) {
                 this.index = index;
             }
-
-            /**
-             * The protobuf wire index for this enum constant.
-             */
-            final int index;
 
             /**
              * Returns the protobuf wire index of this enum constant.
@@ -307,46 +325,40 @@ public final class BusinessAccountPayload {
         }
 
         /**
-         * Enumerates the types of infrastructure that can host a WhatsApp Business
-         * account's data.
-         *
-         * <p>This determines where message data and business information are stored
-         * and processed:
-         * <ul>
-         *   <li>{@link #ON_PREMISE} indicates that data is hosted on the business's
-         *       own infrastructure (on-premises deployment of the WhatsApp Business API).
-         *   <li>{@link #FACEBOOK} indicates that data is hosted on Meta (Facebook)
-         *       infrastructure (Cloud API deployment).
-         * </ul>
+         * Enumerates the kinds of infrastructure that can host a WhatsApp
+         * Business account's data and message-processing pipeline. The
+         * choice of host directly affects the messaging privacy guarantees
+         * the business can advertise to its customers.
          */
         @ProtobufEnum(name = "BizAccountLinkInfo.HostStorageType")
         public enum HostStorageType {
             /**
-             * Data is hosted on the business's own infrastructure (on-premises
-             * deployment).
+             * Data is hosted and processed on the business's own
+             * infrastructure (on-premises deployment of the WhatsApp Business
+             * API).
              */
             ON_PREMISE(0),
 
             /**
-             * Data is hosted on Meta (Facebook) infrastructure (Cloud API
-             * deployment).
+             * Data is hosted and processed on Meta-managed infrastructure
+             * (Cloud API deployment).
              */
             FACEBOOK(1);
 
             /**
-             * Constructs a {@code HostStorageType} enum constant with the given
-             * protobuf index.
+             * Protobuf wire index for this enum constant.
+             */
+            final int index;
+
+            /**
+             * Constructs a {@code HostStorageType} enum constant bound to
+             * the given protobuf wire index.
              *
              * @param index the protobuf wire index
              */
             HostStorageType(@ProtobufEnumIndex int index) {
                 this.index = index;
             }
-
-            /**
-             * The protobuf wire index for this enum constant.
-             */
-            final int index;
 
             /**
              * Returns the protobuf wire index of this enum constant.

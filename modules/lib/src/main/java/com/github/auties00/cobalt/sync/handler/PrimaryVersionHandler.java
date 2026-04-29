@@ -11,6 +11,7 @@ import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.device.PrimaryVersionAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -125,8 +126,8 @@ public final class PrimaryVersionHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPrimaryVersionSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: single-path adapter for batch-only WA Web entry
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: single-path adapter for batch-only WA Web entry
     }
 
     /**
@@ -155,12 +156,12 @@ public final class PrimaryVersionHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPrimaryVersionSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.DIRECT)
-    public List<MutationApplicationResult> applyMutationBatchResults(WhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
+    public List<MutationApplicationResult> applyMutationBatchResults(WhatsAppClient client, WamService wamService, List<DecryptedMutation.Trusted> mutations) {
         // WAWebPrimaryVersionSync.applyMutations: var n = this, r = 0, a = 0
         // r and a are local counters for the WALogger WARN telemetry, intentionally omitted in Cobalt
         var results = new ArrayList<MutationApplicationResult>(mutations.size()); // WAWebPrimaryVersionSync.applyMutations: var i = t.map(...)
         for (var mutation : mutations) { // WAWebPrimaryVersionSync.applyMutations: t.map(function(e) {...})
-            results.add(applyMutationResult(client, mutation)); // WAWebPrimaryVersionSync.applyMutations: per-mutation classification
+            results.add(applyMutationResult(client, wamService, mutation)); // WAWebPrimaryVersionSync.applyMutations: per-mutation classification
         }
         // WAWebPrimaryVersionSync.applyMutations: r > 0 && WALogger.WARN("syncd: primary version sync, %s operations not supported", r) — telemetry skipped
         // WAWebPrimaryVersionSync.applyMutations: a > 0 && WALogger.WARN("syncd: primary version sync, %s malformed mutations", a) — telemetry skipped
@@ -188,7 +189,7 @@ public final class PrimaryVersionHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPrimaryVersionSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) { // WAWebPrimaryVersionSync.applyMutations: if (e.operation !== "set")
             return MutationApplicationResult.unsupported(); // WAWebPrimaryVersionSync.applyMutations: r++, return {actionState: Unsupported}
         }

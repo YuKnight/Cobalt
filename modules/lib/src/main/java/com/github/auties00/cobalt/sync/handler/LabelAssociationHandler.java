@@ -17,6 +17,7 @@ import com.github.auties00.cobalt.model.sync.action.contact.LabelAssociationActi
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 import java.time.Instant;
 import java.util.List;
@@ -130,8 +131,8 @@ public final class LabelAssociationHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebLabelJidSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebLabelJidSync.applyMutations
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebLabelJidSync.applyMutations
     }
 
     /**
@@ -179,7 +180,7 @@ public final class LabelAssociationHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebLabelJidSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         try { // WAWebLabelJidSync.applyMutations, try { ... } catch(e) { return {actionState: Failed} }
             if (mutation.operation() != SyncdOperation.SET) { // WAWebLabelJidSync.applyMutations, if (e.operation === "set") { ... } return _++, {actionState: Unsupported}
                 return MutationApplicationResult.unsupported(); // WAWebLabelJidSync.applyMutations, {actionState: o("WASyncdConst").SyncActionState.Unsupported}

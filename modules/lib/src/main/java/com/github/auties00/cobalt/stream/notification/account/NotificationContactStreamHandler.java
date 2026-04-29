@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.stream.notification.account;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.contact.Contact;
 import com.github.auties00.cobalt.model.contact.ContactStatus;
 import com.github.auties00.cobalt.model.jid.Jid;
@@ -21,6 +22,7 @@ import com.github.auties00.cobalt.stream.SocketStream;
  *
  * @implNote WAWebHandleContactNotification.default
  */
+@WhatsAppWebModule(moduleName = "WAWebHandleContactNotification")
 final class NotificationContactStreamHandler implements SocketStream.Handler {
 
     /**

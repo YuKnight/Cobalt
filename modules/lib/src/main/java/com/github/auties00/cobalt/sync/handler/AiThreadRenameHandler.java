@@ -5,6 +5,7 @@ import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
+import com.github.auties00.cobalt.model.device.DeviceCapabilities;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncActionState;
@@ -15,8 +16,10 @@ import com.github.auties00.cobalt.model.sync.action.bot.AiThreadRenameActionBuil
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.wam.WamService;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.logging.Logger;
 
@@ -120,8 +123,8 @@ public final class AiThreadRenameHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebAiThreadRenameSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, mutation).actionState() == SyncActionState.SUCCESS; // WAWebAiThreadRenameSync.applyMutations
+    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebAiThreadRenameSync.applyMutations
     }
 
     /**
@@ -149,7 +152,7 @@ public final class AiThreadRenameHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebAiThreadRenameSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         try { // WAWebAiThreadRenameSync.applyMutations: try { ... } catch(e) { return {actionState: Failed} }
             // WAWebAiThreadRenameSync.applyMutations: if (e.operation !== "set") return {actionState: Unsupported}
             if (mutation.operation() != SyncdOperation.SET) {
@@ -196,9 +199,9 @@ public final class AiThreadRenameHandler implements WebAppStateActionHandler {
             // Cobalt maps this to DeviceCapabilities.AiThread.SupportLevel check
             // since Cobalt does not have an AB props subsystem.
             var aiThreadSupported = client.store().primaryDeviceCapabilities()
-                    .flatMap(com.github.auties00.cobalt.model.device.DeviceCapabilities::aiThread)
-                    .flatMap(com.github.auties00.cobalt.model.device.DeviceCapabilities.AiThread::supportLevel)
-                    .filter(level -> level != com.github.auties00.cobalt.model.device.DeviceCapabilities.AiThread.SupportLevel.NONE)
+                    .flatMap(DeviceCapabilities::aiThread)
+                    .flatMap(DeviceCapabilities.AiThread::supportLevel)
+                    .filter(level -> level != DeviceCapabilities.AiThread.SupportLevel.NONE)
                     .isPresent();
             if (!aiThreadSupported) {
                 return MutationApplicationResult.unsupported(); // WAWebAiThreadRenameSync.applyMutations: Unsupported if gating fails
@@ -207,7 +210,7 @@ public final class AiThreadRenameHandler implements WebAppStateActionHandler {
             // ADAPTED: WAWebAiThreadRenameSync.applyMutations — WA Web calls
             // createAiThreadFromMutationIndex(botWid, threadId) then resolveThreadForMutationIndex(thread).
             // Cobalt collapses WA Web's ThreadsMetadata IDB table into the aiThreadTitles map.
-            var titles = new java.util.HashMap<>(client.store().aiThreadTitles());
+            var titles = new HashMap<>(client.store().aiThreadTitles());
             var key = chatJidString + "|" + threadId;
             if (!titles.containsKey(key)) {
                 // WAWebAiThreadRenameSync.applyMutations: return {actionState: Orphan, orphanModel: p.orphanModel}
