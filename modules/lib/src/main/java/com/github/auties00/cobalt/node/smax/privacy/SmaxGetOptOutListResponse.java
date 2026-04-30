@@ -17,8 +17,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants.
- *
- * @implNote {@code WASmaxBlocklistsGetOptOutListRPC.sendGetOptOutListRPC}.
  */
 public sealed interface SmaxGetOptOutListResponse extends SmaxOperation.Response
         permits SmaxGetOptOutListResponse.SuccessWithMatch,
@@ -160,10 +158,8 @@ public sealed interface SmaxGetOptOutListResponse extends SmaxOperation.Response
     }
 
     /**
-     * The {@code SuccessWithMatch} reply variant — the client's
+     * The {@code SuccessWithMatch} reply variant. The client's
      * cache is up to date.
-     *
-     * @implNote {@code WASmaxInBlocklistsGetOptOutListResponseSuccessWithMatch.parseGetOptOutListResponseSuccessWithMatch}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBlocklistsGetOptOutListResponseSuccessWithMatch")
     final class SuccessWithMatch implements SmaxGetOptOutListResponse {
@@ -240,11 +236,9 @@ public sealed interface SmaxGetOptOutListResponse extends SmaxOperation.Response
     }
 
     /**
-     * The {@code SuccessWithMismatch} reply variant — the relay
+     * The {@code SuccessWithMismatch} reply variant. The relay
      * returned the full opt-out list because the client's cached
      * digest does not match.
-     *
-     * @implNote {@code WASmaxInBlocklistsGetOptOutListResponseSuccessWithMismatch.parseGetOptOutListResponseSuccessWithMismatch}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBlocklistsGetOptOutListResponseSuccessWithMismatch")
     final class SuccessWithMismatch implements SmaxGetOptOutListResponse {
@@ -341,10 +335,8 @@ public sealed interface SmaxGetOptOutListResponse extends SmaxOperation.Response
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected the
+     * The {@code ClientError} reply variant. The relay rejected the
      * request as malformed.
-     *
-     * @implNote {@code WASmaxInBlocklistsGetOptOutListResponseInvalidRequest.parseGetOptOutListResponseInvalidRequest}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBlocklistsGetOptOutListResponseInvalidRequest")
     final class ClientError implements SmaxGetOptOutListResponse {
@@ -433,10 +425,8 @@ public sealed interface SmaxGetOptOutListResponse extends SmaxOperation.Response
     }
 
     /**
-     * The {@code ServerError} reply variant — transient internal
+     * The {@code ServerError} reply variant. Transient internal
      * failure.
-     *
-     * @implNote {@code WASmaxInBlocklistsGetOptOutListResponseInternalServerError.parseGetOptOutListResponseInternalServerError}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBlocklistsGetOptOutListResponseInternalServerError")
     final class ServerError implements SmaxGetOptOutListResponse {

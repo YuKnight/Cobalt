@@ -8,29 +8,22 @@ import it.auties.protobuf.model.ProtobufString;
 import java.util.*;
 
 /**
- * Represents the value of a single attribute attached to a WhatsApp
- * protocol {@link Node}.
+ * Represents a single attribute value attached to a {@link Node}.
  *
- * <p>Every stanza exchanged between a WhatsApp client and the server is a
- * tree of {@link Node}s whose elements may carry key/value attributes.
- * Attribute keys are always strings, but values may be plain text, binary
- * blobs, or JIDs that identify users, groups, or devices. This sealed
- * interface enumerates those three concrete value shapes and exposes a
- * uniform set of conversion helpers so callers can read an attribute as
- * the type they expect without special-casing on the underlying
- * representation.
+ * <p>Stanzas exchanged between a WhatsApp client and the server are trees
+ * of nodes whose elements may carry key value attributes. Keys are always
+ * strings, but values fall into one of three concrete shapes: a UTF-8
+ * string, a binary blob, or a fully parsed {@link Jid}. This sealed
+ * interface enumerates those shapes and exposes a uniform set of
+ * conversion helpers so callers can read an attribute as the type they
+ * expect without special casing on the underlying representation.
  *
- * <p>Three concrete variants are permitted:
- * <ul>
- *   <li>{@link TextAttribute} for plain UTF-8 strings.</li>
- *   <li>{@link JidAttribute} for WhatsApp identifier values.</li>
- *   <li>{@link BytesAttribute} for raw binary data such as hashes or
- *       encoded tokens.</li>
- * </ul>
+ * <p>Attributes are typically produced through {@link NodeBuilder} and
+ * consumed through the various {@code getAttributeAs...} helpers on
+ * {@link Node}.
  *
- * @implNote WAWap: the on-wire attribute shape and encoding. WAXmlNode:
- *           the JS class whose {@code attrs} hash holds these values.
  * @see Node
+ * @see NodeBuilder
  * @see Jid
  */
 @WhatsAppWebModule(moduleName = "WAWap")
@@ -39,63 +32,61 @@ public sealed interface NodeAttribute {
     /**
      * Returns the string representation of this attribute value.
      *
-     * @return a non-null string representation
+     * @return a non null string view of the value
      */
     String toString();
 
     /**
-     * Returns the byte-array representation of this attribute value.
+     * Returns the byte array representation of this attribute value.
      *
-     * @return a non-null byte array
+     * @return a non null byte view of the value
      */
     byte[] toBytes();
 
     /**
-     * Returns the attribute value parsed as a {@link Jid}, when possible.
+     * Returns the value parsed as a {@link Jid}, when possible.
      *
-     * @return an {@link Optional} containing the JID, or empty if the
-     *         value cannot be parsed as a valid JID
+     * @return an {@link Optional} that holds the parsed JID, or empty when
+     *         the value cannot be parsed
      */
     Optional<Jid> toJid();
 
     /**
-     * Returns the attribute value parsed as a {@code long}, when possible.
+     * Returns the value parsed as a {@code long}, when possible.
      *
-     * @return an {@link OptionalLong} containing the parsed value, or
-     *         empty if parsing fails
+     * @return an {@link OptionalLong} that holds the parsed value, or empty
+     *         when parsing fails
      */
     OptionalLong toLong();
 
     /**
-     * Returns the attribute value parsed as an {@code int}, when possible.
+     * Returns the value parsed as an {@code int}, when possible.
      *
-     * @return an {@link OptionalInt} containing the parsed value, or
-     *         empty if parsing fails
+     * @return an {@link OptionalInt} that holds the parsed value, or empty
+     *         when parsing fails
      */
     OptionalInt toInt();
 
     /**
-     * Returns the attribute value parsed as a {@code double}, when possible.
+     * Returns the value parsed as a {@code double}, when possible.
      *
-     * @return an {@link OptionalDouble} containing the parsed value, or
-     *         empty if parsing fails
+     * @return an {@link OptionalDouble} that holds the parsed value, or
+     *         empty when parsing fails
      */
     OptionalDouble toDouble();
 
     /**
-     * An attribute value that is stored as a plain UTF-8 string.
+     * Attribute variant whose value is a UTF-8 string.
      *
-     * <p>The most common attribute variant: identifiers, type names, state
-     * flags, and any other textual metadata are encoded as text values and
-     * decoded on the wire via the WAWap dictionary tokens.
+     * <p>Most attribute values fall in this variant: identifiers, type
+     * names, state flags, and any other textual metadata.
      *
-     * @param value the text value of this attribute, must not be null
+     * @param value the textual value
      */
     record TextAttribute(String value) implements NodeAttribute {
         /**
-         * Constructs a new text attribute, rejecting null values.
+         * Builds a text attribute, rejecting a {@code null} value.
          *
-         * @param value the text value
          * @throws NullPointerException if {@code value} is {@code null}
          */
         public TextAttribute {
@@ -103,9 +94,9 @@ public sealed interface NodeAttribute {
         }
 
         /**
-         * Returns the stored string value as-is.
+         * Returns the stored string verbatim.
          *
-         * @return the non-null string value
+         * @return the non null string value
          */
         @Override
         public String toString() {
@@ -113,9 +104,9 @@ public sealed interface NodeAttribute {
         }
 
         /**
-         * Returns the UTF-8 byte representation of the stored string.
+         * Returns the UTF-8 encoding of the stored string.
          *
-         * @return a non-null byte array containing the UTF-8 encoded text
+         * @return a non null byte array holding the UTF-8 encoding
          */
         @Override
         public byte[] toBytes() {
@@ -123,10 +114,10 @@ public sealed interface NodeAttribute {
         }
 
         /**
-         * Parses the stored text as a {@link Jid}.
+         * Parses the stored string as a {@link Jid}.
          *
-         * @return an {@link Optional} containing the parsed JID, or empty
-         *         if the text is not a valid JID
+         * @return an {@link Optional} that holds the parsed JID, or empty
+         *         when the string is not a valid JID
          */
         @Override
         public Optional<Jid> toJid() {
@@ -139,10 +130,10 @@ public sealed interface NodeAttribute {
         }
 
         /**
-         * Parses the stored text as a {@code long}.
+         * Parses the stored string as a {@code long}.
          *
-         * @return an {@link OptionalLong} with the parsed value, or empty
-         *         if the text is not a valid long literal
+         * @return an {@link OptionalLong} that holds the parsed value, or
+         *         empty when the string is not a valid long literal
          */
         @Override
         public OptionalLong toLong() {
@@ -155,10 +146,10 @@ public sealed interface NodeAttribute {
         }
 
         /**
-         * Parses the stored text as an {@code int}.
+         * Parses the stored string as an {@code int}.
          *
-         * @return an {@link OptionalInt} with the parsed value, or empty
-         *         if the text is not a valid int literal
+         * @return an {@link OptionalInt} that holds the parsed value, or
+         *         empty when the string is not a valid int literal
          */
         @Override
         public OptionalInt toInt() {
@@ -171,10 +162,10 @@ public sealed interface NodeAttribute {
         }
 
         /**
-         * Parses the stored text as a {@code double}.
+         * Parses the stored string as a {@code double}.
          *
-         * @return an {@link OptionalDouble} with the parsed value, or empty
-         *         if the text is not a valid double literal
+         * @return an {@link OptionalDouble} that holds the parsed value, or
+         *         empty when the string is not a valid double literal
          */
         @Override
         public OptionalDouble toDouble() {
@@ -188,21 +179,18 @@ public sealed interface NodeAttribute {
     }
 
     /**
-     * An attribute value that holds a fully parsed {@link Jid}.
+     * Attribute variant whose value is a fully parsed {@link Jid}.
      *
-     * <p>Used whenever a node attribute references a WhatsApp user, group,
-     * device, or other entity. The JID is encoded on the wire in one of
-     * the WAWap JID shapes (pair, AD, interop, or FB) depending on its
-     * server.
+     * <p>Used whenever an attribute references a WhatsApp user, group,
+     * device, or other addressable entity.
      *
-     * @param value the JID value, must not be null
+     * @param value the JID value
      * @see Jid
      */
     record JidAttribute(Jid value) implements NodeAttribute {
         /**
-         * Constructs a new JID attribute, rejecting null values.
+         * Builds a JID attribute, rejecting a {@code null} value.
          *
-         * @param value the JID value
          * @throws NullPointerException if {@code value} is {@code null}
          */
         public JidAttribute {
@@ -210,9 +198,9 @@ public sealed interface NodeAttribute {
         }
 
         /**
-         * Returns the JID serialised as its canonical string form.
+         * Returns the canonical string form of the stored JID.
          *
-         * @return a non-null string representation of the JID
+         * @return a non null string view of the JID
          */
         @Override
         public String toString() {
@@ -220,12 +208,9 @@ public sealed interface NodeAttribute {
         }
 
         /**
-         * Returns the JID serialised as UTF-8 bytes.
+         * Returns the UTF-8 encoding of the canonical JID string.
          *
-         * <p>The JID is first converted to its string form, then encoded
-         * to bytes via the platform default charset.
-         *
-         * @return a non-null byte array containing the UTF-8 encoded JID
+         * @return a non null byte array holding the UTF-8 encoding
          */
         @Override
         public byte[] toBytes() {
@@ -233,9 +218,9 @@ public sealed interface NodeAttribute {
         }
 
         /**
-         * Returns the underlying JID.
+         * Returns the stored JID.
          *
-         * @return an {@link Optional} always containing the stored JID
+         * @return an {@link Optional} that always holds the stored JID
          */
         @Override
         public Optional<Jid> toJid() {
@@ -243,8 +228,7 @@ public sealed interface NodeAttribute {
         }
 
         /**
-         * Returns an empty {@link OptionalLong} because a JID has no
-         * meaningful integer parse.
+         * Returns an empty result because a JID has no integer parse.
          *
          * @return {@link OptionalLong#empty()}
          */
@@ -254,8 +238,7 @@ public sealed interface NodeAttribute {
         }
 
         /**
-         * Returns an empty {@link OptionalInt} because a JID has no
-         * meaningful integer parse.
+         * Returns an empty result because a JID has no integer parse.
          *
          * @return {@link OptionalInt#empty()}
          */
@@ -265,8 +248,8 @@ public sealed interface NodeAttribute {
         }
 
         /**
-         * Returns an empty {@link OptionalDouble} because a JID has no
-         * meaningful floating-point parse.
+         * Returns an empty result because a JID has no floating point
+         * parse.
          *
          * @return {@link OptionalDouble#empty()}
          */
@@ -277,20 +260,19 @@ public sealed interface NodeAttribute {
     }
 
     /**
-     * An attribute value that holds a raw binary blob.
+     * Attribute variant whose value is an opaque binary blob.
      *
      * <p>Used for values that must not be interpreted as text, such as
-     * cryptographic hashes, protocol tokens, or already-encoded data.
-     * Decoding to a string uses the platform default charset and may
-     * produce nonsense output when the bytes are not valid text.
+     * cryptographic hashes, protocol tokens, or already encoded payloads.
+     * Decoding the blob to a string uses the platform default charset and
+     * may produce unintended output when the bytes are not valid text.
      *
-     * @param value the binary value, must not be null
+     * @param value the binary value
      */
     record BytesAttribute(byte[] value) implements NodeAttribute {
         /**
-         * Constructs a new bytes attribute, rejecting null values.
+         * Builds a bytes attribute, rejecting a {@code null} value.
          *
-         * @param value the binary value
          * @throws NullPointerException if {@code value} is {@code null}
          */
         public BytesAttribute {
@@ -298,10 +280,10 @@ public sealed interface NodeAttribute {
         }
 
         /**
-         * Returns the bytes decoded as a string using the platform default
+         * Returns the bytes decoded as a string under the platform default
          * charset.
          *
-         * @return a non-null string decoded from the binary data
+         * @return a non null string decoded from the binary data
          */
         @Override
         public String toString() {
@@ -311,7 +293,7 @@ public sealed interface NodeAttribute {
         /**
          * Returns the underlying byte array without copying.
          *
-         * @return the non-null byte array
+         * @return the non null byte array
          */
         @Override
         public byte[] toBytes() {
@@ -319,11 +301,11 @@ public sealed interface NodeAttribute {
         }
 
         /**
-         * Interprets the binary blob as a JID via the protobuf lazy string
-         * decoder.
+         * Parses the binary blob as a {@link Jid} via the protobuf lazy
+         * string decoder.
          *
-         * @return an {@link Optional} containing the parsed JID, or empty
-         *         if the bytes do not decode to a valid JID
+         * @return an {@link Optional} that holds the parsed JID, or empty
+         *         when the bytes do not decode to a valid JID
          */
         @Override
         public Optional<Jid> toJid() {
@@ -336,10 +318,10 @@ public sealed interface NodeAttribute {
         }
 
         /**
-         * Parses the bytes (interpreted as text) as a {@code long}.
+         * Parses the bytes as text and then as a {@code long}.
          *
-         * @return an {@link OptionalLong} with the parsed value, or empty
-         *         if the text is not a valid long literal
+         * @return an {@link OptionalLong} that holds the parsed value, or
+         *         empty when the text is not a valid long literal
          */
         @Override
         public OptionalLong toLong() {
@@ -352,10 +334,10 @@ public sealed interface NodeAttribute {
         }
 
         /**
-         * Parses the bytes (interpreted as text) as an {@code int}.
+         * Parses the bytes as text and then as an {@code int}.
          *
-         * @return an {@link OptionalInt} with the parsed value, or empty
-         *         if the text is not a valid int literal
+         * @return an {@link OptionalInt} that holds the parsed value, or
+         *         empty when the text is not a valid int literal
          */
         @Override
         public OptionalInt toInt() {
@@ -368,10 +350,10 @@ public sealed interface NodeAttribute {
         }
 
         /**
-         * Parses the bytes (interpreted as text) as a {@code double}.
+         * Parses the bytes as text and then as a {@code double}.
          *
-         * @return an {@link OptionalDouble} with the parsed value, or empty
-         *         if the text is not a valid double literal
+         * @return an {@link OptionalDouble} that holds the parsed value, or
+         *         empty when the text is not a valid double literal
          */
         @Override
         public OptionalDouble toDouble() {

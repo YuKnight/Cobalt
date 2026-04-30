@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.node.iq.biz;
 
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidServer;
@@ -9,10 +10,13 @@ import com.github.auties00.cobalt.node.iq.IqOperation;
 import java.util.Objects;
 
 /**
- * The outbound stanza variant — wraps a single
- * {@code <signed_user_info biz_jid="…"/>} payload in the canonical
- * {@code <iq xmlns="w:biz:catalog" type="get">} envelope.
+ * The outbound {@code <iq xmlns="w:biz:catalog" type="get">} stanza that
+ * fetches a merchant's signed user-info bundle. Wraps a single
+ * {@code <signed_user_info biz_jid/>} payload that the relay echoes back
+ * with the merchant's phone number, signature blob, signature TTL and
+ * claimed business domain.
  */
+@WhatsAppWebModule(moduleName = "WAWebQueryGetSignedUserInfoJob")
 public final class IqQueryGetSignedUserInfoRequest implements IqOperation.Request {
     /**
      * The business JID whose signed user-info bundle is being requested.

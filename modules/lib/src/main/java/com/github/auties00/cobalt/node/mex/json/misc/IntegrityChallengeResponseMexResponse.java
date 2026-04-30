@@ -16,22 +16,29 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The response variant of {@link IntegrityChallengeResponseMexResponse} that
- * exposes the data returned by the server after a successful mutation.
- *
- * @implNote WAWebMexIntegrityChallengeResponse: adapts the JSON root
- * returned by the GraphQL mutation into a Java value object. WA Web's
- * {@code mexSubmitPasskeyChallengeResponse} returns the
- * {@code xwa2_submit_integrity_challenge_response} sub-object
- * verbatim; the compiled GraphQL artifact projects
- * {@code success} and {@code error_message} on it. Cobalt exposes
- * both scalars through typed accessors.
+ * Parsed response of the {@link IntegrityChallengeResponseMexRequest}
+ * mutation, exposing the {@code success} and {@code error_message} scalars
+ * from the {@code xwa2_submit_integrity_challenge_response} envelope.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexIntegrityChallengeResponse")
 public final class IntegrityChallengeResponseMexResponse implements MexOperation.Response.Json {
+    /**
+     * The {@code success} scalar reflecting the relay's verdict on the
+     * submitted challenge.
+     */
     private final Boolean success;
+    /**
+     * The {@code error_message} scalar populated when the challenge was
+     * rejected.
+     */
     private final String errorMessage;
 
+    /**
+     * Constructs a response wrapping the parsed scalar fields.
+     *
+     * @param success      the {@code success} scalar, or {@code null} if absent
+     * @param errorMessage the {@code error_message} scalar, or {@code null} if absent
+     */
     private IntegrityChallengeResponseMexResponse(Boolean success, String errorMessage) {
         this.success = success;
         this.errorMessage = errorMessage;
@@ -40,13 +47,9 @@ public final class IntegrityChallengeResponseMexResponse implements MexOperation
     /**
      * Parses a MEX response from the given IQ response node.
      *
-     * @implNote WAWebMexIntegrityChallengeResponse.mexSubmitPasskeyChallengeResponse:
-     * WA Web relies on the GraphQL client to unwrap the response.
-     * Cobalt performs the unwrapping manually from the IQ
-     * {@code <result>} child.
      * @param node the IQ response node received from the relay
-     * @return an {@link Optional} containing the parsed response, or
-     *         empty if the node is missing a result payload
+     * @return an {@link Optional} containing the parsed response, or empty
+     *         if the node is missing a result payload
      */
     @WhatsAppWebExport(moduleName = "WAWebMexIntegrityChallengeResponse", exports = "mexSubmitPasskeyChallengeResponse",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -57,7 +60,7 @@ public final class IntegrityChallengeResponseMexResponse implements MexOperation
     }
 
     /**
-     * Returns the {@code success} field reported by the relay.
+     * Returns the relay's verdict on the submitted challenge.
      *
      * @return an {@link Optional} containing the value, or empty if absent
      */
@@ -66,8 +69,8 @@ public final class IntegrityChallengeResponseMexResponse implements MexOperation
     }
 
     /**
-     * Returns the {@code error_message} field reported by the relay
-     * when the challenge was rejected.
+     * Returns the error message reported by the relay when the challenge
+     * was rejected.
      *
      * @return an {@link Optional} containing the value, or empty if absent
      */
@@ -76,34 +79,24 @@ public final class IntegrityChallengeResponseMexResponse implements MexOperation
     }
 
     /**
-     * Parses a {@link IntegrityChallengeResponseMexResponse} from the raw JSON bytes of the
-     * {@code <result>} child.
+     * Parses a {@link IntegrityChallengeResponseMexResponse} from the raw
+     * JSON bytes of the {@code <result>} child.
      *
-     * @implNote WAWebMexIntegrityChallengeResponse.mexSubmitPasskeyChallengeResponse:
-     * mirrors the implicit unwrapping that WA Web performs on the
-     * GraphQL response, extracting the
-     * {@code xwa2_submit_integrity_challenge_response} root.
      * @param json the UTF-8 encoded JSON payload
-     * @return an {@link Optional} containing the parsed response, or
-     *         empty if the envelope is missing expected fields
+     * @return an {@link Optional} containing the parsed response, or empty
+     *         if the envelope is missing expected fields
      */
     private static Optional<IntegrityChallengeResponseMexResponse> of(byte[] json) {
-        // WAWebMexIntegrityChallengeResponse.mexSubmitPasskeyChallengeResponse
-        // Parses the raw JSON payload, bailing out if fastjson2 returns null
         var jsonObject = JSON.parseObject(json);
         if (jsonObject == null) {
             return Optional.empty();
         }
 
-        // WAWebMexIntegrityChallengeResponse.mexSubmitPasskeyChallengeResponse
-        // Descends into the standard GraphQL "data" envelope
         var data = jsonObject.getJSONObject("data");
         if (data == null) {
             return Optional.empty();
         }
 
-        // WAWebMexIntegrityChallengeResponse.mexSubmitPasskeyChallengeResponse
-        // Extracts the operation-specific root keyed by xwa2_submit_integrity_challenge_response
         var root = data.getJSONObject("xwa2_submit_integrity_challenge_response");
         if (root == null) {
             return Optional.empty();

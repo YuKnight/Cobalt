@@ -15,7 +15,7 @@ import java.util.OptionalInt;
 
 /**
  * Documented {@code status} enum carried by the
- * {@code <marketing_messages/>} child — the four-way status surface.
+ * {@code <marketing_messages/>} child. The four-way status surface.
  *
  * @implNote Mirrors {@code WASmaxInBizMarketingMessageEnums.ENUM_FAIL_PAUSED_SUCCESS_WARNING}.
  */
@@ -35,7 +35,7 @@ public enum SmaxGetBusinessEligibilityMarketingMessagesStatus {
     SUCCESS,
     /**
      * The feature is available but the relay is surfacing a
-     * non-fatal warning (e.g. quota close to exhaustion).
+     * non-fatal warning (e.g. Quota close to exhaustion).
      */
     WARNING;
 

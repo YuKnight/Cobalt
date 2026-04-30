@@ -14,7 +14,7 @@ import java.util.Optional;
 import java.util.OptionalInt;
 
 /**
- * The outbound stanza variant — wraps the {@code <features/>} payload
+ * The outbound stanza variant. Wraps the {@code <features/>} payload
  * in the canonical {@code <iq xmlns="w:biz" type="get">} envelope.
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutBizMarketingMessageGetBusinessEligibilityRequest")

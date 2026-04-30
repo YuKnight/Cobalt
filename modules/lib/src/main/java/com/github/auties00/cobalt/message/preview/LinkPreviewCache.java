@@ -120,11 +120,8 @@ final class LinkPreviewCache {
     }
 
     /**
-     * Clears every cached entry.
-     *
-     * @implNote WAWebLinkPreviewCache.clearPreviewCache /
-     *           clearNewsletterPreviewCache: invoked when the user
-     *           opts out of link previews or the session is recycled.
+     * Clears every cached entry, invoked when the user opts out of
+     * link previews or the session is recycled.
      */
     @WhatsAppWebExport(moduleName = "WAWebLinkPreviewCache", exports = "clearPreviewCache",
             adaptation = WhatsAppAdaptation.DIRECT)

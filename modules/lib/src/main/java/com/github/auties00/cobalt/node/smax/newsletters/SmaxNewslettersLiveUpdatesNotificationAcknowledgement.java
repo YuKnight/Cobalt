@@ -13,14 +13,14 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound acknowledgement stanza — emitted by the client back
+ * The outbound acknowledgement stanza. Emitted by the client back
  * through the socket pipeline after consuming the {@link SmaxNewslettersLiveUpdatesNotificationResponse}
  * notification.
  *
  * @implNote {@code WASmaxOutNewslettersLiveUpdatesNotificationResponseAck.makeLiveUpdatesNotificationResponseAck}
  *           composes
  *           {@code WASmaxOutNewslettersNotificationClientAckMixin.mergeNotificationClientAckMixin}
- *           — an {@code <ack id to class="notification" type/>}
+ *           into an {@code <ack id to class="notification" type/>}
  *           stanza echoing the notification's {@code id},
  *           {@code from} (as the ack's {@code to}) and {@code type}
  *           attributes.
@@ -41,7 +41,7 @@ public final class SmaxNewslettersLiveUpdatesNotificationAcknowledgement impleme
 
     /**
      * The {@code type} of the notification (echoed back into the
-     * ack — typically {@code "newsletter"}).
+     * ack, typically {@code "newsletter"}).
      */
     private final String notificationType;
 
@@ -66,7 +66,7 @@ public final class SmaxNewslettersLiveUpdatesNotificationAcknowledgement impleme
      * notification.
      *
      * <p>Lifts the {@code id}/{@code from}/{@code type} attributes
-     * verbatim from the supplied {@code <notification/>} stanza —
+     * verbatim from the supplied {@code <notification/>} stanza .
      * convenience factory mirroring the WA Web closure-builder
      * surface.
      *

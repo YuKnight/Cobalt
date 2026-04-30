@@ -1,8 +1,5 @@
 package com.github.auties00.cobalt.socket.layer.application.websocket;
 
-import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
-import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
-import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.socket.layer.application.SocketClientApplicationLayer;
 import com.github.auties00.cobalt.socket.layer.application.websocket.frame.encoder.WebSocketFrameEncoder;
 import com.github.auties00.cobalt.socket.layer.SocketClientLayer;
@@ -21,37 +18,27 @@ import java.util.Base64;
 import java.util.Objects;
 
 /**
- * A standalone WebSocket client that wraps a {@link SocketClientLayer}
- * transport stack.
+ * Standalone WebSocket client layer that drives the HTTP/1.1 upgrade
+ * handshake and produces RFC 6455 frames over an inner transport
+ * stack.
  *
- * <p>This client performs the HTTP/1.1 WebSocket upgrade handshake over
- * the transport layer, then provides WebSocket binary frame encoding for
- * outbound messages.  Inbound WebSocket frame decoding is handled by the
- * {@link WebSocketClientLayerContext} registered with the selector pipeline.
+ * <p>Inbound frame decoding is handled by the
+ * {@link WebSocketClientLayerContext} that this layer registers with
+ * the selector pipeline; after the upgrade completes the connection
+ * transitions to asynchronous data flow and decoded payloads flow up
+ * the chain to the listener.
  *
- * <p>After the upgrade completes, the connection transitions to
- * asynchronous data flow: the selector delivers decoded WebSocket data
- * frame payloads through the layer context chain to the listener.
- *
- * <p><strong>Performance notes:</strong> The upgrade handshake header
- * validation in {@link #consumeAndValidateHeaders} uses a two-tier
- * approach.  When the entire header line fits in the 8 KiB read buffer
- * (the common case for a 101 response), header names are matched with
- * bulk {@link HttpResponseReader#regionMatchesIgnoreCase} and values
- * are validated by direct buffer peeking — no per-byte method calls at
- * all.  The slow path (line spans buffers) is split into a separate
- * method so the JIT always inlines the fast path.
- *
- * @implNote Adapts WA Web's {@code WASocketTransport.openWebSocket}
- *     factory (module export {@code m}).  WA Web delegates the HTTP/1.1
- *     upgrade handshake, RFC 6455 framing and event dispatch to the
- *     browser's native {@code WebSocket} object and only synchronises on
- *     the {@code onopen}/{@code onclose} promise.  Cobalt performs the
- *     handshake, framing and dispatch itself on a layered selector
- *     model, which is why the bulk of this class has no direct WA Web
- *     counterpart.
+ * @implNote The upgrade response parser in
+ *     {@link #consumeAndValidateHeaders(long, byte[])} uses a two-tier
+ *     strategy. When the line fits in the 8 KiB read buffer (the
+ *     common case for a 101 response) header names are matched with a
+ *     bulk
+ *     {@link HttpResponseReader#regionMatchesIgnoreCase(int, byte[], int)}
+ *     call and values are validated through direct buffer peeking,
+ *     avoiding any per-byte method calls. The cross-buffer fallback
+ *     lives in {@link #consumeHeaderLineSlow(long, int, byte[])} so
+ *     the JIT can always inline the fast path.
  */
-@WhatsAppWebModule(moduleName = "WASocketTransport")
 public final class WebSocketClientLayer implements SocketClientApplicationLayer<WebSocketClientLayerContext> {
     /**
      * The WebSocket protocol GUID used when computing the
@@ -233,32 +220,19 @@ public final class WebSocketClientLayer implements SocketClientApplicationLayer<
     }
 
     /**
-     * Connects the underlying transport stack to {@code address} and
-     * performs the HTTP/1.1 WebSocket upgrade handshake synchronously.
+     * Connects the inner transport to {@code address} and runs the
+     * HTTP/1.1 WebSocket upgrade handshake synchronously.
      *
-     * <p>On return the layer is attached to the selector pipeline and the
-     * connection is ready to exchange binary WebSocket frames.  If the
-     * handshake fails the method throws an {@link IOException} and the
-     * caller is expected to discard the layer.
+     * <p>On success the layer is attached to the selector pipeline and
+     * ready to exchange binary frames; on failure an {@link IOException}
+     * is thrown and the caller must discard this layer.
      *
-     * @apiNote Equivalent to WA Web's {@code openWebSocket(url, onClose,
-     *     onCloseWithId, onOpen)} factory: in WA Web the browser resolves
-     *     the promise on {@code onopen} and rejects it on {@code onclose};
-     *     Cobalt collapses both outcomes into this single blocking call
-     *     that either returns normally (equivalent to {@code resolve})
-     *     or throws (equivalent to {@code reject}).
-     * @implNote WA Web's {@code onOpen}, {@code onClose} and
-     *     {@code onCloseWithId} continuations are all mapped onto the
-     *     caller's control flow: the caller continues after {@code connect}
-     *     on success, and catches the thrown {@link IOException} on
-     *     failure.
      * @param address  the remote endpoint
-     * @param listener the callback for events
-     * @throws IOException if the transport connection or the WebSocket
-     *         upgrade handshake fails
+     * @param listener the callback that receives inbound events
+     * @throws IOException if the transport connection or the upgrade
+     *         handshake fails
      */
     @Override
-    @WhatsAppWebExport(moduleName = "WASocketTransport", exports = "openWebSocket", adaptation = WhatsAppAdaptation.ADAPTED)
     public void connect(InetSocketAddress address, SocketClientLayerListener listener) throws IOException {
         Objects.requireNonNull(address, "address cannot be null");
         Objects.requireNonNull(listener, "listener cannot be null");
@@ -270,26 +244,17 @@ public final class WebSocketClientLayer implements SocketClientApplicationLayer<
     }
 
     /**
-     * Disconnects the underlying transport, tearing down the WebSocket
-     * connection.
-     *
-     * @apiNote Equivalent to {@code WebSocketTransport.close()}: WA Web
-     *     calls {@code underlyingWS.close()} and flips the closed flag;
-     *     Cobalt delegates to {@link SocketClientLayer#disconnect()} on
-     *     the inner layer, which closes the channel and notifies the
-     *     listener.
-     * @implNote The method is idempotent: a second call after the
-     *     inner layer is already closed is a no-op because the transport
-     *     layer tracks the connected state.
+     * Tears down the WebSocket connection by disconnecting the inner
+     * transport. The call is idempotent: a second invocation after the
+     * transport has already closed is a no-op.
      */
     @Override
-    @WhatsAppWebExport(moduleName = "WASocketTransport", exports = "WebSocketTransport", adaptation = WhatsAppAdaptation.ADAPTED)
     public void disconnect() {
         innerLayer.disconnect();
     }
 
     /**
-     * Returns whether the underlying transport is still connected.
+     * Returns whether the inner transport is still connected.
      *
      * @return {@code true} if the transport is connected
      */
@@ -302,26 +267,12 @@ public final class WebSocketClientLayer implements SocketClientApplicationLayer<
      * Encodes {@code buffers} as one logical masked binary WebSocket
      * message and forwards the resulting frames to the inner layer.
      *
-     * <p>If every buffer is {@code null} or empty, no bytes are written:
-     * this matches WA Web's {@code requestSend()} guard
-     * {@code if (dataToSend.size())} which suppresses empty sends.
+     * <p>If every buffer is {@code null} or empty no bytes are written.
      *
-     * @apiNote Equivalent to {@code WebSocketTransport.requestSend()}
-     *     plus the internal {@code dataToSend} accumulator buffer: WA Web
-     *     appends payloads to {@code dataToSend} and then calls
-     *     {@code underlyingWS.send(dataToSend.readBuffer())}; Cobalt
-     *     bypasses the accumulator and encodes the supplied buffers
-     *     directly, because callers already accumulate their own payloads
-     *     before invoking this method.
-     * @implNote WA Web's "WebSocket #id not opened" error log for sends
-     *     after {@code close} has no direct equivalent: if the connection
-     *     is closed, {@link SocketClientLayer#sendBinary(ByteBuffer...)}
-     *     on the inner layer surfaces the condition by throwing.
      * @param buffers payload buffers in send order
      * @throws IOException if the inner layer fails to accept the frame
      */
     @Override
-    @WhatsAppWebExport(moduleName = "WASocketTransport", exports = "WebSocketTransport", adaptation = WhatsAppAdaptation.ADAPTED)
     public void sendBinary(ByteBuffer... buffers) throws IOException {
         var encoded = WebSocketFrameEncoder.encodeBinaryMessage(buffers);
         if (encoded.length != 0) {

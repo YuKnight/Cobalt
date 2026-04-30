@@ -16,18 +16,19 @@ import java.time.Duration;
 import java.util.Optional;
 
 /**
- * USync {@code contact} protocol.
- *
- * @implNote WAWebUsyncContact.USyncContactProtocol.
+ * USync {@code contact} protocol descriptor. Asks the relay whether each peer
+ * is a registered WhatsApp user and optionally resolves usernames or LIDs.
  */
 @WhatsAppWebModule(moduleName = "WAWebUsyncContact")
 public final class UsyncContactProtocol implements UsyncProtocol {
-    /** The wire literal used as the protocol's tag name. */
+    /**
+     * Wire literal for the protocol tag name.
+     */
     public static final String NAME = "contact";
 
     /**
-     * The addressing mode the request applies to. {@code null} means the
-     * default phone-number addressing.
+     * Holds the addressing mode the request applies to. {@code null} means
+     * the default phone-number addressing.
      */
     private final UsyncAddressingMode addressingMode;
 
@@ -44,12 +45,18 @@ public final class UsyncContactProtocol implements UsyncProtocol {
     }
 
     /**
-     * Creates a contact-protocol descriptor with PN addressing.
+     * Creates a contact-protocol descriptor with {@link UsyncAddressingMode#PN}
+     * addressing.
      */
     public UsyncContactProtocol() {
         this(UsyncAddressingMode.PN);
     }
 
+    /**
+     * Returns the wire literal for this protocol's tag name.
+     *
+     * @return the tag name
+     */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUsyncContact",
             exports = "USyncContactProtocol.getName", adaptation = WhatsAppAdaptation.DIRECT)
@@ -57,6 +64,13 @@ public final class UsyncContactProtocol implements UsyncProtocol {
         return NAME;
     }
 
+    /**
+     * Builds the {@code <contact>} query element. Emits the
+     * {@code addressing_mode} attribute only when the LID mode is selected,
+     * mirroring the JS frozen-object {@code DROP_ATTR} default.
+     *
+     * @return the query-element node
+     */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUsyncContact",
             exports = "USyncContactProtocol.getQueryElement", adaptation = WhatsAppAdaptation.DIRECT)
@@ -68,6 +82,15 @@ public final class UsyncContactProtocol implements UsyncProtocol {
         return builder.build();
     }
 
+    /**
+     * Builds the per-user {@code <contact>} element. Picks the addressing
+     * shape (phone-number content, username attributes, or contact-type
+     * attribute) based on which slots the user carries.
+     *
+     * @param user the user the {@code <user>} entry refers to
+     * @return the per-user element, or empty when the user carries none of
+     *     the supported slots
+     */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUsyncContact",
             exports = "USyncContactProtocol.getUserElement", adaptation = WhatsAppAdaptation.DIRECT)
@@ -94,6 +117,15 @@ public final class UsyncContactProtocol implements UsyncProtocol {
         return Optional.empty();
     }
 
+    /**
+     * Parses the {@code <contact>} child of a {@code <user>} response into a
+     * {@link ContactResult} or a per-protocol error.
+     *
+     * @param child the protocol-tagged response node
+     * @return the parsed result
+     * @throws IllegalStateException if the node tag is not {@link #NAME} or
+     *     the required {@code type} attribute is missing
+     */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUsyncContact",
             exports = "contactParser", adaptation = WhatsAppAdaptation.ADAPTED)
@@ -113,8 +145,8 @@ public final class UsyncContactProtocol implements UsyncProtocol {
     }
 
     /**
-     * Helper that probes the optional {@code <error/>} child of a USync
-     * protocol response. Reused by every protocol parser.
+     * Probes the optional {@code <error/>} child of a USync protocol response.
+     * Reused by every protocol parser to share the per-protocol error decode.
      *
      * @param child the protocol-tagged response node
      * @return the parsed error, or empty when the response is a success

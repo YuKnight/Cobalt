@@ -56,7 +56,6 @@ final class LinkPreviewUtils {
      *                       the PSP and a {@link PaymentLinkHeader} of
      *                       type
      *                       {@link PaymentLinkHeaderType#LINK_PREVIEW}
-     * @implNote WAWebLinkPreviewUtils.genLinkPreview.
      */
     @WhatsAppWebExport(moduleName = "WAWebLinkPreviewUtils", exports = "genLinkPreview",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -108,12 +107,10 @@ final class LinkPreviewUtils {
             }
         }
         if (paymentDetails != null && paymentDetails.psp() != null) {
-            // WAWebLinkPreviewUtils.genLinkPreview merges the JS paymentLinkDetails
-            // object into the outgoing message; Cobalt materialises the equivalent
-            // protobuf with header.headerType = LINK_PREVIEW (the URL-driven branch)
-            // and provider.paramsJson set to the resolved PSP label so receivers
-            // can reach the matching payment service. Button text is server-localised
-            // and only attached by the business composer, not by URL detection.
+            // The URL driven branch sets headerType to LINK_PREVIEW and provider.paramsJson
+            // to the resolved PSP label so receivers can reach the matching payment service.
+            // Button text is server localised and only attached by the business composer,
+            // never by URL detection.
             var provider = new PaymentLinkMetadataPaymentLinkProviderBuilder()
                     .paramsJson(paymentDetails.psp())
                     .build();

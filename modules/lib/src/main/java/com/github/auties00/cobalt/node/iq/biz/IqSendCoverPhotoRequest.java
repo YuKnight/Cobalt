@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.node.iq.biz;
 
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.JidServer;
 import com.github.auties00.cobalt.node.NodeBuilder;
@@ -9,8 +10,12 @@ import java.util.Arrays;
 import java.util.Objects;
 
 /**
- * The outbound stanza variant.
+ * The outbound {@code <iq xmlns="w:biz" type="set">} stanza that attaches
+ * a previously-uploaded cover photo to the current merchant's business
+ * profile. The {@code (id, ts, token)} triple identifies the upload
+ * artefact in the mediaWeb store.
  */
+@WhatsAppWebModule(moduleName = "WAWebBusinessProfileJob")
 public final class IqSendCoverPhotoRequest implements IqOperation.Request {
     /**
      * The upload id returned by the mediaWeb upload service.

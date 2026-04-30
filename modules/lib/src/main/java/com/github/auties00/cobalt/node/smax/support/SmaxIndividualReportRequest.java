@@ -29,7 +29,7 @@ import java.util.Optional;
 @WhatsAppWebModule(moduleName = "WASmaxOutSpamTCTokenMixin")
 public final class SmaxIndividualReportRequest implements SmaxOperation.Request {
     /**
-     * The optional reportee JID — when supplied, routed into the
+     * The optional reportee JID. When supplied, routed into the
      * {@code <spam_list jid>} attribute. The {@code jid} attribute
      * is optional per the WA Web schema (some flows synthesise the
      * subject from the message attribution alone).
@@ -245,9 +245,7 @@ public final class SmaxIndividualReportRequest implements SmaxOperation.Request 
     @WhatsAppWebExport(moduleName = "WASmaxOutSpamIndividualReportRequest",
             exports = "makeIndividualReportRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutSpamBaseReportMixin: smax("spam_list", {spam_flow})
         // WASmaxOutSpamIsKnownChatMixin (optional): smax("spam_list", {is_known_chat})
-        // WASmaxOutSpamIndividualReportRequest: smax("spam_list", {jid?},
         //   REPEATED_CHILD(message, 0, 210),
         //   REPEATED_CHILD(call, 0, 5),
         //   REPEATED_CHILD(user_initiated_extension, 0, 5))
@@ -282,8 +280,6 @@ public final class SmaxIndividualReportRequest implements SmaxOperation.Request 
         if (!spamListChildren.isEmpty()) {
             spamListBuilder.content(spamListChildren);
         }
-        // WASmaxOutSpamBaseIQSetRequestMixin: smax("iq", {id: generateId(), type: "set"})
-        // WASmaxOutSpamBaseReportMixin: smax("iq", {to: S_WHATSAPP_NET, xmlns: "spam"})
         var iqChildren = new ArrayList<Node>();
         iqChildren.add(spamListBuilder.build());
         if (frxChild != null) {
@@ -337,7 +333,7 @@ public final class SmaxIndividualReportRequest implements SmaxOperation.Request 
     }
 
     /**
-     * Builder for {@link SmaxIndividualReportRequest} — the canonical entry point for
+     * Builder for {@link SmaxIndividualReportRequest}. The canonical entry point for
      * assembling an individual spam report.
      */
     public static final class Builder {

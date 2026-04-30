@@ -15,90 +15,56 @@ import com.github.auties00.cobalt.store.WhatsAppStore;
 import java.util.Objects;
 
 /**
- * Orchestrates the processing of every incoming {@code <message>}
- * stanza by routing it to the correct receiver.
+ * Routes every incoming {@code <message>} stanza to the correct receiver.
  *
- * <p>This service is the single entry point for inbound message
- * handling and mirrors the role of the outbound sending service. It
- * inspects the stanza's {@code from} JID and dispatches:
+ * <p>This service is the single entry point for inbound message handling. The
+ * stanza's {@code from} JID determines the path:
  * <ul>
  *   <li>Newsletter JIDs (for example {@code "xxx@newsletter"}) go to
- *       {@link NewsletterMessageReceiver}, which handles the plaintext
- *       newsletter pipeline.</li>
- *   <li>All other JIDs go to {@link ChatMessageReceiver}, which
- *       handles the full Signal protocol decryption pipeline for 1:1,
- *       group, broadcast, status, and peer messages.</li>
+ *       {@link NewsletterMessageReceiver} for the plaintext newsletter pipeline.</li>
+ *   <li>All other JIDs go to {@link ChatMessageReceiver} for the full Signal protocol
+ *       decryption pipeline (1:1, group, broadcast, status, peer messages).</li>
  * </ul>
- * A pending-message dedup cache prevents duplicate processing when
- * the same message is delivered more than once during offline/online
- * transitions.
  *
- * @implNote WAWebCommsHandleMessagingStanza.handleMessagingStanza
- * handles the {@code "message"} tag for non-newsletter E2E messages
- * (routing to WAWebHandleMsg) and the {@code "receipt"} tag for
- * non-call, non-retry receipts (routing to WAWebHandleMsgReceipt).
- * Newsletter messages fall through to
- * WAWebCommsHandleWorkerCompatibleStanza.handleWorkerCompatibleStanza
- * which routes them to WAWebHandleNewsletterMsg. Cobalt unifies
- * both newsletter and E2E message routing here, while receipt
- * handling is split out to a separate {@code ReceiptStreamHandler}
- * at the socket stream level.
+ * <p>A pending-message dedup cache prevents duplicate processing when the same
+ * message is delivered more than once during offline/online transitions.
+ *
+ * @implNote WA Web splits this routing across {@code WAWebCommsHandleMessagingStanza}
+ * (for non-newsletter E2E messages) and {@code WAWebCommsHandleWorkerCompatibleStanza}
+ * (newsletter fallback). Cobalt unifies both paths here, while receipt handling lives
+ * in the separate {@code ReceiptStreamHandler} at the socket stream level.
  */
 @WhatsAppWebModule(moduleName = "WAWebCommsHandleMessagingStanza")
 @WhatsAppWebModule(moduleName = "WAWebHandleMsg")
 public final class MessageReceivingService {
     /**
-     * Logger for diagnostic messages during message routing and dedup
-     * handling.
-     *
-     * @implNote WAWebCommsHandleMessagingStanza uses WALogger;
-     * Cobalt uses {@code System.Logger} instead.
+     * Logger for routing and dedup diagnostics.
      */
     private static final System.Logger LOGGER = System.getLogger(MessageReceivingService.class.getName());
 
     /**
-     * The receiver handling E2E-encrypted chat messages.
-     *
-     * @implNote WAWebCommsHandleMessagingStanza.handleMessagingStanza
-     * delegates to WAWebHandleMsg for non-newsletter messages; Cobalt
-     * uses constructor-based DI via this field.
+     * Receiver handling E2E-encrypted chat messages.
      */
     private final ChatMessageReceiver chatReceiver;
 
     /**
-     * The receiver handling plaintext newsletter messages.
-     *
-     * @implNote WAWebCommsHandleWorkerCompatibleStanza.handleWorkerCompatibleStanza
-     * delegates newsletter messages to WAWebHandleNewsletterMsg;
-     * Cobalt uses constructor-based DI via this field.
+     * Receiver handling plaintext newsletter messages.
      */
     private final NewsletterMessageReceiver newsletterReceiver;
 
     /**
-     * Dedup cache preventing duplicate processing of the same E2E
-     * message during offline/online transitions.
-     *
-     * @implNote WAWebMessageDedupUtils maintains a module-level
-     * pending message cache keyed by
-     * WAWebPendingMessageKey.createPendingMessageKey(key, ts, encs)
-     * that is cleared when the offline delivery count reaches zero.
-     * In WA Web the dedup is invoked from WAWebHandleMsg rather than
-     * from handleMessagingStanza; Cobalt wraps the dedup check around
-     * the receiver call in {@link #process(Node)}.
+     * Dedup cache preventing duplicate processing of the same E2E message during
+     * offline/online transitions.
      */
     private final MessageDedup dedup;
 
     /**
-     * Creates a new message receiving service and assembles the
-     * internal receiver graph from the provided dependencies.
+     * Creates a new message receiving service and assembles the internal receiver
+     * graph from the provided dependencies.
      *
      * @param store      the central session data repository
-     * @param decryption the decryption service for Signal protocol
-     *                   (PKMSG/MSG/SKMSG) and bot messages (MSMSG)
-     *
-     * @implNote WAWebCommsHandleMessagingStanza uses module-level
-     * imports for WAWebHandleMsg and WAWebHandleMsgReceipt; Cobalt
-     * assembles the receiver graph via constructor-based DI.
+     * @param decryption the decryption service for Signal protocol (PKMSG/MSG/SKMSG)
+     *                   and bot messages (MSMSG)
      */
     @WhatsAppWebExport(moduleName = "WAWebCommsHandleMessagingStanza", exports = "handleMessagingStanza",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -112,32 +78,19 @@ public final class MessageReceivingService {
     }
 
     /**
-     * Processes an incoming {@code <message>} node, producing the
-     * appropriate {@link MessageInfo} subtype.
+     * Processes an incoming {@code <message>} node, producing the appropriate
+     * {@link MessageInfo} subtype.
      *
-     * <p>Newsletter messages (identified by the newsletter server on
-     * the {@code from} JID) produce {@link NewsletterMessageInfo};
-     * all other messages go through E2E decryption and produce
-     * {@link ChatMessageInfo}. Returns {@code null} for unavailable
-     * fanout placeholders that should be silently acknowledged.
+     * <p>Newsletter messages produce {@link NewsletterMessageInfo}; all other messages
+     * go through E2E decryption and produce {@link ChatMessageInfo}. Returns
+     * {@code null} for unavailable fanout placeholders that should be silently
+     * acknowledged.
      *
      * @param node the raw incoming {@code <message>} node
-     * @return the processed message info, or {@code null} for
-     *         unavailable messages
-     *
+     * @return the processed message info, or {@code null} for unavailable messages
      * @throws NullPointerException             if {@code node} is {@code null}
-     * @throws WhatsAppMessageException.Receive if decryption or
-     *         validation fails for E2E messages
-     *
-     * @implNote WAWebCommsHandleMessagingStanza.handleMessagingStanza
-     * checks {@code WAWebWid.isNewsletter(from)} and returns
-     * {@code undefined} for newsletter messages so they fall through
-     * to WAWebCommsHandleWorkerCompatibleStanza which calls
-     * WAWebHandleNewsletterMsg. For non-newsletter messages it calls
-     * {@code WAWebHandleMsg(e)}. Cobalt unifies both paths here, with
-     * the newsletter check ({@code fromJid.hasNewsletterServer()})
-     * routing to {@link NewsletterMessageReceiver} and all other
-     * messages going to {@link ChatMessageReceiver}.
+     * @throws WhatsAppMessageException.Receive if decryption or validation fails for
+     *                                          E2E messages
      */
     @WhatsAppWebExport(moduleName = "WAWebCommsHandleMessagingStanza", exports = "handleMessagingStanza",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -146,15 +99,11 @@ public final class MessageReceivingService {
     public MessageInfo process(Node node) {
         Objects.requireNonNull(node, "node");
 
-        // WAWebCommsHandleMessagingStanza.handleMessagingStanza
-        // Routes newsletter messages (WAWebWid.isNewsletter) to the newsletter receiver
         var fromJid = node.getRequiredAttributeAsJid("from");
         if (fromJid.hasNewsletterServer()) {
             return newsletterReceiver.receive(node, fromJid);
         }
 
-        // WAWebHandleMsg and WAWebMessageDedupUtils.addPendingMessage
-        // Builds a simplified dedup key and skips already-pending messages to avoid double processing
         var id = node.getRequiredAttributeAsString("id");
         var dedupKey = fromJid + ":" + id;
         if (dedup.isPending(dedupKey)) {
@@ -164,8 +113,6 @@ public final class MessageReceivingService {
         }
         dedup.add(dedupKey);
 
-        // WAWebHandleMsg
-        // Delegates to the chat receiver and guarantees dedup cleanup in a finally block
         try {
             return chatReceiver.receive(node, fromJid);
         } finally {
@@ -176,18 +123,12 @@ public final class MessageReceivingService {
     /**
      * Clears the pending-message dedup cache.
      *
-     * <p>Should be invoked when the offline delivery phase ends so
-     * that messages re-received in a new session are not mistakenly
-     * considered duplicates.
-     *
-     * @implNote WAWebMessageDedupUtils.maybeClearPendingMessages:
-     * clears the cache when the offline count reaches zero.
+     * <p>Invoked when the offline delivery phase ends so messages re-received in a
+     * new session are not mistakenly considered duplicates.
      */
     @WhatsAppWebExport(moduleName = "WAWebMessageDedupUtils", exports = "maybeClearPendingMessages",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public void clearPendingMessages() {
-        // WAWebMessageDedupUtils.maybeClearPendingMessages
-        // Clears the pending-message cache to let newly arriving messages be processed fresh
         dedup.clear();
     }
 }

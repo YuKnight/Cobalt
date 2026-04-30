@@ -11,14 +11,14 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps a {@code <waiting_room_toggle
+ * The outbound stanza variant. Wraps a {@code <waiting_room_toggle
  * enabled link-token media/>} payload in the {@code <call to="call">}
  * envelope.
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutVoipWaitingRoomToggleCallLinkRequest")
 public final class SmaxWaitingRoomToggleCallLinkRequest implements SmaxOperation.Request {
     /**
-     * The desired waiting-room state on the wire — {@code "0"} for
+     * The desired waiting-room state on the wire, {@code "0"} for
      * disabled, {@code "1"} for enabled. Modelled as a raw string
      * for forward-compat with relay-side enum extensions.
      */
@@ -87,23 +87,17 @@ public final class SmaxWaitingRoomToggleCallLinkRequest implements SmaxOperation
      * @return a {@link NodeBuilder} carrying the {@code <call>}
      *         envelope around a {@code <waiting_room_toggle/>}
      *         payload
-     *
-     * @implNote {@code WASmaxOutVoipWaitingRoomToggleCallLinkRequest.makeWaitingRoomToggleCallLinkRequest}
-     *           composes {@code <call to="call" id="…"><waiting_room_toggle
-     *           enabled link-token media/></call>}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutVoipWaitingRoomToggleCallLinkRequest",
             exports = "makeWaitingRoomToggleCallLinkRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutVoipWaitingRoomToggleCallLinkRequest: smax("waiting_room_toggle", {enabled, link-token, media})
         var toggleNode = new NodeBuilder()
                 .description("waiting_room_toggle")
                 .attribute("enabled", waitingRoomToggleEnabled)
                 .attribute("link-token", waitingRoomToggleLinkToken)
                 .attribute("media", waitingRoomToggleMedia)
                 .build();
-        // WASmaxOutVoipWaitingRoomToggleCallLinkRequest: smax("call", {id: generateId(), to: JID("call")})
         return new NodeBuilder()
                 .description("call")
                 .attribute("to", JidServer.call())

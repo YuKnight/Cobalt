@@ -49,9 +49,9 @@ public sealed interface SmaxContactFormResponse extends SmaxOperation.Response
     }
 
     /**
-     * The {@code ContactFormResponseSuccess} reply variant — the
+     * The {@code ContactFormResponseSuccess} reply variant. The
      * relay accepted the form, returning the user-visible
-     * acknowledgement message, the ticket id (for follow-ups),
+     * acknowledgement message. The ticket id (for follow-ups),
      * and the routing group JID.
      *
      * @implNote {@code WASmaxInSupportContactFormResponseSuccess.parseContactFormResponseSuccess}
@@ -239,9 +239,9 @@ public sealed interface SmaxContactFormResponse extends SmaxOperation.Response
     }
 
     /**
-     * The {@code ContactFormResponseRetryableError} reply variant
-     * — the relay deferred the form (e.g. transient back-pressure)
-     * and recommended a retry timestamp.
+     * The {@code ContactFormResponseRetryableError} reply variant. The
+     * relay deferred the form (e.g. transient back-pressure) and
+     * recommended a retry timestamp.
      *
      * @implNote {@code WASmaxInSupportContactFormResponseRetryableError.parseContactFormResponseRetryableError}
      *           extracts the {@code <response error_code="…"
@@ -353,18 +353,18 @@ public sealed interface SmaxContactFormResponse extends SmaxOperation.Response
     }
 
     /**
-     * The {@code ContactFormResponseError} reply variant — the
+     * The {@code ContactFormResponseError} reply variant. The
      * relay rejected the form with one of the documented error
      * codes ({@code 400} bad-request, {@code 475} notice-required,
      * {@code 500} internal-server-error). Carries the parsed
      * {@code (code, text)} pair and, for the
-     * {@code notice-required} sub-case, the surfaced
+     * {@code notice-required} sub-case. The surfaced
      * {@code tos_version}.
      *
      * @implNote {@code WASmaxInSupportContactFormResponseError.parseContactFormResponseError}
      *           extracts the {@code <error/>} child and routes it
      *           through
-     *           {@code WASmaxInSupportContactFormError} —
+     *           {@code WASmaxInSupportContactFormError} .
      *           a disjunction over the three sub-mixins
      *           ({@code IQErrorBadRequest},
      *           {@code IQErrorNoticeRequired},
@@ -469,7 +469,7 @@ public sealed interface SmaxContactFormResponse extends SmaxOperation.Response
             if (code == 400 && "bad-request".equals(text)) {
                 // IQErrorBadRequestMixin
             } else if (code == 475 && "notice-required".equals(text)) {
-                // IQErrorNoticeRequiredMixin — the <error/> child also carries tos_version.
+                // IQErrorNoticeRequiredMixin, the <error/> child also carries tos_version.
                 var errorChild = node.getChild("error").orElse(null);
                 if (errorChild != null) {
                     var tos = errorChild.getAttributeAsInt("tos_version");
@@ -480,7 +480,7 @@ public sealed interface SmaxContactFormResponse extends SmaxOperation.Response
             } else if (code == 500 && "internal-server-error".equals(text)) {
                 // IQErrorInternalServerErrorMixin
             } else {
-                // Unknown code/text pair — not a documented variant.
+                // Unknown code/text pair, not a documented variant.
                 return Optional.empty();
             }
             return Optional.of(new ContactFormResponseError(code, text, tosVersion));

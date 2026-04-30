@@ -273,7 +273,6 @@ public final class Linkify {
      *                              carry an explicit
      *                              {@code http(s)://} scheme
      * @return the detected URLs
-     * @implNote WALinkify.findLinks.
      */
     @WhatsAppWebExport(moduleName = "WALinkify", exports = "findLinks",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -299,7 +298,6 @@ public final class Linkify {
      * @param requireExplicitScheme whether to require an explicit
      *                              http/https/mailto scheme
      * @return the first match, or empty when no URL is detected
-     * @implNote WALinkify.findLink.
      */
     @WhatsAppWebExport(moduleName = "WALinkify", exports = "findLink",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -322,7 +320,6 @@ public final class Linkify {
      *
      * @param text the text to scan
      * @return {@code true} when an HTTP(S) link is detected
-     * @implNote WAWebLinkify.hasHttpLink.
      */
     @WhatsAppWebExport(moduleName = "WAWebLinkify", exports = "hasHttpLink",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -378,10 +375,9 @@ public final class Linkify {
             }
         }
         var rawUrl = input.substring(matchStart + preLength, matcher.end());
-        // Trim balanced trailing punctuation. WA picks the rightmost defined component
-        // (anchor → query → path) and trims its closing brackets/quotes; when a closer
-        // has no opener earlier in the component it is dropped together with everything
-        // after it.
+        // WA picks the rightmost defined component, trying anchor first then query then
+        // path, and trims its closing brackets and quotes. When a closer has no opener
+        // earlier in the component it is dropped together with everything after it.
         var trimmed = trimBalanced(rawUrl);
         var scheme = matcher.group(GROUP_SCHEME);
         var hasExplicitHttp = scheme != null && (scheme.equalsIgnoreCase("http://") || scheme.equalsIgnoreCase("https://"));

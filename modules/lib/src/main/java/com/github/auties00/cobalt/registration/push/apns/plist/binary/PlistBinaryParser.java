@@ -30,10 +30,10 @@ import java.util.LinkedHashMap;
  *
  * <p>Strings are decoded into Java {@link String} (allocation is
  * unavoidable). {@code <data>} payloads are exposed as offset/length
- * slices over the source buffer; nothing is copied.
+ * slices over the source buffer. Nothing is copied.
  *
  * <p>Callers normally route through the
- * {@code Plist} facade; this class is the implementation.
+ * {@code Plist} facade. This class is the implementation.
  */
 public final class PlistBinaryParser {
     /**
@@ -72,7 +72,7 @@ public final class PlistBinaryParser {
     private final int offsetTableOffset;
 
     /**
-     * Constructs a parser; reads and validates the trailer.
+     * Constructs a parser. Reads and validates the trailer.
      *
      * @param src the source bytes
      * @throws IOException if the source is too short or the trailer
@@ -181,7 +181,7 @@ public final class PlistBinaryParser {
      * 16-byte (uint128) integers are rejected.
      *
      * @param offset the marker offset
-     * @param info   the low nibble — {@code 1 << info} is the byte
+     * @param info   the low nibble. {@code 1 << info} is the byte
      *               count
      * @return the integer value
      * @throws IOException if the encoded width exceeds 8 bytes
@@ -198,7 +198,7 @@ public final class PlistBinaryParser {
      * Decodes a {@code 0x2n} floating-point marker.
      *
      * @param offset the marker offset
-     * @param info   the low nibble — {@code 1 << info} is the byte
+     * @param info   the low nibble. {@code 1 << info} is the byte
      *               count (must be 4 or 8)
      * @return the real value
      * @throws IOException if the encoded width is not 4 or 8
@@ -213,7 +213,7 @@ public final class PlistBinaryParser {
     }
 
     /**
-     * Decodes a {@code 0x33} date — IEEE-754 seconds since
+     * Decodes a {@code 0x33} date. IEEE-754 seconds since
      * 2001-01-01 UTC.
      *
      * @param offset the marker offset
@@ -228,8 +228,7 @@ public final class PlistBinaryParser {
 
     /**
      * Decodes a {@code 0x4n} data marker. The returned
-     * {@link PlistDataValue} is a slice over {@link #src} —
-     * zero-copy.
+     * {@link PlistDataValue} is a zero-copy slice over {@link #src}.
      *
      * @param offset the marker offset
      * @param info   the inline length, or {@code 0xF} when an
@@ -309,7 +308,7 @@ public final class PlistBinaryParser {
 
     /**
      * Resolves the count and data start for a variable-length
-     * marker. When {@code info < 0xF} the count is inline;
+     * marker. When {@code info < 0xF} the count is inline.
      * otherwise the next byte is itself an integer marker carrying
      * the actual count.
      *
@@ -342,7 +341,7 @@ public final class PlistBinaryParser {
      * for 8-byte signed integers.
      *
      * @param offset    the start offset
-     * @param byteCount the number of bytes (1–8)
+     * @param byteCount the number of bytes from 1 to 8
      * @return the assembled value
      */
     private long readUnsignedBigEndian(int offset, int byteCount) {

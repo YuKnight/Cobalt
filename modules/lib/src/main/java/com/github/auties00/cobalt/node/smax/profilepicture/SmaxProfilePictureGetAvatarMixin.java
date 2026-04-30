@@ -19,17 +19,11 @@ import java.util.Optional;
  * The optional {@code <picture type="avatar"><avatar
  * pose_id/>×0..4></picture>} payload overlay carried by a
  * {@link SmaxProfilePictureGetRequest}.
- *
- * @implNote {@code WASmaxOutProfilePictureAvatarMixin.mergeAvatarMixin}
- *           replaces the request's {@code <picture>} root with a
- *           {@code <picture type="avatar">} carrying between
- *           {@code 0} and {@code 4} {@code <avatar pose_id/>}
- *           children.
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutProfilePictureAvatarMixin")
 public final class SmaxProfilePictureGetAvatarMixin {
     /**
-     * The list of {@code <avatar pose_id/>} children — between
+     * The list of {@code <avatar pose_id/>} children. Between
      * {@code 0} and {@code 4} entries.
      */
     private final List<AvatarPose> avatarArgs;

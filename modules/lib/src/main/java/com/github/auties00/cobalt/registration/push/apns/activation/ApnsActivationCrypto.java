@@ -34,7 +34,7 @@ import java.util.UUID;
 public final class ApnsActivationCrypto {
     /**
      * Modulus of the leaked FairPlay private key. Built from a
-     * signed-byte two's-complement big-endian array; the leading
+     * signed-byte two's-complement big-endian array. The leading
      * {@code 0x00} keeps the high bit clear so the value stays
      * positive.
      */
@@ -95,7 +95,7 @@ public final class ApnsActivationCrypto {
 
     /**
      * Modulus length of the device-bound RSA key. Matches the value
-     * the iPhone Device CA expects in the CSR; lower would be
+     * the iPhone Device CA expects in the CSR. Lower would be
      * rejected, higher would slow the activation handshake without
      * the server caring.
      */
@@ -215,8 +215,8 @@ public final class ApnsActivationCrypto {
 
     /**
      * Encodes the {@code CertificationRequestInfo} ASN.1 structure
-     * (PKCS#10 §4.1) — version, subject, subjectPublicKeyInfo and an
-     * empty attributes set — into DER.
+     * (PKCS#10 §4.1) into DER. The structure carries the version,
+     * subject, subjectPublicKeyInfo and an empty attributes set.
      *
      * @param subjectDer the DER-encoded subject distinguished name
      * @param publicKey  the public key to embed
@@ -231,7 +231,7 @@ public final class ApnsActivationCrypto {
         inner.write(subjectDer);
         // subjectPublicKeyInfo (already DER from X.509)
         inner.write(publicKey.getEncoded());
-        // attributes [0] IMPLICIT — empty set
+        // attributes [0] IMPLICIT, empty set
         inner.write(EMPTY_ATTRIBUTES);
         return wrapInSequence(inner.toByteArray());
     }

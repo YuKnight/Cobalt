@@ -17,29 +17,33 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The parsed response for this MEX query.
- *
- * <p>The fields mirror the {@code XWA2UsernameCheckResponse} GraphQL type
- * selected by {@code WAWebMexUsernameAvailabilityQuery.graphql}: a
- * {@code result} status string and a list of suggested alternative
- * usernames.
+ * Parsed response for the username-availability check. Mirrors the {@code XWA2UsernameCheckResponse} GraphQL type with
+ * a status token and a list of suggested alternative usernames.
  */
+@WhatsAppWebModule(moduleName = "WAWebMexUsernameAvailability")
 public final class UsernameAvailabilityMexResponse implements MexOperation.Response.Json {
     /**
-     * The {@code result} token the relay returns when the candidate
-     * username is available for registration.
-     *
-     * @implNote {@code WAWebMexUsernameAvailability.mexCheckUsernameAvailabilityQueryJob}:
-     *           the JS helper compares
-     *           {@code s.xwa2_username_check?.result === "SUCCESS"} to
-     *           project the boolean {@code isUsernameAvailable} flag;
-     *           Cobalt mirrors that literal verbatim through this constant.
+     * The status token the relay returns when the candidate username is available for registration. WA Web compares
+     * {@code result === "SUCCESS"} to project the boolean availability flag.
      */
     public static final String RESULT_SUCCESS = "SUCCESS";
 
+    /**
+     * The raw status token reported by the relay.
+     */
     private final String result;
+
+    /**
+     * The list of alternative usernames suggested when the candidate is unavailable.
+     */
     private final List<String> suggestedUsernames;
 
+    /**
+     * Constructs a new response with the given fields.
+     *
+     * @param result the status token reported by the relay
+     * @param suggestedUsernames the list of suggested alternative usernames
+     */
     private UsernameAvailabilityMexResponse(String result, List<String> suggestedUsernames) {
         this.result = result;
         this.suggestedUsernames = suggestedUsernames;
@@ -48,12 +52,8 @@ public final class UsernameAvailabilityMexResponse implements MexOperation.Respo
     /**
      * Parses the MEX response carried by an inbound IQ stanza.
      *
-     * @implNote WAWebMexUsernameAvailability.mexCheckUsernameAvailabilityQueryJob:
-     * reads the {@code result} and {@code suggestions} fields from
-     * {@code data.xwa2_username_check}.
      * @param node the inbound IQ stanza carrying the {@code <result>} child
-     * @return the parsed response, or {@code Optional.empty()} if the
-     *         expected JSON shape is absent
+     * @return the parsed response, or {@link Optional#empty()} if the expected JSON shape is absent
      */
     @WhatsAppWebExport(moduleName = "WAWebMexUsernameAvailability", exports = "mexCheckUsernameAvailabilityQueryJob",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -64,30 +64,19 @@ public final class UsernameAvailabilityMexResponse implements MexOperation.Respo
     }
 
     /**
-     * Returns the raw {@code result} status token reported by the relay.
+     * Returns the raw status token reported by the relay. Known values include {@link #RESULT_SUCCESS} along with
+     * implementation-defined error tokens surfaced when the candidate is rejected.
      *
-     * <p>Known values include {@code "SUCCESS"} (the username is available
-     * for registration) along with implementation-defined error tokens
-     * surfaced by the WhatsApp backend when the candidate is rejected.
-     *
-     * @return an {@link Optional} containing the status token, or empty if
-     *         absent
+     * @return an {@link Optional} containing the status token, or empty if absent
      */
     public Optional<String> result() {
         return Optional.ofNullable(result);
     }
 
     /**
-     * Returns the list of alternative usernames suggested by the relay
-     * when the candidate is not available.
+     * Returns the list of alternative usernames suggested by the relay. The list is unmodifiable and never
+     * {@code null}. An empty list is returned when the relay does not include any suggestions.
      *
-     * <p>The list is unmodifiable and never {@code null}; an empty list is
-     * returned when the relay does not include any suggestions.
-     *
-     * @implNote WAWebMexUsernameAvailability.mexCheckUsernameAvailabilityQueryJob:
-     * {@code u.push.apply(u, c.suggestions)} flattens the
-     * {@code suggestions} array into the {@code suggestedUsernames}
-     * field returned to callers.
      * @return the unmodifiable list of suggested usernames
      */
     @WhatsAppWebExport(moduleName = "WAWebMexUsernameAvailability", exports = "mexCheckUsernameAvailabilityQueryJob",
@@ -97,12 +86,10 @@ public final class UsernameAvailabilityMexResponse implements MexOperation.Respo
     }
 
     /**
-     * Returns whether the queried username is available for registration.
+     * Returns whether the queried username is available for registration. Mirrors WA Web's
+     * {@code isUsernameAvailable: result === "SUCCESS"} projection.
      *
-     * @implNote WAWebMexUsernameAvailability.mexCheckUsernameAvailabilityQueryJob:
-     * mirrors {@code isUsernameAvailable: result === "SUCCESS"} from the
-     * JS job's return shape.
-     * @return {@code true} if {@link #result()} equals {@link #RESULT_SUCCESS}
+     * @return {@code true} if {@link #result()} equals {@link #RESULT_SUCCESS}, {@code false} otherwise
      */
     @WhatsAppWebExport(moduleName = "WAWebMexUsernameAvailability", exports = "mexCheckUsernameAvailabilityQueryJob",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -110,30 +97,31 @@ public final class UsernameAvailabilityMexResponse implements MexOperation.Respo
         return RESULT_SUCCESS.equals(result);
     }
 
+    /**
+     * Parses the response from the raw JSON payload bytes.
+     *
+     * @param json the raw JSON bytes from the {@code <result>} child
+     * @return an {@link Optional} containing the parsed response, or empty if the envelope is missing
+     */
     private static Optional<UsernameAvailabilityMexResponse> of(byte[] json) {
         var jsonObject = JSON.parseObject(json);
         if (jsonObject == null) {
             return Optional.empty();
         }
 
-        // WAWebMexUsernameAvailability.mexCheckUsernameAvailabilityQueryJob
-        // The fetchQuery wrapper unwraps the GraphQL `data` envelope before returning.
         var data = jsonObject.getJSONObject("data");
         if (data == null) {
             return Optional.empty();
         }
 
-        // WAWebMexUsernameAvailability.mexCheckUsernameAvailabilityQueryJob: s.xwa2_username_check
         var root = data.getJSONObject("xwa2_username_check");
         if (root == null) {
             return Optional.empty();
         }
 
-        // WAWebMexUsernameAvailability.mexCheckUsernameAvailabilityQueryJob: r.result
         var result = root.getString("result");
 
-        // WAWebMexUsernameAvailability.mexCheckUsernameAvailabilityQueryJob:
-        // u.push.apply(u, c.suggestions) -- spread `suggestions` array into the result list.
+        // Spread the suggestions array into the response list, matching WA Web's u.push.apply(u, c.suggestions).
         var suggestionsArray = root.getJSONArray("suggestions");
         List<String> suggestedUsernames;
         if (suggestionsArray == null) {

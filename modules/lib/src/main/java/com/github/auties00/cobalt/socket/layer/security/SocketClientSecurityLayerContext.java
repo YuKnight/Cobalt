@@ -3,11 +3,13 @@ package com.github.auties00.cobalt.socket.layer.security;
 import com.github.auties00.cobalt.socket.threading.SocketClientLayerContext;
 
 /**
- * A security layer context in the socket client stack.
+ * Marker interface for the layer context that a security layer
+ * publishes to the selector pipeline.
  *
- * <p>Every connection has two security layer contexts: one for
- * transport-level security and one for tunnel-level security.
- * Each may be TLS or plain (no-op passthrough).
+ * <p>A connection holds at most two security contexts, one for the
+ * proxy hop and one for the end-to-end hop. Each is either a TLS
+ * context or absent (a plain security layer registers no context at
+ * all).
  */
 public interface SocketClientSecurityLayerContext extends SocketClientLayerContext {
 }

@@ -32,7 +32,7 @@ public final class SmaxMdRefreshCodeNotifyCompanionResponse implements SmaxOpera
     private final Jid notificationFrom;
 
     /**
-     * Optional {@code force_manual_refresh} flag — {@code "true"}
+     * Optional {@code force_manual_refresh} flag . {@code "true"}
      * when the rotation was manually requested by the primary device,
      * {@code "false"} (or absent) when it is part of the natural
      * cadence.

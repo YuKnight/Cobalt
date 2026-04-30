@@ -65,7 +65,7 @@ public final class VoipRelayAllCallsHandler implements WebAppStateActionHandler 
     @Override
     @WhatsAppWebExport(moduleName = "WAWebVoipRelayAllCallsSettingSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return PrivacySettingRelayAllCalls.ACTION_NAME; // WAWebVoipRelayAllCallsSettingSync.getAction
+        return PrivacySettingRelayAllCalls.ACTION_NAME;
     }
 
     /**
@@ -78,18 +78,16 @@ public final class VoipRelayAllCallsHandler implements WebAppStateActionHandler 
     @Override
     @WhatsAppWebExport(moduleName = "WAWebVoipRelayAllCallsSettingSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return PrivacySettingRelayAllCalls.COLLECTION_NAME; // WAWebVoipRelayAllCallsSettingSync.collectionName
+        return PrivacySettingRelayAllCalls.COLLECTION_NAME;
     }
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote WAWebVoipRelayAllCallsSettingSync.getVersion — returns {@code 1}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebVoipRelayAllCallsSettingSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return PrivacySettingRelayAllCalls.ACTION_VERSION; // WAWebVoipRelayAllCallsSettingSync.getVersion
+        return PrivacySettingRelayAllCalls.ACTION_VERSION;
     }
 
     /**
@@ -108,7 +106,7 @@ public final class VoipRelayAllCallsHandler implements WebAppStateActionHandler 
     @Override
     @WhatsAppWebExport(moduleName = "WAWebVoipRelayAllCallsSettingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: WAWebVoipRelayAllCallsSettingSync.applyMutations
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -144,12 +142,12 @@ public final class VoipRelayAllCallsHandler implements WebAppStateActionHandler 
     @Override
     @WhatsAppWebExport(moduleName = "WAWebVoipRelayAllCallsSettingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        if (mutation.operation() != SyncdOperation.SET) { // WAWebVoipRelayAllCallsSettingSync.applyMutations: if (e.operation === "set") ... else l++, return {actionState: Unsupported}
-            return MutationApplicationResult.unsupported(); // WAWebVoipRelayAllCallsSettingSync.applyMutations: {actionState: SyncActionState.Unsupported}
+        if (mutation.operation() != SyncdOperation.SET) {
+            return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof PrivacySettingRelayAllCalls action)) { // WAWebVoipRelayAllCallsSettingSync.applyMutations: var r = n.privacySettingRelayAllCalls; if (!r) return a++, malformedActionValue(t.collectionName)
-            return MutationApplicationResult.malformed(); // WAWebVoipRelayAllCallsSettingSync.applyMutations: malformedActionValue(t.collectionName)
+        if (!(mutation.value().action().orElse(null) instanceof PrivacySettingRelayAllCalls action)) {
+            return MutationApplicationResult.malformed();
         }
 
         // MISMATCH (NULL-SKIP): WA Web tests {@code s == null} where {@code s = r.isEnabled}: when null, it increments
@@ -159,7 +157,7 @@ public final class VoipRelayAllCallsHandler implements WebAppStateActionHandler 
         // instead of being a no-op. Per the project-wide "nullable boolean coalesces to false" convention
         // (see {@code feedback_nullable_bool_accessors.md}), this divergence is accepted.
         client.store().setRelayAllCalls(action.isEnabled()); // ADAPTED: WAWebBackendApi.frontendSendAndReceive("setRelayAllCallsToUserPrefs", {disallowAllP2p: s}) -> direct store call
-        return MutationApplicationResult.success(); // WAWebVoipRelayAllCallsSettingSync.applyMutations: {actionState: SyncActionState.Success}
+        return MutationApplicationResult.success();
     }
 
     /**
@@ -182,21 +180,21 @@ public final class VoipRelayAllCallsHandler implements WebAppStateActionHandler 
      */
     @WhatsAppWebExport(moduleName = "WAWebVoipRelayAllCallsSettingSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPendingMutation getMutation(Instant timestamp, boolean isEnabled) {
-        var action = new PrivacySettingRelayAllCallsBuilder() // WAWebVoipRelayAllCallsSettingSync.getMutation: {privacySettingRelayAllCalls: {isEnabled: n}}
-                .isEnabled(isEnabled) // WAWebVoipRelayAllCallsSettingSync.getMutation: isEnabled: n
+        var action = new PrivacySettingRelayAllCallsBuilder()
+                .isEnabled(isEnabled)
                 .build();
-        var value = new SyncActionValueBuilder() // WAWebSyncdActionUtils.buildPendingMutation: encodeProtobuf(SyncActionValueSpec, {...l, timestamp: i})
-                .timestamp(timestamp) // WAWebSyncdActionUtils.buildPendingMutation: timestamp: t
-                .privacySettingRelayAllCalls(action) // WAWebVoipRelayAllCallsSettingSync.getMutation: value: {privacySettingRelayAllCalls: {...}}
+        var value = new SyncActionValueBuilder()
+                .timestamp(timestamp)
+                .privacySettingRelayAllCalls(action)
                 .build();
-        var index = JSON.toJSONString(List.of(actionName())); // WAWebSyncdActionUtils.buildPendingMutation: index = JSON.stringify([action].concat(indexArgs)) where indexArgs = []
-        var mutation = new DecryptedMutation.Trusted( // WAWebSyncdActionUtils.buildPendingMutation: return { collection, index, binarySyncAction, version, operation, timestamp, action }
-                index, // WAWebSyncdActionUtils.buildPendingMutation: index
-                value, // WAWebSyncdActionUtils.buildPendingMutation: binarySyncAction
-                SyncdOperation.SET, // WAWebVoipRelayAllCallsSettingSync.getMutation: operation: SyncdMutation$SyncdOperation.SET
-                timestamp, // WAWebSyncdActionUtils.buildPendingMutation: timestamp
-                version() // WAWebSyncdActionUtils.buildPendingMutation: version: this.getVersion()
+        var index = JSON.toJSONString(List.of(actionName()));
+        var mutation = new DecryptedMutation.Trusted(
+                index,
+                value,
+                SyncdOperation.SET,
+                timestamp,
+                version()
         );
-        return new SyncPendingMutation(mutation, 0); // WAWebSyncdActionUtils.buildPendingMutation
+        return new SyncPendingMutation(mutation, 0);
     }
 }

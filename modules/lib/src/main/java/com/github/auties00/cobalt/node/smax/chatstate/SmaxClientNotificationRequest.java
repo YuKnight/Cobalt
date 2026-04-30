@@ -10,7 +10,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps the {@code to} (chat JID)
+ * The outbound stanza variant. Wraps the {@code to} (chat JID)
  * attribute and one of the two state-type children
  * ({@link SmaxClientNotificationComposing} or {@link SmaxClientNotificationPaused}) into a
  * {@code <chatstate/>} envelope.
@@ -24,7 +24,7 @@ public final class SmaxClientNotificationRequest implements SmaxOperation.Reques
     private final Jid chatstateTo;
 
     /**
-     * The state-type — either a {@link SmaxClientNotificationComposing} or a
+     * The state-type. Either a {@link SmaxClientNotificationComposing} or a
      * {@link SmaxClientNotificationPaused}; never {@code null}.
      */
     private final SmaxClientNotificationStateType stateType;
@@ -66,12 +66,6 @@ public final class SmaxClientNotificationRequest implements SmaxOperation.Reques
      * @return a {@link NodeBuilder} carrying the
      *         {@code <chatstate to=…><composing|paused/></chatstate>}
      *         envelope
-     *
-     * @implNote {@code WASmaxOutChatstateClientNotificationRequest.makeClientNotificationRequest}
-     *           merges the state-type mixin
-     *           ({@code WASmaxOutChatstateComposingMixin} /
-     *           {@code WASmaxOutChatstatePausedMixin}) over the
-     *           {@code <chatstate to=JID>} envelope.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutChatstateClientNotificationRequest",

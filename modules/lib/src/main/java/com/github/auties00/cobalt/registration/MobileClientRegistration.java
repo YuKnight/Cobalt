@@ -146,11 +146,11 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
      * Stable per-registration session identifier sent as the
      * {@code access_session_id} form field on every attested endpoint
      * and every funnel event. The native Android client uses a
-     * 22-character base64url-encoded random 16-byte UUID; we mirror that
+     * 22-character base64url-encoded random 16-byte UUID. We mirror that
      * shape (no padding, URL-safe alphabet). Generated once at
      * construction and reused for the whole registration ceremony so
      * the server can correlate {@code /v2/exist}, {@code /v2/code},
-     * {@code /v2/register}, {@code /v2/client_log}, etc. as one
+     * {@code /v2/register}, {@code /v2/client_log}, etc. As one
      * session.
      */
     private final String accessSessionId = newAccessSessionId();
@@ -199,13 +199,13 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
      * receives a narrowly-typed attestor. The builder's
      * {@link com.github.auties00.cobalt.client.WhatsAppClientBuilder.Options.Mobile#deviceAttestor}
      * setter has already validated at call time that the attestor's
-     * platform matches the device's platform; this factory re-checks
+     * platform matches the device's platform. This factory re-checks
      * defensively and throws when the two disagree.
      *
      * <p>Passing a {@code null} attestor falls back to
      * {@link WhatsAppDeviceAttestor.Android#NONE} or
      * {@link WhatsAppDeviceAttestor.Ios#NONE} depending on the device
-     * platform; passing a {@code null} {@code pushClient} falls back to
+     * platform. Passing a {@code null} {@code pushClient} falls back to
      * {@link WhatsAppDevicePushClient#noop()}. Both are the low-trust-lane
      * defaults.
      *
@@ -288,7 +288,7 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
      * FCM {@code push_token} produced by the configured
      * {@link WhatsAppDevicePushClient}. On iOS this returns just the APNS
      * {@code push_token} produced by the configured push client. Each
-     * call triggers both the attestor and the push client; embedders
+     * call triggers both the attestor and the push client. Embedders
      * that talk to a remote attestation minter should cache the
      * per-session payload inside their attestor implementation to avoid
      * one round-trip per registration step.
@@ -341,7 +341,7 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
      *
      * @param encBodyBytes the UTF-8 bytes of the base64 ENC body, i.e.
      *                     the value that follows the {@code ENC=}
-     *                     prefix on the wire; never {@code null}
+     *                     prefix on the wire. Never {@code null}
      * @return the hex-encoded signature and base64-encoded cert chain,
      *         or {@link BodyAttestation#EMPTY} when no attestor is
      *         configured or the attestor returned empty output
@@ -355,7 +355,7 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
      * becomes the {@code Authorization} request header.
      *
      * <p>{@link #EMPTY} is used whenever no attestor is configured or
-     * the configured attestor returned empty output; in that case
+     * the configured attestor returned empty output. In that case
      * neither piece is appended and the request goes out without the
      * {@code H=} field and without the header.
      *
@@ -486,7 +486,7 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
      * request with a successful status or a definite error.
      *
      * <p>The loop tracks the last error so that two consecutive identical
-     * errors abort the flow; transient errors are retried once. Specific
+     * errors abort the flow. Transient errors are retried once. Specific
      * conditions map to user-facing exceptions: {@code too_recent}/{@code
      * too_many} variants mean the caller is spamming, and {@code no_routes}
      * means WhatsApp refused to deliver the code to the given number via
@@ -704,7 +704,7 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
      * Decodes the server-supplied CAPTCHA blobs, asks the verification
      * handler to solve them, and submits the answer to {@code /v2/challenge}.
      *
-     * <p>The server may respond with another chained challenge; this
+     * <p>The server may respond with another chained challenge. This
      * method recurses in that case. A handler that returns an empty
      * optional aborts the registration with a
      * {@link WhatsAppRegistrationException}.

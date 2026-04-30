@@ -13,7 +13,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps a {@code <timestamp/>} child in
+ * The outbound stanza variant. Wraps a {@code <timestamp/>} child in
  * the canonical {@code <iq xmlns="waffle" smax_id="142" type="get"
  * to="s.whatsapp.net">} envelope.
  */
@@ -49,25 +49,15 @@ public final class SmaxWaffleStateExistsRequest implements SmaxOperation.Request
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <timestamp/>} payload
-     *
-     * @implNote {@code WASmaxOutWaffleStateExistsRequest.makeStateExistsRequest}
-     *           composes {@code WASmaxOutWaffleBaseIQGetRequestMixin}
-     *           ({@code id=generateId()}, {@code type="get"}) over a
-     *           {@code <timestamp>INT</timestamp>} child inside an
-     *           {@code <iq xmlns="waffle" smax_id="142"
-     *           to=S_WHATSAPP_NET>} envelope.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutWaffleStateExistsRequest",
             exports = "makeStateExistsRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutWaffleStateExistsRequest: smax("timestamp", null, INT(t))
         var timestampNode = new NodeBuilder()
                 .description("timestamp")
                 .content(timestamp)
                 .build();
-        // WASmaxOutWaffleStateExistsRequest: smax("iq", {xmlns: "waffle", smax_id: 142, to: S_WHATSAPP_NET})
-        // WASmaxOutWaffleBaseIQGetRequestMixin: smax("iq", {id: generateId(), type: "get"})
         return new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "waffle")

@@ -76,7 +76,7 @@ public final class LabelReorderingHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebLabelReorderingSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return LabelReorderingAction.ACTION_NAME; // WAWebLabelReorderingSync.default.getAction
+        return LabelReorderingAction.ACTION_NAME;
     }
 
     /**
@@ -88,18 +88,16 @@ public final class LabelReorderingHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebLabelReorderingSync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return LabelReorderingAction.COLLECTION_NAME; // WAWebLabelReorderingSync.default constructor: collectionName = Regular
+        return LabelReorderingAction.COLLECTION_NAME;
     }
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote WAWebLabelReorderingSync.default.getVersion — returns {@code 3}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebLabelReorderingSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return LabelReorderingAction.ACTION_VERSION; // WAWebLabelReorderingSync.default.getVersion -> 3
+        return LabelReorderingAction.ACTION_VERSION;
     }
 
     /**
@@ -113,7 +111,7 @@ public final class LabelReorderingHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebLabelReorderingSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: WAWebLabelReorderingSync.default.applyMutations
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -140,17 +138,17 @@ public final class LabelReorderingHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebLabelReorderingSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        if (mutation.operation() != SyncdOperation.SET) { // WAWebLabelReorderingSync.default.applyMutations: if (n.operation === "set")
-            return MutationApplicationResult.unsupported(); // WAWebLabelReorderingSync.default.applyMutations: WARN("operation not supported"); return { actionState: Unsupported }
+        if (mutation.operation() != SyncdOperation.SET) {
+            return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof LabelReorderingAction action)) { // WAWebLabelReorderingSync.default.applyMutations: a = r?.labelReorderingAction; a == null
-            return malformedActionValue(); // WAWebLabelReorderingSync.default.applyMutations: WAWebSyncdIndexUtils.malformedActionValue(t.collectionName)
+        if (!(mutation.value().action().orElse(null) instanceof LabelReorderingAction action)) {
+            return malformedActionValue();
         }
 
-        var sortedLabelIds = action.sortedLabelIds(); // WAWebLabelReorderingSync.default.applyMutations: a.sortedLabelIds
-        if (sortedLabelIds.isEmpty()) { // WAWebLabelReorderingSync.default.applyMutations: a.sortedLabelIds == null || !Array.isArray(a.sortedLabelIds) || a.sortedLabelIds.length === 0
-            return malformedActionValue(); // WAWebLabelReorderingSync.default.applyMutations: WAWebSyncdIndexUtils.malformedActionValue(t.collectionName)
+        var sortedLabelIds = action.sortedLabelIds();
+        if (sortedLabelIds.isEmpty()) {
+            return malformedActionValue();
         }
 
         // ADAPTED: WAWebDBLabelsReorder.updateLabelsSortOrder — WA Web builds a
@@ -158,16 +156,16 @@ public final class LabelReorderingHandler implements WebAppStateActionHandler {
         // then merges { orderIndex: position } into each found row. Cobalt uses
         // findLabel() against the in-memory store which is equivalent to
         // bulkGet + non-null filter.
-        for (var position = 0; position < sortedLabelIds.size(); position++) { // WAWebDBLabelsReorder.updateLabelsSortOrder: t.reduce((e, t, n) => e.set(t, n), new Map())
-            var labelId = sortedLabelIds.get(position); // WAWebDBLabelsReorder.updateLabelsSortOrder: t[n] (Integer id from the action)
-            var labelIdString = String.valueOf(labelId); // WAWebDBLabelsReorder.updateLabelsSortOrder: t.map(e => String(e))
-            var label = client.store().findLabel(labelIdString).orElse(null); // WAWebDBLabelsReorder.updateLabelsSortOrder: a.bulkGet(l); u.forEach(e => { if (e != null) ... })
-            if (label != null) { // WAWebDBLabelsReorder.updateLabelsSortOrder: if (e != null)
-                label.setOrderIndex(position); // WAWebDBLabelsReorder.updateLabelsSortOrder: a.merge(e.id, { orderIndex: t })
+        for (var position = 0; position < sortedLabelIds.size(); position++) {
+            var labelId = sortedLabelIds.get(position);
+            var labelIdString = String.valueOf(labelId);
+            var label = client.store().findLabel(labelIdString).orElse(null);
+            if (label != null) {
+                label.setOrderIndex(position);
             }
         }
 
-        return MutationApplicationResult.success(); // WAWebLabelReorderingSync.default.applyMutations: return { actionState: Success }
+        return MutationApplicationResult.success();
     }
 
     /**
@@ -198,13 +196,13 @@ public final class LabelReorderingHandler implements WebAppStateActionHandler {
             Instant timestamp
     ) {
         var action = new LabelReorderingActionBuilder() // ADAPTED: WAWebLabelReorderingSync has no public getter; Cobalt mirrors the sibling WAWebLabelSync.default.getLabelMutation shape
-                .sortedLabelIds(sortedLabelIds) // WAWebLabelReorderingSync.default.applyMutations: a.sortedLabelIds
+                .sortedLabelIds(sortedLabelIds)
                 .build();
         var value = new SyncActionValueBuilder()
-                .timestamp(timestamp) // WAWebSyncdActionUtils.buildPendingMutation: timestamp
-                .labelReorderingAction(action) // WAWebLabelReorderingSync.default.applyMutations: value.labelReorderingAction
+                .timestamp(timestamp)
+                .labelReorderingAction(action)
                 .build();
-        var index = JSON.toJSONString(List.of(actionName())); // WAWebSyncdActionUtils.buildIndex: JSON.stringify([action]); empty indexArgs
+        var index = JSON.toJSONString(List.of(actionName()));
         var mutation = new DecryptedMutation.Trusted(
                 index,
                 value,

@@ -12,8 +12,8 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * The outbound {@code <iq xmlns="tos" type="get">} stanza variant —
- * wraps a {@code <request>} child whose contents are one
+ * The outbound {@code <iq xmlns="tos" type="get">} stanza variant.
+ * Wraps a {@code <request>} child whose contents are one
  * {@code <notice id="…"/>} per requested notice id.
  */
 @WhatsAppWebModule(moduleName = "WAWebTosJob")
@@ -28,7 +28,7 @@ public final class IqQueryTosRequest implements IqOperation.Request {
     /**
      * Constructs a new query-tos request.
      *
-     * @param noticeIds the list of notice ids to query; never
+     * @param noticeIds the list of notice ids to query. Never
      *                  {@code null}, may be empty
      * @throws NullPointerException if {@code noticeIds} is {@code null}
      */
@@ -40,7 +40,7 @@ public final class IqQueryTosRequest implements IqOperation.Request {
     /**
      * Returns the unmodifiable list of notice ids being queried.
      *
-     * @return the notice ids; never {@code null}
+     * @return the notice ids. Never {@code null}
      */
     public List<String> noticeIds() {
         return noticeIds;

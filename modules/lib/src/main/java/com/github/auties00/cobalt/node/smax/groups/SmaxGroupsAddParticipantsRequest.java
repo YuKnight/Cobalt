@@ -100,7 +100,6 @@ public final class SmaxGroupsAddParticipantsRequest implements SmaxOperation.Req
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsAddParticipantsRequest",
             exports = "makeAddParticipantsRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutGroupsAddParticipantsRequest: smax("participant", {jid: JID(t)})
         var participantNodes = new ArrayList<Node>(participants.size());
         for (var participantJid : participants) {
             var participantNode = new NodeBuilder()
@@ -109,13 +108,10 @@ public final class SmaxGroupsAddParticipantsRequest implements SmaxOperation.Req
                     .build();
             participantNodes.add(participantNode);
         }
-        // WASmaxOutGroupsAddParticipantsRequest: smax("add", null, REPEATED_CHILD(participant, 1, 1024))
         var addNode = new NodeBuilder()
                 .description("add")
                 .content(participantNodes)
                 .build();
-        // WASmaxOutGroupsBaseSetGroupMixin: smax("iq", {to: GROUP_JID(t), xmlns: "w:g2"})
-        // WASmaxOutGroupsBaseIQSetRequestMixin: smax("iq", {id: generateId(), type: "set"})
         return new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "w:g2")

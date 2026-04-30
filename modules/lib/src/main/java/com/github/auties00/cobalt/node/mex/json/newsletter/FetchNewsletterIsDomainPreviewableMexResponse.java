@@ -3,26 +3,16 @@ package com.github.auties00.cobalt.node.mex.json.newsletter;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
-import com.alibaba.fastjson2.JSONWriter;
-import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
-import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.node.mex.MexOperation;
 import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.node.NodeBuilder;
-import java.io.IOException;
-import java.io.StringWriter;
-import java.io.UncheckedIOException;
+import com.github.auties00.cobalt.node.mex.MexOperation;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 /**
- * The response variant of {@link FetchNewsletterIsDomainPreviewableMexResponse} that exposes the data
- * returned by the server after a successful query.
- *
- * @implNote WAWebMexFetchNewsletterIsDomainPreviewableJob: adapts the JSON root returned by the GraphQL
- * query into a Java value object.
+ * Response variant for {@link FetchNewsletterIsDomainPreviewableMexRequest} carrying the parsed server reply.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexFetchNewsletterIsDomainPreviewableJob")
 public final class FetchNewsletterIsDomainPreviewableMexResponse implements MexOperation.Response.Json {
@@ -40,9 +30,6 @@ public final class FetchNewsletterIsDomainPreviewableMexResponse implements MexO
     /**
      * Parses a MEX response from the given IQ response node.
      *
-     * @implNote WAWebMexFetchNewsletterIsDomainPreviewableJob.mexFetchNewsletterIsDomainPreviewable: WA Web relies on the
-     * GraphQL client to unwrap the response. Cobalt performs the
-     * unwrapping manually from the IQ {@code <result>} child.
      * @param node the IQ response node received from the relay
      * @return an {@link Optional} containing the parsed response, or
      *         empty if the node is missing a result payload
@@ -64,10 +51,6 @@ public final class FetchNewsletterIsDomainPreviewableMexResponse implements MexO
 
     /**
      * A parsed {@code UrlPreviews} object.
-     *
-     * @implNote WAWebMexFetchNewsletterIsDomainPreviewableJob.mexFetchNewsletterIsDomainPreviewable: mirrors the per-entry
-     * shape produced by the JS handler when it constructs
-     * {@code new Map(i.map(({is_previewable, url_domain}) => [url_domain, is_previewable === true]))}.
      */
     public static final class UrlPreviews {
         private final String urlDomain;
@@ -96,17 +79,14 @@ public final class FetchNewsletterIsDomainPreviewableMexResponse implements MexO
         /**
          * Returns the {@code is_previewable} field.
          *
-         * @implNote WAWebMexFetchNewsletterIsDomainPreviewableJob.mexFetchNewsletterIsDomainPreviewable: matches the JS
-         * coalescing {@code t === true} which collapses {@code null}, {@code undefined}
-         * and any non-{@code true} value to {@code false}.
-         * @return {@code true} if the value is present and true, {@code false} otherwise
+         * @return true
          */
         public boolean isPreviewable() {
             return isPreviewable != null && isPreviewable;
         }
 
         /**
-         * Parses a {@code UrlPreviews} from the given JSON object.
+         * Returns the {@code is_previewable} field.
          *
          * @param obj the JSON object to parse
          * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
@@ -144,30 +124,21 @@ public final class FetchNewsletterIsDomainPreviewableMexResponse implements MexO
      * Parses a {@link FetchNewsletterIsDomainPreviewableMexResponse} from the raw JSON bytes of the
      * {@code <result>} child.
      *
-     * @implNote WAWebMexFetchNewsletterIsDomainPreviewableJob.mexFetchNewsletterIsDomainPreviewable: mirrors the implicit
-     * unwrapping that WA Web performs on the GraphQL response,
-     * extracting the {@code xwa2_newsletter_message_integrity} root.
      * @param json the UTF-8 encoded JSON payload
      * @return an {@link Optional} containing the parsed response, or
      *         empty if the envelope is missing expected fields
      */
     private static Optional<FetchNewsletterIsDomainPreviewableMexResponse> of(byte[] json) {
-        // WAWebMexFetchNewsletterIsDomainPreviewableJob.mexFetchNewsletterIsDomainPreviewable
-        // Parses the raw JSON payload, bailing out if fastjson2 returns null
         var jsonObject = JSON.parseObject(json);
         if (jsonObject == null) {
             return Optional.empty();
         }
 
-        // WAWebMexFetchNewsletterIsDomainPreviewableJob.mexFetchNewsletterIsDomainPreviewable
-        // Descends into the standard GraphQL "data" envelope
         var data = jsonObject.getJSONObject("data");
         if (data == null) {
             return Optional.empty();
         }
 
-        // WAWebMexFetchNewsletterIsDomainPreviewableJob.mexFetchNewsletterIsDomainPreviewable
-        // Extracts the operation-specific root keyed by xwa2_newsletter_message_integrity
         var root = data.getJSONObject("xwa2_newsletter_message_integrity");
         if (root == null) {
             return Optional.empty();

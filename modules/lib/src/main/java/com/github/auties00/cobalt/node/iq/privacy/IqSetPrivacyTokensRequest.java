@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * The outbound stanza variant — wraps the {@code <tokens>} payload
+ * The outbound stanza variant. Wraps the {@code <tokens>} payload
  * (one {@code <token>} grandchild per requested type) in the
  * canonical {@code <iq xmlns="privacy" type="set">} envelope.
  */
@@ -32,19 +32,19 @@ public final class IqSetPrivacyTokensRequest implements IqOperation.Request {
     private final long timestampSeconds;
 
     /**
-     * The token types being issued; one {@code <token>} grandchild
-     * per entry. Never {@code null}; never empty.
+     * The token types being issued. One {@code <token>} grandchild
+     * per entry. Never {@code null}. Never empty.
      */
     private final List<IqSetPrivacyTokensTokenType> tokenTypes;
 
     /**
      * Constructs a new request.
      *
-     * @param userJid          the local user's PN JID; never
+     * @param userJid          the local user's PN JID. Never
      *                         {@code null}
      * @param timestampSeconds the issuance timestamp in seconds
      *                         since epoch
-     * @param tokenTypes       the token types to issue; never
+     * @param tokenTypes       the token types to issue. Never
      *                         {@code null} and never empty
      * @throws NullPointerException     if {@code userJid} or
      *                                  {@code tokenTypes} is
@@ -66,7 +66,7 @@ public final class IqSetPrivacyTokensRequest implements IqOperation.Request {
     /**
      * Returns the local user's PN JID.
      *
-     * @return the user JID; never {@code null}
+     * @return the user JID. Never {@code null}
      */
     public Jid userJid() {
         return userJid;
@@ -84,7 +84,7 @@ public final class IqSetPrivacyTokensRequest implements IqOperation.Request {
     /**
      * Returns the token types being issued.
      *
-     * @return an unmodifiable list; never {@code null}; never empty
+     * @return an unmodifiable list. Never {@code null}. Never empty
      */
     public List<IqSetPrivacyTokensTokenType> tokenTypes() {
         return tokenTypes;

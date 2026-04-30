@@ -14,7 +14,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps the {@code <props/>} payload in
+ * The outbound stanza variant. Wraps the {@code <props/>} payload in
  * the canonical {@code <iq xmlns="abt" type="get" to="s.whatsapp.net">}
  * envelope.
  */
@@ -37,8 +37,8 @@ public final class SmaxAbPropsGetGroupExperimentConfigRequest implements SmaxOpe
     /**
      * Constructs a request for the given group and hash.
      *
-     * @param groupJid  the target group JID; never {@code null}
-     * @param propsHash the client's currently-cached props hash; may
+     * @param groupJid  the target group JID. Never {@code null}
+     * @param propsHash the client's currently-cached props hash. May
      *                  be {@code null} on the first fetch
      * @throws NullPointerException if {@code groupJid} is {@code null}
      */
@@ -50,7 +50,7 @@ public final class SmaxAbPropsGetGroupExperimentConfigRequest implements SmaxOpe
     /**
      * Constructs an unconditional request for the given group.
      *
-     * @param groupJid the target group JID; never {@code null}
+     * @param groupJid the target group JID. Never {@code null}
      * @throws NullPointerException if {@code groupJid} is {@code null}
      */
     public SmaxAbPropsGetGroupExperimentConfigRequest(Jid groupJid) {
@@ -60,7 +60,7 @@ public final class SmaxAbPropsGetGroupExperimentConfigRequest implements SmaxOpe
     /**
      * Returns the target group JID.
      *
-     * @return the group JID; never {@code null}
+     * @return the group JID. Never {@code null}
      */
     public Jid groupJid() {
         return groupJid;
@@ -91,7 +91,6 @@ public final class SmaxAbPropsGetGroupExperimentConfigRequest implements SmaxOpe
     @WhatsAppWebExport(moduleName = "WASmaxOutAbPropsGetGroupExperimentConfigRequest",
             exports = "makeGetGroupExperimentConfigRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutAbPropsGetGroupExperimentConfigRequest: smax("props", {group: GROUP_JID(t), hash?})
         var propsBuilder = new NodeBuilder()
                 .description("props")
                 .attribute("group", groupJid);
@@ -99,8 +98,6 @@ public final class SmaxAbPropsGetGroupExperimentConfigRequest implements SmaxOpe
             propsBuilder.attribute("hash", propsHash);
         }
         var propsNode = propsBuilder.build();
-        // WASmaxOutAbPropsGetGroupExperimentConfigRequest: smax("iq", {xmlns: "abt", to: S_WHATSAPP_NET})
-        // WASmaxOutAbPropsBaseIQGetRequestMixin: smax("iq", {id: generateId(), type: "get"})
         return new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "abt")

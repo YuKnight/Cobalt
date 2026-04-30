@@ -5,15 +5,13 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import java.util.Optional;
 
 /**
- * Success result of {@code WAWebUsyncUsername.usernameParser}.
- *
- * @implNote WAWebUsyncUsername.usernameParser: success branch returns the
- *     content string or {@code null}.
+ * Success result of {@code WAWebUsyncUsername.usernameParser}. Carries the
+ * peer's claimed username, or {@code null} when the peer has not claimed one.
  */
 @WhatsAppWebModule(moduleName = "WAWebUsyncUsername")
 public final class UsernameResult implements UsyncProtocolResponse {
     /**
-     * The peer's username, or {@code null} if the peer has not claimed
+     * Holds the peer's username, or {@code null} if the peer has not claimed
      * one.
      */
     private final String username;

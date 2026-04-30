@@ -19,31 +19,20 @@ import java.util.Arrays;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * Encodes WebSocket frames according to
+ * Stateless utility that encodes WebSocket frames per
  * <a href="https://datatracker.ietf.org/doc/html/rfc6455">RFC 6455</a>.
  *
- * <p>All frames produced by this encoder are masked with a randomly
- * generated four-byte key, as required for client-to-server WebSocket
- * communication.
+ * <p>Every frame is masked with a fresh four-byte key, as required
+ * for client-to-server messages. Three buffer types are handled
+ * transparently: writable array-backed buffers are masked in place
+ * through the backing array, writable direct buffers are masked in
+ * place through a {@link MemorySegment}, and read-only buffers are
+ * rejected so the caller learns to pass writable input.
  *
- * <p>Masking uses the Vector API (SIMD) for bulk throughput with an
- * int-wise scalar fallback for short tails.  For payloads below
- * {@code VECTORIZE_THRESHOLD} the SIMD path is skipped entirely to
- * avoid vector-setup overhead on small frames.
- *
- * <p>Three buffer types are supported transparently: writable
- * array-backed (heap) buffers are masked in-place via the backing
- * array, writable direct buffers are masked in-place via
- * {@link MemorySegment}, and read-only buffers are copied into a new
- * heap array before masking.
- *
- * <p>This is a stateless utility class.  All methods are static and
- * thread-safe.
- *
- * @implNote No WhatsApp Web counterpart: WA Web relies on the browser's
- *     native {@code WebSocket} object to frame, mask and transmit
- *     payloads.  Cobalt writes to the socket directly, so it has to
- *     produce the RFC 6455 wire format itself.
+ * @implNote Masking uses the Vector API for bulk throughput with an
+ *     int-wise scalar fallback for short tails. Below
+ *     {@link #VECTORIZE_THRESHOLD} the SIMD path is skipped so small
+ *     frames pay no vector setup cost.
  */
 public final class WebSocketFrameEncoder {
 

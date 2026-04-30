@@ -110,15 +110,11 @@ public final class SmaxGroupsPromoteDemoteRequest implements SmaxOperation.Reque
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsPromoteDemoteRequest",
             exports = "makePromoteDemoteRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutGroupsBaseSetGroupMixin: smax("iq", {to: GROUP_JID(t), xmlns: "w:g2"})
-        // WASmaxOutGroupsBaseIQSetRequestMixin: smax("iq", {id: generateId(), type: "set"})
         var iqBuilder = new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "w:g2")
                 .attribute("to", groupJid)
                 .attribute("type", "set");
-        // WASmaxOutGroupsPromoteDemoteRequest: smax("promote", null,
-        //   REPEATED_CHILD(participant, 0, 1024))
         if (!participantsToPromote.isEmpty()) {
             var promoteChildren = new ArrayList<Node>(participantsToPromote.size());
             for (var participantJid : participantsToPromote) {
@@ -134,8 +130,6 @@ public final class SmaxGroupsPromoteDemoteRequest implements SmaxOperation.Reque
                     .build();
             iqBuilder.content(promoteNode);
         }
-        // WASmaxOutGroupsPromoteDemoteRequest: smax("demote", null,
-        //   REPEATED_CHILD(participant, 0, 1024))
         if (!participantsToDemote.isEmpty()) {
             var demoteChildren = new ArrayList<Node>(participantsToDemote.size());
             for (var participantJid : participantsToDemote) {

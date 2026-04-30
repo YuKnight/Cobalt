@@ -5,53 +5,20 @@ import com.github.auties00.cobalt.model.jid.Jid;
 import java.util.Objects;
 
 /**
- * Exception thrown when Account Device Verification (ADV) validation fails.
- * <p>
- * ADV is WhatsApp's cryptographic mechanism for validating companion device identities
- * in the multi-device architecture. When a new device connects or sends a message,
- * WhatsApp uses ADV to verify that the device is legitimately associated with the claimed
- * account.
+ * Thrown when the cryptographic identity of a companion device cannot be
+ * verified through Advanced Device Verification (ADV).
  *
- * <h2>ADV Architecture</h2>
- * ADV validation uses a chain of cryptographic signatures:
- * <ol>
- *   <li><b>Account Signature:</b> Created by the primary device using the account's identity key,
- *       proving the device was authorized by the account owner</li>
- *   <li><b>Device Signature:</b> Created by the companion device itself, proving it possesses
- *       the corresponding private key</li>
- *   <li><b>HMAC Validation:</b> Ensures the device identity data hasn't been tampered with</li>
- * </ol>
+ * <p>Every device linked to a WhatsApp account carries a triple of
+ * signatures the primary device produces when the companion is paired.
+ * Before Cobalt accepts a prekey bundle or message from a remote device,
+ * it re-checks those signatures and an HMAC over the serialized device
+ * identity. Any failure in that check raises one of the nested
+ * subtypes, each describing a specific step of the verification that
+ * went wrong, and carries the JID of the device that failed.
  *
- * <h2>Signed Data Structure</h2>
- * The ADV signature covers:
- * <ul>
- *   <li>Device identity details (device type, platform info)</li>
- *   <li>Device's public key</li>
- *   <li>Account signature (for device signature only)</li>
- * </ul>
- *
- * <h2>Exception Hierarchy</h2>
- * <ul>
- *   <li>{@link MissingDeviceIdentity} - Device identity node not present in response</li>
- *   <li>{@link EmptyDeviceIdentity} - Device identity node present but empty</li>
- *   <li>{@link AccountSignatureFailed} - Account signature verification failed</li>
- *   <li>{@link DeviceSignatureFailed} - Device signature verification failed</li>
- *   <li>{@link HmacValidationFailed} - HMAC integrity check failed</li>
- *   <li>{@link CryptoError} - Low-level cryptographic operation failed</li>
- * </ul>
- *
- * <h2>Security Implications</h2>
- * ADV validation failures may indicate:
- * <ul>
- *   <li>Man-in-the-middle attack attempting to inject a rogue device</li>
- *   <li>Unauthorized device registration attempt</li>
- *   <li>Data corruption during transmission</li>
- *   <li>Protocol implementation bugs</li>
- * </ul>
- *
- * <h2>Fatality</h2>
- * All ADV validation failures are fatal. The session should not continue with an
- * unverified device as this could compromise end-to-end encryption security.
+ * <p>All ADV validation failures are fatal because accepting an
+ * unverified device would allow a third party to inject themselves into
+ * the end-to-end-encrypted exchange.
  *
  * @see MissingDeviceIdentity
  * @see EmptyDeviceIdentity
@@ -69,7 +36,7 @@ public sealed abstract class WhatsAppAdvValidationException extends WhatsAppExce
                 WhatsAppAdvValidationException.CryptoError {
 
     /**
-     * The JID of the device that failed ADV validation.
+     * The JID of the device whose identity could not be verified.
      */
     private final Jid jid;
 
@@ -77,8 +44,8 @@ public sealed abstract class WhatsAppAdvValidationException extends WhatsAppExce
      * Constructs a new ADV validation exception with the specified message and device JID.
      *
      * @param message the detail message describing the validation failure
-     * @param jid     the JID of the device that failed validation; must not be null
-     * @throws NullPointerException if jid is null
+     * @param jid     the JID of the device that failed validation
+     * @throws NullPointerException if {@code jid} is {@code null}
      */
     protected WhatsAppAdvValidationException(String message, Jid jid) {
         super(message);
@@ -89,9 +56,9 @@ public sealed abstract class WhatsAppAdvValidationException extends WhatsAppExce
      * Constructs a new ADV validation exception with a message, device JID, and cause.
      *
      * @param message the detail message describing the validation failure
-     * @param jid     the JID of the device that failed validation; must not be null
+     * @param jid     the JID of the device that failed validation
      * @param cause   the underlying cause of the validation failure
-     * @throws NullPointerException if jid is null
+     * @throws NullPointerException if {@code jid} is {@code null}
      */
     protected WhatsAppAdvValidationException(String message, Jid jid, Throwable cause) {
         super(message, cause);
@@ -100,21 +67,19 @@ public sealed abstract class WhatsAppAdvValidationException extends WhatsAppExce
 
     /**
      * Returns the JID of the device that failed ADV validation.
-     * <p>
-     * This JID identifies the specific device whose identity could not be verified.
-     * It includes both the user identifier and device identifier components.
      *
-     * @return the device JID; never null
+     * @return the device JID, never {@code null}
      */
     public Jid jid() {
         return jid;
     }
 
     /**
-     * Returns whether this exception represents a fatal error.
-     * <p>
-     * All ADV validation failures are fatal because proceeding with an unverified
-     * device would compromise the security of the end-to-end encryption.
+     * Returns whether the failure invalidates the current session.
+     *
+     * <p>All ADV validation failures are fatal because the device on the
+     * other end cannot be trusted as a peer in the end-to-end-encrypted
+     * exchange.
      *
      * @return {@code true}
      */
@@ -124,21 +89,13 @@ public sealed abstract class WhatsAppAdvValidationException extends WhatsAppExce
     }
 
     /**
-     * Exception thrown when the prekey response does not contain the required device-identity node.
-     * <p>
-     * When requesting prekeys from another device, the response must include device identity
-     * information for ADV validation. This exception indicates the response was malformed
-     * or the sender doesn't support ADV.
+     * Thrown when a prekey response is missing the {@code device-identity}
+     * node Cobalt needs in order to start ADV validation.
      *
-     * <h2>Expected Response Structure</h2>
-     * <pre>
-     * &lt;iq type="result"&gt;
-     *   &lt;keys&gt;
-     *     &lt;device-identity&gt;...ADV data...&lt;/device-identity&gt;
-     *     ...prekey data...
-     *   &lt;/keys&gt;
-     * &lt;/iq&gt;
-     * </pre>
+     * <p>WhatsApp guarantees this node accompanies every prekey bundle
+     * served by an ADV-capable device, so its absence indicates either a
+     * malformed response from the server or a peer that does not speak
+     * ADV.
      */
     public static final class MissingDeviceIdentity extends WhatsAppAdvValidationException {
         /**
@@ -152,10 +109,8 @@ public sealed abstract class WhatsAppAdvValidationException extends WhatsAppExce
     }
 
     /**
-     * Exception thrown when the device-identity node is present but contains no data.
-     * <p>
-     * The device identity structure exists but is empty or invalid, indicating a
-     * protocol error or corrupted response from the sender.
+     * Thrown when the {@code device-identity} node is present in a prekey
+     * response but its payload is empty or syntactically broken.
      */
     public static final class EmptyDeviceIdentity extends WhatsAppAdvValidationException {
         /**
@@ -169,25 +124,12 @@ public sealed abstract class WhatsAppAdvValidationException extends WhatsAppExce
     }
 
     /**
-     * Exception thrown when the account signature verification fails.
-     * <p>
-     * The account signature proves the device was authorized by the account owner.
-     * It is created by signing the device identity details concatenated with
-     * the device's public key using the account's identity key.
+     * Thrown when the account signature in the device identity does not
+     * verify against the account's identity key.
      *
-     * <h2>Verification Process</h2>
-     * <ol>
-     *   <li>Extract the account signature from the device identity</li>
-     *   <li>Reconstruct the signed data (identity details + device public key)</li>
-     *   <li>Verify the signature using the account's identity public key</li>
-     * </ol>
-     *
-     * <h2>Failure Implications</h2>
-     * <ul>
-     *   <li>The device was not legitimately registered by the account owner</li>
-     *   <li>The identity data was tampered with after signing</li>
-     *   <li>A potential man-in-the-middle attack is in progress</li>
-     * </ul>
+     * <p>The account signature is produced by the primary device when a
+     * companion is linked. A mismatch means the companion was not
+     * authorized by the account owner and must not be trusted.
      */
     public static final class AccountSignatureFailed extends WhatsAppAdvValidationException {
         /**
@@ -201,26 +143,12 @@ public sealed abstract class WhatsAppAdvValidationException extends WhatsAppExce
     }
 
     /**
-     * Exception thrown when the device signature verification fails.
-     * <p>
-     * The device signature proves the companion device possesses the private key
-     * corresponding to its claimed public key. It is created by signing the
-     * device identity details concatenated with the device's public key and
-     * the account signature.
+     * Thrown when the device signature in the device identity does not
+     * verify against the device's own public key.
      *
-     * <h2>Verification Process</h2>
-     * <ol>
-     *   <li>Extract the device signature from the device identity</li>
-     *   <li>Reconstruct the signed data (identity details + device key + account signature)</li>
-     *   <li>Verify the signature using the device's public key</li>
-     * </ol>
-     *
-     * <h2>Failure Implications</h2>
-     * <ul>
-     *   <li>The device doesn't possess the claimed private key</li>
-     *   <li>The signature was forged or corrupted</li>
-     *   <li>A potential impersonation attack is in progress</li>
-     * </ul>
+     * <p>The device signature is produced by the companion device itself
+     * to prove it possesses the private key matching the public key it
+     * announces. A mismatch means the device cannot prove that ownership.
      */
     public static final class DeviceSignatureFailed extends WhatsAppAdvValidationException {
         /**
@@ -234,21 +162,12 @@ public sealed abstract class WhatsAppAdvValidationException extends WhatsAppExce
     }
 
     /**
-     * Exception thrown when the HMAC validation of the device identity fails.
-     * <p>
-     * HMAC (Hash-based Message Authentication Code) is used to verify the
-     * integrity of the device identity data. The HMAC is computed over the
-     * serialized device identity using a derived key.
+     * Thrown when the HMAC stamped over the serialized device identity
+     * does not match the value Cobalt computes from the shared secret.
      *
-     * <h2>HMAC Computation</h2>
-     * <ol>
-     *   <li>Derive the HMAC key from shared secrets</li>
-     *   <li>Compute HMAC-SHA256 over the serialized device identity</li>
-     *   <li>Compare with the HMAC included in the data</li>
-     * </ol>
-     *
-     * <h2>Failure Implications</h2>
-     * The device identity data was corrupted or tampered with during transmission.
+     * <p>The HMAC protects the identity payload from in-flight tampering;
+     * a mismatch means the bytes were modified or the verification key is
+     * out of sync.
      */
     public static final class HmacValidationFailed extends WhatsAppAdvValidationException {
         /**
@@ -262,19 +181,13 @@ public sealed abstract class WhatsAppAdvValidationException extends WhatsAppExce
     }
 
     /**
-     * Exception thrown when a cryptographic operation fails during ADV validation.
-     * <p>
-     * This is a catch-all for low-level cryptographic errors such as invalid key
-     * formats, unsupported algorithms, or other security provider failures that
-     * prevented validation from completing.
+     * Thrown when a low-level cryptographic operation fails while
+     * validating ADV signatures.
      *
-     * <h2>Possible Causes</h2>
-     * <ul>
-     *   <li>Invalid key format or encoding</li>
-     *   <li>Unsupported cryptographic algorithm</li>
-     *   <li>JCE provider not available or misconfigured</li>
-     *   <li>Key size restrictions (e.g., export restrictions)</li>
-     * </ul>
+     * <p>This wraps unexpected JCE failures such as malformed key
+     * encodings, missing algorithms, or provider misconfiguration so the
+     * caller can distinguish a genuine signature mismatch from an
+     * environment problem.
      */
     public static final class CryptoError extends WhatsAppAdvValidationException {
         /**

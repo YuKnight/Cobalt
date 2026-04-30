@@ -14,51 +14,45 @@ import java.util.Optional;
 /**
  * Aggregated result of a USync query.
  *
- * <p>The relay's response carries three sections:
- * <ul>
- *   <li>a per-protocol {@code <result>} block with optional
- *       {@code <error/>} or {@code refresh="..."} attributes that apply to
- *       <em>every</em> user in the response. Looked up via
- *       {@link #getProtocolError(UsyncProtocol)} and
- *       {@link #getProtocolRefresh(UsyncProtocol)}.</li>
- *   <li>a {@code <list>} block with one {@code <user>} child per peer.
- *       Exposed as an unmodifiable list via {@link #users()}.</li>
- *   <li>a top-level error (when the IQ failed wholesale): exposed via
- *       {@link #topLevelError()}.</li>
- * </ul>
+ * <p>The relay's response carries three sections. A per-protocol
+ * {@code <result>} block carries optional {@code <error/>} or
+ * {@code refresh="..."} attributes that apply to every user in the response,
+ * looked up via {@link #getProtocolError(UsyncProtocol)} and
+ * {@link #getProtocolRefresh(UsyncProtocol)}. A {@code <list>} block carries
+ * one {@code <user>} child per peer, exposed as an unmodifiable list via
+ * {@link #users()}. A top-level error appears when the IQ failed wholesale,
+ * exposed via {@link #topLevelError()}.
  *
- * <p>Maps are not exposed directly — every per-protocol lookup goes
- * through a method so callers always interact with the result through a
- * stable typed surface.
- *
- * @implNote WAWebUsync.usyncParser.
+ * <p>Maps are not exposed directly. Every per-protocol lookup goes through a
+ * method so callers always interact with the result through a stable typed
+ * surface.
  */
 @WhatsAppWebModule(moduleName = "WAWebUsync")
 public final class UsyncResult {
     /**
-     * Per-user, per-protocol parse results in relay order.
+     * Holds the per-user, per-protocol parse results in relay order.
      */
     private final List<UsyncUserResult> users;
 
     /**
-     * Map from protocol name to the error metadata that applied to every
-     * user in the response.
+     * Maps protocol name to the error metadata that applied to every user in
+     * the response.
      */
     private final Map<String, UsyncProtocolError> protocolErrors;
 
     /**
-     * Map from protocol name to the requested refresh window.
+     * Maps protocol name to the requested refresh window.
      */
     private final Map<String, Duration> protocolRefreshes;
 
     /**
-     * Top-level error populated when the IQ failed entirely.
+     * Holds the top-level error populated when the IQ failed entirely.
      */
     private final UsyncTopLevelError topLevelError;
 
     /**
-     * Creates a new aggregated result. All collections are defensively
-     * copied so the public surface stays immutable.
+     * Creates a new aggregated result. All collections are defensively copied
+     * so the public surface stays immutable.
      *
      * @param users             the per-user results
      * @param protocolErrors    map from protocol name to error
@@ -98,8 +92,7 @@ public final class UsyncResult {
     }
 
     /**
-     * Returns the protocol-level error for the named protocol, when
-     * present.
+     * Returns the protocol-level error for the named protocol, when present.
      *
      * @param protocolName the protocol's wire name
      * @return the error metadata
@@ -109,8 +102,8 @@ public final class UsyncResult {
     }
 
     /**
-     * Returns the refresh-window hint the relay attached to the protocol,
-     * when present.
+     * Returns the refresh-window hint the relay attached to the protocol, when
+     * present.
      *
      * @param protocol the protocol descriptor
      * @return the refresh duration
@@ -121,8 +114,7 @@ public final class UsyncResult {
     }
 
     /**
-     * Returns the refresh-window hint for the named protocol, when
-     * present.
+     * Returns the refresh-window hint for the named protocol, when present.
      *
      * @param protocolName the protocol's wire name
      * @return the refresh duration
@@ -132,7 +124,7 @@ public final class UsyncResult {
     }
 
     /**
-     * Returns the top-level IQ error, when the request failed wholesale.
+     * Returns the top-level IQ error when the request failed wholesale.
      *
      * @return the error metadata
      */

@@ -13,7 +13,7 @@ import it.auties.protobuf.model.ProtobufType;
 @ProtobufMessage(name = "FcmMcsHeartbeatPing")
 public final class FcmMcsHeartbeatPing {
     /**
-     * Last stream id the sender has observed; lets the peer infer the
+     * Last stream id the sender has observed. Lets the peer infer the
      * cursor without parsing any stanza payload.
      */
     @ProtobufProperty(index = 2, type = ProtobufType.INT64)

@@ -78,10 +78,12 @@ public sealed interface WhatsAppClientVerificationHandler {
         @FunctionalInterface
         non-sealed interface QrCode extends Web {
             /**
-             * Creates a handler that prints the QR code to the terminal.
+             * Returns a handler that renders the QR code as ASCII art on
+             * standard output.
              *
-             * @return A QrCode handler that renders the QR code to the console
-             * @apiNote If your terminal doesn't support UTF characters, the output may appear as random characters
+             * @apiNote Terminals that do not support UTF block-drawing
+             *          characters render the output as garbled symbols.
+             * @return the terminal-rendering handler
              */
             static QrCode toTerminal() {
                 return qr -> {
@@ -91,13 +93,18 @@ public sealed interface WhatsAppClientVerificationHandler {
             }
 
             /**
-             * Creates a BitMatrix representation of a QR code from a value.
+             * Encodes a QR payload into a {@link BitMatrix} suitable for
+             * rendering.
              *
-             * @param qr     The QR code content to encode
-             * @param size   The size of the QR code in pixels
-             * @param margin The margin size around the QR code
-             * @return A BitMatrix representing the QR code
-             * @throws UnsupportedOperationException if the QR code cannot be created
+             * @param qr     the payload to encode
+             * @param size   the side length, in pixels, of the rendered
+             *               square
+             * @param margin the white margin around the rendered code, in
+             *               modules
+             * @return the encoded bit matrix
+             * @throws UnsupportedOperationException if the payload cannot
+             *                                       be encoded as a QR
+             *                                       code
              */
             static BitMatrix createMatrix(String qr, int size, int margin) {
                 try {
@@ -109,11 +116,15 @@ public sealed interface WhatsAppClientVerificationHandler {
             }
 
             /**
-             * Creates a handler that saves the QR code to a temporary file and processes it with the provided consumer.
+             * Returns a handler that writes the QR code to a temporary
+             * JPEG file and forwards the file path to the supplied
+             * consumer.
              *
-             * @param fileConsumer The consumer to process the created file path
-             * @return A QrCode handler that saves the QR code to a temporary file
-             * @throws UncheckedIOException if the temporary file cannot be created
+             * @param fileConsumer the consumer that receives the path of
+             *                     the rendered file
+             * @return the file-rendering handler
+             * @throws UncheckedIOException if the temporary file cannot
+             *                              be created
              */
             static QrCode toFile(QrCode.ToFile fileConsumer) {
                 try {
@@ -125,11 +136,14 @@ public sealed interface WhatsAppClientVerificationHandler {
             }
 
             /**
-             * Creates a handler that saves the QR code to a specified path and processes it with the provided consumer.
+             * Returns a handler that writes the QR code to the supplied
+             * path and forwards it to the supplied consumer.
              *
-             * @param path The destination path where the QR code image will be saved
-             * @param fileConsumer The consumer to process the file path after creation
-             * @return A QrCode handler that saves the QR code to the specified path
+             * @param path         the destination path where the QR code
+             *                     image is saved
+             * @param fileConsumer the consumer that receives the path of
+             *                     the rendered file
+             * @return the file-rendering handler
              */
             static QrCode toFile(Path path, QrCode.ToFile fileConsumer) {
                 return qr -> {
@@ -156,18 +170,20 @@ public sealed interface WhatsAppClientVerificationHandler {
              */
             interface ToFile extends Consumer<Path> {
                 /**
-                 * Creates a consumer that discards the file path, taking no action.
+                 * Returns a consumer that ignores the rendered file path
+                 * and takes no action.
                  *
-                 * @return A ToFile consumer that ignores the file path
+                 * @return the no-op consumer
                  */
                 static QrCode.ToFile discard() {
                     return ignored -> {};
                 }
 
                 /**
-                 * Creates a consumer that logs the file path to the terminal using the system logger.
+                 * Returns a consumer that logs the rendered file path
+                 * through the system logger.
                  *
-                 * @return A ToFile consumer that prints the file location to the console
+                 * @return the logging consumer
                  */
                 static QrCode.ToFile toTerminal() {
                     return path -> System.getLogger(QrCode.class.getName())
@@ -175,10 +191,12 @@ public sealed interface WhatsAppClientVerificationHandler {
                 }
 
                 /**
-                 * Creates a consumer that opens the QR code file using the default desktop application.
+                 * Returns a consumer that opens the rendered file with
+                 * the default desktop image viewer.
                  *
-                 * @return A ToFile consumer that opens the file with the desktop
-                 * @throws RuntimeException if the file cannot be opened with the desktop
+                 * @return the desktop-opening consumer
+                 * @throws RuntimeException if the file cannot be opened
+                 *                          via {@link Desktop}
                  */
                 static QrCode.ToFile toDesktop() {
                     return path -> {
@@ -207,9 +225,10 @@ public sealed interface WhatsAppClientVerificationHandler {
         @FunctionalInterface
         non-sealed interface PairingCode extends Web {
             /**
-             * Creates a handler that prints the pairing code to the terminal.
+             * Returns a handler that prints the pairing code on standard
+             * output.
              *
-             * @return A PairingCode handler that outputs the code to the console
+             * @return the terminal-printing handler
              */
             static PairingCode toTerminal() {
                 return System.out::println;
@@ -291,12 +310,15 @@ public sealed interface WhatsAppClientVerificationHandler {
         }
 
         /**
-         * Creates a Mobile verification handler with no specific request method.
-         * The verification code is obtained from the provided supplier.
+         * Returns a verification handler that defers the choice of
+         * delivery channel to the WhatsApp server and reads the
+         * verification code from the supplied supplier.
          *
-         * @param supplier A non-null supplier that provides the verification code
-         * @return A Mobile verification handler with no specific request method
-         * @throws NullPointerException if the supplier is null
+         * @param supplier the supplier that produces the verification
+         *                 code once the user has received it
+         * @return the verification handler
+         * @throws NullPointerException if {@code supplier} is
+         *                              {@code null}
          */
         static Mobile none(Supplier<String> supplier) {
             Objects.requireNonNull(supplier, "supplier cannot be null");
@@ -318,12 +340,14 @@ public sealed interface WhatsAppClientVerificationHandler {
         }
 
         /**
-         * Creates a Mobile verification handler that requests verification via SMS.
-         * The verification code is obtained from the provided supplier.
+         * Returns a verification handler that requests SMS delivery and
+         * reads the verification code from the supplied supplier.
          *
-         * @param supplier A non-null supplier that provides the verification code
-         * @return A Mobile verification handler for SMS verification
-         * @throws NullPointerException if the supplier is null
+         * @param supplier the supplier that produces the verification
+         *                 code once the user has received it
+         * @return the verification handler
+         * @throws NullPointerException if {@code supplier} is
+         *                              {@code null}
          */
         static Mobile sms(Supplier<String> supplier) {
             Objects.requireNonNull(supplier, "supplier cannot be null");
@@ -345,12 +369,15 @@ public sealed interface WhatsAppClientVerificationHandler {
         }
 
         /**
-         * Creates a Mobile verification handler that requests verification via phone call.
-         * The verification code is obtained from the provided supplier.
+         * Returns a verification handler that requests voice-call
+         * delivery and reads the verification code from the supplied
+         * supplier.
          *
-         * @param supplier A non-null supplier that provides the verification code
-         * @return A Mobile verification handler for voice call verification
-         * @throws NullPointerException if the supplier is null
+         * @param supplier the supplier that produces the verification
+         *                 code once the user has received it
+         * @return the verification handler
+         * @throws NullPointerException if {@code supplier} is
+         *                              {@code null}
          */
         static Mobile call(Supplier<String> supplier) {
             Objects.requireNonNull(supplier, "supplier cannot be null");
@@ -372,12 +399,15 @@ public sealed interface WhatsAppClientVerificationHandler {
         }
 
         /**
-         * Creates a Mobile verification handler that requests verification via WhatsApp.
-         * The verification code is obtained from the provided supplier.
+         * Returns a verification handler that requests in-app WhatsApp
+         * delivery and reads the verification code from the supplied
+         * supplier.
          *
-         * @param supplier A non-null supplier that provides the verification code
-         * @return A Mobile verification handler for WhatsApp verification
-         * @throws NullPointerException if the supplier is null
+         * @param supplier the supplier that produces the verification
+         *                 code once the user has received it
+         * @return the verification handler
+         * @throws NullPointerException if {@code supplier} is
+         *                              {@code null}
          */
         static Mobile whatsapp(Supplier<String> supplier) {
             Objects.requireNonNull(supplier, "supplier cannot be null");

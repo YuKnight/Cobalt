@@ -127,7 +127,7 @@ final class AndroidClientRegistration extends MobileClientRegistration {
      * into the {@code H=} suffix and {@code Authorization} header.
      *
      * <p>The attestor's {@link WhatsAppDeviceAttestor.Android#sign sign}
-     * call returns raw signature bytes and a raw certificate chain; this
+     * call returns raw signature bytes and a raw certificate chain. This
      * method hex-encodes the signature (lowercase, no separator, the
      * format the WhatsApp server expects) and URL-safe-base64-encodes the
      * certificate chain without padding. When either component comes back

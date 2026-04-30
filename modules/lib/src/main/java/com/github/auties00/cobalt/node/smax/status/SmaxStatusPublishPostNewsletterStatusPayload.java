@@ -11,28 +11,20 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Sealed disjunction over the publish-payload addressing modes —
+ * Sealed disjunction over the publish-payload addressing modes.
  * either a "client + server id" reference (publishing a
  * status-newsletter-reaction or status-newsletter-reaction-revoke
  * tied to a previously-published status identified by its
  * server-id) or a "client id only" reference (publishing a
  * brand-new status carrying an inner client-id content payload).
- *
- * @implNote {@code WASmaxOutStatusPublishClientPostNewsletterStatusAndServerOrPostNewsletterStatusIDMixinGroup.mergeClientPostNewsletterStatusAndServerOrPostNewsletterStatusIDMixinGroup}.
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutStatusPublishClientPostNewsletterStatusAndServerOrPostNewsletterStatusIDMixinGroup")
 public sealed interface SmaxStatusPublishPostNewsletterStatusPayload permits SmaxStatusPublishPostNewsletterStatusPayload.WithServerId, SmaxStatusPublishPostNewsletterStatusPayload.WithClientIdOnly {
 
     /**
-     * The "client id + server id" payload — used for publishing a
+     * The "client id + server id" payload. Used for publishing a
      * status-newsletter-reaction or status-newsletter-reaction-revoke
      * that references a previously-published status.
-     *
-     * @implNote {@code WASmaxOutStatusPublishPostNewsletterStatusClientAndServerIDMixin.mergePostNewsletterStatusClientAndServerIDMixin}
-     *           composes
-     *           {@code WASmaxOutStatusPublishStatusNewsletterReactionStatusNewsletterReactionOrStatusNewsletterReactionRevokeMixinGroup}
-     *           over a {@code <status id=STANZA_ID(t)
-     *           server_id=INT(n)>...</status>} envelope.
      */
     @WhatsAppWebModule(moduleName = "WASmaxOutStatusPublishPostNewsletterStatusClientAndServerIDMixin")
     @WhatsAppWebModule(moduleName = "WASmaxOutStatusPublishStatusNewsletterReactionStatusNewsletterReactionOrStatusNewsletterReactionRevokeMixinGroup")
@@ -127,13 +119,8 @@ public sealed interface SmaxStatusPublishPostNewsletterStatusPayload permits Sma
     }
 
     /**
-     * The "client id only" payload — used for publishing a brand-new
+     * The "client id only" payload. Used for publishing a brand-new
      * status carrying an inner client-id content payload.
-     *
-     * @implNote {@code WASmaxOutStatusPublishPostNewsletterStatusClientIDMixin.mergePostNewsletterStatusClientIDMixin}
-     *           composes
-     *           {@code WASmaxOutStatusPublishNewsletterClientIdContent}
-     *           over a {@code <status id=STANZA_ID(t)>} envelope.
      */
     @WhatsAppWebModule(moduleName = "WASmaxOutStatusPublishPostNewsletterStatusClientIDMixin")
     @WhatsAppWebModule(moduleName = "WASmaxOutStatusPublishNewsletterClientIdContent")

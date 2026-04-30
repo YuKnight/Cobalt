@@ -13,7 +13,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The inbound notification — the relay's "your newsletter has new
+ * The inbound notification. The relay's "your newsletter has new
  * messages" hint carrying the affected newsletter JID, optional
  * timestamp, and the affected {@code <message>} entries.
  *
@@ -29,7 +29,7 @@ import java.util.Optional;
 @WhatsAppWebModule(moduleName = "WASmaxInNewslettersNewsletterMessageResponsePayloadMixin")
 public final class SmaxNewslettersLiveUpdatesNotificationResponse implements SmaxOperation.Response {
     /**
-     * The notification stanza id — echoed verbatim into the
+     * The notification stanza id, echoed verbatim into the
      * {@link SmaxNewslettersLiveUpdatesNotificationAcknowledgement}.
      */
     private final String notificationId;
@@ -255,7 +255,7 @@ public final class SmaxNewslettersLiveUpdatesNotificationResponse implements Sma
         private final boolean fromSelf;
 
         /**
-         * The raw underlying {@link Node} — exposed so callers can
+         * The raw underlying {@link Node}. Exposed so callers can
          * project the variable-shape add-on children.
          */
         private final Node raw;

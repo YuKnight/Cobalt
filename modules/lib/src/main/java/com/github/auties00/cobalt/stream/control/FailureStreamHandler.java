@@ -32,94 +32,68 @@ import com.github.auties00.cobalt.stream.SocketStream;
  *   <li>{@code 503} - Service unavailable: logged as warning, no exception</li>
  * </ul>
  *
- * @implNote WAWebHandleFailure.default
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleFailure")
 @WhatsAppWebModule(moduleName = "WAWebFailureErrorCodes")
 public final class FailureStreamHandler implements SocketStream.Handler {
 
     /**
-     * Logger instance for diagnostic output related to failure stanza handling.
-     *
-     * @implNote WAWebHandleFailure.default (WALogger usage)
+     * Logger for diagnostic output related to failure stanza handling.
      */
     private static final System.Logger LOGGER = System.getLogger(FailureStreamHandler.class.getName());
 
     /**
      * Failure reason code indicating a generic server-side failure.
-     *
-     * @implNote WAWebFailureErrorCodes.FAILURE_REASON.REASON_GENERIC_FAILURE
      */
     private static final int REASON_GENERIC_FAILURE = 400;
 
     /**
      * Failure reason code indicating the client is not authorized.
-     *
-     * @implNote WAWebFailureErrorCodes.FAILURE_REASON.REASON_NOT_AUTHORIZED
      */
     private static final int REASON_NOT_AUTHORIZED = 401;
 
     /**
      * Failure reason code indicating a temporary ban with code and expiry.
-     *
-     * @implNote WAWebFailureErrorCodes.FAILURE_REASON.REASON_TEMP_BANNED
      */
     private static final int REASON_TEMP_BANNED = 402;
 
     /**
-     * Failure reason code indicating the account has been locked.
-     *
-     * @implNote WAWebFailureErrorCodes.FAILURE_REASON.REASON_LOCKED
+     * Failure reason code indicating that the account has been locked.
      */
     private static final int REASON_LOCKED = 403;
 
     /**
-     * Failure reason code indicating the client version is too old.
-     *
-     * @implNote WAWebFailureErrorCodes.FAILURE_REASON.REASON_CLIENT_TOO_OLD
+     * Failure reason code indicating that the client version is too old.
      */
     private static final int REASON_CLIENT_TOO_OLD = 405;
 
     /**
-     * Failure reason code indicating the account has been permanently banned.
-     *
-     * @implNote WAWebFailureErrorCodes.FAILURE_REASON.REASON_BANNED
+     * Failure reason code indicating that the account has been permanently banned.
      */
     private static final int REASON_BANNED = 406;
 
     /**
      * Failure reason code indicating a bad user agent string.
-     *
-     * @implNote WAWebFailureErrorCodes.FAILURE_REASON.REASON_BAD_USER_AGENT
      */
     private static final int REASON_BAD_USER_AGENT = 409;
 
     /**
      * Failure reason code indicating an internal server error.
-     *
-     * @implNote WAWebFailureErrorCodes.FAILURE_REASON.REASON_INTERNAL_SERVER_ERROR
      */
     private static final int REASON_INTERNAL_SERVER_ERROR = 500;
 
     /**
      * Failure reason code indicating an experimental server condition.
-     *
-     * @implNote WAWebFailureErrorCodes.FAILURE_REASON.REASON_EXPERIMENTAL
      */
     private static final int REASON_EXPERIMENTAL = 501;
 
     /**
-     * Failure reason code indicating the service is temporarily unavailable.
-     *
-     * @implNote WAWebFailureErrorCodes.FAILURE_REASON.REASON_SERVICE_UNAVAILABLE
+     * Failure reason code indicating that the service is temporarily unavailable.
      */
     private static final int REASON_SERVICE_UNAVAILABLE = 503;
 
     /**
-     * The WhatsApp client instance used to dispatch failure exceptions through
-     * the pluggable error handler.
-     *
-     * @implNote WAWebHandleFailure.default (implicit via WAWebSocketModel, WAWebBackendEventBus)
+     * The WhatsApp client used to dispatch failure exceptions through the pluggable error handler.
      */
     private final WhatsAppClient whatsapp;
 
@@ -127,7 +101,6 @@ public final class FailureStreamHandler implements SocketStream.Handler {
      * Constructs a new failure stream handler with the specified client.
      *
      * @param whatsapp the WhatsApp client used to dispatch failure exceptions
-     * @implNote WAWebHandleFailure.default
      */
     public FailureStreamHandler(WhatsAppClient whatsapp) {
         this.whatsapp = whatsapp;
@@ -162,29 +135,20 @@ public final class FailureStreamHandler implements SocketStream.Handler {
      * a disconnect.
      *
      * @param node the {@code <failure>} stanza node received from the server
-     * @implNote WAWebHandleFailure.default - WA Web inlines logout/comms-stop/updater calls;
-     * Cobalt routes every recoverable case through {@link WhatsAppClient#handleFailure(WhatsAppException)} )}
-     * so the user-supplied error handler decides DISCARD/DISCONNECT/RECONNECT/LOG_OUT/BAN.
+     * @implNote WA Web inlines logout, comms-stop and updater calls; Cobalt routes every recoverable case through {@link WhatsAppClient#handleFailure(WhatsAppException)} so the user-supplied error handler decides DISCARD, DISCONNECT, RECONNECT, LOG_OUT or BAN.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebHandleFailure", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public void handle(Node node) {
-        // WAWebHandleFailure.default - parse stanza attributes via failureParser:
-        // {reason: attrInt("reason", 400, 599), location: attrString("location"),
-        //  code: maybeAttrInt("code"), expire: maybeAttrInt("expire"),
-        //  message: maybeAttrString("message"), url: maybeAttrString("url"),
-        //  logoutMessageHeader: maybeAttrString("logout_message_header"),
-        //  logoutMessageSubtext: maybeAttrString("logout_message_subtext"),
-        //  logoutMessageLocale: maybeAttrString("logout_message_locale")}
         var reason = node.getAttributeAsInt("reason", (Integer) null);
-        var location = node.getAttributeAsString("location", null); // WAWebHandleFailure.default - attrString("location")
+        var location = node.getAttributeAsString("location", null);
         var code = node.getAttributeAsInt("code", (Integer) null);
         var expire = node.getAttributeAsInt("expire", (Integer) null);
         var message = node.getAttributeAsString("message", null);
         var url = node.getAttributeAsString("url", null);
         var logoutMessageHeader = node.getAttributeAsString("logout_message_header", null);
         var logoutMessageSubtext = node.getAttributeAsString("logout_message_subtext", null);
-        var logoutMessageLocale = node.getAttributeAsString("logout_message_locale", null); // WAWebHandleFailure.default - maybeAttrString("logout_message_locale")
+        var logoutMessageLocale = node.getAttributeAsString("logout_message_locale", null);
 
         LOGGER.log(System.Logger.Level.WARNING,
                 "Received failure stanza: reason={0}, location={1}, code={2}, expire={3}, message={4}, url={5}",
@@ -195,23 +159,15 @@ public final class FailureStreamHandler implements SocketStream.Handler {
                 message,
                 url);
 
-        // ADAPTED: WAWebHandleFailure.default - parser rejects malformed stanzas via
-        // Promise.reject(parseError); Cobalt surfaces this through the configurable
-        // error handler instead of an inline reject.
         if (reason == null) {
             whatsapp.handleFailure(new WhatsAppServerRuntimeException(
                     "Malformed failure stanza: missing reason attribute"));
             return;
         }
 
-        // WAWebHandleFailure.default - switch on reason code
         switch (reason) {
             case REASON_LOCKED -> {
-                // WAWebHandleFailure.default - REASON_LOCKED: clearCredentialsAndStoredData(LogoutReason.AccountLocked, customMessage), triggerLogout
-                // ADAPTED: WA Web only attaches the customMessage when logoutMessageLocale matches
-                // the browser locale (frontendSendAndReceive("getNormalizedLocale")). Cobalt has no
-                // browser locale concept, so the locale is surfaced verbatim for the user-supplied
-                // error handler to inspect.
+                // Cobalt has no browser-locale concept, so the WA Web filter on logoutMessageLocale is dropped and the locale is surfaced verbatim for the error handler.
                 whatsapp.handleFailure(new WhatsAppSessionException.LoggedOut(
                         "Account locked: reason=" + reason
                                 + (logoutMessageHeader != null ? ", header=" + logoutMessageHeader : "")
@@ -219,40 +175,33 @@ public final class FailureStreamHandler implements SocketStream.Handler {
                                 + (logoutMessageLocale != null ? ", locale=" + logoutMessageLocale : "")));
             }
             case REASON_NOT_AUTHORIZED, REASON_BANNED -> {
-                // WAWebHandleFailure.default - REASON_NOT_AUTHORIZED/REASON_BANNED: logout
                 whatsapp.handleFailure(new WhatsAppSessionException.LoggedOut(
                         "Server reported logout, reason=" + reason));
             }
             case REASON_CLIENT_TOO_OLD, REASON_BAD_USER_AGENT -> {
-                // WAWebHandleFailure.default - REASON_CLIENT_TOO_OLD/REASON_BAD_USER_AGENT: client version rejected
                 whatsapp.handleFailure(new WhatsAppConnectionException(
                         "Client version rejected by server, reason=" + reason));
             }
             case REASON_TEMP_BANNED -> {
-                // WAWebHandleFailure.default - REASON_TEMP_BANNED: requires code+expire tuple
                 if (code != null && expire != null) {
                     whatsapp.handleFailure(new WhatsAppSessionException.Banned(
                             "Temporary ban: code=" + code + ", expire=" + expire
                                     + (message != null ? ", message=" + message : "")
                                     + (url != null ? ", url=" + url : "")));
                 } else {
-                    // WAWebHandleFailure.default - malformed temp ban data: throw error
                     whatsapp.handleFailure(new WhatsAppServerRuntimeException(
                             "Incorrect temporary ban data: code=" + code + ", expire=" + expire));
                 }
             }
             case REASON_GENERIC_FAILURE, REASON_INTERNAL_SERVER_ERROR, REASON_EXPERIMENTAL -> {
-                // WAWebHandleFailure.default - warning only, no exception
                 LOGGER.log(System.Logger.Level.WARNING,
                         "Server failure code {0}, no action taken", reason);
             }
             case REASON_SERVICE_UNAVAILABLE -> {
-                // WAWebHandleFailure.default - warning only, no exception
                 LOGGER.log(System.Logger.Level.WARNING,
                         "Service unavailable (reason {0})", reason);
             }
             default -> {
-                // WAWebHandleFailure.default - unrecognized reason: throw error
                 whatsapp.handleFailure(new WhatsAppServerRuntimeException(
                         "Failure reason " + reason + " not implemented yet"));
             }

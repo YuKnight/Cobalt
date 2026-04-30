@@ -13,7 +13,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The {@code <config/>} projection — banner lifecycle attributes.
+ * The {@code <config/>} projection. Banner lifecycle attributes.
  */
 @WhatsAppWebModule(moduleName = "WASmaxInBizCtwaActionBannerSuggestionRequest")
 public final class SmaxBannerSuggestionConfig {

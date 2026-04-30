@@ -14,7 +14,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps a bare empty
+ * The outbound stanza variant. Wraps a bare empty
  * {@code <linked_accounts/>} child in the canonical
  * {@code <iq xmlns="fb:thrift_iq" type="get">} envelope.
  */
@@ -22,7 +22,7 @@ import java.util.Optional;
 @WhatsAppWebModule(moduleName = "WASmaxOutBizLinkingHackBaseIQGetRequestMixin")
 public final class SmaxGetLinkedAccountsRequest implements SmaxOperation.Request {
     /**
-     * Constructs a new request — the request carries no attributes
+     * Constructs a new request. The request carries no attributes
      * other than the static envelope.
      */
     public SmaxGetLinkedAccountsRequest() {

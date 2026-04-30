@@ -93,7 +93,7 @@ public final class MaibaAIFeaturesControlHandler implements WebAppStateActionHan
      */
     @Override
     public String actionName() {
-        return MaibaAIFeaturesControlAction.ACTION_NAME; // NO_WA_BASIS: WAWebProtobufSyncAction.pb only declares the protobuf field maibaAiFeaturesControlAction at index 68
+        return MaibaAIFeaturesControlAction.ACTION_NAME;
     }
 
     /**
@@ -128,7 +128,7 @@ public final class MaibaAIFeaturesControlHandler implements WebAppStateActionHan
      */
     @Override
     public int version() {
-        return MaibaAIFeaturesControlAction.ACTION_VERSION; // NO_WA_BASIS: WA Web has no Maiba version constant; defaults to 1
+        return MaibaAIFeaturesControlAction.ACTION_VERSION;
     }
 
     /**
@@ -197,16 +197,16 @@ public final class MaibaAIFeaturesControlHandler implements WebAppStateActionHan
      */
     @Override
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        if (mutation.operation() != SyncdOperation.SET) { // NO_WA_BASIS: only SET makes sense for a single-enum preference action
+        if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof MaibaAIFeaturesControlAction action) // NO_WA_BASIS: payload type guard
-                || action.aiFeatureStatus().isEmpty()) { // NO_WA_BASIS: aiFeatureStatus is the only field on the protobuf and is required for any meaningful update
+        if (!(mutation.value().action().orElse(null) instanceof MaibaAIFeaturesControlAction action)
+                || action.aiFeatureStatus().isEmpty()) {
             return MutationApplicationResult.malformed();
         }
 
-        client.store().setMaibaAiFeatureStatus(action.aiFeatureStatus().get()); // NO_WA_BASIS: persist the enum on the flattened Cobalt store
+        client.store().setMaibaAiFeatureStatus(action.aiFeatureStatus().get());
         return MutationApplicationResult.success();
     }
 
@@ -234,14 +234,14 @@ public final class MaibaAIFeaturesControlHandler implements WebAppStateActionHan
     public SyncPendingMutation getMaibaAiFeatureStatusMutation(Instant timestamp, MaibaAIFeaturesControlAction.MaibaAIFeatureStatus status) {
         Objects.requireNonNull(timestamp, "timestamp cannot be null");
         Objects.requireNonNull(status, "status cannot be null");
-        var action = new MaibaAIFeaturesControlActionBuilder() // NO_WA_BASIS: wrap the enum into the protobuf payload
+        var action = new MaibaAIFeaturesControlActionBuilder()
                 .aiFeatureStatus(status)
                 .build();
         var value = new SyncActionValueBuilder()
                 .timestamp(timestamp)
                 .maibaAiFeaturesControlAction(action)
                 .build();
-        var index = JSON.toJSONString(List.of(actionName())); // NO_WA_BASIS: JSON.stringify([action]) with empty indexArgs
+        var index = JSON.toJSONString(List.of(actionName()));
         var pending = new DecryptedMutation.Trusted(
                 index,
                 value,

@@ -9,8 +9,8 @@ import com.github.auties00.cobalt.node.iq.IqOperation;
 import java.util.Objects;
 
 /**
- * The outbound {@code <iq xmlns="tos" type="set">} stanza variant —
- * wraps a single {@code <delete id="…"/>} child.
+ * The outbound {@code <iq xmlns="tos" type="set">} stanza variant.
+ * Wraps a single {@code <delete id="…"/>} child.
  */
 @WhatsAppWebModule(moduleName = "WAWebTosJob")
 public final class IqDeleteTosRequest implements IqOperation.Request {
@@ -23,7 +23,7 @@ public final class IqDeleteTosRequest implements IqOperation.Request {
     /**
      * Constructs a new delete-tos request.
      *
-     * @param noticeId the notice id to delete; never {@code null}
+     * @param noticeId the notice id to delete. Never {@code null}
      * @throws NullPointerException if {@code noticeId} is {@code null}
      */
     public IqDeleteTosRequest(String noticeId) {
@@ -33,7 +33,7 @@ public final class IqDeleteTosRequest implements IqOperation.Request {
     /**
      * Returns the notice id being deleted.
      *
-     * @return the notice id; never {@code null}
+     * @return the notice id. Never {@code null}
      */
     public String noticeId() {
         return noticeId;

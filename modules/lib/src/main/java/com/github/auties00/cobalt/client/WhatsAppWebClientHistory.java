@@ -26,9 +26,6 @@ import java.util.Objects;
  * cached constants for the common presets to avoid allocations in hot
  * builder paths.
  *
- * @implNote WAWebProtobufsCompanionReg.pb:
- * {@code DeviceProps$HistorySyncConfigSpec} is the wire-level protobuf
- * message encoded from this class when sending the pairing request.
  * @see WhatsAppClient
  * @see WhatsAppClientBuilder.Options.Web#historySetting(WhatsAppWebClientHistory)
  */
@@ -99,113 +96,112 @@ public final class WhatsAppWebClientHistory {
     }
 
     /**
-     * Creates a policy that discards all chat history, keeping only new messages from session creation onwards.
-     * <p>
-     * This is the most resource-efficient option but provides no access to historical messages.
-     * Recommended for applications that only need real-time messaging capabilities.
-     * </p>
+     * Returns a policy that discards all chat history, keeping only
+     * messages received after the session is established.
      *
-     * @param newsletters whether newsletters should be synchronized during the initial connection
-     * @return a policy that discards all previous chat history
+     * <p>This is the most resource-efficient option and is suited to
+     * applications that only need real-time messaging capabilities.
+     *
+     * @param newsletters whether newsletters should be synchronised
+     *                    during the initial connection
+     * @return the configured policy
      */
     public static WhatsAppWebClientHistory discard(boolean newsletters) {
         return newsletters ? ZERO_WITH_NEWSLETTERS : ZERO;
     }
 
     /**
-     * Creates a policy using WhatsApp Web's default history synchronization settings.
-     * <p>
-     * This policy provides a balanced approach between resource usage and message availability,
-     * syncing approximately the last few weeks of chat history. This is the recommended setting
-     * for most applications as it matches the official WhatsApp Web behavior.
-     * </p>
+     * Returns a policy that mirrors WhatsApp Web's default history-sync
+     * volume.
      *
-     * @param newsletters whether newsletters should be synchronized during the initial connection
-     * @return a policy using standard WhatsApp Web history limits
+     * <p>The setting balances resource usage against message availability
+     * by syncing approximately the last few weeks of chat history. This
+     * is the recommended option for most applications as it matches the
+     * official WhatsApp Web behaviour.
+     *
+     * @param newsletters whether newsletters should be synchronised
+     *                    during the initial connection
+     * @return the configured policy
      */
     public static WhatsAppWebClientHistory standard(boolean newsletters) {
         return newsletters ? STANDARD_WITH_NEWSLETTERS : STANDARD;
     }
 
     /**
-     * Creates a policy that attempts to synchronize most available chat history.
-     * <p>
-     * This policy requests the maximum amount of chat history that WhatsApp allows,
-     * which may include several months or years of messages depending on account age.
-     * <strong>Warning:</strong> This can consume significant system resources and bandwidth.
-     * </p>
+     * Returns a policy that requests as much chat history as the server
+     * is willing to deliver.
      *
-     * @param newsletters whether newsletters should be synchronized during the initial connection
-     * @return a policy that requests extended chat history
+     * <p>The replay may include several months or years of messages
+     * depending on account age. The option can consume significant
+     * memory and bandwidth.
+     *
+     * @param newsletters whether newsletters should be synchronised
+     *                    during the initial connection
+     * @return the configured policy
      */
     public static WhatsAppWebClientHistory extended(boolean newsletters) {
         return newsletters ? EXTENDED_WITH_NEWSLETTERS : EXTENDED;
     }
 
     /**
-     * Creates a policy with a custom history size limit.
-     * <p>
-     * Allows fine-grained control over the amount of history to synchronize.
-     * The actual amount of history received may be less than requested if the account
-     * doesn't have enough historical data or if WhatsApp imposes server-side limits.
-     * </p>
+     * Returns a policy with a caller-supplied history-size cap.
      *
-     * @param size        the maximum value of historical items to synchronize (must be non-negative)
-     * @param newsletters whether newsletters should be synchronized during the initial connection
-     * @return a policy with the specified custom size limit
-     * @throws IllegalArgumentException if size is negative
+     * <p>The actual amount of history delivered may be smaller than
+     * requested if the account does not have enough historical data or
+     * if WhatsApp's servers impose a lower cap.
+     *
+     * @param size        the maximum number of historical items to
+     *                    synchronise, which must be non-negative
+     * @param newsletters whether newsletters should be synchronised
+     *                    during the initial connection
+     * @return the configured policy
+     * @throws IllegalArgumentException if {@code size} is negative
      */
     public static WhatsAppWebClientHistory custom(int size, boolean newsletters) {
         return new WhatsAppWebClientHistory(size, newsletters);
     }
 
     /**
-     * Checks if this policy discards all chat history.
-     * <p>
-     * A zero-size policy means no historical messages will be synchronized,
-     * and only new messages from session creation onwards will be available.
-     * </p>
+     * Returns whether this policy discards all chat history.
      *
-     * @return {@code true} if this policy discards all history, {@code false} otherwise
+     * @return {@code true} if the size cap is zero, {@code false}
+     *         otherwise
      */
     public boolean isZero() {
         return size == 0;
     }
 
     /**
-     * Checks if this policy requests extended chat history beyond the standard amount.
-     * <p>
-     * Extended policies typically result in longer sync times and higher resource usage
-     * but provide access to more historical messages.
-     * </p>
+     * Returns whether this policy requests more chat history than the
+     * standard preset.
      *
-     * @return {@code true} if this policy requests more than the standard amount of history
+     * @return {@code true} if the size cap exceeds the standard preset,
+     *         {@code false} otherwise
      */
     public boolean isExtended() {
         return size > STANDARD.size();
     }
 
     /**
-     * Returns the maximum value of historical items this policy will attempt to synchronize.
-     * <p>
-     * This represents the upper limit of history items to request from WhatsApp's servers.
-     * The actual amount synchronized may be less due to server limitations or account history.
-     * </p>
+     * Returns the upper bound on the number of historical items this
+     * policy requests.
      *
-     * @return the history size limit, or {@link Integer#MAX_VALUE} for unlimited requests
+     * <p>The actual amount synchronised may be smaller due to server
+     * limitations or account history.
+     *
+     * @return the history-size cap, or {@link Integer#MAX_VALUE} for an
+     *         unbounded request
      */
     public int size() {
         return size;
     }
 
     /**
-     * Checks if this policy includes newsletter synchronization.
-     * <p>
-     * When enabled, newsletters and their associated metadata will be synchronized
-     * along with regular chat history during the initial connection.
-     * </p>
+     * Returns whether this policy includes newsletters in the initial
+     * synchronisation.
      *
-     * @return {@code true} if newsletters should be synchronized, {@code false} otherwise
+     * @return {@code true} if newsletters are included, {@code false}
+     *         otherwise
      */
     public boolean hasNewsletters() {
         return newsletters;

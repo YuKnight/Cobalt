@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.node.iq.biz;
 
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidServer;
@@ -12,8 +13,12 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * The outbound stanza variant.
+ * The outbound {@code <iq xmlns="w:biz:merchant_info" type="get">} stanza
+ * that requests the regulatory-compliance bundle for one or more
+ * merchants. India e-commerce surfaces consume the reply to render legal
+ * entity details, customer-care contacts and grievance-officer details.
  */
+@WhatsAppWebModule(moduleName = "WAWebMerchantComplianceJob")
 public final class IqGetMerchantComplianceRequest implements IqOperation.Request {
     /**
      * The merchant JIDs whose compliance bundles are being queried.

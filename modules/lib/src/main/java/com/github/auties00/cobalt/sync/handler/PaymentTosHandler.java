@@ -71,7 +71,7 @@ public final class PaymentTosHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPaymentTosSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return PaymentTosAction.ACTION_NAME; // WAWebPaymentTosSync.getAction
+        return PaymentTosAction.ACTION_NAME;
     }
 
     /**
@@ -84,7 +84,7 @@ public final class PaymentTosHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPaymentTosSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return PaymentTosAction.COLLECTION_NAME; // WAWebPaymentTosSync: collectionName = WASyncdConst.CollectionName.RegularLow
+        return PaymentTosAction.COLLECTION_NAME;
     }
 
     /**
@@ -96,7 +96,7 @@ public final class PaymentTosHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPaymentTosSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return PaymentTosAction.ACTION_VERSION; // WAWebPaymentTosSync.getVersion
+        return PaymentTosAction.ACTION_VERSION;
     }
 
     /**
@@ -115,7 +115,7 @@ public final class PaymentTosHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPaymentTosSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: WAWebPaymentTosSync.applyMutations
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -155,30 +155,25 @@ public final class PaymentTosHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPaymentTosSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        // WAWebPaymentTosSync.applyMutations: if (WAWebMobilePlatforms.isSMB() !== true) return ... Unsupported
         var platform = client.store().device().platform(); // ADAPTED: WAWebMobilePlatforms.isSMB — checks c === u.SMBA || c === u.SMBI where SMBA = "smba" (ANDROID_BUSINESS) and SMBI = "smbi" (IOS_BUSINESS)
         if (platform != ClientPlatformType.IOS_BUSINESS && platform != ClientPlatformType.ANDROID_BUSINESS) {
-            return MutationApplicationResult.unsupported(); // WAWebPaymentTosSync.applyMutations: WALogger.WARN("Payment Tos sync: operation not supported, app is not SMB"); return t.map(() => ({actionState: Unsupported}))
+            return MutationApplicationResult.unsupported();
         }
 
-        // WAWebPaymentTosSync.applyMutations: if (WAWebABProps.getABPropConfigValue("payments_br_pix_on_web") !== true) return ... Unsupported
         if (!client.abPropsService().getBool(ABProp.PAYMENTS_BR_PIX_ON_WEB)) {
-            return MutationApplicationResult.unsupported(); // WAWebPaymentTosSync.applyMutations: WALogger.WARN("Payment Tos sync: unsupported, ABProp check failed"); return t.map(() => ({actionState: Unsupported}))
+            return MutationApplicationResult.unsupported();
         }
 
-        // WAWebPaymentTosSync.applyMutations: if (e.operation !== "set") { r++; return {actionState: Unsupported} }
         if (mutation.operation() != SyncdOperation.SET) {
-            return MutationApplicationResult.unsupported(); // WAWebPaymentTosSync.applyMutations: r++, return {actionState: Unsupported}
+            return MutationApplicationResult.unsupported();
         }
 
-        // WAWebPaymentTosSync.applyMutations: var t = e.value.paymentTosAction; if (t == null) { a++; return malformedActionValue(n.collectionName) }
         if (!(mutation.value().action().orElse(null) instanceof PaymentTosAction action)) {
-            return malformedActionValue(); // WAWebSyncdIndexUtils.malformedActionValue(n.collectionName)
+            return malformedActionValue();
         }
 
-        // WAWebPaymentTosSync.applyMutations: r("WAWebUserPrefsPaymentTos").setPaymentTos(t)
         client.store().setPaymentTos(action); // ADAPTED: WAWebUserPrefsPaymentTos.setPaymentTos -> WhatsAppStore.setPaymentTos
-        return MutationApplicationResult.success(); // WAWebPaymentTosSync.applyMutations: {actionState: SyncActionState.Success}
+        return MutationApplicationResult.success();
     }
 
     /**
@@ -205,19 +200,19 @@ public final class PaymentTosHandler implements WebAppStateActionHandler {
      */
     @WhatsAppWebExport(moduleName = "WAWebPaymentTosSync", exports = "getPaymentTosSetMutation", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncPendingMutation getPaymentTosSetMutation(PaymentTosAction action) {
-        var timestamp = Instant.now(); // WAWebPaymentTosSync.getPaymentTosSetMutation: var t = unixTimeMs()
-        var value = new SyncActionValueBuilder() // WAWebSyncdActionUtils.buildPendingMutation: encodeProtobuf(SyncActionValueSpec, {...l, timestamp: i})
-                .timestamp(timestamp) // WAWebSyncdActionUtils.buildPendingMutation: timestamp: t
-                .paymentTosAction(action) // WAWebPaymentTosSync.getPaymentTosSetMutation: {paymentTosAction: e}
+        var timestamp = Instant.now();
+        var value = new SyncActionValueBuilder()
+                .timestamp(timestamp)
+                .paymentTosAction(action)
                 .build();
-        var index = JSON.toJSONString(List.of(actionName())); // WAWebSyncdActionUtils.buildPendingMutation: index = JSON.stringify([action].concat(indexArgs)) where indexArgs = []
-        var mutation = new DecryptedMutation.Trusted( // WAWebSyncdActionUtils.buildPendingMutation: return { collection, index, binarySyncAction, version, operation, timestamp, action }
-                index, // WAWebSyncdActionUtils.buildPendingMutation: index
-                value, // WAWebSyncdActionUtils.buildPendingMutation: binarySyncAction
-                SyncdOperation.SET, // WAWebPaymentTosSync.getPaymentTosSetMutation: operation: SyncdMutation$SyncdOperation.SET
-                timestamp, // WAWebSyncdActionUtils.buildPendingMutation: timestamp
-                version() // WAWebSyncdActionUtils.buildPendingMutation: version: this.getVersion()
+        var index = JSON.toJSONString(List.of(actionName()));
+        var mutation = new DecryptedMutation.Trusted(
+                index,
+                value,
+                SyncdOperation.SET,
+                timestamp,
+                version()
         );
-        return new SyncPendingMutation(mutation, 0); // WAWebSyncdActionUtils.buildPendingMutation
+        return new SyncPendingMutation(mutation, 0);
     }
 }

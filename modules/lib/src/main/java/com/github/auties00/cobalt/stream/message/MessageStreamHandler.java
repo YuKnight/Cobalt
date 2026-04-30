@@ -180,24 +180,18 @@ public final class MessageStreamHandler implements SocketStream.Handler {
     /**
      * The receipt handler that sends delivery, retry, nack, and bot ack
      * receipts after message processing.
-     *
-     * @implNote WAWebHandleMsgSendReceipt.sendReceipt
      */
     private final MessageReceiptHandler receiptHandler;
 
     /**
      * The snapshot recovery service for handling syncd snapshot fatal
      * recovery responses in peer data operation messages.
-     *
-     * @implNote WAWebNonMessageDataRequestHandler.handlePeerDataOperationRequestResponse
      */
     private final SnapshotRecoveryService snapshotRecoveryService;
 
     /**
      * The sync key rotation service for handling app state sync key
      * shares and requests in protocol messages.
-     *
-     * @implNote WAWebKeyManagementHandleKeyShareApi, WAWebSyncdHandleKeyShare
      */
     private final SyncKeyRotationService syncKeyRotationService;
 
@@ -281,7 +275,6 @@ public final class MessageStreamHandler implements SocketStream.Handler {
      */
     @Override
     public void handle(Node node) {
-        // ADAPTED: WAWebHandleMsgSendReceipt.sendReceipt: for medianotify
         // type with SUCCESS result, sends ack instead of delivery receipt.
         // Cobalt short-circuits here since medianotify stanzas don't carry
         // actual message content requiring decryption.
@@ -292,7 +285,6 @@ public final class MessageStreamHandler implements SocketStream.Handler {
 
         var from = node.getAttributeAsJid("from").orElse(null);
         if (from == null) {
-            // WAWebCreateNackFromStanza.createNackFromStanza: returns "NO_ACK" when
             // from is null, meaning no response is sent to the server
             return;
         }
@@ -309,23 +301,18 @@ public final class MessageStreamHandler implements SocketStream.Handler {
             LOGGER.log(System.Logger.Level.WARNING,
                     "Failed to parse incoming message stanza: {0}",
                     exception.getMessage());
-            // WAWebPostUnknownStanzaMetric.postUnknownStanzaMetric: invoked by
-            // WAWebCommsHandleStanzaUtils.handleMessageParsingFailure and
-            // WAWebHandleMsg.default on an XmppParsingFailure before the
             // IncomingMessageDrop + NACK path. Emits UnknownStanza (id 3448)
             // with only the stanza tag and type populated; WA Web leaves
             // unknownStanzaDropReason unset.
             emitUnknownStanzaMetric(node);
-            // WAWebCommsHandleStanzaUtils.handleMessageParsingFailure and WAWebHandleMsg.default:
             // on a parse failure WA Web calls
             // postIncomingMessageDropMetric.postIncomingMessageDropInvalidStanza(t) and then
             // createNackFromStanza with NackReason.ParsingError.
             emitIncomingMessageDropFromNode(node, MessageDropReasonType.INVALID_STANZA);
-            sendNack(node, "487"); // WAWebCreateNackFromStanza.NackReason.ParsingError
+            sendNack(node, "487");
             return;
         }
 
-        // WAWebHandleMsg.default: var k = a.success; o("WAWebMaybePostOfflineCountTooHighMetric").maybePostOfflineCountTooHigh(k);
         // This is the first thing WA Web invokes after the parser returns a successful stanza, before
         // any decryption or routing. Cobalt mirrors the ordering so the offline-count metric fires on
         // every successfully-parsed incoming message stanza.
@@ -337,12 +324,9 @@ public final class MessageStreamHandler implements SocketStream.Handler {
                 storeIncomingMessage(info);
                 if (info instanceof ChatMessageInfo chatInfo) {
                     handleProtocolMessage(chatInfo);
-                    // WAWebHandleMsgProcess.processDecryptedMessageProto -> WAWebLogReceivedMessages.logReceivedMessagesInWAM
                     // emits MessageReceiveWamEvent (id 450) for every successfully processed E2E message.
                     emitMessageReceiveForChatMessage(chatInfo, stanza);
-                    // WAWebLogReceivedMessages.logReceivedMessagesInWAM: sibling Promise.all branches
                     // call WAWebGalaxyFlowWamLoggerUtils.logStructuredMessageReceivedWAMEvent and
-                    // WAWebPaymentRequestWamLogger.logPaymentRequestReceivedWAMEvent, both of which
                     // commit StructuredMessageReceiveWamEvent (id 3222) when the message is a CTA_FLOW
                     // or PAYMENT_REQUEST native-flow interactive message.
                     emitStructuredMessageReceiveIfApplicable(stanza);
@@ -375,10 +359,8 @@ public final class MessageStreamHandler implements SocketStream.Handler {
                     "Incoming message {0} failed: {1}",
                     stanza.id(),
                     exception.getMessage());
-            // WAWebMsgProcessingDecryptionHandler function k(): emits IncomingMessageDrop with
             // an error-specific drop reason on every failed decrypt slot.
             emitIncomingMessageDropFromStanza(stanza, exception);
-            // WAWebHandleMsgError.DeviceSentMessageError: the error constructor commits
             // MdBadDeviceSentMessageWamEvent({peerType, dsmError}). Cobalt raises the equivalent
             // InvalidDeviceSentMessage from ChatMessageReceiver and emits the event here.
             emitMdBadDeviceSentMessageIfApplicable(stanza, exception);
@@ -388,11 +370,10 @@ public final class MessageStreamHandler implements SocketStream.Handler {
                     "Incoming message {0} failed unexpectedly: {1}",
                     stanza.id(),
                     exception.getMessage());
-            // WAWebCommsHandleStanzaUtils.handleMessageParsingFailure: the catch-all arm
             // posts postIncomingMessageDropInternalError(t) before nacking with
             // NackReason.UnhandledError.
             emitIncomingMessageDropFromStanza(stanza, null);
-            sendNack(node, "500"); // WAWebCreateNackFromStanza.NackReason.UnhandledError
+            sendNack(node, "500");
         }
     }
 
@@ -420,7 +401,6 @@ public final class MessageStreamHandler implements SocketStream.Handler {
             resolveOrphanPayment(info);
             var quoted = whatsapp.store().findQuotedMessage(info);
             notifyMessageReceived(info, quoted);
-            // WAWebHandleNewsletterMsg.default -> WAWebLogReceivedMessages.logReceivedMessagesInWAM
             // emits MessageReceiveWamEvent (id 450) for every successfully processed newsletter message.
             if (info instanceof NewsletterMessageInfo newsletterInfo) {
                 emitMessageReceiveForNewsletterMessage(newsletterInfo);
@@ -429,7 +409,6 @@ public final class MessageStreamHandler implements SocketStream.Handler {
             LOGGER.log(System.Logger.Level.WARNING,
                     "Failed to handle newsletter message stanza: {0}",
                     exception.getMessage());
-            // WAWebHandleNewsletterMsgLogger.handleNewsletterMsgError: fires
             // IncomingMessageDropWamEvent with messageDropReason = INVALID_PROTOBUF and
             // e2eDestination = CHANNEL whenever a newsletter message fails MessageValidationError.
             wamService.commit(new IncomingMessageDropEventBuilder()
@@ -468,10 +447,9 @@ public final class MessageStreamHandler implements SocketStream.Handler {
             return;
         }
 
-        // WAWebHandleMsgSendReceipt.sendReceipt: HSM_MISMATCH -> no receipt sent at all
         if (exception instanceof WhatsAppMessageException.Receive.HsmMismatch) {
             LOGGER.log(System.Logger.Level.DEBUG,
-                    "HSM mismatch for message {0}, no receipt sent", // WAWebHandleMsgSendReceipt.sendReceipt
+                    "HSM mismatch for message {0}, no receipt sent",
                     stanza.id());
             return;
         }
@@ -489,7 +467,6 @@ public final class MessageStreamHandler implements SocketStream.Handler {
                     exception.retryReason(),
                     nextRetryCount
             );
-            // WAWebHandleMsgSendReceipt.sendReceipt: immediately after sendRetryReceipt the
             // handler calls WAWebPostMessageHighRetryCountMetric.maybePostMessageHighRetryCountMetric.
             maybeEmitMessageHighRetryCount(stanza, nextRetryCount);
             return;
@@ -546,29 +523,24 @@ public final class MessageStreamHandler implements SocketStream.Handler {
             exports = "maybePostMessageHighRetryCountMetric",
             adaptation = WhatsAppAdaptation.ADAPTED)
     private void maybeEmitMessageHighRetryCount(MessageReceiveStanza stanza, int retryCount) {
-        // WAWebPostMessageHighRetryCountMetric: if (!(t < e)) { ... commit(); }
         if (retryCount < MAX_MESSAGE_RETRY_COUNT) {
             return;
         }
 
         var builder = new MessageHighRetryCountEventBuilder()
-                .retryCount(retryCount) // WAWebPostMessageHighRetryCountMetric: retryCount: t
-                .messageType(wamService.getWamMessageTypeFromStanzaType(stanza.messageType())); // WAWebPostMessageHighRetryCountMetric: messageType: getMessageTypeFromMsgInfoType(n.type)
+                .retryCount(retryCount)
+                .messageType(wamService.getWamMessageTypeFromStanzaType(stanza.messageType()));
 
-        // WAWebPostMessageHighRetryCountMetric: var a = getWamE2eSenderType(n.author); a != null && (r.e2eSenderType = a);
         var selfJid = whatsapp.store().jid().orElse(null);
         var senderType = wamService.getWamE2eSenderType(stanza.senderJid(), selfJid);
         if (senderType != null) {
             builder.e2eSenderType(senderType);
         }
 
-        // WAWebPostMessageHighRetryCountMetric: n.author.isHosted() && (r.encryptionType = ENCRYPTION_TYPE_CODE.COEX);
         if (stanza.senderJid().hasHostedServer() || stanza.senderJid().hasHostedLidServer()) {
             builder.encryptionType(EncryptionTypeCode.COEX);
         }
 
-        // WAWebPostMessageHighRetryCountMetric: group-only deviceSizeBucket is sourced from
-        // WAWebWamGroupMetricCache.getGroupMetrics which Cobalt does not track; WA Web also
         // skips the field when the cached metric is absent, so omission is parity-preserving.
 
         wamService.commit(builder.build());
@@ -618,8 +590,6 @@ public final class MessageStreamHandler implements SocketStream.Handler {
             exports = "maybePostOfflineCountTooHigh",
             adaptation = WhatsAppAdaptation.ADAPTED)
     private void maybePostOfflineCountTooHigh(MessageReceiveStanza stanza) {
-        // WAWebMaybePostOfflineCountTooHighMetric: var l = parseInt(a.offline, 10);
-        // if (Number.isNaN(l) || l < s) return;
         var rawOffline = stanza.offline().orElse(null);
         if (rawOffline == null) {
             return;
@@ -628,14 +598,12 @@ public final class MessageStreamHandler implements SocketStream.Handler {
         try {
             offlineCount = Integer.parseInt(rawOffline);
         } catch (NumberFormatException ignored) {
-            // WAWebMaybePostOfflineCountTooHighMetric: Number.isNaN(l) guard skips the metric
             return;
         }
         if (offlineCount < OFFLINE_COUNT_TOO_HIGH_THRESHOLD) {
             return;
         }
 
-        // WAWebMaybePostOfflineCountTooHighMetric: new OfflineCountTooHighWamEvent({
         //   offlineCount: l,
         //   stanzaType: STANZA_TYPE.MESSAGE,
         //   mediaType: getMetricMediaType({ encMediaType, msgType: i.type, msgPollType: i.pollType })
@@ -644,7 +612,6 @@ public final class MessageStreamHandler implements SocketStream.Handler {
                 .offlineCount(offlineCount)
                 .stanzaType(StanzaType.MESSAGE);
 
-        // WAWebMaybePostOfflineCountTooHighMetric: encs.find(e => e.encMediaType != null)?.encMediaType
         var encMediaType = stanza.encs().stream()
                 .map(enc -> enc.encMediaType().orElse(null))
                 .filter(Objects::nonNull)
@@ -656,25 +623,21 @@ public final class MessageStreamHandler implements SocketStream.Handler {
             builder.mediaType(mediaType);
         }
 
-        // WAWebMaybePostOfflineCountTooHighMetric: var c = getMessageTypeFromMsgInfoType(a.type); c != null && (u.messageType = c);
         var messageType = wamService.getWamMessageTypeFromStanzaType(stanza.messageType());
         if (messageType != null) {
             builder.messageType(messageType);
         }
 
-        // WAWebMaybePostOfflineCountTooHighMetric: var m = getWamE2eSenderType(d = getFrom(a)); m != null && (u.e2eSenderType = m);
         var selfJid = whatsapp.store().jid().orElse(null);
         var senderType = wamService.getWamE2eSenderType(stanza.senderJid(), selfJid);
         if (senderType != null) {
             builder.e2eSenderType(senderType);
         }
 
-        // WAWebMaybePostOfflineCountTooHighMetric: d.isHosted() && (u.encryptionType = ENCRYPTION_TYPE_CODE.COEX);
         if (stanza.senderJid().hasHostedServer() || stanza.senderJid().hasHostedLidServer()) {
             builder.encryptionType(EncryptionTypeCode.COEX);
         }
 
-        // WAWebMaybePostOfflineCountTooHighMetric: u.commitAndWaitForFlush().catch(...)
         wamService.commit(builder.build());
     }
 
@@ -710,23 +673,18 @@ public final class MessageStreamHandler implements SocketStream.Handler {
             String stanzaType,
             String pollType
     ) {
-        // WAWebBackendJobsCommon.getMetricMediaType: if (r === STANZA_MSG_TYPES.reaction) return MEDIA_TYPE.REACTION;
         if ("reaction".equals(stanzaType)) {
             return MediaType.REACTION;
         }
-        // WAWebBackendJobsCommon.getMetricMediaType: if (r === STANZA_MSG_TYPES.medianotify) return MEDIA_TYPE.MEDIA_EXPRESS_NOTIFY;
         if ("medianotify".equals(stanzaType)) {
             return MediaType.MEDIA_EXPRESS_NOTIFY;
         }
-        // WAWebBackendJobsCommon.getMetricMediaType: if (n === POLL_TYPES.creation) return MEDIA_TYPE.POLL_CREATE;
         if ("creation".equals(pollType)) {
             return MediaType.POLL_CREATE;
         }
-        // WAWebBackendJobsCommon.getMetricMediaType: if (n === POLL_TYPES.vote) return MEDIA_TYPE.POLL_VOTE;
         if ("vote".equals(pollType)) {
             return MediaType.POLL_VOTE;
         }
-        // WAWebBackendJobsCommon.getMetricMediaType: if (t) switch (t) { ... }
         if (encMediaType == null) {
             return MediaType.NONE;
         }
@@ -791,9 +749,6 @@ public final class MessageStreamHandler implements SocketStream.Handler {
         var builder = new IncomingMessageDropEventBuilder()
                 .messageDropReason(messageDropReason);
 
-        // WAWebPostIncomingMessageDropMetric incomingMsgParserForMetric:
-        // t.offline = e.attrInt("offline"); v.offline = t.offline != null;
-        // v.offlineCount = t.offline.
         var offline = node.getAttributeAsLong("offline", (Long) null);
         if (offline != null) {
             builder.offline(true).offlineCount(offline.intValue());
@@ -823,8 +778,6 @@ public final class MessageStreamHandler implements SocketStream.Handler {
             exports = "postUnknownStanzaMetric",
             adaptation = WhatsAppAdaptation.DIRECT)
     private void emitUnknownStanzaMetric(Node node) {
-        // WAWebPostUnknownStanzaMetric: unknownStanzaTag = e.tag
-        // WAWebPostUnknownStanzaMetric: unknownStanzaType = e.attrs.type?.toString()
         wamService.commit(new UnknownStanzaEventBuilder()
                 .unknownStanzaTag(node.description())
                 .unknownStanzaType(node.getAttributeAsString("type", null))
@@ -865,7 +818,6 @@ public final class MessageStreamHandler implements SocketStream.Handler {
             MessageReceiveStanza stanza,
             WhatsAppMessageException.Receive exception
     ) {
-        // WAWebMsgProcessingDecryptionHandler function k(): HsmMismatch, SignalRetryable,
         // UnknownDevice, BroadcastEphSettings and SignalDuplicateMessage skip the metric.
         if (exception instanceof WhatsAppMessageException.Receive.HsmMismatch
                 || exception instanceof WhatsAppMessageException.Receive.BroadcastEphemeralSettings
@@ -893,10 +845,7 @@ public final class MessageStreamHandler implements SocketStream.Handler {
         var builder = new IncomingMessageDropEventBuilder()
                 .messageDropReason(messageDropReason);
 
-        // WAWebPostIncomingMessageDropMetric function f(): offline = i.offline != null,
         // offlineCount = parseInt(i.offline, 10).
-        // WAWebPostIncomingMessageDropMetric function u(): offline = b.offline != null;
-        // v.offlineCount = b.offline.
         builder.offline(stanza.isOffline());
         stanza.offline().ifPresent(raw -> {
             try {
@@ -906,30 +855,23 @@ public final class MessageStreamHandler implements SocketStream.Handler {
             }
         });
 
-        // WAWebPostIncomingMessageDropMetric function f(): retryCount = r.retryCount
-        // WAWebPostIncomingMessageDropMetric function u(): v.retryCount = b.retryCount
         var encs = stanza.encs();
         if (!encs.isEmpty()) {
             var firstEnc = encs.getFirst();
             builder.retryCount(firstEnc.retryCount());
 
-            // WAWebPostIncomingMessageDropMetric: getMetricE2eCiphertextType(r.e2eType)
             builder.e2eCiphertextType(mapCiphertextTypeForDrop(firstEnc.e2eType()));
         }
 
-        // WAWebPostIncomingMessageDropMetric: invisibleMessageCategory from the category attr.
         // Cobalt exposes stanza.category() but does not classify the WAM enum locally; this
         // matches the WA Web behaviour where the classifier (getWamInvisibleMessageCatgoryType)
         // returns null for unrecognised values and the field remains absent.
 
-        // WAWebPostIncomingMessageDropMetric function u(): destination from stanza "from",
-        // function f(): destination derived from msgInfo. Cobalt derives it from stanza.chatJid().
         var destination = mapDestination(stanza);
         if (destination != null) {
             builder.e2eDestination(destination);
         }
 
-        // WAWebPostIncomingMessageDropMetric function f(): e2eFailureReason from
         // MessageValidationError. Cobalt does not track an e2eFailureReason on its
         // exception hierarchy today, so the field is left absent.
 
@@ -977,19 +919,16 @@ public final class MessageStreamHandler implements SocketStream.Handler {
             MessageReceiveStanza stanza,
             WhatsAppMessageException.Receive exception
     ) {
-        // WAWebHandleMsgError.DeviceSentMessageError: the event fires only when a DSM
         // validation failure occurs; all other exception subtypes bypass this emission.
         if (!(exception instanceof WhatsAppMessageException.Receive.InvalidDeviceSentMessage dsmException)) {
             return;
         }
 
-        // WAWebMsgProcessingApiUtils.getDeviceType: author.device == null || author.device === DEFAULT_DEVICE_ID
         // → DEVICE_TYPE.PRIMARY, otherwise → DEVICE_TYPE.COMPANION.
         var peerType = stanza.senderJid().device() == 0
                 ? DeviceType.PRIMARY
                 : DeviceType.COMPANION;
 
-        // WAWebHandleMsgError.DeviceSentMessageError: the dsmError argument is passed straight through
         // to MdBadDeviceSentMessageWamEvent. Cobalt's DsmErrorType uses the same three enum constants
         // as the WAM enum, so the mapping is 1:1 by name.
         var dsmError = switch (dsmException.errorType()) {
@@ -998,7 +937,6 @@ public final class MessageStreamHandler implements SocketStream.Handler {
             case INVALID_DSM -> DsmError.INVALID_DSM;
         };
 
-        // WAWebHandleMsgError.DeviceSentMessageError
         wamService.commit(new MdBadDeviceSentMessageEventBuilder()
                 .peerType(peerType)
                 .dsmError(dsmError)
@@ -1052,37 +990,28 @@ public final class MessageStreamHandler implements SocketStream.Handler {
     ) {
         var builder = new MessageReceiveEventBuilder();
 
-        // WAWebLogReceivedMessages: messageType: WAWebwamService.getWamMessageType(e)
         builder.messageType(wamService.getWamMessageType(info));
 
-        // WAWebLogReceivedMessages: messageMediaType: WAWebwamService.getWamMediaType(e)
         builder.messageMediaType(wamService.getWamMediaType(info));
 
-        // WAWebLogReceivedMessages: messageIsOffline: d != null (d = offline)
         builder.messageIsOffline(stanza.isOffline());
 
-        // WAWebLogReceivedMessages: if (d != null) (b.offlineCount = d)
         stanza.offline().ifPresent(raw -> {
             try {
                 builder.offlineCount(Integer.parseInt(raw));
             } catch (NumberFormatException ignored) {
-                // WAWebLogReceivedMessages relies on the raw offline attribute parsing as int;
                 // Cobalt skips the property when the attribute is not numeric, matching WA Web
                 // behaviour for malformed attributes.
             }
         });
 
-        // WAWebLogReceivedMessages: isViewOnce: !!e.isViewOnce
         builder.isViewOnce(isViewOnceMessage(info.message()));
 
-        // WAWebLogReceivedMessages: isForwardedForward: WAWebMsgGetters.getNumTimesForwarded(e) > 1
-        // WAWebLogReceivedMessages: isAReply: WAWebMsgGetters.getIsReply(e)
         var contextInfo = extractContextInfo(info.message()).orElse(null);
         if (contextInfo != null) {
-            builder.isForwardedForward(contextInfo.forwardingScore().orElse(0) > 1); // WAWebMsgGetters.getNumTimesForwarded(e) > 1
+            builder.isForwardedForward(contextInfo.forwardingScore().orElse(0) > 1);
             builder.isAReply(contextInfo.quotedMessageId().isPresent());
 
-            // WAWebLogReceivedMessages: disappearingChatInitiator/ephemeralityTriggerAction/
             // ephemeralityInitiator come from WAWebMsgGetters.getWamDisappearingMode*.
             contextInfo.disappearingMode().ifPresent(mode -> applyDisappearingMode(builder, mode));
         } else {
@@ -1090,72 +1019,56 @@ public final class MessageStreamHandler implements SocketStream.Handler {
             builder.isAReply(false);
         }
 
-        // WAWebLogReceivedMessages: editType: WAWebMsgGetters.getWamEditType(e). Cobalt derives it from
         // the stanza edit attribute and the ProtocolMessage REVOKE subtype.
         var editType = resolveEditType(stanza, info);
         if (editType != null) {
             builder.editType(editType);
         }
 
-        // WAWebLogReceivedMessages: botType: WAWebWamMsgUtils.getWamBotType(a, e.bizBotType, e.bizBotAutomatedType)
         // Cobalt reduces the branch to the primary METABOT classification because BizBotType /
         // BizBotAutomatedType are not modelled; WA Web's function also returns null when neither signal is set.
         if (stanza.senderJid().isBot()) {
             builder.botType(BotType.METABOT);
         }
 
-        // WAWebLogReceivedMessages: isAComment: WAWebMsgGetters.getType(e) === MSG_TYPE.COMMENT
         builder.isAComment(info.message().content() instanceof CommentMessage);
 
-        // WAWebLogReceivedMessages: chatOrigins: LID_CTWA when a.isLid() else OTHERS
         builder.chatOrigins(stanza.chatJid().hasLidServer()
                 ? ChatOriginsType.LID_CTWA
                 : ChatOriginsType.OTHERS);
 
-        // WAWebLogReceivedMessages: isLid: a.isGroup() ? e.from.isLid() : WAWebWamMsgUtils.msgIsLid(e, a)
         builder.isLid(stanza.senderJid().hasLidServer());
 
-        // WAWebLogReceivedMessages: revokeType: admin_revoke -> ADMIN, else SENDER, only when getIsRevoke(e)
         resolveRevokeType(stanza, info).ifPresent(builder::revokeType);
 
-        // WAWebLogReceivedMessages: if (e.ephemeralDuration != null && e.ephemeralDuration > 0)
-        //   b.ephemeralityDuration = e.ephemeralDuration
         info.ephemeralDuration().ifPresent(duration -> {
             if (duration > 0) {
                 builder.ephemeralityDuration(duration);
             }
         });
 
-        // WAWebLogReceivedMessages: messageReceiveT0 = clientReceivedTsMillis - tsMillis
-        // WAWebLogReceivedMessages: messageReceiveT1 = now - clientReceivedTsMillis
-        // WAWebLogReceivedMessages: messageReceiveT2 = 0
         var clientReceivedTsMillis = Instant.now().toEpochMilli();
         var serverTsMillis = stanza.timestamp().toEpochMilli();
         builder.messageReceiveT0(Instant.ofEpochMilli(Math.max(0, clientReceivedTsMillis - serverTsMillis)));
         builder.messageReceiveT1(Instant.ofEpochMilli(0));
         builder.messageReceiveT2(Instant.ofEpochMilli(0));
 
-        // WAWebLogReceivedMessages: e2eSenderType: WAWebwamService.getWamE2eSenderType(senderWithDevice)
         var selfJid = whatsapp.store().jid().orElse(null);
         var senderType = wamService.getWamE2eSenderType(stanza.senderJid(), selfJid);
         if (senderType != null) {
             builder.e2eSenderType(senderType);
         }
 
-        // WAWebLogReceivedMessages: senderWithDevice.isHosted() -> encryptionType = COEX
         if (stanza.senderJid().hasHostedServer() || stanza.senderJid().hasHostedLidServer()) {
             builder.encryptionType(EncryptionTypeCode.COEX);
         }
 
-        // WAWebLogReceivedMessages: typeOfGroup comes from WAWebWamGroupMetadataMetricUtils.getGroupTypeFromChatWid.
         // Cobalt does not track subgroup metadata, so the simplest faithful mapping is to emit GROUP when the chat
         // JID is a group/community and to leave the field absent otherwise - matching WA Web when that helper yields null.
         if (stanza.chatJid().hasGroupOrCommunityServer()) {
             builder.typeOfGroup(TypeOfGroupEnum.GROUP);
         }
 
-        // WAWebLogReceivedMessages: if (serverAddressingMode != null) b.serverAddressingMode = getWamAddressingModeFromString(serverAddressingMode)
-        // WAWebLogReceivedMessages: if (localAddressingMode != null) b.localAddressingMode = getWamAddressingModeFromString(localAddressingMode)
         stanza.addressingMode()
                 .flatMap(MessageStreamHandler::mapAddressingMode)
                 .ifPresent(builder::serverAddressingMode);
@@ -1223,7 +1136,6 @@ public final class MessageStreamHandler implements SocketStream.Handler {
     private void emitStructuredMessageReceiveIfApplicable(
             MessageReceiveStanza stanza
     ) {
-        // WAWebGalaxyFlowWamLoggerUtils u(e) / WAWebPaymentRequestWamLogger v(e):
         // both require nativeFlowName to be present on the biz node
         var nativeFlowName = stanza.bizInfo()
                 .flatMap(bi -> bi.nativeFlowName())
@@ -1232,17 +1144,13 @@ public final class MessageStreamHandler implements SocketStream.Handler {
             return;
         }
 
-        // WAWebGalaxyFlowWamLoggerUtils u(e): nativeFlowName === CTA_FLOW (value "galaxy_message")
-        // WAWebPaymentRequestWamLogger v(e): nativeFlowName === PAYMENT_REQUEST (value "payment_request")
         // Per WAWebInteractiveMessagesNativeFlowName: CTA_FLOW="galaxy_message", PAYMENT_REQUEST="payment_request"
         MediaType mediaType;
         switch (nativeFlowName) {
             case "galaxy_message" -> {
-                // WAWebWamMsgUtils d(e): CTA_FLOW maps to MEDIA_TYPE.NONE inside getWamMediaType
                 mediaType = MediaType.NONE;
             }
             case "payment_request" -> {
-                // WAWebPaymentRequestWamLogger I(e): messageMediaType hard-coded to INTERACTIVE_NFM
                 mediaType = MediaType.INTERACTIVE_NFM;
             }
             default -> {
@@ -1250,11 +1158,9 @@ public final class MessageStreamHandler implements SocketStream.Handler {
             }
         }
 
-        // WAWebGalaxyFlowWamLoggerUtils c(e) / WAWebPaymentRequestWamLogger L(e):
         // businessOwnerJid = getSender(e).user
         var businessOwnerJid = stanza.senderJid().toUserJid().user();
 
-        // WAWebGalaxyFlowWamLoggerUtils d(e) / WAWebPaymentRequestWamLogger I(e):
         // new StructuredMessageReceiveWamEvent({messageClass:BUTTON_NFM, messageMediaType, bizPlatform:CLOUDAPI, businessOwnerJid, messageClassAttributes:...}).commit()
         var builder = new StructuredMessageReceiveEventBuilder()
                 .messageClass(StructuredMessageClass.BUTTON_NFM) // hard-coded at both WA Web call sites
@@ -1264,7 +1170,6 @@ public final class MessageStreamHandler implements SocketStream.Handler {
             builder.businessOwnerJid(businessOwnerJid);
         }
 
-        // WAWebGalaxyFlowWamLoggerUtils _(e) / WAWebPaymentRequestWamLogger I(e):
         // messageClassAttributes is assembled from WAWebGetGalaxyFlowCtaButton / WAWebBrPaymentRequest
         // / P2XFunnelIdGenerator plus per-conversation CTWA state. Cobalt does not implement any of
         // those helpers, and WA Web also omits the field when its helpers yield null/undefined, so
@@ -1302,32 +1207,26 @@ public final class MessageStreamHandler implements SocketStream.Handler {
     private void emitMessageReceiveForNewsletterMessage(NewsletterMessageInfo info) {
         var builder = new MessageReceiveEventBuilder();
 
-        // WAWebLogReceivedMessages: messageType resolves to CHANNEL for newsletter JIDs via the isNewsletter branch
         var parent = info.key().parentJid().orElse(null);
         builder.messageType(wamService.getWamMessageType(parent));
 
-        // WAWebLogReceivedMessages: messageMediaType: WAWebwamService.getWamMediaType(e)
         builder.messageMediaType(wamService.getWamMediaType(info.message()));
 
-        // WAWebLogReceivedMessages: messageIsOffline: d != null (the newsletter call site passes
         // the offline argument straight through, so false here matches the default)
         builder.messageIsOffline(false);
 
-        // WAWebLogReceivedMessages: isViewOnce / isForwardedForward / isAReply derived from the content
         builder.isViewOnce(isViewOnceMessage(info.message()));
         var contextInfo = extractContextInfo(info.message()).orElse(null);
         if (contextInfo != null) {
-            builder.isForwardedForward(contextInfo.forwardingScore().orElse(0) > 1); // WAWebMsgGetters.getNumTimesForwarded(e) > 1
+            builder.isForwardedForward(contextInfo.forwardingScore().orElse(0) > 1);
             builder.isAReply(contextInfo.quotedMessageId().isPresent());
         } else {
             builder.isForwardedForward(false);
             builder.isAReply(false);
         }
 
-        // WAWebLogReceivedMessages: chatOrigins defaults to OTHERS for newsletters since isLid() is false
         builder.chatOrigins(ChatOriginsType.OTHERS);
 
-        // WAWebLogReceivedMessages: the receive timers are zeroed when the call site passes no
         // clientReceivedTsMillis, matching the newsletter invocation of logReceivedMessagesInWAM
         builder.messageReceiveT0(Instant.ofEpochMilli(0));
         builder.messageReceiveT1(Instant.ofEpochMilli(0));
@@ -1405,7 +1304,6 @@ public final class MessageStreamHandler implements SocketStream.Handler {
     @WhatsAppWebExport(moduleName = "WAWebEphemeralityWAMUtils", exports = "getWamDisappearingModeInitiatedByMe",
             adaptation = WhatsAppAdaptation.ADAPTED)
     private static void applyDisappearingMode(MessageReceiveEventBuilder builder, ChatDisappearingMode mode) {
-        // WAWebEphemeralityWAMUtils.getWamDisappearingModeInitiator: maps DisappearingMode.Initiator
         // to DISAPPEARING_CHAT_INITIATOR_TYPE.
         mode.initiator().ifPresent(initiator -> {
             var mapped = switch (initiator) {
@@ -1417,7 +1315,6 @@ public final class MessageStreamHandler implements SocketStream.Handler {
             builder.disappearingChatInitiator(mapped);
         });
 
-        // WAWebEphemeralityWAMUtils.getWamDisappearingModeTrigger: maps DisappearingMode.Trigger to
         // EPHEMERALITY_TRIGGER_ACTION_TYPE.
         mode.trigger().ifPresent(trigger -> {
             var mapped = switch (trigger) {
@@ -1431,7 +1328,6 @@ public final class MessageStreamHandler implements SocketStream.Handler {
             builder.ephemeralityTriggerAction(mapped);
         });
 
-        // WAWebEphemeralityWAMUtils.getWamDisappearingModeInitiatedByMe: maps the boolean initiatedByMe
         // onto EPHEMERALITY_INITIATOR_TYPE (INITIATED_BY_ME / INITIATED_BY_OTHER).
         builder.ephemeralityInitiator(mode.initiatedByMe()
                 ? EphemeralityInitiatorType.INITIATED_BY_ME
@@ -1472,7 +1368,6 @@ public final class MessageStreamHandler implements SocketStream.Handler {
         if (editAttr == MessageReceiveStanza.EDIT_ADMIN_REVOKE) {
             return EditType.ADMIN_REVOKE;
         }
-        // WAWebMsgGetters.getWamEditType: protocol messages of type REVOKE map to SENDER_REVOKE unless
         // the subtype indicates an admin revoke.
         if (info.message().content() instanceof ProtocolMessage protocol) {
             var protocolType = protocol.type().orElse(null);
@@ -1562,7 +1457,6 @@ public final class MessageStreamHandler implements SocketStream.Handler {
             MessageReceiveStanza stanza,
             WhatsAppMessageException.Receive exception
     ) {
-        // WAWebMsgProcessingDecryptionHandler function R(): status messages older
         // than DAY_SECONDS are reported with MESSAGE_DROP_REASON_TYPE.EXPIRED
         // regardless of the underlying error type.
         if (stanza.chatJid().isStatusBroadcastAccount()) {
@@ -1573,14 +1467,12 @@ public final class MessageStreamHandler implements SocketStream.Handler {
         }
 
         if (exception == null) {
-            // WAWebCommsHandleStanzaUtils.handleMessageParsingFailure: the catch-all
             // arm calls postIncomingMessageDropInternalError.
             return MessageDropReasonType.INTERNAL_ERROR;
         }
 
         if (exception instanceof WhatsAppMessageException.Receive.InvalidProtobuf
                 || exception instanceof WhatsAppMessageException.Receive.InvalidDeviceSentMessage) {
-            // WAWebMsgProcessingDecryptionHandler function k(): InvalidProtobuf / DeviceSentMessage
             // branch calls postIncomingMessageDropInvalidProtobuf.
             return MessageDropReasonType.INVALID_PROTOBUF;
         }
@@ -1588,13 +1480,11 @@ public final class MessageStreamHandler implements SocketStream.Handler {
         if (exception instanceof WhatsAppMessageException.Receive.InvalidMessage) {
             // ADAPTED: Cobalt's InvalidMessage covers both the hosted-companion rejection
             // path (mapped by WA Web to INVALID_HOSTED_COMPANION_STANZA in
-            // WAWebHandleMsg.default) and general validation rejections. Without a dedicated
             // subclass the best-effort mapping is INVALID_STANZA, matching
             // postIncomingMessageDropInvalidStanza in WAWebHandleMsg.default.
             return MessageDropReasonType.INVALID_STANZA;
         }
 
-        // WAWebMsgProcessingDecryptionHandler function k(): DecryptionErrorType.Unknown
         // calls postIncomingMessageDropInvalidStanzaFromDecryptedMessageInfo.
         return MessageDropReasonType.INVALID_STANZA;
     }
@@ -1982,10 +1872,8 @@ public final class MessageStreamHandler implements SocketStream.Handler {
      * @param status the transaction status string
      * @param fromMe whether the transaction was initiated by us
      * @return the mapped payment status
-     * @implNote WAWebPaymentStatusUtils.getPaymentWebStatus
      */
     private PaymentInfo.Status mapPaymentStatus(String type, String status, boolean fromMe) {
-        // WAWebPaymentStatusUtils.getPaymentWebStatus
         return switch (paymentMessageStatus(type, status, fromMe)) {
             case SEND_PAY_INIT, SEND_PAY_PENDING, RECV_PAY_INIT, RECV_PAY_PENDING, RECV_PAY_RETRY_ON_FAILURE, REQUEST_PAY_INIT -> PaymentInfo.Status.PROCESSING;
             case SEND_PAY_PENDING_RECEIVER, SEND_PAY_FAILURE_RECEIVER -> PaymentInfo.Status.SENT;
@@ -1994,7 +1882,7 @@ public final class MessageStreamHandler implements SocketStream.Handler {
             case SEND_PAY_SUCCESS, RECV_PAY_SUCCESS, REQUEST_PAY_FULFILLED -> PaymentInfo.Status.COMPLETE;
             case SEND_PAY_FAILURE, SEND_PAY_FAILURE_RISK, SEND_PAY_PENDING_REFUND, SEND_PAY_REFUND_PENDING, SEND_PAY_REFUND_FAILED, SEND_PAY_REFUND_FAILED_PROCESSING, RECV_PAY_FAILURE, REQUEST_PAY_FAILED, REQUEST_PAY_FAILED_RISK -> PaymentInfo.Status.COULD_NOT_COMPLETE;
             case SEND_PAY_REFUNDED -> PaymentInfo.Status.REFUNDED;
-            case RECV_PAY_EXPIRED, REQUEST_PAY_EXPIRED, SEND_PAY_AUTH_CANCELED, SEND_PAY_AUTH_CANCEL_FAILED, SEND_PAY_AUTH_CANCEL_FAILED_PROCESSING -> PaymentInfo.Status.EXPIRED; // WAWebPaymentStatusUtils: SEND_PAY_EXPIRED is NOT in EXPIRED
+            case RECV_PAY_EXPIRED, REQUEST_PAY_EXPIRED, SEND_PAY_AUTH_CANCELED, SEND_PAY_AUTH_CANCEL_FAILED, SEND_PAY_AUTH_CANCEL_FAILED_PROCESSING -> PaymentInfo.Status.EXPIRED;
             case REQUEST_PAY_REJECTED -> PaymentInfo.Status.REJECTED;
             case REQUEST_PAY_CANCELLED -> PaymentInfo.Status.CANCELLED;
             case null, default -> PaymentInfo.Status.UNKNOWN_STATUS;
@@ -2009,10 +1897,8 @@ public final class MessageStreamHandler implements SocketStream.Handler {
      * @param status the transaction status string
      * @param fromMe whether the transaction was initiated by us
      * @return the mapped transaction status
-     * @implNote WAWebPaymentStatusUtils.getPaymentTxnWebStatus
      */
     private PaymentInfo.TxnStatus mapTxnStatus(String type, String status, boolean fromMe) {
-        // WAWebPaymentStatusUtils.getPaymentTxnWebStatus
         return switch (paymentMessageStatus(type, status, fromMe)) {
             case RECV_PAY_EXPIRED, SEND_PAY_EXPIRED -> PaymentInfo.TxnStatus.EXPIRED_TXN;
             case RECV_PAY_FAILURE, SEND_PAY_FAILURE -> PaymentInfo.TxnStatus.FAILED;
@@ -2053,13 +1939,11 @@ public final class MessageStreamHandler implements SocketStream.Handler {
      * @param status the raw status string from the transaction node
      * @param fromMe whether the payment was sent by us
      * @return the resolved payment message status
-     * @implNote WAWebPaymentStatusUtils.getNotificationTransactionStatus
      */
     private PaymentMessageStatus paymentMessageStatus(String type, String status, boolean fromMe) {
-        // WAWebPaymentStatusUtils.getNotificationTransactionStatus
         var statusValue = status == null ? "" : status.toUpperCase();
         return switch (paymentMessageTransactionType(type, fromMe)) {
-            case TYPE_P2M_PAYOUT -> PaymentMessageStatus.STATUS_UNSET; // WAWebPaymentStatusUtils: falls through to STATUS_UNSET
+            case TYPE_P2M_PAYOUT -> PaymentMessageStatus.STATUS_UNSET;
             case TYPE_P2P_SENT, TYPE_P2M_SENT, TYPE_DEPOSIT -> switch (statusValue) {
                 case "PENDING_RECEIVER_SETUP" -> PaymentMessageStatus.SEND_PAY_PENDING_RECEIVER;
                 case "FAILED_DA" -> PaymentMessageStatus.SEND_PAY_PENDING;
@@ -2075,8 +1959,8 @@ public final class MessageStreamHandler implements SocketStream.Handler {
                 case "FAILED_DA_FINAL" -> PaymentMessageStatus.SEND_PAY_PENDING_REFUND;
                 case "AUTH_CANCEL_FAILED_PROCESSING" -> PaymentMessageStatus.SEND_PAY_AUTH_CANCEL_FAILED_PROCESSING;
                 case "AUTH_CANCEL_FAILED" -> PaymentMessageStatus.SEND_PAY_AUTH_CANCEL_FAILED;
-                case "AUTH_CANCELED" -> PaymentMessageStatus.SEND_PAY_AUTH_CANCELED; // WAWebPaymentStatusUtils: d.AUTH_CANCELED = "AUTH_CANCELED"
-                case "CANCELLED" -> PaymentMessageStatus.SEND_PAY_USER_CANCELED; // WAWebPaymentStatusUtils: d.CANCELED = "CANCELLED" -> SEND_PAY_USER_CANCELED
+                case "AUTH_CANCELED" -> PaymentMessageStatus.SEND_PAY_AUTH_CANCELED;
+                case "CANCELLED" -> PaymentMessageStatus.SEND_PAY_USER_CANCELED;
                 case "EXPIRED" -> PaymentMessageStatus.SEND_PAY_EXPIRED;
                 case "IN_REVIEW" -> PaymentMessageStatus.SEND_PAY_IN_REVIEW;
                 case "PENDING" -> PaymentMessageStatus.SEND_PAY_PENDING_PROCESSING;
@@ -2084,7 +1968,7 @@ public final class MessageStreamHandler implements SocketStream.Handler {
             };
             case TYPE_P2P_RCVD, TYPE_P2M_RCVD -> switch (statusValue) {
                 case "PENDING_SETUP" -> PaymentMessageStatus.RECV_PAY_PENDING_SETUP;
-                case "FAILED_DA" -> PaymentMessageStatus.RECV_PAY_PENDING; // WAWebPaymentStatusUtils: only FAILED_DA, no PENDING
+                case "FAILED_DA" -> PaymentMessageStatus.RECV_PAY_PENDING;
                 case "FAILED_PROCESSING" -> PaymentMessageStatus.RECV_PAY_RETRY_ON_FAILURE;
                 case "SUCCESS", "COMPLETED" -> PaymentMessageStatus.RECV_PAY_SUCCESS;
                 case "FAILURE", "FAILED" -> PaymentMessageStatus.RECV_PAY_FAILURE;
@@ -2093,7 +1977,7 @@ public final class MessageStreamHandler implements SocketStream.Handler {
                 case "WITHDRAWAL_PROCESSING" -> PaymentMessageStatus.RECV_PAY_WITHDRAWAL_PROCESSING;
                 case "WITHDRAWAL_FAILURE" -> PaymentMessageStatus.RECV_PAY_WITHDRAWAL_FAILURE;
                 case "WITHDRAWAL_PERMANENT_FAILED" -> PaymentMessageStatus.RECV_PAY_WITHDRAWAL_PERMANENT_FAILED;
-                case "CANCELLED" -> PaymentMessageStatus.RECV_PAY_SENDER_CANCELED; // WAWebPaymentStatusUtils: d.CANCELED = "CANCELLED"
+                case "CANCELLED" -> PaymentMessageStatus.RECV_PAY_SENDER_CANCELED;
                 default -> PaymentMessageStatus.STATUS_UNSET;
             };
             case TYPE_P2P_REQ_SENT, TYPE_P2P_REQ_RCVD -> switch (statusValue) {
@@ -2119,12 +2003,11 @@ public final class MessageStreamHandler implements SocketStream.Handler {
                 case "IN_REVIEW" -> PaymentMessageStatus.WITHDRAWAL_IN_REVIEW;
                 case "SUCCESS", "COMPLETED" -> PaymentMessageStatus.WITHDRAWAL_SUCCESS;
                 case "FAILED", "DECLINED" -> PaymentMessageStatus.WITHDRAWAL_FAILED;
-                case "CANCELLED" -> PaymentMessageStatus.WITHDRAWAL_USER_CANCELED; // WAWebPaymentStatusUtils: d.CANCELED = "CANCELLED"
+                case "CANCELLED" -> PaymentMessageStatus.WITHDRAWAL_USER_CANCELED;
                 case "EXPIRED" -> PaymentMessageStatus.WITHDRAWAL_EXPIRED;
                 case "WITHDRAWAL_ACTIVE" -> PaymentMessageStatus.WITHDRAWAL_ACTIVE;
                 default -> PaymentMessageStatus.STATUS_UNSET;
             };
-            // WAWebPaymentStatusUtils: unmapped transaction types fall through to STATUS_UNSET
             case TYPE_UNSET, TYPE_P2P_GRP, TYPE_P2P_NO_INFO, TYPE_FUTURE, TYPE_P2P_REQ_GRP, TYPE_MISSING_DETAILS ->
                     PaymentMessageStatus.STATUS_UNSET;
         };
@@ -2137,10 +2020,8 @@ public final class MessageStreamHandler implements SocketStream.Handler {
      * @param type   the raw transaction type string, or {@code null}
      * @param fromMe whether the payment was sent by us
      * @return the resolved transaction type
-     * @implNote WAWebPaymentStatusUtils.getPaymentTransactionType
      */
     private PaymentMessageTransactionType paymentMessageTransactionType(String type, boolean fromMe) {
-        // WAWebPaymentStatusUtils.getPaymentTransactionType
         if (type == null) {
             return fromMe ? PaymentMessageTransactionType.TYPE_P2P_SENT : PaymentMessageTransactionType.TYPE_P2P_RCVD;
         }
@@ -2181,9 +2062,7 @@ public final class MessageStreamHandler implements SocketStream.Handler {
             return;
         }
 
-        // WAWebHandleMsgProcess.processDecryptedMessageProto: when the decoded
         // protobuf exposes a lidMigrationSyncMessage, WA Web invokes
-        // WAWebLid1X1ThreadAccountMigrations.setLidMigrationMappings with the
         // raw encodedMappingPayload; the parser (WAWebLid1x1MigrationMsgParser.
         // parseLidMigrationMappingSyncMsg) may yield {mappings: [], ...} for an
         // empty or malformed buffer. Cobalt performs the decode here so the
@@ -2205,7 +2084,6 @@ public final class MessageStreamHandler implements SocketStream.Handler {
         protocolMessage.appStateSyncKeyRequest()
                 .ifPresent(request -> processAppStateSyncKeyRequest(info, request));
 
-        // WAWebHandleHistorySyncNotification.default: the primary device
         // announces each history chunk with a HistorySyncNotification inside
         // a ProtocolMessage. The service downloads and decodes the chunk on a
         // dedicated virtual thread so the dispatch loop keeps draining.
@@ -2225,11 +2103,7 @@ public final class MessageStreamHandler implements SocketStream.Handler {
      * before delegating to WAWebSyncdHandleKeyShare.handleKeyShare.
      */
     private void processAppStateSyncKeyShare(ChatMessageInfo info, AppStateSyncKeyShare keyShare) {
-        // WAWebKeyManagementHandleKeyShareApi.handleAppStateSyncKeyShare: the inner async
-        // function emits MdBootstrapAppStateCriticalDataProcessingEvent with
-        // stage=MISSING_KEYS_RECEIVED as its very first step, before any key validation.
         syncKeyRotationService.logMissingKeysReceived();
-        // WAWebKeyManagementHandleKeyShareApi: caller-side validation before delegating
         // to WAWebSyncdHandleKeyShare.handleKeyShare. Sender device ID is extracted from
         // the message info; keys with missing or malformed key IDs are filtered out so
         // they never reach the underlying handler.
@@ -2242,10 +2116,9 @@ public final class MessageStreamHandler implements SocketStream.Handler {
                     .flatMap(AppStateSyncKeyId::keyId)
                     .orElse(null);
             if (keyId == null) {
-                continue; // WAWebKeyManagementHandleKeyShareApi: skip keys with missing keyID
+                continue;
             }
 
-            // WAWebKeyManagementHandleKeyShareApi: key ID must be exactly 6 bytes.
             // WA Web treats this as a fatal error and reports a metric; Cobalt
             // logs and skips the offending key (the error model elevates fatal
             // states via WhatsAppClientErrorHandler rather than inline calls).
@@ -2263,7 +2136,6 @@ public final class MessageStreamHandler implements SocketStream.Handler {
             return;
         }
 
-        // WAWebSyncdHandleKeyShare.handleKeyShare: stores keys, updates missing key
         // tracking, reschedules timeouts, and resumes blocked collections (which
         // includes the equivalent of WAWebSyncd.syncBlockedCollections).
         syncKeyRotationService.handleKeyShare(senderDeviceId, validatedKeys);
@@ -2367,12 +2239,10 @@ public final class MessageStreamHandler implements SocketStream.Handler {
             return;
         }
 
-        if (!snapshotRecoveryService.isRecoveryEnabled()) { // WAWebNonMessageDataRequestHandler: syncdSnapshotRecoveryEnabled() === false
+        if (!snapshotRecoveryService.isRecoveryEnabled()) {
             return;
         }
 
-        // WAWebNonMessageDataRequestHandler: only the first peerDataOperationResult is
-        // consumed (`d(n.peerDataOperationResult[0], t)`); for snapshot recovery the
         // primary device sends back a single result.
         var results = response.peerDataOperationResult();
         if (results.isEmpty()) {
@@ -2384,9 +2254,8 @@ public final class MessageStreamHandler implements SocketStream.Handler {
             return;
         }
 
-        var sessionId = response.stanzaId().orElse(null); // WAWebNonMessageDataRequestHandler: peerDataRequestSessionId is the response stanza id (`t`)
+        var sessionId = response.stanzaId().orElse(null);
 
-        // WAWebNonMessageDataRequestHandler.m: decode the SyncDSnapshotFatalRecoveryResponse
         // exactly once and pass the decoded SyncdSnapshotRecovery through the recovery
         // promise so the awaiting consumer in WebAppStateService does not decode again.
         SyncdSnapshotRecovery decoded;
@@ -2396,7 +2265,6 @@ public final class MessageStreamHandler implements SocketStream.Handler {
             LOGGER.log(System.Logger.Level.WARNING,
                     "Failed to decode snapshot recovery payload: {0}",
                     exception.getMessage());
-            // WAWebNonMessageDataRequestHandler.c: catch branch emits
             // logNonMessagePeerDataResponse(COMPANION_SYNCD_SNAPSHOT_FATAL_RECOVERY, t, 0,0,0,1,0)
             // when the initial snapshot-recovery handling throws; errorCount=1.
             wamService.commit(new NonMessagePeerDataOperationResponseEventBuilder()
@@ -2415,7 +2283,6 @@ public final class MessageStreamHandler implements SocketStream.Handler {
                 .flatMap(SyncPatchType::of)
                 .ifPresent(collectionName -> snapshotRecoveryService.resolveRecovery(collectionName, decoded));
 
-        // WAWebNonMessageDataRequestHandler.m: success path emits
         // logNonMessagePeerDataResponse(COMPANION_SYNCD_SNAPSHOT_FATAL_RECOVERY, t, 1,1,1,0,0)
         // after resolveRecoveryPromise; responseCount=1, successResponseCount=1, successProcessCount=1.
         wamService.commit(new NonMessagePeerDataOperationResponseEventBuilder()

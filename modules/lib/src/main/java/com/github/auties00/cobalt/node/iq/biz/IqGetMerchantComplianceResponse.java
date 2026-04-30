@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.node.iq.biz;
 
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.iq.IqOperation;
@@ -13,8 +14,10 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Sealed family of inbound reply variants.
+ * Sealed family of inbound reply variants produced by the relay in
+ * response to an {@link IqGetMerchantComplianceRequest}.
  */
+@WhatsAppWebModule(moduleName = "WAWebMerchantComplianceJob")
 public sealed interface IqGetMerchantComplianceResponse extends IqOperation.Response
         permits IqGetMerchantComplianceResponse.Success, IqGetMerchantComplianceResponse.ClientError, IqGetMerchantComplianceResponse.ServerError {
 

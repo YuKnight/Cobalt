@@ -67,7 +67,7 @@ public final class PaymentInfoHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPaymentInfoSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return PaymentInfoAction.ACTION_NAME; // WAWebPaymentInfoSync.getAction
+        return PaymentInfoAction.ACTION_NAME;
     }
 
     /**
@@ -80,7 +80,7 @@ public final class PaymentInfoHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPaymentInfoSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return PaymentInfoAction.COLLECTION_NAME; // WAWebPaymentInfoSync: collectionName = WASyncdConst.CollectionName.RegularLow
+        return PaymentInfoAction.COLLECTION_NAME;
     }
 
     /**
@@ -92,7 +92,7 @@ public final class PaymentInfoHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPaymentInfoSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return PaymentInfoAction.ACTION_VERSION; // WAWebPaymentInfoSync.getVersion
+        return PaymentInfoAction.ACTION_VERSION;
     }
 
     /**
@@ -111,7 +111,7 @@ public final class PaymentInfoHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPaymentInfoSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: WAWebPaymentInfoSync.applyMutations
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -160,37 +160,29 @@ public final class PaymentInfoHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPaymentInfoSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        // WAWebPaymentInfoSync.applyMutations: if (WAWebMobilePlatforms.isSMB() !== true) return ... Unsupported
         var platform = client.store().device().platform(); // ADAPTED: WAWebMobilePlatforms.isSMB — checks c === u.SMBA || c === u.SMBI where SMBA = "smba" (ANDROID_BUSINESS) and SMBI = "smbi" (IOS_BUSINESS)
         if (platform != ClientPlatformType.IOS_BUSINESS && platform != ClientPlatformType.ANDROID_BUSINESS) {
-            return MutationApplicationResult.unsupported(); // WAWebPaymentInfoSync.applyMutations: WALogger.WARN("payment info sync: operation not supported, app is not SMB"); return t.map(() => ({actionState: Unsupported}))
+            return MutationApplicationResult.unsupported();
         }
 
-        // WAWebPaymentInfoSync.applyMutations: if (WAWebABProps.getABPropConfigValue("order_details_payment_instructions_sync_enabled") !== true) return ... Unsupported
         if (!client.abPropsService().getBool(ABProp.ORDER_DETAILS_PAYMENT_INSTRUCTIONS_SYNC_ENABLED)) {
-            return MutationApplicationResult.unsupported(); // WAWebPaymentInfoSync.applyMutations: WALogger.WARN("payment info sync: unsupported, ABProp not passed"); return t.map(() => ({actionState: Unsupported}))
+            return MutationApplicationResult.unsupported();
         }
 
-        // WAWebPaymentInfoSync.applyMutations: if (e.operation !== "set") { r++; return {actionState: Unsupported} }
         if (mutation.operation() != SyncdOperation.SET) {
-            return MutationApplicationResult.unsupported(); // WAWebPaymentInfoSync.applyMutations: r++, return {actionState: Unsupported}
+            return MutationApplicationResult.unsupported();
         }
 
-        // WAWebPaymentInfoSync.applyMutations: var i = (t = e.value.paymentInfoAction) == null ? void 0 : t.cpi
         if (!(mutation.value().action().orElse(null) instanceof PaymentInfoAction action)) {
-            return malformedActionValue(); // WAWebPaymentInfoSync.applyMutations: typeof i != "string" (paymentInfoAction missing) -> a++, WAWebSyncdIndexUtils.malformedActionValue(n.collectionName)
+            return malformedActionValue();
         }
 
-        // WAWebPaymentInfoSync.applyMutations: typeof i != "string" ? (a++, malformedActionValue(n.collectionName)) : ...
         var cpi = action.cpi().orElse(null);
         if (cpi == null) {
-            return malformedActionValue(); // WAWebPaymentInfoSync.applyMutations: a++, WAWebSyncdIndexUtils.malformedActionValue(n.collectionName)
+            return malformedActionValue();
         }
 
-        // WAWebPaymentInfoSync.applyMutations: WAWebBackendApi.frontendFireAndForget("setCPIInfo", {cpiInfo: i}) ->
-        // WAWebPaymentInfoSyncBridgeApi.setCPIInfo({cpiInfo: e}) ->
-        // WAWebPaymentInfo.PaymentInfo.setCPIInfo(n) -> if (current != n) WAWebUserPrefsPaymentInfo.setCPIInfo(n); this.trigger(CPI_INFO_CHANGE_EVENT)
         client.store().setPaymentInstructionCpi(cpi); // ADAPTED: WAWebBackendApi.frontendFireAndForget("setCPIInfo") -> WAWebPaymentInfoSyncBridgeApi.setCPIInfo -> WAWebPaymentInfo.setCPIInfo -> WAWebUserPrefsPaymentInfo.setCPIInfo collapsed into WhatsAppStore.setPaymentInstructionCpi
-        return MutationApplicationResult.success(); // WAWebPaymentInfoSync.applyMutations: {actionState: SyncActionState.Success}
+        return MutationApplicationResult.success();
     }
 }

@@ -18,11 +18,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The response variant of {@link UpdateNewsletterUserSettingMexResponse} that exposes the data
- * returned by the server after a successful mutation.
- *
- * @implNote WAWebMexUpdateNewsletterUserSetting: adapts the JSON root returned by the GraphQL
- * mutation into a Java value object.
+ * Response variant for {@link UpdateNewsletterUserSettingMexRequest} carrying the parsed server reply.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexUpdateNewsletterUserSetting")
 public final class UpdateNewsletterUserSettingMexResponse implements MexOperation.Response.Json {
@@ -37,9 +33,6 @@ public final class UpdateNewsletterUserSettingMexResponse implements MexOperatio
     /**
      * Parses a MEX response from the given IQ response node.
      *
-     * @implNote WAWebMexUpdateNewsletterUserSetting.mexUpdateNewsletterUserSetting: WA Web relies on the
-     * GraphQL client to unwrap the response. Cobalt performs the
-     * unwrapping manually from the IQ {@code <result>} child.
      * @param node the IQ response node received from the relay
      * @return an {@link Optional} containing the parsed response, or
      *         empty if the node is missing a result payload
@@ -81,7 +74,7 @@ public final class UpdateNewsletterUserSettingMexResponse implements MexOperatio
         /**
          * Returns the {@code type} field.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
          */
         public Optional<String> type() {
             return Optional.ofNullable(type);
@@ -90,7 +83,7 @@ public final class UpdateNewsletterUserSettingMexResponse implements MexOperatio
         /**
          * Parses a {@code State} from the given JSON object.
          *
-         * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
          * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
          */
         static Optional<State> of(JSONObject obj) {
@@ -105,7 +98,7 @@ public final class UpdateNewsletterUserSettingMexResponse implements MexOperatio
         /**
          * Parses a list of {@code State} from the given JSON array.
          *
-         * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
          * @return the list of parsed results, empty if {@code arr} is {@code null}
          */
         static List<State> ofArray(JSONArray arr) {
@@ -125,30 +118,21 @@ public final class UpdateNewsletterUserSettingMexResponse implements MexOperatio
      * Parses a {@link UpdateNewsletterUserSettingMexResponse} from the raw JSON bytes of the
      * {@code <result>} child.
      *
-     * @implNote WAWebMexUpdateNewsletterUserSetting.mexUpdateNewsletterUserSetting: mirrors the implicit
-     * unwrapping that WA Web performs on the GraphQL response,
-     * extracting the {@code xwa2_newsletter_update_user_setting} root.
      * @param json the UTF-8 encoded JSON payload
      * @return an {@link Optional} containing the parsed response, or
      *         empty if the envelope is missing expected fields
      */
     private static Optional<UpdateNewsletterUserSettingMexResponse> of(byte[] json) {
-        // WAWebMexUpdateNewsletterUserSetting.mexUpdateNewsletterUserSetting
-        // Parses the raw JSON payload, bailing out if fastjson2 returns null
         var jsonObject = JSON.parseObject(json);
         if (jsonObject == null) {
             return Optional.empty();
         }
 
-        // WAWebMexUpdateNewsletterUserSetting.mexUpdateNewsletterUserSetting
-        // Descends into the standard GraphQL "data" envelope
         var data = jsonObject.getJSONObject("data");
         if (data == null) {
             return Optional.empty();
         }
 
-        // WAWebMexUpdateNewsletterUserSetting.mexUpdateNewsletterUserSetting
-        // Extracts the operation-specific root keyed by xwa2_newsletter_update_user_setting
         var root = data.getJSONObject("xwa2_newsletter_update_user_setting");
         if (root == null) {
             return Optional.empty();

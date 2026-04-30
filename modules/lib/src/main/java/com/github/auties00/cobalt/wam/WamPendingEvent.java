@@ -10,12 +10,11 @@ import java.util.concurrent.CompletableFuture;
  * an optional flush completion future.
  *
  * @param event             the WAM event
- * @param commitTimeSeconds the Unix epoch seconds when the event was committed
- * @param flushFuture       an optional future that is completed when the buffer
- *                          containing this event is flushed, or {@code null}
- *                          for fire-and-forget commits
- * @implNote Mirrors the per-event envelope that {@code WAWebWam} places in
- *     its internal buffers while awaiting a batched flush.
+ * @param commitTimeSeconds the Unix epoch seconds at which the event
+ *                          was committed
+ * @param flushFuture       a future completed when the buffer
+ *                          containing this event is flushed, or
+ *                          {@code null} for fire-and-forget commits
  */
 @WhatsAppWebModule(moduleName = "WAWebWam")
 record WamPendingEvent(WamEventSpec event, long commitTimeSeconds, CompletableFuture<Void> flushFuture) {
@@ -23,7 +22,8 @@ record WamPendingEvent(WamEventSpec event, long commitTimeSeconds, CompletableFu
      * Constructs a fire-and-forget pending event with no flush future.
      *
      * @param event             the WAM event
-     * @param commitTimeSeconds the Unix epoch seconds when the event was committed
+     * @param commitTimeSeconds the Unix epoch seconds at which the
+     *                          event was committed
      */
     WamPendingEvent(WamEventSpec event, long commitTimeSeconds) {
         this(event, commitTimeSeconds, null);

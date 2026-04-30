@@ -79,7 +79,7 @@ public final class PrivacySettingChannelsPersonalisedRecommendationHandler imple
      *           used by every other Cobalt sync handler.
      */
     public static final PrivacySettingChannelsPersonalisedRecommendationHandler INSTANCE =
-            new PrivacySettingChannelsPersonalisedRecommendationHandler(); // NO_WA_BASIS: no WA Web counterpart singleton
+            new PrivacySettingChannelsPersonalisedRecommendationHandler();
 
     /**
      * Private constructor that enforces the singleton pattern.
@@ -108,7 +108,7 @@ public final class PrivacySettingChannelsPersonalisedRecommendationHandler imple
      */
     @Override
     public String actionName() {
-        return PrivacySettingChannelsPersonalisedRecommendationAction.ACTION_NAME; // NO_WA_BASIS: WAWebProtobufSyncAction.pb only declares the protobuf field name string
+        return PrivacySettingChannelsPersonalisedRecommendationAction.ACTION_NAME;
     }
 
     /**
@@ -130,7 +130,7 @@ public final class PrivacySettingChannelsPersonalisedRecommendationHandler imple
      */
     @Override
     public SyncPatchType collectionName() {
-        return SyncPatchType.REGULAR; // WAWebProtobufSyncAction.pb collection resolver: PRIVACY_SETTING_CHANNELS_PERSONALISED_RECOMMENDATION_ACTION -> u.REGULAR
+        return SyncPatchType.REGULAR;
     }
 
     /**
@@ -145,7 +145,7 @@ public final class PrivacySettingChannelsPersonalisedRecommendationHandler imple
      */
     @Override
     public int version() {
-        return PrivacySettingChannelsPersonalisedRecommendationAction.ACTION_VERSION; // NO_WA_BASIS: WA Web has no personalised-recommendation version constant; defaults to 1
+        return PrivacySettingChannelsPersonalisedRecommendationAction.ACTION_VERSION;
     }
 
     /**
@@ -215,15 +215,15 @@ public final class PrivacySettingChannelsPersonalisedRecommendationHandler imple
      */
     @Override
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        if (mutation.operation() != SyncdOperation.SET) { // NO_WA_BASIS: only SET makes sense for a single-boolean opt-out flag
+        if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof PrivacySettingChannelsPersonalisedRecommendationAction action)) { // NO_WA_BASIS: payload type guard
+        if (!(mutation.value().action().orElse(null) instanceof PrivacySettingChannelsPersonalisedRecommendationAction action)) {
             return MutationApplicationResult.malformed();
         }
 
-        client.store().setChannelsPersonalisedRecommendationOptOut(action.isUserOptedOut()); // NO_WA_BASIS: persist the opt-out flag on the flattened Cobalt store
+        client.store().setChannelsPersonalisedRecommendationOptOut(action.isUserOptedOut());
         return MutationApplicationResult.success();
     }
 }

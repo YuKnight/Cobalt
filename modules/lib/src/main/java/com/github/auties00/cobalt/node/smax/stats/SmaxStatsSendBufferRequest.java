@@ -20,8 +20,8 @@ import java.util.Optional;
 @WhatsAppWebModule(moduleName = "WASmaxOutStatsBaseIQSetRequestMixin")
 public final class SmaxStatsSendBufferRequest implements SmaxOperation.Request {
     /**
-     * The Unix-epoch timestamp at which the batch was sealed —
-     * routed verbatim into the {@code <add t="…"/>} attribute.
+     * The Unix-epoch timestamp at which the batch was sealed.
+     * Routed verbatim into the {@code <add t="…"/>} attribute.
      */
     private final long addT;
 
@@ -35,7 +35,7 @@ public final class SmaxStatsSendBufferRequest implements SmaxOperation.Request {
      * Constructs a new send-buffer request.
      *
      * @param addT             the batch timestamp
-     * @param addElementValue  the encoded WAM payload bytes; never
+     * @param addElementValue  the encoded WAM payload bytes. Never
      *                         {@code null}
      * @throws NullPointerException if {@code addElementValue} is
      *                              {@code null}
@@ -58,7 +58,7 @@ public final class SmaxStatsSendBufferRequest implements SmaxOperation.Request {
     /**
      * Returns the encoded WAM payload bytes.
      *
-     * @return the bytes; never {@code null}
+     * @return the bytes. Never {@code null}
      */
     public byte[] addElementValue() {
         return addElementValue;
@@ -82,13 +82,11 @@ public final class SmaxStatsSendBufferRequest implements SmaxOperation.Request {
     @WhatsAppWebExport(moduleName = "WASmaxOutStatsSendBufferRequest",
             exports = "makeSendBufferRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutStatsSendBufferRequest: smax("add", {t: INT(t)}, n)
         var addNode = new NodeBuilder()
                 .description("add")
                 .attribute("t", addT)
                 .content(addElementValue)
                 .build();
-        // WASmaxOutStatsBaseIQSetRequestMixin: smax("iq", {id: generateId(), type: "set"})
         return new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "w:stats")

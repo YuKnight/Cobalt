@@ -1,15 +1,23 @@
 package com.github.auties00.cobalt.pairing;
 
 /**
- * Holds the output of {@link #companionFinish}: the wrapped key bundle
- * that must ship in the {@code companion_finish} IQ and the ADV master
- * secret that must be persisted as the store's {@code advSecretKey}
- * once the handshake is acknowledged.
+ * Carries the output of the companion finish algorithm.
  *
- * @param linkCodePairingWrappedKeyBundle the salt (32 bytes) || IV (12 bytes) || AES-GCM ciphertext containing the identity bundle
- * @param advSecret                       the HKDF-derived 32-byte ADV master secret
- * @param companionIdentityPublic         the companion's long-term identity public key; echoed into the IQ
- * @implNote WAWebcompanionFinishInternal: return {companionIdentityPublic, linkCodePairingWrappedKeyBundle, advSecret}
+ * <p>The {@link #linkCodePairingWrappedKeyBundle} is the wire-format
+ * payload that ships in the {@code companion_finish} IQ, structured as
+ * a 32-byte HKDF salt, followed by a 12-byte AES-GCM IV, followed by the
+ * AES-GCM ciphertext of the identity bundle. The {@link #advSecret} is
+ * the 32-byte HKDF-derived ADV master secret that must be persisted as
+ * the store's {@code advSecretKey} once the handshake is acknowledged.
+ * The {@link #companionIdentityPublic} is echoed into the IQ alongside
+ * the bundle.
+ *
+ * @param linkCodePairingWrappedKeyBundle the wrapped identity bundle
+ *     bytes carried in the IQ
+ * @param advSecret                       the HKDF-derived 32-byte ADV
+ *     master secret
+ * @param companionIdentityPublic         the companion's long-term
+ *     identity public key
  */
 record CompanionPairingCompanionFinish(
         byte[] linkCodePairingWrappedKeyBundle,

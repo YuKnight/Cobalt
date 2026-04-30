@@ -35,7 +35,7 @@ public sealed interface SmaxGetSMBMeteredMessagingCheckoutResponse extends SmaxO
      *
      * @param node    the inbound IQ stanza received from the relay;
      *                never {@code null}
-     * @param request the original outbound stanza — used to validate
+     * @param request the original outbound stanza. Used to validate
      *                echoed identifiers; never {@code null}
      * @return an {@link Optional} carrying the parsed variant, or
      *         {@link Optional#empty()} when no documented variant
@@ -60,7 +60,7 @@ public sealed interface SmaxGetSMBMeteredMessagingCheckoutResponse extends SmaxO
     }
 
     /**
-     * The {@code Success} reply variant — carries the projected
+     * The {@code Success} reply variant. Carries the projected
      * cost, optional discounts, integrity-eligibility marker,
      * account-balance triple and optional quota state.
      *
@@ -241,7 +241,7 @@ public sealed interface SmaxGetSMBMeteredMessagingCheckoutResponse extends SmaxO
         }
 
         /**
-         * The {@code <cost/>} child projection — full cost
+         * The {@code <cost/>} child projection. Full cost
          * breakdown.
          */
         @WhatsAppWebModule(moduleName = "WASmaxInSmbMeteredMessagingAccountGetSMBMeteredMessagingCheckoutResponseSuccess")
@@ -698,7 +698,7 @@ public sealed interface SmaxGetSMBMeteredMessagingCheckoutResponse extends SmaxO
         }
 
         /**
-         * The {@code <account_balance/>} child projection — the
+         * The {@code <account_balance/>} child projection. The
          * billing / available / offset triple for the calling
          * business's metered-messaging wallet.
          */
@@ -815,7 +815,7 @@ public sealed interface SmaxGetSMBMeteredMessagingCheckoutResponse extends SmaxO
         }
 
         /**
-         * The {@code <quota/>} child projection — the calling
+         * The {@code <quota/>} child projection. The calling
          * business's monthly free-message quota state.
          */
         @WhatsAppWebModule(moduleName = "WASmaxInSmbMeteredMessagingAccountGetSMBMeteredMessagingCheckoutResponseSuccess")
@@ -966,7 +966,7 @@ public sealed interface SmaxGetSMBMeteredMessagingCheckoutResponse extends SmaxO
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected the
+     * The {@code ClientError} reply variant. The relay rejected the
      * request with a documented {@code 4xx} error code drawn from
      * the SMB metered-messaging error catalogue.
      *
@@ -1067,7 +1067,7 @@ public sealed interface SmaxGetSMBMeteredMessagingCheckoutResponse extends SmaxO
     }
 
     /**
-     * The {@code ServerError} reply variant — the relay encountered
+     * The {@code ServerError} reply variant. The relay encountered
      * a transient internal failure ({@code 5xx}).
      *
      * @implNote Sourced from the {@code 5xx} arms of

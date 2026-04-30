@@ -32,7 +32,7 @@ public sealed interface SmaxNewslettersGetNewsletterMessagesResponse extends Sma
      *
      * @param node    the inbound IQ stanza received from the relay;
      *                never {@code null}
-     * @param request the original outbound stanza — used to validate
+     * @param request the original outbound stanza, used to validate
      *                echoed identifiers; never {@code null}
      * @return an {@link Optional} carrying the parsed variant, or
      *         {@link Optional#empty()} when no documented variant
@@ -56,7 +56,7 @@ public sealed interface SmaxNewslettersGetNewsletterMessagesResponse extends Sma
     }
 
     /**
-     * The {@code Success} reply variant — the relay returned the
+     * The {@code Success} reply variant. The relay returned the
      * requested message slice.
      *
      * <p>The {@code <messages>} envelope echoes the optional
@@ -211,7 +211,7 @@ public sealed interface SmaxNewslettersGetNewsletterMessagesResponse extends Sma
     }
 
     /**
-     * One newsletter message entry — projects the canonical
+     * One newsletter message entry. Projects the canonical
      * {@code <message id? server_id t? is_sender?>} envelope into a
      * typed bundle and exposes the underlying {@link Node} so callers
      * can drill into the variable-shape add-on children (reactions,
@@ -261,7 +261,7 @@ public sealed interface SmaxNewslettersGetNewsletterMessagesResponse extends Sma
         private final boolean fromSelf;
 
         /**
-         * The raw underlying {@link Node} — exposed so callers can
+         * The raw underlying {@link Node}. Exposed so callers can
          * project the variable-shape add-on children.
          */
         private final Node raw;
@@ -403,7 +403,7 @@ public sealed interface SmaxNewslettersGetNewsletterMessagesResponse extends Sma
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected the
+     * The {@code ClientError} reply variant. The relay rejected the
      * request as malformed, unauthorised, or referencing a
      * non-existent newsletter / invite.
      *
@@ -417,7 +417,7 @@ public sealed interface SmaxNewslettersGetNewsletterMessagesResponse extends Sma
         private final int errorCode;
 
         /**
-         * The human-readable error text, when the relay supplied one.
+         * The human-readable error text. When the relay supplied one.
          */
         private final String errorText;
 
@@ -498,7 +498,7 @@ public sealed interface SmaxNewslettersGetNewsletterMessagesResponse extends Sma
     }
 
     /**
-     * The {@code ServerError} reply variant — the relay encountered a
+     * The {@code ServerError} reply variant. The relay encountered a
      * transient internal failure while processing the request.
      *
      * @implNote {@code WASmaxInNewslettersGetNewsletterMessagesResponseServerError.parseGetNewsletterMessagesResponseServerError}.
@@ -511,7 +511,7 @@ public sealed interface SmaxNewslettersGetNewsletterMessagesResponse extends Sma
         private final int errorCode;
 
         /**
-         * The human-readable error text, when the relay supplied one.
+         * The human-readable error text. When the relay supplied one.
          */
         private final String errorText;
 

@@ -16,7 +16,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Section display-type discriminator (V3 only) — projects the
+ * Section display-type discriminator (V3 only). Projects the
  * {@code <section display_type>} attribute through
  * {@code WASmaxInBotEnums.ENUM_HIDDEN_HSCROLL_HSCROLLICEBREAKERS_HSCROLLLARGE_HSCROLLSMALL_LISTVIEW}.
  */

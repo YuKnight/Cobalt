@@ -97,7 +97,7 @@ public final class NewsletterSavedInterestsHandler implements WebAppStateActionH
      */
     @Override
     public String actionName() {
-        return NewsletterSavedInterestsAction.ACTION_NAME; // NO_WA_BASIS: WAWebProtobufSyncAction.pb only declares the protobuf field newsletterSavedInterestsAction at index 75
+        return NewsletterSavedInterestsAction.ACTION_NAME;
     }
 
     /**
@@ -132,7 +132,7 @@ public final class NewsletterSavedInterestsHandler implements WebAppStateActionH
      */
     @Override
     public int version() {
-        return NewsletterSavedInterestsAction.ACTION_VERSION; // NO_WA_BASIS: WA Web has no newsletter saved interests version constant; defaults to 1
+        return NewsletterSavedInterestsAction.ACTION_VERSION;
     }
 
     /**
@@ -202,16 +202,16 @@ public final class NewsletterSavedInterestsHandler implements WebAppStateActionH
      */
     @Override
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        if (mutation.operation() != SyncdOperation.SET) { // NO_WA_BASIS: only SET makes sense for a single-string identifier-style action
+        if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof NewsletterSavedInterestsAction action) // NO_WA_BASIS: payload type guard
+        if (!(mutation.value().action().orElse(null) instanceof NewsletterSavedInterestsAction action)
                 || action.newsletterSavedInterests().isEmpty()) { // NO_WA_BASIS: newsletterSavedInterests is the only field on the protobuf and is required for any meaningful update
             return MutationApplicationResult.malformed();
         }
 
-        client.store().setNewsletterSavedInterests(action.newsletterSavedInterests().get()); // NO_WA_BASIS: persist the interests string on the flattened Cobalt store
+        client.store().setNewsletterSavedInterests(action.newsletterSavedInterests().get());
         return MutationApplicationResult.success();
     }
 }

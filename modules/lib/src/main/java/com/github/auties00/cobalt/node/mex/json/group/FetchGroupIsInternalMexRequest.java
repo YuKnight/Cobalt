@@ -34,61 +34,38 @@ import java.util.Optional;
 @WhatsAppWebModule(moduleName = "WAWebMexFetchGroupIsInternalJob")
 public final class FetchGroupIsInternalMexRequest implements MexOperation.Request.Json {
     /**
-     * The numeric GraphQL query identifier assigned by the WhatsApp relay
-     * to the {@code FetchGroupIsInternal} compiled query.
-     *
-     * @implNote WAWebMexFetchGroupIsInternalJobQuery.graphql: corresponds
-     * to the compiled document id registered for the
-     * {@code mexFetchGroupIsInternal} query.
+     * The numeric GraphQL query identifier assigned by the WhatsApp relay to
+     * the compiled {@code mexFetchGroupIsInternal} query.
      */
     public static final String QUERY_ID = "34119218944390847";
 
     /**
-     * The GraphQL operation name reported by WA Web's
-     * {@code MexPerfTracker} when dispatching this query, mirroring the
-     * {@code params.name} value of the compiled mexFetchGroupIsInternal
-     * operation.
-     *
-     * <p>The constant is exposed through {@link #name()} so
-     * call sites can reach the same telemetry tag WA Web emits without
-     * duplicating the literal at every dispatch site.
-     *
-     * @implNote WAWebMexFetchGroupIsInternalJob: WA Web invokes the operation through
-     * {@code WAWebMexClient.fetchQuery} which forwards to
-     * {@code WAWebMexNativeClient}; the native client passes the
-     * {@code params.name} of the compiled GraphQL artifact to
-     * {@code MexPerfTracker.setOperationName}. Cobalt mirrors that
-     * scalar verbatim as {@code "mexFetchGroupIsInternal"}.
+     * The GraphQL operation name reported by WA Web's {@code MexPerfTracker}
+     * when dispatching this query, mirroring the {@code params.name} value of
+     * the compiled {@code mexFetchGroupIsInternal} operation.
      */
     public static final String OPERATION_NAME = "mexFetchGroupIsInternal";
+    /**
+     * The target group identifier bound to the {@code id} GraphQL variable.
+     */
     private final String groupId;
 
     /**
-     * Constructs a request that asks the relay whether the given group
-     * is flagged as internal.
+     * Constructs a request that asks the relay whether the given group is
+     * flagged as internal.
      *
-     * @implNote WAWebMexFetchGroupIsInternalJob.mexFetchGroupIsInternal:
-     * WA Web's {@code function*(e)} accepts the group identifier
-     * {@code e} and constructs {@code {id: e}} as the GraphQL
-     * variables payload.
-     * @param groupId the group identifier emitted as the {@code id}
-     *                variable; the compiled query injects the literal
-     *                {@code query_context: "INTERACTIVE"} alongside it
+     * @implNote The compiled query injects the literal {@code query_context:
+     * "INTERACTIVE"} alongside the {@code id} variable.
+     * @param groupId the group identifier emitted as the {@code id} variable
      */
     public FetchGroupIsInternalMexRequest(String groupId) {
         this.groupId = groupId;
     }
 
     /**
-     * Returns the compiled GraphQL query identifier projected from
-     * {@link #QUERY_ID}.
+     * Returns the compiled GraphQL query identifier.
      *
-     * @implNote WAWebMexFetchGroupIsInternalJob: WA Web reads the {@code params.id}
-     *           field of the compiled artifact and forwards it to
-     *           {@code MexPerfTracker.setQueryId}; Cobalt projects
-     *           the same scalar through this accessor.
-     * @return the constant {@link #QUERY_ID}; never
-     *         {@code null}
+     * @return the constant {@link #QUERY_ID}; never {@code null}
      */
     @Override
     public String id() {
@@ -96,17 +73,9 @@ public final class FetchGroupIsInternalMexRequest implements MexOperation.Reques
     }
 
     /**
-     * Returns the GraphQL operation name projected from
-     * {@link #OPERATION_NAME}.
+     * Returns the GraphQL operation name.
      *
-     * @implNote WAWebMexFetchGroupIsInternalJob: WA Web's
-     *           {@code WAWebMexNativeClient.fetchQuery} reads
-     *           {@code params.name} from the compiled GraphQL
-     *           artifact and forwards it to
-     *           {@code MexPerfTracker.setOperationName}; Cobalt
-     *           projects the same scalar through this accessor.
-     * @return the constant {@link #OPERATION_NAME};
-     *         never {@code null}
+     * @return the constant {@link #OPERATION_NAME}; never {@code null}
      */
     @Override
     public String name() {
@@ -114,15 +83,8 @@ public final class FetchGroupIsInternalMexRequest implements MexOperation.Reques
     }
 
     /**
-     * Builds the IQ stanza that dispatches this operation to the
-     * WhatsApp relay.
+     * Builds the IQ stanza that dispatches this operation to the WhatsApp relay.
      *
-     * @implNote WAWebMexFetchGroupIsInternalJob.mexFetchGroupIsInternal:
-     * WA Web constructs the {@code variables} object inline as
-     * {@code {id: e}} and delegates to
-     * {@code WAWebMexClient.fetchQuery}. Cobalt writes the JSON
-     * directly via {@code fastjson2.JSONWriter} and wraps it through
-     * {@link Json#createMexNode(String, String)}.
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         serialised GraphQL variables
      */
@@ -130,17 +92,11 @@ public final class FetchGroupIsInternalMexRequest implements MexOperation.Reques
             adaptation = WhatsAppAdaptation.ADAPTED)
     @Override
     public NodeBuilder toNode() {
-        // WAWebMexFetchGroupIsInternalJob.mexFetchGroupIsInternal
-        // Opens a UTF-8 JSON writer that will serialise the GraphQL variables envelope
         try (var writer = JSONWriter.ofUTF8()) {
-            // WAWebMexFetchGroupIsInternalJob.mexFetchGroupIsInternal
-            // Begins the outer envelope and the nested "variables" object consumed by WAWebMexClient.fetchQuery
             writer.startObject();
             writer.writeName("variables");
             writer.writeColon();
             writer.startObject();
-            // WAWebMexFetchGroupIsInternalJob.mexFetchGroupIsInternal
-            // Emits the id variable when present
             if (groupId != null) {
                 writer.writeName("id");
                 writer.writeColon();
@@ -149,8 +105,6 @@ public final class FetchGroupIsInternalMexRequest implements MexOperation.Reques
             writer.endObject();
             writer.endObject();
 
-            // ADAPTED: WAWebMexFetchGroupIsInternalJob.mexFetchGroupIsInternal
-            // Flushes the JSON buffer into a StringWriter and wraps it in the shared MEX IQ envelope
             try (var output = new StringWriter()) {
                 writer.flushTo(output);
                 return Json.createMexNode(QUERY_ID, output.toString());

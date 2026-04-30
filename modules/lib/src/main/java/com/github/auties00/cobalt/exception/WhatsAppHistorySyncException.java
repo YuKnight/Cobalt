@@ -1,44 +1,19 @@
 package com.github.auties00.cobalt.exception;
 
 /**
- * Exception thrown when message history synchronization fails.
- * <p>
- * History sync is the mechanism WhatsApp uses to transfer existing chat history
- * to newly connected companion devices. When a new device links to an account,
- * the primary device uploads encrypted history chunks that the companion device
- * downloads and decrypts.
+ * Thrown when the message history transfer from the primary phone to a
+ * newly linked companion device fails.
  *
- * <h2>History Sync Architecture</h2>
- * The sync process involves:
- * <ol>
- *   <li><b>Initiation:</b> Companion device requests history from primary</li>
- *   <li><b>Upload:</b> Primary device encrypts and uploads history chunks to media servers</li>
- *   <li><b>Notification:</b> Primary device sends download URLs to companion</li>
- *   <li><b>Download:</b> Companion device downloads encrypted history</li>
- *   <li><b>Decryption:</b> Companion device decrypts and imports messages</li>
- * </ol>
+ * <p>WhatsApp ships chat history to a freshly paired companion as a
+ * sequence of encrypted blobs uploaded by the primary phone and
+ * downloaded, decrypted, and applied by the companion. Failures can
+ * happen at any stage: downloading the blob, decrypting it, parsing the
+ * embedded protobuf, or persisting the resulting messages. Any of those
+ * conditions raises this exception.
  *
- * <h2>History Chunk Types</h2>
- * History is delivered in multiple chunks:
- * <ul>
- *   <li><b>Initial:</b> Most recent messages (fast initial sync)</li>
- *   <li><b>Recent:</b> Recent history from past few days</li>
- *   <li><b>Full:</b> Complete history (may take longer)</li>
- *   <li><b>On-demand:</b> History for specific chats requested later</li>
- * </ul>
- *
- * <h2>Possible Causes</h2>
- * <ul>
- *   <li><b>Download failure:</b> Network issues fetching history data</li>
- *   <li><b>Decryption failure:</b> Invalid or missing history keys</li>
- *   <li><b>Parse failure:</b> Corrupted or malformed history protobuf</li>
- *   <li><b>Storage failure:</b> Unable to persist imported messages</li>
- *   <li><b>Primary unavailable:</b> Primary device offline or unreachable</li>
- * </ul>
- *
- * <h2>Fatality</h2>
- * History sync exceptions are non-fatal. The client can continue operating without
- * full history, and sync can be retried later.
+ * <p>History sync failures are non-fatal. The session continues to
+ * receive new messages and a partial or missing history can be retried
+ * later when the primary phone is online again.
  */
 public final class WhatsAppHistorySyncException extends WhatsAppException {
 
@@ -78,10 +53,10 @@ public final class WhatsAppHistorySyncException extends WhatsAppException {
     }
 
     /**
-     * Returns whether this exception represents a fatal error.
-     * <p>
-     * History sync exceptions are non-fatal. The client can continue operating
-     * with partial or no history, and the sync can be retried later.
+     * Returns whether the failure invalidates the current session.
+     *
+     * <p>History sync failures only affect the population of past
+     * messages on this device. The session itself stays usable.
      *
      * @return {@code false}
      */

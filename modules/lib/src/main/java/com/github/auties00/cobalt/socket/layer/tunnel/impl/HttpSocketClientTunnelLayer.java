@@ -16,61 +16,98 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * An HTTP CONNECT tunnel layer for proxied socket connections.
+ * Tunnel layer that establishes a TCP tunnel through an HTTP or HTTPS
+ * proxy by sending an {@code HTTP CONNECT} request.
  *
- * <p>Establishes a TCP tunnel through an HTTP or HTTPS proxy server by
- * issuing an {@code HTTP CONNECT} request.  Once the tunnel is
- * established, the underlying connection is transparent to higher-level
- * protocols.
- *
- * <p>This layer only performs the HTTP CONNECT handshake.  It does
- * <b>not</b> handle TLS for HTTPS proxies or call
- * {@code markReady()} — those are the responsibility of the tunnel
- * security layer above.
+ * <p>Once the tunnel is established the connection is transparent to
+ * higher-level protocols. The layer performs only the CONNECT
+ * handshake; TLS for HTTPS proxies is the responsibility of the
+ * tunnel security layer above.
  *
  * <p>Authentication is supported via the proxy's configured
- * {@link WhatsAppProxyAuthenticator.Http
- * authenticator}.  Redirects (3xx) to alternate proxy servers within the
- * same scheme are followed up to {@value #MAX_REDIRECTS} times.
+ * {@link WhatsAppProxyAuthenticator.Http authenticator}. {@code 3xx}
+ * redirects to alternate proxies within the same scheme are followed
+ * up to {@value #MAX_REDIRECTS} times.
  *
- * <p><strong>Performance notes:</strong>
- * <ul>
- *   <li>Non-matching headers are skipped via the vectorised
- *       {@link HttpResponseReader#skipToEndOfLine(long)} — no per-byte
- *       method calls for the vast majority of header data.</li>
- *   <li>{@code Proxy-Authenticate} values are extracted with a single
- *       bulk copy when the value fits in the read buffer (the common
- *       case with an 8 KiB buffer).  The slow path — which essentially
- *       never runs for typical auth challenges — is split into a
- *       separate method so the JIT always inlines the fast path, and
- *       uses a {@link StringBuilder} for zero-guess-sizing
- *       accumulation.</li>
- *   <li>{@code Location} URI parsing never materialises the full value.
- *       When the value fits in the buffer, direct array indexing is
- *       used.  When it spans buffers, a streaming state machine reads
- *       host bytes into a fixed {@code byte[253]} and port digits into
- *       an {@code int} accumulator, refilling as needed — no
- *       intermediate buffer at all.</li>
- * </ul>
- *
- * @apiNote This layer directly depends on
- * {@link WhatsAppProxy.Http} for proxy configuration.  This
- * coupling is intentional for this project.  If the socket stack is
- * extracted as a standalone library, a generic proxy configuration
- * interface should be introduced to replace the direct dependency.
+ * @apiNote The layer directly depends on
+ *     {@link WhatsAppProxy.Http} for proxy configuration; if the
+ *     socket stack is ever extracted as a standalone library a
+ *     generic proxy configuration interface should be introduced.
+ * @implNote The response parser uses two tiers throughout. Header
+ *     names are matched with a quick first-byte reject, then with
+ *     bulk
+ *     {@link HttpResponseReader#regionMatchesIgnoreCase(int, byte[], int)}
+ *     when the value fits in the buffer; non-matching lines are
+ *     skipped with the vectorised
+ *     {@link HttpResponseReader#skipToEndOfLine(long)}. Cross-buffer
+ *     paths live in dedicated slow methods so the JIT can always
+ *     inline the fast path. {@code Location} URIs are parsed without
+ *     materialising the full value: a streaming state machine reads
+ *     host bytes into a fixed {@code byte[253]} and port digits into
+ *     an {@code int} accumulator.
  */
 public final class HttpSocketClientTunnelLayer implements SocketClientTunnelLayer {
+    /**
+     * Major HTTP version advertised in the CONNECT request line.
+     */
     private static final int HTTP_VERSION_MAJOR = 1;
+
+    /**
+     * Minor HTTP version advertised in the CONNECT request line.
+     */
     private static final int HTTP_VERSION_MINOR_MAX = 1;
+
+    /**
+     * HTTP status code that requests proxy authentication.
+     */
     private static final int PROXY_AUTH_REQUIRED_STATUS_CODE = 407;
+
+    /**
+     * Maximum time in milliseconds spent on the entire CONNECT
+     * handshake including authentication and redirects.
+     */
     private static final long OVERALL_HANDSHAKE_TIMEOUT = 30_000;
+
+    /**
+     * Maximum total byte size of the response headers; enforced to
+     * guard against unbounded streams.
+     */
     private static final int MAX_RESPONSE_HEADER_SIZE = 65536;
+
+    /**
+     * Maximum number of {@code 1xx} informational responses tolerated
+     * before the proxy is considered misbehaving.
+     */
     private static final int MAX_1XX_RESPONSES = 10;
+
+    /**
+     * Maximum amount of whitespace tolerated in the status line.
+     */
     private static final int MAX_STATUS_LINE_SPACES = 64;
+
+    /**
+     * Maximum number of authentication attempts allowed.
+     */
     private static final int MAX_AUTH_ATTEMPTS = 3;
+
+    /**
+     * Maximum number of {@code 3xx} redirects followed.
+     */
     private static final int MAX_REDIRECTS = 5;
+
+    /**
+     * ASCII carriage-return byte.
+     */
     private static final byte CARRIAGE_RETURN = '\r';
+
+    /**
+     * ASCII line-feed byte.
+     */
     private static final byte LINE_FEED = '\n';
+
+    /**
+     * ASCII space byte.
+     */
     private static final byte SPACE = ' ';
 
     /**
@@ -118,19 +155,17 @@ public final class HttpSocketClientTunnelLayer implements SocketClientTunnelLaye
     }
 
     /**
-     * Connects through the HTTP proxy to the specified target endpoint.
+     * Connects through the HTTP proxy to {@code address}.
      *
-     * <p>Opens a connection to the proxy via the inner layer, then
-     * performs the HTTP CONNECT handshake.  Follows 3xx redirects to
-     * alternate proxy servers (up to {@value #MAX_REDIRECTS}).
-     *
-     * <p>After this method returns successfully, the tunnel is established
-     * but the connection is not yet marked ready for application data.
-     * The caller (typically a tunnel security layer) is responsible for
-     * calling {@code markReady()} and optionally setting up TLS.
+     * <p>Opens the inner connection to the proxy, performs the
+     * CONNECT handshake and follows up to {@value #MAX_REDIRECTS}
+     * redirects to alternate proxies. On return the tunnel is
+     * established but not yet marked ready; the surrounding tunnel
+     * security layer is responsible for the ready transition.
      *
      * @param address  the target endpoint for the CONNECT tunnel
-     * @param listener the callback for events (not used during handshake)
+     * @param listener the callback for events (unused during the
+     *                 handshake)
      * @throws IOException if the connection or handshake fails
      */
     @Override
@@ -161,21 +196,22 @@ public final class HttpSocketClientTunnelLayer implements SocketClientTunnelLaye
     }
 
     /**
-     * Performs the HTTP CONNECT handshake with authentication and redirect
-     * handling.
+     * Performs one CONNECT handshake attempt against the given proxy,
+     * handling authentication and redirects.
      *
-     * <p>Sends the initial CONNECT request without authentication.  If
-     * the proxy responds with 407, retries with the configured
-     * authenticator (up to {@value #MAX_AUTH_ATTEMPTS} times to support
-     * multi-step protocols).  On 3xx, returns the redirect target.  On
-     * 2xx, the tunnel is established.
+     * <p>Sends the initial CONNECT without authentication; on
+     * {@code 407} retries with the authenticator up to
+     * {@value #MAX_AUTH_ATTEMPTS} times to support multi-step
+     * protocols. On {@code 3xx} returns the redirect target; on
+     * {@code 2xx} the tunnel is established.
      *
      * @param currentProxy the proxy configuration for this attempt
-     * @param deadline     the absolute timestamp after which the handshake
+     * @param deadline     absolute timestamp after which the handshake
      *                     times out
-     * @return {@code null} on success, or the redirect target proxy on 3xx
-     * @throws IOException if the handshake fails, times out, or
-     *                     authentication is rejected
+     * @return {@code null} on success, or the redirect target on
+     *         {@code 3xx}
+     * @throws IOException if the handshake fails, times out or
+     *         authentication is rejected
      */
     private WhatsAppProxy.Http authenticate(WhatsAppProxy.Http currentProxy, long deadline) throws IOException {
         var authenticator = currentProxy.authenticator();
@@ -217,34 +253,18 @@ public final class HttpSocketClientTunnelLayer implements SocketClientTunnelLaye
     }
 
     /**
-     * Scans response headers and collects all {@code Proxy-Authenticate}
-     * values as strings.
+     * Scans response headers and collects every
+     * {@code Proxy-Authenticate} value as a string.
      *
-     * <p>Only the {@code proxy-authenticate} header is extracted; all
-     * other headers are skipped at the byte level without allocation.
-     * All headers are consumed so the stream is correctly positioned for
-     * the next request on the same connection.
-     *
-     * <p>Per-byte method calls are limited to the short header-name
-     * prefix match (~20 bytes) that occurs only for candidate headers.
-     * Value extraction has two tiers:
-     * <ol>
-     *   <li><b>Fast path</b> (value in buffer — the common case): a
-     *       single bulk {@link HttpResponseReader#getBuffered} produces
-     *       an exact-sized {@code byte[]} that is decoded to a
-     *       {@link String} with zero transcoding on compact-string
-     *       JVMs.</li>
-     *   <li><b>Slow path</b> (value spans buffers — essentially never
-     *       for typical auth challenges): split into
-     *       {@link #readAuthValueSlow} so the JIT always inlines this
-     *       method.  Uses a {@link StringBuilder} that grows on demand
-     *       with no up-front sizing.</li>
-     * </ol>
+     * <p>Only the {@code proxy-authenticate} header is extracted;
+     * other headers are skipped at the byte level without allocation
+     * so the stream is correctly positioned for the next request on
+     * the same connection.
      *
      * @param deadline the handshake deadline
-     * @return all {@code Proxy-Authenticate} challenge values
+     * @return every {@code Proxy-Authenticate} challenge value
      * @throws IOException if the headers exceed the size limit, the
-     *                     connection closes, or the deadline is exceeded
+     *         connection closes or the deadline is exceeded
      */
     private List<String> consumeProxyAuthenticateValues(long deadline) throws IOException {
         responseReader.startHeaderSection();
@@ -319,24 +339,19 @@ public final class HttpSocketClientTunnelLayer implements SocketClientTunnelLaye
     }
 
     /**
-     * Slow-path reader for a {@code Proxy-Authenticate} value that spans
-     * buffer boundaries.
+     * Slow-path reader for a {@code Proxy-Authenticate} value that
+     * spans buffer boundaries.
      *
-     * <p>Separated from the fast path so that the JIT sees a small
-     * inlineable method body for
-     * {@link #consumeProxyAuthenticateValues}.  Uses a
-     * {@link StringBuilder} whose internal growth is JVM-optimised,
-     * avoiding any up-front size guesses or large fixed-size buffers.
-     *
-     * <p>Each buffer chunk is appended in bulk via
-     * {@link HttpResponseReader#writeTo(StringBuilder, int)},
-     * so per-byte overhead is limited to the {@code StringBuilder}
-     * internal char copy.
+     * <p>Separated from the fast path so the JIT can always inline
+     * {@link #consumeProxyAuthenticateValues(long)}. Uses a
+     * {@link StringBuilder} that grows on demand and bulk-appends
+     * each buffer chunk via
+     * {@link HttpResponseReader#writeTo(StringBuilder, int)}.
      *
      * @param firstByte the first non-OWS byte (already consumed)
      * @param deadline  the handshake deadline
      * @return the trimmed header value
-     * @throws IOException on timeout, EOF, or header size overflow
+     * @throws IOException on timeout, EOF or header size overflow
      */
     private String readAuthValueSlow(byte firstByte, long deadline) throws IOException {
         var sb = new StringBuilder();
@@ -380,35 +395,22 @@ public final class HttpSocketClientTunnelLayer implements SocketClientTunnelLaye
     }
 
     /**
-     * Scans response headers for the first {@code Location} value and
-     * parses it directly into a {@link WhatsAppProxy.Http} redirect
+     * Scans response headers for the first {@code Location} value
+     * and parses it into a {@link WhatsAppProxy.Http} redirect
      * target.
      *
-     * <p>Two parsing tiers avoid ever materialising the full URI:
-     * <ol>
-     *   <li><b>Fast path</b> (value in buffer — the common case): the
-     *       value is extracted into an exact-sized {@code byte[]} and
-     *       parsed with direct array indexing via
-     *       {@link #parseRedirectUri(byte[], int, WhatsAppProxy.Http)}.</li>
-     *   <li><b>Slow path</b> (value spans buffers): a streaming state
-     *       machine in {@link #parseRedirectUriStreaming} reads host
-     *       bytes into a fixed {@code byte[253]} and port digits into
-     *       an {@code int} accumulator, refilling as needed — zero
-     *       intermediate allocation.</li>
-     * </ol>
+     * <p>Every header is consumed so the stream is correctly
+     * positioned regardless of which header contained the
+     * {@code Location}.
      *
-     * <p>All headers are consumed so the stream is correctly positioned
-     * regardless of which header contained the {@code Location}.
-     *
-     * @param currentProxy the current proxy (used as host fallback and
-     *                     authenticator source)
-     * @param statusCode   the 3xx status code (for error messages)
+     * @param currentProxy fallback host and authenticator source
+     * @param statusCode   the {@code 3xx} status code, included in
+     *                     error messages
      * @param deadline     the handshake deadline
      * @return the redirect target proxy configuration
-     * @throws IOException if the {@code Location} header is missing or
-     *                     the URI is malformed, or if headers exceed the
-     *                     size limit, the connection closes, or the
-     *                     deadline is exceeded
+     * @throws IOException if {@code Location} is missing or malformed,
+     *         the headers exceed the size limit, the connection
+     *         closes, or the deadline is exceeded
      */
     private WhatsAppProxy.Http consumeLocationRedirect(WhatsAppProxy.Http currentProxy, int statusCode, long deadline) throws IOException {
         responseReader.startHeaderSection();
@@ -487,12 +489,10 @@ public final class HttpSocketClientTunnelLayer implements SocketClientTunnelLaye
     }
 
     /**
-     * Parses an HTTP or HTTPS redirect URI from a byte array using
-     * direct random access.
-     *
-     * <p>Extracts scheme, host, and port with no intermediate
-     * {@link java.net.URI} or {@link String} allocation beyond the
-     * final host name (required by the proxy config API).
+     * Parses an HTTP or HTTPS redirect URI from a byte array via
+     * direct random access; extracts scheme, host and port without
+     * any {@link java.net.URI} or extra {@link String} allocation
+     * beyond the final host name.
      *
      * @param value        the raw URI bytes
      * @param valueLen     the number of valid bytes in {@code value}
@@ -576,21 +576,16 @@ public final class HttpSocketClientTunnelLayer implements SocketClientTunnelLaye
     }
 
     /**
-     * Parses a redirect URI incrementally when the value spans buffer
-     * boundaries.
+     * Parses a redirect URI incrementally when the value spans
+     * buffer boundaries.
      *
-     * <p>Separated from the fast path so that the JIT always inlines
-     * {@link #consumeLocationRedirect}.  No intermediate buffer is
-     * allocated for the full URI.  Instead:
-     * <ul>
-     *   <li>Scheme ({@code http://} or {@code https://}) is verified
-     *       byte-by-byte (~10 bytes).</li>
-     *   <li>Host bytes are accumulated into a fixed
-     *       {@code byte[253]} (DNS maximum).</li>
-     *   <li>Port digits are accumulated into an {@code int}.</li>
-     *   <li>Remaining path/query bytes are skipped to end of line
-     *       via {@link HttpResponseReader#skipToEndOfLine}.</li>
-     * </ul>
+     * <p>Separated from the fast path so the JIT can always inline
+     * {@link #consumeLocationRedirect(WhatsAppProxy.Http, int, long)}.
+     * No buffer is allocated for the full URI: scheme bytes are
+     * matched against literal characters, host bytes accumulate into
+     * a fixed {@code byte[253]} (DNS maximum), port digits accumulate
+     * into an {@code int} and any remaining path or query bytes are
+     * skipped to end of line.
      *
      * @param firstByte    the first non-OWS byte of the value
      * @param currentProxy fallback host and authenticator source

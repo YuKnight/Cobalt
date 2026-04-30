@@ -14,11 +14,21 @@ import java.io.UncheckedIOException;
 import java.util.Optional;
 
 /**
- * The parsed response for this MEX mutation.
+ * Parsed response for the update-text-status mutation. Carries the relay's status token from
+ * {@code data.xwa2_update_text_status}.
  */
+@WhatsAppWebModule(moduleName = "WAWebMexUpdateTextStatusJob")
 public final class UpdateTextStatusMexResponse implements MexOperation.Response.Json {
+    /**
+     * The status token reported by the relay after the mutation runs.
+     */
     private final String result;
 
+    /**
+     * Constructs a new response with the given status token.
+     *
+     * @param result the status token reported by the relay
+     */
     private UpdateTextStatusMexResponse(String result) {
         this.result = result;
     }
@@ -26,12 +36,8 @@ public final class UpdateTextStatusMexResponse implements MexOperation.Response.
     /**
      * Parses the MEX response carried by an inbound IQ stanza.
      *
-     * @implNote WAWebMexUpdateTextStatusJob.mexUpdateTextStatus: reads
-     * the {@code result} status from
-     * {@code data.xwa2_update_text_status}.
      * @param node the inbound IQ stanza carrying the {@code <result>} child
-     * @return the parsed response, or {@code Optional.empty()} if the
-     *         expected JSON shape is absent
+     * @return the parsed response, or {@link Optional#empty()} if the expected JSON shape is absent
      */
     @WhatsAppWebExport(moduleName = "WAWebMexUpdateTextStatusJob", exports = "mexUpdateTextStatus",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -42,14 +48,20 @@ public final class UpdateTextStatusMexResponse implements MexOperation.Response.
     }
 
     /**
-     * Returns the {@code result} field.
+     * Returns the status token reported by the relay.
      *
-     * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the status token, or empty if absent
      */
     public Optional<String> result() {
         return Optional.ofNullable(result);
     }
 
+    /**
+     * Parses the response from the raw JSON payload bytes.
+     *
+     * @param json the raw JSON bytes from the {@code <result>} child
+     * @return an {@link Optional} containing the parsed response, or empty if the envelope is missing
+     */
     private static Optional<UpdateTextStatusMexResponse> of(byte[] json) {
         var jsonObject = JSON.parseObject(json);
         if (jsonObject == null) {

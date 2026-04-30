@@ -15,14 +15,14 @@ import java.util.Objects;
 import java.util.SequencedCollection;
 
 /**
- * The outbound syncd sync IQ — wraps a typed list of
+ * The outbound syncd sync IQ. Wraps a typed list of
  * {@link IqSyncdServerSyncRequestCollection} entries inside the canonical
  * {@code <iq xmlns="w:sync:app:state" type="set"><sync>…</sync></iq>}
  * envelope.
  *
  * <p>Each collection entry contributes one {@code <collection>} child
  * with the standard {@code name}, {@code return_snapshot} and
- * {@code version} attributes; entries that ship local mutations
+ * {@code version} attributes. Entries that ship local mutations
  * additionally attach a {@code <patch>} grandchild carrying the encoded
  * {@code SyncdPatch} protobuf bytes.
  *
@@ -34,7 +34,7 @@ import java.util.SequencedCollection;
  *           "true"|"false", version: INT(version ??
  *           DEFAULT_COLLECTION_VERSION)}, optionalPatchNode)}. The
  *           default collection version is {@code 0} per
- *           {@code WASyncdConst.DEFAULT_COLLECTION_VERSION}; Cobalt
+ *           {@code WASyncdConst.DEFAULT_COLLECTION_VERSION}. Cobalt
  *           projects the same fallback.
  */
 @WhatsAppWebModule(moduleName = "WAWebSyncdServerSync")
@@ -61,7 +61,7 @@ public final class IqSyncdServerSyncRequest implements IqOperation.Request {
     /**
      * Constructs a new server-sync request.
      *
-     * @param collections the list of collection entries; never
+     * @param collections the list of collection entries. Never
      *                    {@code null}, may be empty (the
      *                    no-collection case produces a degenerate
      *                    {@code <sync/>} child)
@@ -76,7 +76,7 @@ public final class IqSyncdServerSyncRequest implements IqOperation.Request {
     /**
      * Returns the list of collection entries.
      *
-     * @return an unmodifiable view of the entries; never {@code null},
+     * @return an unmodifiable view of the entries. Never {@code null},
      *         possibly empty
      */
     public SequencedCollection<IqSyncdServerSyncRequestCollection> collections() {

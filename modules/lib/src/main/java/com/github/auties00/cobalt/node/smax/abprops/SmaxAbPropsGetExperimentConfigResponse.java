@@ -28,8 +28,8 @@ public sealed interface SmaxAbPropsGetExperimentConfigResponse extends SmaxOpera
      * Tries each {@link SmaxAbPropsGetExperimentConfigResponse} variant in priority order and
      * returns the first that parses cleanly.
      *
-     * @param node    the inbound IQ stanza; never {@code null}
-     * @param request the original outbound stanza; never {@code null}
+     * @param node    the inbound IQ stanza. Never {@code null}
+     * @param request the original outbound stanza. Never {@code null}
      * @return an {@link Optional} carrying the parsed variant, or
      *         empty on no-match
      * @throws NullPointerException if either argument is {@code null}
@@ -51,13 +51,13 @@ public sealed interface SmaxAbPropsGetExperimentConfigResponse extends SmaxOpera
     }
 
     /**
-     * The {@code Success} reply variant — the relay returned the
+     * The {@code Success} reply variant. The relay returned the
      * materialised props bundle.
      *
      * @implNote {@code WASmaxInAbPropsGetExperimentConfigResponseSuccess.parseGetExperimentConfigResponseSuccess}
      *           projects the {@code <props/>} envelope plus its
      *           {@code <prop/>} children and the optional
-     *           {@code <erid/>} blob; Cobalt surfaces only the raw
+     *           {@code <erid/>} blob. Cobalt surfaces only the raw
      *           {@code <props/>} subtree because every consumer
      *           re-parses it through the dedicated
      *           {@code WAWebABPropsParseConfigValue} pipeline.
@@ -66,19 +66,19 @@ public sealed interface SmaxAbPropsGetExperimentConfigResponse extends SmaxOpera
     @WhatsAppWebModule(moduleName = "WASmaxInAbPropsIQResultResponseMixin")
     final class Success implements SmaxAbPropsGetExperimentConfigResponse {
         /**
-         * The relay-returned content hash; echoed back to the relay on
+         * The relay-returned content hash. Echoed back to the relay on
          * the next refresh.
          */
         private final String propsHash;
 
         /**
-         * The relay-returned refresh-cooldown hint, in seconds; absent
+         * The relay-returned refresh-cooldown hint, in seconds. Absent
          * when the relay omits it.
          */
         private final Integer propsRefresh;
 
         /**
-         * The relay-returned refresh id; echoed back to the relay on
+         * The relay-returned refresh id. Echoed back to the relay on
          * the next refresh.
          */
         private final Integer propsRefreshId;
@@ -90,7 +90,7 @@ public sealed interface SmaxAbPropsGetExperimentConfigResponse extends SmaxOpera
 
         /**
          * The raw {@code <props/>} subtree carrying the per-experiment
-         * configuration values; consumers re-parse it through the
+         * configuration values. Consumers re-parse it through the
          * dedicated {@code WAWebABPropsParseConfigValue} pipeline.
          */
         private final Node propsNode;
@@ -98,15 +98,15 @@ public sealed interface SmaxAbPropsGetExperimentConfigResponse extends SmaxOpera
         /**
          * Constructs a new success projection.
          *
-         * @param propsHash       the relay-returned hash; may be
+         * @param propsHash       the relay-returned hash. May be
          *                        {@code null}
          * @param propsRefresh    the relay-returned refresh-cooldown;
          *                        may be {@code null}
-         * @param propsRefreshId  the relay-returned refresh id; may be
+         * @param propsRefreshId  the relay-returned refresh id. May be
          *                        {@code null}
-         * @param propsAbKey      the relay-returned ab-key; may be
+         * @param propsAbKey      the relay-returned ab-key. May be
          *                        {@code null}
-         * @param propsNode       the raw {@code <props/>} subtree; never
+         * @param propsNode       the raw {@code <props/>} subtree. Never
          *                        {@code null}
          * @throws NullPointerException if {@code propsNode} is
          *                              {@code null}
@@ -160,7 +160,7 @@ public sealed interface SmaxAbPropsGetExperimentConfigResponse extends SmaxOpera
         /**
          * Returns the raw {@code <props/>} subtree.
          *
-         * @return the {@code <props/>} node; never {@code null}
+         * @return the {@code <props/>} node. Never {@code null}
          */
         public Node propsNode() {
             return propsNode;
@@ -231,7 +231,7 @@ public sealed interface SmaxAbPropsGetExperimentConfigResponse extends SmaxOpera
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected the
+     * The {@code ClientError} reply variant. The relay rejected the
      * request as malformed or unauthorised.
      *
      * @implNote {@code WASmaxInAbPropsGetExperimentConfigResponseErrorNoRetry.parseGetExperimentConfigResponseErrorNoRetry}
@@ -255,7 +255,7 @@ public sealed interface SmaxAbPropsGetExperimentConfigResponse extends SmaxOpera
          * Constructs a new client-error reply.
          *
          * @param errorCode the numeric error code
-         * @param errorText the optional human-readable text; may be
+         * @param errorText the optional human-readable text. May be
          *                  {@code null}
          */
         public ClientError(int errorCode, String errorText) {
@@ -326,7 +326,7 @@ public sealed interface SmaxAbPropsGetExperimentConfigResponse extends SmaxOpera
     }
 
     /**
-     * The {@code ServerError} reply variant — the relay encountered a
+     * The {@code ServerError} reply variant. The relay encountered a
      * transient internal failure and asks the client to retry.
      *
      * @implNote {@code WASmaxInAbPropsGetExperimentConfigResponseErrorRetry.parseGetExperimentConfigResponseErrorRetry}
@@ -351,7 +351,7 @@ public sealed interface SmaxAbPropsGetExperimentConfigResponse extends SmaxOpera
          * Constructs a new server-error reply.
          *
          * @param errorCode the numeric error code
-         * @param errorText the optional human-readable text; may be
+         * @param errorText the optional human-readable text. May be
          *                  {@code null}
          */
         public ServerError(int errorCode, String errorText) {

@@ -259,10 +259,11 @@ import java.util.stream.Stream;
  * the configured {@link WhatsAppClientErrorHandler} so recovery policy is
  * pluggable rather than hardcoded.
  *
- * @implNote WAWebSocketModel.Socket: the overall shape of the client
- * mirrors WhatsApp Web's top-level socket model, but with the
- * Cobalt-specific DI structure (services injected in the constructor) and
- * virtual-thread blocking replacing module-level imports and async/await.
+ * @implNote The overall shape of the client mirrors WhatsApp Web's
+ * top-level socket model, with the Cobalt-specific DI structure
+ * (services injected in the constructor) and virtual-thread blocking
+ * replacing the original module-level imports and {@code async/await}
+ * usage.
  * @see WhatsAppClientBuilder
  * @see WhatsAppClientListener
  * @see WhatsAppClientErrorHandler
@@ -387,17 +388,16 @@ public final class WhatsAppClient {
     /**
      * The per-protocol backoff registry consulted before every USync
      * dispatch and updated when the relay returns an
-     * {@code error_backoff} hint.
-     *
-     * @implNote WAWebUsyncBackoff: the JS module-level singleton.
+     * {@code error_backoff} hint. Mirrors the {@code WAWebUsyncBackoff}
+     * module-level singleton.
      */
     private final UsyncBackoff usyncBackoff;
     /**
-     * The companion pairing service for the WEB
+     * The service that drives the web companion pairing ceremony.
      */
     private final CompanionPairingService companionPairingService;
     /**
-     * The snapshot recovery service
+     * The service that recovers app-state snapshots after a sync failure.
      */
     private final SnapshotRecoveryService snapshotRecoveryService;
     /**
@@ -561,12 +561,7 @@ public final class WhatsAppClient {
                         disconnect(WhatsAppClientDisconnectReason.RECONNECTING);
                     }
                 });
-                // WAWebOpenChatSocket.J — after the socket_open and
-                // auth_handshake QPL spans have closed successfully, a
-                // WebcSocketConnectWamEvent is committed summarising the
-                // two durations and the connect reason. The event is only
-                // emitted for web companions (the "webc" prefix in
-                // WAWebOpenChatSocket and WAWebWebcSocketConnectWamEvent);
+                // The webc socket-connect WAM event is web-only on WA Web;
                 // mobile sessions do not commit it.
                 if (store.clientType() == WhatsAppClientType.WEB) {
                     emitWebcSocketConnectEvent(reason);
@@ -12009,7 +12004,7 @@ public final class WhatsAppClient {
      * (the {@code dhash}) so reconciliation can hit a server-side fast path
      * when the local cache is up to date. Submit the digest of the locally
      * cached roster as {@code dhash}; the server returns a
-     * {@link PrivacyDisallowedList#match()} verdict when the digest matches
+     * {@link PrivacyDisallowedList#isMatch()} verdict when the digest matches
      * its own and a {@link PrivacyDisallowedList#mismatch(List, String)}
      * carrying the fresh contacts plus the new digest otherwise.
      *

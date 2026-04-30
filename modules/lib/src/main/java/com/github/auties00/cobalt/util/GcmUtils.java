@@ -8,11 +8,8 @@ import javax.crypto.spec.GCMParameterSpec;
  *
  * <p>The nonce layout is four leading zero bytes followed by the 64-bit
  * big-endian encoding of the counter, matching the Signal protocol nonce
- * derivation used by WhatsApp's Noise and Signal ciphers.
- *
- * @implNote Mirrors the nonce construction used throughout WA Web's
- *     {@code WANoiseCipher} and {@code WASignalCipher} modules; the
- *     authentication tag length is fixed at 128 bits.
+ * derivation used by WhatsApp's Noise and Signal ciphers. The
+ * authentication tag length is fixed at 128 bits.
  */
 public final class GcmUtils {
     /**

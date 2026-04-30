@@ -82,7 +82,7 @@ public final class LockChatHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebLockChatSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return LockChatAction.ACTION_NAME; // WAWebLockChatSync.getAction -> WASyncdConst.Actions.LockChat
+        return LockChatAction.ACTION_NAME;
     }
 
     /**
@@ -98,7 +98,7 @@ public final class LockChatHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebLockChatSync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return LockChatAction.COLLECTION_NAME; // WAWebLockChatSync.collectionName = WASyncdConst.CollectionName.RegularLow
+        return LockChatAction.COLLECTION_NAME;
     }
 
     /**
@@ -110,7 +110,7 @@ public final class LockChatHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebLockChatSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return LockChatAction.ACTION_VERSION; // WAWebLockChatSync.getVersion -> 7
+        return LockChatAction.ACTION_VERSION;
     }
 
     /**
@@ -128,7 +128,7 @@ public final class LockChatHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebLockChatSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebLockChatSync.applyMutations
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -177,43 +177,42 @@ public final class LockChatHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebLockChatSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        if (mutation.operation() != SyncdOperation.SET) { // WAWebLockChatSync.applyMutations: if (e.operation !== "set") return {actionState: Unsupported}
-            return MutationApplicationResult.unsupported(); // WAWebLockChatSync.applyMutations: l++, {actionState: SyncActionState.Unsupported}
+        if (mutation.operation() != SyncdOperation.SET) {
+            return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof LockChatAction action)) { // WAWebLockChatSync.applyMutations: var s = e.value.lockChatAction?.locked; if (s == null) return malformedActionValue
-            return malformedActionValue(); // WAWebLockChatSync.applyMutations: p++, malformedActionValue(a.collectionName)
+        if (!(mutation.value().action().orElse(null) instanceof LockChatAction action)) {
+            return malformedActionValue();
         }
 
-        var chatJidString = JSON.parseArray(mutation.index()).getString(1); // WAWebLockChatSync.applyMutations: var n = e.indexParts[1]
-        if (chatJidString == null || chatJidString.isEmpty()) { // WAWebLockChatSync.applyMutations: if (!isWid(n)) return this.malformedActionIndex()
-            return malformedActionIndex(); // WAWebLockChatSync.applyMutations: _++, a.malformedActionIndex()
+        var chatJidString = JSON.parseArray(mutation.index()).getString(1);
+        if (chatJidString == null || chatJidString.isEmpty()) {
+            return malformedActionIndex();
         }
 
         Jid chatJid;
         try {
-            chatJid = Jid.of(chatJidString); // WAWebLockChatSync.applyMutations: createWid(n)
+            chatJid = Jid.of(chatJidString);
         } catch (Exception e) { // ADAPTED: WAWebWid.isWid would reject before reaching createWid; Cobalt catches parse failures
-            return malformedActionIndex(); // WAWebLockChatSync.applyMutations: a.malformedActionIndex()
+            return malformedActionIndex();
         }
 
-        var chat = client.store().findChatByJid(chatJid); // WAWebLockChatSync.applyMutations: yield resolveChatForMutationIndex(createWid(n))
-        if (chat.isEmpty()) { // WAWebLockChatSync.applyMutations: if (!u.success) return {actionState: Orphan, orphanModel: u.orphanModel}
-            return MutationApplicationResult.orphan(chatJidString, "Chat"); // WAWebLockChatSync.applyMutations: SyncActionState.Orphan with orphan model
+        var chat = client.store().findChatByJid(chatJid);
+        if (chat.isEmpty()) {
+            return MutationApplicationResult.orphan(chatJidString, "Chat");
         }
 
-        // WAWebLockChatSync.applyMutations: i.push({isLocked: s, chatId: ...}); return {actionState: Success}
         // Post-loop, WA Web iterates i and calls setChatAsLocked / setChatAsUnlocked with syncWithPrimaries: false.
         // Both collapse to WAWebChatLockAction.e() which writes
         //   {isLocked: true, archive: false, pin: undefined} when locking
         //   {isLocked: false}                                when unlocking
         // Cobalt inlines this write directly on the in-memory Chat model.
-        chat.get().setLocked(action.locked()); // WAWebChatLockAction.e: {isLocked: t} / {isLocked: t, archive: !1, pin: void 0}
-        if (action.locked()) { // WAWebChatLockAction.e: t ? {isLocked: t, archive: !1, pin: void 0} : {isLocked: t}
-            chat.get().setArchived(false); // WAWebChatLockAction.e: archive: !1
-            chat.get().setPinnedTimestamp(null); // WAWebChatLockAction.e: pin: void 0
+        chat.get().setLocked(action.locked());
+        if (action.locked()) {
+            chat.get().setArchived(false);
+            chat.get().setPinnedTimestamp(null);
         }
-        return MutationApplicationResult.success(); // WAWebLockChatSync.applyMutations: {actionState: SyncActionState.Success}
+        return MutationApplicationResult.success();
     }
 
     /**
@@ -249,20 +248,20 @@ public final class LockChatHandler implements WebAppStateActionHandler {
      */
     @WhatsAppWebExport(moduleName = "WAWebLockChatSync", exports = "getChatLockMutation", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncPendingMutation getChatLockMutation(Instant timestamp, boolean locked, Jid chatJid) {
-        var action = new LockChatActionBuilder() // WAWebLockChatSync.getChatLockMutation: value: {lockChatAction: {locked: t}}
-                .locked(locked) // WAWebLockChatSync.getChatLockMutation: locked: t
+        var action = new LockChatActionBuilder()
+                .locked(locked)
                 .build();
-        var value = new SyncActionValueBuilder() // WAWebSyncdActionUtils.buildPendingMutation: encodeProtobuf(SyncActionValueSpec, {...l, timestamp: i})
-                .timestamp(timestamp) // WAWebSyncdActionUtils.buildPendingMutation: timestamp: i (encoder overlay)
-                .lockChatAction(action) // WAWebLockChatSync.getChatLockMutation: lockChatAction from value
+        var value = new SyncActionValueBuilder()
+                .timestamp(timestamp)
+                .lockChatAction(action)
                 .build();
-        var index = JSON.toJSONString(List.of(actionName(), chatJid.toString())); // WAWebSyncdActionUtils.buildIndex: JSON.stringify([action].concat(indexArgs)); indexArgs = [getChatJidMutationIndexForChat(chatJid, Actions.LockChat)]
-        var trusted = new DecryptedMutation.Trusted( // WAWebSyncdActionUtils.buildPendingMutation: return { collection, index, binarySyncAction, version, operation, timestamp, action }
+        var index = JSON.toJSONString(List.of(actionName(), chatJid.toString()));
+        var trusted = new DecryptedMutation.Trusted(
                 index,
                 value,
-                SyncdOperation.SET, // WAWebLockChatSync.getChatLockMutation: operation: SyncdMutation$SyncdOperation.SET
-                timestamp, // WAWebLockChatSync.getChatLockMutation: timestamp: e
-                version() // WAWebLockChatSync.getChatLockMutation: version: this.getVersion()
+                SyncdOperation.SET,
+                timestamp,
+                version()
         );
         return new SyncPendingMutation(trusted, 0); // ADAPTED: WA Web returns the raw mutation object; Cobalt wraps it in SyncPendingMutation for the outgoing queue
     }
@@ -317,12 +316,12 @@ public final class LockChatHandler implements WebAppStateActionHandler {
             Jid chatJid,
             SyncActionMessageRange messageRange
     ) {
-        var mutations = new ArrayList<SyncPendingMutation>(); // WAWebLockChatSync.sendLockMutation: var l = []
-        if (locked) { // WAWebLockChatSync.sendLockMutation: if (a) l.push(...)
-            mutations.add(ArchiveChatHandler.INSTANCE.getArchiveChatMutation(timestamp, false, chatJid, messageRange)); // WAWebLockChatSync.sendLockMutation: WAWebArchiveChatSync.getArchiveChatMutation(i, false, e)
-            mutations.add(PinChatHandler.INSTANCE.getPinMutation(timestamp, false, chatJid)); // WAWebLockChatSync.sendLockMutation: WAWebPinChatSync.PinChatSync.getPinMutation(i, false, e)
+        var mutations = new ArrayList<SyncPendingMutation>();
+        if (locked) {
+            mutations.add(ArchiveChatHandler.INSTANCE.getArchiveChatMutation(timestamp, false, chatJid, messageRange));
+            mutations.add(PinChatHandler.INSTANCE.getPinMutation(timestamp, false, chatJid));
         }
-        mutations.add(getChatLockMutation(timestamp, locked, chatJid)); // WAWebLockChatSync.sendLockMutation: l.push(this.getChatLockMutation(i, a, e))
+        mutations.add(getChatLockMutation(timestamp, locked, chatJid));
         return mutations; // ADAPTED: WA Web yields Promise.all(l) and hands the result to lockForSync; Cobalt returns the list so the caller controls the commit step
     }
 }

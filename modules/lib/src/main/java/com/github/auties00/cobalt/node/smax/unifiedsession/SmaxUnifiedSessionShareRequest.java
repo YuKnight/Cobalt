@@ -8,7 +8,7 @@ import com.github.auties00.cobalt.node.smax.SmaxOperation;
 import java.util.Objects;
 
 /**
- * The outbound stanza variant — wraps the {@code <unified_session
+ * The outbound stanza variant. Wraps the {@code <unified_session
  * id/>} payload in the bare {@code <ib>} envelope.
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutUnifiedSessionShareRequest")
@@ -21,7 +21,7 @@ public final class SmaxUnifiedSessionShareRequest implements SmaxOperation.Reque
     /**
      * Constructs a request with the given unified-session id.
      *
-     * @param unifiedSessionId the unified-session id token; never
+     * @param unifiedSessionId the unified-session id token. Never
      *                         {@code null}
      * @throws NullPointerException if {@code unifiedSessionId} is
      *                              {@code null}
@@ -33,7 +33,7 @@ public final class SmaxUnifiedSessionShareRequest implements SmaxOperation.Reque
     /**
      * Returns the unified-session id token.
      *
-     * @return the id; never {@code null}
+     * @return the id. Never {@code null}
      */
     public String unifiedSessionId() {
         return unifiedSessionId;

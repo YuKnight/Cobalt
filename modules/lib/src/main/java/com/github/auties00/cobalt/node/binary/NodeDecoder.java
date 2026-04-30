@@ -22,24 +22,21 @@ import static com.github.auties00.cobalt.node.binary.NodeTags.*;
 import static com.github.auties00.cobalt.node.binary.NodeTokens.*;
 
 /**
- * Parses WhatsApp stanza trees from the server's binary wire format.
+ * Parses {@link Node} trees from WhatsApp's binary stanza format.
  *
- * <p>Incoming WebSocket frames from the WhatsApp server are either raw or
- * DEFLATE-compressed binary blobs encoded with the WAWap protocol. This
- * class turns those blobs back into {@link Node} trees by reading the
- * leading size indicator, description, attribute list, and typed content
- * (list, JID pair, hex/nibble packed string, dictionary token, single-byte
- * token, or binary blob of various widths).
+ * <p>Inbound WebSocket frames from the WhatsApp server are either raw or
+ * DEFLATE compressed binary blobs encoded with the WAWap protocol. This
+ * class turns those blobs back into node trees by reading the leading size
+ * header, description, attribute list, and typed content (sized list, JID
+ * variant, hex or nibble packed run, dictionary token, single byte token,
+ * or binary blob).
  *
- * <p>Clients create a decoder via {@link #of(ByteBuffer)}, which inspects
- * the first byte's compression flag and picks the direct or inflating
- * implementation, and then call {@link #decode()} to obtain the root
- * {@link Node}. The decoder implements {@link AutoCloseable} so the
- * underlying {@link Inflater} can be released deterministically.
+ * <p>Callers create a decoder via {@link #of(ByteBuffer)}, which inspects
+ * the leading flags byte and selects the direct or inflating
+ * implementation, and then invoke {@link #decode()} to obtain the root
+ * node. The decoder implements {@link AutoCloseable} so the underlying
+ * {@link Inflater} can be released deterministically.
  *
- * @implNote WAWap.decodeStanza: the JS decoder this class mirrors. Uses
- *           the WAWapDict token tables and the WAWap JID encoding to
- *           translate bytes back into a {@code WapNode} tree.
  * @see Node
  * @see NodeAttribute
  * @see NodeEncoder
@@ -49,58 +46,57 @@ import static com.github.auties00.cobalt.node.binary.NodeTokens.*;
 @WhatsAppWebModule(moduleName = "WAWap")
 public sealed abstract class NodeDecoder implements AutoCloseable {
     /**
-     * VarHandle for reading 16-bit values in big-endian byte order from byte arrays.
+     * VarHandle that reads 16 bit big endian integers from a byte array.
      */
     private static final VarHandle SHORT_HANDLE = MethodHandles.byteArrayViewVarHandle(short[].class, ByteOrder.BIG_ENDIAN);
 
     /**
-     * VarHandle for reading 32-bit values in big-endian byte order from byte arrays.
+     * VarHandle that reads 32 bit big endian integers from a byte array.
      */
     private static final VarHandle INT_HANDLE = MethodHandles.byteArrayViewVarHandle(int[].class, ByteOrder.BIG_ENDIAN);
 
     /**
-     * Alphabet used for decoding nibble-encoded strings (4-bit per character).
-     * Contains digits, hyphen, period, and special characters.
+     * Alphabet used to decode nibble packed strings.
+     *
+     * @implNote Indices {@code 12}-{@code 15} are reserved padding values
+     *           that the encoder never emits.
      */
     private static final char[] NIBBLE_ALPHABET = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '-', '.', '�', '�', '�', '�'};
 
     /**
-     * Alphabet used for decoding hexadecimal-encoded strings (4-bit per character).
-     * Contains standard hexadecimal digits 0-9 and A-F.
+     * Alphabet used to decode hex packed strings.
      */
     private static final char[] HEX_ALPHABET = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
 
     /**
-     * Maximum size of the temporary buffer used for decompression operations.
+     * Capacity of the temporary buffer used by the inflating decoder.
      */
     private static final int DECOMPRESSION_BUFFER_SIZE = 8192;
 
     /**
-     * The source ByteBuffer containing the encoded node data.
+     * Source buffer that holds the raw or compressed bytes still to be
+     * read.
      */
     final ByteBuffer source;
 
     /**
-     * Constructs a new {@code NodeDecoder} backed by the given source buffer.
+     * Builds a decoder backed by the supplied source buffer.
      *
-     * @param source the ByteBuffer containing the encoded node data
+     * @param source the buffer containing the encoded stanza
      */
     private NodeDecoder(ByteBuffer source) {
         this.source = source;
     }
 
     /**
-     * Creates a new decoder for the given encoded stanza buffer.
+     * Builds a decoder appropriate for the leading flags byte of the
+     * supplied stanza buffer.
      *
-     * <p>Reads the leading flags byte and returns a
-     * {@link Compressed} decoder when bit 2 is set, or an
-     * {@link Uncompressed} decoder otherwise.
-     *
-     * @implNote WAWap.decodeStanza: WA Web performs the same flag check
-     *           and dispatches to an inflating path when compressed.
-     * @param source the ByteBuffer containing the encoded node data
-     * @return a {@code NodeDecoder} appropriate for the data's
-     *         compression mode
+     * @implNote Bit {@code 1} of the flags byte marks DEFLATE compressed
+     *           payloads.
+     * @param source the buffer containing the encoded stanza
+     * @return an inflating decoder when the compression flag is set, a
+     *         direct decoder otherwise
      */
     @WhatsAppWebExport(moduleName = "WAWap", exports = "decodeStanza",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -116,11 +112,8 @@ public sealed abstract class NodeDecoder implements AutoCloseable {
     /**
      * Decodes the root {@link Node} of this stanza.
      *
-     * @implNote WAWap.decodeStanza: reads the node size, description,
-     *           attributes, and typed content.
      * @return the decoded node
-     * @throws IOException if an I/O error occurs while reading or
-     *         decompressing data
+     * @throws IOException if the input is truncated or fails to decompress
      */
     @WhatsAppWebExport(moduleName = "WAWap", exports = "decodeStanza",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -129,59 +122,55 @@ public sealed abstract class NodeDecoder implements AutoCloseable {
     }
 
     /**
-     * Checks if there is more data available to be processed.
+     * Returns whether this decoder still has bytes available to be read.
      *
-     * @return {@code true} if more data is available to read, {@code false} otherwise
+     * @return {@code true} when more bytes remain
      */
     public abstract boolean hasData();
 
     /**
-     * Reads a single byte from the underlying data source.
+     * Reads the next byte as an unsigned value.
      *
-     * @return the next byte value (0-255)
-     * @throws IOException if an I/O error occurs or end of data is reached
+     * @return the next byte in the {@code 0..255} range
+     * @throws IOException if no more bytes are available
      */
     abstract int read() throws IOException;
 
     /**
-     * Reads a 16-bit unsigned value in big-endian byte order from the underlying data source.
+     * Reads the next two bytes as an unsigned 16 bit big endian integer.
      *
-     * @return the next 16-bit value (0-65535)
-     * @throws IOException if an I/O error occurs or insufficient data is available
+     * @return the next 16 bit value in the {@code 0..65535} range
+     * @throws IOException if fewer than two bytes are available
      */
     abstract int readShort() throws IOException;
 
     /**
-     * Reads a 32-bit signed value in big-endian byte order from the underlying data source.
+     * Reads the next four bytes as a signed 32 bit big endian integer.
      *
-     * @return the next 32-bit value
-     * @throws IOException if an I/O error occurs or insufficient data is available
+     * @return the next 32 bit signed value
+     * @throws IOException if fewer than four bytes are available
      */
     abstract int readInt() throws IOException;
 
     /**
-     * Reads the specified number of bytes into a new byte array from the underlying data source.
+     * Reads the next {@code length} bytes into a fresh array.
      *
      * @param length the number of bytes to read
-     * @return a byte array containing the read data
-     * @throws IOException if an I/O error occurs or insufficient data is available
+     * @return a newly allocated array holding the bytes that were read
+     * @throws IOException if fewer than {@code length} bytes are available
      */
     abstract byte[] readBytes(int length) throws IOException;
 
     /**
-     * Reads and decodes a complete node from the data source.
-     * <p>
-     * The node structure consists of:
-     * <ul>
-     *     <li>Size indicator (determines number of attributes and children presence)</li>
-     *     <li>Description string (optional)</li>
-     *     <li>Attributes as key-value pairs (each pair consumes 2 size units)</li>
-     *     <li>Content (present if size is odd after accounting for attributes)</li>
-     * </ul>
+     * Reads a complete node from the source.
      *
-     * @return the decoded {@link Node} which may be an EmptyNode, TextNode, BufferNode,
-     *         JidNode, ContainerNode, or null
-     * @throws IOException if an I/O error occurs during reading or decoding
+     * @implNote The node header carries a list size that counts
+     *           {@code description + attribute keys + attribute values +
+     *           content}. An odd size means the content slot is absent and
+     *           an {@link Node.EmptyNode} is produced.
+     * @return the decoded node
+     * @throws IOException if the stream is truncated or holds a malformed
+     *         tag
      */
     private Node readNode() throws IOException {
         var size = readNodeSize();
@@ -225,17 +214,12 @@ public sealed abstract class NodeDecoder implements AutoCloseable {
     }
 
     /**
-     * Reads the size indicator that determines the node structure.
-     * <p>
-     * Supports two size formats:
-     * <ul>
-     *     <li>LIST_8: 8-bit size (0-255)</li>
-     *     <li>LIST_16: 16-bit size (0-65535)</li>
-     * </ul>
+     * Reads a list size header.
      *
-     * @return the size value indicating number of elements in the node structure
-     * @throws IOException if an I/O error occurs
-     * @throws IllegalStateException if an unexpected size token is encountered
+     * @return the list size
+     * @throws IOException if reading fails
+     * @throws IllegalStateException if the leading byte is not a known
+     *         list size tag
      */
     private int readNodeSize() throws IOException {
         var token = (byte) read();
@@ -247,13 +231,11 @@ public sealed abstract class NodeDecoder implements AutoCloseable {
     }
 
     /**
-     * Reads and decodes a string based on its encoding tag.
-     * <p>
-     * Supports multiple string encoding formats including packed hexadecimal,
-     * nibble encoding, binary data, dictionary tokens, and single-byte tokens.
+     * Reads a string under whichever encoding tag appears next.
      *
-     * @return the decoded string, or null if LIST_EMPTY tag is encountered
-     * @throws IOException if an I/O error occurs during reading or decoding
+     * @return the decoded string, or {@code null} when the leading tag is
+     *         {@link NodeTags#LIST_EMPTY}
+     * @throws IOException if the leading tag is not a string shape
      */
     private String readString() throws IOException {
         var tag = (byte) read();
@@ -279,10 +261,10 @@ public sealed abstract class NodeDecoder implements AutoCloseable {
     }
 
     /**
-     * Reads binary data with an 8-bit size prefix (up to 255 bytes).
+     * Reads a binary blob with an 8 bit length prefix.
      *
-     * @return a byte array containing the read data
-     * @throws IOException if an I/O error occurs
+     * @return the bytes that were read
+     * @throws IOException if the stream is truncated
      */
     private byte[] readBinary8() throws IOException {
         var size = read() & 0xFF;
@@ -290,12 +272,10 @@ public sealed abstract class NodeDecoder implements AutoCloseable {
     }
 
     /**
-     * Reads binary data with a 20-bit size prefix (up to 1,048,575 bytes).
-     * <p>
-     * Size is encoded in big-endian format across 3 bytes.
+     * Reads a binary blob with a 20 bit big endian length prefix.
      *
-     * @return a byte array containing the read data
-     * @throws IOException if an I/O error occurs
+     * @return the bytes that were read
+     * @throws IOException if the stream is truncated
      */
     private byte[] readBinary20() throws IOException {
         var size = ((read() & 0x0F) << 16)
@@ -305,26 +285,22 @@ public sealed abstract class NodeDecoder implements AutoCloseable {
     }
 
     /**
-     * Reads binary data with a 32-bit size prefix (up to 2,147,483,647 bytes).
-     * <p>
-     * Size is encoded in big-endian format across 4 bytes.
+     * Reads a binary blob with a 32 bit big endian length prefix.
      *
-     * @return a byte array containing the read data
-     * @throws IOException if an I/O error occurs
+     * @return the bytes that were read
+     * @throws IOException if the stream is truncated
      */
     private byte[] readBinary32() throws IOException {
         return readBytes(readInt());
     }
 
     /**
-     * Reads a token from a specified dictionary using an 8-bit index.
-     * <p>
-     * Dictionaries provide efficient string encoding by mapping frequently used
-     * strings to single-byte indices.
+     * Reads an 8 bit token index and resolves it through the supplied
+     * dictionary.
      *
-     * @param dictionary the token dictionary to use for lookup
-     * @return the string value associated with the read index
-     * @throws IOException if an I/O error occurs
+     * @param dictionary the dictionary to look up
+     * @return the resolved string
+     * @throws IOException if the stream is truncated
      */
     private String readDictionaryToken(NodeTokens dictionary) throws IOException {
         var index = read() & 0xFF;
@@ -332,12 +308,10 @@ public sealed abstract class NodeDecoder implements AutoCloseable {
     }
 
     /**
-     * Reads a single-byte token from the global single-byte token dictionary.
-     * <p>
-     * Used for very common strings that can be represented by a single byte.
+     * Resolves a single byte token through {@link NodeTokens#SINGLE_BYTE_TOKENS}.
      *
-     * @param tag the byte tag representing the token index
-     * @return the string value associated with the token
+     * @param tag the token byte
+     * @return the resolved string
      */
     private String readSingleByteToken(byte tag) {
         var index = tag & 0xFF;
@@ -345,14 +319,13 @@ public sealed abstract class NodeDecoder implements AutoCloseable {
     }
 
     /**
-     * Reads a sequenced map of attributes.
-     * <p>
-     * Each attribute consists of a key-value pair, consuming 2 size units.
-     * The order of attributes is preserved in the returned map.
+     * Reads {@code size / 2} attribute key value pairs preserving their
+     * declaration order.
      *
-     * @param size the number of remaining size units (must be even for complete attributes)
-     * @return a sequenced map of attribute keys to {@link NodeAttribute} values
-     * @throws IOException if an I/O error occurs during reading
+     * @param size the number of size units that the attribute block
+     *             consumes (always even)
+     * @return the parsed attribute map
+     * @throws IOException if the stream is truncated
      */
     private SequencedMap<String, NodeAttribute> readAttributes(int size) throws IOException {
         var attributes = new LinkedHashMap<String, NodeAttribute>(size / 2);
@@ -366,14 +339,13 @@ public sealed abstract class NodeDecoder implements AutoCloseable {
     }
 
     /**
-     * Reads and decodes a single attribute value.
-     * <p>
-     * Attributes can be text, bytes, or JID values, encoded using various formats
-     * similar to node children encoding.
+     * Reads a single attribute value under whichever encoding tag appears
+     * next.
      *
-     * @return a {@link NodeAttribute} object representing the attribute value, or null if empty
-     * @throws IOException if an I/O error occurs
-     * @throws IllegalStateException if unexpected list tags (LIST_8 or LIST_16) are encountered
+     * @return the parsed attribute, or {@code null} for {@link NodeTags#LIST_EMPTY}
+     *         and list shapes
+     * @throws IOException if the stream is truncated or holds a malformed
+     *         tag
      */
     private NodeAttribute readAttribute() throws IOException {
         var tag = (byte) read();
@@ -411,10 +383,10 @@ public sealed abstract class NodeDecoder implements AutoCloseable {
     }
 
     /**
-     * Reads a sequence of nodes with an 8-bit length prefix (up to 255 nodes).
+     * Reads a list of child nodes with an 8 bit length prefix.
      *
-     * @return a sequence of decoded {@link Node} objects
-     * @throws IOException if an I/O error occurs
+     * @return the parsed children in declaration order
+     * @throws IOException if the stream is truncated
      */
     private SequencedCollection<Node> readList8() throws IOException {
         var length = read() & 0xFF;
@@ -422,25 +394,21 @@ public sealed abstract class NodeDecoder implements AutoCloseable {
     }
 
     /**
-     * Reads a sequence of nodes with a 16-bit length prefix (up to 65,535 nodes).
-     * <p>
-     * Length is encoded in big-endian format across 2 bytes.
+     * Reads a list of child nodes with a 16 bit big endian length prefix.
      *
-     * @return a sequence of decoded {@link Node} objects
-     * @throws IOException if an I/O error occurs
+     * @return the parsed children in declaration order
+     * @throws IOException if the stream is truncated
      */
     private SequencedCollection<Node> readList16() throws IOException {
         return readList(readShort());
     }
 
     /**
-     * Reads a sequence of nodes with the specified size.
-     * <p>
-     * Each node in the list is decoded sequentially.
+     * Reads {@code size} consecutive child nodes.
      *
      * @param size the number of nodes to read
-     * @return a sequence of decoded {@link Node} objects
-     * @throws IOException if an I/O error occurs during reading or decoding
+     * @return the parsed children in declaration order
+     * @throws IOException if the stream is truncated
      */
     private SequencedCollection<Node> readList(int size) throws IOException {
         var results = new ArrayList<Node>(size);
@@ -452,20 +420,15 @@ public sealed abstract class NodeDecoder implements AutoCloseable {
     }
 
     /**
-     * Reads a packed string encoded using the specified alphabet.
-     * <p>
-     * Packed encoding stores two characters per byte, with each character represented
-     * by 4 bits (nibble). The first byte contains metadata:
-     * <ul>
-     *     <li>Bit 7: Start offset (0 or 1)</li>
-     *     <li>Bits 0-6: End position</li>
-     * </ul>
-     * If the start offset is 1, the last character is stored in the high nibble
-     * of an additional byte.
+     * Reads a packed string under the supplied alphabet.
      *
-     * @param alphabet the character alphabet to use for decoding nibbles (must have 16 elements)
+     * @implNote The first body byte holds the high bit as an odd length
+     *           flag and the low 7 bits as the byte count of the packed
+     *           run. When the flag is set the trailing nibble of the last
+     *           body byte is dropped.
+     * @param alphabet the 16 entry alphabet to translate nibbles through
      * @return the decoded string
-     * @throws IOException if an I/O error occurs
+     * @throws IOException if the stream is truncated
      */
     private String readPacked(char[] alphabet) throws IOException {
         var token = read() & 0xFF;
@@ -485,14 +448,11 @@ public sealed abstract class NodeDecoder implements AutoCloseable {
     }
 
     /**
-     * Reads a JID pair consisting of a user and server component.
-     * <p>
-     * A JID pair represents a WhatsApp user or group identifier. If the user
-     * component is null, a server-only JID is created.
+     * Reads a {@link NodeTags#JID_PAIR} body.
      *
-     * @return a {@link Jid} object representing the user or group
-     * @throws IOException if an I/O error occurs
-     * @throws NullPointerException if the server component is null (malformed pair)
+     * @return the parsed JID
+     * @throws IOException if the stream is truncated
+     * @throws NullPointerException if the server component is missing
      */
     private Jid readJidPair() throws IOException {
         var user = readString();
@@ -501,24 +461,16 @@ public sealed abstract class NodeDecoder implements AutoCloseable {
     }
 
     /**
-     * Reads an AD JID which includes domain type and device identifiers.
-     * <p>
-     * AD JIDs are used for multi-device WhatsApp accounts and contain:
-     * <ul>
-     *     <li>Domain type (8-bit): determines the server domain</li>
-     *     <li>Device ID (8-bit)</li>
-     *     <li>User identifier string</li>
-     * </ul>
-     * The domain type is mapped to a {@link JidServer} as follows:
-     * <ul>
-     *     <li>{@code 0} → {@code s.whatsapp.net} (WHATSAPP)</li>
-     *     <li>{@code 1} → {@code lid} (LID)</li>
-     *     <li>{@code 129} → {@code hosted.lid} (HOSTED_LID)</li>
-     *     <li>Even values with bit 7 set → {@code hosted} (HOSTED)</li>
-     * </ul>
+     * Reads an {@link NodeTags#AD_JID} body.
      *
-     * @return a {@link Jid} object representing the device-specific user identifier
-     * @throws IOException if an I/O error occurs or the domain type is invalid
+     * @implNote The domain code maps to {@code s.whatsapp.net} for
+     *           {@link NodeTags#DOMAIN_WHATSAPP}, {@code lid} for
+     *           {@link NodeTags#DOMAIN_LID}, {@code hosted.lid} for
+     *           {@link NodeTags#DOMAIN_HOSTED_LID}, and {@code hosted} for
+     *           any other even value with bit {@code 7} set.
+     * @return the parsed JID
+     * @throws IOException if the stream is truncated or carries an unknown
+     *         domain code
      */
     private Jid readAdJid() throws IOException {
         var domainType = read() & 0xFF;
@@ -539,61 +491,47 @@ public sealed abstract class NodeDecoder implements AutoCloseable {
     }
 
     /**
-     * Reads a Facebook Messenger JID (tag 246).
-     * <p>
-     * FB JIDs represent Messenger users participating in cross-platform conversations
-     * and contain:
-     * <ul>
-     *     <li>User identifier string</li>
-     *     <li>Device ID (16-bit)</li>
-     *     <li>Domain string (consumed but not used, as the server is implicit)</li>
-     * </ul>
+     * Reads a {@link NodeTags#JID_FB} body.
      *
-     * @return a {@link Jid} object representing the Messenger user
-     * @throws IOException if an I/O error occurs
+     * @implNote The trailing domain string is consumed but discarded
+     *           because the messenger server is implicit.
+     * @return the parsed JID
+     * @throws IOException if the stream is truncated
      */
     private Jid readFbJid() throws IOException {
         var user = readString();
         var device = readShort();
-        // Domain string is part of the wire format but the server is implicit (msgr)
         var _ = readString();
         return Jid.of(user, JidServer.messenger(), device, 0);
     }
 
     /**
-     * Reads a cross-platform interoperability JID (tag 245).
-     * <p>
-     * Interop JIDs represent users from external platforms and contain:
-     * <ul>
-     *     <li>User identifier string</li>
-     *     <li>Device ID (16-bit)</li>
-     *     <li>Integrator ID (16-bit platform identifier)</li>
-     *     <li>Domain string (consumed but not used, as the server is implicit)</li>
-     * </ul>
-     * The integrator and user are combined as {@code integrator-user} in the
-     * resulting JID's user component.
+     * Reads a {@link NodeTags#JID_INTEROP} body.
      *
-     * @return a {@link Jid} object representing the interop user
-     * @throws IOException if an I/O error occurs
+     * @implNote The integrator id is folded into the user component as
+     *           {@code integrator-user}. The trailing domain string is
+     *           consumed but discarded because the interop server is
+     *           implicit.
+     * @return the parsed JID
+     * @throws IOException if the stream is truncated
      */
     private Jid readInteropJid() throws IOException {
         var user = readString();
         var device = readShort();
         var integrator = readShort();
-        // Domain string is part of the wire format but the server is implicit (interop)
         var _ = readString();
         return Jid.of(integrator + "-" + user, JidServer.interop(), device, 0);
     }
 
     /**
-     * A decoder implementation for uncompressed node data that reads directly
-     * from the source {@link ByteBuffer} without any decompression.
+     * Decoder implementation that reads directly from the source buffer
+     * without decompressing.
      */
     private static final class Uncompressed extends NodeDecoder {
         /**
-         * Constructs a new uncompressed decoder backed by the given source buffer.
+         * Builds an uncompressed decoder backed by the supplied buffer.
          *
-         * @param source the ByteBuffer containing the encoded node data
+         * @param source the buffer to read from
          */
         Uncompressed(ByteBuffer source) {
             super(source);
@@ -644,39 +582,39 @@ public sealed abstract class NodeDecoder implements AutoCloseable {
     }
 
     /**
-     * A decoder implementation for DEFLATE-compressed node data that inflates
-     * data from the source {@link ByteBuffer} through a buffered decompression layer.
+     * Decoder implementation that inflates DEFLATE compressed source bytes
+     * through a buffered staging area before serving reads.
      */
     private static final class Compressed extends NodeDecoder {
         /**
-         * The inflater used for decompressing data.
+         * Inflater that decompresses the source bytes.
          */
         private final Inflater inflater;
 
         /**
-         * Temporary buffer used for decompression output.
+         * Staging buffer that holds inflated bytes pending consumption.
          */
         private final byte[] decompressionBuffer;
 
         /**
-         * Pre-allocated buffer used for feeding compressed data to the inflater.
+         * Working buffer that feeds compressed bytes into the inflater.
          */
         private final byte[] inflaterInputBuffer;
 
         /**
-         * Current read position in the decompression buffer.
+         * Read offset into {@link #decompressionBuffer}.
          */
         private int bufferPosition;
 
         /**
-         * Number of valid bytes available in the decompression buffer.
+         * Count of valid bytes in {@link #decompressionBuffer}.
          */
         private int bufferLimit;
 
         /**
-         * Constructs a new compressed decoder backed by the given source buffer.
+         * Builds a compressed decoder backed by the supplied buffer.
          *
-         * @param source the ByteBuffer containing the DEFLATE-compressed node data
+         * @param source the buffer of DEFLATE compressed bytes
          */
         Compressed(ByteBuffer source) {
             super(source);
@@ -722,14 +660,15 @@ public sealed abstract class NodeDecoder implements AutoCloseable {
         }
 
         /**
-         * Ensures that at least the specified number of bytes are available contiguously
-         * in the decompression buffer starting at {@code bufferPosition}.
-         * <p>
-         * If fewer bytes are available, the remaining bytes are compacted to the start
-         * of the buffer and more data is inflated until the requirement is met.
+         * Ensures that at least {@code needed} contiguous inflated bytes
+         * are available starting at {@link #bufferPosition}.
          *
+         * @implNote Compacts surviving bytes to the head of the staging
+         *           buffer and inflates more data until the requirement is
+         *           satisfied.
          * @param needed the minimum number of contiguous bytes required
-         * @throws IOException if the stream ends before enough bytes are available
+         * @throws IOException if the source ends before enough bytes are
+         *         inflated
          */
         private void ensureAvailable(int needed) throws IOException {
             var available = bufferLimit - bufferPosition;
@@ -782,9 +721,9 @@ public sealed abstract class NodeDecoder implements AutoCloseable {
         }
 
         /**
-         * Fills the decompression buffer by inflating data from the source ByteBuffer.
+         * Refills the staging buffer with another inflated block.
          *
-         * @throws IOException if a decompression error occurs
+         * @throws IOException if the source bytes are malformed
          */
         private void fillDecompressionBuffer() throws IOException {
             try {

@@ -29,8 +29,8 @@ public sealed interface SmaxAbPropsGetGroupExperimentConfigResponse extends Smax
      * Tries each {@link SmaxAbPropsGetGroupExperimentConfigResponse} variant in priority order and
      * returns the first that parses cleanly.
      *
-     * @param node    the inbound IQ stanza; never {@code null}
-     * @param request the original outbound stanza; never {@code null}
+     * @param node    the inbound IQ stanza. Never {@code null}
+     * @param request the original outbound stanza. Never {@code null}
      * @return an {@link Optional} carrying the parsed variant, or
      *         empty on no-match
      * @throws NullPointerException if either argument is {@code null}
@@ -52,12 +52,12 @@ public sealed interface SmaxAbPropsGetGroupExperimentConfigResponse extends Smax
     }
 
     /**
-     * The {@code Success} reply variant — the relay returned the
+     * The {@code Success} reply variant. The relay returned the
      * materialised group-scoped props bundle.
      *
      * @implNote {@code WASmaxInAbPropsGetGroupExperimentConfigResponseSuccess.parseGetGroupExperimentConfigResponseSuccess}
      *           projects the {@code <props/>} envelope plus its
-     *           {@code <prop/>} children; Cobalt surfaces only the raw
+     *           {@code <prop/>} children. Cobalt surfaces only the raw
      *           {@code <props/>} subtree.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInAbPropsGetGroupExperimentConfigResponseSuccess")
@@ -91,15 +91,15 @@ public sealed interface SmaxAbPropsGetGroupExperimentConfigResponse extends Smax
         /**
          * Constructs a new success projection.
          *
-         * @param propsHash      the relay-returned hash; may be
+         * @param propsHash      the relay-returned hash. May be
          *                       {@code null}
          * @param propsRefresh   the relay-returned refresh-cooldown;
          *                       may be {@code null}
-         * @param propsRefreshId the relay-returned refresh id; may be
+         * @param propsRefreshId the relay-returned refresh id. May be
          *                       {@code null}
-         * @param propsAbKey     the relay-returned ab-key; may be
+         * @param propsAbKey     the relay-returned ab-key. May be
          *                       {@code null}
-         * @param propsNode      the raw {@code <props/>} subtree; never
+         * @param propsNode      the raw {@code <props/>} subtree. Never
          *                       {@code null}
          * @throws NullPointerException if {@code propsNode} is
          *                              {@code null}
@@ -153,7 +153,7 @@ public sealed interface SmaxAbPropsGetGroupExperimentConfigResponse extends Smax
         /**
          * Returns the raw {@code <props/>} subtree.
          *
-         * @return the {@code <props/>} node; never {@code null}
+         * @return the {@code <props/>} node. Never {@code null}
          */
         public Node propsNode() {
             return propsNode;
@@ -221,7 +221,7 @@ public sealed interface SmaxAbPropsGetGroupExperimentConfigResponse extends Smax
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected the
+     * The {@code ClientError} reply variant. The relay rejected the
      * request as malformed or unauthorised.
      *
      * @implNote {@code WASmaxInAbPropsGetGroupExperimentConfigResponseErrorNoRetry.parseGetGroupExperimentConfigResponseErrorNoRetry}
@@ -245,7 +245,7 @@ public sealed interface SmaxAbPropsGetGroupExperimentConfigResponse extends Smax
          * Constructs a new client-error reply.
          *
          * @param errorCode the numeric error code
-         * @param errorText the optional human-readable text; may be
+         * @param errorText the optional human-readable text. May be
          *                  {@code null}
          */
         public ClientError(int errorCode, String errorText) {
@@ -316,7 +316,7 @@ public sealed interface SmaxAbPropsGetGroupExperimentConfigResponse extends Smax
     }
 
     /**
-     * The {@code ServerError} reply variant — the relay encountered a
+     * The {@code ServerError} reply variant. The relay encountered a
      * transient internal failure and asks the client to retry.
      *
      * @implNote {@code WASmaxInAbPropsGetGroupExperimentConfigResponseErrorRetry.parseGetGroupExperimentConfigResponseErrorRetry}
@@ -341,7 +341,7 @@ public sealed interface SmaxAbPropsGetGroupExperimentConfigResponse extends Smax
          * Constructs a new server-error reply.
          *
          * @param errorCode the numeric error code
-         * @param errorText the optional human-readable text; may be
+         * @param errorText the optional human-readable text. May be
          *                  {@code null}
          */
         public ServerError(int errorCode, String errorText) {

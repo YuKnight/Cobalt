@@ -45,8 +45,6 @@ public final class CustomerDataHandler implements WebAppStateActionHandler {
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote WAWebCustomerDataSync.getAction — returns {@code WASyncdConst.Actions.CustomerData}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebCustomerDataSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
@@ -67,8 +65,6 @@ public final class CustomerDataHandler implements WebAppStateActionHandler {
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote WAWebCustomerDataSync.getVersion — returns {@code 1}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebCustomerDataSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
@@ -118,39 +114,38 @@ public final class CustomerDataHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebCustomerDataSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        var indexArray = JSON.parseArray(mutation.index()); // WAWebCustomerDataSync.applyMutations — var n = t.indexParts
-        var chatJidString = indexArray.size() >= 2 ? indexArray.getString(1) : null; // WAWebCustomerDataSync.applyMutations — u = n[1]
+        var indexArray = JSON.parseArray(mutation.index());
+        var chatJidString = indexArray.size() >= 2 ? indexArray.getString(1) : null;
 
-        if (mutation.operation() == SyncdOperation.SET) { // WAWebCustomerDataSync.applyMutations — t.operation === "set"
-            if (chatJidString == null || chatJidString.isBlank()) { // WAWebCustomerDataSync.applyMutations — if (!u)
-                return malformedActionValue(); // WAWebCustomerDataSync.applyMutations — return a++, malformedActionValue(r.collectionName)
+        if (mutation.operation() == SyncdOperation.SET) {
+            if (chatJidString == null || chatJidString.isBlank()) {
+                return malformedActionValue();
             }
 
             var chatJid = Jid.of(chatJidString); // ADAPTED: WAWebCustomerDataSync.applyMutations — validateChatJid(u); Cobalt uses Jid.of which is more lenient than validateChatJid
-            if (chatJid == null) { // WAWebCustomerDataSync.applyMutations — if (c == null)
-                return malformedActionValue(); // WAWebCustomerDataSync.applyMutations — return a++, malformedActionValue(r.collectionName)
+            if (chatJid == null) {
+                return malformedActionValue();
             }
 
-            if (mutation.value() == null) { // WAWebCustomerDataSync.applyMutations — if (s)
-                return MutationApplicationResult.success(); // WAWebCustomerDataSync.applyMutations — value is falsy, fall through to success
+            if (mutation.value() == null) {
+                return MutationApplicationResult.success();
             }
 
-            if (!(mutation.value().action().orElse(null) instanceof CustomerDataAction)) { // WAWebCustomerDataSync.applyMutations — var d = s.customerDataAction; if (d == null)
-                return malformedActionValue(); // WAWebCustomerDataSync.applyMutations — return i++, malformedActionValue(r.collectionName)
+            if (!(mutation.value().action().orElse(null) instanceof CustomerDataAction)) {
+                return malformedActionValue();
             }
 
             // ADAPTED: WAWebCustomerDataSync.$CustomerDataSync$p_1 — addOrEditCustomerData + frontendFireAndForget
             // Cobalt does not have a dedicated customer data store; the action is acknowledged
-            return MutationApplicationResult.success(); // WAWebCustomerDataSync.applyMutations — return {actionState: Success}
-        } else if (mutation.operation() == SyncdOperation.REMOVE) { // WAWebCustomerDataSync.applyMutations — t.operation === "remove"
-            if (chatJidString != null && !chatJidString.isBlank()) { // WAWebCustomerDataSync.applyMutations — if (u)
-                // WAWebCustomerDataSync.applyMutations — var p = validateChatJid(u); p != null && $p_2(p)
+            return MutationApplicationResult.success();
+        } else if (mutation.operation() == SyncdOperation.REMOVE) {
+            if (chatJidString != null && !chatJidString.isBlank()) {
                 // ADAPTED: WAWebCustomerDataSync.$CustomerDataSync$p_2 — removeCustomerDataByChatJid + frontendFireAndForget
                 // Cobalt does not have a dedicated customer data store; valid JID removal is acknowledged
             }
-            return MutationApplicationResult.success(); // WAWebCustomerDataSync.applyMutations — return {actionState: Success}
+            return MutationApplicationResult.success();
         } else {
-            return MutationApplicationResult.unsupported(); // WAWebCustomerDataSync.applyMutations — return {actionState: Unsupported}
+            return MutationApplicationResult.unsupported();
         }
     }
 }

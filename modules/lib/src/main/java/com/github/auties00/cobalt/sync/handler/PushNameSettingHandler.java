@@ -95,7 +95,7 @@ public final class PushNameSettingHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPushNameSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return PushNameSetting.ACTION_NAME; // WAWebPushNameSync.getAction -> Actions.SettingPushName
+        return PushNameSetting.ACTION_NAME;
     }
 
     /**
@@ -111,7 +111,7 @@ public final class PushNameSettingHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPushNameSync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return PushNameSetting.COLLECTION_NAME; // WAWebPushNameSync -> CollectionName.CriticalBlock
+        return PushNameSetting.COLLECTION_NAME;
     }
 
     /**
@@ -123,7 +123,7 @@ public final class PushNameSettingHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPushNameSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return PushNameSetting.ACTION_VERSION; // WAWebPushNameSync.getVersion -> 1
+        return PushNameSetting.ACTION_VERSION;
     }
 
     /**
@@ -145,7 +145,7 @@ public final class PushNameSettingHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPushNameSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: WAWebPushNameSync.applyMutations
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -234,12 +234,10 @@ public final class PushNameSettingHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPushNameSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        // WAWebPushNameSync.applyMutations: if (e.operation === "set") { ... } i++; return {actionState: Unsupported}
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
 
-        // WAWebPushNameSync.applyMutations: var t, l = e.value, _ = (t = l.pushNameSetting) == null ? void 0 : t.name
         // Cobalt: read the optional name from the decoded action; treat missing pushNameSetting the same as a missing name (WA Web's optional chain).
         var resolvedName = mutation.value().action()
                 .filter(PushNameSetting.class::isInstance)
@@ -248,14 +246,12 @@ public final class PushNameSettingHandler implements WebAppStateActionHandler {
                 .orElse(null);
         String name;
         if (resolvedName == null || resolvedName.isEmpty()) {
-            // WAWebPushNameSync.applyMutations: _ || (a++, logCriticalBootstrapStageIfNecessary(PUSHNAME_INVALID), _ = "")
             logCriticalBootstrapStageIfNecessary(client, wamService, BootstrapAppStateDataStageCode.PUSHNAME_INVALID);
             name = "";
         } else {
             name = resolvedName;
         }
 
-        // WAWebPushNameSync.applyMutations: WASendPresenceStatusProtocol.sendPresenceStatusProtocol({name: _})
         // -> WASmaxOutPresenceAvailabilityRequest.makeAvailabilityRequest({presenceType: undefined, presenceName: _})
         // -> smax("presence", {type: OPTIONAL(CUSTOM_STRING, undefined), name: OPTIONAL(CUSTOM_STRING, _)})
         // -> WAComms.castSmaxStanza(...)
@@ -264,11 +260,10 @@ public final class PushNameSettingHandler implements WebAppStateActionHandler {
                 .attribute("name", name) // WASmaxOutPresenceAvailabilityRequest.makeAvailabilityRequest: name: OPTIONAL(CUSTOM_STRING, n)
                 .build());
 
-        // WAWebPushNameSync.applyMutations: WAWebSetPushnameLocallyAction.setPushnameLocally(_)
         // -> WAWebConnModel.Conn.pushname = _ + WAWebUserPrefsGeneral.setPushname(_)
         // Cobalt collapses both writes into store.setName(), the single source of truth for the broadcast pushname.
         var oldName = client.store().name();
-        client.store().setName(name); // WAWebSetPushnameLocallyAction.setPushnameLocally -> Conn.pushname / LAST_PUSHNAME
+        client.store().setName(name);
 
         // ADAPTED: Cobalt-only — keep the self-contact's chosenName aligned with the broadcast pushname
         // so downstream consumers that read the self-jid contact stay consistent. WA Web does not touch
@@ -281,10 +276,9 @@ public final class PushNameSettingHandler implements WebAppStateActionHandler {
         // ADAPTED: WAWebPushNameSync.applyMutations — Cobalt notifies registered listeners on virtual threads
         // instead of relying on WA Web's BackendEventBus / Conn observable propagation.
         for (var listener : client.store().listeners()) {
-            Thread.startVirtualThread(() -> listener.onNameChanged(client, oldName, name)); // ADAPTED: WAWebPushNameSync -> notify Cobalt listeners
+            Thread.startVirtualThread(() -> listener.onNameChanged(client, oldName, name));
         }
 
-        // WAWebPushNameSync.applyMutations: yield logCriticalBootstrapStageIfNecessary(PUSHNAME_APPLIED)
         logCriticalBootstrapStageIfNecessary(client, wamService, BootstrapAppStateDataStageCode.PUSHNAME_APPLIED);
 
         // NO_WA_BASIS: the following WA Web telemetry/logging is intentionally dropped:
@@ -298,7 +292,6 @@ public final class PushNameSettingHandler implements WebAppStateActionHandler {
         // (SyncCollectionMetadata.bootstrapped) and is flipped by
         // WebAppStateService/MutationRequestBuilder, not by individual
         // setting handlers. There is no global syncdCritical flag to flip here.
-        // WAWebPushNameSync.applyMutations: return {actionState: Success}
         return MutationApplicationResult.success();
     }
 
@@ -328,23 +321,22 @@ public final class PushNameSettingHandler implements WebAppStateActionHandler {
      */
     @WhatsAppWebExport(moduleName = "WAWebPushNameSync", exports = "getPushnameMutation", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPendingMutation getPushnameMutation(Instant timestamp, String name) {
-        var setting = new PushNameSettingBuilder() // WAWebPushNameSync.getPushnameMutation: var e = {pushNameSetting: {name: n}}
-                .name(name) // WAWebPushNameSync.getPushnameMutation: name: n
+        var setting = new PushNameSettingBuilder()
+                .name(name)
                 .build();
-        var value = new SyncActionValueBuilder() // WAWebSyncdActionUtils.buildPendingMutation: encodeProtobuf(SyncActionValueSpec, {...l, timestamp: i})
-                .timestamp(timestamp) // WAWebSyncdActionUtils.buildPendingMutation: timestamp: e
-                .pushNameSetting(setting) // WAWebPushNameSync.getPushnameMutation: {pushNameSetting: {name: n}}
+        var value = new SyncActionValueBuilder()
+                .timestamp(timestamp)
+                .pushNameSetting(setting)
                 .build();
-        // WAWebSyncdActionUtils.buildPendingMutation: index = JSON.stringify([action].concat(indexArgs)) where indexArgs = []
         var index = JSON.toJSONString(List.of(actionName()));
-        var pending = new DecryptedMutation.Trusted( // WAWebSyncdActionUtils.buildPendingMutation: return {collection, index, binarySyncAction, version, operation, timestamp, action}
+        var pending = new DecryptedMutation.Trusted(
                 index,
                 value,
-                SyncdOperation.SET, // WAWebPushNameSync.getPushnameMutation: operation: SyncdMutation$SyncdOperation.SET
+                SyncdOperation.SET,
                 timestamp,
-                version() // WAWebPushNameSync.getPushnameMutation: version: this.getVersion()
+                version()
         );
-        return new SyncPendingMutation(pending, 0); // WAWebSyncdActionUtils.buildPendingMutation
+        return new SyncPendingMutation(pending, 0);
     }
 
     /**
@@ -371,8 +363,8 @@ public final class PushNameSettingHandler implements WebAppStateActionHandler {
             return;
         }
         wamService.commit(new MdBootstrapAppStateCriticalDataProcessingEventBuilder()
-                .bootstrapAppStateDataStage(stage) // WAWebSyncdCriticalBootstrapProcessingApi: bootstrapAppStateDataStage: e
-                .mdTimestamp((int) System.currentTimeMillis()) // WAWebSyncdCriticalBootstrapProcessingApi: mdTimestamp: unixTimeMs()
+                .bootstrapAppStateDataStage(stage)
+                .mdTimestamp((int) System.currentTimeMillis())
                 .build());
     }
 }

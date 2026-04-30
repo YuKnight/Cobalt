@@ -5,30 +5,30 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import java.util.Objects;
 
 /**
- * Top-level error returned when the IQ failed entirely (network error,
- * server NACK, etc.) — i.e. when the response's {@code type} attribute is
- * not {@code "result"}.
+ * Top-level error returned when the IQ failed entirely (network error, server
+ * NACK, or any other failure where the response's {@code type} attribute is
+ * not {@code "result"}).
  *
- * @implNote WAWebUsync.execute: matches the catch branch of the
- *     {@code deprecatedSendIq} call where the response shape is
+ * @implNote Matches the catch branch of the {@code deprecatedSendIq} call in
+ *     {@code WAWebUsync.execute} where the response shape is
  *     {@code {error: {all: ...}}}.
  */
 @WhatsAppWebModule(moduleName = "WAWebUsync")
 public final class UsyncTopLevelError {
     /**
-     * The {@code code} attribute on the {@code <error>} child of the IQ.
+     * Holds the {@code code} attribute on the {@code <error>} child of the IQ.
      */
     private final int errorCode;
 
     /**
-     * The {@code text} attribute on the {@code <error>} child; never
-     * {@code null} (defaults to the empty string when absent).
+     * Holds the {@code text} attribute on the {@code <error>} child. Never
+     * {@code null} because it defaults to the empty string when absent.
      */
     private final String errorText;
 
     /**
-     * The {@code type} attribute on the {@code <error>} child; never
-     * {@code null} (defaults to the empty string when absent).
+     * Holds the {@code type} attribute on the {@code <error>} child. Never
+     * {@code null} because it defaults to the empty string when absent.
      */
     private final String errorType;
 
@@ -36,9 +36,9 @@ public final class UsyncTopLevelError {
      * Creates a new top-level error.
      *
      * @param errorCode the error code
-     * @param errorText the error text; coerced to the empty string when
+     * @param errorText the error text, coerced to the empty string when
      *                  {@code null}
-     * @param errorType the error type; coerced to the empty string when
+     * @param errorType the error type, coerced to the empty string when
      *                  {@code null}
      */
     public UsyncTopLevelError(int errorCode, String errorText, String errorType) {

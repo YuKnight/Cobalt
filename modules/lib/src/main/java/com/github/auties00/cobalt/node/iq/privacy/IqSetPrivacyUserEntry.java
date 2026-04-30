@@ -9,7 +9,7 @@ import java.util.Optional;
  * One {@code <user/>} entry in the outbound user list.
  *
  * @implNote {@code WAWebSetPrivacyJob.createLidUserNode} for the LID
- *           variant; {@code WAWebSetPrivacyJob.g} (function {@code g})
+ *           variant. {@code WAWebSetPrivacyJob.g} (function {@code g})
  *           for the PN variant.
  */
 @WhatsAppWebModule(moduleName = "WAWebSetPrivacyJob")
@@ -20,19 +20,19 @@ public final class IqSetPrivacyUserEntry {
     private final IqSetPrivacyUserAction action;
 
     /**
-     * The user's JID — interpreted as PN or LID per the request's
+     * The user's JID. Interpreted as PN or LID per the request's
      * {@link IqSetPrivacyAddressingMode}.
      */
     private final Jid jid;
 
     /**
-     * The optional WhatsApp username discriminator — emitted only on
+     * The optional WhatsApp username discriminator. Emitted only on
      * the LID variant when the contact carries a username.
      */
     private final String username;
 
     /**
-     * The optional PN JID echo — emitted only on the LID variant when
+     * The optional PN JID echo. Emitted only on the LID variant when
      * the contact has no username and the relay should fall back to
      * the legacy PN identity.
      */
@@ -41,10 +41,10 @@ public final class IqSetPrivacyUserEntry {
     /**
      * Constructs a user entry.
      *
-     * @param action   the action; never {@code null}
-     * @param jid      the JID; never {@code null}
-     * @param username the optional username; may be {@code null}
-     * @param pnJid    the optional PN echo; may be {@code null}
+     * @param action   the action. Never {@code null}
+     * @param jid      the JID. Never {@code null}
+     * @param username the optional username. May be {@code null}
+     * @param pnJid    the optional PN echo. May be {@code null}
      * @throws NullPointerException if {@code action} or {@code jid} is
      *                              {@code null}
      */
@@ -58,7 +58,7 @@ public final class IqSetPrivacyUserEntry {
     /**
      * Returns the action to apply to this user.
      *
-     * @return the action; never {@code null}
+     * @return the action. Never {@code null}
      */
     public IqSetPrivacyUserAction action() {
         return action;
@@ -67,7 +67,7 @@ public final class IqSetPrivacyUserEntry {
     /**
      * Returns the user's JID.
      *
-     * @return the JID; never {@code null}
+     * @return the JID. Never {@code null}
      */
     public Jid jid() {
         return jid;

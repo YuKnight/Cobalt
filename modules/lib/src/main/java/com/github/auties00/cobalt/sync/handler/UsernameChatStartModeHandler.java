@@ -94,7 +94,7 @@ public final class UsernameChatStartModeHandler implements WebAppStateActionHand
      */
     @Override
     public String actionName() {
-        return UsernameChatStartModeAction.ACTION_NAME; // WAWebProtobufSyncAction.pb -> USERNAME_CHAT_START_MODE:"usernameChatStartMode"
+        return UsernameChatStartModeAction.ACTION_NAME;
     }
 
     /**
@@ -110,7 +110,7 @@ public final class UsernameChatStartModeHandler implements WebAppStateActionHand
      */
     @Override
     public SyncPatchType collectionName() {
-        return SyncPatchType.REGULAR; // WAWebProtobufSyncAction.pb -> getMutationProps$CollectionName: USERNAME_CHAT_START_MODE -> REGULAR
+        return SyncPatchType.REGULAR;
     }
 
     /**
@@ -130,7 +130,7 @@ public final class UsernameChatStartModeHandler implements WebAppStateActionHand
      */
     @Override
     public int version() {
-        return UsernameChatStartModeAction.ACTION_VERSION; // NO_WA_BASIS: forward-looking default
+        return UsernameChatStartModeAction.ACTION_VERSION;
     }
 
     /**

@@ -13,14 +13,14 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The {@code <localised_*>} projection — value plus localisation
+ * The {@code <localised_*>} projection. Value plus localisation
  * metadata. Used by all three of {@code <localised_heading/>},
  * {@code <localised_body/>} and {@code <localised_highlight/>}.
  */
 @WhatsAppWebModule(moduleName = "WASmaxInBizCtwaActionBannerSuggestionRequest")
 public final class SmaxBannerSuggestionLocalisedString {
     /**
-     * The {@code value} attribute — the localised string.
+     * The {@code value} attribute. The localised string.
      */
     private final String value;
 

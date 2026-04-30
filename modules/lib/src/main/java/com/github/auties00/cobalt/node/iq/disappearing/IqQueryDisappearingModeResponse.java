@@ -12,8 +12,10 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Sealed family of inbound reply variants.
+ * Sealed family of inbound reply variants produced by the relay in
+ * response to an {@link IqQueryDisappearingModeRequest}.
  */
+@WhatsAppWebModule(moduleName = "WAWebQueryDisappearingModeJob")
 public sealed interface IqQueryDisappearingModeResponse extends IqOperation.Response
         permits IqQueryDisappearingModeResponse.Success, IqQueryDisappearingModeResponse.ClientError, IqQueryDisappearingModeResponse.ServerError {
 

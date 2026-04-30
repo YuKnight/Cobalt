@@ -20,26 +20,25 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Predicate;
 
 /**
- * A singleton NIO event loop that multiplexes all socket connections on
- * a single virtual thread.
+ * Singleton NIO event loop that multiplexes every socket connection on
+ * one virtual thread.
  *
- * <p>This selector is a thin orchestrator that reads bytes from the
- * channel into the bottommost layer context's
- * {@link SocketClientLayerContext#inboundTarget() inboundTarget()}, calls
- * {@link SocketClientLayerContext#processInbound(int) processInbound()},
- * and handles the resulting {@link SocketClientInboundResult}.  All protocol-specific
- * logic (TLS, WebSocket, datagram framing, proxy handshake) lives in
- * the layer contexts, not here.
+ * <p>The selector is a thin orchestrator: it reads bytes from the
+ * channel into the head layer context's
+ * {@link SocketClientLayerContext#inboundTarget() inboundTarget()},
+ * calls {@link SocketClientLayerContext#processInbound(int) processInbound()},
+ * and reacts to the returned {@link SocketClientInboundResult}. Every
+ * protocol-specific decision (TLS, WebSocket, datagram framing, proxy
+ * handshake) is made by the layer contexts, not here.
  *
- * <p>The outbound write path drains the transport context's
- * {@link SocketClientPendingWrites} queue.  If a
- * TLS layer context is present, buffers are wrapped before writing;
- * otherwise they are written directly via
- * {@link java.nio.channels.GatheringByteChannel}.
+ * <p>The outbound write path drains the connection's
+ * {@link SocketClientPendingWrites} queue. When a TLS context is
+ * present, buffers are wrapped before being written; otherwise they
+ * are gathered straight to the channel.
  */
 public final class SocketClientSelector implements Runnable {
     /**
-     * The singleton instance.
+     * Shared singleton instance, started lazily on first registration.
      */
     public static final SocketClientSelector INSTANCE;
 
@@ -51,19 +50,53 @@ public final class SocketClientSelector implements Runnable {
         }
     }
 
+    /**
+     * Hard cap on a single {@link Selector#select(long)} call so the
+     * loop can detect a fully idle selector and exit instead of
+     * sleeping forever.
+     */
     private static final long SAFETY_TIMEOUT_MS = 5000;
 
+    /**
+     * Logger for unrecoverable selector-loop errors.
+     */
     private final System.Logger logger;
+
+    /**
+     * The shared NIO {@link Selector} that multiplexes every channel.
+     */
     private final Selector selector;
+
+    /**
+     * Coalesces concurrent {@link Selector#wakeup()} calls so the
+     * selector never wakes up more than once per pending event.
+     */
     private final AtomicBoolean wakeupPending;
+
+    /**
+     * Reference to the running event-loop thread, started lazily when
+     * the first connection is registered and cleared when the last
+     * connection unregisters.
+     */
     private volatile Thread selectorThread;
 
+    /**
+     * Allocates the underlying {@link Selector}; called once during
+     * class initialization.
+     *
+     * @throws IOException if the JDK cannot open a {@link Selector}
+     */
     private SocketClientSelector() throws IOException {
         this.logger = System.getLogger(SocketClientSelector.class.getName());
         this.selector = Selector.open();
         this.wakeupPending = new AtomicBoolean();
     }
 
+    /**
+     * Wakes the selector thread, coalescing concurrent calls so the
+     * underlying {@link Selector#wakeup()} never fires more than once
+     * per pending event.
+     */
     private void wakeup() {
         if (wakeupPending.compareAndSet(false, true)) {
             selector.wakeup();
@@ -163,12 +196,12 @@ public final class SocketClientSelector implements Runnable {
 
         var ctx = (AttachmentData) key.attachment();
 
-        // Notify connection lock
         synchronized (ctx.connectionLock()) {
             ctx.connectionLock().notifyAll();
         }
 
-        // Use connected CAS to guard single notification
+        // CAS guards us against double notification when two threads
+        // race to unregister the same channel.
         if (!ctx.compareAndSetConnected(true, false)) {
             try {
                 channel.close();
@@ -178,8 +211,8 @@ public final class SocketClientSelector implements Runnable {
             return;
         }
 
-        // Notify all layer contexts before closing the channel so that
-        // the TLS layer can send its close_notify alert (RFC 8446 §6.1)
+        // Notify the layer chain before closing so the TLS layer can
+        // emit its close_notify alert (RFC 8446 §6.1).
         ctx.head().onDisconnect();
 
         try {
@@ -300,7 +333,6 @@ public final class SocketClientSelector implements Runnable {
 
         var ctx = (AttachmentData) key.attachment();
 
-        // Mark tunnel as established
         ctx.tunnelContext().ifPresent(SocketClientTunnelLayerContext::markTunnelled);
 
         try {
@@ -442,6 +474,14 @@ public final class SocketClientSelector implements Runnable {
         }
     }
 
+    /**
+     * Runs the selector event loop on a virtual thread.
+     *
+     * <p>Selects ready keys, dispatches each one through
+     * {@link #handleKey(SelectionKey)} and exits when the registry has
+     * been emptied. Any uncaught throwable tears down every still
+     * registered channel and stops the loop.
+     */
     @Override
     public void run() {
         try {
@@ -480,6 +520,17 @@ public final class SocketClientSelector implements Runnable {
         }
     }
 
+    /**
+     * Dispatches one ready selection key.
+     *
+     * <p>Handles {@code OP_CONNECT}, hands the read path to a layer
+     * that is currently handshaking (if any) so its {@code netInBuffer}
+     * gets populated through the outer layers' unwraps before
+     * progress, and otherwise routes between the inbound and outbound
+     * paths in interest order.
+     *
+     * @param key the ready selection key
+     */
     @SuppressWarnings("MagicConstant")
     private void handleKey(SelectionKey key) {
         var attachment = key.attachment();
@@ -535,11 +586,30 @@ public final class SocketClientSelector implements Runnable {
         }
     }
 
+    /**
+     * Drives one step of a layer's handshake state machine.
+     *
+     * @param channel  the channel
+     * @param ctx      the connection's attachment
+     * @param key      the selection key
+     * @param layerCtx the layer currently handshaking
+     * @return {@code true} if the connection should remain open
+     * @throws IOException if the handshake step fails
+     */
     private boolean processHandshake(SocketChannel channel, AttachmentData ctx, SelectionKey key, SocketClientLayerContext layerCtx) throws IOException {
         var result = layerCtx.driveHandshake(channel);
         return handleInboundResult(ctx, key, result);
     }
 
+    /**
+     * Reads from the channel into the head layer context's inbound
+     * target and propagates the result through the chain.
+     *
+     * @param channel the channel
+     * @param ctx     the connection's attachment
+     * @return {@code true} if the connection should remain open
+     * @throws IOException if reading or processing fails
+     */
     private boolean processRead(SocketChannel channel, AttachmentData ctx) throws IOException {
         var bottom = ctx.head();
         var target = bottom.inboundTarget();
@@ -550,6 +620,15 @@ public final class SocketClientSelector implements Runnable {
         return key != null && handleInboundResult(ctx, key, result);
     }
 
+    /**
+     * Translates a layer's {@link SocketClientInboundResult} into the
+     * matching selector action.
+     *
+     * @param ctx    the connection's attachment
+     * @param key    the selection key
+     * @param result the layer's result
+     * @return {@code true} if the connection should remain open
+     */
     private boolean handleInboundResult(AttachmentData ctx, SelectionKey key, SocketClientInboundResult result) {
         return switch (result) {
             case SocketClientInboundResult.Continue _, SocketClientInboundResult.Buffering _ -> true;
@@ -587,6 +666,16 @@ public final class SocketClientSelector implements Runnable {
         };
     }
 
+    /**
+     * Drains the outbound queue through the tail layer, walking down
+     * the chain so each layer can wrap its bytes before they reach the
+     * channel.
+     *
+     * @param channel the channel
+     * @param ctx     the connection's attachment
+     * @return {@code true} if every queued buffer was written
+     * @throws IOException if writing fails
+     */
     private boolean processWrite(SocketChannel channel, AttachmentData ctx) throws IOException {
         var tail = ctx.tail();
         while (ctx.isConnected()) {
@@ -606,6 +695,15 @@ public final class SocketClientSelector implements Runnable {
         return false;
     }
 
+    /**
+     * Counts how many leading buffers in {@code claim} have been
+     * fully drained, so {@link SocketClientPendingWrites#release(int)}
+     * can advance past them.
+     *
+     * @param claim the most recently claimed region
+     * @return the number of fully consumed entries at the head of the
+     *         claim
+     */
     private static int countConsumed(SocketClientPendingWrites.Claim claim) {
         var consumed = 0;
         for (var i = claim.offset(); i < claim.offset() + claim.count(); i++) {
@@ -617,6 +715,15 @@ public final class SocketClientSelector implements Runnable {
         return consumed;
     }
 
+    /**
+     * Returns the new interest-ops bitmask for a key after a write
+     * step, setting or clearing {@link SelectionKey#OP_WRITE}
+     * depending on whether more outbound bytes are queued.
+     *
+     * @param currentOps       the current interest-ops bitmask
+     * @param hasPendingWrites whether queued or buffered output remains
+     * @return the updated bitmask
+     */
     static int updateWriteInterestOps(int currentOps, boolean hasPendingWrites) {
         return hasPendingWrites
                 ? (currentOps | SelectionKey.OP_WRITE)
@@ -624,26 +731,31 @@ public final class SocketClientSelector implements Runnable {
     }
 
     /**
-     * Per-connection context attached to a {@link SelectionKey}.
+     * Per-connection context attached to each {@link SelectionKey}.
      *
-     * <p>Layer contexts are stored as a singly-linked list that is built
-     * in the order the factories register them (bottom-to-top).  Each new
-     * registration appends to the tail and wires the previous tail's
-     * {@code nextLayer} forward — no rebuilding, no type-based ordering,
-     * no field-per-position switch.
+     * <p>Layer contexts form a singly-linked list built in the order
+     * the factories register them, bottom-to-top. Each
+     * {@link #addLayerContext(SocketClientLayerContext)} appends to
+     * the tail and wires the previous tail's next pointer forward, so
+     * the chain order is always exactly the composition order chosen
+     * by {@code WhatsAppSocketClient.newCipheredSocketClient}.
      *
-     * <p>The chain order is therefore exactly the composition order used
-     * by the factory in {@code WhatsAppSocketClient.newCipheredSocketClient},
-     * so the selector can never disagree with the factory about layer
-     * positions.
-     *
-     * <p>The attachment also owns the per-connection state that is not
-     * really "the transport's" — the outbound write queue, the connection
-     * lock, and the {@code connected} flag.  The transport layer context
-     * only owns the read buffer and its chain link.
+     * <p>The attachment also owns the per-connection state that does
+     * not naturally belong to the transport: the outbound write queue,
+     * the connection lock and the {@code connected} flag. The
+     * transport layer context itself only owns the read buffer and
+     * its chain link.
      */
     private static final class AttachmentData {
+        /**
+         * Slots per chunk in the outbound write queue.
+         */
         private static final int WRITES_CHUNK_CAPACITY = 64;
+
+        /**
+         * VarHandle used to perform atomic transitions on
+         * {@link #connected}.
+         */
         private static final VarHandle CONNECTED;
 
         static {
@@ -655,33 +767,38 @@ public final class SocketClientSelector implements Runnable {
         }
 
         /**
-         * The layers in registration order, first entry is the head
-         * (the transport context).  Short — typical depth is 3–5 entries.
+         * Layers in registration order; the first entry is the head
+         * (the transport context). Typical depth is three to five
+         * entries.
          */
         private final List<SocketClientLayerContext> layers;
 
         /**
-         * Monitor used to block the connecting thread until the selector
-         * completes the non-blocking connect operation.
+         * Monitor that the connecting thread parks on while the
+         * selector completes the non-blocking connect operation.
          */
         private final Object connectionLock;
 
         /**
-         * Lock-free MPSC queue of outbound buffers waiting to be written
-         * to the channel.  Owned by the connection, drained by the
-         * selector thread, produced into by caller-thread
-         * {@code sendBinary} calls.
+         * Lock-free MPSC queue of outbound buffers awaiting write,
+         * produced into by caller-thread {@code sendBinary} invocations
+         * and drained by the selector thread.
          */
         private final SocketClientPendingWrites pendingWrites;
 
         /**
-         * Whether the underlying channel is connected and registered with
-         * the selector.  Accessed via the {@link #CONNECTED} VarHandle for
-         * atomic transitions.
+         * Whether the underlying channel is connected and registered;
+         * accessed through {@link #CONNECTED} for atomic transitions.
          */
         @SuppressWarnings("unused")
         private volatile boolean connected;
 
+        /**
+         * Constructs an attachment around a single head layer context.
+         *
+         * @param head the head of the layer chain (the transport
+         *             context)
+         */
         private AttachmentData(SocketClientLayerContext head) {
             Objects.requireNonNull(head);
             this.layers = new ArrayList<>(5);
@@ -772,16 +889,17 @@ public final class SocketClientSelector implements Runnable {
         }
 
         /**
-         * Returns the first application layer context in the chain.
+         * Returns the first application-layer context in the chain.
          *
-         * <p>Used as the feed point for leftover bytes from a synchronous
-         * protocol upgrade (for example the WebSocket HTTP upgrade parser).
-         * By the time the upgrade completes, all crypto layers have been
-         * unwrapping bytes, so leftover bytes are plaintext that belongs at
-         * the first application-layer buffer.
+         * <p>Used as the feed point for leftover bytes from a
+         * synchronous protocol upgrade (the WebSocket HTTP upgrade
+         * parser, in particular). By the time the upgrade completes
+         * every crypto layer has already unwrapped its bytes, so the
+         * leftovers are plaintext that belongs in the first
+         * application-layer buffer.
          *
          * @return the first application-layer context, or {@code null}
-         *         if no application layer is registered
+         *         if no application layer is registered yet
          */
         SocketClientApplicationLayerContext firstApplicationContext() {
             for (var layer : layers) {
@@ -887,8 +1005,12 @@ public final class SocketClientSelector implements Runnable {
         }
 
         /**
-         * Returns the first layer context matching the predicate, walking
-         * the chain from head to tail.
+         * Returns the first layer context matching {@code predicate},
+         * walking the chain from head to tail.
+         *
+         * @param predicate the test to apply to each layer context
+         * @return the first matching layer context, or empty if none
+         *         matches
          */
         private Optional<SocketClientLayerContext> findFirst(Predicate<SocketClientLayerContext> predicate) {
             for (var layer : layers) {

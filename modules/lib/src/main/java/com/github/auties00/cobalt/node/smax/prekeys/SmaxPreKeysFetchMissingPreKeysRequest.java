@@ -17,7 +17,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps the per-user
+ * The outbound stanza variant. Wraps the per-user
  * {@code <user>(<device id> <registration/>)} list in the canonical
  * {@code <iq xmlns="encrypt" type="get" to="s.whatsapp.net">} envelope.
  */
@@ -33,7 +33,7 @@ public final class SmaxPreKeysFetchMissingPreKeysRequest implements SmaxOperatio
     /**
      * Constructs a request for the given list of users.
      *
-     * @param users the per-user requests; never {@code null} and never
+     * @param users the per-user requests. Never {@code null} and never
      *              empty
      * @throws NullPointerException     if {@code users} is {@code null}
      * @throws IllegalArgumentException if {@code users} is empty
@@ -49,7 +49,7 @@ public final class SmaxPreKeysFetchMissingPreKeysRequest implements SmaxOperatio
     /**
      * Returns the list of users carried by this request.
      *
-     * @return an unmodifiable list of per-user requests; never
+     * @return an unmodifiable list of per-user requests. Never
      *         {@code null}
      */
     public List<UserKeyFetchRequest> users() {
@@ -133,7 +133,7 @@ public final class SmaxPreKeysFetchMissingPreKeysRequest implements SmaxOperatio
     }
 
     /**
-     * Per-user entry in the outbound {@code <key_fetch>} payload — pairs
+     * Per-user entry in the outbound {@code <key_fetch>} payload. Pairs
      * a target user JID with a list of per-device fetch entries plus
      * the optional {@code reason="identity"} hint.
      *
@@ -163,11 +163,11 @@ public final class SmaxPreKeysFetchMissingPreKeysRequest implements SmaxOperatio
         /**
          * Constructs a per-user request entry.
          *
-         * @param userJid               the target user JID; never
+         * @param userJid               the target user JID. Never
          *                              {@code null}
          * @param hasUserReasonIdentity whether to include the
          *                              identity-reason hint
-         * @param devices               the per-device entries; never
+         * @param devices               the per-device entries. Never
          *                              {@code null}, may be empty (the
          *                              relay still echoes the user node
          *                              when devices is empty, mirroring
@@ -185,7 +185,7 @@ public final class SmaxPreKeysFetchMissingPreKeysRequest implements SmaxOperatio
         /**
          * Returns the target user JID.
          *
-         * @return the user JID; never {@code null}
+         * @return the user JID. Never {@code null}
          */
         public Jid userJid() {
             return userJid;
@@ -203,7 +203,7 @@ public final class SmaxPreKeysFetchMissingPreKeysRequest implements SmaxOperatio
         /**
          * Returns the per-device fetch entries.
          *
-         * @return an unmodifiable list; never {@code null}
+         * @return an unmodifiable list. Never {@code null}
          */
         public List<DeviceKeyFetchRequest> devices() {
             return devices;
@@ -237,7 +237,7 @@ public final class SmaxPreKeysFetchMissingPreKeysRequest implements SmaxOperatio
     }
 
     /**
-     * Per-device entry — pairs a numeric device id with the 4-byte
+     * Per-device entry. Pairs a numeric device id with the 4-byte
      * registration id whose stale-state needs refreshing.
      *
      * @implNote {@code WASmaxOutPreKeysFetchMissingPreKeysRequest.makeFetchMissingPreKeysRequestKeyFetchUserDevice}
@@ -263,7 +263,7 @@ public final class SmaxPreKeysFetchMissingPreKeysRequest implements SmaxOperatio
          * Constructs a per-device fetch entry.
          *
          * @param deviceId       the device id; {@code 0..99}
-         * @param registrationId the 4-byte registration id; never
+         * @param registrationId the 4-byte registration id. Never
          *                       {@code null}
          * @throws NullPointerException if {@code registrationId} is
          *                              {@code null}
@@ -285,7 +285,7 @@ public final class SmaxPreKeysFetchMissingPreKeysRequest implements SmaxOperatio
         /**
          * Returns the 4-byte registration id.
          *
-         * @return the registration bytes; never {@code null}
+         * @return the registration bytes. Never {@code null}
          */
         public byte[] registrationId() {
             return registrationId;

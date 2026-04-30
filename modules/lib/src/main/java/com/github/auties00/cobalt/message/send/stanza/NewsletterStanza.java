@@ -7,16 +7,11 @@ import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 
 /**
- * Builds common SMAX stanza child nodes used across newsletter
- * message types.
+ * Builds common SMAX stanza child nodes used across newsletter message types.
  *
- * <p>Currently only the {@code <plaintext>} payload wrapper is shared.
- * Media handles are encoded as the {@code media_id} attribute on the
- * outer {@code <message>} node (per {@code mergeNewsletterMediaPublishMixin}),
- * not as a child element.
- *
- * @apiNote WASmaxOutMessagePublishPayloadMixin: wraps the serialised
- * protobuf in a {@code <plaintext>} node.
+ * <p>The {@code <plaintext>} payload wrapper is currently the only shared element.
+ * Media handles are encoded as the {@code media_id} attribute on the outer
+ * {@code <message>} node (per {@code mergeNewsletterMediaPublishMixin}), not as a child.
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutMessagePublishPayloadMixin")
 public final class NewsletterStanza {
@@ -28,12 +23,10 @@ public final class NewsletterStanza {
     }
 
     /**
-     * Builds the {@code <plaintext>} node wrapping a serialised payload.
+     * Builds a {@code <plaintext>} node wrapping a serialised payload.
      *
      * @param payload the serialised protobuf bytes
      * @return the plaintext node
-     *
-     * @apiNote WASmaxOutMessagePublishPayloadMixin
      */
     @WhatsAppWebExport(moduleName = "WASmaxOutMessagePublishPayloadMixin", exports = "applyMixin",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -45,16 +38,12 @@ public final class NewsletterStanza {
     }
 
     /**
-     * Builds the {@code <plaintext>} node with a {@code mediatype}
-     * attribute carrying the SMAX media subtype string (e.g.
-     * {@code "image"}, {@code "video"}, {@code "url"}, ...).
+     * Builds a {@code <plaintext>} node with a {@code mediatype} attribute carrying the
+     * SMAX media subtype string (e.g. {@code "image"}, {@code "video"}, {@code "url"}).
      *
      * @param payload   the serialised protobuf bytes
-     * @param mediaType the SMAX media subtype (must not be {@code null})
+     * @param mediaType the SMAX media subtype, must not be {@code null}
      * @return the plaintext node
-     *
-     * @apiNote WASmaxOutMessagePublishNewsletterMediaMixin: emits the
-     * {@code mediatype} attribute on the {@code <plaintext>} node.
      */
     @WhatsAppWebExport(moduleName = "WASmaxOutMessagePublishNewsletterMediaMixin", exports = "applyMixin",
             adaptation = WhatsAppAdaptation.DIRECT)

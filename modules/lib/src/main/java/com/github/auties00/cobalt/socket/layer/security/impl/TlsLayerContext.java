@@ -14,39 +14,91 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SocketChannel;
 
 /**
- * A layer context that provides TLS encryption and decryption.
+ * Layer context that provides TLS encryption and decryption.
  *
- * <p>This context owns an {@link SSLEngine} and the associated net/app
- * buffers. It is positionally polymorphic — the same implementation serves
- * both tunnel-level TLS (client-to-proxy) and transport-level TLS
- * (client-to-target).  The composition of the stack determines which role
- * a particular instance fulfils.
+ * <p>Owns an {@link SSLEngine} and its associated net and app
+ * buffers. The same implementation serves both tunnel-level TLS
+ * (client-to-proxy) and transport-level TLS (client-to-target); the
+ * composition of the stack picks the role.
  *
- * <p>The inbound read path uses a zero-copy fast path: encrypted data is
- * read into {@link #netInBuffer}, then unwrapped directly into the next
- * layer's {@link SocketClientLayerContext#inboundTarget()}, avoiding an
- * intermediate application buffer copy.  A slow path through
- * {@link #appInBuffer} handles the rare {@code BUFFER_OVERFLOW} case.
- *
- * <p>The outbound write path coalesces multiple application buffers into
- * a single TLS record via
- * {@link SSLEngine#wrap(ByteBuffer[], int, int, ByteBuffer)}.
- *
- * <p>TLS handshake is driven by the selector calling
- * {@link #driveHandshake(SocketChannel)} while {@link #sslHandshaking} is
- * true.
+ * @implNote The inbound read path takes a zero-copy fast path:
+ *     encrypted bytes are read into {@link #netInBuffer} and then
+ *     unwrapped directly into the next layer's
+ *     {@link SocketClientLayerContext#inboundTarget()}. A slow path
+ *     through {@link #appInBuffer} handles the rare
+ *     {@code BUFFER_OVERFLOW} case after the buffer sizes have been
+ *     fixed by {@link #resizeSslBuffers()} at end of handshake.
+ * @implNote The outbound path coalesces multiple application buffers
+ *     into a single TLS record via
+ *     {@link SSLEngine#wrap(ByteBuffer[], int, int, ByteBuffer)} so
+ *     batched writes do not produce one record per buffer.
  */
 final class TlsLayerContext implements SocketClientSecurityLayerContext {
+    /**
+     * Next layer in the inbound chain; receives the decrypted bytes
+     * that this layer's unwrap produces.
+     */
     private volatile SocketClientLayerContext nextLayer;
+
+    /**
+     * Previous layer in the outbound chain; receives the encrypted
+     * bytes that this layer's wrap produces, or {@code null} when
+     * this is the bottommost crypto layer and writes go straight to
+     * the channel.
+     */
     private volatile SocketClientLayerContext prevLayer;
+
+    /**
+     * Underlying SSL engine, configured by
+     * {@link #initSsl(SSLEngine)}.
+     */
     private SSLEngine sslEngine;
+
+    /**
+     * Direct buffer holding encrypted bytes coming from the channel
+     * before they are unwrapped.
+     */
     private ByteBuffer netInBuffer;
+
+    /**
+     * Direct buffer holding encrypted bytes produced by wrap and
+     * waiting to be written to the channel.
+     */
     private ByteBuffer netOutBuffer;
+
+    /**
+     * Heap buffer used as the slow-path destination when the next
+     * layer's inbound target cannot accept more bytes.
+     */
     private ByteBuffer appInBuffer;
+
+    /**
+     * Whether the TLS handshake is still running.
+     */
     private volatile boolean sslHandshaking;
+
+    /**
+     * Whether the SSL engine has delegated tasks waiting on a virtual
+     * thread.
+     */
     private volatile boolean sslTasksPending;
+
+    /**
+     * Whether the TLS handshake has completed successfully.
+     */
     private volatile boolean sslHandshakeComplete;
+
+    /**
+     * Monitor used to park the calling thread until
+     * {@link #sslHandshakeComplete} becomes {@code true}.
+     */
     private final Object sslHandshakeLock;
+
+    /**
+     * Channel reference captured at handshake completion; used by
+     * {@link #sendCloseNotify()} to write the TLS close-notify alert
+     * during teardown.
+     */
     private volatile SocketChannel channel;
 
     /**
@@ -72,7 +124,8 @@ final class TlsLayerContext implements SocketClientSecurityLayerContext {
     }
 
     /**
-     * Initializes the TLS engine and allocates initial buffers.
+     * Initializes the TLS engine and allocates the initial net and
+     * app buffers based on the engine's session sizes.
      *
      * @param engine the configured SSL engine
      */
@@ -86,6 +139,11 @@ final class TlsLayerContext implements SocketClientSecurityLayerContext {
         this.sslHandshakeComplete = false;
     }
 
+    /**
+     * Grows {@link #netInBuffer}, {@link #netOutBuffer} and
+     * {@link #appInBuffer} to match the session sizes finalised at
+     * end of handshake.
+     */
     private void resizeSslBuffers() {
         var session = sslEngine.getSession();
         var packetSize = session.getPacketBufferSize();
@@ -116,11 +174,11 @@ final class TlsLayerContext implements SocketClientSecurityLayerContext {
             return new SocketClientInboundResult.Close();
         }
         if (sslHandshaking) {
-            // During the handshake bytes are left accumulated in
-            // netInBuffer for driveHandshake() to unwrap.  We must not
-            // call processDataSsl here because the engine will refuse to
-            // unwrap application data while still handshaking, and
-            // because nextLayer may not even be registered yet.
+            // Bytes are left accumulated in netInBuffer for
+            // driveHandshake() to unwrap. processDataSsl is unsafe
+            // here: the engine refuses to unwrap application data
+            // mid-handshake and nextLayer may not even be registered
+            // yet.
             return new SocketClientInboundResult.Buffering();
         }
         return processDataSsl();
@@ -128,7 +186,7 @@ final class TlsLayerContext implements SocketClientSecurityLayerContext {
 
     @Override
     public SocketClientInboundResult driveHandshake(SocketChannel channel) throws IOException {
-        // Flush any leftover bytes from a previous handshake iteration.
+        // Flush leftover bytes from a previous handshake iteration.
         if (netOutBuffer.position() > 0) {
             netOutBuffer.flip();
             if (!writeHandshakeBytes(channel, netOutBuffer)) {
@@ -162,9 +220,9 @@ final class TlsLayerContext implements SocketClientSecurityLayerContext {
                 }
 
                 case NEED_UNWRAP -> {
-                    // Bytes are placed into netInBuffer by the normal
-                    // inbound chain (selector processRead → outer layers'
-                    // unwraps end up here).  If nothing arrived yet, wait.
+                    // Bytes flow into netInBuffer through the normal
+                    // inbound path (selector read, then any outer
+                    // layer's unwrap). If nothing has arrived yet, wait.
                     netInBuffer.flip();
                     if (!netInBuffer.hasRemaining()) {
                         netInBuffer.compact();
@@ -211,6 +269,15 @@ final class TlsLayerContext implements SocketClientSecurityLayerContext {
         }
     }
 
+    /**
+     * Drains the post-handshake data path: unwraps every byte of
+     * {@link #netInBuffer} into the next layer's inbound target,
+     * falling back to {@link #appInBuffer} when the target cannot
+     * accept more data.
+     *
+     * @return the processing result for the selector
+     * @throws IOException if {@link SSLEngine#unwrap} fails
+     */
     private SocketClientInboundResult processDataSsl() throws IOException {
         if (nextLayer == null) {
             return new SocketClientInboundResult.Buffering();
@@ -283,19 +350,29 @@ final class TlsLayerContext implements SocketClientSecurityLayerContext {
         return new SocketClientInboundResult.Continue();
     }
 
+    /**
+     * Feeds {@code source} into the next inbound layer, returning its
+     * result.
+     *
+     * @param source the buffer containing decrypted bytes
+     * @return the next layer's processing result
+     * @throws IOException if the next layer fails to process the bytes
+     */
     private SocketClientInboundResult feedNextLayer(ByteBuffer source) throws IOException {
         return nextLayer.feedFromSource(source);
     }
 
     /**
-     * Writes {@code bytes} (a read-mode view of {@link #netOutBuffer}) to
-     * the channel, routing through {@link #prevLayer} so any outer TLS
-     * layer below this one also wraps them.  If this is the outermost TLS
-     * layer ({@code prevLayer == null}) the bytes go straight to the
-     * channel.
+     * Writes the contents of {@code bytes} to the channel, routing
+     * through {@link #prevLayer} so any outer TLS layer below this
+     * one wraps the bytes again.
      *
-     * @return {@code true} if all bytes were written; {@code false} if
-     *         the write was partial (caller should buffer and retry)
+     * @param channel the channel to write to
+     * @param bytes   a read-mode view of {@link #netOutBuffer}
+     * @return {@code true} if every byte was written, {@code false}
+     *         if the write was partial and the caller should buffer
+     *         and retry
+     * @throws IOException if writing fails
      */
     private boolean writeHandshakeBytes(SocketChannel channel, ByteBuffer bytes) throws IOException {
         var prev = prevLayer;
@@ -469,6 +546,10 @@ final class TlsLayerContext implements SocketClientSecurityLayerContext {
         }
     }
 
+    /**
+     * Best-effort send of the TLS close-notify alert during teardown,
+     * silently ignoring channel-close races.
+     */
     private void sendCloseNotify() {
         var ch = this.channel;
         if (ch == null || !ch.isOpen()) {

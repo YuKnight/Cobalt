@@ -15,7 +15,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps the
+ * The outbound stanza variant. Wraps the
  * {@code <message_updates count since? before|after>} payload in the
  * canonical
  * {@code <iq xmlns="newsletter" type="get" to=NEWSLETTER_JID>}
@@ -37,7 +37,7 @@ public final class SmaxNewslettersGetNewsletterMessageUpdatesRequest implements 
     private final int count;
 
     /**
-     * The optional unix-second floor — the relay only returns updates
+     * The optional unix-second floor. The relay only returns updates
      * applied at or after this timestamp; {@code null} requests the
      * full delta.
      */
@@ -121,8 +121,6 @@ public final class SmaxNewslettersGetNewsletterMessageUpdatesRequest implements 
             exports = "makeGetNewsletterMessageUpdatesRequest",
             adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutNewslettersGetNewsletterMessageUpdatesRequest:
-        //   smax("message_updates", {count, since: OPTIONAL(INT), before|after})
         var updatesBuilder = new NodeBuilder()
                 .description("message_updates")
                 .attribute("count", count);
@@ -133,8 +131,6 @@ public final class SmaxNewslettersGetNewsletterMessageUpdatesRequest implements 
             case SmaxNewslettersGetNewsletterMessageUpdatesDirection.Before before -> updatesBuilder.attribute("before", before.pivot());
             case SmaxNewslettersGetNewsletterMessageUpdatesDirection.After after -> updatesBuilder.attribute("after", after.pivot());
         }
-        // WASmaxOutNewslettersNewsletterIQGetRequestMixin: smax("iq", {to: JID(iqTo), xmlns: "newsletter"})
-        // WASmaxOutNewslettersBaseIQGetRequestMixin: smax("iq", {id: generateId(), type: "get"})
         return new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "newsletter")

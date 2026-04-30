@@ -11,16 +11,8 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The inbound notification — the relay's "drop your QP prefetch
+ * The inbound notification. The relay's "drop your QP prefetch
  * timestamp" hint.
- *
- * @implNote {@code WASmaxInPsaResetSmbLastQpPrefetchTimestampRequest.parseResetSmbLastQpPrefetchTimestampRequest}
- *           validates the {@code <notification type="psa">} envelope,
- *           extracts the {@code from} (a user JID), asserts the literal
- *           {@code type="psa"}, requires a
- *           {@code <reset_smb_last_qp_prefetch_timestamp/>} child, and
- *           layers the {@code WASmaxInPsaServerNotificationMixin}
- *           ({@code t}, {@code id}, optional {@code offline}) over it.
  */
 @WhatsAppWebModule(moduleName = "WASmaxInPsaResetSmbLastQpPrefetchTimestampRequest")
 @WhatsAppWebModule(moduleName = "WASmaxInPsaServerNotificationMixin")
@@ -31,13 +23,13 @@ public final class SmaxPsaResetSmbLastQpPrefetchTimestampResponse implements Sma
     private final String notificationId;
 
     /**
-     * The notification sender JID — always a user JID per the
+     * The notification sender JID. Always a user JID per the
      * {@code attrUserJid(from)} assertion.
      */
     private final Jid notificationFrom;
 
     /**
-     * The notification type — always the literal {@code "psa"} per
+     * The notification type. Always the literal {@code "psa"} per
      * the {@code literal(attrString, "type", "psa")} assertion.
      */
     private final String notificationType;
@@ -50,7 +42,7 @@ public final class SmaxPsaResetSmbLastQpPrefetchTimestampResponse implements Sma
     private final long timestampSeconds;
 
     /**
-     * The optional {@code offline} hint — when set carries the count
+     * The optional {@code offline} hint. When set carries the count
      * of offline notifications still queued for delivery.
      */
     private final Integer offline;
@@ -61,7 +53,7 @@ public final class SmaxPsaResetSmbLastQpPrefetchTimestampResponse implements Sma
      * @param notificationId   the notification id; never {@code null}
      * @param notificationFrom the notification sender JID; never
      *                         {@code null}
-     * @param notificationType the notification type — always
+     * @param notificationType the notification type. Always
      *                         {@code "psa"}; never {@code null}
      * @param timestampSeconds the relay-side timestamp in seconds
      * @param offline          the optional offline-queue depth; may
@@ -97,7 +89,7 @@ public final class SmaxPsaResetSmbLastQpPrefetchTimestampResponse implements Sma
     }
 
     /**
-     * Returns the notification type — always {@code "psa"}.
+     * Returns the notification type. Always {@code "psa"}.
      *
      * @return the type; never {@code null}
      */
@@ -141,7 +133,6 @@ public final class SmaxPsaResetSmbLastQpPrefetchTimestampResponse implements Sma
         if (!node.hasDescription("notification")) {
             return Optional.empty();
         }
-        // WASmaxInPsaResetSmbLastQpPrefetchTimestampRequest:
         //   literal(attrString, "type", "psa")
         if (!node.hasAttribute("type", "psa")) {
             return Optional.empty();
@@ -158,7 +149,6 @@ public final class SmaxPsaResetSmbLastQpPrefetchTimestampResponse implements Sma
         if (type == null) {
             return Optional.empty();
         }
-        // WASmaxInPsaServerNotificationMixin: parseServerNotificationMixin
         //   - attrIntRange(t, 0, void 0)
         //   - attrStanzaId(id)
         //   - optional(attrIntRange, offline, 0, 1024)

@@ -81,7 +81,7 @@ public final class SentinelHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSentinelMutationSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return KeyExpirationAction.ACTION_NAME; // WAWebSentinelMutationSync.getAction: WASyncdConst.Actions.Sentinel = "sentinel"
+        return KeyExpirationAction.ACTION_NAME;
     }
 
     /**
@@ -97,7 +97,7 @@ public final class SentinelHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSentinelMutationSync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return KeyExpirationAction.COLLECTION_NAME; // WAWebSentinelMutationSync: collectionName = CollectionName.RegularLow = "regular_low"
+        return KeyExpirationAction.COLLECTION_NAME;
     }
 
     /**
@@ -111,7 +111,7 @@ public final class SentinelHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSentinelMutationSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return KeyExpirationAction.ACTION_VERSION; // WAWebSentinelMutationSync.getVersion: return 3
+        return KeyExpirationAction.ACTION_VERSION;
     }
 
     /**
@@ -130,7 +130,7 @@ public final class SentinelHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSentinelMutationSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebSentinelMutationSync.applyMutations: per-mutation processing
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -157,21 +157,21 @@ public final class SentinelHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSentinelMutationSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.DIRECT)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        if (mutation.operation() != SyncdOperation.SET) { // WAWebSentinelMutationSync.applyMutations: if (e.operation === "set") ... else { i++, return {actionState: Unsupported} }
+        if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof KeyExpirationAction action)) { // WAWebSentinelMutationSync.applyMutations: (n = e.value.keyExpiration) == null
-            return malformedActionValue(); // WAWebSentinelMutationSync.applyMutations: (a++, malformedActionValue(t.collectionName))
+        if (!(mutation.value().action().orElse(null) instanceof KeyExpirationAction action)) {
+            return malformedActionValue();
         }
 
-        var expiredEpoch = action.expiredKeyEpoch(); // WAWebSentinelMutationSync.applyMutations: n.expiredKeyEpoch
-        if (expiredEpoch.isEmpty()) { // WAWebSentinelMutationSync.applyMutations: r == null ? (a++, malformedActionValue(t.collectionName))
-            return malformedActionValue(); // WAWebSentinelMutationSync.applyMutations: malformedActionValue(t.collectionName)
+        var expiredEpoch = action.expiredKeyEpoch();
+        if (expiredEpoch.isEmpty()) {
+            return malformedActionValue();
         }
 
-        client.store().expireAppStateKeysByEpoch(expiredEpoch.getAsInt()); // WAWebSentinelMutationSync.applyMutations: yield expireSyncKeyInTransaction(r)
-        return MutationApplicationResult.success(); // WAWebSentinelMutationSync.applyMutations: {actionState: Success}
+        client.store().expireAppStateKeysByEpoch(expiredEpoch.getAsInt());
+        return MutationApplicationResult.success();
     }
 
     /**
@@ -198,37 +198,37 @@ public final class SentinelHandler implements WebAppStateActionHandler {
      */
     @WhatsAppWebExport(moduleName = "WAWebSentinelMutationSync", exports = "getSentinelMutations", adaptation = WhatsAppAdaptation.DIRECT)
     public List<SyncPendingMutation> getSentinelMutations(WhatsAppClient client) {
-        LOGGER.fine("preparing mutations..."); // WAWebSentinelMutationSync.getSentinelMutations: p.LOG("preparing mutations...")
+        LOGGER.fine("preparing mutations...");
 
-        var timestamp = Instant.now(); // WAWebSentinelMutationSync.getSentinelMutations: var t = unixTimeMs()
-        var collections = SyncPatchType.values(); // WAWebSentinelMutationSync.getSentinelMutations: var n = Array.from(CollectionName.members())
-        var newestKey = SyncKeyUtils.findNewestKey(client.store().appStateKeys()); // WAWebSentinelMutationSync.getSentinelMutations: var r = yield getNewestKeyPair()
-        if (newestKey == null) { // WAWebSentinelMutationSync.getSentinelMutations: if (r == null)
-            LOGGER.warning("sentinel mutation sync: no key pairs"); // WAWebSentinelMutationSync.getSentinelMutations: WALogger.ERROR("sentinel mutation sync: no key pairs")
-            return Collections.emptyList(); // WAWebSentinelMutationSync.getSentinelMutations: return []
+        var timestamp = Instant.now();
+        var collections = SyncPatchType.values();
+        var newestKey = SyncKeyUtils.findNewestKey(client.store().appStateKeys());
+        if (newestKey == null) {
+            LOGGER.warning("sentinel mutation sync: no key pairs");
+            return Collections.emptyList();
         }
 
-        var keyEpoch = SyncKeyUtils.getKeyEpoch(newestKey); // WAWebSentinelMutationSync.getSentinelMutations: var a = r.keyEpoch
-        var keyExpirationAction = new KeyExpirationActionBuilder() // WAWebSentinelMutationSync.getSentinelMutations: var i = {keyExpiration: {expiredKeyEpoch: a}}
+        var keyEpoch = SyncKeyUtils.getKeyEpoch(newestKey);
+        var keyExpirationAction = new KeyExpirationActionBuilder()
                 .expiredKeyEpoch(keyEpoch)
                 .build();
-        var value = new SyncActionValueBuilder() // WAWebSyncdActionUtils.buildPendingMutation: encodeProtobuf(SyncActionValueSpec, {...l, timestamp: i})
+        var value = new SyncActionValueBuilder()
                 .timestamp(timestamp)
                 .keyExpirationAction(keyExpirationAction)
                 .build();
 
-        var mutations = new ArrayList<SyncPendingMutation>(collections.length); // WAWebSentinelMutationSync.getSentinelMutations: n.map(function(n) { ... })
-        for (var collection : collections) { // WAWebSentinelMutationSync.getSentinelMutations: n.map(function(n) { return buildPendingMutation({...}) })
-            var index = JSON.toJSONString(List.of(actionName(), collection.toString())); // WAWebSyncdActionUtils.buildPendingMutation: index = JSON.stringify([action].concat(indexArgs)) where indexArgs = [n]
-            var mutation = new DecryptedMutation.Trusted( // WAWebSyncdActionUtils.buildPendingMutation: return { collection, index, binarySyncAction, version, operation, timestamp, action }
+        var mutations = new ArrayList<SyncPendingMutation>(collections.length);
+        for (var collection : collections) {
+            var index = JSON.toJSONString(List.of(actionName(), collection.toString()));
+            var mutation = new DecryptedMutation.Trusted(
                     index,
                     value,
-                    SyncdOperation.SET, // WAWebSentinelMutationSync.getSentinelMutations: operation = SET
+                    SyncdOperation.SET,
                     timestamp,
-                    version() // WAWebSentinelMutationSync.getSentinelMutations: version = this.getVersion()
+                    version()
             );
             mutations.add(new SyncPendingMutation(mutation, 0)); // ADAPTED: WAWebSyncdActionUtils.buildPendingMutation returns raw; WAWebSentinel bulk-creates via bulkCreateSyncPendingMutationsInTransaction
         }
-        return mutations; // WAWebSentinelMutationSync.getSentinelMutations: return n.map(...)
+        return mutations;
     }
 }

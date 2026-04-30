@@ -756,21 +756,18 @@ public final class FetchRecommendedNewslettersMexResponse implements MexOperatio
      *         empty if the envelope is missing expected fields
      */
     private static Optional<FetchRecommendedNewslettersMexResponse> of(byte[] json) {
-        // WAWebMexFetchRecommendedNewslettersJob.mexFetchRecommendedNewsletters
         // Parses the raw JSON payload, bailing out if fastjson2 returns null
         var jsonObject = JSON.parseObject(json);
         if (jsonObject == null) {
             return Optional.empty();
         }
 
-        // WAWebMexFetchRecommendedNewslettersJob.mexFetchRecommendedNewsletters
         // Descends into the standard GraphQL "data" envelope
         var data = jsonObject.getJSONObject("data");
         if (data == null) {
             return Optional.empty();
         }
 
-        // WAWebMexFetchRecommendedNewslettersJob.mexFetchRecommendedNewsletters
         // Extracts the operation-specific root keyed by xwa2_newsletters_recommended
         var root = data.getJSONObject("xwa2_newsletters_recommended");
         if (root == null) {

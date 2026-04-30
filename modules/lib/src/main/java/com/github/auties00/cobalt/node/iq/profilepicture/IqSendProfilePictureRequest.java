@@ -12,7 +12,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps the optional
+ * The outbound stanza variant. Wraps the optional
  * {@code <picture type="image">PIC_BYTES</picture>} child in the
  * canonical {@code <iq xmlns="w:profile:picture" type="set">}
  * envelope.
@@ -20,13 +20,13 @@ import java.util.Optional;
 @WhatsAppWebModule(moduleName = "WAWebSendProfilePictureJob")
 public final class IqSendProfilePictureRequest implements IqOperation.Request {
     /**
-     * The target group JID when updating a group profile picture;
+     * The target group JID when updating a group profile picture.
      * {@code null} when updating the calling user's own picture.
      */
     private final Jid groupTarget;
 
     /**
-     * The new JPEG profile-picture bytes; {@code null} clears the
+     * The new JPEG profile-picture bytes. {@code null} clears the
      * existing picture.
      */
     private final byte[] picture;

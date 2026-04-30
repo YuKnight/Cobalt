@@ -1,13 +1,8 @@
 package com.github.auties00.cobalt.socket.layer.application.websocket.frame;
 
 /**
- * Constants for WebSocket frame encoding and decoding as defined by
+ * Wire-format constants for WebSocket framing, as defined by
  * <a href="https://datatracker.ietf.org/doc/html/rfc6455">RFC 6455</a>.
- *
- * @implNote No WhatsApp Web counterpart: WA Web relies on the browser's
- *     native {@code WebSocket} object, so the RFC 6455 wire format is
- *     never touched by application code.  Cobalt implements the wire
- *     format itself and therefore needs these constants.
  */
 public final class WebSocketFrameConstants {
     /**

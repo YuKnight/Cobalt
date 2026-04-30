@@ -30,8 +30,8 @@ public sealed interface SmaxUserNoticeGetDisclosuresResponse extends SmaxOperati
      *
      * @param node    the inbound IQ stanza received from the relay;
      *                never {@code null}
-     * @param request the original outbound stanza — used to validate
-     *                echoed identifiers; never {@code null}
+     * @param request the original outbound stanza. Used to validate
+     *                echoed identifiers. Never {@code null}
      * @return an {@link Optional} carrying the parsed variant, or
      *         {@link Optional#empty()} when no documented variant
      *         matched the stanza shape
@@ -54,7 +54,7 @@ public sealed interface SmaxUserNoticeGetDisclosuresResponse extends SmaxOperati
     }
 
     /**
-     * The {@code ClientSuccess} reply variant — the relay returned
+     * The {@code ClientSuccess} reply variant. The relay returned
      * zero or more disclosure entries.
      *
      * @implNote {@code WASmaxInUserNoticeGetDisclosuresResponseClientSuccess.parseGetDisclosuresResponseClientSuccess}
@@ -73,7 +73,7 @@ public sealed interface SmaxUserNoticeGetDisclosuresResponse extends SmaxOperati
         /**
          * Constructs a new {@code ClientSuccess} reply.
          *
-         * @param notices the list of disclosure notices; never
+         * @param notices the list of disclosure notices. Never
          *                {@code null}
          */
         public ClientSuccess(List<DisclosureNotice> notices) {
@@ -83,7 +83,7 @@ public sealed interface SmaxUserNoticeGetDisclosuresResponse extends SmaxOperati
         /**
          * Returns the list of disclosure notices.
          *
-         * @return an unmodifiable list; never {@code null}
+         * @return an unmodifiable list. Never {@code null}
          */
         public List<DisclosureNotice> notices() {
             return notices;
@@ -138,7 +138,7 @@ public sealed interface SmaxUserNoticeGetDisclosuresResponse extends SmaxOperati
         }
 
         /**
-         * A single {@code <notice>} entry — the relay's projection of
+         * A single {@code <notice>} entry. The relay's projection of
          * one disclosure carrying the per-notice timestamp,
          * version/type pair, and the {@code WASmaxInUserNoticeStageMixin}
          * (id + stage) progression marker.
@@ -146,24 +146,24 @@ public sealed interface SmaxUserNoticeGetDisclosuresResponse extends SmaxOperati
         @WhatsAppWebModule(moduleName = "WASmaxInUserNoticeStageMixin")
         public static final class DisclosureNotice {
             /**
-             * The relay-side timestamp ({@code t}) — seconds since
+             * The relay-side timestamp ({@code t}). Seconds since
              * epoch.
              */
             private final long timestampSeconds;
 
             /**
-             * The notice version ({@code version}) — at least 1.
+             * The notice version ({@code version}). At least 1.
              */
             private final int version;
 
             /**
-             * The notice type ({@code type}) — non-negative.
+             * The notice type ({@code type}). Non-negative.
              */
             private final int type;
 
             /**
-             * The notice id from {@code WASmaxInUserNoticeStageMixin}
-             * — uniquely identifies the disclosure across versions.
+             * The notice id from {@code WASmaxInUserNoticeStageMixin}.
+             * Uniquely identifies the disclosure across versions.
              */
             private final long noticeId;
 
@@ -239,7 +239,7 @@ public sealed interface SmaxUserNoticeGetDisclosuresResponse extends SmaxOperati
              * Tries to parse a disclosure notice from the given
              * {@code <notice>} child.
              *
-             * @param node the {@code <notice>} child; never
+             * @param node the {@code <notice>} child. Never
              *             {@code null}
              * @return an {@link Optional} carrying the parsed entry
              */
@@ -251,8 +251,6 @@ public sealed interface SmaxUserNoticeGetDisclosuresResponse extends SmaxOperati
                 if (!node.hasDescription("notice")) {
                     return Optional.empty();
                 }
-                // WASmaxInUserNoticeGetDisclosuresResponseClientSuccess:
-                //   attrIntRange(t, 0, void 0); attrIntRange(version, 1, void 0); attrIntRange(type, 0, void 0)
                 var timestampOpt = node.getAttributeAsLong("t");
                 if (timestampOpt.isEmpty()) {
                     return Optional.empty();
@@ -265,7 +263,6 @@ public sealed interface SmaxUserNoticeGetDisclosuresResponse extends SmaxOperati
                 if (typeOpt.isEmpty() || typeOpt.getAsInt() < 0) {
                     return Optional.empty();
                 }
-                // WASmaxInUserNoticeStageMixin: attrIntRange(id, 0, void 0); attrIntRange(stage, 0, 1000)
                 var idOpt = node.getAttributeAsLong("id");
                 if (idOpt.isEmpty()) {
                     return Optional.empty();
@@ -313,7 +310,7 @@ public sealed interface SmaxUserNoticeGetDisclosuresResponse extends SmaxOperati
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected the
+     * The {@code ClientError} reply variant. The relay rejected the
      * request as malformed (always {@code 400 bad-request}).
      *
      * @implNote {@code WASmaxInUserNoticeGetDisclosuresResponseClientError.parseGetDisclosuresResponseClientError}
@@ -328,12 +325,12 @@ public sealed interface SmaxUserNoticeGetDisclosuresResponse extends SmaxOperati
     @WhatsAppWebModule(moduleName = "WASmaxInUserNoticeIQErrorBadRequestMixin")
     final class ClientError implements SmaxUserNoticeGetDisclosuresResponse {
         /**
-         * The numeric error code — always {@code 400}.
+         * The numeric error code. Always {@code 400}.
          */
         private final int errorCode;
 
         /**
-         * The human-readable error text — always {@code "bad-request"}
+         * The human-readable error text. Always {@code "bad-request"}
          * when present.
          */
         private final String errorText;
@@ -342,7 +339,7 @@ public sealed interface SmaxUserNoticeGetDisclosuresResponse extends SmaxOperati
          * Constructs a new client-error reply.
          *
          * @param errorCode the error code
-         * @param errorText the optional text; may be {@code null}
+         * @param errorText the optional text. May be {@code null}
          */
         public ClientError(int errorCode, String errorText) {
             this.errorCode = errorCode;
@@ -411,13 +408,13 @@ public sealed interface SmaxUserNoticeGetDisclosuresResponse extends SmaxOperati
     }
 
     /**
-     * The {@code ServerError} reply variant — the relay encountered
+     * The {@code ServerError} reply variant. The relay encountered
      * an internal failure while processing the request.
      *
      * <p>The user-notice domain projects two documented variants
-     * ({@code internal-server-error/500}, {@code rate-overlimit/429}
-     * — note that {@code 429} maps to "too many requests" but the WA
-     * Web disjunction lumps it under {@code ServerError}); Cobalt
+     * ({@code internal-server-error/500}, {@code rate-overlimit/429}).
+     * Note that {@code 429} maps to "too many requests" but the WA
+     * Web disjunction lumps it under {@code ServerError}. Cobalt
      * collapses them into the single {@code (errorCode, errorText)}
      * pair.
      *
@@ -444,7 +441,7 @@ public sealed interface SmaxUserNoticeGetDisclosuresResponse extends SmaxOperati
          * Constructs a new server-error reply.
          *
          * @param errorCode the numeric error code
-         * @param errorText the optional human-readable text; may be
+         * @param errorText the optional human-readable text. May be
          *                  {@code null}
          */
         public ServerError(int errorCode, String errorText) {

@@ -42,137 +42,88 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
- * Sends messages to 1:1 user chats (both PN and LID addressed).
- *
- * <p>The send flow:
- * <ol>
- *   <li>Resolve the device fanout list for the recipient and self</li>
- *   <li>Encrypt the protobuf individually for each device</li>
- *   <li>Build the chat fanout stanza via {@link ChatFanoutStanza}</li>
- *   <li>Send the stanza and parse the server ack</li>
- *   <li>Handle phash mismatch by resyncing devices and resending
- *       to the delta device list</li>
- *   <li>Handle {@code refresh_lid} by triggering a contact list sync</li>
- * </ol>
- *
- * @implNote WAWebSendUserMsgJob.encryptAndSendUserMsg: orchestrates the
- * full 1:1 send flow including device list resolution, stanza creation,
- * and post-send phash/refreshLid handling.
- * WAWebSendMsgToDeviceList.sendMsgToDeviceList: sends the stanza and
- * parses the server ack.
+ * Sends messages to 1:1 user chats addressed by either PN or LID. The flow
+ * resolves the device fanout list, encrypts the protobuf for each device,
+ * builds the chat fanout stanza, dispatches it, and reacts to the server ack
+ * by either triggering a LID refresh or resending to the delta devices when
+ * the server reports a phash mismatch.
  */
 @WhatsAppWebModule(moduleName = "WAWebSendUserMsgJob")
 @WhatsAppWebModule(moduleName = "WAWebSendMsgToDeviceList")
 @WhatsAppWebModule(moduleName = "WAWebSendMsgCreateFanoutStanza")
 final class UserMessageSender extends MessageSender<ChatMessageInfo> {
     /**
-     * Logger for diagnostics.
-     *
-     * @implNote ADAPTED: WAWebSendUserMsgJob uses {@code WALogger.LOG/WARN/ERROR};
-     * Cobalt uses {@link System.Logger} instead.
+     * Holds the logger used for user-send diagnostics.
      */
     private static final System.Logger LOGGER = System.getLogger(UserMessageSender.class.getName());
 
     /**
-     * LID origin type constant for phone-number-hiding click-to-WhatsApp chats.
-     *
-     * @implNote WAWebUsernameTypes.LidOriginType.PNH_CTWA: the string value
-     * {@code "ctwa"} used when comparing {@code chat.lidOriginType}.
+     * Holds the LID origin-type literal for phone-number-hiding click-to-WhatsApp
+     * chats.
      */
     @WhatsAppWebExport(moduleName = "WAWebUsernameTypes", exports = "LidOriginType",
             adaptation = WhatsAppAdaptation.DIRECT)
     private static final String LID_ORIGIN_TYPE_PNH_CTWA = "ctwa";
 
     /**
-     * The encryption service for per-device message encryption.
-     *
-     * @implNote ADAPTED: WAWebEncryptMsgProtobuf is a module-level import;
-     * Cobalt uses constructor-based DI instead.
+     * Holds the encryption service used for per-device Signal encryption.
      */
     private final MessageEncryption encryption;
 
     /**
-     * The device service for fanout list resolution and session management.
-     *
-     * @implNote ADAPTED: WAWebDBDeviceListFanout, WAWebManageE2ESessionsJob,
-     * WAWebSyncDeviceAdvDeviceListJob are module-level imports;
-     * Cobalt uses constructor-based DI instead.
+     * Holds the device service used for fanout resolution and session management.
      */
     private final DeviceService deviceService;
 
     /**
-     * The AB props service for feature flag lookups.
-     *
-     * @implNote ADAPTED: WAWebABProps is a module-level import;
-     * Cobalt uses constructor-based DI instead.
+     * Holds the AB-props service used for feature-flag lookups.
      */
     private final ABPropsService abPropsService;
 
     /**
-     * Stanza builder for bot-specific nodes.
-     *
-     * @implNote ADAPTED: WAWebSendMsgCreateFanoutStanza builds bot nodes
-     * inline; Cobalt delegates to {@link BotStanza}.
+     * Holds the bot-specific stanza builder.
      */
     private final BotStanza botStanza;
 
     /**
-     * Stanza builder for business-specific nodes.
-     *
-     * @implNote ADAPTED: WAWebSendMsgCreateFanoutStanza builds biz nodes
-     * inline; Cobalt delegates to {@link BizStanza}.
+     * Holds the business-specific stanza builder used for payment native flows.
      */
     private final BizStanza bizStanza;
 
     /**
-     * Stanza builder for meta nodes.
-     *
-     * @implNote ADAPTED: WAWebSendMsgMetaNode is a module-level import;
-     * Cobalt delegates to {@link MetaStanza}.
+     * Holds the meta stanza builder.
      */
     private final MetaStanza metaStanza;
 
     /**
-     * Stanza builder for reporting nodes.
-     *
-     * @implNote ADAPTED: WAWebReportingTokenUtils is a module-level import;
-     * Cobalt delegates to {@link ReportingStanza}.
+     * Holds the reporting stanza builder.
      */
     private final ReportingStanza reportingStanza;
 
     /**
-     * Stanza builder for CTWA attribution nodes.
-     *
-     * @implNote ADAPTED: WAWebSendMsgCtwaAttributionNode is a module-level
-     * import; Cobalt delegates to {@link CtwaAttributionStanza}.
+     * Holds the CTWA attribution stanza builder.
      */
     private final CtwaAttributionStanza ctwaStanza;
 
     /**
-     * Stanza builder for trusted contact token nodes.
-     *
-     * @implNote ADAPTED: WAWebSendMsgCreateFanoutStanza resolves tctoken
-     * inline; Cobalt delegates to {@link TcTokenStanza}.
+     * Holds the trusted-contact-token stanza builder.
      */
     private final TcTokenStanza tcTokenStanza;
 
     /**
-     * Constructs a new user message sender with the given dependencies.
+     * Constructs a user-chat sender bound to the given dependencies.
      *
-     * @param client         the WhatsApp client
-     * @param encryption     the encryption service
-     * @param deviceService  the device service
-     * @param abPropsService the AB props service
-     * @param botStanza      the bot stanza builder
-     * @param bizStanza      the business stanza builder
-     * @param metaStanza     the meta stanza builder
+     * @param client          the WhatsApp client used to dispatch stanzas
+     * @param encryption      the message encryption service
+     * @param deviceService   the device service
+     * @param abPropsService  the AB-props service
+     * @param botStanza       the bot stanza builder
+     * @param bizStanza       the business stanza builder
+     * @param metaStanza      the meta stanza builder
      * @param reportingStanza the reporting stanza builder
-     * @param ctwaStanza     the CTWA attribution stanza builder
-     * @param tcTokenStanza  the trusted contact token stanza builder
-     * @param wamService     the WAM telemetry service for committing send events
-     *
-     * @implNote ADAPTED: WAWebSendUserMsgJob uses module-level imports;
-     * Cobalt uses constructor-based DI instead.
+     * @param ctwaStanza      the CTWA attribution stanza builder
+     * @param tcTokenStanza   the trusted-contact-token stanza builder
+     * @param wamService      the WAM telemetry service shared with the base sender
      */
     @WhatsAppWebExport(moduleName = "WAWebSendUserMsgJob", exports = "encryptAndSendUserMsg",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -202,41 +153,28 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
     }
 
     /**
-     * Sends a message to a 1:1 user chat.
-     *
-     * <p>Resolves the device fanout list, encrypts and sends the message,
-     * then handles {@code refresh_lid} and phash mismatch in the server ack.
+     * Sends the given message to a 1:1 user chat. Resolves the device fanout
+     * list, dispatches the encrypted stanza, and reacts to the server ack by
+     * triggering a LID refresh and/or a phash-mismatch resend when needed.
      *
      * @param chatJid     the target chat JID
-     * @param messageInfo the outgoing message with its key, container,
-     *                    and metadata
+     * @param messageInfo the outgoing message and its metadata
      * @return the server ack result
-     *
-     * @implNote WAWebSendUserMsgJob.encryptAndSendUserMsg: resolves fanout
-     * via {@code getFanOutList}, calls {@code sendMsgToDeviceList}, then
-     * handles {@code maybeRefreshLid} and phash mismatch resend.
      */
     @WhatsAppWebExport(moduleName = "WAWebSendUserMsgJob", exports = "encryptAndSendUserMsg",
             adaptation = WhatsAppAdaptation.DIRECT)
     @Override
     AckResult send(Jid chatJid, ChatMessageInfo messageInfo) {
-        // WAWebSendUserMsgJob.encryptAndSendUserMsg: waits for offline delivery
         waitForOfflineDelivery();
 
-        // WAWebSendUserMsgJob.encryptAndSendUserMsg: R = {wids: [v, S]}
-        // then yield getFanOutList(R)
         var fanoutDevices = deviceService.getUserFanout(chatJid, null);
 
-        // WAWebSendMsgCreateFanoutStanza: create receipt records for all devices
         store.createOrMergeReceiptRecords(messageInfo.key().id().orElseThrow(), fanoutDevices);
 
-        // WAWebSendUserMsgJob.encryptAndSendUserMsg: yield sendMsgToDeviceList(...)
         var ack = encryptBuildAndSend(chatJid, messageInfo, fanoutDevices, false);
 
-        // WAWebSendUserMsgJob.encryptAndSendUserMsg: f(v, I), maybeRefreshLid
         maybeRefreshLid(chatJid, ack);
 
-        // WAWebSendUserMsgJob.encryptAndSendUserMsg: if (T != null), phash mismatch
         ack.phash().ifPresent(serverPhash ->
                 handlePhashMismatch(chatJid, messageInfo, fanoutDevices, serverPhash));
 
@@ -244,23 +182,13 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
     }
 
     /**
-     * Triggers a contact list sync when the server requests a LID refresh.
-     *
-     * <p>Converts the chat JID from LID to PN, then fires a device list
-     * sync for the PN JID. This is the Cobalt adaptation of the WA Web
-     * contact sync job, since Cobalt does not have a dedicated contact
-     * sync API.
+     * Triggers a device-list sync when the server requests a LID refresh on
+     * the ack. Cobalt uses a device-list sync as a stand-in for WA Web's
+     * dedicated contact-sync job since both pathways drive a USync request
+     * that refreshes LID-to-PN mappings.
      *
      * @param chatJid the target chat JID
      * @param ack     the server ack result
-     *
-     * @implNote WAWebSendUserMsgJob.maybeRefreshLid: if
-     * {@code ack.refreshLid}, converts {@code chatJid} to PN via
-     * {@code WAWebLidMigrationUtils.toPn(chatJid)} then calls
-     * {@code syncContactListJob({contactIds: [pn], shouldSyncDevice: false, mode: "query"})}.
-     * ADAPTED: Cobalt uses a device list sync as a stand-in for the
-     * contact sync job, since both trigger a USync request that updates
-     * LID-to-PN mappings.
      */
     @WhatsAppWebExport(moduleName = "WAWebSendUserMsgJob", exports = "maybeRefreshLid",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -272,41 +200,27 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
         LOGGER.log(System.Logger.Level.DEBUG,
                 "Server requested LID refresh for {0}", chatJid);
 
-        // WAWebSendUserMsgJob.maybeRefreshLid: var r = toPn(e)
-        // Convert LID to PN; if not LID, the JID itself is already PN
         var pnJid = chatJid.hasLidServer()
                 ? store.findPhoneByLid(chatJid.toUserJid()).orElse(null)
                 : null;
         if (pnJid == null) {
-            return; // WAWebSendUserMsgJob.maybeRefreshLid: r && ... (early return if null)
+            return;
         }
 
-        // ADAPTED: WAWebSendUserMsgJob.maybeRefreshLid: calls
-        // syncContactListJob({contactIds: [r], shouldSyncDevice: false, mode: "query"})
-        // Cobalt uses a device list sync as a stand-in
         deviceService.getDeviceLists(List.of(pnJid), "message", null, false);
     }
 
     /**
-     * Encrypts, builds the stanza, sends it, and parses the ack.
-     *
-     * <p>Corresponds to the full {@code sendMsgToDeviceList} flow:
-     * calls {@code createFanoutMsgStanza} to encrypt and build the stanza,
-     * sends it via {@code deprecatedSendStanzaAndReturnAck}, and parses
-     * the server ack.  Throws if the ack contains an error.
+     * Encrypts the message for the given devices, builds the chat fanout
+     * stanza, dispatches it, and parses the server ack.
      *
      * @param chatJid     the target chat JID
      * @param messageInfo the outgoing message
      * @param devices     the device JIDs to encrypt for
-     * @param isResend    {@code true} if this is a phash mismatch resend
+     * @param isResend    {@code true} when this is a phash-mismatch resend
      * @return the parsed ack result
-     * @throws WhatsAppMessageException.Send.Unknown if the ack contains an error
-     *
-     * @implNote WAWebSendMsgToDeviceList.sendMsgToDeviceList: calls
-     * {@code createFanoutMsgStanza} then
-     * {@code deprecatedSendStanzaAndReturnAck}, parses via
-     * {@code sendMsgAckSyncParser.parse}, and throws if
-     * {@code C.error} is present.
+     * @throws WhatsAppMessageException.Send.Unknown if encryption fails for every
+     *                                               device or the ack carries an error
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgToDeviceList", exports = "sendMsgToDeviceList",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -317,12 +231,7 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
             boolean isResend
     ) {
         var container = messageInfo.message();
-        // WAWebSendMsgCreateFanoutStanza: ensureE2ESessions before encrypting
         var depletedPrekeyCount = deviceService.ensureSessions(devices);
-        // WAWebSendMsgCreateFanoutStanza -> WAWebPostPrekeysDepletionMetric.maybePostPrekeysDepletionMetric
-        // emits PrekeysDepletionEvent (id 3014) with SEND_MESSAGE / INDIVIDUAL. For INDIVIDUAL fanout
-        // WAWebSendMsgCreateFanoutStanza passes deviceSizeBucket=null (the bucket is only set for
-        // GROUP_DIRECT fanouts).
         emitPrekeysDepletionEvents(depletedPrekeyCount, MessageType.INDIVIDUAL, null);
         var senderIcdc = deviceService.computeIcdc(requireSelfJid())
                 .orElse(null);
@@ -339,7 +248,6 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
         var ackNode = client.sendNode(stanza);
         var ack = AckParser.parse(ackNode);
 
-        // WAWebSendMsgToDeviceList.sendMsgToDeviceList: if (C.error) throw err(...)
         if (ack.error().isPresent()) {
             throw new WhatsAppMessageException.Send.Unknown(
                     "Invalid ack from server (error " + ack.error().getAsInt() + ") for " + chatJid, null);
@@ -349,18 +257,15 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
     }
 
     /**
-     * Builds the complete chat fanout stanza with all fields resolved.
+     * Builds the complete chat fanout stanza, resolving every attribute and
+     * child node.
      *
      * @param chatJid     the target chat JID
      * @param messageInfo the outgoing message
      * @param payloads    the per-device encrypted payloads
-     * @param devices     the device JIDs (used for identity node resolution)
-     * @param isResend    {@code true} if this is a phash mismatch resend
-     * @return a {@link NodeBuilder} for the {@code <message>} stanza
-     *
-     * @implNote WAWebSendMsgCreateFanoutStanza.createFanoutMsgStanza:
-     * builds the message stanza with all child nodes, attributes, and
-     * per-device encrypted payloads.
+     * @param devices     the device JIDs used for identity-node resolution
+     * @param isResend    {@code true} when this is a phash-mismatch resend
+     * @return the {@code <message>} stanza builder
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgCreateFanoutStanza", exports = "createFanoutMsgStanza",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -382,9 +287,6 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
         var senderContentBinding = SenderContentBindingStanza.buildForUser(messageInfo, requireSelfJid());
         var ctwaNode = ctwaStanza.build(chatJid);
 
-        // WAWebSendMsgCreateFanoutStanza: metadata-only <bot> node with
-        // type (prompt/command/request_welcome), local_automated_type,
-        // client_thread_id - resolved from message context and AI thread
         var botMetadataNode = resolveBotMetadataNode(chatJid, messageInfo);
 
         return ChatFanoutStanza.build(
@@ -394,8 +296,6 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
                 payloads,
                 resolveEditAttribute(container),
                 null,
-                // WAWebSendMsgCreateFanoutStanza: device_fanout="false" when
-                // isResendingMsg || any payload type === Pkmsg (P flag)
                 (isResend || anyPkmsg) ? "false" : null,
                 resolveMediaType(container),
                 resolveDecryptFail(container),
@@ -420,14 +320,10 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
     }
 
     /**
-     * Resolves {@code peer_recipient_lid} for PN-addressed chats.
+     * Resolves the {@code peer_recipient_lid} attribute for a PN-addressed chat.
      *
      * @param chatJid the target chat JID
-     * @return the peer recipient LID, or {@code null} if not applicable
-     *
-     * @implNote WAWebSendMsgCreateFanoutStanza: when {@code L.isUser()}
-     * and {@code K.accountLid} exists and {@code J.isLid()}, includes
-     * {@code J} as the {@code peer_recipient_lid} attribute.
+     * @return the peer recipient LID, or {@code null} when not applicable
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgCreateFanoutStanza", exports = "createFanoutMsgStanza",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -442,19 +338,12 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
     }
 
     /**
-     * Resolves {@code peer_recipient_pn} for LID-addressed chats.
-     *
-     * <p>Only resolves the PN when the chat is LID-addressed,
-     * LID migration is complete (always true in Cobalt), and the
-     * {@code lidOriginType} is not {@code PNH_CTWA}.
+     * Resolves the {@code peer_recipient_pn} attribute for a LID-addressed chat.
+     * Returns {@code null} for non-LID chats and for chats whose
+     * {@code lidOriginType} matches {@code PNH_CTWA}.
      *
      * @param chatJid the target chat JID
-     * @return the peer recipient PN, or {@code null} if not applicable
-     *
-     * @implNote WAWebSendMsgCreateFanoutStanza: {@code L.isLid() ?
-     * te && (K?.lidOriginType) !== LidOriginType.PNH_CTWA &&
-     * (Z = getPhoneNumber(L))}. {@code te} is {@code isLidMigrated()},
-     * which is always true in Cobalt.
+     * @return the peer recipient PN, or {@code null} when not applicable
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgCreateFanoutStanza", exports = "createFanoutMsgStanza",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -463,8 +352,6 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
             return null;
         }
 
-        // WAWebSendMsgCreateFanoutStanza: te && (K?.lidOriginType) !== PNH_CTWA
-        // isLidMigrated() is always true in Cobalt
         var lidOriginType = store.findChatByJid(chatJid)
                 .flatMap(Chat::lidOriginType)
                 .orElse(null);
@@ -476,20 +363,16 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
     }
 
     /**
-     * Resolves {@code recipient_pn} for LID-addressed chats.
-     *
-     * <p>Only includes the recipient's phone number when the chat is
-     * LID-addressed, the {@code lidOriginType} is {@code null} or
-     * {@code PNH_CTWA}, the contact has not opted in to share their PN,
-     * and a phone number is available.
+     * Resolves the {@code recipient_pn} attribute for a LID-addressed chat.
+     * The phone number is only included when the chat's {@code lidOriginType}
+     * is absent or matches {@code PNH_CTWA}, the contact has not opted in to
+     * share their phone number, and a mapping is available in the store.
      *
      * @param chatJid the target chat JID
-     * @return the recipient PN, or {@code null} if not applicable
+     * @return the recipient PN, or {@code null} when not applicable
      *
-     * @implNote WAWebSendMsgCreateFanoutStanza: {@code l.isLid() &&
-     * ((K?.lidOriginType) == null || (K?.lidOriginType) === PNH_CTWA)
-     * && (j?.shareOwnPn) !== true && (j?.phoneNumber) != null
-     * && (Y = j?.phoneNumber)}.
+     * @implNote Cobalt reads the phone number from the LID-to-PN mapping
+     * table in the store rather than from the contact model.
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgCreateFanoutStanza", exports = "createFanoutMsgStanza",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -498,35 +381,27 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
             return null;
         }
 
-        // WAWebSendMsgCreateFanoutStanza: (K?.lidOriginType) == null || === PNH_CTWA
         var chat = store.findChatByJid(chatJid).orElse(null);
         var lidOriginType = chat != null ? chat.lidOriginType().orElse(null) : null;
         if (lidOriginType != null && !LID_ORIGIN_TYPE_PNH_CTWA.equals(lidOriginType)) {
             return null;
         }
 
-        // WAWebSendMsgCreateFanoutStanza: (j?.shareOwnPn) !== true
         var contact = store.findContactByJid(chatJid).orElse(null);
         if (contact != null && contact.isPhoneNumberShared()) {
             return null;
         }
 
-        // WAWebSendMsgCreateFanoutStanza: (j?.phoneNumber) != null && (Y = j.phoneNumber)
-        // ADAPTED: Cobalt uses the LID-to-PN mapping from the store rather than
-        // contact.phoneNumber, since in Cobalt the phone number is stored in the
-        // LID mapping table rather than on the Contact model.
         return store.findPhoneByLid(chatJid.toUserJid()).orElse(null);
     }
 
     /**
-     * Resolves {@code peer_recipient_username} for LID-addressed chats.
+     * Resolves the {@code peer_recipient_username} attribute for a
+     * LID-addressed chat when the username-display AB prop is enabled and
+     * a username is available on the contact.
      *
      * @param chatJid the target chat JID
-     * @return the peer recipient username, or {@code null} if not applicable
-     *
-     * @implNote WAWebSendMsgCreateFanoutStanza: {@code l.isLid() &&
-     * usernameDisplayedEnabled() && (j?.username) != null
-     * && (ee = j.username)}.
+     * @return the peer recipient username, or {@code null} when not applicable
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgCreateFanoutStanza", exports = "createFanoutMsgStanza",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -546,19 +421,13 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
     }
 
     /**
-     * Resolves the metadata-only {@code <bot>} node for the stanza.
-     *
-     * <p>Determines the bot message body type (prompt/command/request_welcome)
-     * from the message content and chat context, and extracts the AI
-     * thread ID from the device context info.
+     * Resolves the metadata-only {@code <bot>} node, derived from the message
+     * content (bot message body type), the AI-thread id stored on the device
+     * context info, and the business profile's automated type.
      *
      * @param chatJid     the target chat JID
      * @param messageInfo the outgoing message
-     * @return the bot metadata node, or {@code null} if no metadata applies
-     *
-     * @implNote WAWebSendMsgCreateFanoutStanza: resolves {@code ae}
-     * (type), {@code ie} (local_automated_type), {@code N.key.id}
-     * (client_thread_id) and builds {@code me} when any is present.
+     * @return the bot metadata node, or {@code null} when no metadata applies
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgCreateFanoutStanza", exports = "createFanoutMsgStanza",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -566,7 +435,6 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
         var container = messageInfo.message();
         var content = container.content();
 
-        // WAWebSendMsgCreateFanoutStanza: resolve bot message body type
         String botMsgBodyType = null;
         if (content instanceof ProtocolMessage pm
                 && pm.type().orElse(null) == ProtocolMessage.Type.REQUEST_WELCOME_MESSAGE) {
@@ -575,7 +443,6 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
             botMsgBodyType = resolveBotMsgBodyType(chatJid, content);
         }
 
-        // WAWebSendMsgCreateFanoutStanza: resolve AI thread ID
         var clientThreadId = container.messageContextInfo()
                 .map(ChatMessageContextInfo::threadId)
                 .stream()
@@ -587,10 +454,6 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
                 .filter(id -> !id.isEmpty())
                 .orElse(null);
 
-        // WAWebSendMsgCreateFanoutStanza: resolve bizBotType from the
-        // business profile's automated_type field
-        // WAWebCommonParsersParseBusinessProfile: automated_type is
-        // "1p_partial" (BIZ_1P) or "3p_full" (BIZ_3P)
         var bizBotType = client.queryBusinessProfile(chatJid)
                 .flatMap(BusinessProfile::automatedType)
                 .map(BusinessAutomatedType::value)
@@ -600,17 +463,12 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
     }
 
     /**
-     * Resolves the bot message body type by checking whether the message
-     * text matches a registered command on the bot's profile.
+     * Returns {@code "command"} when the message text matches a registered
+     * command on the bot's profile, otherwise {@code "prompt"}.
      *
      * @param botJid  the bot JID
      * @param content the inner message content
-     * @return {@code "command"} if the text starts with a registered
-     *         bot command, otherwise {@code "prompt"}
-     *
-     * @implNote WAWebBotCommandFormatMutator: matches text against the
-     * bot's registered command names.
-     * WAWebSendTextMsgChatAction: sets botMsgBodyType from caller options.
+     * @return the bot message body type
      */
     @WhatsAppWebExport(moduleName = "WAWebBotCommandFormatMutator", exports = "formatBotCommand",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -626,22 +484,14 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
     }
 
     /**
-     * Handles phash mismatch by resyncing device lists and resending
-     * to newly discovered devices only.
+     * Handles a phash mismatch by emitting the {@code MdDeviceSyncAck} WAM
+     * event, refreshing the device fanout, and resending the message to the
+     * delta devices using the resend stanza shape.
      *
      * @param chatJid         the target chat JID
      * @param messageInfo     the outgoing message
-     * @param originalDevices the devices from the original send
+     * @param originalDevices the device list used for the original send
      * @param serverPhash     the phash returned by the server
-     *
-     * @implNote WAWebSendUserMsgJob.encryptAndSendUserMsg: when phash is
-     * non-null, calls {@code syncDeviceListJob([v, S], "message", T)} then
-     * delegates to {@code resendUserMsg}.
-     * WAWebResendUserMsg.resendUserMsg: computes delta via
-     * {@code differenceBy(b, a, String)}, resends with
-     * {@code isResendingMsg: true} (device_fanout="false").
-     * WAWebPostMdDeviceSyncAckMetric.postMdDeviceSyncAckMetric: emits the
-     * {@code MdDeviceSyncAck} WAM event before the resend.
      */
     @WhatsAppWebExport(moduleName = "WAWebResendUserMsg", exports = "resendUserMsg",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -656,12 +506,6 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
         LOGGER.log(System.Logger.Level.DEBUG,
                 "Phash mismatch for {0}, server phash: {1}", chatJid, serverPhash);
 
-        // WAWebSendUserMsgJob.encryptAndSendUserMsg: when the server returns a
-        // phash mismatch, WAWebPostMdDeviceSyncAckMetric.postMdDeviceSyncAckMetric
-        // emits MdDeviceSyncAck (id 2180) before the resend is scheduled.
-        // For the 1:1 branch: revoke = isRevokeMsg(msg), chatType = fromWid(chatJid),
-        // isLid = chatJid.isLid(); groupData and serverAddressingMode are not
-        // supplied, so localAddressingMode and serverAddressingMode stay empty.
         wamService.commit(new MdDeviceSyncAckEventBuilder()
                 .revoke(isRevokeMessage(messageInfo))
                 .chatType(chatTypeFromJid(chatJid))
@@ -691,47 +535,25 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
     }
 
     /**
-     * Returns the WAM {@link MessageChatType} for the given chat JID.
-     *
-     * <p>Mirrors the cascaded ternary in
-     * {@code WAWebGetMessageChatTypeFromWid.getMessageChatTypeFromWid}
-     * exactly, dispatching on the WA Web {@code Wid} predicates in the
-     * same order:
-     * <ol>
-     *     <li>{@code isUser()} (user/legacy-user/LID/bot/hosted/hosted.lid
-     *         domains) maps to {@code INDIVIDUAL};</li>
-     *     <li>{@code isGroup()} ({@code g.us} domain) maps to
-     *         {@code GROUP};</li>
-     *     <li>{@code isBroadcast()} ({@code broadcast} domain) maps to
-     *         {@code BROADCAST};</li>
-     *     <li>{@code isStatus()} ({@code status@broadcast}) maps to
-     *         {@code STATUS};</li>
-     *     <li>{@code isNewsletter()} ({@code newsletter} domain) maps to
-     *         {@code CHANNEL};</li>
-     *     <li>anything else maps to {@code OTHER}.</li>
-     * </ol>
+     * Returns the WAM {@link MessageChatType} for the given chat JID,
+     * matching the predicate order of the WA Web cascade. The {@code null}
+     * input is a defensive Cobalt adaptation that maps to
+     * {@link MessageChatType#OTHER}.
      *
      * @param jid the chat JID to classify, or {@code null}
-     * @return the corresponding {@link MessageChatType}; never {@code null}
+     * @return the matching {@link MessageChatType}; never {@code null}
      *
      * @implNote The {@code STATUS} branch is unreachable because the
-     *           preceding {@code isBroadcast()} check already catches
-     *           {@code status@broadcast}. It is preserved here solely to
-     *           keep the method body in lock-step with the WA Web source.
-     *           The {@code null} guard is a Cobalt-side defensive
-     *           adaptation for callers that may pass unresolved JIDs;
-     *           WA Web callers always hold a valid {@code Wid} instance
-     *           at this point.
+     * preceding broadcast check already catches {@code status@broadcast}; it
+     * is kept to mirror the WA Web source exactly.
      */
     @WhatsAppWebExport(moduleName = "WAWebGetMessageChatTypeFromWid",
             exports = "getMessageChatTypeFromWid",
             adaptation = WhatsAppAdaptation.DIRECT)
     static MessageChatType chatTypeFromJid(Jid jid) {
         if (jid == null) {
-            // NO_WA_BASIS: defensive null guard, WA callers always pass a valid Wid
             return MessageChatType.OTHER;
         }
-        // WAWebGetMessageChatTypeFromWid.getMessageChatTypeFromWid: e.isUser()? INDIVIDUAL
         if (jid.hasUserServer()
                 || jid.hasLidServer()
                 || jid.hasBotServer()
@@ -739,43 +561,27 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
                 || jid.hasHostedLidServer()) {
             return MessageChatType.INDIVIDUAL;
         }
-        // WAWebGetMessageChatTypeFromWid.getMessageChatTypeFromWid: e.isGroup()? GROUP
         if (jid.hasGroupOrCommunityServer()) {
             return MessageChatType.GROUP;
         }
-        // WAWebGetMessageChatTypeFromWid.getMessageChatTypeFromWid: e.isBroadcast()? BROADCAST
         if (jid.hasBroadcastServer()) {
             return MessageChatType.BROADCAST;
         }
-        // WAWebGetMessageChatTypeFromWid.getMessageChatTypeFromWid: e.isStatus()? STATUS
-        // (unreachable: isBroadcast above already catches status@broadcast; kept for
-        // structural parity with the JS ternary)
         if (jid.isStatusBroadcastAccount()) {
             return MessageChatType.STATUS;
         }
-        // WAWebGetMessageChatTypeFromWid.getMessageChatTypeFromWid: e.isNewsletter()? CHANNEL
         if (jid.hasNewsletterServer()) {
             return MessageChatType.CHANNEL;
         }
-        // WAWebGetMessageChatTypeFromWid.getMessageChatTypeFromWid: OTHER fallthrough
         return MessageChatType.OTHER;
     }
 
     /**
-     * Returns {@code true} when the given message is a revoke protocol
-     * message.
+     * Returns whether the given message wraps a {@code protocolMessage} of
+     * type {@link ProtocolMessage.Type#REVOKE}.
      *
-     * <p>Mirrors WA Web's
-     * {@code WAWebSendMsgCommonApi.isRevokeMsg}: checks the message
-     * protobuf for a {@code protocolMessage} payload of type
-     * {@link ProtocolMessage.Type#REVOKE}.
-     *
-     * @param messageInfo the outgoing message
-     * @return {@code true} if the payload is a revoke protocol message
-     *
-     * @apiNote WAWebSendMsgCommonApi.isRevokeMsg:
-     *          {@code e.protocolMessage != null &&
-     *          e.protocolMessage.type === Message$ProtocolMessage$Type.REVOKE}.
+     * @param messageInfo the outgoing message, possibly {@code null}
+     * @return {@code true} when the payload is a revoke protocol message
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "isRevokeMsg",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -788,36 +594,25 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
     }
 
     /**
-     * Emits one {@link com.github.auties00.cobalt.wam.event.PrekeysDepletionEvent} per
-     * depleted one-time pre-key reported by the last {@code ensureSessions} call, matching
-     * the {@code SEND_MESSAGE} reason used by the message fanout path.
+     * Commits one {@link com.github.auties00.cobalt.wam.event.PrekeysDepletionEvent}
+     * per depleted one-time pre-key reported by the last
+     * {@code ensureSessions} call. No-op when {@code depletedPrekeyCount} is
+     * not positive.
      *
-     * <p>No-op when {@code depletedPrekeyCount} is {@code 0}, matching the early return in
-     * {@code WAWebPostPrekeysDepletionMetric.maybePostPrekeysDepletionMetric}
-     * ({@code if (t==null||t===0) return}).
-     *
-     * @param depletedPrekeyCount number of depleted one-time pre-keys (may be zero)
+     * @param depletedPrekeyCount the number of depleted one-time pre-keys
      * @param messageType         the WAM message type for this send
-     * @param deviceCount         the fanout device count to classify into a
-     *                            {@code deviceSizeBucket}, or {@code null} to omit the
-     *                            bucket property (matches WA Web's conditional
-     *                            {@code fanoutType===GROUP_DIRECT ? numberToSizeBucket(n.length) : null})
-     *
-     * @implNote WAWebPostPrekeysDepletionMetric.maybePostPrekeysDepletionMetric: emits
-     *     {@code t} (count) events inside a {@code setTimeout(...,0)}; Cobalt emits
-     *     synchronously on the calling virtual thread which matches the end-of-turn
-     *     semantics of the JS timeout.
+     * @param deviceCount         the fanout device count used for the
+     *                            {@code deviceSizeBucket} classification, or
+     *                            {@code null} to omit the bucket
      */
     @WhatsAppWebExport(moduleName = "WAWebPostPrekeysDepletionMetric",
             exports = "maybePostPrekeysDepletionMetric",
             adaptation = WhatsAppAdaptation.ADAPTED)
     private void emitPrekeysDepletionEvents(int depletedPrekeyCount, MessageType messageType, Integer deviceCount) {
-        // WAWebPostPrekeysDepletionMetric.maybePostPrekeysDepletionMetric: early-return guard
         if (depletedPrekeyCount <= 0) {
             return;
         }
         var bucket = deviceCount == null ? null : WamSizeBuckets.numberToSizeBucket(deviceCount);
-        // WAWebPostPrekeysDepletionMetric.maybePostPrekeysDepletionMetric: for (var e=0;e<t;e++) commit()
         for (var i = 0; i < depletedPrekeyCount; i++) {
             wamService.commit(new PrekeysDepletionEventBuilder()
                     .prekeysFetchReason(PrekeysFetchContext.SEND_MESSAGE)

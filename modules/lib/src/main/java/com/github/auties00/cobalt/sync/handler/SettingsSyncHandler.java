@@ -107,7 +107,7 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSettingsSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return SettingsSyncAction.ACTION_NAME; // WAWebSettingsSync.getAction -> Actions.SettingsSync
+        return SettingsSyncAction.ACTION_NAME;
     }
 
     /**
@@ -123,7 +123,7 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSettingsSync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return SettingsSyncAction.COLLECTION_NAME; // WAWebSettingsSync -> CollectionName.RegularLow
+        return SettingsSyncAction.COLLECTION_NAME;
     }
 
     /**
@@ -135,7 +135,7 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSettingsSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return SettingsSyncAction.ACTION_VERSION; // WAWebSettingsSync.getVersion -> 1
+        return SettingsSyncAction.ACTION_VERSION;
     }
 
     /**
@@ -156,7 +156,7 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSettingsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: WAWebSettingsSync.applyMutations
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -196,42 +196,37 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSettingsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public List<MutationApplicationResult> applyMutationBatchResults(WhatsAppClient client, WamService wamService, List<DecryptedMutation.Trusted> mutations) {
-        // WAWebSettingsSync.applyMutations: if (!h()) return e.map(() => ({actionState: Unsupported}))
         if (!isSettingsSyncEnabled(client)) {
             var unsupported = new ArrayList<MutationApplicationResult>(mutations.size());
             for (var ignored : mutations) {
-                unsupported.add(MutationApplicationResult.unsupported()); // WAWebSettingsSync.applyMutations: {actionState: SyncActionState.Unsupported}
+                unsupported.add(MutationApplicationResult.unsupported());
             }
             return unsupported;
         }
 
-        // WAWebSettingsSync.applyMutations: var a = new Map(); for (var i of e) { var l = JSON.stringify(i.indexParts); if (i.operation === "set") { ... } }
         var latestByIndex = new HashMap<String, DecryptedMutation.Trusted>();
         for (var mutation : mutations) {
-            if (mutation.operation() != SyncdOperation.SET) { // WAWebSettingsSync.applyMutations: if (i.operation === "set")
+            if (mutation.operation() != SyncdOperation.SET) {
                 continue;
             }
-            var key = mutation.index(); // WAWebSettingsSync.applyMutations: l = JSON.stringify(i.indexParts) — Cobalt mutations already store the JSON string form as their index
-            var existing = latestByIndex.get(key); // WAWebSettingsSync.applyMutations: var u = a.get(l)
-            // WAWebSettingsSync.applyMutations: var c = u?.timestamp ?? 0; if (u == null || i.timestamp > c) a.set(l, i)
+            var key = mutation.index();
+            var existing = latestByIndex.get(key);
             if (existing == null || mutation.timestamp().compareTo(existing.timestamp()) > 0) {
                 latestByIndex.put(key, mutation);
             }
         }
 
-        // WAWebSettingsSync.applyMutations: var d = e.map(e => { var n = a.get(JSON.stringify(e.indexParts)); return n == null ? Malformed : n !== e ? Skipped : t.$SettingsSync$p_1(e); });
         var results = new ArrayList<MutationApplicationResult>(mutations.size());
         for (var mutation : mutations) {
-            var latest = latestByIndex.get(mutation.index()); // WAWebSettingsSync.applyMutations: a.get(JSON.stringify(e.indexParts))
+            var latest = latestByIndex.get(mutation.index());
             if (latest == null) {
-                results.add(MutationApplicationResult.malformed()); // WAWebSettingsSync.applyMutations: n == null -> {actionState: Malformed}
+                results.add(MutationApplicationResult.malformed());
             } else if (latest != mutation) {
-                results.add(MutationApplicationResult.skipped()); // WAWebSettingsSync.applyMutations: n !== e -> {actionState: Skipped}
+                results.add(MutationApplicationResult.skipped());
             } else {
-                results.add(applyOne(client, mutation)); // WAWebSettingsSync.applyMutations: t.$SettingsSync$p_1(e)
+                results.add(applyOne(client, mutation));
             }
         }
-        // WAWebSettingsSync.applyMutations: m = yield Promise.all(d); r.push.apply(r, m); return r
         return results;
     }
 
@@ -263,7 +258,6 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSettingsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        // WAWebSettingsSync.applyMutations: if (!h()) return Unsupported
         if (!isSettingsSyncEnabled(client)) {
             return MutationApplicationResult.unsupported();
         }
@@ -326,7 +320,6 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
      */
     @WhatsAppWebExport(moduleName = "WAWebSettingsSync", exports = "$SettingsSync$p_1", adaptation = WhatsAppAdaptation.ADAPTED)
     private MutationApplicationResult applyOne(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        // WAWebSettingsSync.$SettingsSync$p_1: var n = t.indexParts; if (!n || n.length !== 4) return Malformed
         JSONArray indexArray;
         try {
             indexArray = JSON.parseArray(mutation.index());
@@ -334,53 +327,45 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
             return MutationApplicationResult.malformed(); // ADAPTED: WAWebSettingsSync.$SettingsSync$p_1 — Cobalt parses the JSON eagerly so a malformed JSON also yields Malformed
         }
         if (indexArray == null || indexArray.size() != INDEX_PARTS_LENGTH) {
-            return MutationApplicationResult.malformed(); // WAWebSettingsSync.$SettingsSync$p_1: !n || n.length !== 4
+            return MutationApplicationResult.malformed();
         }
 
-        // WAWebSettingsSync.$SettingsSync$p_1: var i = n[0], l = n[1], p = n[2], _ = n[3]
         // n[0] (user index) is read but never used after assignment in WA Web — Cobalt skips it.
-        var platformValue = indexArray.getString(1); // WAWebSettingsSync.$SettingsSync$p_1: l = n[1]
-        var settingKeyValue = indexArray.getString(2); // WAWebSettingsSync.$SettingsSync$p_1: p = n[2]
-        var scope = indexArray.getString(3); // WAWebSettingsSync.$SettingsSync$p_1: _ = n[3]
+        var platformValue = indexArray.getString(1);
+        var settingKeyValue = indexArray.getString(2);
+        var scope = indexArray.getString(3);
 
-        // WAWebSettingsSync.$SettingsSync$p_1: var f = SettingPlatform.cast(Number(l));
         // var g = f === WEB || (isWindows && f === HYBRID); if (!g) return Skipped
         var platform = parsePlatform(platformValue);
         if (!appliesToCurrentPlatform(client, platform)) {
-            return MutationApplicationResult.skipped(); // WAWebSettingsSync.$SettingsSync$p_1: !g -> Skipped
+            return MutationApplicationResult.skipped();
         }
 
-        // WAWebSettingsSync.$SettingsSync$p_1: var h = SettingKey.cast(Number(p)); if (h == null) WARN; return Malformed
         var settingKey = parseSettingKey(settingKeyValue);
         if (settingKey == null) {
-            return MutationApplicationResult.malformed(); // WAWebSettingsSync.$SettingsSync$p_1: h == null -> Malformed
+            return MutationApplicationResult.malformed();
         }
 
-        // WAWebSettingsSync.$SettingsSync$p_1: var y = SETTING_KEY_TO_FIELD[h]; if (!y) WARN; return Malformed
         // SETTING_KEY_UNKNOWN has no field mapping in WAWebSettingsSyncConst.SETTING_KEY_TO_FIELD,
         // so it falls into this branch.
         if (settingKey == SettingsSyncAction.SettingKey.SETTING_KEY_UNKNOWN) {
-            return MutationApplicationResult.malformed(); // WAWebSettingsSync.$SettingsSync$p_1: !y -> Malformed
+            return MutationApplicationResult.malformed();
         }
 
-        // WAWebSettingsSync.$SettingsSync$p_1: var C = a == null ? void 0 : a.settingsSyncAction; if (!C) return Malformed
         if (!(mutation.value().action().orElse(null) instanceof SettingsSyncAction action)) {
-            return MutationApplicationResult.malformed(); // WAWebSettingsSync.$SettingsSync$p_1: !C -> Malformed
+            return MutationApplicationResult.malformed();
         }
 
-        // WAWebSettingsSync.$SettingsSync$p_1: var b = C[y]; if (b === void 0) return Malformed
         if (!hasFieldFor(action, settingKey)) {
-            return MutationApplicationResult.malformed(); // WAWebSettingsSync.$SettingsSync$p_1: b === undefined -> Malformed
+            return MutationApplicationResult.malformed();
         }
 
-        // WAWebSettingsSync.$SettingsSync$p_1: try { yield applySettingUpdate(y, b, _) } catch { return Failed }
         try {
             applySettingUpdate(client, action, settingKey, scope); // ADAPTED: WAWebSettingsSyncHelpers.applySettingUpdate -> direct store mutation
         } catch (RuntimeException exception) {
-            return MutationApplicationResult.failed(); // WAWebSettingsSync.$SettingsSync$p_1: catch -> {actionState: Failed}
+            return MutationApplicationResult.failed();
         }
 
-        // WAWebSettingsSync.$SettingsSync$p_1: return {actionState: Success}
         return MutationApplicationResult.success();
     }
 
@@ -399,8 +384,8 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
      * @return {@code true} if both the primary feature and the AB prop are enabled
      */
     private boolean isSettingsSyncEnabled(WhatsAppClient client) {
-        return client.store().primaryFeatures().contains("settings_sync_enabled") // WAWebSettingsSync.h: primaryFeatureEnabled("settings_sync_enabled") === true
-                && client.abPropsService().getBool(ABProp.SETTINGS_SYNC_ENABLED); // WAWebSettingsSync.h: getABPropConfigValue("settings_sync_enabled") === true
+        return client.store().primaryFeatures().contains("settings_sync_enabled")
+                && client.abPropsService().getBool(ABProp.SETTINGS_SYNC_ENABLED);
     }
 
     /**
@@ -421,8 +406,8 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
             return null;
         }
         try {
-            var index = Integer.parseInt(value); // WAWebSettingsSync.$SettingsSync$p_1: Number(l)
-            for (var platform : SettingsSyncAction.SettingPlatform.values()) { // WAWebSettingsSync.$SettingsSync$p_1: SettingPlatform.cast — enum index lookup
+            var index = Integer.parseInt(value);
+            for (var platform : SettingsSyncAction.SettingPlatform.values()) {
                 if (platform.index() == index) {
                     return platform;
                 }
@@ -451,8 +436,8 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
             return null;
         }
         try {
-            var index = Integer.parseInt(value); // WAWebSettingsSync.$SettingsSync$p_1: Number(p)
-            for (var settingKey : SettingsSyncAction.SettingKey.values()) { // WAWebSettingsSync.$SettingsSync$p_1: SettingKey.cast — enum index lookup
+            var index = Integer.parseInt(value);
+            for (var settingKey : SettingsSyncAction.SettingKey.values()) {
                 if (settingKey.index() == index) {
                     return settingKey;
                 }
@@ -482,13 +467,13 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
      */
     private boolean appliesToCurrentPlatform(WhatsAppClient client, SettingsSyncAction.SettingPlatform platform) {
         if (platform == null) {
-            return false; // WAWebSettingsSync.$SettingsSync$p_1: f null -> g false
+            return false;
         }
         return switch (platform) {
-            case WEB -> true; // WAWebSettingsSync.$SettingsSync$p_1: f === WEB
+            case WEB -> true;
             // ADAPTED: WAWebSettingsSync.$SettingsSync$p_1 -> isWindows check; Cobalt uses paired device platform
             case HYBRID -> client.store().device() != null && client.store().device().platform() == ClientPlatformType.WINDOWS;
-            default -> false; // WAWebSettingsSync.$SettingsSync$p_1: any other -> g false
+            default -> false;
         };
     }
 
@@ -522,68 +507,37 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
      */
     private boolean hasFieldFor(SettingsSyncAction action, SettingsSyncAction.SettingKey key) {
         return switch (key) {
-            // WAWebSettingsSyncConst.SETTING_KEY_TO_FIELD[START_AT_LOGIN] = "startAtLogin"
             // ADAPTED: nullable Boolean — coalesced to false by accessor; presence not strictly checkable
             case START_AT_LOGIN -> true;
-            // WAWebSettingsSyncConst.SETTING_KEY_TO_FIELD[MINIMIZE_TO_TRAY] = "minimizeToTray"
             case MINIMIZE_TO_TRAY -> true;
-            // WAWebSettingsSyncConst.SETTING_KEY_TO_FIELD[LANGUAGE] = "language"
             case LANGUAGE -> action.language().isPresent();
-            // WAWebSettingsSyncConst.SETTING_KEY_TO_FIELD[REPLACE_TEXT_WITH_EMOJI] = "replaceTextWithEmoji"
             case REPLACE_TEXT_WITH_EMOJI -> true;
-            // WAWebSettingsSyncConst.SETTING_KEY_TO_FIELD[BANNER_NOTIFICATION_DISPLAY_MODE] = "bannerNotificationDisplayMode"
             case BANNER_NOTIFICATION_DISPLAY_MODE -> action.bannerNotificationDisplayMode().isPresent();
-            // WAWebSettingsSyncConst.SETTING_KEY_TO_FIELD[UNREAD_COUNTER_BADGE_DISPLAY_MODE] = "unreadCounterBadgeDisplayMode"
             case UNREAD_COUNTER_BADGE_DISPLAY_MODE -> action.unreadCounterBadgeDisplayMode().isPresent();
-            // WAWebSettingsSyncConst.SETTING_KEY_TO_FIELD[IS_MESSAGES_NOTIFICATION_ENABLED] = "isMessagesNotificationEnabled"
             case IS_MESSAGES_NOTIFICATION_ENABLED -> true;
-            // WAWebSettingsSyncConst.SETTING_KEY_TO_FIELD[IS_CALLS_NOTIFICATION_ENABLED] = "isCallsNotificationEnabled"
             case IS_CALLS_NOTIFICATION_ENABLED -> true;
-            // WAWebSettingsSyncConst.SETTING_KEY_TO_FIELD[IS_REACTIONS_NOTIFICATION_ENABLED] = "isReactionsNotificationEnabled"
             case IS_REACTIONS_NOTIFICATION_ENABLED -> true;
-            // WAWebSettingsSyncConst.SETTING_KEY_TO_FIELD[IS_STATUS_REACTIONS_NOTIFICATION_ENABLED] = "isStatusReactionsNotificationEnabled"
             case IS_STATUS_REACTIONS_NOTIFICATION_ENABLED -> true;
-            // WAWebSettingsSyncConst.SETTING_KEY_TO_FIELD[IS_TEXT_PREVIEW_FOR_NOTIFICATION_ENABLED] = "isTextPreviewForNotificationEnabled"
             case IS_TEXT_PREVIEW_FOR_NOTIFICATION_ENABLED -> true;
-            // WAWebSettingsSyncConst.SETTING_KEY_TO_FIELD[DEFAULT_NOTIFICATION_TONE_ID] = "defaultNotificationToneId"
             case DEFAULT_NOTIFICATION_TONE_ID -> action.defaultNotificationToneId().isPresent();
-            // WAWebSettingsSyncConst.SETTING_KEY_TO_FIELD[GROUP_DEFAULT_NOTIFICATION_TONE_ID] = "groupDefaultNotificationToneId"
             case GROUP_DEFAULT_NOTIFICATION_TONE_ID -> action.groupDefaultNotificationToneId().isPresent();
-            // WAWebSettingsSyncConst.SETTING_KEY_TO_FIELD[APP_THEME] = "appTheme"
             case APP_THEME -> action.appTheme().isPresent();
-            // WAWebSettingsSyncConst.SETTING_KEY_TO_FIELD[WALLPAPER_ID] = "wallpaperId"
             case WALLPAPER_ID -> action.wallpaperId().isPresent();
-            // WAWebSettingsSyncConst.SETTING_KEY_TO_FIELD[IS_DOODLE_WALLPAPER_ENABLED] = "isDoodleWallpaperEnabled"
             case IS_DOODLE_WALLPAPER_ENABLED -> true;
-            // WAWebSettingsSyncConst.SETTING_KEY_TO_FIELD[FONT_SIZE] = "fontSize"
             case FONT_SIZE -> action.fontSize().isPresent();
-            // WAWebSettingsSyncConst.SETTING_KEY_TO_FIELD[IS_PHOTOS_AUTODOWNLOAD_ENABLED] = "isPhotosAutodownloadEnabled"
             case IS_PHOTOS_AUTODOWNLOAD_ENABLED -> true;
-            // WAWebSettingsSyncConst.SETTING_KEY_TO_FIELD[IS_AUDIOS_AUTODOWNLOAD_ENABLED] = "isAudiosAutodownloadEnabled"
             case IS_AUDIOS_AUTODOWNLOAD_ENABLED -> true;
-            // WAWebSettingsSyncConst.SETTING_KEY_TO_FIELD[IS_VIDEOS_AUTODOWNLOAD_ENABLED] = "isVideosAutodownloadEnabled"
             case IS_VIDEOS_AUTODOWNLOAD_ENABLED -> true;
-            // WAWebSettingsSyncConst.SETTING_KEY_TO_FIELD[IS_DOCUMENTS_AUTODOWNLOAD_ENABLED] = "isDocumentsAutodownloadEnabled"
             case IS_DOCUMENTS_AUTODOWNLOAD_ENABLED -> true;
-            // WAWebSettingsSyncConst.SETTING_KEY_TO_FIELD[DISABLE_LINK_PREVIEWS] = "disableLinkPreviews"
             case DISABLE_LINK_PREVIEWS -> true;
-            // WAWebSettingsSyncConst.SETTING_KEY_TO_FIELD[NOTIFICATION_TONE_ID] = "notificationToneId"
             case NOTIFICATION_TONE_ID -> action.notificationToneId().isPresent();
-            // WAWebSettingsSyncConst.SETTING_KEY_TO_FIELD[MEDIA_UPLOAD_QUALITY] = "mediaUploadQuality"
             case MEDIA_UPLOAD_QUALITY -> action.mediaUploadQuality().isPresent();
-            // WAWebSettingsSyncConst.SETTING_KEY_TO_FIELD[IS_SPELL_CHECK_ENABLED] = "isSpellCheckEnabled"
             case IS_SPELL_CHECK_ENABLED -> true;
-            // WAWebSettingsSyncConst.SETTING_KEY_TO_FIELD[IS_ENTER_TO_SEND_ENABLED] = "isEnterToSendEnabled"
             case IS_ENTER_TO_SEND_ENABLED -> true;
-            // WAWebSettingsSyncConst.SETTING_KEY_TO_FIELD[IS_GROUP_MESSAGE_NOTIFICATION_ENABLED] = "isGroupMessageNotificationEnabled"
             case IS_GROUP_MESSAGE_NOTIFICATION_ENABLED -> true;
-            // WAWebSettingsSyncConst.SETTING_KEY_TO_FIELD[IS_GROUP_REACTIONS_NOTIFICATION_ENABLED] = "isGroupReactionsNotificationEnabled"
             case IS_GROUP_REACTIONS_NOTIFICATION_ENABLED -> true;
-            // WAWebSettingsSyncConst.SETTING_KEY_TO_FIELD[IS_STATUS_NOTIFICATION_ENABLED] = "isStatusNotificationEnabled"
             case IS_STATUS_NOTIFICATION_ENABLED -> true;
-            // WAWebSettingsSyncConst.SETTING_KEY_TO_FIELD[STATUS_NOTIFICATION_TONE_ID] = "statusNotificationToneId"
             case STATUS_NOTIFICATION_TONE_ID -> action.statusNotificationToneId().isPresent();
-            // WAWebSettingsSyncConst.SETTING_KEY_TO_FIELD[SHOULD_PLAY_SOUND_FOR_CALL_NOTIFICATION] = "shouldPlaySoundForCallNotification"
             case SHOULD_PLAY_SOUND_FOR_CALL_NOTIFICATION -> true;
             // SETTING_KEY_UNKNOWN has no entry in WAWebSettingsSyncConst.SETTING_KEY_TO_FIELD
             // and is filtered out by applyOne before this method is reached.

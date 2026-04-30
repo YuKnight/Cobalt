@@ -87,7 +87,7 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebClearChatSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return ClearChatAction.ACTION_NAME; // WAWebClearChatSync.getAction -> WASyncdConst.Actions.ClearChat
+        return ClearChatAction.ACTION_NAME;
     }
 
     /**
@@ -103,7 +103,7 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebClearChatSync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return ClearChatAction.COLLECTION_NAME; // WAWebClearChatSync.collectionName = WASyncdConst.CollectionName.RegularHigh
+        return ClearChatAction.COLLECTION_NAME;
     }
 
     /**
@@ -115,7 +115,7 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebClearChatSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return ClearChatAction.ACTION_VERSION; // WAWebClearChatSync.getVersion -> 6
+        return ClearChatAction.ACTION_VERSION;
     }
 
     /**
@@ -133,7 +133,7 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebClearChatSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebClearChatSync.applyMutations
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -168,54 +168,47 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebClearChatSync", exports = {"applyMutations", "getMessageRange"}, adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        if (mutation.operation() != SyncdOperation.SET) { // WAWebClearChatSync.applyMutations: e.operation === "set" check, else return Unsupported
-            return MutationApplicationResult.unsupported(); // WAWebClearChatSync.applyMutations: c++, {actionState: Unsupported}
+        if (mutation.operation() != SyncdOperation.SET) {
+            return MutationApplicationResult.unsupported();
         }
 
-        try { // WAWebClearChatSync.applyMutations: try/catch wrapping per-mutation logic
-            var indexParts = JSON.parseArray(mutation.index()); // WAWebClearChatSync.applyMutations: var t = e.indexParts
-            var chatJidString = indexParts.getString(CHAT_JID_INDEX); // WAWebClearChatSync.applyMutations: var a = t[1] (chatJidIndex = 1)
-            var deleteStarredString = indexParts.getString(CHAT_JID_INDEX + 1); // WAWebClearChatSync.applyMutations: var s = t[2]
-            var deleteMediaString = indexParts.getString(CHAT_JID_INDEX + 2); // WAWebClearChatSync.applyMutations: var d = t[3]
+        try {
+            var indexParts = JSON.parseArray(mutation.index());
+            var chatJidString = indexParts.getString(CHAT_JID_INDEX);
+            var deleteStarredString = indexParts.getString(CHAT_JID_INDEX + 1);
+            var deleteMediaString = indexParts.getString(CHAT_JID_INDEX + 2);
 
-            if (chatJidString == null || chatJidString.isEmpty() // WAWebClearChatSync.applyMutations: if (!a || !s || !d || !isWid(a))
+            if (chatJidString == null || chatJidString.isEmpty()
                     || deleteStarredString == null || deleteStarredString.isEmpty()
                     || deleteMediaString == null || deleteMediaString.isEmpty()) {
-                return malformedActionIndex(); // WAWebClearChatSync.applyMutations: return i.malformedActionIndex()
+                return malformedActionIndex();
             }
 
             Jid chatJid;
             try {
-                chatJid = Jid.of(chatJidString); // WAWebClearChatSync.applyMutations: createWid(a) — isWid(a) validated above
+                chatJid = Jid.of(chatJidString);
             } catch (Exception e) {
                 return malformedActionIndex(); // ADAPTED: Jid.of throws for invalid JIDs; WA Web uses isWid() upfront
             }
 
             if (chatJid == null) { // ADAPTED: Jid.of returns null for null input
-                return malformedActionIndex(); // WAWebClearChatSync.applyMutations: !isWid(a)
+                return malformedActionIndex();
             }
 
-            // WAWebClearChatSync.applyMutations: var m = validateMessageRange(getMessageRange(n), collectionName, getAction())
-            // WAWebClearChatSync.getMessageRange: return value.clearChatAction?.messageRange
-            if (!(mutation.value().action().orElse(null) instanceof ClearChatAction clearChatAction)) { // WAWebClearChatSync.applyMutations: var n = e.value
-                return malformedActionValue(); // WAWebClearChatSync.applyMutations: malformedActionValue when messageRange null
+            if (!(mutation.value().action().orElse(null) instanceof ClearChatAction clearChatAction)) {
+                return malformedActionValue();
             }
 
-            var messageRange = clearChatAction.messageRange().orElse(null); // WAWebClearChatSync.getMessageRange
-            if (messageRange == null) { // WAWebClearChatSync.applyMutations: if (m == null) return malformedActionValue
-                return malformedActionValue(); // WAWebClearChatSync.applyMutations: u++, malformedActionValue(collectionName)
+            var messageRange = clearChatAction.messageRange().orElse(null);
+            if (messageRange == null) {
+                return malformedActionValue();
             }
 
-            // WAWebClearChatSync.applyMutations: resolveChatForMutationIndex(createWid(a))
-            var chat = client.store().findChatByJid(chatJid); // WAWebClearChatSync.applyMutations: var p = yield resolveChatForMutationIndex(createWid(a))
-            if (chat.isEmpty()) { // WAWebClearChatSync.applyMutations: if (!p.success) return {actionState: Orphan, orphanModel: p.orphanModel}
-                return MutationApplicationResult.orphan(chatJidString, "Chat"); // WAWebClearChatSync.applyMutations: {actionState: Orphan, orphanModel: p.orphanModel}
+            var chat = client.store().findChatByJid(chatJid);
+            if (chat.isEmpty()) {
+                return MutationApplicationResult.orphan(chatJidString, "Chat");
             }
 
-            // WAWebClearChatSync.applyMutations: var _ = createWid(p.chat.id)
-            // WAWebClearChatSync.applyMutations: var f = replaceMessageRangeRemoteJid(_, m)
-            // WAWebClearChatSync.applyMutations: var g = $ClearChatSync$p_1(l, e.timestamp, _, p.chat.accountLid)
-            // WAWebClearChatSync.applyMutations: return $ClearChatSync$p_2(_, f, s==="1", d==="0", g, n)
             // $ClearChatSync$p_2: addActiveMessageRange, clearChat(chatId, messageRange, deleteStarred, starredKeys)
             // clearChat: queryAndRemoveMessagesInMessageRange(chatId, messageRange, {skipStarred: !deleteStarred, skipMessages: starredKeys, deleteAutomatedGreetingMessages: true})
             //            deleteAllThreadsForChat, deleteMessages, maybeClearGroupStatus
@@ -228,11 +221,11 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
             //    which is not yet supported by the Chat abstraction
             // 3. Thread deletion, add-on cleanup, and AI thread deletion are browser-specific UI concerns
             // 4. maybeClearGroupStatus is a StatusCollection concern not present in Cobalt's store
-            chat.get().removeMessages(); // ADAPTED: WAWebClearChatSync.$ClearChatSync$p_2 -> clearChat
+            chat.get().removeMessages();
 
-            return MutationApplicationResult.success(); // WAWebClearChatSync.$ClearChatSync$p_2: {actionState: Success}
-        } catch (Exception e) { // WAWebClearChatSync.applyMutations: catch(e) { return {actionState: Failed} }
-            return MutationApplicationResult.failed(); // WAWebClearChatSync.applyMutations: {actionState: SyncActionState.Failed}
+            return MutationApplicationResult.success();
+        } catch (Exception e) {
+            return MutationApplicationResult.failed();
         }
     }
 
@@ -266,11 +259,11 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebClearChatSync", exports = "resolveConflicts", adaptation = WhatsAppAdaptation.ADAPTED)
     public ConflictResolution resolveConflicts(DecryptedMutation.Trusted localMutation, DecryptedMutation.Trusted remoteMutation) {
-        var localAction = localMutation.value().action() // WAWebClearChatSync.resolveConflicts: var c = nullthrows(i.clearChatAction) — i decoded from e.binarySyncAction
+        var localAction = localMutation.value().action()
                 .filter(a -> a instanceof ClearChatAction)
                 .map(a -> (ClearChatAction) a)
                 .orElse(null);
-        var remoteAction = remoteMutation.value().action() // WAWebClearChatSync.resolveConflicts: var p = nullthrows(l?.clearChatAction) — l decoded from t.binarySyncData
+        var remoteAction = remoteMutation.value().action()
                 .filter(a -> a instanceof ClearChatAction)
                 .map(a -> (ClearChatAction) a)
                 .orElse(null);
@@ -279,43 +272,42 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
             return ConflictResolution.of(ConflictResolutionState.APPLY_REMOTE_DROP_LOCAL); // ADAPTED: defensive fallback
         }
 
-        var localRange = localAction.messageRange().orElse(null); // WAWebClearChatSync.resolveConflicts: nullthrows(c.messageRange)
-        var remoteRange = remoteAction.messageRange().orElse(null); // WAWebClearChatSync.resolveConflicts: nullthrows(p.messageRange)
+        var localRange = localAction.messageRange().orElse(null);
+        var remoteRange = remoteAction.messageRange().orElse(null);
 
         if (localRange == null || remoteRange == null) { // ADAPTED: WA Web uses nullthrows; Cobalt gracefully falls back
             return ConflictResolution.of(ConflictResolutionState.APPLY_REMOTE_DROP_LOCAL); // ADAPTED: defensive fallback
         }
 
-        return switch (MessageRangeUtils.compareMessageRanges(remoteRange, localRange)) { // WAWebClearChatSync.resolveConflicts: compareMessageRanges(nullthrows(p.messageRange), nullthrows(c.messageRange))
-            case RANGE_A_ENCLOSES_RANGE_B -> // WAWebClearChatSync.resolveConflicts: case RangeAEnclosesRangeB -> ApplyRemoteAndDropLocal
+        return switch (MessageRangeUtils.compareMessageRanges(remoteRange, localRange)) {
+            case RANGE_A_ENCLOSES_RANGE_B ->
                     ConflictResolution.of(ConflictResolutionState.APPLY_REMOTE_DROP_LOCAL);
-            case RANGE_B_ENCLOSES_RANGE_A -> // WAWebClearChatSync.resolveConflicts: case RangeBEnclosesRangeA -> SkipRemote
+            case RANGE_B_ENCLOSES_RANGE_A ->
                     ConflictResolution.of(ConflictResolutionState.SKIP_REMOTE);
-            case RANGES_ARE_EQUAL -> // WAWebClearChatSync.resolveConflicts: case RangesAreEqual -> timestamp tiebreaker
-                    localMutation.timestamp().compareTo(remoteMutation.timestamp()) <= 0 // WAWebClearChatSync.resolveConflicts: s <= u (local <= remote)
-                            ? ConflictResolution.of(ConflictResolutionState.APPLY_REMOTE_DROP_LOCAL) // WAWebClearChatSync.resolveConflicts: ApplyRemoteAndDropLocal
-                            : ConflictResolution.of(ConflictResolutionState.SKIP_REMOTE); // WAWebClearChatSync.resolveConflicts: SkipRemote
-            case RANGES_NOT_ENCLOSING -> { // WAWebClearChatSync.resolveConflicts: case RangesNotEnclosing
-                var mergedRange = MessageRangeUtils.mergeMessageRanges(remoteRange, localRange); // WAWebClearChatSync.resolveConflicts: mergeMessageRanges(nullthrows(p.messageRange), nullthrows(c.messageRange))
-                var mergedAction = new ClearChatActionBuilder() // WAWebClearChatSync.resolveConflicts: var g = {messageRange: f}
-                        .messageRange(mergedRange) // WAWebClearChatSync.resolveConflicts: messageRange: f
+            case RANGES_ARE_EQUAL ->
+                    localMutation.timestamp().compareTo(remoteMutation.timestamp()) <= 0
+                            ? ConflictResolution.of(ConflictResolutionState.APPLY_REMOTE_DROP_LOCAL)
+                            : ConflictResolution.of(ConflictResolutionState.SKIP_REMOTE);
+            case RANGES_NOT_ENCLOSING -> {
+                var mergedRange = MessageRangeUtils.mergeMessageRanges(remoteRange, localRange);
+                var mergedAction = new ClearChatActionBuilder()
+                        .messageRange(mergedRange)
                         .build();
-                var mergedValue = new SyncActionValueBuilder() // WAWebClearChatSync.resolveConflicts: extends({}, l, {clearChatAction: g})
-                        .timestamp(remoteMutation.timestamp()) // WAWebClearChatSync.resolveConflicts: timestamp from remote value (l)
-                        .clearChatAction(mergedAction) // WAWebClearChatSync.resolveConflicts: clearChatAction: g
+                var mergedValue = new SyncActionValueBuilder()
+                        .timestamp(remoteMutation.timestamp())
+                        .clearChatAction(mergedAction)
                         .build();
-                var merged = new DecryptedMutation.Trusted( // WAWebClearChatSync.resolveConflicts: extends({}, e, {binarySyncAction: h}); delete b.id
-                        localMutation.index(), // WAWebClearChatSync.resolveConflicts: from local (e.index)
-                        mergedValue, // WAWebClearChatSync.resolveConflicts: merged binary value
-                        localMutation.operation(), // WAWebClearChatSync.resolveConflicts: from local (e.operation)
-                        localMutation.timestamp(), // WAWebClearChatSync.resolveConflicts: from local (e.timestamp)
-                        localMutation.actionVersion() // WAWebClearChatSync.resolveConflicts: from local (e.version)
+                var merged = new DecryptedMutation.Trusted(
+                        localMutation.index(),
+                        mergedValue,
+                        localMutation.operation(),
+                        localMutation.timestamp(),
+                        localMutation.actionVersion()
                 );
-                // WAWebClearChatSync.resolveConflicts: lockForMessageRangeSync -> addActiveMessageRange + clearChat
                 // ADAPTED: In WA Web, the merged mutation is applied to the chat DB immediately
                 // during conflict resolution via lockForMessageRangeSync. In Cobalt, the merged
                 // mutation is returned for the caller to apply, separating resolution from application.
-                yield ConflictResolution.merged(merged); // WAWebClearChatSync.resolveConflicts: return SkipRemoteAndDropLocal
+                yield ConflictResolution.merged(merged);
             }
         };
     }
@@ -378,29 +370,28 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
             boolean deleteMedia,
             SyncActionMessageRange messageRange
     ) {
-        var actionBuilder = new ClearChatActionBuilder(); // WAWebClearChatSync.getClearChatMutation: value: {clearChatAction: {messageRange: s}}
-        if (messageRange != null) { // WAWebClearChatSync.getClearChatMutation: messageRange: constructForwardMovingMessageRange(t, l)
+        var actionBuilder = new ClearChatActionBuilder();
+        if (messageRange != null) {
             actionBuilder.messageRange(messageRange);
         }
         var action = actionBuilder.build();
-        var value = new SyncActionValueBuilder() // WAWebSyncdActionUtils.buildPendingMutation: encodeProtobuf(SyncActionValueSpec, {...l, timestamp: i})
-                .timestamp(timestamp) // WAWebSyncdActionUtils.buildPendingMutation: timestamp: e (encoder overlay)
-                .clearChatAction(action) // WAWebClearChatSync.getClearChatMutation: {clearChatAction: ...}
+        var value = new SyncActionValueBuilder()
+                .timestamp(timestamp)
+                .clearChatAction(action)
                 .build();
-        // WAWebClearChatSync.$ClearChatSync$p_3: [t.toJid(), n ? "1" : "0", r ? "1" : "0"]
         // deleteStarred: "1" = delete, "0" = keep; deleteMedia: "1" = keep, "0" = delete (per $p_2 -> s==="1", d==="0")
-        var index = JSON.toJSONString(List.of( // WAWebSyncdActionUtils.buildIndex: JSON.stringify([action].concat(indexArgs))
-                actionName(), // WAWebClearChatSync.getAction: "clearChat"
-                chatJid.toString(), // WAWebClearChatSync.$ClearChatSync$p_3: t.toJid()
-                deleteStarred ? "1" : "0", // WAWebClearChatSync.$ClearChatSync$p_3: n ? "1" : "0"
-                deleteMedia ? "1" : "0" // WAWebClearChatSync.$ClearChatSync$p_3: r ? "1" : "0"
+        var index = JSON.toJSONString(List.of(
+                actionName(),
+                chatJid.toString(),
+                deleteStarred ? "1" : "0",
+                deleteMedia ? "1" : "0"
         ));
-        var mutation = new DecryptedMutation.Trusted( // WAWebSyncdActionUtils.buildPendingMutation: return {collection, index, binarySyncAction, version, operation, timestamp, action}
+        var mutation = new DecryptedMutation.Trusted(
                 index,
                 value,
-                SyncdOperation.SET, // WAWebClearChatSync.getClearChatMutation: operation: SyncdMutation$SyncdOperation.SET
+                SyncdOperation.SET,
                 timestamp,
-                version() // WAWebClearChatSync.getClearChatMutation: version: this.getVersion()
+                version()
         );
         return new SyncPendingMutation(mutation, 0); // ADAPTED: WA Web returns the raw mutation object; Cobalt wraps it in SyncPendingMutation for the outgoing queue
     }
@@ -425,13 +416,13 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
     @WhatsAppWebExport(moduleName = "WAWebSyncdAction", exports = "ChatSyncdActionBase", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean isLidMutation(DecryptedMutation.Trusted mutation) {
         try {
-            var indexParts = JSON.parseArray(mutation.index()); // WAWebSyncdAction.ChatSyncdActionBase.isLidMutation: var n = t[e.chatJidIndex]
+            var indexParts = JSON.parseArray(mutation.index());
             var chatJidString = indexParts.getString(CHAT_JID_INDEX);
-            if (chatJidString == null || chatJidString.isEmpty()) { // WAWebSyncdAction.ChatSyncdActionBase.isLidMutation: n == null ? false
+            if (chatJidString == null || chatJidString.isEmpty()) {
                 return false;
             }
-            var chatJid = Jid.of(chatJidString); // WAWebSyncdAction.ChatSyncdActionBase.isLidMutation: createWid(n)
-            return chatJid != null && chatJid.hasLidServer(); // WAWebSyncdAction.ChatSyncdActionBase.isLidMutation: createWid(n).isLid()
+            var chatJid = Jid.of(chatJidString);
+            return chatJid != null && chatJid.hasLidServer();
         } catch (Exception e) { // ADAPTED: malformed index returns false rather than propagating
             return false;
         }

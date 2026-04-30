@@ -46,7 +46,7 @@ public sealed interface SmaxNewsletterReportResponse extends SmaxOperation.Respo
     }
 
     /**
-     * The {@code Success} reply variant — the relay accepted the
+     * The {@code Success} reply variant. The relay accepted the
      * report and (typically) returned a ticket id.
      *
      * @implNote {@code WASmaxInSpamNewsletterReportResponseSuccess.parseNewsletterReportResponseSuccess}
@@ -127,7 +127,7 @@ public sealed interface SmaxNewsletterReportResponse extends SmaxOperation.Respo
     }
 
     /**
-     * The {@code Error} reply variant — the relay rejected the
+     * The {@code Error} reply variant. The relay rejected the
      * report (malformed payload, rate limit, or transient internal
      * failure).
      *

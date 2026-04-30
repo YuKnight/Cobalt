@@ -20,22 +20,17 @@ import com.github.auties00.cobalt.stream.SocketStream;
  * default path that simply acknowledges unhandled notification types such as
  * {@code add} or {@code remove}.
  *
- * @implNote WAWebHandleContactNotification.default
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleContactNotification")
 final class NotificationContactStreamHandler implements SocketStream.Handler {
 
     /**
      * Logger for diagnostic output related to contacts notification handling.
-     *
-     * @implNote WAWebHandleContactNotification.default, WALogger usage
      */
     private static final System.Logger LOGGER = System.getLogger(NotificationContactStreamHandler.class.getName());
 
     /**
      * The WhatsApp client used to send acknowledgements and access the store.
-     *
-     * @implNote WAWebHandleContactNotification.default, constructor DI
      */
     private final WhatsAppClient whatsapp;
 
@@ -43,7 +38,6 @@ final class NotificationContactStreamHandler implements SocketStream.Handler {
      * Constructs a new handler for contacts notifications.
      *
      * @param whatsapp the non-{@code null} WhatsApp client
-     * @implNote WAWebHandleContactNotification.default
      */
     NotificationContactStreamHandler(WhatsAppClient whatsapp) {
         this.whatsapp = whatsapp;
@@ -57,12 +51,11 @@ final class NotificationContactStreamHandler implements SocketStream.Handler {
      * handling are logged; the acknowledgement is always sent.
      *
      * @param node the incoming notification node
-     * @implNote WAWebHandleContactNotification.default (function k / L / E)
      */
     @Override
     public void handle(Node node) {
         if (!node.hasDescription("notification") || !node.hasAttribute("type", "contacts")) {
-            return; // ADAPTED: defensive guard; dispatcher already checks this
+            return;
         }
 
         try {
@@ -73,26 +66,18 @@ final class NotificationContactStreamHandler implements SocketStream.Handler {
                     node.getAttributeAsString("id", "[missing-id]"),
                     throwable.getMessage());
         } finally {
-            sendNotificationAck(node); // WAWebHandleContactNotification.E, inner function y
+            sendNotificationAck(node);
         }
     }
 
     /**
      * Parses the notification node and dispatches to the appropriate case handler.
      *
-     * <p>The notification node is expected to contain one of the following
-     * children: {@code update}, {@code modify}, or {@code sync}. Any other
-     * child (such as {@code add} or {@code remove}) is logged and acknowledged
-     * without further processing.
+     * <p>The notification node is expected to contain one of the following children: {@code update}, {@code modify}, or {@code sync}. Any other child (such as {@code add} or {@code remove}) is logged and acknowledged without further processing.
      *
      * @param node the notification node
-     * @implNote WAWebHandleContactNotification.E, main switch on r.type
      */
     private void handleNotification(Node node) {
-        // WAWebHandleContactNotification.f, parser: check children for action type
-        // WA Web checks children in the order: update, add, remove, modify, sync.
-        // Cobalt picks the first supported child; notifications have exactly one
-        // action child so the order is semantically equivalent.
         Node actionNode = null;
         for (var child : node.children()) {
             var desc = child.description();
@@ -103,22 +88,20 @@ final class NotificationContactStreamHandler implements SocketStream.Handler {
             }
         }
         if (actionNode == null) {
-            // WAWebHandleContactNotification.f, fallback: returns {type:"empty"}
             LOGGER.log(System.Logger.Level.DEBUG,
                     "Contacts notification {0} has no supported action child",
                     node.getAttributeAsString("id", "[missing-id]"));
             return;
         }
 
-        // WAWebHandleContactNotification.E, switch (r.type)
         switch (actionNode.description()) {
-            case "update" -> handleUpdate(node, actionNode); // WAWebHandleContactNotification.E case "update"
-            case "modify" -> handleModify(node, actionNode); // WAWebHandleContactNotification.E case "modify" -> S(r)
-            case "sync" -> { // WAWebHandleContactNotification.E case "sync"
+            case "update" -> handleUpdate(node, actionNode);
+            case "modify" -> handleModify(node, actionNode);
+            case "sync" -> {
                 LOGGER.log(System.Logger.Level.DEBUG, "Received contact sync notification");
-                whatsapp.store().setSyncedContacts(false); // ADAPTED: WAWebContactSyncBridge.doFullContactSync
+                whatsapp.store().setSyncedContacts(false);
             }
-            default -> // WAWebHandleContactNotification.E default case (add, remove, etc.)
+            default ->
                     LOGGER.log(System.Logger.Level.DEBUG,
                             "Ignoring unhandled contacts notification type {0} for notification {1}",
                             actionNode.description(),
@@ -138,17 +121,13 @@ final class NotificationContactStreamHandler implements SocketStream.Handler {
      *
      * @param notificationNode the parent notification node
      * @param updateNode       the {@code "update"} child node
-     * @implNote WAWebHandleContactNotification.E case "update"
      */
     private void handleUpdate(Node notificationNode, Node updateNode) {
-        // WAWebHandleContactNotification.f, parser: update child
-        // If jid attribute present, use it directly
         if (updateNode.hasAttribute("jid")) {
             var targetJid = updateNode.getAttributeAsJid("jid")
                     .map(Jid::toUserJid)
                     .orElse(null);
             if (targetJid == null) {
-                // WAWebHandleContactNotification.E, if (!a) return ... y(r)
                 LOGGER.log(System.Logger.Level.DEBUG,
                         "handleContactsNotification: update cmd missing jid");
                 return;
@@ -158,27 +137,21 @@ final class NotificationContactStreamHandler implements SocketStream.Handler {
                     .findContactByJid(targetJid)
                     .orElseGet(() -> whatsapp.store().addNewContact(targetJid));
 
-            // WAWebHandleContactNotification.E, PresenceCollection.get(a).reset()
             contact.setLastKnownPresence(ContactStatus.UNAVAILABLE);
 
-            // ADAPTED: WAWebHandleContactNotification.E, changeProfilePicThumb + status refresh
-            // Cobalt refreshes the push name as an adapted equivalent
+            // Cobalt refreshes the push name as the adapted equivalent of WA Web's changeProfilePicThumb plus status refresh.
             refreshContact(targetJid, contact);
             return;
         }
 
-        // WAWebHandleContactNotification.f, if hash attr present, try hash lookup
         if (updateNode.hasAttribute("hash")) {
-            // ADAPTED: WAWebHandleContactNotification.f, hash-based contact lookup
-            // WA Web searches ContactCollection by userhash prefix; Cobalt does not
-            // maintain userhash, so this falls through to the empty case
+            // Cobalt does not maintain userhash, so hash-only updates fall through to the empty case.
             LOGGER.log(System.Logger.Level.DEBUG,
                     "Ignoring hash-only contacts update notification {0}",
                     notificationNode.getAttributeAsString("id", "[missing-id]"));
             return;
         }
 
-        // WAWebHandleContactNotification.f, no jid, no hash -> {type:"empty"}
         LOGGER.log(System.Logger.Level.DEBUG,
                 "Contacts update notification {0} has neither jid nor hash",
                 notificationNode.getAttributeAsString("id", "[missing-id]"));
@@ -192,14 +165,10 @@ final class NotificationContactStreamHandler implements SocketStream.Handler {
      * {@code changeNumberOldJid} fields. If LID attributes are present, LID-to-phone
      * mappings are registered for both old and new identifiers.
      *
-     * @param notificationNode the parent notification node (unused but available
-     *                         for context)
-     * @param modifyNode       the {@code "modify"} child node containing
-     *                         {@code old} and {@code new} jid attributes
-     * @implNote WAWebHandleContactNotification.R (handleModifyAction)
+     * @param notificationNode the parent notification node (unused but available for context)
+     * @param modifyNode       the {@code "modify"} child node containing {@code old} and {@code new} jid attributes
      */
     private void handleModify(Node notificationNode, Node modifyNode) {
-        // WAWebHandleContactNotification.R, if (e.oldJid) { ... }
         var oldJid = modifyNode.getAttributeAsJid("old")
                 .map(Jid::toUserJid)
                 .orElse(null);
@@ -207,13 +176,11 @@ final class NotificationContactStreamHandler implements SocketStream.Handler {
                 .map(Jid::toUserJid)
                 .orElse(null);
         if (oldJid == null || newJid == null) {
-            // WAWebHandleContactNotification.R, else LOG("notification.oldJid is null")
             LOGGER.log(System.Logger.Level.DEBUG,
                     "modify notification missing old or new jid");
             return;
         }
 
-        // WAWebHandleContactNotification.R, resolve LIDs from modify node
         var newLid = modifyNode.getAttributeAsJid("new_lid")
                 .map(Jid::toUserJid)
                 .orElse(null);
@@ -221,23 +188,19 @@ final class NotificationContactStreamHandler implements SocketStream.Handler {
                 .map(Jid::toUserJid)
                 .orElse(null);
 
-        // WAWebHandleContactNotification.R, update old chat: changeNumberNewJid = newJid
         whatsapp.store().findChatByJid(oldJid).ifPresent(chat -> {
-            chat.setNewJid(newJid); // WAWebHandleContactNotification.R, changeNumberNewJid: r.toString()
+            chat.setNewJid(newJid);
         });
 
-        // WAWebHandleContactNotification.R, update new chat: changeNumberOldJid = oldJid
         whatsapp.store().findChatByJid(newJid).ifPresent(chat -> {
-            chat.setOldJid(oldJid); // WAWebHandleContactNotification.R, changeNumberOldJid: t.toString()
+            chat.setOldJid(oldJid);
         });
 
-        // WAWebHandleContactNotification.R, createLidPnMappings for both old and new
         if (oldLid != null && newLid != null) {
-            whatsapp.store().registerLidMapping(oldJid, oldLid); // WAWebHandleContactNotification.R, {lid:a, pn:t}
-            whatsapp.store().registerLidMapping(newJid, newLid); // WAWebHandleContactNotification.R, {lid:i, pn:r}
+            whatsapp.store().registerLidMapping(oldJid, oldLid);
+            whatsapp.store().registerLidMapping(newJid, newLid);
         }
 
-        // ADAPTED: WAWebHandleContactNotification.R, ensure new contact exists in store
         var updated = whatsapp.store()
                 .findContactByJid(newJid)
                 .orElseGet(() -> whatsapp.store().addNewContact(newJid));
@@ -252,7 +215,6 @@ final class NotificationContactStreamHandler implements SocketStream.Handler {
      *
      * @param targetJid the JID of the contact to refresh
      * @param contact   the contact model to update
-     * @implNote ADAPTED: WAWebHandleContactNotification.E case "update", changeProfilePicThumb + status updates
      */
     private void refreshContact(Jid targetJid, Contact contact) {
         try {
@@ -275,10 +237,8 @@ final class NotificationContactStreamHandler implements SocketStream.Handler {
      * {@code type} set to {@code "contacts"}.
      *
      * @param node the notification node to acknowledge
-     * @implNote WAWebHandleContactNotification.E, inner function y(e, t)
      */
     private void sendNotificationAck(Node node) {
-        // WAWebHandleContactNotification.E, y(e, t): wap("ack", {id, to, class, type})
         var stanzaId = node.getAttributeAsString("id", null);
         var stanzaFrom = node.getAttributeAsJid("from", null);
         if (stanzaId == null || stanzaFrom == null) {
@@ -287,10 +247,10 @@ final class NotificationContactStreamHandler implements SocketStream.Handler {
 
         whatsapp.sendNodeWithNoResponse(new NodeBuilder()
                 .description("ack")
-                .attribute("id", stanzaId) // WAWebHandleContactNotification.E, id: CUSTOM_STRING(e.stanzaId)
-                .attribute("to", stanzaFrom) // WAWebHandleContactNotification.E, to: e.from
-                .attribute("class", "notification") // WAWebHandleContactNotification.E, class: "notification"
-                .attribute("type", "contacts") // WAWebHandleContactNotification.E, type: "contacts"
+                .attribute("id", stanzaId)
+                .attribute("to", stanzaFrom)
+                .attribute("class", "notification")
+                .attribute("type", "contacts")
                 .build());
     }
 }

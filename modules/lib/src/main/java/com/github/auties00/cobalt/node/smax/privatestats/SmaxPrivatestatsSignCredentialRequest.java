@@ -34,8 +34,8 @@ public final class SmaxPrivatestatsSignCredentialRequest implements SmaxOperatio
      * Constructs a new sign-credential request.
      *
      * @param blindedCredentialElementValue the blinded credential
-     *                                      bytes; never {@code null}
-     * @param projectNameElementValue       the project name; never
+     *                                      bytes. Never {@code null}
+     * @param projectNameElementValue       the project name. Never
      *                                      {@code null}
      * @throws NullPointerException if any argument is {@code null}
      */
@@ -49,7 +49,7 @@ public final class SmaxPrivatestatsSignCredentialRequest implements SmaxOperatio
     /**
      * Returns the blinded credential bytes.
      *
-     * @return the bytes; never {@code null}
+     * @return the bytes. Never {@code null}
      */
     public byte[] blindedCredentialElementValue() {
         return blindedCredentialElementValue;
@@ -58,7 +58,7 @@ public final class SmaxPrivatestatsSignCredentialRequest implements SmaxOperatio
     /**
      * Returns the project name.
      *
-     * @return the project name; never {@code null}
+     * @return the project name. Never {@code null}
      */
     public String projectNameElementValue() {
         return projectNameElementValue;

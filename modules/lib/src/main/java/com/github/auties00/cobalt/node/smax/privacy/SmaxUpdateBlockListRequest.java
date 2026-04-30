@@ -34,14 +34,14 @@ public final class SmaxUpdateBlockListRequest implements SmaxOperation.Request {
     private final Jid itemJid;
 
     /**
-     * The optional client-side digest of the cached blocklist —
+     * The optional client-side digest of the cached blocklist.
      * supplied so the relay can return a {@code SuccessWithMatch}
      * envelope when the cache is up to date.
      */
     private final String itemDhash;
 
     /**
-     * The optional report-block entry-point source — surfaced when
+     * The optional report-block entry-point source. Surfaced when
      * the block originates from a "report and block" action so the
      * relay can attribute the report.
      */
@@ -107,17 +107,11 @@ public final class SmaxUpdateBlockListRequest implements SmaxOperation.Request {
      * Builds the outbound IQ stanza.
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope
-     *
-     * @implNote {@code WASmaxOutBlocklistsUpdateBlockListRequest.makeUpdateBlockListRequest}
-     *           composes {@code <iq to="s.whatsapp.net" xmlns="blocklist"
-     *           type="set" id="…"><item action jid dhash?/><entry_point
-     *           source/>?</iq>}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutBlocklistsUpdateBlockListRequest",
             exports = "makeUpdateBlockListRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutBlocklistsUpdateBlockListBlockItemMixin / UnblockItemMixin: smax("item", {action, jid, dhash?})
         var itemBuilder = new NodeBuilder()
                 .description("item")
                 .attribute("action", action.wire())
@@ -125,7 +119,6 @@ public final class SmaxUpdateBlockListRequest implements SmaxOperation.Request {
         if (itemDhash != null) {
             itemBuilder.attribute("dhash", itemDhash);
         }
-        // WASmaxOutBlocklistsUpdateBlockListRequest: smax("iq", {to: S_WHATSAPP_NET, xmlns: "blocklist", type: "set", id: generateId()})
         var iqBuilder = new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "blocklist")
@@ -133,7 +126,6 @@ public final class SmaxUpdateBlockListRequest implements SmaxOperation.Request {
                 .attribute("type", "set")
                 .content(itemBuilder.build());
         if (entryPointSource != null) {
-            // WASmaxOutBlocklistsUpdateBlockListReportBlockEntryPointMixin: smax("entry_point", {source})
             var entryPointNode = new NodeBuilder()
                     .description("entry_point")
                     .attribute("source", entryPointSource)

@@ -36,7 +36,7 @@ public sealed interface SmaxGroupsCreateSubGroupSuggestionSuggestion permits Sma
     void contributeTo(NodeBuilder builder);
 
     /**
-     * SmaxGroupsCreateSubGroupSuggestionSuggestion body for a brand-new sub-group spun up inside the
+     * Suggestion body for a brand-new sub-group spun up inside the
      * parent community.
      *
      * @implNote {@code WASmaxOutGroupsCreateSubGroupSuggestionSuggestionForNewGroupMixin.mergeCreateSubGroupSuggestionSuggestionForNewGroupMixin}
@@ -336,7 +336,7 @@ public sealed interface SmaxGroupsCreateSubGroupSuggestionSuggestion permits Sma
     }
 
     /**
-     * SmaxGroupsCreateSubGroupSuggestionSuggestion body recommending that one or more existing groups
+     * Suggestion body recommending that one or more existing groups
      * be linked into the parent community as sub-groups.
      *
      * @implNote {@code WASmaxOutGroupsCreateSubGroupSuggestionSuggestionForExistingGroupsMixin.mergeCreateSubGroupSuggestionSuggestionForExistingGroupsMixin}

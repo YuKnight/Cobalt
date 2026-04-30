@@ -19,11 +19,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The response variant of {@link FetchSimilarNewslettersMexResponse} that exposes the data
- * returned by the server after a successful query.
- *
- * @implNote WAWebMexFetchSimilarNewslettersJob: adapts the JSON root returned by the GraphQL
- * query into a Java value object.
+ * Response variant for {@link FetchSimilarNewslettersMexRequest} carrying the parsed server reply.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexFetchSimilarNewslettersJob")
 public final class FetchSimilarNewslettersMexResponse implements MexOperation.Response.Json {
@@ -36,9 +32,6 @@ public final class FetchSimilarNewslettersMexResponse implements MexOperation.Re
     /**
      * Parses a MEX response from the given IQ response node.
      *
-     * @implNote WAWebMexFetchSimilarNewslettersJob.mexFetchSimilarNewsletters: WA Web relies on the
-     * GraphQL client to unwrap the response. Cobalt performs the
-     * unwrapping manually from the IQ {@code <result>} child.
      * @param node the IQ response node received from the relay
      * @return an {@link Optional} containing the parsed response, or
      *         empty if the node is missing a result payload
@@ -75,7 +68,7 @@ public final class FetchSimilarNewslettersMexResponse implements MexOperation.Re
         /**
          * Returns the {@code id} field.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
          */
         public Optional<String> id() {
             return Optional.ofNullable(id);
@@ -84,7 +77,7 @@ public final class FetchSimilarNewslettersMexResponse implements MexOperation.Re
         /**
          * Returns the {@code thread_metadata} field.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
          */
         public Optional<ThreadMetadata> threadMetadata() {
             return Optional.ofNullable(threadMetadata);
@@ -93,7 +86,7 @@ public final class FetchSimilarNewslettersMexResponse implements MexOperation.Re
         /**
          * Returns the {@code state} field.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
          */
         public Optional<State> state() {
             return Optional.ofNullable(state);
@@ -116,7 +109,7 @@ public final class FetchSimilarNewslettersMexResponse implements MexOperation.Re
             /**
              * Returns the {@code name} field.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
              */
             public Optional<Name> name() {
                 return Optional.ofNullable(name);
@@ -125,7 +118,7 @@ public final class FetchSimilarNewslettersMexResponse implements MexOperation.Re
             /**
              * Returns the {@code picture} field.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
              */
             public Optional<Picture> picture() {
                 return Optional.ofNullable(picture);
@@ -134,7 +127,7 @@ public final class FetchSimilarNewslettersMexResponse implements MexOperation.Re
             /**
              * Returns the {@code verification} field.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
              */
             public Optional<String> verification() {
                 return Optional.ofNullable(verification);
@@ -157,7 +150,7 @@ public final class FetchSimilarNewslettersMexResponse implements MexOperation.Re
                 /**
                  * Returns the {@code id} field.
                  *
-                 * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
                  */
                 public Optional<String> id() {
                     return Optional.ofNullable(id);
@@ -166,7 +159,7 @@ public final class FetchSimilarNewslettersMexResponse implements MexOperation.Re
                 /**
                  * Returns the {@code text} field.
                  *
-                 * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
                  */
                 public Optional<String> text() {
                     return Optional.ofNullable(text);
@@ -175,7 +168,7 @@ public final class FetchSimilarNewslettersMexResponse implements MexOperation.Re
                 /**
                  * Returns the {@code update_time} field.
                  *
-                 * @return an {@link Optional} containing the value as an {@link Instant}, or empty if absent
+     * @return an {@link Optional} containing the value as an {@link Instant}, or empty if absent
                  */
                 public Optional<Instant> updateTime() {
                     return Optional.ofNullable(updateTime).map(Instant::ofEpochSecond);
@@ -184,7 +177,7 @@ public final class FetchSimilarNewslettersMexResponse implements MexOperation.Re
                 /**
                  * Parses a {@code Name} from the given JSON object.
                  *
-                 * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
                  * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
                  */
                 static Optional<Name> of(JSONObject obj) {
@@ -201,7 +194,7 @@ public final class FetchSimilarNewslettersMexResponse implements MexOperation.Re
                 /**
                  * Parses a list of {@code Name} from the given JSON array.
                  *
-                 * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
                  * @return the list of parsed results, empty if {@code arr} is {@code null}
                  */
                 static List<Name> ofArray(JSONArray arr) {
@@ -234,7 +227,7 @@ public final class FetchSimilarNewslettersMexResponse implements MexOperation.Re
                 /**
                  * Returns the {@code id} field.
                  *
-                 * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
                  */
                 public Optional<String> id() {
                     return Optional.ofNullable(id);
@@ -243,7 +236,7 @@ public final class FetchSimilarNewslettersMexResponse implements MexOperation.Re
                 /**
                  * Returns the {@code type} field.
                  *
-                 * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
                  */
                 public Optional<String> type() {
                     return Optional.ofNullable(type);
@@ -252,7 +245,7 @@ public final class FetchSimilarNewslettersMexResponse implements MexOperation.Re
                 /**
                  * Returns the {@code direct_path} field.
                  *
-                 * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
                  */
                 public Optional<String> directPath() {
                     return Optional.ofNullable(directPath);
@@ -261,7 +254,7 @@ public final class FetchSimilarNewslettersMexResponse implements MexOperation.Re
                 /**
                  * Parses a {@code Picture} from the given JSON object.
                  *
-                 * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
                  * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
                  */
                 static Optional<Picture> of(JSONObject obj) {
@@ -278,7 +271,7 @@ public final class FetchSimilarNewslettersMexResponse implements MexOperation.Re
                 /**
                  * Parses a list of {@code Picture} from the given JSON array.
                  *
-                 * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
                  * @return the list of parsed results, empty if {@code arr} is {@code null}
                  */
                 static List<Picture> ofArray(JSONArray arr) {
@@ -297,7 +290,7 @@ public final class FetchSimilarNewslettersMexResponse implements MexOperation.Re
             /**
              * Parses a {@code ThreadMetadata} from the given JSON object.
              *
-             * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
              * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
              */
             static Optional<ThreadMetadata> of(JSONObject obj) {
@@ -314,7 +307,7 @@ public final class FetchSimilarNewslettersMexResponse implements MexOperation.Re
             /**
              * Parses a list of {@code ThreadMetadata} from the given JSON array.
              *
-             * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
              * @return the list of parsed results, empty if {@code arr} is {@code null}
              */
             static List<ThreadMetadata> ofArray(JSONArray arr) {
@@ -343,7 +336,7 @@ public final class FetchSimilarNewslettersMexResponse implements MexOperation.Re
             /**
              * Returns the {@code type} field.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
              */
             public Optional<String> type() {
                 return Optional.ofNullable(type);
@@ -352,7 +345,7 @@ public final class FetchSimilarNewslettersMexResponse implements MexOperation.Re
             /**
              * Parses a {@code State} from the given JSON object.
              *
-             * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
              * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
              */
             static Optional<State> of(JSONObject obj) {
@@ -367,7 +360,7 @@ public final class FetchSimilarNewslettersMexResponse implements MexOperation.Re
             /**
              * Parses a list of {@code State} from the given JSON array.
              *
-             * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
              * @return the list of parsed results, empty if {@code arr} is {@code null}
              */
             static List<State> ofArray(JSONArray arr) {
@@ -386,7 +379,7 @@ public final class FetchSimilarNewslettersMexResponse implements MexOperation.Re
         /**
          * Parses a {@code Result} from the given JSON object.
          *
-         * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
          * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
          */
         static Optional<Result> of(JSONObject obj) {
@@ -403,7 +396,7 @@ public final class FetchSimilarNewslettersMexResponse implements MexOperation.Re
         /**
          * Parses a list of {@code Result} from the given JSON array.
          *
-         * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
          * @return the list of parsed results, empty if {@code arr} is {@code null}
          */
         static List<Result> ofArray(JSONArray arr) {
@@ -423,30 +416,21 @@ public final class FetchSimilarNewslettersMexResponse implements MexOperation.Re
      * Parses a {@link FetchSimilarNewslettersMexResponse} from the raw JSON bytes of the
      * {@code <result>} child.
      *
-     * @implNote WAWebMexFetchSimilarNewslettersJob.mexFetchSimilarNewsletters: mirrors the implicit
-     * unwrapping that WA Web performs on the GraphQL response,
-     * extracting the {@code xwa2_newsletters_similar} root.
      * @param json the UTF-8 encoded JSON payload
      * @return an {@link Optional} containing the parsed response, or
      *         empty if the envelope is missing expected fields
      */
     private static Optional<FetchSimilarNewslettersMexResponse> of(byte[] json) {
-        // WAWebMexFetchSimilarNewslettersJob.mexFetchSimilarNewsletters
-        // Parses the raw JSON payload, bailing out if fastjson2 returns null
         var jsonObject = JSON.parseObject(json);
         if (jsonObject == null) {
             return Optional.empty();
         }
 
-        // WAWebMexFetchSimilarNewslettersJob.mexFetchSimilarNewsletters
-        // Descends into the standard GraphQL "data" envelope
         var data = jsonObject.getJSONObject("data");
         if (data == null) {
             return Optional.empty();
         }
 
-        // WAWebMexFetchSimilarNewslettersJob.mexFetchSimilarNewsletters
-        // Extracts the operation-specific root keyed by xwa2_newsletters_similar
         var root = data.getJSONObject("xwa2_newsletters_similar");
         if (root == null) {
             return Optional.empty();

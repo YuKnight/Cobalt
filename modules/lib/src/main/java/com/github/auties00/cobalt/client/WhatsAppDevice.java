@@ -297,11 +297,9 @@ public final class WhatsAppDevice {
     String manufacturer;
 
     /**
-     * The platform type identifying the operating system and client variant, such as
-     * {@link DevicePlatformType#IOS_PHONE} or {@link DevicePlatformType#ANDROID_PHONE}.
-     *
-     * @implNote WAWebProtobufsCompanionReg.pb: {@code DeviceProps$PlatformType}
-     * constrains the set of wire values accepted here.
+     * The platform type identifying the operating system and client
+     * variant, such as {@link DevicePlatformType#IOS_PHONE} or
+     * {@link DevicePlatformType#ANDROID_PHONE}.
      */
     @WhatsAppWebExport(moduleName = "WAWebProtobufsCompanionReg.pb",
             exports = "DeviceProps$PlatformType", adaptation = WhatsAppAdaptation.DIRECT)
@@ -662,7 +660,6 @@ public final class WhatsAppDevice {
      * Sets the user-facing model name of this device.
      *
      * @param model the new model name
-     * @return this instance
      */
     public void setModel(String model) {
         this.model = model;
@@ -672,7 +669,6 @@ public final class WhatsAppDevice {
      * Sets the manufacturer name of this device.
      *
      * @param manufacturer the new manufacturer name
-     * @return this instance
      */
     public void setManufacturer(String manufacturer) {
         this.manufacturer = manufacturer;
@@ -682,7 +678,6 @@ public final class WhatsAppDevice {
      * Sets the platform type of this device.
      *
      * @param platform the new platform type
-     * @return this instance
      */
     public void setPlatform(ClientPlatformType platform) {
         this.platform = platform;
@@ -692,7 +687,6 @@ public final class WhatsAppDevice {
      * Sets the operating system version of this device.
      *
      * @param osDeviceAppVersion the new OS version
-     * @return this instance
      */
     public void setOsDeviceAppVersion(ClientAppVersion osDeviceAppVersion) {
         this.osDeviceAppVersion = osDeviceAppVersion;
@@ -702,7 +696,6 @@ public final class WhatsAppDevice {
      * Sets the OS build number of this device.
      *
      * @param osBuildNumber the new OS build number, or {@code null}
-     * @return this instance
      */
     public void setOsBuildNumber(String osBuildNumber) {
         this.osBuildNumber = osBuildNumber;
@@ -712,7 +705,6 @@ public final class WhatsAppDevice {
      * Sets the internal hardware model identifier of this device.
      *
      * @param modelId the new model identifier, or {@code null}
-     * @return this instance
      */
     public void setModelId(String modelId) {
         this.modelId = modelId;
@@ -722,7 +714,6 @@ public final class WhatsAppDevice {
      * Sets the WhatsApp client type of this device.
      *
      * @param clientType the new client type
-     * @return this instance
      */
     public void setClientType(WhatsAppClientType clientType) {
         this.clientType = clientType;
@@ -761,13 +752,14 @@ public final class WhatsAppDevice {
     }
 
     /**
-     * Returns a string representation of this device for debugging purposes.
+     * Returns a human-readable description of this device suitable for
+     * logs.
      *
-     * @return a human-readable string containing all device properties
+     * @return the string representation
      */
     @Override
     public String toString() {
-        return "JidCompanion[" +
+        return "WhatsAppDevice[" +
                 "model='" + model + '\'' +
                 ", manufacturer='" + manufacturer + '\'' +
                 ", platform=" + platform +

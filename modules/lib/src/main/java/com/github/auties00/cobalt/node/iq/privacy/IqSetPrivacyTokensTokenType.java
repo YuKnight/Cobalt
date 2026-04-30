@@ -11,7 +11,7 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 @WhatsAppWebModule(moduleName = "WAWebSetPrivacyTokensJob")
 public enum IqSetPrivacyTokensTokenType {
     /**
-     * The {@code trusted_contact} token type — grants the recipient
+     * The {@code trusted_contact} token type. Grants the recipient
      * trusted-contact status for call/messages gating.
      */
     TRUSTED_CONTACT("trusted_contact");
@@ -24,7 +24,7 @@ public enum IqSetPrivacyTokensTokenType {
     /**
      * Constructs a token-type constant.
      *
-     * @param wire the wire string; never {@code null}
+     * @param wire the wire string. Never {@code null}
      */
     IqSetPrivacyTokensTokenType(String wire) {
         this.wire = wire;
@@ -33,7 +33,7 @@ public enum IqSetPrivacyTokensTokenType {
     /**
      * Returns the wire string for this token type.
      *
-     * @return the wire string; never {@code null}
+     * @return the wire string. Never {@code null}
      */
     public String wire() {
         return wire;

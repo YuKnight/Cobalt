@@ -13,7 +13,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The {@code <localisation_metadata/>} projection — uid /
+ * The {@code <localisation_metadata/>} projection. Uid /
  * translation-project tuple plus 0..20 {@code <parameter/>} entries.
  */
 @WhatsAppWebModule(moduleName = "WASmaxInBizCtwaActionLocalisationMetadataMixin")

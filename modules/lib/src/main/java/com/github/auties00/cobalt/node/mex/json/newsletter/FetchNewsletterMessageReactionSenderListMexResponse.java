@@ -19,11 +19,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The response variant of {@link FetchNewsletterMessageReactionSenderListMexResponse} that exposes the data
- * returned by the server after a successful query.
- *
- * @implNote WAWebMexFetchNewsletterMessageReactionSenderListJob: adapts the JSON root returned by the GraphQL
- * query into a Java value object.
+ * Response variant for {@link FetchNewsletterMessageReactionSenderListMexRequest} carrying the parsed server reply.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexFetchNewsletterMessageReactionSenderListJob")
 public final class FetchNewsletterMessageReactionSenderListMexResponse implements MexOperation.Response.Json {
@@ -36,9 +32,6 @@ public final class FetchNewsletterMessageReactionSenderListMexResponse implement
     /**
      * Parses a MEX response from the given IQ response node.
      *
-     * @implNote WAWebMexFetchNewsletterMessageReactionSenderListJob.mexFetchNewsletterMessageReactionSenderList: WA Web relies on the
-     * GraphQL client to unwrap the response. Cobalt performs the
-     * unwrapping manually from the IQ {@code <result>} child.
      * @param node the IQ response node received from the relay
      * @return an {@link Optional} containing the parsed response, or
      *         empty if the node is missing a result payload
@@ -73,7 +66,7 @@ public final class FetchNewsletterMessageReactionSenderListMexResponse implement
         /**
          * Returns the {@code reaction_code} field.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
          */
         public Optional<String> reactionCode() {
             return Optional.ofNullable(reactionCode);
@@ -82,7 +75,7 @@ public final class FetchNewsletterMessageReactionSenderListMexResponse implement
         /**
          * Returns the {@code sender_list} field.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
          */
         public Optional<SenderList> senderList() {
             return Optional.ofNullable(senderList);
@@ -101,7 +94,7 @@ public final class FetchNewsletterMessageReactionSenderListMexResponse implement
             /**
              * Returns the {@code edges} field.
              *
-             * @return the list of values, empty if absent
+     * @return the list of values, empty if absent
              */
             public List<Edges> edges() {
                 return edges;
@@ -120,7 +113,7 @@ public final class FetchNewsletterMessageReactionSenderListMexResponse implement
                 /**
                  * Returns the {@code node} field.
                  *
-                 * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
                  */
                 public Optional<Node> node() {
                     return Optional.ofNullable(node);
@@ -141,7 +134,7 @@ public final class FetchNewsletterMessageReactionSenderListMexResponse implement
                     /**
                      * Returns the {@code id} field.
                      *
-                     * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
                      */
                     public Optional<String> id() {
                         return Optional.ofNullable(id);
@@ -150,7 +143,7 @@ public final class FetchNewsletterMessageReactionSenderListMexResponse implement
                     /**
                      * Returns the {@code profile_pic_direct_path} field.
                      *
-                     * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
                      */
                     public Optional<String> profilePicDirectPath() {
                         return Optional.ofNullable(profilePicDirectPath);
@@ -159,7 +152,7 @@ public final class FetchNewsletterMessageReactionSenderListMexResponse implement
                     /**
                      * Parses a {@code Node} from the given JSON object.
                      *
-                     * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
                      * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
                      */
                     static Optional<Node> of(JSONObject obj) {
@@ -175,7 +168,7 @@ public final class FetchNewsletterMessageReactionSenderListMexResponse implement
                     /**
                      * Parses a list of {@code Node} from the given JSON array.
                      *
-                     * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
                      * @return the list of parsed results, empty if {@code arr} is {@code null}
                      */
                     static List<Node> ofArray(JSONArray arr) {
@@ -194,7 +187,7 @@ public final class FetchNewsletterMessageReactionSenderListMexResponse implement
                 /**
                  * Parses a {@code Edges} from the given JSON object.
                  *
-                 * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
                  * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
                  */
                 static Optional<Edges> of(JSONObject obj) {
@@ -209,7 +202,7 @@ public final class FetchNewsletterMessageReactionSenderListMexResponse implement
                 /**
                  * Parses a list of {@code Edges} from the given JSON array.
                  *
-                 * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
                  * @return the list of parsed results, empty if {@code arr} is {@code null}
                  */
                 static List<Edges> ofArray(JSONArray arr) {
@@ -228,7 +221,7 @@ public final class FetchNewsletterMessageReactionSenderListMexResponse implement
             /**
              * Parses a {@code SenderList} from the given JSON object.
              *
-             * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
              * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
              */
             static Optional<SenderList> of(JSONObject obj) {
@@ -243,7 +236,7 @@ public final class FetchNewsletterMessageReactionSenderListMexResponse implement
             /**
              * Parses a list of {@code SenderList} from the given JSON array.
              *
-             * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
              * @return the list of parsed results, empty if {@code arr} is {@code null}
              */
             static List<SenderList> ofArray(JSONArray arr) {
@@ -262,7 +255,7 @@ public final class FetchNewsletterMessageReactionSenderListMexResponse implement
         /**
          * Parses a {@code Reactions} from the given JSON object.
          *
-         * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
          * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
          */
         static Optional<Reactions> of(JSONObject obj) {
@@ -278,7 +271,7 @@ public final class FetchNewsletterMessageReactionSenderListMexResponse implement
         /**
          * Parses a list of {@code Reactions} from the given JSON array.
          *
-         * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
          * @return the list of parsed results, empty if {@code arr} is {@code null}
          */
         static List<Reactions> ofArray(JSONArray arr) {
@@ -298,30 +291,21 @@ public final class FetchNewsletterMessageReactionSenderListMexResponse implement
      * Parses a {@link FetchNewsletterMessageReactionSenderListMexResponse} from the raw JSON bytes of the
      * {@code <result>} child.
      *
-     * @implNote WAWebMexFetchNewsletterMessageReactionSenderListJob.mexFetchNewsletterMessageReactionSenderList: mirrors the implicit
-     * unwrapping that WA Web performs on the GraphQL response,
-     * extracting the {@code xwa2_newsletters_reaction_sender_list} root.
      * @param json the UTF-8 encoded JSON payload
      * @return an {@link Optional} containing the parsed response, or
      *         empty if the envelope is missing expected fields
      */
     private static Optional<FetchNewsletterMessageReactionSenderListMexResponse> of(byte[] json) {
-        // WAWebMexFetchNewsletterMessageReactionSenderListJob.mexFetchNewsletterMessageReactionSenderList
-        // Parses the raw JSON payload, bailing out if fastjson2 returns null
         var jsonObject = JSON.parseObject(json);
         if (jsonObject == null) {
             return Optional.empty();
         }
 
-        // WAWebMexFetchNewsletterMessageReactionSenderListJob.mexFetchNewsletterMessageReactionSenderList
-        // Descends into the standard GraphQL "data" envelope
         var data = jsonObject.getJSONObject("data");
         if (data == null) {
             return Optional.empty();
         }
 
-        // WAWebMexFetchNewsletterMessageReactionSenderListJob.mexFetchNewsletterMessageReactionSenderList
-        // Extracts the operation-specific root keyed by xwa2_newsletters_reaction_sender_list
         var root = data.getJSONObject("xwa2_newsletters_reaction_sender_list");
         if (root == null) {
             return Optional.empty();

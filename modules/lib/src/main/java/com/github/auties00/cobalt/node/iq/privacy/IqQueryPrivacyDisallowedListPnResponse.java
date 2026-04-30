@@ -31,8 +31,8 @@ public sealed interface IqQueryPrivacyDisallowedListPnResponse extends IqOperati
     /**
      * Tries each {@link IqQueryPrivacyDisallowedListPnResponse} variant in priority order.
      *
-     * @param node    the inbound IQ stanza; never {@code null}
-     * @param request the original outbound stanza; never {@code null}
+     * @param node    the inbound IQ stanza. Never {@code null}
+     * @param request the original outbound stanza. Never {@code null}
      * @return an {@link Optional} carrying the parsed variant, or
      *         empty when no documented variant matched
      * @throws NullPointerException if either argument is
@@ -56,7 +56,7 @@ public sealed interface IqQueryPrivacyDisallowedListPnResponse extends IqOperati
     }
 
     /**
-     * The {@code Success} reply variant — the relay accepted the
+     * The {@code Success} reply variant. The relay accepted the
      * query and either confirmed the local cache is authoritative
      * ({@link Match}) or shipped the up-to-date authoritative list
      * ({@link Mismatch}).
@@ -110,7 +110,7 @@ public sealed interface IqQueryPrivacyDisallowedListPnResponse extends IqOperati
     }
 
     /**
-     * The {@code Match} sub-variant — the relay omitted the
+     * The {@code Match} sub-variant. The relay omitted the
      * {@code <list>} grandchild, signalling the local copy of
      * the disallowed list is still authoritative.
      */
@@ -142,9 +142,9 @@ public sealed interface IqQueryPrivacyDisallowedListPnResponse extends IqOperati
     }
 
     /**
-     * The {@code Mismatch} sub-variant — the relay shipped the
+     * The {@code Mismatch} sub-variant. The relay shipped the
      * authoritative {@code <list dhash="..."><user jid="..."/>...
-     * </list>} envelope; the caller must replace the local cache
+     * </list>} envelope. The caller must replace the local cache
      * with this snapshot.
      */
     @WhatsAppWebModule(moduleName = "WAWebQueryPrivacyDisallowedListPnJob")
@@ -155,7 +155,7 @@ public sealed interface IqQueryPrivacyDisallowedListPnResponse extends IqOperati
         private final List<Jid> users;
 
         /**
-         * The relay-side digest of the shipped list — clients
+         * The relay-side digest of the shipped list. Clients
          * persist this and replay it as the {@code dhash} attribute
          * on subsequent {@code WAWebSetPrivacyJob} mutations.
          */
@@ -164,9 +164,9 @@ public sealed interface IqQueryPrivacyDisallowedListPnResponse extends IqOperati
         /**
          * Constructs a {@code Mismatch} reply.
          *
-         * @param users the authoritative user list; never
+         * @param users the authoritative user list. Never
          *              {@code null}
-         * @param dhash the relay-side digest; never {@code null}
+         * @param dhash the relay-side digest. Never {@code null}
          * @throws NullPointerException if either argument is
          *                              {@code null}
          */
@@ -179,7 +179,7 @@ public sealed interface IqQueryPrivacyDisallowedListPnResponse extends IqOperati
         /**
          * Returns the authoritative user list.
          *
-         * @return an unmodifiable list; never {@code null}
+         * @return an unmodifiable list. Never {@code null}
          */
         public List<Jid> users() {
             return users;
@@ -188,7 +188,7 @@ public sealed interface IqQueryPrivacyDisallowedListPnResponse extends IqOperati
         /**
          * Returns the relay-side digest of the user list.
          *
-         * @return the digest string; never {@code null}
+         * @return the digest string. Never {@code null}
          */
         public String dhash() {
             return dhash;
@@ -220,7 +220,7 @@ public sealed interface IqQueryPrivacyDisallowedListPnResponse extends IqOperati
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected
+     * The {@code ClientError} reply variant. The relay rejected
      * the query with a {@code 4xx} error code.
      */
     @WhatsAppWebModule(moduleName = "WAWebQueryPrivacyDisallowedListPnJob")
@@ -239,7 +239,7 @@ public sealed interface IqQueryPrivacyDisallowedListPnResponse extends IqOperati
          * Constructs a client-error reply.
          *
          * @param errorCode the numeric error code
-         * @param errorText the optional text; may be {@code null}
+         * @param errorText the optional text. May be {@code null}
          */
         public ClientError(int errorCode, String errorText) {
             this.errorCode = errorCode;
@@ -311,7 +311,7 @@ public sealed interface IqQueryPrivacyDisallowedListPnResponse extends IqOperati
     }
 
     /**
-     * The {@code ServerError} reply variant — transient internal
+     * The {@code ServerError} reply variant. Transient internal
      * failure ({@code 5xx} error code).
      */
     @WhatsAppWebModule(moduleName = "WAWebQueryPrivacyDisallowedListPnJob")
@@ -330,7 +330,7 @@ public sealed interface IqQueryPrivacyDisallowedListPnResponse extends IqOperati
          * Constructs a server-error reply.
          *
          * @param errorCode the numeric error code
-         * @param errorText the optional text; may be {@code null}
+         * @param errorText the optional text. May be {@code null}
          */
         public ServerError(int errorCode, String errorText) {
             this.errorCode = errorCode;

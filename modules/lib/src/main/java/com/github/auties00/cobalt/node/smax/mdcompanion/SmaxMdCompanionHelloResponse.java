@@ -54,7 +54,7 @@ public sealed interface SmaxMdCompanionHelloResponse extends SmaxOperation.Respo
     }
 
     /**
-     * The {@code NotifyCompanion} reply variant — the relay accepted
+     * The {@code NotifyCompanion} reply variant. The relay accepted
      * the hello and echoes back a {@code link_code_pairing_ref} that
      * the user types on the primary device.
      *
@@ -145,7 +145,7 @@ public sealed interface SmaxMdCompanionHelloResponse extends SmaxOperation.Respo
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected the
+     * The {@code ClientError} reply variant. The relay rejected the
      * request with a {@code 4xx} {@code IqMixin} error
      * (bad-request, forbidden, rate-overlimit, feature-not-available,
      * or internal-server-error mapped to client range).
@@ -245,7 +245,7 @@ public sealed interface SmaxMdCompanionHelloResponse extends SmaxOperation.Respo
     }
 
     /**
-     * The {@code ServerError} reply variant — the relay encountered a
+     * The {@code ServerError} reply variant. The relay encountered a
      * {@code 5xx} transient internal failure while processing the
      * request.
      *

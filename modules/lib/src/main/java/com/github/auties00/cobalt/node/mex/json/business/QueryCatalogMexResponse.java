@@ -12,13 +12,9 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The response variant of the {@code queryCatalog} MEX operation that
- * parses the JSON returned by the relay.
- *
- * @implNote WAWebQueryCatalog: adapts the
- * {@code xwa_product_catalog_get_product_catalog.product_catalog}
- * projection into a list of {@link BusinessCatalogEntry}; the GraphQL
- * {@code paging.after} cursor is surfaced so callers can paginate.
+ * Parsed response of the {@code queryCatalog} MEX query carrying the
+ * {@code xwa_product_catalog_get_product_catalog.product_catalog} projection
+ * and the {@code paging.after} cursor.
  */
 @WhatsAppWebModule(moduleName = "WAWebQueryCatalog")
 public final class QueryCatalogMexResponse implements MexOperation.Response.Json {
@@ -39,14 +35,11 @@ public final class QueryCatalogMexResponse implements MexOperation.Response.Json
     /**
      * Parses the MEX response carried by an inbound IQ stanza.
      *
-     * @implNote WAWebQueryCatalog.default: the WA Web helper reads
-     * {@code data.xwa_product_catalog_get_product_catalog.product_catalog.products}
-     * and the sibling {@code paging} cursors. When the relay returns an
-     * absent {@code product_catalog} both the WA Web helper and this
-     * method yield an empty response.
+     * @implNote When the relay returns an absent {@code product_catalog}
+     *           both the WA Web helper and this method yield an empty page.
      * @param node the inbound IQ stanza carrying the {@code <result>} child
-     * @return the parsed response, or {@code Optional.empty()} if the
-     *         expected JSON shape is absent
+     * @return the parsed response, or empty if the expected JSON shape is
+     *         absent
      */
     @WhatsAppWebExport(moduleName = "WAWebQueryCatalog", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -57,8 +50,7 @@ public final class QueryCatalogMexResponse implements MexOperation.Response.Json
     }
 
     /**
-     * Returns the list of products returned by this page of the
-     * catalog.
+     * Returns the products returned by this page of the catalog.
      *
      * @return an unmodifiable list of entries, never {@code null}
      */
@@ -67,10 +59,10 @@ public final class QueryCatalogMexResponse implements MexOperation.Response.Json
     }
 
     /**
-     * Returns the {@code paging.after} cursor usable to request the
-     * next page of products.
+     * Returns the {@code paging.after} cursor usable to request the next
+     * page of products.
      *
-     * @return an {@link Optional} containing the cursor when the relay
+     * @return an {@link Optional} carrying the cursor when the relay
      *         returned a non-empty value, or empty otherwise
      */
     public Optional<String> afterCursor() {
@@ -78,12 +70,11 @@ public final class QueryCatalogMexResponse implements MexOperation.Response.Json
     }
 
     /**
-     * Parses the raw JSON bytes of the {@code <result>} child into a
-     * structured response.
+     * Parses the raw JSON bytes of the {@code <result>} child.
      *
      * @param json the UTF-8 encoded JSON payload
-     * @return an {@link Optional} containing the parsed response, or
-     *         empty if the envelope is missing the expected fields
+     * @return the parsed response, or empty if the envelope is missing the
+     *         expected fields
      */
     private static Optional<QueryCatalogMexResponse> of(byte[] json) {
         var root = JSON.parseObject(json);
@@ -100,7 +91,6 @@ public final class QueryCatalogMexResponse implements MexOperation.Response.Json
         }
         var catalog = getResult.getJSONObject("product_catalog");
         if (catalog == null) {
-            // WAWebQueryCatalog.default: when product_catalog is absent WA Web returns an empty page
             return Optional.of(new QueryCatalogMexResponse(List.of(), ""));
         }
         var paging = catalog.getJSONObject("paging");

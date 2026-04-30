@@ -41,81 +41,91 @@ import java.util.Set;
  */
 public interface WhatsAppClientListener {
     /**
-     * Called when a node is sent to the WhatsApp server.
+     * Notifies the listener that a node has been sent to the WhatsApp
+     * server.
      *
-     * @param whatsapp an instance of the calling API
-     * @param outgoing the non-null node that was sent
+     * @param whatsapp the client emitting the event
+     * @param outgoing the node that was sent
      */
     default void onNodeSent(WhatsAppClient whatsapp, Node outgoing) {
     }
 
     /**
-     * Called when a node is received from the WhatsApp server.
+     * Notifies the listener that a node has been received from the
+     * WhatsApp server.
      *
-     * @param whatsapp an instance of the calling API
-     * @param incoming the non-null node that was received
+     * @param whatsapp the client emitting the event
+     * @param incoming the node that was received
      */
     default void onNodeReceived(WhatsAppClient whatsapp, Node incoming) {
     }
 
     /**
-     * Called when a successful connection and login to a WhatsApp account is established.
-     * <p>
-     * Note: When this event is fired, data such as chats and contacts may not yet be loaded
-     * into memory. For specific data types, use the corresponding event handlers:
-     * {@link #onChats(WhatsAppClient, Collection)}, {@link #onContacts(WhatsAppClient, Collection)}, etc.
+     * Notifies the listener that a successful connection and login to a
+     * WhatsApp account has been established.
      *
-     * @param whatsapp an instance of the calling API
+     * <p>When this event fires, data such as chats and contacts may not
+     * yet be loaded into memory. Use the corresponding event handlers for
+     * specific data types, such as
+     * {@link #onChats(WhatsAppClient, Collection)} and
+     * {@link #onContacts(WhatsAppClient, Collection)}.
+     *
+     * @param whatsapp the client emitting the event
      */
     default void onLoggedIn(WhatsAppClient whatsapp) {
     }
 
     /**
-     * Called when the connection to WhatsApp is terminated.
+     * Notifies the listener that the connection to WhatsApp has been
+     * terminated.
      *
-     * @param whatsapp an instance of the calling API
-     * @param reason   the reason for disconnection, indicating why the session was terminated
+     * @param whatsapp the client emitting the event
+     * @param reason   the reason for disconnection
      * @see WhatsAppClientDisconnectReason
      */
     default void onDisconnected(WhatsAppClient whatsapp, WhatsAppClientDisconnectReason reason) {
     }
 
     /**
-     * Called when an action is received from WhatsApp Web.
-     * <p>
-     * This event is only triggered for web client connections.
+     * Notifies the listener that an app-state action has been received
+     * from WhatsApp Web.
      *
-     * @param whatsapp         an instance of the calling API
-     * @param action           the action that was executed
-     * @param index            the data associated with this action
+     * <p>This event is only triggered for web client connections.
+     *
+     * @param whatsapp the client emitting the event
+     * @param action   the action that was executed
+     * @param index    the data associated with this action
      */
     default void onWebAppStateAction(WhatsAppClient whatsapp, SyncAction action, String index) {
     }
 
     /**
-     * Called when primary features are received from WhatsApp Web.
-     * <p>
-     * This event is only triggered for web client connections.
+     * Notifies the listener that the primary feature flags have been
+     * received from WhatsApp Web.
      *
-     * @param whatsapp an instance of the calling API
-     * @param features the non-null collection of features that were sent
+     * <p>This event is only triggered for web client connections.
+     *
+     * @param whatsapp the client emitting the event
+     * @param features the collection of feature flags that were sent
      */
     default void onWebAppPrimaryFeatures(WhatsAppClient whatsapp, List<String> features) {
     }
 
     /**
-     * Called when all contacts are received from WhatsApp.
+     * Notifies the listener that the full contact list has been received
+     * from WhatsApp.
      *
-     * @param whatsapp an instance of the calling API
+     * @param whatsapp the client emitting the event
      * @param contacts the collection of contacts
      */
     default void onContacts(WhatsAppClient whatsapp, Collection<Contact> contacts) {
     }
 
     /**
-     * Called when a contact's presence status is updated.
+     * Notifies the listener that a contact's presence status has been
+     * updated.
      *
-     * @param whatsapp     an instance of the calling API
+     * @param whatsapp     the client emitting the event
      * @param conversation the chat related to this presence update
      * @param participant  the contact whose presence status changed
      */
@@ -123,112 +133,127 @@ public interface WhatsAppClientListener {
     }
 
     /**
-     * Called when all chats are received from WhatsApp.
-     * <p>
-     * When this event is fired, all chat metadata is available, excluding message content.
-     * For message content, refer to {@link #onWebHistorySyncMessages(WhatsAppClient, Chat, boolean)}.
-     * Note that particularly old chats may be loaded later through the history sync process.
+     * Notifies the listener that the full chat list has been received
+     * from WhatsApp.
      *
-     * @param whatsapp an instance of the calling API
+     * <p>When this event fires, all chat metadata is available, excluding
+     * message content. For message content refer to
+     * {@link #onWebHistorySyncMessages(WhatsAppClient, Chat, boolean)}.
+     * Particularly old chats may be loaded later through the history-sync
+     * process.
+     *
+     * @param whatsapp the client emitting the event
      * @param chats    the collection of chats
      */
     default void onChats(WhatsAppClient whatsapp, Collection<Chat> chats) {
     }
 
     /**
-     * Called when all newsletters are received from WhatsApp.
+     * Notifies the listener that the full newsletter list has been
+     * received from WhatsApp.
      *
-     * @param whatsapp    an instance of the calling API
+     * @param whatsapp    the client emitting the event
      * @param newsletters the collection of newsletters
      */
     default void onNewsletters(WhatsAppClient whatsapp, Collection<Newsletter> newsletters) {
     }
 
     /**
-     * Called when messages for a chat are received during history synchronization.
-     * <p>
-     * This event is only triggered during initial QR code scanning and history syncing.
-     * In subsequent connections, messages will already be loaded in the chats.
+     * Notifies the listener that messages for a chat have been received
+     * during history synchronization.
      *
-     * @param whatsapp an instance of the calling API
+     * <p>This event is only triggered during initial QR code scanning and
+     * history syncing. On subsequent connections messages are already
+     * loaded in the chats.
+     *
+     * @param whatsapp the client emitting the event
      * @param chat     the chat being synchronized
-     * @param last     true if these are the final messages for this chat, false if more are coming
+     * @param last     {@code true} if these are the final messages for
+     *                 this chat, {@code false} if more are coming
      */
     default void onWebHistorySyncMessages(WhatsAppClient whatsapp, Chat chat, boolean last) {
     }
 
     /**
-     * Called when past participants for a group are received during history synchronization.
+     * Notifies the listener that past participants for a group have been
+     * received during history synchronization.
      *
-     * @param whatsapp             an instance of the calling API
-     * @param chatJid              the non-null group chat JID
-     * @param groupPastParticipants the non-null collection of past participants
+     * @param whatsapp              the client emitting the event
+     * @param chatJid               the group chat JID
+     * @param groupPastParticipants the collection of past participants
      */
     default void onWebHistorySyncPastParticipants(WhatsAppClient whatsapp, Jid chatJid, Collection<GroupPastParticipant> groupPastParticipants) {
     }
 
     /**
-     * Called with the progress of the history synchronization process.
-     * <p>
-     * This event is only triggered during initial QR code scanning and history syncing.
+     * Notifies the listener of progress made by the history-synchronization
+     * process.
      *
-     * @param whatsapp   an instance of the calling API
+     * <p>This event is only triggered during initial QR code scanning and
+     * history syncing.
+     *
+     * @param whatsapp   the client emitting the event
      * @param percentage the percentage of synchronization completed
-     * @param recent     true if syncing recent messages, false if syncing older messages
+     * @param recent     {@code true} if syncing recent messages,
+     *                   {@code false} if syncing older messages
      */
     default void onWebHistorySyncProgress(WhatsAppClient whatsapp, int percentage, boolean recent) {
     }
 
     /**
-     * Called when a new message is received.
+     * Notifies the listener that a new message has been received.
      *
-     * @param whatsapp an instance of the calling API
+     * @param whatsapp the client emitting the event
      * @param info     the message that was received
      */
     default void onNewMessage(WhatsAppClient whatsapp, MessageInfo info) {
     }
 
     /**
-     * Called when a message is deleted.
+     * Notifies the listener that a message has been deleted.
      *
-     * @param whatsapp an instance of the calling API
+     * @param whatsapp the client emitting the event
      * @param info     the message that was deleted
-     * @param everyone true if the message was deleted for everyone, false if deleted only for the user
+     * @param everyone {@code true} if the message was deleted for
+     *                 everyone, {@code false} if deleted only for the user
      */
     default void onMessageDeleted(WhatsAppClient whatsapp, MessageInfo info, boolean everyone) {
     }
 
     /**
-     * Called when a message's status changes (e.g., sent, delivered, read).
+     * Notifies the listener that a message's status has changed (sent,
+     * delivered, read).
      *
-     * @param whatsapp an instance of the calling API
+     * @param whatsapp the client emitting the event
      * @param info     the message whose status changed
      */
     default void onMessageStatus(WhatsAppClient whatsapp, MessageInfo info) {
     }
 
     /**
-     * Called when all status updates are received from WhatsApp.
+     * Notifies the listener that the full status feed has been received
+     * from WhatsApp.
      *
-     * @param whatsapp an instance of the calling API
+     * @param whatsapp the client emitting the event
      * @param status   the collection of status updates
      */
     default void onStatus(WhatsAppClient whatsapp, Collection<ChatMessageInfo> status) {
     }
 
     /**
-     * Called when a new status update is received.
+     * Notifies the listener that a new status update has been received.
      *
-     * @param whatsapp an instance of the calling API
+     * @param whatsapp the client emitting the event
      * @param status   the new status message
      */
     default void onNewStatus(WhatsAppClient whatsapp, ChatMessageInfo status) {
     }
 
     /**
-     * Called when a message is sent in reply to a previous message.
+     * Notifies the listener that a message has been sent in reply to a
+     * previous message.
      *
-     * @param whatsapp an instance of the calling API
+     * @param whatsapp the client emitting the event
      * @param response the reply message
      * @param quoted   the message being replied to
      */
@@ -236,38 +261,40 @@ public interface WhatsAppClientListener {
     }
 
     /**
-     * Called when a contact's profile picture changes.
+     * Notifies the listener that a contact's profile picture has changed.
      *
-     * @param whatsapp an instance of the calling API
+     * @param whatsapp the client emitting the event
      * @param jid      the contact whose profile picture changed
      */
     default void onProfilePictureChanged(WhatsAppClient whatsapp, Jid jid) {
     }
 
     /**
-     * Called when the user's display name changes.
+     * Notifies the listener that the user's display name has changed.
      *
-     * @param whatsapp an instance of the calling API
-     * @param oldName  the non-null previous name
-     * @param newName  the non-null new name
+     * @param whatsapp the client emitting the event
+     * @param oldName  the previous name
+     * @param newName  the new name
      */
     default void onNameChanged(WhatsAppClient whatsapp, String oldName, String newName) {
     }
 
     /**
-     * Called when the user's about/status text changes.
+     * Notifies the listener that the user's about/status text has
+     * changed.
      *
-     * @param whatsapp an instance of the calling API
-     * @param oldAbout the non-null previous about text
-     * @param newAbout the non-null new about text
+     * @param whatsapp the client emitting the event
+     * @param oldAbout the previous about text
+     * @param newAbout the new about text
      */
     default void onAboutChanged(WhatsAppClient whatsapp, String oldAbout, String newAbout) {
     }
 
     /**
-     * Called when a contact's text status metadata changes.
+     * Notifies the listener that a contact's text status metadata has
+     * changed.
      *
-     * @param whatsapp an instance of the calling API
+     * @param whatsapp the client emitting the event
      * @param contact  the contact whose text status changed
      * @param status   the new text status
      */
@@ -275,68 +302,72 @@ public interface WhatsAppClientListener {
     }
 
     /**
-     * Called when the user's locale settings change.
+     * Notifies the listener that the user's locale settings have changed.
      *
-     * @param whatsapp  an instance of the calling API
-     * @param oldLocale the non-null previous locale
-     * @param newLocale the non-null new locale
+     * @param whatsapp  the client emitting the event
+     * @param oldLocale the previous locale
+     * @param newLocale the new locale
      */
     default void onLocaleChanged(WhatsAppClient whatsapp, String oldLocale, String newLocale) {
     }
 
     /**
-     * Called when a contact is blocked or unblocked.
+     * Notifies the listener that a contact has been blocked or unblocked.
      *
-     * @param whatsapp an instance of the calling API
-     * @param contact  the non-null contact that was blocked or unblocked
+     * @param whatsapp the client emitting the event
+     * @param contact  the contact that was blocked or unblocked
      */
     default void onContactBlocked(WhatsAppClient whatsapp, Jid contact) {
     }
 
     /**
-     * Called when a new contact is added to the contact list.
+     * Notifies the listener that a new contact has been added to the
+     * contact list.
      *
-     * @param whatsapp an instance of the calling API
+     * @param whatsapp the client emitting the event
      * @param contact  the new contact
      */
     default void onNewContact(WhatsAppClient whatsapp, Contact contact) {
     }
 
     /**
-     * Called when a privacy setting is changed.
+     * Notifies the listener that a privacy setting has been changed.
      *
-     * @param whatsapp        an instance of the calling API
+     * @param whatsapp        the client emitting the event
      * @param newPrivacyEntry the new privacy setting
      */
     default void onPrivacySettingChanged(WhatsAppClient whatsapp, PrivacySettingEntry newPrivacyEntry) {
     }
 
     /**
-     * Called when a registration code (OTP) is requested from a new device.
-     * <p>
-     * Note: This event is only triggered for the mobile API.
+     * Notifies the listener that a registration code (OTP) has been
+     * requested from a new device.
      *
-     * @param whatsapp an instance of the calling API
+     * <p>This event is only triggered for the mobile API.
+     *
+     * @param whatsapp the client emitting the event
      * @param code     the registration code
      */
     default void onRegistrationCode(WhatsAppClient whatsapp, long code) {
     }
 
     /**
-     * Called when a phone call is received.
+     * Notifies the listener that a phone call has been received.
      *
-     * @param whatsapp an instance of the calling API
-     * @param call     the non-null phone call information
+     * @param whatsapp the client emitting the event
+     * @param call     the phone call information
      */
     default void onCall(WhatsAppClient whatsapp, CallOffer call) {
     }
 
     /**
-     * Called when a device's identity key has changed.
-     * This indicates the device was reset, reinstalled, or potentially compromised.
-     * Applications should display a security warning to users.
+     * Notifies the listener that a device's identity key has changed.
      *
-     * @param whatsapp       an instance of the calling API
+     * <p>This indicates that the device was reset, reinstalled, or
+     * potentially compromised. Applications should display a security
+     * warning to users.
+     *
+     * @param whatsapp       the client emitting the event
      * @param userJid        the user whose device changed
      * @param changedDevices the devices with new identity keys
      */
@@ -344,10 +375,13 @@ public interface WhatsAppClientListener {
     }
 
     /**
-     * Called when a contact's account type changes between E2EE and HOSTED.
-     * This indicates a transition in the contact's encryption configuration.
+     * Notifies the listener that a contact's account type has changed
+     * between {@code E2EE} and {@code HOSTED}.
      *
-     * @param whatsapp an instance of the calling API
+     * <p>This indicates a transition in the contact's encryption
+     * configuration.
+     *
+     * @param whatsapp the client emitting the event
      * @param userJid  the user whose account type changed
      * @param oldType  the previous account type
      * @param newType  the new account type

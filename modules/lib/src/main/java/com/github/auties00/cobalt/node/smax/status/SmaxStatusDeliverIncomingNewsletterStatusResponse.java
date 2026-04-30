@@ -14,15 +14,6 @@ import java.util.Optional;
  * The inbound projection of the
  * {@code <status from=NEWSLETTER_JID id server_id t
  * is_sender?>...</status>} stanza.
- *
- * @implNote {@code WASmaxInStatusDeliverIncomingNewsletterStatusRequest.parseIncomingNewsletterStatusRequest}
- *           composes
- *           {@code WASmaxInStatusDeliverFromNewsletterMixin}
- *           (envelope: {@code from=newsletterJid}, server_id 99..2_147_476_647,
- *           t 1577865600..4102473600, optional is_sender, content-type
- *           projection via
- *           {@code WASmaxInStatusDeliverStatusNewsletterContentMixin},
- *           optional offline 0..12).
  */
 @WhatsAppWebModule(moduleName = "WASmaxInStatusDeliverIncomingNewsletterStatusRequest")
 @WhatsAppWebModule(moduleName = "WASmaxInStatusDeliverFromNewsletterMixin")
@@ -50,15 +41,15 @@ public final class SmaxStatusDeliverIncomingNewsletterStatusResponse implements 
     private final long timestamp;
 
     /**
-     * Whether the {@code is_sender="true"} attribute was present —
+     * Whether the {@code is_sender="true"} attribute was present.
      * i.e. the connected client authored the status post.
      */
     private final boolean fromSelf;
 
     /**
-     * The newsletter-status content-type variant name — e.g.
+     * The newsletter-status content-type variant name. E.g.
      * {@code "newsletter_reaction"},
-     * {@code "newsletter_reaction_revoke"} — derived from the first
+     * {@code "newsletter_reaction_revoke"}. Derived from the first
      * matching content child.
      */
     private final String contentTypeName;
@@ -70,7 +61,7 @@ public final class SmaxStatusDeliverIncomingNewsletterStatusResponse implements 
     private final Integer offline;
 
     /**
-     * The raw underlying {@code <status/>} {@link Node} — exposed so
+     * The raw underlying {@code <status/>} {@link Node}. Exposed so
      * callers can project the variable-shape content children
      * (reaction emoji, target server-id, etc.) without Cobalt
      * needing to model every fanout variant here.
@@ -256,8 +247,6 @@ public final class SmaxStatusDeliverIncomingNewsletterStatusResponse implements 
      * @param node the status stanza; never {@code null}
      * @return the variant name, or {@code null} when no variant
      *         matched
-     *
-     * @implNote {@code WASmaxInStatusDeliverNewsletterStatusContentTypeMixins.parseNewsletterStatusContentTypeMixins}.
      */
     @WhatsAppWebExport(moduleName = "WASmaxInStatusDeliverNewsletterStatusContentTypeMixins",
             exports = "parseNewsletterStatusContentTypeMixins",

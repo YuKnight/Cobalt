@@ -1,14 +1,18 @@
 package com.github.auties00.cobalt.node.iq.biz;
 
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.JidServer;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.node.iq.IqOperation;
 
 /**
- * The outbound stanza variant.
+ * The outbound {@code <iq xmlns="fb:thrift_iq" type="set">} stanza that
+ * toggles the cart-enabled flag in the current merchant's commerce
+ * settings.
  */
+@WhatsAppWebModule(moduleName = "WAWebBusinessProfileJob")
 public final class IqUpdateCartEnabledRequest implements IqOperation.Request {
     /**
      * Whether the cart should be enabled.

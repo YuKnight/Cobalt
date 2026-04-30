@@ -16,7 +16,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * One {@code <message>} child of the {@code <spam_list>} payload —
+ * One {@code <message>} child of the {@code <spam_list>} payload .
  * the wire-shape descriptor of a single offending message harvested
  * from the local cache.
  *
@@ -39,7 +39,7 @@ import java.util.Optional;
 @WhatsAppWebModule(moduleName = "WASmaxOutSpamMessageMixin")
 public final class SmaxNewsletterReportMessageEntry {
     /**
-     * The sender JID of the offending message — routed verbatim into
+     * The sender JID of the offending message, routed verbatim into
      * the message's {@code from} attribute.
      */
     private final Jid messageFrom;
@@ -55,7 +55,7 @@ public final class SmaxNewsletterReportMessageEntry {
     private final String messageId;
 
     /**
-     * The optional pre-built node — when supplied, the request
+     * The optional pre-built node. When supplied, the request
      * embeds the supplied node verbatim instead of reconstructing
      * the {@code <message>} envelope from the scalar fields.
      */

@@ -112,7 +112,7 @@ public final class OfflineNotificationsReporter {
             exports = "offlineNotificationsCount", adaptation = WhatsAppAdaptation.ADAPTED)
     public void increment(SyncPatchType collection) {
         Objects.requireNonNull(collection, "collection cannot be null");
-        offlineNotificationsCount.merge(collection, 1, Integer::sum); // WAWebHandleServerSyncNotification._: t != null ? set(e, t+1) : set(e, 1)
+        offlineNotificationsCount.merge(collection, 1, Integer::sum);
     }
 
     /**
@@ -139,23 +139,19 @@ public final class OfflineNotificationsReporter {
     @WhatsAppWebExport(moduleName = "WAWebHandleReportServerSyncNotification",
             exports = "reportOfflineNotifications", adaptation = WhatsAppAdaptation.DIRECT)
     public void report() {
-        if (offlineNotificationsCount.isEmpty()) { // WAWebHandleReportServerSyncNotification.reportOfflineNotifications: if (!(e.size < 1))
+        if (offlineNotificationsCount.isEmpty()) {
             return;
         }
 
-        var redundantCount = 0; // WAWebHandleReportServerSyncNotification.reportOfflineNotifications: var t = 0
-        // WAWebHandleReportServerSyncNotification.reportOfflineNotifications:
-        // Array.from(e.entries()).forEach(function(e){ var n = e[1]; t += n - 1 })
+        var redundantCount = 0;
         for (var count : offlineNotificationsCount.values()) {
             redundantCount += count - 1;
         }
 
-        // WAWebHandleReportServerSyncNotification.reportOfflineNotifications:
-        // new MdAppStateOfflineNotificationsWamEvent({redundantCount: t}).commit()
         wamService.commit(new MdAppStateOfflineNotificationsEventBuilder()
                 .redundantCount(redundantCount)
                 .build());
 
-        offlineNotificationsCount.clear(); // WAWebHandleReportServerSyncNotification.reportOfflineNotifications: e.clear()
+        offlineNotificationsCount.clear();
     }
 }

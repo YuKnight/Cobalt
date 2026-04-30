@@ -12,14 +12,15 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants produced by the relay in
- * response to a {@link IqUnpairDeviceRequest}.
+ * response to an {@link IqUnpairDeviceRequest}.
  *
  * @implNote {@code WAWebUnpairDeviceJob.unpairDevice} projects both
  *           result and error envelopes into a single
  *           {@code {status:int}} record; Cobalt splits them into typed
- *           {@code Success} / {@code ClientError} / {@code ServerError}
- *           variants.
+ *           {@code Success}, {@code ClientError} and
+ *           {@code ServerError} variants.
  */
+@WhatsAppWebModule(moduleName = "WAWebUnpairDeviceJob")
 public sealed interface IqUnpairDeviceResponse extends IqOperation.Response
         permits IqUnpairDeviceResponse.Success, IqUnpairDeviceResponse.ClientError, IqUnpairDeviceResponse.ServerError {
 

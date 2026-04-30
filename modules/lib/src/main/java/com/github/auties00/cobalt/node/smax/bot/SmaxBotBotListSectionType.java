@@ -16,17 +16,17 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Section type discriminator — projects the {@code <section type>}
+ * Section type discriminator. Projects the {@code <section type>}
  * attribute through {@code WASmaxInBotEnums.ENUM_ALL_CATEGORY_FEATURED}.
  */
 @WhatsAppWebModule(moduleName = "WASmaxInBotEnums")
 public enum SmaxBotBotListSectionType {
     /**
-     * The "all bots" section — a flat list aggregating every bot.
+     * The "all bots" section. A flat list aggregating every bot.
      */
     ALL("all"),
     /**
-     * A category section — bots grouped by topical category.
+     * A category section. Bots grouped by topical category.
      */
     CATEGORY("category"),
     /**

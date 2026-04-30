@@ -30,8 +30,8 @@ public sealed interface IqSetPrivacyResponse extends IqOperation.Response
     /**
      * Tries each {@link IqSetPrivacyResponse} variant in priority order.
      *
-     * @param node    the inbound IQ stanza; never {@code null}
-     * @param request the original outbound stanza; never {@code null}
+     * @param node    the inbound IQ stanza. Never {@code null}
+     * @param request the original outbound stanza. Never {@code null}
      * @return an {@link Optional} carrying the parsed variant, or
      *         empty when no documented variant matched
      * @throws NullPointerException if either argument is {@code null}
@@ -59,7 +59,7 @@ public sealed interface IqSetPrivacyResponse extends IqOperation.Response
      *           per-{@code <category>} mapping projects either a
      *           {@code (name, value, dhash)} record or a
      *           {@code ServerStatusCodeError}. {@link CategoryOutcome}
-     *           is the typed successful projection; per-category
+     *           is the typed successful projection. Per-category
      *           rejections are surfaced via the optional
      *           {@link CategoryOutcome#errorCode} / {@link CategoryOutcome#errorText}
      *           fields.
@@ -99,13 +99,13 @@ public sealed interface IqSetPrivacyResponse extends IqOperation.Response
         /**
          * Constructs a category outcome.
          *
-         * @param name      the category; never {@code null}
+         * @param name      the category. Never {@code null}
          * @param value     the new value, or {@code null} when the
          *                  relay rejected the mutation
-         * @param dhash     the optional digest; may be {@code null}
+         * @param dhash     the optional digest. May be {@code null}
          * @param errorCode the embedded error code, or {@code -1} on
          *                  success
-         * @param errorText the optional error text; may be
+         * @param errorText the optional error text. May be
          *                  {@code null}
          */
         public CategoryOutcome(IqQueryPrivacySettingsCategoryName name,
@@ -123,7 +123,7 @@ public sealed interface IqSetPrivacyResponse extends IqOperation.Response
         /**
          * Returns the category.
          *
-         * @return the category; never {@code null}
+         * @return the category. Never {@code null}
          */
         public IqQueryPrivacySettingsCategoryName name() {
             return name;
@@ -199,7 +199,7 @@ public sealed interface IqSetPrivacyResponse extends IqOperation.Response
     }
 
     /**
-     * The {@code Success} reply variant — the relay accepted the
+     * The {@code Success} reply variant. The relay accepted the
      * envelope and returned a per-category outcome list.
      */
     @WhatsAppWebModule(moduleName = "WAWebSetPrivacyJob")
@@ -212,7 +212,7 @@ public sealed interface IqSetPrivacyResponse extends IqOperation.Response
         /**
          * Constructs a {@code Success} reply.
          *
-         * @param categories the outcomes; never {@code null}
+         * @param categories the outcomes. Never {@code null}
          * @throws NullPointerException if {@code categories} is
          *                              {@code null}
          */
@@ -224,7 +224,7 @@ public sealed interface IqSetPrivacyResponse extends IqOperation.Response
         /**
          * Returns the parsed per-category outcomes.
          *
-         * @return an unmodifiable list; never {@code null}
+         * @return an unmodifiable list. Never {@code null}
          */
         public List<CategoryOutcome> categories() {
             return categories;
@@ -304,7 +304,7 @@ public sealed interface IqSetPrivacyResponse extends IqOperation.Response
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected the
+     * The {@code ClientError} reply variant. The relay rejected the
      * envelope with a {@code 4xx} error code.
      */
     @WhatsAppWebModule(moduleName = "WAWebSetPrivacyJob")
@@ -323,7 +323,7 @@ public sealed interface IqSetPrivacyResponse extends IqOperation.Response
          * Constructs a client-error reply.
          *
          * @param errorCode the numeric error code
-         * @param errorText the optional text; may be {@code null}
+         * @param errorText the optional text. May be {@code null}
          */
         public ClientError(int errorCode, String errorText) {
             this.errorCode = errorCode;
@@ -390,7 +390,7 @@ public sealed interface IqSetPrivacyResponse extends IqOperation.Response
     }
 
     /**
-     * The {@code ServerError} reply variant — the relay encountered a
+     * The {@code ServerError} reply variant. The relay encountered a
      * transient internal failure ({@code 5xx} error code).
      */
     @WhatsAppWebModule(moduleName = "WAWebSetPrivacyJob")
@@ -409,7 +409,7 @@ public sealed interface IqSetPrivacyResponse extends IqOperation.Response
          * Constructs a server-error reply.
          *
          * @param errorCode the numeric error code
-         * @param errorText the optional text; may be {@code null}
+         * @param errorText the optional text. May be {@code null}
          */
         public ServerError(int errorCode, String errorText) {
             this.errorCode = errorCode;

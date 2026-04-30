@@ -25,7 +25,7 @@ public sealed interface SmaxSetPrivacySettingResponse extends SmaxOperation.Resp
      *
      * @param node    the inbound IQ stanza received from the relay;
      *                never {@code null}
-     * @param request the original outbound stanza — used to validate
+     * @param request the original outbound stanza. Used to validate
      *                echoed identifiers; never {@code null}
      * @return an {@link Optional} carrying the parsed variant, or
      *         {@link Optional#empty()} when no documented variant
@@ -49,13 +49,13 @@ public sealed interface SmaxSetPrivacySettingResponse extends SmaxOperation.Resp
     }
 
     /**
-     * The {@code Success} reply variant — the relay accepted the
+     * The {@code Success} reply variant. The relay accepted the
      * preference write and (optionally) echoed back the stored
      * value.
      *
      * <p>The {@code <privacy>} child of the reply may carry a
      * {@code <smb_data_sharing_with_meta_consent value="..."/>} echo
-     * mirroring the post-write state — Cobalt surfaces this as an
+     * mirroring the post-write state. Cobalt surfaces this as an
      * optional {@code dataSharingConsent} field. WhatsApp Web
      * tolerates an empty {@code <privacy/>} reply, so the field is
      * not required.
@@ -65,8 +65,8 @@ public sealed interface SmaxSetPrivacySettingResponse extends SmaxOperation.Resp
      *           envelope, asserts a {@code <privacy/>} child exists,
      *           and surfaces the optional
      *           {@code WASmaxInBizSettingsSmbDataSharingSettingMixin}
-     *           projection (via {@code parseSmbDataSharingSettingMixin})
-     *           — the JS uses {@code success ? value : null}, so the
+     *           projection (via {@code parseSmbDataSharingSettingMixin}).
+     *           The JS uses {@code success ? value : null}, so the
      *           field is genuinely optional even on the success arm.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBizSettingsSetPrivacySettingResponseSuccess")
@@ -155,7 +155,7 @@ public sealed interface SmaxSetPrivacySettingResponse extends SmaxOperation.Resp
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected the
+     * The {@code ClientError} reply variant. The relay rejected the
      * request with a documented privacy-setting error code in the
      * {@code 4xx} range.
      *
@@ -256,7 +256,7 @@ public sealed interface SmaxSetPrivacySettingResponse extends SmaxOperation.Resp
     }
 
     /**
-     * The {@code ServerError} reply variant — the relay encountered a
+     * The {@code ServerError} reply variant. The relay encountered a
      * transient internal failure ({@code 5xx}) while processing the
      * request.
      *

@@ -111,15 +111,12 @@ public final class SmaxGroupsAcceptGroupAddRequest implements SmaxOperation.Requ
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsAcceptGroupAddRequest",
             exports = "makeAcceptGroupAddRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutGroupsAcceptGroupAddRequest: smax("accept", {code, expiration, admin})
         var acceptNode = new NodeBuilder()
                 .description("accept")
                 .attribute("code", acceptCode)
                 .attribute("expiration", acceptExpiration)
                 .attribute("admin", acceptAdmin)
                 .build();
-        // WASmaxOutGroupsBaseSetGroupMixin: smax("iq", {to: GROUP_JID(t), xmlns: "w:g2"})
-        // WASmaxOutGroupsBaseIQSetRequestMixin: smax("iq", {id: generateId(), type: "set"})
         return new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "w:g2")

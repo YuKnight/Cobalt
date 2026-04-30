@@ -34,43 +34,43 @@ import java.util.logging.Logger;
 /**
  * Builder for a USync IQ query.
  *
- * <p>Mirrors {@code WAWebUsync.USyncQuery} from WhatsApp Web. The
- * "must have at least one protocol" invariant is enforced by the type
- * system: instances are constructed via {@link #of(UsyncProtocol)} (or one
- * of the protocol-specific {@code of*} factories), all of which require a
- * starting protocol. Additional protocols, mode, context, and users are
- * attached through fluent {@code with*} setters.
+ * <p>Mirrors {@code WAWebUsync.USyncQuery} from WhatsApp Web. The "must have at
+ * least one protocol" invariant is enforced by the type system. Instances are
+ * constructed via {@link #of(UsyncProtocol)} or one of the protocol-specific
+ * {@code of*} factories, all of which require a starting protocol. Additional
+ * protocols, mode, context, and users are attached through fluent {@code with*}
+ * setters.
  *
- * <p>The query is pure: {@link #toNode()} produces the outbound IQ stanza
- * and {@link #parseResponse(Node)} parses the inbound response into a
- * {@link UsyncResult}. Backoff side-effects (waiting before send,
- * applying server-supplied {@code error_backoff} hints after parse) are
- * driven by {@code WhatsAppClient.executeUsyncQuery}, which composes both
- * sides with a shared {@link UsyncBackoff} registry.
+ * <p>The query is pure. {@link #toNode()} produces the outbound IQ stanza and
+ * {@link #parseResponse(Node)} parses the inbound response into a
+ * {@link UsyncResult}. Backoff side effects (waiting before send and applying
+ * server-supplied {@code error_backoff} hints after parse) are driven by
+ * {@code WhatsAppClient.executeUsyncQuery}, which composes both sides with a
+ * shared {@link UsyncBackoff} registry.
  *
- * <p><strong>Thread safety.</strong> A single {@code UsyncQuery} is
- * <em>not</em> safe to share across threads. Each call site is expected
- * to construct its own builder, configure it on one thread, and dispatch
- * it once via {@code WhatsAppClient.executeUsyncQuery}. The internal
- * lists ({@code protocols}, {@code users}) and the {@code lidProtocolAdded}
- * flag are not synchronised, so concurrent {@code with*} mutations on the
- * same instance produce {@link java.util.ConcurrentModificationException}
- * during {@link #toNode()} or otherwise undefined behaviour. Concurrent
- * <em>reads</em> after the builder has been fully configured (i.e.
- * concurrent calls to {@link #toNode()} or {@link #parseResponse(Node)}
- * with no parallel {@code with*} calls) are safe but rarely useful.
- * Different threads each holding their own {@code UsyncQuery} can
- * dispatch in parallel without coordination — the underlying transport
- * and the shared {@link UsyncBackoff} registry are concurrency-safe.
+ * <p><strong>Thread safety.</strong> A single {@code UsyncQuery} is not safe
+ * to share across threads. Each call site is expected to construct its own
+ * builder, configure it on one thread, and dispatch it once via
+ * {@code WhatsAppClient.executeUsyncQuery}. The internal lists
+ * ({@code protocols}, {@code users}) and the {@code lidProtocolAdded} flag are
+ * not synchronised, so concurrent {@code with*} mutations on the same instance
+ * produce {@link java.util.ConcurrentModificationException} during
+ * {@link #toNode()} or otherwise undefined behaviour. Concurrent reads after
+ * the builder has been fully configured (concurrent calls to {@link #toNode()}
+ * or {@link #parseResponse(Node)} with no parallel {@code with*} calls) are
+ * safe but rarely useful. Different threads each holding their own
+ * {@code UsyncQuery} can dispatch in parallel without coordination because
+ * the underlying transport and the shared {@link UsyncBackoff} registry are
+ * concurrency-safe.
  *
- * @implNote WAWebUsync.USyncQuery: instance fields {@code context},
- *     {@code mode}, {@code protocols}, {@code users}, and {@code $1} (the
- *     LID-added flag) are mirrored. The internal {@code $3} method is
- *     split into {@link #toNode()}; the JS {@code execute} method moves
- *     to {@code WhatsAppClient.executeUsyncQuery} so the transport layer
- *     owns dispatch and backoff orchestration. The single-thread-builder
- *     contract matches WA Web's JS where {@code USyncQuery} is also
- *     used in a single-threaded build-then-execute pattern.
+ * @implNote The JS instance fields {@code context}, {@code mode},
+ *     {@code protocols}, {@code users}, and {@code $1} (the LID-added flag)
+ *     are mirrored. The internal {@code $3} method is split into
+ *     {@link #toNode()}; the JS {@code execute} method moves to
+ *     {@code WhatsAppClient.executeUsyncQuery} so the transport layer owns
+ *     dispatch and backoff orchestration. The single-thread-builder contract
+ *     matches WA Web's JS where {@code USyncQuery} is also used in a
+ *     single-threaded build-then-execute pattern.
  */
 @WhatsAppWebModule(moduleName = "WAWebUsync")
 public final class UsyncQuery {
@@ -81,33 +81,36 @@ public final class UsyncQuery {
     private static final Logger LOGGER = Logger.getLogger(UsyncQuery.class.getName());
 
     /**
-     * Ordered list of protocols to query. Always non-empty by construction.
+     * Holds the ordered list of protocols to query. Always non-empty by
+     * construction.
      */
     private final List<UsyncProtocol> protocols;
 
     /**
-     * Ordered list of user entries to query.
+     * Holds the ordered list of user entries to query.
      */
     private final List<UsyncUser> users;
 
     /**
-     * The {@code context} attribute on the {@code <usync>} stanza.
+     * Holds the {@code context} attribute on the {@code <usync>} stanza.
      */
     private UsyncContext context;
 
     /**
-     * The {@code mode} attribute on the {@code <usync>} stanza.
+     * Holds the {@code mode} attribute on the {@code <usync>} stanza.
      */
     private UsyncMode mode;
 
     /**
-     * Whether the LID protocol has already been added. Subsequent
+     * Tracks whether the LID protocol has already been added. Subsequent
      * {@link #withLidProtocol()} calls are no-ops.
      */
     private boolean lidProtocolAdded;
 
     /**
-     * Hidden constructor; use the {@link #of} factories.
+     * Hidden constructor that is invoked through the {@link #of} factories.
+     *
+     * @param firstProtocol the first protocol attached to the query
      */
     private UsyncQuery(UsyncProtocol firstProtocol) {
         this.protocols = new ArrayList<>();
@@ -133,59 +136,103 @@ public final class UsyncQuery {
         return new UsyncQuery(firstProtocol);
     }
 
-    /** @return a query starting with the contact protocol */
+    /**
+     * Creates a query starting with the contact protocol.
+     *
+     * @param addressingMode the addressing mode the contact protocol applies to
+     * @return a fresh query
+     */
     public static UsyncQuery ofContact(UsyncAddressingMode addressingMode) {
         return of(new UsyncContactProtocol(addressingMode));
     }
 
-    /** @return a query starting with the device protocol */
+    /**
+     * Creates a query starting with the device protocol.
+     *
+     * @return a fresh query
+     */
     public static UsyncQuery ofDevices() {
         return of(new UsyncDeviceProtocol());
     }
 
-    /** @return a query starting with the business protocol */
+    /**
+     * Creates a query starting with the business protocol.
+     *
+     * @return a fresh query
+     */
     public static UsyncQuery ofBusiness() {
         return of(new UsyncBusinessProtocol());
     }
 
-    /** @return a query starting with the picture protocol */
+    /**
+     * Creates a query starting with the picture protocol.
+     *
+     * @return a fresh query
+     */
     public static UsyncQuery ofPicture() {
         return of(new UsyncPictureProtocol());
     }
 
-    /** @return a query starting with the status protocol */
+    /**
+     * Creates a query starting with the status protocol.
+     *
+     * @return a fresh query
+     */
     public static UsyncQuery ofStatus() {
         return of(new UsyncStatusProtocol());
     }
 
-    /** @return a query starting with the disappearing-mode protocol */
+    /**
+     * Creates a query starting with the disappearing-mode protocol.
+     *
+     * @return a fresh query
+     */
     public static UsyncQuery ofDisappearingMode() {
         return of(new UsyncDisappearingModeProtocol());
     }
 
-    /** @return a query starting with the LID protocol */
+    /**
+     * Creates a query starting with the LID protocol.
+     *
+     * @return a fresh query
+     */
     public static UsyncQuery ofLid() {
         return of(new UsyncLidProtocol());
     }
 
-    /** @return a query starting with the bot-profile protocol */
+    /**
+     * Creates a query starting with the bot-profile protocol.
+     *
+     * @return a fresh query
+     */
     public static UsyncQuery ofBotProfile() {
         return of(new UsyncBotProfileProtocol());
     }
 
-    /** @return a query starting with the username protocol */
+    /**
+     * Creates a query starting with the username protocol.
+     *
+     * @return a fresh query
+     */
     public static UsyncQuery ofUsername() {
         return of(new UsyncUsernameProtocol());
     }
 
-    /** @return a query starting with the text-status protocol */
+    /**
+     * Creates a query starting with the text-status protocol.
+     *
+     * @return a fresh query
+     */
     public static UsyncQuery ofTextStatus() {
         return of(new UsyncTextStatusProtocol());
     }
 
     /**
-     * @return a query starting with the feature protocol restricted to
-     *     the given queries
+     * Creates a query starting with the feature protocol restricted to the
+     * given queries.
+     *
+     * @param queries the features to request
+     * @return a fresh query
      */
     public static UsyncQuery ofFeatures(List<UsyncFeatureProtocol.FeatureQuery> queries) {
         return of(new UsyncFeatureProtocol(queries));
@@ -232,7 +279,12 @@ public final class UsyncQuery {
         return this;
     }
 
-    /** Adds the contact protocol. */
+    /**
+     * Adds the contact protocol to this query.
+     *
+     * @param addressingMode the addressing mode the contact protocol applies to
+     * @return this builder
+     */
     @WhatsAppWebExport(moduleName = "WAWebUsync",
             exports = "USyncQuery.withContactProtocol", adaptation = WhatsAppAdaptation.DIRECT)
     public UsyncQuery withContactProtocol(UsyncAddressingMode addressingMode) {
@@ -240,7 +292,11 @@ public final class UsyncQuery {
         return this;
     }
 
-    /** Adds the business protocol. */
+    /**
+     * Adds the business protocol to this query.
+     *
+     * @return this builder
+     */
     @WhatsAppWebExport(moduleName = "WAWebUsync",
             exports = "USyncQuery.withBusinessProtocol", adaptation = WhatsAppAdaptation.DIRECT)
     public UsyncQuery withBusinessProtocol() {
@@ -248,7 +304,11 @@ public final class UsyncQuery {
         return this;
     }
 
-    /** Adds the device protocol. */
+    /**
+     * Adds the device protocol to this query.
+     *
+     * @return this builder
+     */
     @WhatsAppWebExport(moduleName = "WAWebUsync",
             exports = "USyncQuery.withDeviceProtocol", adaptation = WhatsAppAdaptation.DIRECT)
     public UsyncQuery withDeviceProtocol() {
@@ -256,7 +316,11 @@ public final class UsyncQuery {
         return this;
     }
 
-    /** Adds the disappearing-mode protocol. */
+    /**
+     * Adds the disappearing-mode protocol to this query.
+     *
+     * @return this builder
+     */
     @WhatsAppWebExport(moduleName = "WAWebUsync",
             exports = "USyncQuery.withDisappearingModeProtocol", adaptation = WhatsAppAdaptation.DIRECT)
     public UsyncQuery withDisappearingModeProtocol() {
@@ -264,7 +328,11 @@ public final class UsyncQuery {
         return this;
     }
 
-    /** Adds the picture protocol. */
+    /**
+     * Adds the picture protocol to this query.
+     *
+     * @return this builder
+     */
     @WhatsAppWebExport(moduleName = "WAWebUsync",
             exports = "USyncQuery.withPictureProtocol", adaptation = WhatsAppAdaptation.DIRECT)
     public UsyncQuery withPictureProtocol() {
@@ -272,7 +340,11 @@ public final class UsyncQuery {
         return this;
     }
 
-    /** Adds the status protocol. */
+    /**
+     * Adds the status protocol to this query.
+     *
+     * @return this builder
+     */
     @WhatsAppWebExport(moduleName = "WAWebUsync",
             exports = "USyncQuery.withStatusProtocol", adaptation = WhatsAppAdaptation.DIRECT)
     public UsyncQuery withStatusProtocol() {
@@ -280,7 +352,11 @@ public final class UsyncQuery {
         return this;
     }
 
-    /** Adds the text-status protocol. */
+    /**
+     * Adds the text-status protocol to this query.
+     *
+     * @return this builder
+     */
     @WhatsAppWebExport(moduleName = "WAWebUsync",
             exports = "USyncQuery.withTextStatusProtocol", adaptation = WhatsAppAdaptation.DIRECT)
     public UsyncQuery withTextStatusProtocol() {
@@ -288,7 +364,12 @@ public final class UsyncQuery {
         return this;
     }
 
-    /** Adds the feature protocol. */
+    /**
+     * Adds the feature protocol to this query.
+     *
+     * @param queries the features to request
+     * @return this builder
+     */
     @WhatsAppWebExport(moduleName = "WAWebUsync",
             exports = "USyncQuery.withFeaturesProtocol", adaptation = WhatsAppAdaptation.DIRECT)
     public UsyncQuery withFeaturesProtocol(List<UsyncFeatureProtocol.FeatureQuery> queries) {
@@ -297,11 +378,11 @@ public final class UsyncQuery {
     }
 
     /**
-     * Adds the LID protocol. Idempotent: subsequent calls are no-ops.
+     * Adds the LID protocol to this query. Idempotent because subsequent
+     * calls are no-ops.
      *
      * @return this builder
-     * @implNote WAWebUsync.USyncQuery.withLidProtocol: the JS guard is
-     *     the {@code this.$1} flag.
+     * @implNote The JS guard is the {@code this.$1} flag.
      */
     @WhatsAppWebExport(moduleName = "WAWebUsync",
             exports = "USyncQuery.withLidProtocol", adaptation = WhatsAppAdaptation.DIRECT)
@@ -313,7 +394,11 @@ public final class UsyncQuery {
         return this;
     }
 
-    /** Adds the bot-profile protocol. */
+    /**
+     * Adds the bot-profile protocol to this query.
+     *
+     * @return this builder
+     */
     @WhatsAppWebExport(moduleName = "WAWebUsync",
             exports = "USyncQuery.withBotProfileProtocol", adaptation = WhatsAppAdaptation.DIRECT)
     public UsyncQuery withBotProfileProtocol() {
@@ -321,7 +406,11 @@ public final class UsyncQuery {
         return this;
     }
 
-    /** Adds the username protocol. */
+    /**
+     * Adds the username protocol to this query.
+     *
+     * @return this builder
+     */
     @WhatsAppWebExport(moduleName = "WAWebUsync",
             exports = "USyncQuery.withUsernameProtocol", adaptation = WhatsAppAdaptation.DIRECT)
     public UsyncQuery withUsernameProtocol() {
@@ -347,8 +436,8 @@ public final class UsyncQuery {
      * pre-populates the user's LID from the provided current-LID hint.
      *
      * @param user        the user entry
-     * @param currentLid  the LID currently associated with the user's PN,
-     *                    or {@code null} if unknown
+     * @param currentLid  the LID currently associated with the user's PN, or
+     *                    {@code null} if unknown
      * @return this builder
      */
     @WhatsAppWebExport(moduleName = "WAWebUsync",
@@ -367,12 +456,20 @@ public final class UsyncQuery {
         return this;
     }
 
-    /** @return the configured context */
+    /**
+     * Returns the configured context.
+     *
+     * @return the context
+     */
     public UsyncContext context() {
         return context;
     }
 
-    /** @return the configured mode */
+    /**
+     * Returns the configured mode.
+     *
+     * @return the mode
+     */
     public UsyncMode mode() {
         return mode;
     }
@@ -400,7 +497,6 @@ public final class UsyncQuery {
      *
      * @return the IQ builder ready for dispatch through
      *     {@code WhatsAppClient.sendNode}
-     * @implNote WAWebUsync.USyncQuery.$3.
      */
     @WhatsAppWebExport(moduleName = "WAWebUsync",
             exports = "USyncQuery", adaptation = WhatsAppAdaptation.ADAPTED)
@@ -459,17 +555,16 @@ public final class UsyncQuery {
     /**
      * Parses the inbound IQ response into a {@link UsyncResult}.
      *
-     * <p>This method is pure: it does not touch any backoff registry. The
+     * <p>This method is pure and does not touch any backoff registry. The
      * caller (typically {@code WhatsAppClient.executeUsyncQuery}) is
-     * responsible for applying any
-     * {@link UsyncProtocolError#errorBackoff()} side-effects.
+     * responsible for applying any {@link UsyncProtocolError#errorBackoff()}
+     * side effects.
      *
      * @param response the relay's IQ response
      * @return the aggregated parse result
-     * @implNote WAWebUsync.usyncParser.
      */
     @WhatsAppWebExport(moduleName = "WAWebUsync",
-            exports = "usyncParser", adaptation = WhatsAppAdaptation.ADAPTED)
+            exports = "USyncQuery", adaptation = WhatsAppAdaptation.ADAPTED)
     public UsyncResult parseResponse(Node response) {
         Objects.requireNonNull(response, "response cannot be null");
         var type = response.getAttributeAsString("type", "");
@@ -525,6 +620,9 @@ public final class UsyncQuery {
     /**
      * Builds a top-level error from an IQ whose {@code type} is not
      * {@code "result"}.
+     *
+     * @param response the IQ response carrying the error envelope
+     * @return the parsed top-level error
      */
     private UsyncTopLevelError parseTopLevelError(Node response) {
         var errorNode = response.getChild("error");

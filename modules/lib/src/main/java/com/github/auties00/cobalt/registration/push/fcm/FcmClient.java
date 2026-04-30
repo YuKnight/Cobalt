@@ -19,16 +19,16 @@ import java.util.concurrent.atomic.AtomicReference;
  * <p>Owns three single-responsibility collaborators and orchestrates
  * the lifecycle around them:
  * <ul>
- *   <li>{@link FcmRegistration} — runs the three-step Android
- *       registration handshake on demand;</li>
- *   <li>{@link FcmMcsConnection} — owns the long-lived MCS TLS
- *       stream and reconnect loop;</li>
- *   <li>{@link FcmPushCode} — single-value sync primitive that hands
- *       the verification code back to {@link #getPushCode()}.</li>
+ *   <li>{@link FcmRegistration} runs the three-step Android
+ *       registration handshake on demand.</li>
+ *   <li>{@link FcmMcsConnection} owns the long-lived MCS TLS
+ *       stream and reconnect loop.</li>
+ *   <li>{@link FcmPushCode} is the single-value sync primitive that
+ *       hands the verification code back to {@link #getPushCode()}.</li>
  * </ul>
  *
  * <p>State is owned by the caller via {@link #getSession()} and
- * {@link #loadSession(FcmSession)}; the client never touches the file
+ * {@link #loadSession(FcmSession)}. The client never touches the file
  * system. A typical usage:
  *
  * <pre>{@code
@@ -51,7 +51,7 @@ import java.util.concurrent.atomic.AtomicReference;
 public final class FcmClient implements WhatsAppDevicePushClient, AutoCloseable {
     /**
      * Cached, unmodifiable set of platforms this client can
-     * authenticate against — the personal and business Android
+     * authenticate against, namely the personal and business Android
      * variants. Returned by {@link #supportedPlatforms()}.
      */
     private static final Set<ClientPlatformType> SUPPORTED_PLATFORMS =
@@ -67,7 +67,7 @@ public final class FcmClient implements WhatsAppDevicePushClient, AutoCloseable 
      */
     private enum State {
         /**
-         * No session bound; only {@link #authenticate(WhatsAppDevice)}
+         * No session bound. Only {@link #authenticate(WhatsAppDevice)}
          * and {@link #close()} are valid.
          */
         UNAUTHENTICATED,
@@ -77,12 +77,12 @@ public final class FcmClient implements WhatsAppDevicePushClient, AutoCloseable 
          */
         AUTHENTICATING,
         /**
-         * Registration has succeeded; the MCS listener is running and
+         * Registration has succeeded. The MCS listener is running and
          * the read-only accessors are usable.
          */
         AUTHENTICATED,
         /**
-         * {@link #close()} has been invoked; all accessors throw and
+         * {@link #close()} has been invoked. All accessors throw and
          * the listener thread is being torn down.
          */
         CLOSED
@@ -114,20 +114,20 @@ public final class FcmClient implements WhatsAppDevicePushClient, AutoCloseable 
     /**
      * Session bound during {@link #authenticate(WhatsAppDevice)} or
      * {@link #loadSession(FcmSession, URI)}. {@code null} until
-     * authentication succeeds; reset to {@code null} on auth failure
+     * authentication succeeds. Reset to {@code null} on auth failure
      * so a retry sees a clean slate.
      */
     private volatile FcmSession session;
 
     /**
      * MCS connection owning the long-lived TLS stream. {@code null}
-     * until authentication completes; closed and dereferenced by
+     * until authentication completes. Closed and dereferenced by
      * {@link #close()}.
      */
     private volatile FcmMcsConnection connection;
 
     /**
-     * Base constructor. Builds the I/O collaborators only; never
+     * Base constructor. Builds the I/O collaborators only. Never
      * touches the network. Public callers go through the static
      * factories.
      *
@@ -225,7 +225,7 @@ public final class FcmClient implements WhatsAppDevicePushClient, AutoCloseable 
      * read-only accessors become usable.
      *
      * <p>Thread-safe via {@link AtomicReference#compareAndSet}: only
-     * the first concurrent caller actually runs the registration; any
+     * the first concurrent caller actually runs the registration. Any
      * other caller observing {@link State#AUTHENTICATING} or
      * {@link State#AUTHENTICATED} throws
      * {@link IllegalStateException}. On failure the state reverts to
@@ -334,7 +334,7 @@ public final class FcmClient implements WhatsAppDevicePushClient, AutoCloseable 
      * already arrived, or blocks the calling thread until either the
      * push arrives or {@link #close()} is invoked.
      *
-     * <p>Safe to call from multiple threads concurrently; every
+     * <p>Safe to call from multiple threads concurrently. Every
      * caller sees the same delivered code, since the WhatsApp
      * registration flow only ever sends one per session.
      *

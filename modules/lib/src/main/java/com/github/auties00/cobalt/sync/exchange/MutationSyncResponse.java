@@ -22,11 +22,36 @@ import java.util.*;
  *           WASyncdConst.CollectionState (state mapped to hasMore/exceptions)
  */
 public final class MutationSyncResponse {
+    /**
+     * The collection this response applies to.
+     */
     private final SyncPatchType collectionName;
+
+    /**
+     * The collection version reported by the server.
+     */
     private final long version;
+
+    /**
+     * {@code true} when the server signalled that more patches are available.
+     */
     private final boolean hasMore;
+
+    /**
+     * The patches returned for this collection, possibly empty.
+     */
     private final SequencedCollection<SyncdPatch> patches;
+
+    /**
+     * The external blob reference for a snapshot, or {@code null} when the
+     * response carries patches instead.
+     */
     private final ExternalBlobReference snapshotReference;
+
+    /**
+     * The collection-level error captured during parsing, or {@code null}
+     * when the collection was processed successfully.
+     */
     private final WhatsAppWebAppStateSyncException collectionError;
 
     /**
@@ -152,6 +177,13 @@ public final class MutationSyncResponse {
         return Optional.ofNullable(collectionError);
     }
 
+    /**
+     * Compares this response to the given object for equality on every field.
+     *
+     * @param o the object to compare against
+     * @return {@code true} when both responses carry the same name, version, flags, patches,
+     *         snapshot reference and collection error
+     */
     @Override
     public boolean equals(Object o) {
         return o instanceof MutationSyncResponse that
@@ -163,11 +195,21 @@ public final class MutationSyncResponse {
                && Objects.equals(collectionError, that.collectionError);
     }
 
+    /**
+     * Computes a hash consistent with {@link #equals(Object)}.
+     *
+     * @return the combined hash over every field of this response
+     */
     @Override
     public int hashCode() {
         return Objects.hash(collectionName, version, hasMore, patches, snapshotReference, collectionError);
     }
 
+    /**
+     * Returns a debug-only representation listing every field.
+     *
+     * @return a single-line bracketed string for diagnostic logging
+     */
     @Override
     public String toString() {
         return "MutationSyncResponse[" +

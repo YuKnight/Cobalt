@@ -11,7 +11,7 @@ import java.util.Objects;
 
 /**
  * The outbound {@code <iq xmlns="urn:xmpp:whatsapp:push" type="set">}
- * stanza variant — wraps the {@code <config id platform version/>}
+ * stanza variant. Wraps the {@code <config id platform version/>}
  * payload.
  */
 @WhatsAppWebModule(moduleName = "WAWebSetWindowsPushConfig")
@@ -32,8 +32,8 @@ public final class IqSetWindowsPushConfigRequest implements IqOperation.Request 
     /**
      * Constructs a new set-windows-push-config request.
      *
-     * @param channelUri the WNS channel URI; never {@code null}
-     * @param ring       the distribution ring; never {@code null}
+     * @param channelUri the WNS channel URI. Never {@code null}
+     * @param ring       the distribution ring. Never {@code null}
      * @throws NullPointerException if either argument is
      *                              {@code null}
      */
@@ -45,7 +45,7 @@ public final class IqSetWindowsPushConfigRequest implements IqOperation.Request 
     /**
      * Returns the WNS channel URI.
      *
-     * @return the URI; never {@code null}
+     * @return the URI. Never {@code null}
      */
     public String channelUri() {
         return channelUri;
@@ -54,7 +54,7 @@ public final class IqSetWindowsPushConfigRequest implements IqOperation.Request 
     /**
      * Returns the distribution ring.
      *
-     * @return the ring; never {@code null}
+     * @return the ring. Never {@code null}
      */
     public IqSetWindowsPushConfigRing ring() {
         return ring;

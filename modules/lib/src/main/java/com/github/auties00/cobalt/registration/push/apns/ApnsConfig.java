@@ -32,7 +32,7 @@ public final class ApnsConfig {
     /**
      * Configuration for WhatsApp's consumer iOS app
      * ({@code net.whatsapp.WhatsApp}). The first entry is the messaging
-     * topic surfaced by {@link ApnsClient#getPushToken()}; the
+     * topic surfaced by {@link ApnsClient#getPushToken()}. The
      * {@code .voip} entry is also subscribed so the courier delivers
      * the VoIP-flavoured silent pushes used during phone-number
      * registration.
@@ -53,7 +53,7 @@ public final class ApnsConfig {
 
     /**
      * Bundle identifiers we subscribe to. The wire protocol filters
-     * pushes by the SHA-1 hash of these strings; they must match the
+     * pushes by the SHA-1 hash of these strings. They must match the
      * iOS app's {@code CFBundleIdentifier} exactly (case-sensitive).
      * The first entry is treated as the primary messaging topic by
      * {@link ApnsClient#getPushToken()}.

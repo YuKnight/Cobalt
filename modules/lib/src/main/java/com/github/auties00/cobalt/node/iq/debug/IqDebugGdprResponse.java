@@ -11,8 +11,10 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Sealed family of inbound reply variants.
+ * Sealed family of inbound reply variants produced by the relay in
+ * response to an {@link IqDebugGdprRequest}.
  */
+@WhatsAppWebModule(moduleName = "WAWebGdprHookUtils")
 public sealed interface IqDebugGdprResponse extends IqOperation.Response
         permits IqDebugGdprResponse.Success, IqDebugGdprResponse.ClientError, IqDebugGdprResponse.ServerError {
 

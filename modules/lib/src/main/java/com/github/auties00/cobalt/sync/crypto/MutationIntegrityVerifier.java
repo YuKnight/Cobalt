@@ -47,20 +47,17 @@ import java.util.SequencedCollection;
 public final class MutationIntegrityVerifier {
     /**
      * The WhatsApp store for key lookups and collection state queries.
-     *
-     * @implNote ADAPTED: WAWebSyncdAntiTampering — module-level imports replaced with
-     *           constructor DI per Cobalt architecture
      */
     private final WhatsAppStore store;
 
     /**
      * Constructs a new integrity verifier.
      *
-     * @implNote ADAPTED: WAWebSyncdAntiTampering — module-level imports of
-     *           {@code WAWebSyncdKeyCache}, {@code WAWebSyncdCrypto}, {@code WAWebEncryptionManagerSelector},
-     *           and {@code WAWebGetCollectionVersion} are replaced by constructor DI of the
-     *           {@link WhatsAppStore} which provides equivalent functionality
      * @param store the WhatsApp store for key lookups and collection state queries
+     * @implNote Replaces WA Web's module-level imports of {@code WAWebSyncdKeyCache},
+     *           {@code WAWebSyncdCrypto}, {@code WAWebEncryptionManagerSelector}, and
+     *           {@code WAWebGetCollectionVersion} with constructor DI of the
+     *           {@link WhatsAppStore}, which provides equivalent functionality.
      */
     public MutationIntegrityVerifier(WhatsAppStore store) {
         this.store = store;

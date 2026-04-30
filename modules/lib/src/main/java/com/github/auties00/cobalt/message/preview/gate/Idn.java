@@ -172,8 +172,7 @@ final class Idn {
      * cumulative entry count fits the reasonable upper bound on
      * {@link Map#ofEntries(Map.Entry[])} call sizes.
      *
-     * @return the immutable language→regions map
-     * @implNote WALanguagesAndRegions.LANGUAGE_TO_REGIONS.
+     * @return the immutable language to regions map
      */
     @WhatsAppWebExport(moduleName = "WALanguagesAndRegions", exports = "LANGUAGE_TO_REGIONS",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -415,7 +414,6 @@ final class Idn {
      *                            (BCP-47 tags); the empty list when
      *                            unknown
      * @return {@code true} when the label is flagged as suspicious
-     * @implNote WAIdn.findSuspiciousCharacters.
      */
     @WhatsAppWebExport(moduleName = "WAIdn", exports = "findSuspiciousCharacters",
             adaptation = WhatsAppAdaptation.DIRECT)

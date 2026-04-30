@@ -46,11 +46,8 @@ import java.util.logging.Logger;
 public final class MutationLTHash {
     /**
      * Logger for LT-Hash consistency check diagnostics.
-     *
-     * @implNote WAWebSyncdAntiTamperingLtHash.checkLtHash — WALogger.ERROR replaced
-     *           with JUL logger per Cobalt conventions
      */
-    private static final Logger LOGGER = Logger.getLogger(MutationLTHash.class.getName()); // WAWebSyncdAntiTamperingLtHash: WALogger
+    private static final Logger LOGGER = Logger.getLogger(MutationLTHash.class.getName());
 
     /**
      * Length of the hash state in bytes (64 little-endian Uint16 values).
@@ -59,7 +56,7 @@ public final class MutationLTHash {
      * @implNote WACryptoLtHash.KEY_LENGTH_BYTES — constant {@code u = 128}
      */
     @WhatsAppWebExport(moduleName = "WACryptoLtHash", exports = "KEY_LENGTH_BYTES", adaptation = WhatsAppAdaptation.DIRECT)
-    public static final int HASH_LENGTH = 128; // WACryptoLtHash: u = 128 (KEY_LENGTH_BYTES)
+    public static final int HASH_LENGTH = 128;
 
     /**
      * HKDF info string used for expanding value MACs.
@@ -68,7 +65,7 @@ public final class MutationLTHash {
      *
      * @implNote WACryptoLtHash.LT_HASH_ANTI_TAMPERING — {@code new LtHash16("WhatsApp Patch Integrity")} stored as {@code this.salt}
      */
-    private static final byte[] HKDF_INFO = "WhatsApp Patch Integrity".getBytes(); // WACryptoLtHash: m = new d("WhatsApp Patch Integrity")
+    private static final byte[] HKDF_INFO = "WhatsApp Patch Integrity".getBytes();
 
     /**
      * The empty/zero hash state.
@@ -77,7 +74,7 @@ public final class MutationLTHash {
      * @implNote WACryptoLtHash.EMPTY_LT_HASH — constant {@code c = new ArrayBuffer(u)}
      */
     @WhatsAppWebExport(moduleName = "WACryptoLtHash", exports = "EMPTY_LT_HASH", adaptation = WhatsAppAdaptation.DIRECT)
-    public static final byte[] EMPTY_HASH = new byte[HASH_LENGTH]; // WACryptoLtHash: c = new ArrayBuffer(u) (EMPTY_LT_HASH)
+    public static final byte[] EMPTY_HASH = new byte[HASH_LENGTH];
 
     /**
      * Prevents instantiation of this utility class.

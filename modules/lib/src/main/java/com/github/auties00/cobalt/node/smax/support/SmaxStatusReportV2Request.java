@@ -49,7 +49,7 @@ public final class SmaxStatusReportV2Request implements SmaxOperation.Request {
 
     /**
      * The optional pre-built status payload child (the text-or-media
-     * inner content) — when supplied, embedded verbatim under the
+     * inner content). When supplied, embedded verbatim under the
      * {@code <status>} envelope; when {@code null}, the status
      * envelope is emitted without a content child.
      */
@@ -160,7 +160,6 @@ public final class SmaxStatusReportV2Request implements SmaxOperation.Request {
     @WhatsAppWebExport(moduleName = "WASmaxOutSpamStatusReportV2Request",
             exports = "makeStatusReportV2Request", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutSpamReportableNewsletterStatusMixin: smax("status", {server_id, t})
         //   + optional payload child via mergeStatusNewsletterTextOrMediaMixinGroup
         var statusBuilder = new NodeBuilder()
                 .description("status")
@@ -169,9 +168,7 @@ public final class SmaxStatusReportV2Request implements SmaxOperation.Request {
         if (statusPayloadContent != null) {
             statusBuilder.content(statusPayloadContent);
         }
-        // WASmaxOutSpamBaseReportMixin: smax("spam_list", {spam_flow})
         // WASmaxOutSpamEntitySubjectMixin (optional): smax("spam_list", {subject})
-        // WASmaxOutSpamStatusReportV2Request: smax("spam_list", {jid}, <status/>)
         var spamListBuilder = new NodeBuilder()
                 .description("spam_list")
                 .attribute("jid", spamListJid)
@@ -180,8 +177,6 @@ public final class SmaxStatusReportV2Request implements SmaxOperation.Request {
             spamListBuilder.attribute("subject", spamListSubject);
         }
         spamListBuilder.content(statusBuilder.build());
-        // WASmaxOutSpamBaseIQSetRequestMixin: smax("iq", {id: generateId(), type: "set"})
-        // WASmaxOutSpamBaseReportMixin: smax("iq", {to: S_WHATSAPP_NET, xmlns: "spam"})
         return new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "spam")

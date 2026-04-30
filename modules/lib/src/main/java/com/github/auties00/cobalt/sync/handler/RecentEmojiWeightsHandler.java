@@ -114,7 +114,7 @@ public final class RecentEmojiWeightsHandler implements WebAppStateActionHandler
      */
     @Override
     public String actionName() {
-        return RecentEmojiWeightsAction.ACTION_NAME; // NO_WA_BASIS: WAWebProtobufSyncAction.pb only declares the protobuf field recentEmojiWeightsAction at index 11
+        return RecentEmojiWeightsAction.ACTION_NAME;
     }
 
     /**
@@ -221,16 +221,16 @@ public final class RecentEmojiWeightsHandler implements WebAppStateActionHandler
      */
     @Override
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        if (mutation.operation() != SyncdOperation.SET) { // NO_WA_BASIS: only SET makes sense for a snapshot-style weight list
+        if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof RecentEmojiWeightsAction action)) { // NO_WA_BASIS: payload type guard
+        if (!(mutation.value().action().orElse(null) instanceof RecentEmojiWeightsAction action)) {
             return MutationApplicationResult.malformed();
         }
 
         var weights = action.weights(); // NO_WA_BASIS: full snapshot of the recent emoji weight list (already null-safe via the action accessor)
-        client.store().setRecentEmojiWeights(weights); // NO_WA_BASIS: persist the snapshot on the flattened Cobalt store
+        client.store().setRecentEmojiWeights(weights);
         return MutationApplicationResult.success();
     }
 }

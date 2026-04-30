@@ -14,7 +14,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps the empty
+ * The outbound stanza variant. Wraps the empty
  * send-account-recovery-nonce request payload in the canonical
  * {@code <iq xmlns="fb:thrift_iq" type="get" to="s.whatsapp.net">}
  * envelope.
@@ -73,8 +73,6 @@ public final class SmaxSendAccountRecoveryNonceRequest implements SmaxOperation.
     @WhatsAppWebExport(moduleName = "WASmaxOutBizCtwaAdAccountSendAccountRecoveryNonceRequest",
             exports = "makeSendAccountRecoveryNonceRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutBizCtwaAdAccountHackBaseIQGetRequestMixin: smax("iq", {from: OPTIONAL(USER_JID, t), to: S_WHATSAPP_NET})
-        // WASmaxOutBizCtwaAdAccountBaseIQGetRequestMixin: smax("iq", {id: generateId(), type: "get"})
         var builder = new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "fb:thrift_iq")

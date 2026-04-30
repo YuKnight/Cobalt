@@ -22,14 +22,14 @@ import java.util.Optional;
 @WhatsAppWebModule(moduleName = "WASmaxOutReceiptStatusClassMixin")
 public final class SmaxReceiptPublishViewRequest implements SmaxOperation.Request {
     /**
-     * The opaque stanza id used as the receipt's {@code id} attribute
-     * — usually the id of the original incoming {@code <message>}
+     * The opaque stanza id used as the receipt's {@code id} attribute.
+     * Usually the id of the original incoming {@code <message>}
      * being acknowledged.
      */
     private final String receiptId;
 
     /**
-     * The recipient JID of the acknowledgement — typically a
+     * The recipient JID of the acknowledgement. Typically a
      * newsletter / status JID.
      */
     private final Jid receiptTo;
@@ -42,7 +42,7 @@ public final class SmaxReceiptPublishViewRequest implements SmaxOperation.Reques
     private final boolean hasStatusClass;
 
     /**
-     * The list of {@code <item server_id=INT/>} entries — between
+     * The list of {@code <item server_id=INT/>} entries. Between
      * {@code 0} and {@code 255} entries.
      */
     private final List<Integer> itemServerIds;
@@ -50,10 +50,10 @@ public final class SmaxReceiptPublishViewRequest implements SmaxOperation.Reques
     /**
      * Constructs a new view-receipt request.
      *
-     * @param receiptId      the stanza id; never {@code null}
-     * @param receiptTo      the recipient JID; never {@code null}
+     * @param receiptId      the stanza id. Never {@code null}
+     * @param receiptTo      the recipient JID. Never {@code null}
      * @param hasStatusClass whether to emit {@code class="status"}
-     * @param itemServerIds  the list of server ids; never
+     * @param itemServerIds  the list of server ids. Never
      *                       {@code null}, between {@code 0} and
      *                       {@code 255} entries
      * @throws NullPointerException     if any required argument is
@@ -78,7 +78,7 @@ public final class SmaxReceiptPublishViewRequest implements SmaxOperation.Reques
     /**
      * Returns the stanza id used as the receipt's {@code id}.
      *
-     * @return the id; never {@code null}
+     * @return the id. Never {@code null}
      */
     public String receiptId() {
         return receiptId;
@@ -87,7 +87,7 @@ public final class SmaxReceiptPublishViewRequest implements SmaxOperation.Reques
     /**
      * Returns the recipient JID.
      *
-     * @return the JID; never {@code null}
+     * @return the JID. Never {@code null}
      */
     public Jid receiptTo() {
         return receiptTo;
@@ -106,7 +106,7 @@ public final class SmaxReceiptPublishViewRequest implements SmaxOperation.Reques
     /**
      * Returns the list of {@code <item server_id/>} ids.
      *
-     * @return an unmodifiable list; never {@code null}
+     * @return an unmodifiable list. Never {@code null}
      */
     public List<Integer> itemServerIds() {
         return itemServerIds;
@@ -129,7 +129,6 @@ public final class SmaxReceiptPublishViewRequest implements SmaxOperation.Reques
     @WhatsAppWebExport(moduleName = "WASmaxOutReceiptPublishViewRequest",
             exports = "makePublishViewRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutReceiptSenderAggregatedViewPublishMixin: <list><item server_id=INT/>×0..255</list>
         var itemNodes = new ArrayList<Node>(itemServerIds.size());
         for (var serverId : itemServerIds) {
             var itemNode = new NodeBuilder()
@@ -142,9 +141,6 @@ public final class SmaxReceiptPublishViewRequest implements SmaxOperation.Reques
                 .description("list")
                 .content(itemNodes)
                 .build();
-        // WASmaxOutReceiptNewsletterMixin: <receipt to=JID + class="status"?>
-        // WASmaxOutReceiptViewTypeMixin: <receipt type="view">
-        // WASmaxOutReceiptSenderAggregatedViewPublishMixin: <receipt id=STANZA_ID>
         var receiptBuilder = new NodeBuilder()
                 .description("receipt")
                 .attribute("id", receiptId)

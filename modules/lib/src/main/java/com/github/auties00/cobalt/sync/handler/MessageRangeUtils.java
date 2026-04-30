@@ -110,16 +110,16 @@ final class MessageRangeUtils {
             adaptation = WhatsAppAdaptation.DIRECT
     )
     static EnclosureType compareMessageRanges(SyncActionMessageRange rangeA, SyncActionMessageRange rangeB) {
-        var aEnclosesB = encloses(rangeA, rangeB); // WAWebMessageRangeUtils.compareMessageRanges: var n = m(e, t)
-        var bEnclosesA = encloses(rangeB, rangeA); // WAWebMessageRangeUtils.compareMessageRanges: var r = m(t, e)
-        if (aEnclosesB && bEnclosesA) { // WAWebMessageRangeUtils.compareMessageRanges: n && r ? RangesAreEqual
+        var aEnclosesB = encloses(rangeA, rangeB);
+        var bEnclosesA = encloses(rangeB, rangeA);
+        if (aEnclosesB && bEnclosesA) {
             return EnclosureType.RANGES_ARE_EQUAL;
-        } else if (aEnclosesB) { // WAWebMessageRangeUtils.compareMessageRanges: n ? RangeAEnclosesRangeB
+        } else if (aEnclosesB) {
             return EnclosureType.RANGE_A_ENCLOSES_RANGE_B;
-        } else if (bEnclosesA) { // WAWebMessageRangeUtils.compareMessageRanges: r ? RangeBEnclosesRangeA
+        } else if (bEnclosesA) {
             return EnclosureType.RANGE_B_ENCLOSES_RANGE_A;
         } else {
-            return EnclosureType.RANGES_NOT_ENCLOSING; // WAWebMessageRangeUtils.compareMessageRanges: RangesNotEnclosing
+            return EnclosureType.RANGES_NOT_ENCLOSING;
         }
     }
 
@@ -148,29 +148,29 @@ final class MessageRangeUtils {
             adaptation = WhatsAppAdaptation.DIRECT
     )
     static SyncActionMessageRange mergeMessageRanges(SyncActionMessageRange rangeA, SyncActionMessageRange rangeB) {
-        var aLastTimestamp = toEpochSeconds(rangeA.lastMessageTimestamp().orElse(null)); // WAWebMessageRangeUtils.mergeMessageRanges: var a = numberOrThrowIfTooLarge(e.lastMessageTimestamp ?? 0)
-        var bLastTimestamp = toEpochSeconds(rangeB.lastMessageTimestamp().orElse(null)); // WAWebMessageRangeUtils.mergeMessageRanges: var i = numberOrThrowIfTooLarge(t.lastMessageTimestamp ?? 0)
-        var maxTimestamp = Math.max(aLastTimestamp, bLastTimestamp); // WAWebMessageRangeUtils.mergeMessageRanges: var l = Math.max(a, i)
+        var aLastTimestamp = toEpochSeconds(rangeA.lastMessageTimestamp().orElse(null));
+        var bLastTimestamp = toEpochSeconds(rangeB.lastMessageTimestamp().orElse(null));
+        var maxTimestamp = Math.max(aLastTimestamp, bLastTimestamp);
 
-        var mergedMessages = mergeMessages(rangeA.messages(), rangeB.messages(), maxTimestamp); // WAWebMessageRangeUtils.mergeMessageRanges: var s = g(e.messages, t.messages, l)
+        var mergedMessages = mergeMessages(rangeA.messages(), rangeB.messages(), maxTimestamp);
 
-        var builder = new SyncActionMessageRangeBuilder() // WAWebMessageRangeUtils.mergeMessageRanges: var u = {messages: s}
+        var builder = new SyncActionMessageRangeBuilder()
                 .messages(mergedMessages);
 
-        if (maxTimestamp != 0) { // WAWebMessageRangeUtils.mergeMessageRanges: l !== 0 && (u.lastMessageTimestamp = l)
+        if (maxTimestamp != 0) {
             builder.lastMessageTimestamp(Instant.ofEpochSecond(maxTimestamp));
         }
 
         var aSystemTimestamp = toEpochSeconds(rangeA.lastSystemMessageTimestamp().orElse(null));
         var bSystemTimestamp = toEpochSeconds(rangeB.lastSystemMessageTimestamp().orElse(null));
-        if (aSystemTimestamp != 0 || bSystemTimestamp != 0) { // WAWebMessageRangeUtils.mergeMessageRanges: e.lastSystemMessageTimestamp != null || t.lastSystemMessageTimestamp != null
-            var maxSystemTimestamp = Math.max(aSystemTimestamp, bSystemTimestamp); // WAWebMessageRangeUtils.mergeMessageRanges: var m = Math.max(numberOrThrowIfTooLarge(e.lastSystemMessageTimestamp ?? 0), numberOrThrowIfTooLarge(t.lastSystemMessageTimestamp ?? 0))
-            if (maxSystemTimestamp > maxTimestamp) { // WAWebMessageRangeUtils.mergeMessageRanges: (l == null || m > l) - l is always a number, so equivalent to m > l
-                builder.lastSystemMessageTimestamp(Instant.ofEpochSecond(maxSystemTimestamp)); // WAWebMessageRangeUtils.mergeMessageRanges: u.lastSystemMessageTimestamp = m
+        if (aSystemTimestamp != 0 || bSystemTimestamp != 0) {
+            var maxSystemTimestamp = Math.max(aSystemTimestamp, bSystemTimestamp);
+            if (maxSystemTimestamp > maxTimestamp) {
+                builder.lastSystemMessageTimestamp(Instant.ofEpochSecond(maxSystemTimestamp));
             }
         }
 
-        return builder.build(); // WAWebMessageRangeUtils.mergeMessageRanges: return u
+        return builder.build();
     }
 
     /**
@@ -203,12 +203,11 @@ final class MessageRangeUtils {
             adaptation = WhatsAppAdaptation.ADAPTED
     )
     static SyncActionMessageRange validateMessageRange(SyncActionMessageRange messageRange) {
-        if (messageRange == null) { // WAWebMessageRangeUtils.validateMessageRange: if (e == null) { uploadMdCriticalEventMetric(MESSAGE_RANGE_UNSET); return }
+        if (messageRange == null) {
             return null; // ADAPTED: WAM telemetry emission skipped (not shipped in Cobalt)
         }
-        // WAWebMessageRangeUtils.validateMessageRange: remaining branches emit WAM telemetry only and return e unchanged;
         // Cobalt treats the range as valid and defers field-level validation to callers.
-        return messageRange; // WAWebMessageRangeUtils.validateMessageRange: return e
+        return messageRange;
     }
 
     /**
@@ -240,26 +239,26 @@ final class MessageRangeUtils {
             adaptation = WhatsAppAdaptation.DIRECT
     )
     static SyncActionMessageRange replaceMessageRangeRemoteJid(Jid remoteJid, SyncActionMessageRange messageRange) {
-        var rewrittenMessages = new ArrayList<SyncActionMessage>(messageRange.messages().size()); // WAWebMessageRangeUtils.replaceMessageRangeRemoteJid: t.messages.map(...)
-        for (var msg : messageRange.messages()) { // WAWebMessageRangeUtils.replaceMessageRangeRemoteJid: function(m) { ... }
-            var existingKey = msg.key().orElse(null); // WAWebMessageRangeUtils.replaceMessageRangeRemoteJid: {...m.key, remoteJid: e.toString()}
-            var newKeyBuilder = new MessageKeyBuilder() // WAWebMessageRangeUtils.replaceMessageRangeRemoteJid: extends({}, t.key, {remoteJid: e.toString()})
-                    .parentJid(remoteJid); // WAWebMessageRangeUtils.replaceMessageRangeRemoteJid: remoteJid: e.toString()
-            if (existingKey != null) { // WAWebMessageRangeUtils.replaceMessageRangeRemoteJid: spread of existing key fields
-                newKeyBuilder.fromMe(existingKey.fromMe()); // WAWebMessageRangeUtils.replaceMessageRangeRemoteJid: fromMe preserved
-                existingKey.id().ifPresent(newKeyBuilder::id); // WAWebMessageRangeUtils.replaceMessageRangeRemoteJid: id preserved
-                existingKey.senderJid().ifPresent(newKeyBuilder::senderJid); // WAWebMessageRangeUtils.replaceMessageRangeRemoteJid: participant preserved via senderJid
+        var rewrittenMessages = new ArrayList<SyncActionMessage>(messageRange.messages().size());
+        for (var msg : messageRange.messages()) {
+            var existingKey = msg.key().orElse(null);
+            var newKeyBuilder = new MessageKeyBuilder()
+                    .parentJid(remoteJid);
+            if (existingKey != null) {
+                newKeyBuilder.fromMe(existingKey.fromMe());
+                existingKey.id().ifPresent(newKeyBuilder::id);
+                existingKey.senderJid().ifPresent(newKeyBuilder::senderJid);
             }
-            var newMsgBuilder = new SyncActionMessageBuilder() // WAWebMessageRangeUtils.replaceMessageRangeRemoteJid: extends({}, m, {key: ...})
+            var newMsgBuilder = new SyncActionMessageBuilder()
                     .key(newKeyBuilder.build());
-            msg.timestamp().ifPresent(newMsgBuilder::timestamp); // WAWebMessageRangeUtils.replaceMessageRangeRemoteJid: timestamp preserved via spread
+            msg.timestamp().ifPresent(newMsgBuilder::timestamp);
             rewrittenMessages.add(newMsgBuilder.build());
         }
 
-        var builder = new SyncActionMessageRangeBuilder() // WAWebMessageRangeUtils.replaceMessageRangeRemoteJid: extends({}, t, {messages: ...})
+        var builder = new SyncActionMessageRangeBuilder()
                 .messages(rewrittenMessages);
-        messageRange.lastMessageTimestamp().ifPresent(builder::lastMessageTimestamp); // WAWebMessageRangeUtils.replaceMessageRangeRemoteJid: lastMessageTimestamp preserved via spread
-        messageRange.lastSystemMessageTimestamp().ifPresent(builder::lastSystemMessageTimestamp); // WAWebMessageRangeUtils.replaceMessageRangeRemoteJid: lastSystemMessageTimestamp preserved via spread
+        messageRange.lastMessageTimestamp().ifPresent(builder::lastMessageTimestamp);
+        messageRange.lastSystemMessageTimestamp().ifPresent(builder::lastSystemMessageTimestamp);
         return builder.build();
     }
 
@@ -277,31 +276,31 @@ final class MessageRangeUtils {
      * @return the merged and deduplicated message list
      */
     private static List<SyncActionMessage> mergeMessages(List<SyncActionMessage> messagesA, List<SyncActionMessage> messagesB, long maxTimestamp) {
-        var byKeyId = new LinkedHashMap<String, SyncActionMessage>(); // WAWebMessageRangeUtils (function g): var r = new Map
-        var combined = new ArrayList<SyncActionMessage>(messagesA.size() + messagesB.size()); // WAWebMessageRangeUtils (function g): var a = e.concat(t)
+        var byKeyId = new LinkedHashMap<String, SyncActionMessage>();
+        var combined = new ArrayList<SyncActionMessage>(messagesA.size() + messagesB.size());
         combined.addAll(messagesA);
         combined.addAll(messagesB);
 
-        for (var msg : combined) { // WAWebMessageRangeUtils (function g): a.forEach(function(e) { ... })
+        for (var msg : combined) {
             var keyId = msg.key()
                     .flatMap(key -> key.id())
-                    .orElse(""); // WAWebMessageRangeUtils (function g): var l = (e.key?.id) ?? ""
-            var msgTimestamp = toEpochSeconds(msg.timestamp().orElse(null)); // WAWebMessageRangeUtils (function g): numberOrThrowIfTooLarge(e.timestamp ?? 0)
+                    .orElse("");
+            var msgTimestamp = toEpochSeconds(msg.timestamp().orElse(null));
 
-            if (msgTimestamp >= maxTimestamp) { // WAWebMessageRangeUtils (function g): if (numberOrThrowIfTooLarge(e.timestamp ?? 0) >= n)
-                var existing = byKeyId.get(keyId); // WAWebMessageRangeUtils (function g): var s = r.get(l)
-                if (existing != null) { // WAWebMessageRangeUtils (function g): if (s)
-                    var existingTimestamp = toEpochSeconds(existing.timestamp().orElse(null)); // WAWebMessageRangeUtils (function g): numberOrThrowIfTooLarge(s.timestamp ?? 0)
-                    if (existingTimestamp < msgTimestamp) { // WAWebMessageRangeUtils (function g): existingTs < eTs ? e : s
+            if (msgTimestamp >= maxTimestamp) {
+                var existing = byKeyId.get(keyId);
+                if (existing != null) {
+                    var existingTimestamp = toEpochSeconds(existing.timestamp().orElse(null));
+                    if (existingTimestamp < msgTimestamp) {
                         byKeyId.put(keyId, msg);
                     }
                 } else {
-                    byKeyId.put(keyId, msg); // WAWebMessageRangeUtils (function g): r.set(l, e)
+                    byKeyId.put(keyId, msg);
                 }
             }
         }
 
-        return new ArrayList<>(byKeyId.values()); // WAWebMessageRangeUtils (function g): Array.from(r.values())
+        return new ArrayList<>(byKeyId.values());
     }
 
     /**
@@ -323,9 +322,8 @@ final class MessageRangeUtils {
      * @return {@code true} if {@code encloser} encloses {@code enclosed}
      */
     private static boolean encloses(SyncActionMessageRange encloser, SyncActionMessageRange enclosed) {
-        var encloserLastTimestamp = toEpochSeconds(encloser.lastMessageTimestamp().orElse(null)); // WAWebMessageRangeUtils (function m): numberOrThrowIfTooLarge(e.lastMessageTimestamp ?? 0)
+        var encloserLastTimestamp = toEpochSeconds(encloser.lastMessageTimestamp().orElse(null));
 
-        // WAWebMessageRangeUtils (function m): var n = new Set(e.messages.map(e => e.key?.id))
         var encloserKeyIds = new HashSet<String>();
         for (var msg : encloser.messages()) {
             msg.key()
@@ -333,28 +331,26 @@ final class MessageRangeUtils {
                     .ifPresent(encloserKeyIds::add);
         }
 
-        // WAWebMessageRangeUtils (function m): first loop - if message has no timestamp and key not in set, return false
         for (var msg : enclosed.messages()) {
             var keyId = msg.key()
                     .flatMap(key -> key.id())
                     .orElse(null);
             var msgTimestamp = msg.timestamp().orElse(null);
 
-            if (keyId != null && encloserKeyIds.contains(keyId)) { // WAWebMessageRangeUtils (function m): n.has(t.messages[r].key?.id)
+            if (keyId != null && encloserKeyIds.contains(keyId)) {
                 continue; // Message explicitly present in encloser's list
             }
 
-            if (msgTimestamp == null) { // WAWebMessageRangeUtils (function m): if (t.messages[r].timestamp == null) if (!n.has(...)) return false
+            if (msgTimestamp == null) {
                 return false;
             }
 
-            // WAWebMessageRangeUtils (function m): second loop - numberOrThrowIfTooLarge(e.lastMessageTimestamp ?? 0) <= numberOrThrowIfTooLarge(t.messages[i].timestamp ?? 0) return false
             if (encloserLastTimestamp <= toEpochSeconds(msgTimestamp)) {
                 return false;
             }
         }
 
-        return true; // WAWebMessageRangeUtils (function m): return true
+        return true;
     }
 
     /**

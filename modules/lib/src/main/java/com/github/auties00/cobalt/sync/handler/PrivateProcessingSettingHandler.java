@@ -84,7 +84,7 @@ public final class PrivateProcessingSettingHandler implements WebAppStateActionH
      */
     @Override
     public String actionName() {
-        return PrivateProcessingSettingAction.ACTION_NAME; // NO_WA_BASIS: WAWebProtobufSyncAction.pb only declares the protobuf field privateProcessingSettingAction at index 74
+        return PrivateProcessingSettingAction.ACTION_NAME;
     }
 
     /**
@@ -118,7 +118,7 @@ public final class PrivateProcessingSettingHandler implements WebAppStateActionH
      */
     @Override
     public int version() {
-        return PrivateProcessingSettingAction.ACTION_VERSION; // NO_WA_BASIS: WA Web has no PrivateProcessingSetting version constant; defaults to 1
+        return PrivateProcessingSettingAction.ACTION_VERSION;
     }
 
     /**
@@ -187,16 +187,16 @@ public final class PrivateProcessingSettingHandler implements WebAppStateActionH
      */
     @Override
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        if (mutation.operation() != SyncdOperation.SET) { // NO_WA_BASIS: only SET makes sense for a single-enum preference action
+        if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof PrivateProcessingSettingAction action) // NO_WA_BASIS: payload type guard
+        if (!(mutation.value().action().orElse(null) instanceof PrivateProcessingSettingAction action)
                 || action.privateProcessingStatus().isEmpty()) { // NO_WA_BASIS: privateProcessingStatus is the only field on the protobuf and is required for any meaningful update
             return MutationApplicationResult.malformed();
         }
 
-        client.store().setPrivateProcessingStatus(action.privateProcessingStatus().get()); // NO_WA_BASIS: persist the enum on the flattened Cobalt store
+        client.store().setPrivateProcessingStatus(action.privateProcessingStatus().get());
         return MutationApplicationResult.success();
     }
 }

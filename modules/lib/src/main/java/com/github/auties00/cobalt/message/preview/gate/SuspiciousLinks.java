@@ -74,9 +74,8 @@ public final class SuspiciousLinks {
         var host = match.domain().toLowerCase();
         var recipientCC = countryCodeFor(chatJid);
         var selfCC = countryCodeFor(client == null ? null : client.store().jid().orElse(null));
-        // WAWebLinkify.c: the recipient-language list is always passed empty
-        // because Web does not propagate the recipient's locale into the
-        // suspicious-character heuristic.
+        // Web does not propagate the recipient locale into the suspicious character
+        // heuristic, so the recipient language list is always passed empty.
         return Idn.isSuspicious(host, recipientCC, selfCC, List.of());
     }
 

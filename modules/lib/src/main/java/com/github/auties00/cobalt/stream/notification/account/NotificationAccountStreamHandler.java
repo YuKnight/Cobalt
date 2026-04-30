@@ -27,8 +27,6 @@ import java.util.function.Consumer;
  * account state, including status, text status, privacy settings, devices,
  * blocklist, profile picture, disappearing mode, TOS notices, user flags,
  * and business opt-out list updates.
- *
- * @implNote WAWebHandleAccountSyncNotification
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleAccountSyncNotification")
 final class NotificationAccountStreamHandler implements SocketStream.Handler {
@@ -42,10 +40,8 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
 
     /**
      * The PDFN (Privacy Disclosure For Notices) accepted stage value.
-     *
-     * @implNote WAWebPDFNTypes.NOTICE_STAGES.PDFN_ACCEPTED
      */
-    private static final String PDFN_ACCEPTED_STAGE = "5"; // WAWebPDFNTypes.NOTICE_STAGES.PDFN_ACCEPTED
+    private static final String PDFN_ACCEPTED_STAGE = "5";
 
     /**
      * The WhatsApp client instance used for queries and sending nodes.
@@ -77,7 +73,6 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
      * Handles an incoming node by verifying it is an account-sync notification,
      * dispatching to the appropriate sub-handler, and sending an acknowledgment.
      *
-     * @implNote WAWebHandleAccountSyncNotification.handleAccountSyncNotification
      * @param node the incoming stanza node
      */
     @Override
@@ -93,7 +88,7 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
                     "Cannot handle account_sync notification " + node.getAttributeAsString("id", "<missing>"),
                     throwable);
         } finally {
-            sendNotificationAck(node); // WAWebHandleAccountSyncNotification.handleAccountSyncNotification (ack stanza)
+            sendNotificationAck(node);
         }
     }
 
@@ -110,48 +105,48 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
     private void handleNotification(Node node) {
         for (var child : node.children()) {
             switch (child.description()) {
-                case "status" -> { // WAWebAccountSyncJob.AccountSyncType.STATUS
+                case "status" -> {
                     refreshOwnAbout();
                     return;
                 }
-                case "text_status" -> { // WAWebAccountSyncJob.AccountSyncType.TEXT_STATUS
+                case "text_status" -> {
                     handleTextStatusNotification(node, child);
                     return;
                 }
-                case "privacy" -> { // WAWebAccountSyncJob.AccountSyncType.PRIVACY
-                    whatsapp.pullWebAppState(SyncPatchType.REGULAR_LOW, SyncPatchType.REGULAR); // ADAPTED: WAWebAccountSyncJob.updatePrivacySettings + triggerAccountSyncForPrivacy
+                case "privacy" -> {
+                    whatsapp.pullWebAppState(SyncPatchType.REGULAR_LOW, SyncPatchType.REGULAR);
                     return;
                 }
-                case "devices" -> { // WAWebAccountSyncJob.AccountSyncType.DEVICES
+                case "devices" -> {
                     refreshOwnDevices(node);
                     return;
                 }
-                case "blocklist" -> { // WAWebAccountSyncJob.AccountSyncType.BLOCKLIST
-                    applyBlocklistUsernames(child); // WAWebHandleAccountSyncNotification parser: p.forEachChildWithTag("item", ...) + setUsernamesJob
+                case "blocklist" -> {
+                    applyBlocklistUsernames(child);
                     refreshBlockList();
                     return;
                 }
-                case "picture" -> { // WAWebAccountSyncJob.AccountSyncType.PICTURE
+                case "picture" -> {
                     refreshOwnPicture();
                     return;
                 }
-                case "disappearing_mode" -> { // WAWebAccountSyncJob.AccountSyncType.DISAPPEARING_MODE
+                case "disappearing_mode" -> {
                     handleDisappearingModeNotification(node, child);
                     return;
                 }
-                case "tos" -> { // WAWebAccountSyncJob.AccountSyncType.TOS
+                case "tos" -> {
                     handleTosNotification(child);
                     return;
                 }
-                case "notice" -> { // WAWebAccountSyncJob.AccountSyncType.NOTICE
+                case "notice" -> {
                     handleNoticeNotification(child);
                     return;
                 }
-                case "user" -> { // WAWebAccountSyncJob.AccountSyncType.USER
+                case "user" -> {
                     handleUserNotification(child);
                     return;
                 }
-                case "biz_opt_out_list" -> { // WAWebAccountSyncJob.AccountSyncType.OPTOUTLIST
+                case "biz_opt_out_list" -> {
                     handleBizOptOutListNotification(child);
                     return;
                 }
@@ -173,22 +168,20 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
      * <p>WA Web queries the about status, and if non-empty, sends it to the frontend
      * via {@code frontendSendAndReceive("setMyStatus")}. Cobalt instead directly
      * updates the store and fires listeners.
-     *
-     * @implNote WAWebHandleAccountSyncNotification.getAndUpdateStatus
      */
     void refreshOwnAbout() {
-        var self = whatsapp.store().jid().orElse(null); // ADAPTED: WAWebUserPrefsMeUser.getMePnUserOrThrow_DO_NOT_USE
+        var self = whatsapp.store().jid().orElse(null);
         if (self == null) {
             return;
         }
 
         var oldAbout = whatsapp.store().about().orElse(""); // NO_WA_BASIS - defensive comparison
-        var newAbout = whatsapp.queryAbout(self).orElse(""); // WAWebGetAboutQueryJob.getAbout
+        var newAbout = whatsapp.queryAbout(self).orElse("");
         if (Objects.equals(oldAbout, newAbout)) {
             return; // NO_WA_BASIS - Cobalt optimization to avoid redundant updates
         }
 
-        whatsapp.store().setAbout(newAbout); // ADAPTED: WAWebBackendApi.frontendSendAndReceive("setMyStatus", {status: r})
+        whatsapp.store().setAbout(newAbout);
         fireListeners(listener -> listener.onAboutChanged(whatsapp, oldAbout, newAbout)); // ADAPTED: Cobalt listener pattern
     }
 
@@ -205,34 +198,32 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
      * @param textStatusNode the {@code text_status} child element
      */
     private void handleTextStatusNotification(Node node, Node textStatusNode) {
-        var action = textStatusNode.getAttributeAsString("action", null); // WAWebHandleAccountSyncNotification parser (action)
+        var action = textStatusNode.getAttributeAsString("action", null);
         if ("modify".equals(action)) {
-            // WAWebHandleAccountSyncNotification function g/h: fetches text status from server
             // ADAPTED: Cobalt does not have a dedicated text status query API yet,
             // so the modify case is treated the same as the default case (stanza values)
             updateOwnTextStatus(textStatusNode);
         } else {
-            // WAWebHandleAccountSyncNotification.handleAccountSyncNotification (non-modify TEXT_STATUS path)
-            var from = getUserJid(node, "from"); // WAWebWidFactory.asUserWidOrThrow(r.from)
+            var from = getUserJid(node, "from");
             var self = from != null ? from : whatsapp.store().jid().map(Jid::toUserJid).orElse(null);
             if (self == null) {
                 return;
             }
 
-            var text = textStatusNode.getAttributeAsString("text", null); // WAWebHandleAccountSyncNotification parser (text)
+            var text = textStatusNode.getAttributeAsString("text", null);
             var emoji = textStatusNode.getChild("emoji")
-                    .flatMap(emojiNode -> emojiNode.getAttributeAsString("content")) // WAWebHandleAccountSyncNotification parser (emoji content)
+                    .flatMap(emojiNode -> emojiNode.getAttributeAsString("content"))
                     .orElse(null);
-            var ephemeralDuration = textStatusNode.getAttributeAsInt("ephemeral_duration_sec", (Integer) null); // WAWebHandleAccountSyncNotification parser (ephemeralDurationSeconds)
-            var lastUpdateTimeStr = textStatusNode.getAttributeAsString("last_update_time", null); // WAWebHandleAccountSyncNotification parser (lastUpdateTime as string)
-            var lastUpdateTime = lastUpdateTimeStr != null ? Instant.ofEpochSecond(Long.parseLong(lastUpdateTimeStr)) : null; // WAWebHandleAccountSyncNotification (s != null ? Number(s) : void 0)
+            var ephemeralDuration = textStatusNode.getAttributeAsInt("ephemeral_duration_sec", (Integer) null);
+            var lastUpdateTimeStr = textStatusNode.getAttributeAsString("last_update_time", null);
+            var lastUpdateTime = lastUpdateTimeStr != null ? Instant.ofEpochSecond(Long.parseLong(lastUpdateTimeStr)) : null;
             upsertContactTextStatus(
                     self,
                     text,
                     emoji,
                     ephemeralDuration,
                     lastUpdateTime
-            ); // WAWebUpdateTextStatusForContact.updateTextStatusForContact
+            );
         }
     }
 
@@ -245,17 +236,17 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
      * @param textStatusNode the {@code text_status} child element
      */
     private void updateOwnTextStatus(Node textStatusNode) {
-        var self = whatsapp.store().jid().orElse(null); // ADAPTED: WAWebUserPrefsMeUser.getMeDevicePnOrThrow_DO_NOT_USE
+        var self = whatsapp.store().jid().orElse(null);
         if (self == null) {
             return;
         }
 
-        var text = textStatusNode.getAttributeAsString("text", null); // WAWebHandleAccountSyncNotification parser (text)
+        var text = textStatusNode.getAttributeAsString("text", null);
         var emoji = textStatusNode.getChild("emoji")
-                .flatMap(emojiNode -> emojiNode.getAttributeAsString("content")) // WAWebHandleAccountSyncNotification parser (emoji content)
+                .flatMap(emojiNode -> emojiNode.getAttributeAsString("content"))
                 .orElse(null);
-        var ephemeralDuration = textStatusNode.getAttributeAsInt("ephemeral_duration_sec", (Integer) null); // WAWebHandleAccountSyncNotification parser (ephemeralDurationSeconds)
-        var lastUpdateTimeStr = textStatusNode.getAttributeAsString("last_update_time", null); // WAWebHandleAccountSyncNotification parser (lastUpdateTime)
+        var ephemeralDuration = textStatusNode.getAttributeAsInt("ephemeral_duration_sec", (Integer) null);
+        var lastUpdateTimeStr = textStatusNode.getAttributeAsString("last_update_time", null);
         var lastUpdateTime = lastUpdateTimeStr != null ? Instant.ofEpochSecond(Long.parseLong(lastUpdateTimeStr)) : null;
         upsertContactTextStatus(
                 self.toUserJid(),
@@ -263,7 +254,7 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
                 emoji,
                 ephemeralDuration,
                 lastUpdateTime
-        ); // WAWebUpdateTextStatusForContact.updateTextStatusForContact
+        );
     }
 
     /**
@@ -276,12 +267,11 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
     private void refreshOwnDevices(Node node) {
         var self = whatsapp.store().jid()
                 .map(Jid::toUserJid)
-                .orElseGet(() -> getUserJid(node, "from")); // ADAPTED: WAWebWidFactory.asUserWidOrThrow(r.from)
+                .orElseGet(() -> getUserJid(node, "from"));
         if (self == null) {
             return;
         }
 
-        // ADAPTED: WAWebHandleAccountSyncNotification.handleAccountSyncNotification (DEVICES case).
         // The notification already carries the full device list inline as <device jid=... key-index=.../>
         // children of the <devices> child, along with the server-computed dhash. The earlier
         // implementation kicked off a fresh USync device query for self, but the server does not
@@ -294,15 +284,15 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
 
         var parsed = new ArrayList<DeviceInfo>();
         for (var deviceNode : devicesChild.getChildren("device")) {
-            var deviceJid = deviceNode.getAttributeAsJid("jid").orElse(null); // WAWebHandleAccountSyncNotification: e.attrUserJid("jid")
+            var deviceJid = deviceNode.getAttributeAsJid("jid").orElse(null);
             if (deviceJid == null) {
                 continue;
             }
-            var keyIndex = deviceNode.getAttributeAsInt("key-index", 0); // WAWebHandleAccountSyncNotification: e.maybeAttrInt("key-index")
+            var keyIndex = deviceNode.getAttributeAsInt("key-index", 0);
             parsed.add(DeviceInfo.ofE2EE(deviceJid.device(), keyIndex));
         }
 
-        var dhash = devicesChild.getAttributeAsString("dhash", null); // WAWebHandleAccountSyncNotification: devicesNode.attrs.dhash (used as rawId/phash hint)
+        var dhash = devicesChild.getAttributeAsString("dhash", null);
         var list = new DeviceListBuilder()
                 .userJid(self)
                 .devices(List.copyOf(parsed))
@@ -327,17 +317,16 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
      */
     private void applyBlocklistUsernames(Node blocklistNode) {
         for (var item : blocklistNode.getChildren("item")) {
-            var username = item.getAttributeAsString("username", null); // WAWebHandleAccountSyncNotification parser: e.maybeAttrString("username")
+            var username = item.getAttributeAsString("username", null);
             if (username == null) {
                 continue;
             }
-            var userJid = item.getAttributeAsJid("jid") // WAWebHandleAccountSyncNotification parser: e.attrUserJid("jid") via userJidToUserWid
+            var userJid = item.getAttributeAsJid("jid")
                     .map(Jid::toUserJid)
                     .orElse(null);
             if (userJid == null) {
                 continue;
             }
-            // ADAPTED: WAWebSetUsernameJob.setUsernamesJob applies usernames to contact records;
             // Cobalt updates the contact's username directly on the local store.
             var contact = whatsapp.store()
                     .findContactByJid(userJid)
@@ -354,7 +343,6 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
      * @implNote WAWebHandleAccountSyncNotification.handleAccountSyncNotification (BLOCKLIST case)
      */
     private void refreshBlockList() {
-        // ADAPTED: WAWebQueryBlockListJob.fetchAndUpdateBlocklist("notification")
         // Cobalt queries blocklist and updates contact records directly
         var blockedJids = new HashSet<>(whatsapp.queryBlockList());
         for (var contact : whatsapp.store().contacts()) {
@@ -385,18 +373,18 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
      * @implNote WAWebHandleAccountSyncNotification.handleAccountSyncNotification (PICTURE case)
      */
     private void refreshOwnPicture() {
-        var self = whatsapp.store().jid().orElse(null); // ADAPTED: WAWebAccountSyncJob.getAndUpdateProfilePicture
+        var self = whatsapp.store().jid().orElse(null);
         if (self == null) {
             return;
         }
 
         var oldPicture = whatsapp.store().profilePicture().orElse(null); // NO_WA_BASIS - defensive comparison
-        var newPicture = whatsapp.queryPicture(self).orElse(null); // WAWebProfilePicThumbCollection.resyncPictures
+        var newPicture = whatsapp.queryPicture(self).orElse(null);
         if (Objects.equals(oldPicture, newPicture)) {
             return; // NO_WA_BASIS - Cobalt optimization to avoid redundant updates
         }
 
-        whatsapp.store().setProfilePicture(newPicture); // ADAPTED: WAWebProfilePicThumbCollection update
+        whatsapp.store().setProfilePicture(newPicture);
         fireListeners(listener -> listener.onProfilePictureChanged(whatsapp, self)); // ADAPTED: Cobalt listener pattern
     }
 
@@ -418,36 +406,30 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
      * @param disappearingMode the {@code disappearing_mode} child element
      */
     private void handleDisappearingModeNotification(Node node, Node disappearingMode) {
-        var action = disappearingMode.getAttributeAsString("action", null); // WAWebHandleAccountSyncNotification parser (action)
-        Integer duration; // WAWebHandleAccountSyncNotification (disappearingModeDuration / C)
-        Integer settingTimestamp; // WAWebHandleAccountSyncNotification (disappearingModeSettingTimestamp / b)
+        var action = disappearingMode.getAttributeAsString("action", null);
+        Integer duration;
+        Integer settingTimestamp;
         if (action != null) {
-            // WAWebHandleAccountSyncNotification: h.hasAttr("action") -> y = h.attrString("action")
             // When action is present, duration and timestamp are not in the stanza
             duration = null;
             settingTimestamp = null;
         } else {
-            // WAWebHandleAccountSyncNotification: C = h.attrInt("duration"), b = h.attrInt("t")
             duration = disappearingMode.getAttributeAsInt("duration", (Integer) null);
             settingTimestamp = disappearingMode.getAttributeAsInt("t", (Integer) null);
         }
 
         if ("modify".equals(action)) {
-            // WAWebHandleAccountSyncNotification: action === "modify" -> getDisappearingMode from server
             // ADAPTED: Cobalt queries disappearing mode via the store's default timer
             // The server query would return the latest duration and timestamp
             // For now, we use the store's current setting if available
-            var selfJid = getUserJid(node, "from"); // WAWebHandleAccountSyncNotification (T = r.from)
+            var selfJid = getUserJid(node, "from");
             if (selfJid != null) {
-                // ADAPTED: WAWebGetDisappearingModeJob.getDisappearingMode
                 // Cobalt does not have a dedicated disappearing mode query;
                 // the duration update will be handled by the next full sync
             }
         }
 
-        // WAWebHandleAccountSyncNotification: D != null && x != null && updateDisappearingModeForContact(...)
         if (duration != null) {
-            // ADAPTED: WAWebUpdateDisappearingModeForContact.updateDisappearingModeForContact
             // Cobalt stores this as the global new-chats ephemeral timer
             whatsapp.store().setNewChatsEphemeralTimer(ChatEphemeralTimer.of(duration));
         }
@@ -466,17 +448,15 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
      * @param tosNode the {@code tos} child element containing notice children
      */
     private void handleTosNotification(Node tosNode) {
-        // WAWebHandleAccountSyncNotification parser: f.forEachChildWithTag("notice", ...)
         var notices = new HashSet<String>();
         for (var notice : tosNode.getChildren("notice")) {
-            var state = notice.getAttributeAsString("state", null); // WAWebHandleAccountSyncNotification parser (state !== "false")
-            var accepted = !"false".equals(state); // WAWebHandleAccountSyncNotification parser: maybeAttrString("state") !== "false"
-            var id = notice.getAttributeAsString("id", null); // WAWebHandleAccountSyncNotification parser: attrString("id")
+            var state = notice.getAttributeAsString("state", null);
+            var accepted = !"false".equals(state);
+            var id = notice.getAttributeAsString("id", null);
             if (id != null && accepted) {
                 notices.add(id);
             }
         }
-        // WAWebAccountSyncJob.updateTosStateFromAccountSync -> TosManager.setState
         // ADAPTED: Cobalt stores accepted notice IDs in the store
         if (!notices.isEmpty()) {
             var currentNotices = new HashSet<>(whatsapp.store().tosNoticeIds());
@@ -498,20 +478,17 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
      * @param noticeNode the {@code notice} child element
      */
     private void handleNoticeNotification(Node noticeNode) {
-        var noticeId = noticeNode.getAttributeAsString("id", null); // WAWebHandleAccountSyncNotification parser: v.attrString("id")
-        var noticeStage = noticeNode.getAttributeAsString("stage", null); // WAWebHandleAccountSyncNotification parser: v.maybeAttrString("stage")
-        var noticeVersion = noticeNode.getAttributeAsString("version", null); // WAWebHandleAccountSyncNotification parser: v.maybeAttrString("version")
-        var noticeTimestamp = noticeNode.getAttributeAsInt("t", (Integer) null); // WAWebHandleAccountSyncNotification parser: v.attrInt("t")
+        var noticeId = noticeNode.getAttributeAsString("id", null);
+        var noticeStage = noticeNode.getAttributeAsString("stage", null);
+        var noticeVersion = noticeNode.getAttributeAsString("version", null);
+        var noticeTimestamp = noticeNode.getAttributeAsInt("t", (Integer) null);
 
-        // WAWebHandleAccountSyncNotification: P != null && P !== "" && N != null && w != null && M != null
         if (noticeId == null || noticeId.isEmpty() || noticeStage == null || noticeVersion == null || noticeTimestamp == null) {
             return;
         }
 
-        // WAWebHandleAccountSyncNotification: A = N === WAWebPDFNTypes.NOTICE_STAGES.PDFN_ACCEPTED
         var accepted = PDFN_ACCEPTED_STAGE.equals(noticeStage);
 
-        // WAWebHandleAccountSyncNotification: updateTosStateFromAccountSync([{id: P, state: A, timestamp: castToUnixTime(M)}])
         // ADAPTED: Cobalt stores accepted notice IDs in the store
         if (accepted) {
             var currentNotices = new HashSet<>(whatsapp.store().tosNoticeIds());
@@ -530,7 +507,6 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
      * @param userNode the {@code user} child element
      */
     private void handleUserNotification(Node userNode) {
-        // WAWebHandleAccountSyncNotification parser: S.maybeAttrString("state") === "AI available"
         var isAiAvailable = "AI available".equals(userNode.getAttributeAsString("state", null));
         whatsapp.store().setAiAvailable(isAiAvailable); // ADAPTED: Cobalt persists the flag; WA Web only logs
     }
@@ -548,31 +524,26 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
      * @param optOutListNode the {@code biz_opt_out_list} child element
      */
     private void handleBizOptOutListNotification(Node optOutListNode) {
-        var dhash = optOutListNode.getAttributeAsString("dhash", null); // WAWebHandleAccountSyncNotification parser: L.maybeAttrString("dhash")
-        var prevDhash = optOutListNode.getAttributeAsString("prev_dhash", null); // WAWebHandleAccountSyncNotification parser: L.maybeAttrString("prev_dhash")
-        var storedHash = whatsapp.store().businessOptOutListHash().orElse(null); // WAWebUserPrefsMultiDevice.getOptOutListHash()
+        var dhash = optOutListNode.getAttributeAsString("dhash", null);
+        var prevDhash = optOutListNode.getAttributeAsString("prev_dhash", null);
+        var storedHash = whatsapp.store().businessOptOutListHash().orElse(null);
 
-        // WAWebHandleAccountSyncNotification: if (R !== k) { workerSafeFireAndForget("updateOptOutList"); break; }
         // Hash mismatch triggers a full refresh and does NOT update the stored hash.
         if (!Objects.equals(storedHash, prevDhash)) {
-            // ADAPTED: WAWebWorkerSafeBackendApi.workerSafeFireAndForget("updateOptOutList")
             // Cobalt does not have a dedicated full opt-out list refresh job; the next
             // sync will bring the store back in line. The hash is deliberately left
             // untouched to match WA Web semantics (mismatch -> do not persist L).
             return;
         }
 
-        // WAWebHandleAccountSyncNotification: else branch — L != null && (E == null || E.forEach(...)), then setOptOutlistHash(L)
         if (dhash != null) {
-            // WAWebHandleAccountSyncNotification: E.forEach(async ({action, biz_jid}) => workerSafeFireAndForget("updateOptOutListModelInCollection", {targetWid, isBlocked: action === "block"}))
             for (var item : optOutListNode.children()) {
-                var action = item.getAttributeAsString("action", null); // WAWebHandleAccountSyncNotification: e.attrString("action")
-                var bizJid = item.getAttributeAsJid("biz_jid", null); // WAWebHandleAccountSyncNotification: e.attrUserJid("biz_jid") via WAWebJidToWid.userJidToUserWid
+                var action = item.getAttributeAsString("action", null);
+                var bizJid = item.getAttributeAsJid("biz_jid", null);
                 if (action == null || bizJid == null) {
                     continue;
                 }
-                var isBlocked = "block".equals(action); // WAWebHandleAccountSyncNotification: r = t === "block"
-                // ADAPTED: WAWebWorkerSafeBackendApi.workerSafeFireAndForget("updateOptOutListModelInCollection", {targetWid, isBlocked})
+                var isBlocked = "block".equals(action);
                 // Cobalt flips the blocked flag on the contact record directly.
                 var userJid = bizJid.toUserJid();
                 var contact = whatsapp.store()
@@ -584,7 +555,7 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
                     fireListeners(listener -> listener.onContactBlocked(whatsapp, userJid));
                 }
             }
-            whatsapp.store().setBusinessOptOutListHash(dhash); // WAWebUserPrefsMultiDevice.setOptOutlistHash(L)
+            whatsapp.store().setBusinessOptOutListHash(dhash);
         }
     }
 
@@ -617,7 +588,6 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
     /**
      * Creates or updates the text status for a contact in the store.
      *
-     * @implNote WAWebUpdateTextStatusForContact.updateTextStatusForContact
      * @param contactJid the JID of the contact whose text status is being updated
      * @param text the text status string, may be {@code null}
      * @param emoji the emoji associated with the text status, may be {@code null}
@@ -668,19 +638,18 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
      * @param node the notification node to acknowledge
      */
     private void sendNotificationAck(Node node) {
-        var stanzaId = node.getAttributeAsString("id", null); // WAWebHandleAccountSyncNotification: r.stanzaId
-        var stanzaFrom = node.getAttributeAsJid("from", null); // WAWebHandleAccountSyncNotification: r.from
+        var stanzaId = node.getAttributeAsString("id", null);
+        var stanzaFrom = node.getAttributeAsJid("from", null);
         if (stanzaId == null || stanzaFrom == null) {
             return;
         }
 
-        // WAWebHandleAccountSyncNotification: WAWap.wap("ack", {id: CUSTOM_STRING(r.stanzaId), to: JID(r.from), class: "notification", type: "account_sync"})
         whatsapp.sendNodeWithNoResponse(new NodeBuilder()
                 .description("ack")
                 .attribute("id", stanzaId)
-                .attribute("class", "notification") // WAWebHandleAccountSyncNotification: hardcoded "notification"
+                .attribute("class", "notification")
                 .attribute("to", stanzaFrom)
-                .attribute("type", "account_sync") // WAWebHandleAccountSyncNotification: hardcoded "account_sync"
+                .attribute("type", "account_sync")
                 .build());
     }
 }

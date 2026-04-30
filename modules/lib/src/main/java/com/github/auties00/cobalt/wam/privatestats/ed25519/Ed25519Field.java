@@ -1,30 +1,35 @@
 package com.github.auties00.cobalt.wam.privatestats.ed25519;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+
 /**
- * Field arithmetic over {@code GF(2^255 - 19)}, the prime field underlying
- * Curve25519 and Ed25519.
+ * Field arithmetic over {@code GF(2^255 - 19)}, the prime field
+ * underlying Curve25519 and Ed25519.
  *
- * <p>Field elements are represented as 16 little-endian limbs in radix
- * {@code 2^16}, stored in a {@code long[16]}. This mirrors the
- * {@code Float64Array(16)} representation of the {@code WACryptoPrimitives}
- * {@code lowlevel} object (a port of {@code nacl.lowlevel} from
- * {@code tweetnacl-js}). Keeping the limb layout identical lets the port be
- * diff-validated against the JavaScript reference function-for-function.
+ * <p>Field elements are represented as 16 little-endian limbs in
+ * radix {@code 2^16}, stored in a {@code long[16]}. This mirrors the
+ * {@code Float64Array(16)} representation of the
+ * {@code WACryptoPrimitives.lowlevel} object, a port of
+ * {@code nacl.lowlevel} from {@code tweetnacl-js}. Keeping the limb
+ * layout identical lets the port be diff-validated against the
+ * JavaScript reference function-for-function.
  *
- * <p>Limbs are signed: subtraction may produce negative limbs, and the carry
- * chain implemented in {@link #car25519} normalises any layout (including
- * negative limbs and limbs up to {@code ~2^36}) back to {@code [0, 2^16)}
- * after a multiplication.
+ * <p>Limbs are signed. Subtraction may produce negative limbs, and
+ * the carry chain implemented in {@link #car25519} normalises any
+ * layout (including negative limbs and limbs up to {@code ~2^36})
+ * back to {@code [0, 2^16)} after a multiplication.
  *
- * <p>All operations are constant time with respect to limb values. No branch
- * depends on the secret data being processed.
+ * <p>All operations are constant time with respect to limb values.
+ * No branch depends on the secret data being processed.
  *
  * @implNote Mirrors the {@code A}, {@code Z}, {@code M}, {@code S},
- * {@code car25519}, {@code pack25519}, {@code unpack25519}, {@code sel25519},
- * {@code pow2523} and {@code inv25519} helpers from
- * {@code WACryptoPrimitives.lowlevel}, which {@code WACryptoEd25519} (and
- * therefore {@code WAWamPrivateStatsToken}) builds upon.
+ *     {@code car25519}, {@code pack25519}, {@code unpack25519},
+ *     {@code sel25519}, {@code pow2523}, and {@code inv25519}
+ *     helpers from {@code WACryptoPrimitives.lowlevel}, which
+ *     {@code WACryptoEd25519} (and therefore the private-stats token
+ *     blinder) builds upon.
  */
+@WhatsAppWebModule(moduleName = "WACryptoPrimitives")
 public final class Ed25519Field {
     /**
      * Number of base-{@code 2^16} limbs in a field element.
@@ -123,7 +128,7 @@ public final class Ed25519Field {
      * normalise every limb back into {@code [0, 2^16)}.
      *
      * <p>The 16-by-16 partial-product expansion is fully unrolled to mirror
-     * {@code lowlevel.M} from {@code tweetnacl-js} line for line — the
+     * {@code lowlevel.M} from {@code tweetnacl-js} line for line. The
      * choice exists for diff-validatability against the reference, not
      * performance.
      *
@@ -235,7 +240,8 @@ public final class Ed25519Field {
         t23 += v * b8; t24 += v * b9; t25 += v * b10; t26 += v * b11;
         t27 += v * b12; t28 += v * b13; t29 += v * b14; t30 += v * b15;
 
-        // 2^256 ≡ 38 (mod 2^255 - 19): fold the 15 high limbs back into the low ones.
+        // 2^256 is congruent to 38 modulo 2^255 - 19, so fold the
+        // 15 high limbs back into the low ones.
         t0 += 38 * t16;
         t1 += 38 * t17;
         t2 += 38 * t18;

@@ -46,13 +46,8 @@ public sealed interface SmaxWaffleWFPingResponse extends SmaxOperation.Response
     }
 
     /**
-     * The {@code Success} reply variant — the relay accepted the ping
+     * The {@code Success} reply variant. The relay accepted the ping
      * and surfaced the next-ping cadence.
-     *
-     * @implNote {@code WASmaxInWaffleWFPingResponseSuccess.parseWFPingResponseSuccess}
-     *           projects the {@code <ping_interval>INT</ping_interval>}
-     *           content as the relay-chosen
-     *           seconds-between-pings cadence.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInWaffleWFPingResponseSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxInWaffleIQResultResponseMixin")
@@ -140,7 +135,7 @@ public sealed interface SmaxWaffleWFPingResponse extends SmaxOperation.Response
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected the
+     * The {@code ClientError} reply variant. The relay rejected the
      * request as malformed, unauthorised, or referencing a
      * non-existent / suspended Waffle state.
      *
@@ -235,7 +230,7 @@ public sealed interface SmaxWaffleWFPingResponse extends SmaxOperation.Response
     }
 
     /**
-     * The {@code ServerError} reply variant — the relay encountered a
+     * The {@code ServerError} reply variant. The relay encountered a
      * transient internal failure.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInWaffleWFPingResponseError")

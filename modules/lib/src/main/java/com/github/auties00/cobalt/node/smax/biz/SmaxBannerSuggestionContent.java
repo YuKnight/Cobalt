@@ -13,7 +13,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The {@code <content/>} projection — banner copy plus locale and
+ * The {@code <content/>} projection. Banner copy plus locale and
  * optional localised parallels.
  */
 @WhatsAppWebModule(moduleName = "WASmaxInBizCtwaActionBannerSuggestionRequest")

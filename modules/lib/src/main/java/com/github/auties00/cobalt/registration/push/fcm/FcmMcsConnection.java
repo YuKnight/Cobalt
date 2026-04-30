@@ -1,18 +1,6 @@
 package com.github.auties00.cobalt.registration.push.fcm;
 
-import com.github.auties00.cobalt.client.registration.fcm.mcs.FcmMcsDataMessageStanzaSpec;
-import com.github.auties00.cobalt.client.registration.fcm.mcs.FcmMcsHeartbeatAckBuilder;
-import com.github.auties00.cobalt.client.registration.fcm.mcs.FcmMcsHeartbeatAckSpec;
-import com.github.auties00.cobalt.client.registration.fcm.mcs.FcmMcsHeartbeatPingBuilder;
-import com.github.auties00.cobalt.client.registration.fcm.mcs.FcmMcsHeartbeatPingSpec;
-import com.github.auties00.cobalt.client.registration.fcm.mcs.FcmMcsIqStanzaBuilder;
-import com.github.auties00.cobalt.client.registration.fcm.mcs.FcmMcsIqStanzaExtensionBuilder;
-import com.github.auties00.cobalt.client.registration.fcm.mcs.FcmMcsIqStanzaSpec;
-import com.github.auties00.cobalt.registration.push.fcm.mcs.FcmMcsLoginRequest;
-import com.github.auties00.cobalt.client.registration.fcm.mcs.FcmMcsLoginRequestBuilder;
-import com.github.auties00.cobalt.client.registration.fcm.mcs.FcmMcsLoginRequestSettingBuilder;
-import com.github.auties00.cobalt.client.registration.fcm.mcs.FcmMcsLoginRequestSpec;
-import com.github.auties00.cobalt.client.registration.fcm.mcs.FcmMcsLoginResponseSpec;
+import com.github.auties00.cobalt.registration.push.fcm.mcs.*;
 
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
@@ -30,13 +18,13 @@ import java.util.List;
  * FCM client maintains with {@code mtalk.google.com:5228} after
  * registration completes. Drives the framed protocol:
  * version preamble, login handshake, heartbeat ping/ack, stream-ack
- * iq, and incoming data messages — and reconnects with a fixed
+ * iq, and incoming data messages. And reconnects with a fixed
  * back-off after any transport failure.
  *
  * <p>Two virtual threads are involved at steady state:
  * <ul>
  *   <li>the <em>reader thread</em>, started by {@link #start()},
- *       which owns the socket lifecycle and pumps incoming frames;</li>
+ *       which owns the socket lifecycle and pumps incoming frames.</li>
  *   <li>the <em>heartbeat thread</em>, spawned per connection by the
  *       reader after login, which writes a {@code HeartbeatPing} every
  *       {@link #HEARTBEAT_INTERVAL_SECONDS} seconds.</li>
@@ -55,19 +43,19 @@ import java.util.List;
  */
 final class FcmMcsConnection {
     /**
-     * Logger shared with the rest of the FCM client — same logger
+     * Logger shared with the rest of the FCM client. Same logger
      * name {@code cobalt.fcm} so consumers can configure verbosity
      * uniformly.
      */
     private static final Logger LOG = System.getLogger("cobalt.fcm");
 
     /**
-     * MCS gateway hostname; identical for every Android device.
+     * MCS gateway hostname. Identical for every Android device.
      */
     private static final String MCS_HOST = "mtalk.google.com";
 
     /**
-     * MCS port; matches the value the native Play Services client
+     * MCS port. Matches the value the native Play Services client
      * uses.
      */
     private static final int MCS_PORT = 5228;
@@ -104,7 +92,7 @@ final class FcmMcsConnection {
     private static final byte TAG_CLOSE = 4;
 
     /**
-     * Frame tag for IQ stanzas — Cobalt only emits the periodic
+     * Frame tag for IQ stanzas. Cobalt only emits the periodic
      * stream-ack iq.
      */
     private static final byte TAG_IQ_STANZA = 7;
@@ -116,7 +104,7 @@ final class FcmMcsConnection {
     private static final byte TAG_DATA_MESSAGE_STANZA = 8;
 
     /**
-     * Heartbeat interval; matches the cadence the native client uses
+     * Heartbeat interval. Matches the cadence the native client uses
      * to keep middleboxes from idle-timing out the TCP flow.
      */
     private static final long HEARTBEAT_INTERVAL_SECONDS = 10 * 60L;
@@ -165,7 +153,7 @@ final class FcmMcsConnection {
     /**
      * Serialises every outbound write on the MCS stream. Both the
      * reader thread (acks, heartbeat acks) and the heartbeat virtual
-     * thread (10-min ping) need to write framed bytes; without this
+     * thread (10-min ping) need to write framed bytes. Without this
      * lock two writers could interleave inside one frame and corrupt
      * the stream.
      */
@@ -209,7 +197,7 @@ final class FcmMcsConnection {
     /**
      * Last received stream id. Written by the reader thread and read
      * by both the reader (for iq acks) and the heartbeat thread (for
-     * the ping cursor); marked {@code volatile} so the heartbeat
+     * the ping cursor). Marked {@code volatile} so the heartbeat
      * thread sees fresh values without a happens-before edge per
      * ping.
      */
@@ -224,7 +212,7 @@ final class FcmMcsConnection {
 
     /**
      * Constructs a new connection bound to the given session and
-     * push-code sink. Does not open a socket — the caller must
+     * push-code sink. Does not open a socket. The caller must
      * invoke {@link #start()} after construction.
      *
      * @param session  the session that supplies login credentials and
@@ -243,7 +231,7 @@ final class FcmMcsConnection {
     /**
      * Spawns the reader virtual thread that owns the MCS connection
      * and reconnects with a fixed back-off after any transport
-     * failure. Returns immediately; subsequent failures are swallowed
+     * failure. Returns immediately. Subsequent failures are swallowed
      * and retried until {@link #close()} flips the stop flag.
      */
     void start() {
@@ -356,7 +344,7 @@ final class FcmMcsConnection {
 
     /**
      * Routes one decoded frame to the matching protocol handler.
-     * Unknown tags are logged and ignored; a {@link #TAG_CLOSE} from
+     * Unknown tags are logged and ignored. A {@link #TAG_CLOSE} from
      * the server is converted to an {@link IOException} so the outer
      * loop reconnects.
      *
@@ -488,7 +476,7 @@ final class FcmMcsConnection {
 
     /**
      * Spawns the heartbeat virtual thread for the current connection.
-     * Quietly returns when the socket dies — the outer reader loop
+     * Quietly returns when the socket dies. The outer reader loop
      * notices the failure and reconnects, which spawns a fresh
      * heartbeat thread.
      *

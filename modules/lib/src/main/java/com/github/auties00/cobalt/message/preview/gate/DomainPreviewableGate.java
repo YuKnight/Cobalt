@@ -61,11 +61,9 @@ public final class DomainPreviewableGate {
         if (!client.abPropsService().getBool(ABProp.CHANNELS_HIDE_NEWS_URL_PREVIEW)) {
             return true;
         }
-        // WAWebNewsletterIsDomainPreviewableAction.isDomainPreviewableAction:
-        // when channels_hide_news_url_preview is on, defer to the server-side
-        // allow-list via mexFetchNewsletterIsDomainPreviewable. The action
-        // returns false for malformed responses or any error, so the gate
-        // closes if the round-trip fails.
+        // When channels_hide_news_url_preview is on, defer to the server side allow list
+        // via mexFetchNewsletterIsDomainPreviewable. The action returns false for any
+        // malformed response or error, so the gate closes if the round trip fails.
         try {
             return domain != null && client.isNewsletterDomainPreviewable(domain);
         } catch (RuntimeException ignored) {

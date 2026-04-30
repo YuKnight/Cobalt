@@ -11,7 +11,7 @@ import java.io.IOException;
  *
  * <p>The producer ({@link ApnsCourierConnection}) calls
  * {@link #deliver} once a {@code regcode} entry is observed in the
- * JSON payload of an incoming {@link ApnsPayloadTag#NOTIFICATION};
+ * JSON payload of an incoming {@link ApnsPayloadTag#NOTIFICATION}.
  * the consumer ({@link ApnsClient}) blocks in {@link #waitForCode()}
  * until either the value is delivered or {@link #close()} is invoked.
  *
@@ -63,7 +63,7 @@ final class ApnsPushCode {
      * Returns immediately if a value was already delivered before the
      * call.
      *
-     * <p>Safe to call from multiple threads concurrently; every
+     * <p>Safe to call from multiple threads concurrently. Every
      * caller observes the same delivered value.
      *
      * @return the delivered verification code

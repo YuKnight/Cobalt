@@ -63,7 +63,7 @@ public final class PrimaryFeatureHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPrimaryFeatureSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return PrimaryFeatureAction.ACTION_NAME; // WAWebPrimaryFeatureSync.getAction
+        return PrimaryFeatureAction.ACTION_NAME;
     }
 
     /**
@@ -75,18 +75,16 @@ public final class PrimaryFeatureHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPrimaryFeatureSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return PrimaryFeatureAction.COLLECTION_NAME; // WAWebPrimaryFeatureSync constructor: this.collectionName = Regular
+        return PrimaryFeatureAction.COLLECTION_NAME;
     }
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote WAWebPrimaryFeatureSync.getVersion — returns the literal {@code 7}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPrimaryFeatureSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return PrimaryFeatureAction.ACTION_VERSION; // WAWebPrimaryFeatureSync.getVersion: return 7
+        return PrimaryFeatureAction.ACTION_VERSION;
     }
 
     /**
@@ -127,33 +125,31 @@ public final class PrimaryFeatureHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPrimaryFeatureSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.DIRECT)
     public List<MutationApplicationResult> applyMutationBatchResults(WhatsAppClient client, WamService wamService, List<DecryptedMutation.Trusted> mutations) {
-        DecryptedMutation.Trusted latest = null; // WAWebPrimaryFeatureSync.applyMutations: var a
-        var results = new ArrayList<MutationApplicationResult>(mutations.size()); // WAWebPrimaryFeatureSync.applyMutations: var u = t.map(...)
-        for (var mutation : mutations) { // WAWebPrimaryFeatureSync.applyMutations: t.map(function(e) {...})
-            if (mutation.operation() != SyncdOperation.SET) { // WAWebPrimaryFeatureSync.applyMutations: if (e.operation !== "set")
-                results.add(MutationApplicationResult.unsupported()); // WAWebPrimaryFeatureSync.applyMutations: return {actionState: Unsupported}
+        DecryptedMutation.Trusted latest = null;
+        var results = new ArrayList<MutationApplicationResult>(mutations.size());
+        for (var mutation : mutations) {
+            if (mutation.operation() != SyncdOperation.SET) {
+                results.add(MutationApplicationResult.unsupported());
                 continue;
             }
 
-            var action = mutation.value().action().orElse(null); // WAWebPrimaryFeatureSync.applyMutations: var r = (t = e.value.primaryFeature) == null ? void 0 : t.flags
-            if (!(action instanceof PrimaryFeatureAction)) { // WAWebPrimaryFeatureSync.applyMutations: if (r == null), in protobuf, an absent primaryFeature sub-action is the only way r becomes null
-                results.add(malformedActionValue()); // WAWebPrimaryFeatureSync.applyMutations: return WAWebSyncdIndexUtils.malformedActionValue(n.collectionName)
+            var action = mutation.value().action().orElse(null);
+            if (!(action instanceof PrimaryFeatureAction)) {
+                results.add(malformedActionValue());
                 continue;
             }
 
-            if (latest == null || mutation.timestamp().compareTo(latest.timestamp()) > 0) { // WAWebPrimaryFeatureSync.applyMutations: if (a == null || e.timestamp > a.timestamp)
-                latest = mutation; // WAWebPrimaryFeatureSync.applyMutations: a = e
+            if (latest == null || mutation.timestamp().compareTo(latest.timestamp()) > 0) {
+                latest = mutation;
             }
-            results.add(MutationApplicationResult.success()); // WAWebPrimaryFeatureSync.applyMutations: return {actionState: Success}
+            results.add(MutationApplicationResult.success());
         }
-        // WAWebPrimaryFeatureSync.applyMutations: WARN("primary feature sync: i operations not supported") and WARN("primary feature sync: l malformed mutations"), skipped, telemetry/logging
-        if (latest != null) { // WAWebPrimaryFeatureSync.applyMutations: if (a != null)
-            // WAWebPrimaryFeatureSync.applyMutations: var d = WANullthrows((c = a.value.primaryFeature) == null ? void 0 : c.flags)
+        if (latest != null) {
             var pfa = (PrimaryFeatureAction) latest.value().action().orElseThrow();
-            client.store().setPrimaryFeatures(pfa.flags()); // WAWebPrimaryFeatureSync.applyMutations: yield WAWebPrimaryFeatures.setPrimaryFeatures(d)
+            client.store().setPrimaryFeatures(pfa.flags());
         }
 
-        return results; // WAWebPrimaryFeatureSync.applyMutations: return u
+        return results;
     }
 
     /**
@@ -173,15 +169,15 @@ public final class PrimaryFeatureHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPrimaryFeatureSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        if (mutation.operation() != SyncdOperation.SET) { // WAWebPrimaryFeatureSync.applyMutations: if (e.operation !== "set")
-            return MutationApplicationResult.unsupported(); // WAWebPrimaryFeatureSync.applyMutations: return {actionState: Unsupported}
+        if (mutation.operation() != SyncdOperation.SET) {
+            return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof PrimaryFeatureAction action)) { // WAWebPrimaryFeatureSync.applyMutations: if (r == null) where r = e.value.primaryFeature?.flags
-            return malformedActionValue(); // WAWebPrimaryFeatureSync.applyMutations: return WAWebSyncdIndexUtils.malformedActionValue(n.collectionName)
+        if (!(mutation.value().action().orElse(null) instanceof PrimaryFeatureAction action)) {
+            return malformedActionValue();
         }
 
-        client.store().setPrimaryFeatures(action.flags()); // WAWebPrimaryFeatureSync.applyMutations: yield WAWebPrimaryFeatures.setPrimaryFeatures(d)
-        return MutationApplicationResult.success(); // WAWebPrimaryFeatureSync.applyMutations: return {actionState: Success}
+        client.store().setPrimaryFeatures(action.flags());
+        return MutationApplicationResult.success();
     }
 }

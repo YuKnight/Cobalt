@@ -78,21 +78,11 @@ public final class NotificationBusinessDispatcher implements SocketStream.Handle
         }
 
         switch (type) {
-            // WAWebCommsHandleLoggedInStanza.handleLoggedInStanza: case "business"
-            // -> WAWebHandleBusinessNotification.handleBusinessNotificationJob
-            // case "digital_commerce_subscription"
-            // -> WAWebHandleDigitalCommerceSubscriptionNotification.handleDigitalCommerceSubscriptionNotificationJob
-            // case "fb:update"
-            // -> WAWebHandleBotProfileNotification.handleBotProfileNotification
             case "business", "digital_commerce_subscription", "fb:update" -> businessHandler.handle(node);
-            // WAWebCommsHandleLoggedInStanza.handleLoggedInStanza: case "mex"
-            // -> WAWebHandleMexNotification.handleMexNotification
             case "mex" -> mexHandler.handle(node);
-            // WAWebCommsHandleLoggedInStanza.handleLoggedInStanza: case "pay"
-            // -> WAWebPaymentNotificationHandler.handlePaymentNotification
             case "pay" -> paymentHandler.handle(node);
             default -> {
-                // NO_WA_BASIS: outer stream pipeline handles the NACK for unmatched notification types
+                // The outer stream pipeline handles the NACK for unmatched notification types.
             }
         }
     }

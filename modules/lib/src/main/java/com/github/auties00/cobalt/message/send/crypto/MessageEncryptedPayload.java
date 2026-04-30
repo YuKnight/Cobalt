@@ -7,18 +7,12 @@ import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 
 /**
- * The result of encrypting a message.
+ * Carries the result of encrypting a single outbound message.
  *
  * @param type         the Signal encryption type (pkmsg, msg, or skmsg)
  * @param ciphertext   the encrypted message bytes
- * @param recipientJid the recipient device JID, or {@code null} for group messages
- *
- * @implNote WAWebEncryptMsgProtobuf.encryptMsgProtobuf returns
- * {@code {type, ciphertext}} for 1:1 encryption;
- * WAWebEncryptMsgProtobuf.encryptMsgSenderKey returns
- * {@code {ciphertext, senderKeyBytes}} for group encryption.
- * In Cobalt, both are unified into this record; the {@code recipientJid}
- * field is a Cobalt-specific convenience.
+ * @param recipientJid the recipient device JID, or {@code null} for sender-key
+ *                     group encryption
  */
 @WhatsAppWebModule(moduleName = "WAWebEncryptMsgProtobuf")
 public record MessageEncryptedPayload(
@@ -27,12 +21,9 @@ public record MessageEncryptedPayload(
         Jid recipientJid
 ) {
     /**
-     * Returns whether this message establishes a new session.
+     * Returns whether this payload establishes a new Signal session.
      *
-     * @return {@code true} if this is a PreKeySignalMessage
-     *
-     * @implNote WAWebSendMsgCreateFanoutStanza: sets {@code shouldHaveIdentity}
-     * when any encryption result has type {@code Pkmsg}.
+     * @return {@code true} when the payload is a {@code PreKeySignalMessage}
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgCreateFanoutStanza", exports = "createFanoutMsgStanza",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -41,12 +32,9 @@ public record MessageEncryptedPayload(
     }
 
     /**
-     * Returns whether this is a group sender key message.
+     * Returns whether this payload is a sender-key group message.
      *
-     * @return {@code true} if this is a SenderKeyMessage
-     *
-     * @implNote NO_WA_BASIS: convenience predicate for checking
-     * SenderKeyMessage type.
+     * @return {@code true} when the payload is a {@code SenderKeyMessage}
      */
     public boolean isSenderKeyMessage() {
         return type.isSenderKeyMessage();

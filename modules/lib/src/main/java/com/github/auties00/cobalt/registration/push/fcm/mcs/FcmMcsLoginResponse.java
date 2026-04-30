@@ -7,7 +7,7 @@ import it.auties.protobuf.model.ProtobufType;
 /**
  * Server reply to {@link FcmMcsLoginRequest} (tag {@code 3} on the wire).
  * On success, {@link #error} is {@code null} and {@link #serverTimestamp}
- * carries the server's clock; on failure, {@link #error} carries the
+ * carries the server's clock. On failure, {@link #error} carries the
  * code/message pair.
  */
 @ProtobufMessage(name = "FcmMcsLoginResponse")
@@ -39,7 +39,7 @@ public final class FcmMcsLoginResponse {
 
     /**
      * Non-zero error code + human-readable message returned when the
-     * login is rejected (e.g. expired security token).
+     * login is rejected (e.g. Expired security token).
      */
     @ProtobufMessage(name = "FcmMcsLoginResponse.ErrorInfo")
     public static final class ErrorInfo {

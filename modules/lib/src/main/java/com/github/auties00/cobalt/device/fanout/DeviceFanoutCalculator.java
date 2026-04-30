@@ -35,28 +35,20 @@ import java.util.stream.Collectors;
 public final class DeviceFanoutCalculator {
 
     /**
-     * Logger for device fanout operations.
-     *
-     * @implNote WAWebDBDeviceListFanout.getFanOutList: logs fallback-to-primary events
-     * when no device record is found for a user.
+     * Logger for fanout diagnostics.
      */
     private static final System.Logger LOGGER = System.getLogger(DeviceFanoutCalculator.class.getName());
 
     /**
-     * The AB props service for checking feature flags.
-     *
-     * @implNote WAWebBizCoexGatingUtils.bizHostedDevicesEnabled: checks the
-     * {@code adv_accept_hosted_devices} AB prop to determine whether hosted devices
-     * should be included in the fanout.
+     * The AB props service used to gate hosted-device inclusion.
      */
     private final ABPropsService abPropsService;
 
     /**
-     * Creates a new device fanout calculator with the specified AB props service.
+     * Constructs a new fanout calculator.
      *
-     * @param abPropsService the AB props service for checking hosted device feature flags
-     * @implNote WAWebDBDeviceListFanout: module-level dependency on WAWebBizCoexGatingUtils
-     * for the {@code bizHostedDevicesEnabled} check.
+     * @param abPropsService the AB props service
+     * @throws NullPointerException if {@code abPropsService} is {@code null}
      */
     @WhatsAppWebExport(moduleName = "WAWebDBDeviceListFanout",
             exports = "getFanOutList",
@@ -98,33 +90,20 @@ public final class DeviceFanoutCalculator {
             Set<DeviceList> deviceLists,
             Jid includeHostedForOneToOneChatJid
     ) {
-        // WAWebDBDeviceListFanout.getFanOutList: uses Map with toString() key for deduplication
         var results = new HashSet<Jid>();
-
-        // WAWebDBDeviceListFanout.getFanOutList: hosted devices are included for 1:1 user chats
-        // when bizHostedDevicesEnabled is true AND the chat JID is a user type (not group)
-        // The check is global for all users in the fanout, not per-user
         var includeHosted = isBizHostedDevicesEnabled()
                 && includeHostedForOneToOneChatJid != null
-                && isUserJid(includeHostedForOneToOneChatJid); // WAWebDBDeviceListFanout.getFanOutList
-
-        // WAWebDBDeviceListFanout.getFanOutList: tracks fallback wids for logging (up to 3)
+                && isUserJid(includeHostedForOneToOneChatJid);
         var fallbackWids = new ArrayList<String>();
 
         for (var deviceList : deviceLists) {
             var userJid = deviceList.userJid();
 
             if (deviceList.devices().isEmpty()) {
-                // WAWebDBDeviceListFanout.getFanOutList: fallback to primary device when no devices found
-                // WA Web: var a = asUserWidOrThrow(wids[t])
-                var primaryJid = userJid.toUserJid(); // WAWebWidFactory.asUserWidOrThrow
-
-                // WAWebDBDeviceListFanout.getFanOutList: log up to 3 fallback wids
+                var primaryJid = userJid.toUserJid();
                 if (fallbackWids.size() < 3) {
                     fallbackWids.add(primaryJid.toString());
                 }
-
-                // WAWebDBDeviceListFanout.getFanOutList: isMeAccount check - don't add self as fallback
                 if (!isSameAccount(primaryJid, senderJid)) {
                     results.add(primaryJid);
                 }
@@ -132,27 +111,17 @@ public final class DeviceFanoutCalculator {
             }
 
             for (var device : deviceList.devices()) {
-                // WAWebDBDeviceListFanout.getFanOutList: skip hosted devices unless explicitly included
-                // Checks: t.id === 99 || t.isHosted === true
                 if (device.isHosted() && !includeHosted) {
                     continue;
                 }
-
-                // WAWebDBDeviceListFanout.getFanOutList: createDeviceWidFromDeviceListPk(e.id, t.id, t.isHosted)
                 var deviceJid = device.toDeviceJid(userJid.user(), userJid.server());
-
-                // WAWebDBDeviceListFanout.getFanOutList: exclude sender's own device
-                // Uses isMeDevice which checks exact device JID equality
                 if (isSameDevice(deviceJid, senderJid)) {
                     continue;
                 }
-
-                // WAWebDBDeviceListFanout.getFanOutList: uses toString() as Map key for deduplication
                 results.add(deviceJid);
             }
         }
 
-        // WAWebDBDeviceListFanout.getFanOutList: log fallback wids if any
         if (!fallbackWids.isEmpty()) {
             LOGGER.log(System.Logger.Level.DEBUG,
                     "[getFanOutList] no device for {0} wids => primary {1}",
@@ -164,11 +133,9 @@ public final class DeviceFanoutCalculator {
     }
 
     /**
-     * Checks if business hosted devices feature is enabled.
+     * Returns whether the hosted-devices feature is enabled.
      *
-     * @return {@code true} if hosted devices are enabled
-     * @implNote WAWebBizCoexGatingUtils.bizHostedDevicesEnabled: returns true if the
-     * {@code adv_accept_hosted_devices} AB prop is enabled.
+     * @return {@code true} when {@code adv_accept_hosted_devices} is set
      */
     @WhatsAppWebExport(moduleName = "WAWebBizCoexGatingUtils",
             exports = "bizHostedDevicesEnabled",
@@ -178,12 +145,11 @@ public final class DeviceFanoutCalculator {
     }
 
     /**
-     * Checks if the JID is a user type (not group, broadcast, etc).
+     * Returns whether the given JID addresses an individual user account.
      *
-     * @param jid the JID to check
-     * @return {@code true} if the JID has a user-type server
-     * @implNote WAWebWid.isUser: returns {@code true} for {@code c.us}, {@code lid},
-     * {@code bot}, {@code hosted}, {@code hosted.lid} servers.
+     * @param jid the JID to test
+     * @return {@code true} for user-type servers ({@code c.us}, {@code lid},
+     *         {@code bot}, {@code hosted}, {@code hosted.lid})
      */
     @WhatsAppWebExport(moduleName = "WAWebWid",
             exports = "isUser",
@@ -197,13 +163,11 @@ public final class DeviceFanoutCalculator {
     }
 
     /**
-     * Checks if two JIDs represent the same device (exact match).
+     * Returns whether the two JIDs reference the same device.
      *
      * @param a the first JID
      * @param b the second JID
-     * @return {@code true} if the JIDs are equal
-     * @implNote WAWebUserPrefsMeUser.isMeDevice: checks exact device JID equality via
-     * {@code equals()} against the logged-in device's PN and LID wids.
+     * @return {@code true} if both refer to the same device
      */
     @WhatsAppWebExport(moduleName = "WAWebUserPrefsMeUser",
             exports = "isMeDevice",
@@ -213,17 +177,14 @@ public final class DeviceFanoutCalculator {
     }
 
     /**
-     * Checks if two JIDs represent the same account (same user, ignoring device).
+     * Returns whether the two JIDs reference the same account.
      *
-     * <p>Handles hosted server mappings: {@code hosted} maps to {@code c.us} and
-     * {@code hosted.lid} maps to {@code lid} when comparing via {@link Jid#toUserJid()}.
+     * <p>The {@code hosted} server maps to {@code c.us} and {@code hosted.lid} to
+     * {@code lid} when comparing via {@link Jid#toUserJid()}.
      *
      * @param a the first JID
      * @param b the second JID
-     * @return {@code true} if the JIDs belong to the same account
-     * @implNote WAWebUserPrefsMeUser.isMeAccount: uses {@code isSameAccountAndAddressingMode}
-     * which compares user part and handles hosted server mappings (hosted-to-c.us,
-     * hosted.lid-to-lid).
+     * @return {@code true} if both reference the same account
      */
     @WhatsAppWebExport(moduleName = "WAWebUserPrefsMeUser",
             exports = "isMeAccount",
@@ -236,19 +197,14 @@ public final class DeviceFanoutCalculator {
     }
 
     /**
-     * Filters out devices with unconfirmed identity changes.
+     * Returns the device subset whose identity keys have not been flagged as changed.
      *
-     * <p>Devices whose identity keys have changed but whose changes have not been
-     * confirmed by the user are excluded from the fanout to prevent sending messages
-     * to potentially compromised sessions.
+     * <p>Devices with pending identity-change confirmations are removed from the
+     * fanout so messages are never silently re-encrypted against an unverified key.
      *
-     * @param devices           the devices to filter
-     * @param changedIdentities the set of devices with unconfirmed identity changes
-     * @return filtered set excluding devices with identity changes
-     * @implNote WAWebSendMsgCommonApi.filterDeviceWithChangedIdentity: excludes devices
-     * with pending identity change confirmation from the fanout. In WA Web this is
-     * called separately from {@code getFanOutList}; in Cobalt it is co-located in this
-     * calculator for convenience.
+     * @param devices           the candidate devices
+     * @param changedIdentities the devices with pending identity changes
+     * @return the filtered device set
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi",
             exports = "filterDeviceWithChangedIdentity",

@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.node.iq.biz;
 
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.JidServer;
 import com.github.auties00.cobalt.node.Node;
@@ -11,8 +12,12 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * The outbound stanza variant.
+ * The outbound {@code <iq xmlns="w:biz" type="get">} stanza that fetches
+ * one or more typed business profiles. Each entry materialises one
+ * {@code <profile jid tag/>} child; the optional version tag lets the
+ * relay short-circuit when the cached profile matches.
  */
+@WhatsAppWebModule(moduleName = "WAWebQueryBusinessProfileJob")
 public final class IqQueryBusinessProfileRequest implements IqOperation.Request {
     /**
      * The list of {@code (businessJid, tag)} entries to query — at least

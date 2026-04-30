@@ -13,7 +13,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps the {@code <props/>} payload in
+ * The outbound stanza variant. Wraps the {@code <props/>} payload in
  * the canonical {@code <iq xmlns="abt" type="get" to="s.whatsapp.net">}
  * envelope.
  */
@@ -48,7 +48,7 @@ public final class SmaxAbPropsGetExperimentConfigRequest implements SmaxOperatio
     }
 
     /**
-     * Constructs an unconditional request — the relay always replies
+     * Constructs an unconditional request. The relay always replies
      * with the full props bundle.
      */
     public SmaxAbPropsGetExperimentConfigRequest() {
@@ -92,7 +92,6 @@ public final class SmaxAbPropsGetExperimentConfigRequest implements SmaxOperatio
     @WhatsAppWebExport(moduleName = "WASmaxOutAbPropsGetExperimentConfigRequest",
             exports = "makeGetExperimentConfigRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutAbPropsGetExperimentConfigRequest: smax("props", {protocol: "1", hash?, refresh_id?})
         var propsBuilder = new NodeBuilder()
                 .description("props")
                 .attribute("protocol", "1");
@@ -103,8 +102,6 @@ public final class SmaxAbPropsGetExperimentConfigRequest implements SmaxOperatio
             propsBuilder.attribute("refresh_id", propsRefreshId);
         }
         var propsNode = propsBuilder.build();
-        // WASmaxOutAbPropsGetExperimentConfigRequest: smax("iq", {xmlns: "abt", to: S_WHATSAPP_NET})
-        // WASmaxOutAbPropsBaseIQGetRequestMixin: smax("iq", {id: generateId(), type: "get"})
         return new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "abt")

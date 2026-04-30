@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.node.iq.biz;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.iq.IqOperation;
 import com.github.auties00.cobalt.node.smax.util.SmaxBaseServerErrorMixin;
@@ -8,8 +9,10 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Sealed family of inbound reply variants.
+ * Sealed family of inbound reply variants produced by the relay in
+ * response to an {@link IqEditBusinessProfileRequest}.
  */
+@WhatsAppWebModule(moduleName = "WAWebBusinessProfileJob")
 public sealed interface IqEditBusinessProfileResponse extends IqOperation.Response
         permits IqEditBusinessProfileResponse.Success, IqEditBusinessProfileResponse.ClientError, IqEditBusinessProfileResponse.ServerError {
 

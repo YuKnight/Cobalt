@@ -5,58 +5,24 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 
 /**
- * Exception thrown when LID (Lid Identity) migration encounters a critical error.
- * <p>
- * LID migration is WhatsApp's process for transitioning from phone number-based identifiers
- * to Lid-based identifiers for improved privacy. This migration affects how contacts and
- * groups are identified across the platform.
+ * Thrown for failures during WhatsApp's migration from phone-number
+ * identifiers to LID (Linked Identity) identifiers.
  *
- * <h2>LID Migration Architecture</h2>
- * The migration involves:
- * <ul>
- *   <li><b>Mappings:</b> Translation tables between old phone-based IDs and new LIDs</li>
- *   <li><b>Split thread:</b> Mechanism to handle conversations during the migration period</li>
- *   <li><b>Primary sync:</b> Synchronization of mappings from the primary device</li>
- * </ul>
+ * <p>WhatsApp is gradually replacing phone-number-based JIDs with LID
+ * JIDs to keep numbers private from group members and other peers.
+ * Companion devices learn the mapping between the two identifier kinds
+ * from the primary phone, migrate every chat and the blocklist
+ * accordingly, and check at every step that the resulting state is
+ * consistent. Each nested subtype represents one of the things that
+ * can go wrong during that migration: missing mappings, malformed
+ * mappings, state drift between companion and primary, the
+ * killswitch being flipped, the blocklist still containing legacy
+ * entries, or the chat database being out of date.
  *
- * <h2>Exception Hierarchy</h2>
- * Each nested type maps to a distinct {@code LogoutReason.LidMigration*} /
- * {@code LogoutReason.LidBlocklist*} value in
- * {@code WAWebLogoutReasonConstants}. WA Web triggers {@code socketLogout} with
- * one of these reasons; Cobalt throws the corresponding exception subtype and
- * routes recovery through the configurable {@code WhatsAppClientErrorHandler}.
- * <ul>
- *   <li>{@link SplitThreadMismatch} &mdash; {@code LidMigrationSplitThreadMismatch}</li>
- *   <li>{@link PrimaryMappingsObsolete} &mdash; {@code LidMigrationPrimaryMappingsObsolete}</li>
- *   <li>{@link PeerMappingsNotReceived} &mdash; {@code LidMigrationPeerMappingsNotReceived}</li>
- *   <li>{@link StateDiscrepancy} &mdash; {@code LidMigrationStateDiscrepancy}</li>
- *   <li>{@link PeerMappingsMalformed} &mdash; {@code LidMigrationPeerMappingsMalformed}</li>
- *   <li>{@link FailedToParseMappings} &mdash; {@code LidMigrationFailedToParseMapping}</li>
- *   <li>{@link NoLidAvailable} &mdash; {@code LidMigrationNoLidAvailiable} (WA Web typo preserved in the string value {@code "lid_migration_no_lid_available"})</li>
- *   <li>{@link IncompatibleClient} &mdash; {@code LidMigrationCompanionIncompatibleKillswitch}</li>
- *   <li>{@link OneOnOneThreadMigrationInternalError} &mdash; {@code LidMigrationOneOnOneThreadMigrationInternalError}</li>
- *   <li>{@link BlocklistPnWhenMigrated} &mdash; {@code LidBlocklistPnWhenMigrated}</li>
- *   <li>{@link BlocklistChatDbUnmigrated} &mdash; {@code LidBlocklistChatDbUnmigrated}</li>
- * </ul>
- *
- * <h2>Fatality</h2>
- * All LID migration errors are fatal as they indicate the client cannot correctly
- * identify contacts and groups, which would lead to data corruption or message misrouting.
- * This matches {@code WAWebLogoutReason.getErrorCodeFromLogoutReason}, which classifies
- * every {@code LidMigration*} and {@code LidBlocklist*} value as a {@code null} error code
- * (that is, no {@code LOGOUT_REASON_CODE} bucket) because they each trigger a full session
- * teardown rather than a recoverable fault.
- *
- * @implNote WA Web models logout reasons as a flat string enum in
- *           {@code WAWebLogoutReasonConstants.LogoutReason}. Cobalt's error model
- *           intentionally replaces the enum with a sealed exception hierarchy so
- *           recovery is driven by {@code WhatsAppClientErrorHandler} rather than
- *           hardcoded inline {@code socketLogout} calls (see CLAUDE.md / Error Model).
- *           Only LID-migration reasons are modelled in this file; non-LID reasons
- *           map to other members of the {@code WhatsAppException} family
- *           (for example {@code LogoutReason.AccountLocked} maps to
- *           {@link WhatsAppSessionException.LoggedOut} inside
- *           {@code FailureStreamHandler}).
+ * <p>Every migration failure is fatal: the device's view of contacts
+ * and groups can no longer be trusted to address messages correctly,
+ * so the configurable error handler is expected to log the device out
+ * and drive a fresh pairing.
  *
  * @see SplitThreadMismatch
  * @see PrimaryMappingsObsolete
@@ -105,10 +71,11 @@ public sealed abstract class WhatsAppLidMigrationException
     }
 
     /**
-     * Returns whether this exception represents a fatal error.
-     * <p>
-     * All LID migration errors are fatal as they indicate fundamental issues with
-     * contact and group identification that cannot be safely ignored.
+     * Returns whether the failure invalidates the current session.
+     *
+     * <p>Every LID migration failure leaves the device with an
+     * untrustworthy mapping between phone numbers and LIDs, so the
+     * answer is always {@code true}.
      *
      * @return {@code true}
      */
@@ -118,25 +85,17 @@ public sealed abstract class WhatsAppLidMigrationException
     }
 
     /**
-     * Exception thrown when there is a split thread mismatch between local and primary device.
-     * <p>
-     * During LID migration, conversations may be "split" into pre-migration and post-migration
-     * threads. This exception occurs when the local device's split thread state doesn't match
-     * the primary device's state, indicating a synchronization failure.
+     * Thrown when the local device's split-thread bookkeeping does not
+     * match the primary phone's view.
      *
-     * <h2>Implications</h2>
-     * <ul>
-     *   <li>Messages may be routed to the wrong conversation</li>
-     *   <li>Chat history may appear fragmented</li>
-     *   <li>The client cannot safely proceed without risking data loss</li>
-     * </ul>
+     * <p>During the migration each conversation may be split into a
+     * pre-migration thread and a post-migration thread. A mismatch
+     * between the two sides means messages would land in the wrong
+     * thread, so the migration is aborted.
      */
     public static final class SplitThreadMismatch extends WhatsAppLidMigrationException {
         /**
          * Constructs a new split thread mismatch exception.
-         *
-         * @implNote Replaces {@code socketLogout(LogoutReason.LidMigrationSplitThreadMismatch)}
-         *           (string value {@code "lid_migration_split_thread_mismatch"}).
          */
         @WhatsAppWebExport(
                 moduleName = "WAWebLogoutReasonConstants",
@@ -149,25 +108,16 @@ public sealed abstract class WhatsAppLidMigrationException
     }
 
     /**
-     * Exception thrown when the primary device's LID mappings are obsolete.
-     * <p>
-     * Companion devices synchronize their LID mappings from the primary device.
-     * This exception occurs when the primary device's mappings are outdated or
-     * inconsistent with the current state of the account.
+     * Thrown when the LID mappings the primary phone is publishing are
+     * stale relative to the rest of the account state.
      *
-     * <h2>Possible Causes</h2>
-     * <ul>
-     *   <li>Primary device has been offline for too long</li>
-     *   <li>Primary device was restored from an old backup</li>
-     *   <li>Migration state became corrupted on the primary device</li>
-     * </ul>
+     * <p>Possible triggers include a primary phone that has been
+     * offline for too long, a restore from an old backup, or local
+     * corruption of the migration bookkeeping on the primary side.
      */
     public static final class PrimaryMappingsObsolete extends WhatsAppLidMigrationException {
         /**
          * Constructs a new primary mappings obsolete exception.
-         *
-         * @implNote Replaces {@code socketLogout(LogoutReason.LidMigrationPrimaryMappingsObsolete)}
-         *           (string value {@code "lid_migration_primary_mappings_obsolete"}).
          */
         @WhatsAppWebExport(
                 moduleName = "WAWebLogoutReasonConstants",
@@ -180,24 +130,16 @@ public sealed abstract class WhatsAppLidMigrationException
     }
 
     /**
-     * Exception thrown when peer LID mappings are not received within the migration timeout.
+     * Thrown when the migration timeout fires before any peer mapping
+     * has arrived from the primary phone.
      *
-     * <p>During companion-device LID migration the primary device pushes peer
-     * mapping records. If the timeout fires before any mappings arrive, WA Web
-     * schedules a forced logout so the companion can be re-bootstrapped from
-     * scratch.
-     *
-     * @implNote This corresponds to the
-     *           {@code WAWebLid1x1MigrationTimeout.scheduleLogoutIfNeeded} path
-     *           that calls
-     *           {@code socketLogout(LogoutReason.LidMigrationPeerMappingsNotReceived)}.
+     * <p>The companion device gives up at this point and the
+     * configurable error handler is expected to drive a fresh
+     * pairing.
      */
     public static final class PeerMappingsNotReceived extends WhatsAppLidMigrationException {
         /**
          * Constructs a new peer mappings not received exception.
-         *
-         * @implNote Replaces {@code socketLogout(LogoutReason.LidMigrationPeerMappingsNotReceived)}
-         *           (string value {@code "lid_migration_peer_mapping_not_received"}).
          */
         @WhatsAppWebExport(
                 moduleName = "WAWebLogoutReasonConstants",
@@ -210,22 +152,15 @@ public sealed abstract class WhatsAppLidMigrationException
     }
 
     /**
-     * Exception thrown when the LID migration state on this device does not match
-     * the primary device's state.
+     * Thrown when the LID migration state computed locally does not
+     * match the state advertised by the primary phone.
      *
-     * <p>WA Web detects state drift via
-     * {@code WAWebLid1x1MigrationTimeoutUtils.hasStateDiscrepancy()} in
-     * {@code WAWebQueryBlockListJob} and by explicit checks in
-     * {@code WAWebLid1x1MigrationTimeout}; both trigger
-     * {@code socketLogout(LogoutReason.LidMigrationStateDiscrepancy)} because the
-     * mismatch cannot be reconciled without a fresh companion bootstrap.
+     * <p>The drift cannot be reconciled without re-bootstrapping the
+     * companion device.
      */
     public static final class StateDiscrepancy extends WhatsAppLidMigrationException {
         /**
          * Constructs a new state discrepancy exception.
-         *
-         * @implNote Replaces {@code socketLogout(LogoutReason.LidMigrationStateDiscrepancy)}
-         *           (string value {@code "lid_migration_state_discrepancy"}).
          */
         @WhatsAppWebExport(
                 moduleName = "WAWebLogoutReasonConstants",
@@ -238,21 +173,16 @@ public sealed abstract class WhatsAppLidMigrationException
     }
 
     /**
-     * Exception thrown when peer LID mapping data is malformed and cannot be applied.
+     * Thrown when peer LID mapping data passes initial parsing but
+     * fails the subsequent structural validation (for example, an
+     * empty mapping set).
      *
-     * <p>Unlike {@link FailedToParseMappings}, which signals a hard parse error,
-     * this is raised when decoded mappings fail subsequent structural validation
-     * (for example, empty mapping sets in
-     * {@code WAWebLid1X1ThreadAccountMigrations}). WA Web logs
-     * {@code "lid-migration-empty-mappings"} and calls
-     * {@code socketLogout(LogoutReason.LidMigrationPeerMappingsMalformed)}.
+     * <p>This is distinct from {@link FailedToParseMappings}, which
+     * fires when the bytes themselves do not parse.
      */
     public static final class PeerMappingsMalformed extends WhatsAppLidMigrationException {
         /**
          * Constructs a new peer mappings malformed exception.
-         *
-         * @implNote Replaces {@code socketLogout(LogoutReason.LidMigrationPeerMappingsMalformed)}
-         *           (string value {@code "lid_migration_peer_mapping_malformed"}).
          */
         @WhatsAppWebExport(
                 moduleName = "WAWebLogoutReasonConstants",
@@ -266,9 +196,7 @@ public sealed abstract class WhatsAppLidMigrationException
         /**
          * Constructs a new peer mappings malformed exception with additional context.
          *
-         * @param message additional context about why the mappings are malformed
-         * @implNote Replaces {@code socketLogout(LogoutReason.LidMigrationPeerMappingsMalformed)}
-         *           (string value {@code "lid_migration_peer_mapping_malformed"}).
+         * @param message extra detail about why the mappings are malformed
          */
         @WhatsAppWebExport(
                 moduleName = "WAWebLogoutReasonConstants",
@@ -281,27 +209,17 @@ public sealed abstract class WhatsAppLidMigrationException
     }
 
     /**
-     * Exception thrown when migration mapping data could not be parsed.
-     * <p>
-     * The LID migration process involves serialized mapping data that translates
-     * between old and new identifier formats. This exception occurs when this
-     * data is malformed or corrupted.
+     * Thrown when the serialized LID mapping payload cannot be decoded
+     * at all.
      *
-     * <h2>Possible Causes</h2>
-     * <ul>
-     *   <li>Data corruption during transmission</li>
-     *   <li>Protocol version mismatch</li>
-     *   <li>Invalid protobuf encoding</li>
-     *   <li>Missing required fields in the mapping data</li>
-     * </ul>
+     * <p>Common causes are corruption in transit, a protobuf version
+     * skew, or required fields missing from the mapping record.
      */
     public static final class FailedToParseMappings extends WhatsAppLidMigrationException {
         /**
          * Constructs a new failed to parse mappings exception with a detail message.
          *
-         * @param message additional context about the parsing failure
-         * @implNote Replaces {@code socketLogout(LogoutReason.LidMigrationFailedToParseMapping)}
-         *           (string value {@code "lid_migration_failed_to_parse_mapping"}).
+         * @param message extra detail about the parsing failure
          */
         @WhatsAppWebExport(
                 moduleName = "WAWebLogoutReasonConstants",
@@ -315,10 +233,8 @@ public sealed abstract class WhatsAppLidMigrationException
         /**
          * Constructs a new failed to parse mappings exception with a detail message and cause.
          *
-         * @param message additional context about the parsing failure
+         * @param message extra detail about the parsing failure
          * @param reason  the underlying parsing exception
-         * @implNote Replaces {@code socketLogout(LogoutReason.LidMigrationFailedToParseMapping)}
-         *           (string value {@code "lid_migration_failed_to_parse_mapping"}).
          */
         @WhatsAppWebExport(
                 moduleName = "WAWebLogoutReasonConstants",
@@ -331,25 +247,16 @@ public sealed abstract class WhatsAppLidMigrationException
     }
 
     /**
-     * Exception thrown when a non-deletable chat has no LID mapping available.
+     * Thrown when a chat that cannot be deleted (because it carries
+     * user content, is archived, muted, or locked) has no LID mapping
+     * to migrate to.
      *
-     * <p>During LID migration, every chat that cannot be deleted (because it has
-     * user content, is archived, muted, or locked) must have a LID mapping to
-     * migrate to. This exception occurs when no such mapping exists, which means
-     * the migration cannot proceed safely without data loss.
-     *
-     * <p>This corresponds to WhatsApp Web's
-     * {@code LogoutReason.LidMigrationNoLidAvailiable} logout reason (WA Web
-     * typo preserved in the key; the string value is
-     * {@code "lid_migration_no_lid_available"}), which aborts the entire migration
-     * process.
+     * <p>Continuing without a mapping would lose data, so the entire
+     * migration is aborted.
      */
     public static final class NoLidAvailable extends WhatsAppLidMigrationException {
         /**
          * Constructs a new no LID available exception.
-         *
-         * @implNote Replaces {@code socketLogout(LogoutReason.LidMigrationNoLidAvailiable)}
-         *           (string value {@code "lid_migration_no_lid_available"}).
          */
         @WhatsAppWebExport(
                 moduleName = "WAWebLogoutReasonConstants",
@@ -362,21 +269,15 @@ public sealed abstract class WhatsAppLidMigrationException
     }
 
     /**
-     * Exception thrown when the companion client is not compatible with LID migration.
+     * Thrown when the server-side killswitch declares this companion
+     * client incompatible with the LID migration.
      *
-     * <p>The {@code LID_ONE_ON_ONE_MIGRATION_COMPATIBLE} AB prop controls whether
-     * the companion device is allowed to perform the migration. When set to
-     * {@code false}, the migration must not proceed.
-     *
-     * <p>This corresponds to WhatsApp Web's
-     * {@code LogoutReason.LidMigrationCompanionIncompatibleKillswitch} logout reason.
+     * <p>The migration must not run against an unsupported client and
+     * the device is logged out.
      */
     public static final class IncompatibleClient extends WhatsAppLidMigrationException {
         /**
          * Constructs a new incompatible client exception.
-         *
-         * @implNote Replaces {@code socketLogout(LogoutReason.LidMigrationCompanionIncompatibleKillswitch)}
-         *           (string value {@code "lid_migration_companion_incompatible_killswitch"}).
          */
         @WhatsAppWebExport(
                 moduleName = "WAWebLogoutReasonConstants",
@@ -389,21 +290,12 @@ public sealed abstract class WhatsAppLidMigrationException
     }
 
     /**
-     * Exception thrown when one-on-one thread migration fails with an internal error.
-     *
-     * <p>WA Web's {@code WAWebLid1X1ThreadAccountMigrations} runs the actual
-     * thread migration in a try/catch; on any unexpected failure it sends
-     * {@code "lid-thread-migration"} logs and calls
-     * {@code socketLogout(LogoutReason.LidMigrationOneOnOneThreadMigrationInternalError)}.
-     * In Cobalt the migration runner rethrows this exception, letting the
-     * configurable error handler drive disconnect or log-out as appropriate.
+     * Thrown when migrating a one-on-one thread fails for an
+     * unexpected reason that the migration runner could not handle.
      */
     public static final class OneOnOneThreadMigrationInternalError extends WhatsAppLidMigrationException {
         /**
          * Constructs a new one-on-one thread migration internal error.
-         *
-         * @implNote Replaces {@code socketLogout(LogoutReason.LidMigrationOneOnOneThreadMigrationInternalError)}
-         *           (string value {@code "lid_migration_one_on_one_thread_migration_internal_error"}).
          */
         @WhatsAppWebExport(
                 moduleName = "WAWebLogoutReasonConstants",
@@ -418,8 +310,6 @@ public sealed abstract class WhatsAppLidMigrationException
          * Constructs a new one-on-one thread migration internal error with a cause.
          *
          * @param reason the underlying cause of the migration failure
-         * @implNote Replaces {@code socketLogout(LogoutReason.LidMigrationOneOnOneThreadMigrationInternalError)}
-         *           (string value {@code "lid_migration_one_on_one_thread_migration_internal_error"}).
          */
         @WhatsAppWebExport(
                 moduleName = "WAWebLogoutReasonConstants",
@@ -432,21 +322,16 @@ public sealed abstract class WhatsAppLidMigrationException
     }
 
     /**
-     * Exception thrown when a phone-number JID is present in the blocklist after the
-     * account has already been migrated to LID.
+     * Thrown when the blocklist still contains a legacy phone-number
+     * JID after the account has migrated to LID.
      *
-     * <p>After a successful LID migration the blocklist must contain only LID
-     * identifiers. Encountering a legacy phone-number JID indicates that the
-     * blocklist was not correctly migrated and the client cannot trust its
-     * local state to enforce blocking correctly. WA Web forces a logout via
-     * {@code socketLogout(LogoutReason.LidBlocklistPnWhenMigrated)}.
+     * <p>A migrated blocklist must contain only LID identifiers; the
+     * presence of a phone-number entry means the local blocklist is
+     * inconsistent and cannot be enforced reliably.
      */
     public static final class BlocklistPnWhenMigrated extends WhatsAppLidMigrationException {
         /**
          * Constructs a new blocklist phone-number-when-migrated exception.
-         *
-         * @implNote Replaces {@code socketLogout(LogoutReason.LidBlocklistPnWhenMigrated)}
-         *           (string value {@code "lid_blocklist_pn_when_migrated"}).
          */
         @WhatsAppWebExport(
                 moduleName = "WAWebLogoutReasonConstants",
@@ -459,21 +344,12 @@ public sealed abstract class WhatsAppLidMigrationException
     }
 
     /**
-     * Exception thrown when the chat database is unmigrated while the blocklist
-     * requests LID-aware enforcement.
-     *
-     * <p>WA Web's {@code WAWebQueryBlockListJob.fetchAndUpdateBlocklist} sleeps
-     * briefly and then calls
-     * {@code socketLogout(LogoutReason.LidBlocklistChatDbUnmigrated)} when it
-     * detects that the chat database has not yet been migrated to LID even
-     * though the blocklist expects it.
+     * Thrown when the blocklist requires LID-aware enforcement but the
+     * local chat database has not yet been migrated to LID.
      */
     public static final class BlocklistChatDbUnmigrated extends WhatsAppLidMigrationException {
         /**
          * Constructs a new blocklist chat-db-unmigrated exception.
-         *
-         * @implNote Replaces {@code socketLogout(LogoutReason.LidBlocklistChatDbUnmigrated)}
-         *           (string value {@code "lid_blocklist_chat_db_unmigrated"}).
          */
         @WhatsAppWebExport(
                 moduleName = "WAWebLogoutReasonConstants",

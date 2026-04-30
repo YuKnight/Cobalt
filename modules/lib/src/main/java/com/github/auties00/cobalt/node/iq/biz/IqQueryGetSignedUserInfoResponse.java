@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.node.iq.biz;
 
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.iq.IqOperation;
@@ -10,8 +11,10 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Sealed family of inbound reply variants produced by the relay.
+ * Sealed family of inbound reply variants produced by the relay in
+ * response to an {@link IqQueryGetSignedUserInfoRequest}.
  */
+@WhatsAppWebModule(moduleName = "WAWebQueryGetSignedUserInfoJob")
 public sealed interface IqQueryGetSignedUserInfoResponse extends IqOperation.Response
         permits IqQueryGetSignedUserInfoResponse.Success, IqQueryGetSignedUserInfoResponse.ClientError, IqQueryGetSignedUserInfoResponse.ServerError {
 

@@ -12,14 +12,14 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants produced by the relay in
- * response to a {@link IqResetGroupInviteCodeRequest}.
+ * response to an {@link IqResetGroupInviteCodeRequest}.
  *
- * @implNote {@code WAWebGroupInviteJob.resetGroupInviteCode} folds
- *           every non-result reply into a
- *           {@code ServerStatusCodeError}; Cobalt splits the
- *           failure path into typed
+ * @implNote {@code WAWebGroupInviteJob.resetGroupInviteCode} folds every
+ *           non-result reply into a {@code ServerStatusCodeError};
+ *           Cobalt splits the failure path into typed
  *           {@code ClientError}/{@code ServerError} variants.
  */
+@WhatsAppWebModule(moduleName = "WAWebGroupInviteJob")
 public sealed interface IqResetGroupInviteCodeResponse extends IqOperation.Response
         permits IqResetGroupInviteCodeResponse.Success, IqResetGroupInviteCodeResponse.ClientError, IqResetGroupInviteCodeResponse.ServerError {
 

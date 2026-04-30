@@ -40,7 +40,7 @@ public final class FcmConfig {
      * {@code google_app_id}, {@code google_api_key},
      * {@code gcm_defaultSenderId}) is identical to
      * {@link #WHATSAPP_PERSONAL}, and both APKs are signed with the
-     * same WhatsApp Inc. certificate. Only the package name differs.
+     * same WhatsApp Inc. Certificate. Only the package name differs.
      */
     public static final FcmConfig WHATSAPP_BUSINESS = new FcmConfig(
             "whatsapp-messenger",
@@ -95,14 +95,14 @@ public final class FcmConfig {
      * Hex-encoded SHA-1 of the Android application's signing
      * certificate, sent as the {@code cert} form field and the
      * {@code X-Android-Cert} header. Spaces and colons are stripped at
-     * encode time; case is normalised per call site.
+     * encode time. Case is normalised per call site.
      */
     @ProtobufProperty(index = 6, type = ProtobufType.STRING)
     String certSha1;
 
     /**
      * Whether to perform the Firebase Installations (FIS) step before
-     * the GCM register3 call. Modern Firebase-backed apps need it; some
+     * the GCM register3 call. Modern Firebase-backed apps need it. Some
      * legacy pre-Firebase projects (registered against the bare GCM
      * endpoint) must skip it. {@code true} is the right default for
      * any project set up after 2019.

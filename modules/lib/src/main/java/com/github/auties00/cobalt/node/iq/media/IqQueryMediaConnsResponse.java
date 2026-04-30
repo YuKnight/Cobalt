@@ -13,14 +13,16 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Sealed family of inbound reply variants produced by the relay.
+ * Sealed family of inbound reply variants produced by the relay in
+ * response to an {@link IqQueryMediaConnsRequest}.
  *
- * @implNote {@code WAWebQueryMediaConnsJob.queryMediaConn} folds
- *           every non-success code into either {@code E507} (with
- *           backoff) or {@code ServerStatusCodeError}; Cobalt
- *           splits the failure into typed {@code ClientError} /
- *           {@code ServerError} variants.
+ * @implNote {@code WAWebQueryMediaConnsJob.queryMediaConn} folds every
+ *           non-success code into either {@code E507} with backoff or
+ *           {@code ServerStatusCodeError}; Cobalt splits the failure
+ *           into typed {@code ClientError} and {@code ServerError}
+ *           variants.
  */
+@WhatsAppWebModule(moduleName = "WAWebQueryMediaConnsJob")
 public sealed interface IqQueryMediaConnsResponse extends IqOperation.Response
         permits IqQueryMediaConnsResponse.Success, IqQueryMediaConnsResponse.ClientError, IqQueryMediaConnsResponse.ServerError {
 

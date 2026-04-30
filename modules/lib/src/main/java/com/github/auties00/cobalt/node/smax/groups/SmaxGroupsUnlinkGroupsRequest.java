@@ -105,13 +105,11 @@ public final class SmaxGroupsUnlinkGroupsRequest implements SmaxOperation.Reques
             }
             groupNodes.add(groupBuilder.build());
         }
-        // WASmaxOutGroupsUnlinkGroupsRequest: <unlink unlink_type="sub_group">REPEATED_CHILD(group)</unlink>
         var unlinkNode = new NodeBuilder()
                 .description("unlink")
                 .attribute("unlink_type", "sub_group")
                 .content(groupNodes)
                 .build();
-        // WASmaxOutGroupsBaseSetGroupMixin + WASmaxOutGroupsBaseIQSetRequestMixin
         return new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "w:g2")

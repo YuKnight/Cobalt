@@ -18,23 +18,17 @@ import java.util.Optional;
 
 /**
  * Wire-level addressing mode for the outbound contact-blacklist request.
- *
- * @implNote {@code WASmaxOutPrivacyGetContactBlacklistGetContactBlacklistLIDOrGetContactBlacklistPNMixinGroup.mergeGetContactBlacklistGetContactBlacklistLIDOrGetContactBlacklistPNMixinGroup}
- *           dispatches between the LID variant (which adds
- *           {@code addressing_mode="lid"} to the {@code <privacy/>}
- *           element) and the PN variant (which omits the attribute
- *           entirely).
  */
 public enum SmaxGetContactBlacklistAddressingMode {
     /**
-     * The legacy PN-addressed variant — emits a bare
+     * The legacy PN-addressed variant. Emits a bare
      * {@code <privacy>} envelope with no {@code addressing_mode}
      * attribute.
      */
     PN,
 
     /**
-     * The migrated LID-addressed variant — emits a
+     * The migrated LID-addressed variant. Emits a
      * {@code <privacy addressing_mode="lid">} envelope.
      */
     LID

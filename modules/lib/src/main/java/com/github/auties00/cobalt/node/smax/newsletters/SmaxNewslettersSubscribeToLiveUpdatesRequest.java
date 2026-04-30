@@ -13,7 +13,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps the bare {@code <live_updates/>}
+ * The outbound stanza variant. Wraps the bare {@code <live_updates/>}
  * payload in the canonical
  * {@code <iq xmlns="newsletter" type="set" to="<newsletterJid>">}
  * envelope.
@@ -65,12 +65,9 @@ public final class SmaxNewslettersSubscribeToLiveUpdatesRequest implements SmaxO
     @WhatsAppWebExport(moduleName = "WASmaxOutNewslettersSubscribeToLiveUpdatesRequest",
             exports = "makeSubscribeToLiveUpdatesRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutNewslettersSubscribeToLiveUpdatesRequest: smax("live_updates", null)
         var liveUpdatesNode = new NodeBuilder()
                 .description("live_updates")
                 .build();
-        // WASmaxOutNewslettersNewsletterIQSetRequestMixin: smax("iq", {to: JID(iqTo), xmlns: "newsletter"})
-        // WASmaxOutNewslettersBaseIQSetRequestMixin: smax("iq", {id: generateId(), type: "set"})
         return new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "newsletter")

@@ -21,25 +21,21 @@ import static com.github.auties00.cobalt.node.binary.NodeTags.*;
 import static com.github.auties00.cobalt.node.binary.NodeTokens.*;
 
 /**
- * Serialises {@link Node} trees into WhatsApp's compact binary wire
+ * Serialises {@link Node} trees into WhatsApp's compact binary stanza
  * format.
  *
- * <p>Every outgoing stanza is run through this encoder before being
- * wrapped in a Noise-encrypted frame. The encoder implements the same
- * WAWap protocol as the server: strings are replaced with dictionary
- * tokens where possible, short numeric strings are packed as nibble
- * or hex sequences, binary blobs are length-prefixed with 8-, 20-, or
- * 32-bit widths, and JIDs are serialised in one of four shapes
- * ({@code JID_PAIR}, {@code AD_JID}, {@code JID_INTEROP}, {@code JID_FB})
+ * <p>Every outgoing stanza passes through this encoder before being wrapped
+ * in a Noise encrypted frame. Strings are replaced with dictionary tokens
+ * when possible, short numeric strings are packed as nibble or hex
+ * sequences, binary blobs are length prefixed with 8, 20, or 32 bit widths,
+ * and JIDs are written in one of four shapes ({@link NodeTags#JID_PAIR},
+ * {@link NodeTags#AD_JID}, {@link NodeTags#JID_INTEROP}, {@link NodeTags#JID_FB})
  * depending on their server and device.
  *
- * <p>All methods are static and stateless; the class is a pure utility.
- * Callers typically compute the output size via {@link #sizeOf(Node)},
- * allocate a buffer, and call {@link #encode(Node, byte[], int, int)}.
+ * <p>The class is a stateless utility. Callers compute the output size with
+ * {@link #sizeOf(Node)}, allocate a buffer, and invoke
+ * {@link #encode(Node, byte[], int, int)} to populate it.
  *
- * @implNote WAWap.encodeStanza: the JS encoder this class mirrors.
- *           Token lookups use {@link NodeTokens} (WAWapDict in WA Web),
- *           and the numeric constants come from {@link NodeTags}.
  * @see Node
  * @see NodeDecoder
  * @see NodeTokens
@@ -48,24 +44,24 @@ import static com.github.auties00.cobalt.node.binary.NodeTokens.*;
 @WhatsAppWebModule(moduleName = "WAWap")
 public final class NodeEncoder {
     /**
-     * VarHandle for writing 16-bit values in big-endian byte order to byte arrays.
+     * VarHandle that writes 16 bit big endian integers into a byte array.
      */
     private static final VarHandle SHORT_HANDLE = MethodHandles.byteArrayViewVarHandle(short[].class, ByteOrder.BIG_ENDIAN);
 
     /**
-     * VarHandle for writing 32-bit values in big-endian byte order to byte arrays.
+     * VarHandle that writes 32 bit big endian integers into a byte array.
      */
     private static final VarHandle INT_HANDLE = MethodHandles.byteArrayViewVarHandle(int[].class, ByteOrder.BIG_ENDIAN);
 
     /**
-     * Lookup table for nibble encoding: maps ASCII characters to their 4-bit nibble values.
-     * Valid characters are {@code [0-9.-]}, all others map to {@code -1}.
+     * Lookup table that maps an ASCII character to its 4 bit nibble code or
+     * to {@code -1} when the character is outside the {@code [0-9.-]} set.
      */
     private static final byte[] NIBBLE_ENCODE = new byte[128];
 
     /**
-     * Lookup table for hex encoding: maps ASCII characters to their 4-bit nibble values.
-     * Valid characters are {@code [0-9A-F]}, all others map to {@code -1}.
+     * Lookup table that maps an ASCII character to its 4 bit hex code or to
+     * {@code -1} when the character is outside the {@code [0-9A-F]} set.
      */
     private static final byte[] HEX_ENCODE = new byte[128];
 
@@ -84,41 +80,40 @@ public final class NodeEncoder {
     }
 
     /**
-     * Maximum value for unsigned byte (2^8).
+     * Exclusive upper bound for values that fit in an unsigned byte.
      */
     private static final int UNSIGNED_BYTE_MAX_VALUE = 256;
 
     /**
-     * Maximum value for unsigned short (2^16).
+     * Exclusive upper bound for values that fit in an unsigned short.
      */
     private static final int UNSIGNED_SHORT_MAX_VALUE = 65536;
 
     /**
-     * Maximum value for 20-bit integer (2^20).
+     * Exclusive upper bound for values that fit in 20 bits.
      */
     private static final int INT_20_MAX_VALUE = 1048576;
 
     /**
-     * Private constructor to prevent instantiation of this utility class.
+     * Prevents instantiation of this stateless utility.
      *
-     * @throws UnsupportedOperationException always, as this class should not be instantiated
+     * @throws UnsupportedOperationException always
      */
     private NodeEncoder() {
         throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
     }
 
     /**
-     * Computes the exact number of bytes required to encode the given
-     * node, including the leading flags byte.
+     * Computes the exact byte count required to encode the supplied node,
+     * including the leading flags byte.
      *
-     * <p>Callers use this method to size the output buffer before calling
-     * {@link #encode(Node, byte[], int, int)}.
+     * <p>Callers use the returned value to size the output buffer before
+     * invoking {@link #encode(Node, byte[], int, int)}.
      *
-     * @implNote WAWap.encodeStanza: the JS encoder performs the same
-     *           length pre-pass via {@code nodeLength}.
      * @param node the node to size
-     * @return the total number of bytes required to encode the node
-     * @throws IllegalArgumentException if the node is too large to encode
+     * @return the byte count required to encode the node
+     * @throws IllegalArgumentException if the node exceeds the format's
+     *         length limits
      */
     @WhatsAppWebExport(moduleName = "WAWap", exports = "encodeStanza",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -127,10 +122,11 @@ public final class NodeEncoder {
     }
 
     /**
-     * Calculates the length of a node's encoding, excluding the message header.
+     * Returns the length of a single node's encoding without the leading
+     * flags byte.
      *
-     * @param input the node to calculate the length for
-     * @return the length in bytes
+     * @param input the node to size
+     * @return the byte count required to encode the node body
      */
     private static int nodeLength(Node input){
         return listLength(input.size())
@@ -140,14 +136,12 @@ public final class NodeEncoder {
     }
 
     /**
-     * Calculates the number of bytes required to encode a list size.
-     * <p>
-     * Uses 8-bit encoding (LIST_8) for sizes less than 256, and 16-bit encoding (LIST_16)
-     * for sizes less than 65536.
+     * Returns the byte count required to write a list size header.
      *
-     * @param size the size of the list
-     * @return the number of bytes required (2 or 3)
-     * @throws IllegalArgumentException if the size exceeds the maximum supported value
+     * @param size the list size
+     * @return {@code 2} for an 8 bit length, {@code 3} for a 16 bit length
+     * @throws IllegalArgumentException if the size exceeds the 16 bit
+     *         maximum
      */
     private static int listLength(int size) {
         if (size < UNSIGNED_BYTE_MAX_VALUE) {
@@ -160,20 +154,14 @@ public final class NodeEncoder {
     }
 
     /**
-     * Calculates the number of bytes required to encode a string.
-     * <p>
-     * The encoding strategy prioritizes efficiency:
-     * <ol>
-     *   <li>Empty strings use 2 bytes (BINARY_8 + LIST_EMPTY)</li>
-     *   <li>Strings in SINGLE_BYTE_TOKENS dictionary use 1 byte</li>
-     *   <li>Strings in DICTIONARY_0-3 use 2 bytes (dictionary tag + index)</li>
-     *   <li>Short strings matching {@code [0-9.-]+} use nibble encoding (tag + metadata + packed data)</li>
-     *   <li>Short strings matching {@code [0-9A-F]+} use hex encoding (tag + metadata + packed data)</li>
-     *   <li>Other strings are UTF-8 encoded with a length prefix</li>
-     * </ol>
+     * Returns the byte count required to encode a string under the most
+     * efficient applicable strategy.
      *
-     * @param input the string to calculate the encoding length for
-     * @return the number of bytes required to encode the string
+     * @implNote The encoder picks the first strategy that applies in this
+     *           order: empty literal, single byte token, dictionary token,
+     *           nibble or hex packed run, length prefixed UTF-8.
+     * @param input the string to size
+     * @return the byte count required to encode the string
      */
     private static int stringLength(String input){
         if (input.isEmpty()) {
@@ -217,10 +205,11 @@ public final class NodeEncoder {
     }
 
     /**
-     * Calculates the number of bytes required to encode a binary length prefix.
+     * Returns the byte count required to write a binary length prefix
+     * header.
      *
      * @param input the length value to encode
-     * @return the number of bytes required (2, 4, or 5)
+     * @return {@code 2} for 8 bit, {@code 4} for 20 bit, {@code 5} for 32 bit
      */
     private static int binaryLength(long input) {
         if (input < UNSIGNED_BYTE_MAX_VALUE) {
@@ -233,10 +222,10 @@ public final class NodeEncoder {
     }
 
     /**
-     * Calculates the total number of bytes required to encode a map of node attributes.
+     * Returns the byte count required to encode an attribute map.
      *
-     * @param attributes the attributes to encode
-     * @return the total number of bytes required
+     * @param attributes the attribute map to size
+     * @return the byte count required to encode every key value pair
      */
     private static int attributesLength(SequencedMap<String, ? extends NodeAttribute> attributes) {
         var result = 0;
@@ -247,10 +236,10 @@ public final class NodeEncoder {
     }
 
     /**
-     * Calculates the number of bytes required to encode a single node attribute value.
+     * Returns the byte count required to encode a single attribute value.
      *
-     * @param attribute the attribute to encode
-     * @return the number of bytes required
+     * @param attribute the attribute to size
+     * @return the byte count required to encode the attribute
      */
     private static int attributeLength(NodeAttribute attribute){
         return switch (attribute) {
@@ -261,10 +250,11 @@ public final class NodeEncoder {
     }
 
     /**
-     * Calculates the total number of bytes required to encode a collection of child nodes.
+     * Returns the byte count required to encode a list of child nodes,
+     * including its leading list size header.
      *
-     * @param values the child nodes to encode
-     * @return the total number of bytes required
+     * @param values the child nodes to size
+     * @return the byte count required to encode the list
      */
     private static int childrenLength(SequencedCollection<Node> values) {
         var length = listLength(values.size());
@@ -275,10 +265,10 @@ public final class NodeEncoder {
     }
 
     /**
-     * Calculates the number of bytes required to encode a node's children.
+     * Returns the byte count required to encode the content slot of a node.
      *
-     * @param node the node whose children to calculate
-     * @return the number of bytes required
+     * @param node the node whose content to size
+     * @return the byte count required to encode the content
      */
     private static int contentLength(Node node){
         return switch (node) {
@@ -291,28 +281,22 @@ public final class NodeEncoder {
     }
 
     /**
-     * Calculates the number of bytes required to encode an array of bytes.
+     * Returns the byte count required to encode a binary blob with its
+     * length prefix.
      *
-     * @param bytes the array of bytes to encode
-     * @return the number of bytes required (length prefix + data)
+     * @param bytes the blob to size
+     * @return the byte count required to encode the blob
      */
     private static int bytesLength(byte[] bytes){
         return calculateLength(bytes.length);
     }
 
     /**
-     * Calculates the number of bytes required to encode a WhatsApp JID.
-     * <p>
-     * JIDs can be encoded in four ways:
-     * <ul>
-     *   <li>JID_FB format: for Messenger JIDs (1 + user string + 2 device + domain string)</li>
-     *   <li>JID_INTEROP format: for interop JIDs (1 + user string + 2 device + 2 integrator)</li>
-     *   <li>AD_JID format: for device JIDs (1 + 1 domainType + 1 device + user string)</li>
-     *   <li>JID_PAIR format: standard format (1 + user string or 1 + server string)</li>
-     * </ul>
+     * Returns the byte count required to encode a JID under the shape
+     * appropriate for its server and device.
      *
-     * @param jid the JID to encode
-     * @return the number of bytes required
+     * @param jid the JID to size
+     * @return the byte count required to encode the JID
      */
     private static int jidLength(Jid jid){
         if (jid.hasMessengerServer()) {
@@ -330,20 +314,22 @@ public final class NodeEncoder {
     }
 
     /**
-     * Calculates the total number of bytes required to encode data with a length prefix.
+     * Returns the byte count required to encode a payload of the supplied
+     * length together with its binary length prefix.
      *
-     * @param length the length of the data
-     * @return the number of bytes required (prefix + data)
+     * @param length the payload length in bytes
+     * @return the byte count required to encode the prefixed payload
      */
     private static int calculateLength(int length) {
         return binaryLength(length) + length;
     }
 
     /**
-     * Calculates the total number of bytes required to encode a UTF-8 string.
+     * Returns the byte count of a string when encoded as UTF-8.
      *
-     * @param input the UTF-8 string to calculate the length for
-     * @return the number of bytes required
+     * @param input the string to measure, may be {@code null}
+     * @return the UTF-8 byte length, or {@code 0} when {@code input} is
+     *         {@code null}
      */
     private static int calculateUtf8Length(String input) {
         var length = 0;
@@ -369,28 +355,25 @@ public final class NodeEncoder {
     }
 
     /**
-     * Encodes a node into the given buffer at the specified offset.
+     * Encodes the supplied node into the output array starting at
+     * {@code offset}.
      *
-     * <p>The caller must pass a {@code length} equal to the value
-     * returned by {@link #sizeOf(Node)}; a mismatch indicates a bug in
-     * the encoder and throws {@link WhatsAppStreamException.MalformedNode}.
+     * <p>The caller passes a {@code length} equal to the value returned by
+     * {@link #sizeOf(Node)}. A mismatch indicates an internal encoder bug
+     * and is reported through {@link WhatsAppStreamException.MalformedNode}.
      *
-     * @implNote WAWap.encodeStanza: the JS encoder writes the same
-     *           leading zero flags byte and then walks the node tree
-     *           producing the wire bytes. WAWap.makeStanza: the JS
-     *           {@code makeStanza} normaliser deep-copies a {@code WapNode}
-     *           tree converting any string content into UTF-8 byte views
-     *           before encoding; Cobalt performs the same conversion
-     *           inline in {@link #writeContent(Node, byte[], int)}.
+     * @implNote The leading zero byte is the WAWap flags byte. Bit
+     *           {@code 1} would mark a DEFLATE compressed payload but
+     *           Cobalt always writes uncompressed bytes.
      * @param node   the node to encode
-     * @param output the output byte array
-     * @param offset the offset in the output array where encoding should
-     *               start
-     * @param length the expected number of bytes to write, as returned by
+     * @param output the destination byte array
+     * @param offset the position in the destination array to start writing
+     *               at
+     * @param length the byte count expected to be written, as returned by
      *               {@link #sizeOf(Node)}
-     * @return the new offset after writing
-     * @throws WhatsAppStreamException.MalformedNode if the node encodes
-     *         to a different size than {@code length}
+     * @return the offset positioned past the last written byte
+     * @throws WhatsAppStreamException.MalformedNode if the node encodes to
+     *         a different size than {@code length}
      */
     @WhatsAppWebExport(moduleName = "WAWap", exports = "encodeStanza",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -406,20 +389,13 @@ public final class NodeEncoder {
     }
 
     /**
-     * Writes a complete node to the output array.
-     * <p>
-     * A node consists of:
-     * <ol>
-     *   <li>List size (number of attributes + 2 for description + children)</li>
-     *   <li>Description string</li>
-     *   <li>Attributes</li>
-     *   <li>Content</li>
-     * </ol>
+     * Writes a complete node (size header, description, attributes,
+     * content) to the output array.
      *
-     * @param input the node to write
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param input  the node to write
+     * @param output the destination byte array
+     * @param offset the current write offset
+     * @return the offset positioned past the last written byte
      */
     private static int writeNode(Node input, byte[] output, int offset){
         offset = writeList(input.size(), output, offset);
@@ -430,13 +406,15 @@ public final class NodeEncoder {
     }
 
     /**
-     * Writes a list size tag and value.
+     * Writes a list size tag followed by the size value, picking the
+     * narrowest representation that fits.
      *
-     * @param size the size of the list
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
-     * @throws IllegalArgumentException if the size exceeds the maximum supported value
+     * @param size   the list size
+     * @param output the destination byte array
+     * @param offset the current write offset
+     * @return the offset positioned past the last written byte
+     * @throws IllegalArgumentException if the size exceeds the 16 bit
+     *         maximum
      */
     private static int writeList(int size, byte[] output, int offset) {
         if (size < UNSIGNED_BYTE_MAX_VALUE) {
@@ -449,12 +427,12 @@ public final class NodeEncoder {
     }
 
     /**
-     * Writes an 8-bit list size (LIST_8 tag + size byte).
+     * Writes a {@link NodeTags#LIST_8} tag followed by an 8 bit size byte.
      *
-     * @param size the size of the list
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param size   the list size
+     * @param output the destination byte array
+     * @param offset the current write offset
+     * @return the offset positioned past the last written byte
      */
     private static int writeList8(byte size, byte[] output, int offset) {
         output[offset++] = LIST_8;
@@ -463,12 +441,13 @@ public final class NodeEncoder {
     }
 
     /**
-     * Writes a 16-bit list size (LIST_16 tag + two size bytes).
+     * Writes a {@link NodeTags#LIST_16} tag followed by a 16 bit big endian
+     * size value.
      *
-     * @param size the size of the list
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param size   the list size
+     * @param output the destination byte array
+     * @param offset the current write offset
+     * @return the offset positioned past the last written byte
      */
     private static int writeList16(int size, byte[] output, int offset) {
         output[offset++] = LIST_16;
@@ -477,21 +456,15 @@ public final class NodeEncoder {
     }
 
     /**
-     * Writes a string using the most efficient encoding method.
-     * <p>
-     * Encoding priority:
-     * <ol>
-     *   <li>Empty string → BINARY_8 + LIST_EMPTY</li>
-     *   <li>Single-byte token → token index only</li>
-     *   <li>Dictionary token → DICTIONARY_X + index</li>
-     *   <li>UTF-8 string → binary length prefix + UTF-8 bytes</li>
-     * </ol>
+     * Writes a string under the most efficient applicable strategy.
      *
-     * @param input the string to write
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
-     * @throws RuntimeException if UTF-8 encoding fails
+     * @implNote The encoder picks the first strategy that applies in this
+     *           order: empty literal, single byte token, dictionary token,
+     *           nibble or hex packed run, length prefixed UTF-8.
+     * @param input  the string to write
+     * @param output the destination byte array
+     * @param offset the current write offset
+     * @return the offset positioned past the last written byte
      */
     private static int writeString(String input, byte[] output, int offset){
         if (input.isEmpty()) {
@@ -552,12 +525,12 @@ public final class NodeEncoder {
     }
 
     /**
-     * Writes a binary length prefix with the appropriate size tag.
+     * Writes a binary length prefix using the narrowest tag that fits.
      *
-     * @param input the length value to write
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param input  the length value
+     * @param output the destination byte array
+     * @param offset the current write offset
+     * @return the offset positioned past the last written byte
      */
     private static int writeBinary(int input, byte[] output, int offset) {
         if (input < UNSIGNED_BYTE_MAX_VALUE) {
@@ -570,12 +543,13 @@ public final class NodeEncoder {
     }
 
     /**
-     * Writes an 8-bit binary length (BINARY_8 tag + length byte).
+     * Writes a {@link NodeTags#BINARY_8} tag followed by an 8 bit length
+     * byte.
      *
-     * @param input the length value
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param input  the length value
+     * @param output the destination byte array
+     * @param offset the current write offset
+     * @return the offset positioned past the last written byte
      */
     private static int writeBinary8(byte input, byte[] output, int offset) {
         output[offset++] = BINARY_8;
@@ -584,12 +558,13 @@ public final class NodeEncoder {
     }
 
     /**
-     * Writes a 20-bit binary length (BINARY_20 tag + three length bytes).
+     * Writes a {@link NodeTags#BINARY_20} tag followed by a 20 bit big
+     * endian length value.
      *
-     * @param input the length value
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param input  the length value
+     * @param output the destination byte array
+     * @param offset the current write offset
+     * @return the offset positioned past the last written byte
      */
     private static int writeBinary20(int input, byte[] output, int offset) {
         output[offset++] = BINARY_20;
@@ -600,12 +575,13 @@ public final class NodeEncoder {
     }
 
     /**
-     * Writes a 32-bit binary length (BINARY_32 tag + four length bytes).
+     * Writes a {@link NodeTags#BINARY_32} tag followed by a 32 bit big
+     * endian length value.
      *
-     * @param input the length value
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param input  the length value
+     * @param output the destination byte array
+     * @param offset the current write offset
+     * @return the offset positioned past the last written byte
      */
     private static int writeBinary32(int input, byte[] output, int offset) {
         output[offset++] = BINARY_32;
@@ -614,14 +590,15 @@ public final class NodeEncoder {
     }
 
     /**
-     * Determines whether a string can be packed using nibble or hex encoding.
-     * <p>
-     * Nibble encoding supports characters {@code [0-9.-]} and hex encoding supports
-     * characters {@code [0-9A-F]}. Nibble encoding is preferred when applicable.
+     * Determines whether the supplied string is eligible for nibble or hex
+     * packed encoding.
      *
-     * @param input the string to check
-     * @return {@link NodeTags#NIBBLE_8} if nibble-encodable, {@link NodeTags#HEX_8} if
-     *         hex-encodable, or {@code -1} if neither
+     * @implNote Nibble packing covers {@code [0-9.-]} and hex packing covers
+     *           {@code [0-9A-F]}. Nibble packing is preferred when both
+     *           shapes apply.
+     * @param input the string to inspect
+     * @return {@link NodeTags#NIBBLE_8}, {@link NodeTags#HEX_8}, or
+     *         {@code -1} when neither shape applies
      */
     private static byte getPackedType(String input) {
         var nibble = true;
@@ -646,17 +623,16 @@ public final class NodeEncoder {
     }
 
     /**
-     * Writes a string using nibble or hex packed encoding.
-     * <p>
-     * Each character is encoded as a 4-bit nibble, with two characters packed per byte.
-     * For odd-length strings, the last byte contains the final character in the high
-     * nibble and {@code 0xF} as padding in the low nibble.
+     * Writes a string in nibble or hex packed form.
      *
+     * @implNote Two characters share each output byte. Odd lengths set the
+     *           high bit of the byte count header and pad the trailing
+     *           nibble with {@code 0xF}.
      * @param input  the string to encode
-     * @param tag    the encoding tag ({@link NodeTags#NIBBLE_8} or {@link NodeTags#HEX_8})
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param tag    {@link NodeTags#NIBBLE_8} or {@link NodeTags#HEX_8}
+     * @param output the destination byte array
+     * @param offset the current write offset
+     * @return the offset positioned past the last written byte
      */
     private static int writePacked(String input, byte tag, byte[] output, int offset) {
         var table = tag == NIBBLE_8 ? NIBBLE_ENCODE : HEX_ENCODE;
@@ -678,12 +654,12 @@ public final class NodeEncoder {
     }
 
     /**
-     * Writes all node attributes as key-value pairs.
+     * Writes every entry of the supplied attribute map as a key value pair.
      *
      * @param attributes the attributes to write
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param output     the destination byte array
+     * @param offset     the current write offset
+     * @return the offset positioned past the last written byte
      */
     private static int writeAttributes(SequencedMap<String, ? extends NodeAttribute> attributes, byte[] output, int offset) {
         for (var entry : attributes.entrySet()) {
@@ -694,12 +670,12 @@ public final class NodeEncoder {
     }
 
     /**
-     * Writes a single attribute value.
+     * Writes a single attribute value under its variant specific shape.
      *
      * @param attribute the attribute to write
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param output    the destination byte array
+     * @param offset    the current write offset
+     * @return the offset positioned past the last written byte
      */
     private static int writeAttribute(NodeAttribute attribute, byte[] output, int offset) {
         return switch (attribute) {
@@ -710,12 +686,12 @@ public final class NodeEncoder {
     }
 
     /**
-     * Writes the children of a node based on its type.
+     * Writes the content slot of a node based on its concrete variant.
      *
-     * @param content the node whose children to write
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param content the node whose content to write
+     * @param output  the destination byte array
+     * @param offset  the current write offset
+     * @return the offset positioned past the last written byte
      */
     private static int writeContent(Node content, byte[] output, int offset) {
         return switch (content) {
@@ -728,12 +704,13 @@ public final class NodeEncoder {
     }
 
     /**
-     * Writes a collection of child nodes.
+     * Writes a list size header followed by the encoding of every child
+     * node.
      *
      * @param values the child nodes to write
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param output the destination byte array
+     * @param offset the current write offset
+     * @return the offset positioned past the last written byte
      */
     private static int writeChildren(SequencedCollection<Node> values, byte[] output, int offset) {
         offset = writeList(values.size(), output, offset);
@@ -744,12 +721,12 @@ public final class NodeEncoder {
     }
 
     /**
-     * Writes a byte array with a length prefix.
+     * Writes a binary blob with its length prefix.
      *
-     * @param buffer the byte array to write
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param buffer the blob to write
+     * @param output the destination byte array
+     * @param offset the current write offset
+     * @return the offset positioned past the last written byte
      */
     private static int writeBytes(byte[] buffer, byte[] output, int offset){
         var length = buffer.length;
@@ -759,20 +736,15 @@ public final class NodeEncoder {
     }
 
     /**
-     * Writes a WhatsApp JID.
-     * <p>
-     * Four encoding formats:
-     * <ul>
-     *   <li>JID_FB: for Messenger JIDs (tag + user + device(u16) + domain)</li>
-     *   <li>JID_INTEROP: for interop JIDs (tag + user + device(u16) + integrator(u16))</li>
-     *   <li>AD_JID: for device JIDs (tag + domainType + device + user)</li>
-     *   <li>JID_PAIR: standard format (tag + user/empty + server)</li>
-     * </ul>
+     * Writes a JID under the shape appropriate for its server and device.
      *
-     * @param jid the JID to write
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @implNote Messenger and interop JIDs carry a 16 bit device id;
+     *           multi device JIDs carry an 8 bit device id and a domain
+     *           code; plain JIDs use a user and server pair.
+     * @param jid    the JID to write
+     * @param output the destination byte array
+     * @param offset the current write offset
+     * @return the offset positioned past the last written byte
      */
     private static int writeJid(Jid jid, byte[] output, int offset){
         if (jid.hasMessengerServer()) {
@@ -816,10 +788,10 @@ public final class NodeEncoder {
     }
 
     /**
-     * Returns the binary domain type encoding for the given server.
+     * Maps a {@link JidServer} to its multi device JID domain code.
      *
-     * @param server the JID server to map
-     * @return the domain type value
+     * @param server the server to translate
+     * @return one of the {@code DOMAIN_*} constants in {@link NodeTags}
      */
     private static int getDomainForServer(JidServer server) {
         return switch (server.type()) {

@@ -17,7 +17,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps the
+ * The outbound stanza variant. Wraps the
  * {@code <privacy><list value="contact_blacklist" name=NAME/></privacy>}
  * payload in the canonical {@code <iq xmlns="privacy" type="get">}
  * envelope, optionally promoting the {@code <privacy/>} envelope to LID
@@ -40,7 +40,7 @@ public final class SmaxGetContactBlacklistRequest implements SmaxOperation.Reque
     private final String categoryName;
 
     /**
-     * The wire addressing mode — selects the LID-promoted or legacy-PN
+     * The wire addressing mode. Selects the LID-promoted or legacy-PN
      * variant of the {@code <privacy/>} envelope.
      */
     private final SmaxGetContactBlacklistAddressingMode addressingMode;
@@ -80,19 +80,11 @@ public final class SmaxGetContactBlacklistRequest implements SmaxOperation.Reque
      * Builds the outbound IQ stanza ready for dispatch.
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope
-     *
-     * @implNote {@code WASmaxOutPrivacyGetContactBlacklistRequest.makeGetContactBlacklistRequest}
-     *           composes {@code <iq to="s.whatsapp.net" xmlns="privacy"
-     *           type="get" id="…"><privacy [addressing_mode="lid"]><list
-     *           value="contact_blacklist" name=NAME/></privacy></iq>}.
-     *           The {@code addressing_mode} attribute is emitted only on
-     *           the {@link SmaxGetContactBlacklistAddressingMode#LID} variant.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutPrivacyGetContactBlacklistRequest",
             exports = "makeGetContactBlacklistRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutPrivacyCategoryNamesForContactBlacklistMixin: smax("smax$any", {name})
         // merged onto: smax("list", {value: "contact_blacklist"})
         var listNode = new NodeBuilder()
                 .description("list")
@@ -102,13 +94,11 @@ public final class SmaxGetContactBlacklistRequest implements SmaxOperation.Reque
         var privacyBuilder = new NodeBuilder()
                 .description("privacy");
         if (addressingMode == SmaxGetContactBlacklistAddressingMode.LID) {
-            // WASmaxOutPrivacyGetContactBlacklistGetContactBlacklistLIDMixin: smax("privacy", {addressing_mode: "lid"})
             privacyBuilder.attribute("addressing_mode", "lid");
         }
         var privacyNode = privacyBuilder
                 .content(listNode)
                 .build();
-        // WASmaxOutPrivacyGetIQMixin + WASmaxOutPrivacyBaseIQGetRequestMixin:
         // smax("iq", {to: S_WHATSAPP_NET, xmlns: "privacy", id: generateId(), type: "get"})
         return new NodeBuilder()
                 .description("iq")

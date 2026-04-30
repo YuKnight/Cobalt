@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.node.iq.biz;
 
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.JidServer;
 import com.github.auties00.cobalt.node.Node;
@@ -11,8 +12,14 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant.
+ * The outbound {@code <iq xmlns="w:biz:merchant_info" type="set">} stanza
+ * that updates the regulatory-compliance bundle of the current merchant.
+ * Each non-{@code null} field becomes one child of the
+ * {@code <merchant_info/>} payload, so callers can patch any subset of
+ * registration flag, legal entity details, customer-care contacts and
+ * grievance-officer details in a single round-trip.
  */
+@WhatsAppWebModule(moduleName = "WAWebMerchantComplianceJob")
 public final class IqSetMerchantComplianceRequest implements IqOperation.Request {
     /**
      * Whether the merchant is registered.

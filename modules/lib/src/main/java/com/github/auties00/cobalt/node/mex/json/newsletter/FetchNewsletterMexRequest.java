@@ -23,21 +23,12 @@ import java.util.OptionalLong;
  * Fetches full metadata for a single newsletter by id or invite key.
  *
  * <p>This is the primary query used to hydrate a newsletter's metadata on-demand. Depending on the input key type, the server returns metadata for an already-joined newsletter (JID) or a newsletter discovered through an invite link.
- *
- * @implNote WAWebMexFetchNewsletterJob: adapts the {@code mexGetNewsletter} GraphQL query,
- * which in WA Web is invoked via {@code WAWebMexClient.fetchQuery} and
- * whose response is unwrapped by the same module. Cobalt models the request
- * and response as sibling variants of a sealed interface rather than a
- * free-standing async function.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexFetchNewsletterJob")
 public final class FetchNewsletterMexRequest implements MexOperation.Request.Json {
     /**
      * The numeric GraphQL query identifier assigned by the WhatsApp relay
      * to the {@code FetchNewsletter} compiled query.
-     *
-     * @implNote WAWebMexFetchNewsletterJobQuery.graphql: corresponds to the compiled
-     * document id registered for the {@code mexGetNewsletter} query.
      */
     public static final String QUERY_ID = "35452404184358876";
 
@@ -46,17 +37,6 @@ public final class FetchNewsletterMexRequest implements MexOperation.Request.Jso
      * {@code MexPerfTracker} when dispatching this query, mirroring the
      * {@code params.name} value of the compiled mexGetNewsletter
      * operation.
-     *
-     * <p>The constant is exposed through {@link #name()} so
-     * call sites can reach the same telemetry tag WA Web emits without
-     * duplicating the literal at every dispatch site.
-     *
-     * @implNote WAWebMexFetchNewsletterJob: WA Web invokes the operation through
-     * {@code WAWebMexClient.fetchQuery} which forwards to
-     * {@code WAWebMexNativeClient}; the native client passes the
-     * {@code params.name} of the compiled GraphQL artifact to
-     * {@code MexPerfTracker.setOperationName}. Cobalt mirrors that
-     * scalar verbatim as {@code "mexGetNewsletter"}.
      */
     public static final String OPERATION_NAME = "mexGetNewsletter";
     private final Boolean fetchCreationTime;
@@ -102,12 +82,7 @@ public final class FetchNewsletterMexRequest implements MexOperation.Request.Jso
      * Returns the compiled GraphQL query identifier projected from
      * {@link #QUERY_ID}.
      *
-     * @implNote WAWebMexFetchNewsletterJob: WA Web reads the {@code params.id}
-     *           field of the compiled artifact and forwards it to
-     *           {@code MexPerfTracker.setQueryId}; Cobalt projects
-     *           the same scalar through this accessor.
-     * @return the constant {@link #QUERY_ID}; never
-     *         {@code null}
+     * @return the constant {@link #QUERY_ID}, never {@code null}
      */
     @Override
     public String id() {
@@ -118,14 +93,7 @@ public final class FetchNewsletterMexRequest implements MexOperation.Request.Jso
      * Returns the GraphQL operation name projected from
      * {@link #OPERATION_NAME}.
      *
-     * @implNote WAWebMexFetchNewsletterJob: WA Web's
-     *           {@code WAWebMexNativeClient.fetchQuery} reads
-     *           {@code params.name} from the compiled GraphQL
-     *           artifact and forwards it to
-     *           {@code MexPerfTracker.setOperationName}; Cobalt
-     *           projects the same scalar through this accessor.
-     * @return the constant {@link #OPERATION_NAME};
-     *         never {@code null}
+     * @return the constant {@link #OPERATION_NAME}, never {@code null}
      */
     @Override
     public String name() {
@@ -136,11 +104,6 @@ public final class FetchNewsletterMexRequest implements MexOperation.Request.Jso
      * Builds the IQ stanza that dispatches this operation to the
      * WhatsApp relay.
      *
-     * @implNote WAWebMexFetchNewsletterJob.mexGetNewsletter: WA Web constructs the
-     * {@code variables} object inline and delegates to
-     * {@code WAWebMexClient.fetchQuery}. Cobalt writes the JSON directly
-     * via {@code fastjson2.JSONWriter} and wraps it through
-     * {@link Json#createMexNode(String, String)}.
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         serialised GraphQL variables
      */
@@ -148,16 +111,11 @@ public final class FetchNewsletterMexRequest implements MexOperation.Request.Jso
             adaptation = WhatsAppAdaptation.ADAPTED)
     @Override
     public NodeBuilder toNode() {
-        // WAWebMexFetchNewsletterJob.mexGetNewsletter
-        // Opens a UTF-8 JSON writer that will serialise the GraphQL variables envelope
         try (var writer = JSONWriter.ofUTF8()) {
-            // WAWebMexFetchNewsletterJob.mexGetNewsletter
-            // Begins the outer envelope and the nested "variables" object consumed by WAWebMexClient.fetchQuery
             writer.startObject();
             writer.writeName("variables");
             writer.writeColon();
             writer.startObject();
-            // WAWebMexFetchNewsletterJob.mexGetNewsletter: d.input = {key: t, type: u, view_role: a}
             // Emits the input variable as a nested object when present
             if (input != null) {
                 writer.writeName("input");
@@ -180,36 +138,27 @@ public final class FetchNewsletterMexRequest implements MexOperation.Request.Jso
                 }
                 writer.endObject();
             }
-            // WAWebMexFetchNewsletterJob.mexGetNewsletter
-            // Emits the fetch_viewer_metadata boolean variable when present
             if (fetchViewerMetadata != null) {
                 writer.writeName("fetch_viewer_metadata");
                 writer.writeColon();
                 writer.writeBool(fetchViewerMetadata);
             }
-            // WAWebMexFetchNewsletterJob.mexGetNewsletter: c = u !== "INVITE"
             // Emits the fetch_full_image boolean variable when present
             if (fetchFullImage != null) {
                 writer.writeName("fetch_full_image");
                 writer.writeColon();
                 writer.writeBool(fetchFullImage);
             }
-            // WAWebMexFetchNewsletterJob.mexGetNewsletter
-            // Emits the fetch_creation_time boolean variable when present
             if (fetchCreationTime != null) {
                 writer.writeName("fetch_creation_time");
                 writer.writeColon();
                 writer.writeBool(fetchCreationTime);
             }
-            // WAWebMexFetchNewsletterJob.mexGetNewsletter
-            // Emits the fetch_wamo_sub boolean variable when present
             if (fetchWamoSub != null) {
                 writer.writeName("fetch_wamo_sub");
                 writer.writeColon();
                 writer.writeBool(fetchWamoSub);
             }
-            // WAWebMexFetchNewsletterJob.mexGetNewsletter
-            // Emits the fetch_status_metadata boolean variable when present
             if (fetchStatusMetadata != null) {
                 writer.writeName("fetch_status_metadata");
                 writer.writeColon();
@@ -218,8 +167,6 @@ public final class FetchNewsletterMexRequest implements MexOperation.Request.Jso
             writer.endObject();
             writer.endObject();
 
-            // ADAPTED: WAWebMexFetchNewsletterJob.mexGetNewsletter
-            // Flushes the JSON buffer into a StringWriter and wraps it in the shared MEX IQ envelope
             try (var output = new StringWriter()) {
                 writer.flushTo(output);
                 return Json.createMexNode(QUERY_ID, output.toString());
@@ -232,12 +179,6 @@ public final class FetchNewsletterMexRequest implements MexOperation.Request.Jso
     /**
      * The structured {@code input} GraphQL variable consumed by the
      * {@code mexGetNewsletter} query.
-     *
-     * @implNote WAWebMexFetchNewsletterJob.mexGetNewsletter: corresponds to
-     * the inline JS object {@code {input: {key: t, type: u, view_role: a}}},
-     * where {@code u} is computed by WAWebWid.isNewsletter as
-     * {@code "JID"} for newsletter JIDs and {@code "INVITE"} for invite
-     * keys.
      */
     public static final class Input {
         private final String key;
@@ -247,7 +188,7 @@ public final class FetchNewsletterMexRequest implements MexOperation.Request.Jso
         /**
          * Constructs a new {@link Input}.
          *
-         * @param key      the newsletter JID or invite key
+     * @param key      the newsletter JID or invite key
          * @param type     the lookup discriminator, either {@code "JID"} or {@code "INVITE"}
          * @param viewRole the optional viewer role enum name, may be {@code null}
          */
@@ -260,7 +201,7 @@ public final class FetchNewsletterMexRequest implements MexOperation.Request.Jso
         /**
          * Returns the {@code key} field.
          *
-         * @return the newsletter JID or invite key, or {@code null} if absent
+     * @return the newsletter JID or invite key, or {@code null} if absent
          */
         public String key() {
             return key;
@@ -269,7 +210,7 @@ public final class FetchNewsletterMexRequest implements MexOperation.Request.Jso
         /**
          * Returns the {@code type} field.
          *
-         * @return the lookup discriminator, or {@code null} if absent
+     * @return the lookup discriminator, or {@code null} if absent
          */
         public String type() {
             return type;
@@ -278,7 +219,7 @@ public final class FetchNewsletterMexRequest implements MexOperation.Request.Jso
         /**
          * Returns the {@code view_role} field.
          *
-         * @return the viewer role enum name, or {@code null} if absent
+     * @return the viewer role enum name, or {@code null} if absent
          */
         public String viewRole() {
             return viewRole;

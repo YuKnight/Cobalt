@@ -12,16 +12,15 @@ import java.nio.file.attribute.FileTime;
 import java.util.Optional;
 
 /**
- * Filesystem helpers that resolve the on-disk layout of Cobalt's persistent
- * stores.
+ * Filesystem helpers that resolve the on-disk layout of Cobalt's
+ * persistent stores.
  *
  * <p>Each {@link WhatsAppClientType} has its own home directory under a
- * caller-supplied base path, and each session is stored inside a UUID named
- * subdirectory. These helpers handle directory creation, lookup of the
- * most recently modified session and recursive deletion.
+ * caller-supplied base path, and each session is stored inside a
+ * UUID-named subdirectory. These helpers handle directory creation,
+ * lookup of the most recently modified session, and recursive deletion.
  *
- * @implNote Pure Cobalt utility with no WhatsApp Web counterpart; WhatsApp
- *     Web persists its equivalent data to IndexedDB via
+ * @implNote WhatsApp Web persists its equivalent data to IndexedDB via
  *     {@code WAWebSchema*} modules rather than the filesystem.
  */
 public final class StorePathUtils {

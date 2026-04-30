@@ -27,8 +27,8 @@ public sealed interface SmaxBugReportingReportBugResponse extends SmaxOperation.
     /**
      * Tries each {@link SmaxBugReportingReportBugResponse} variant in priority order.
      *
-     * @param node    the inbound IQ stanza; never {@code null}
-     * @param request the original outbound stanza; never
+     * @param node    the inbound IQ stanza. Never {@code null}
+     * @param request the original outbound stanza. Never
      *                {@code null}
      * @return an {@link Optional} carrying the parsed variant
      * @throws NullPointerException if either argument is
@@ -47,7 +47,7 @@ public sealed interface SmaxBugReportingReportBugResponse extends SmaxOperation.
     }
 
     /**
-     * The {@code Success} reply variant — the relay accepted the
+     * The {@code Success} reply variant. The relay accepted the
      * report and returned a backend-side {@code <task_id/>}.
      *
      * @implNote {@code WASmaxInBugReportingReportBugResponseSuccess.parseReportBugResponseSuccess}
@@ -62,7 +62,7 @@ public sealed interface SmaxBugReportingReportBugResponse extends SmaxOperation.
     final class Success implements SmaxBugReportingReportBugResponse {
         /**
          * The optional {@code to} attribute echoed on the reply (a
-         * user JID — when the request set {@code from=USER_JID(t)}
+         * user JID. When the request set {@code from=USER_JID(t)}
          * the reply echoes that JID back into the {@code to}
          * attribute).
          */
@@ -76,9 +76,9 @@ public sealed interface SmaxBugReportingReportBugResponse extends SmaxOperation.
         /**
          * Constructs a new success reply.
          *
-         * @param replyTo            the optional reply-to JID; may
+         * @param replyTo            the optional reply-to JID. May
          *                           be {@code null}
-         * @param taskIdElementValue the task id; never {@code null}
+         * @param taskIdElementValue the task id. Never {@code null}
          * @throws NullPointerException if {@code taskIdElementValue}
          *                              is {@code null}
          */
@@ -100,7 +100,7 @@ public sealed interface SmaxBugReportingReportBugResponse extends SmaxOperation.
         /**
          * Returns the backend-side task id.
          *
-         * @return the task id; never {@code null}
+         * @return the task id. Never {@code null}
          */
         public String taskIdElementValue() {
             return taskIdElementValue;
@@ -158,7 +158,7 @@ public sealed interface SmaxBugReportingReportBugResponse extends SmaxOperation.
     }
 
     /**
-     * The {@code Error} reply variant — the relay rejected the
+     * The {@code Error} reply variant. The relay rejected the
      * report with one of two documented codes:
      * {@code 400} bad-request or {@code 500} internal-server-error.
      *
@@ -167,8 +167,8 @@ public sealed interface SmaxBugReportingReportBugResponse extends SmaxOperation.
      *           {@code WASmaxInBugReportingHackBaseIQErrorResponseMixin}
      *           which permits an optional {@code to=USER_JID}
      *           echo on the reply) and routes the {@code <error/>}
-     *           child through {@code WASmaxInBugReportingReportBugErrors}
-     *           — a disjunction over {@code IQErrorBadRequest}
+     *           child through {@code WASmaxInBugReportingReportBugErrors},
+     *           a disjunction over {@code IQErrorBadRequest}
      *           ({@code 400}) and {@code IQErrorInternalServerError}
      *           ({@code 500}). Cobalt collapses the two sub-mixins
      *           into the single {@code (errorCode, errorText)} pair
@@ -186,13 +186,13 @@ public sealed interface SmaxBugReportingReportBugResponse extends SmaxOperation.
         private final Jid replyTo;
 
         /**
-         * The numeric error code — one of {@code 400} or
+         * The numeric error code. One of {@code 400} or
          * {@code 500}.
          */
         private final int errorCode;
 
         /**
-         * The error text — one of {@code "bad-request"} or
+         * The error text. One of {@code "bad-request"} or
          * {@code "internal-server-error"}.
          */
         private final String errorText;
@@ -200,10 +200,10 @@ public sealed interface SmaxBugReportingReportBugResponse extends SmaxOperation.
         /**
          * Constructs a new error reply.
          *
-         * @param replyTo   the optional reply-to JID; may be
+         * @param replyTo   the optional reply-to JID. May be
          *                  {@code null}
          * @param errorCode the numeric error code
-         * @param errorText the optional error text; may be
+         * @param errorText the optional error text. May be
          *                  {@code null}
          */
         public Error(Jid replyTo, int errorCode, String errorText) {
@@ -267,7 +267,7 @@ public sealed interface SmaxBugReportingReportBugResponse extends SmaxOperation.
             } else if (code == 500 && "internal-server-error".equals(text)) {
                 // IQErrorInternalServerErrorMixin
             } else {
-                // Unknown code/text pair — not a documented variant.
+                // Unknown code/text pair. Not a documented variant.
                 return Optional.empty();
             }
             var replyTo = node.getAttributeAsJid("to").orElse(null);

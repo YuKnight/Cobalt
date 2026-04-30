@@ -89,7 +89,7 @@ public final class LocaleSettingHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebLocaleSettingSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return LocaleSetting.ACTION_NAME; // WAWebLocaleSettingSync.getAction -> Actions.LocaleSetting
+        return LocaleSetting.ACTION_NAME;
     }
 
     /**
@@ -105,7 +105,7 @@ public final class LocaleSettingHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebLocaleSettingSync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return LocaleSetting.COLLECTION_NAME; // WAWebLocaleSettingSync -> CollectionName.CriticalBlock
+        return LocaleSetting.COLLECTION_NAME;
     }
 
     /**
@@ -117,7 +117,7 @@ public final class LocaleSettingHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebLocaleSettingSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return LocaleSetting.ACTION_VERSION; // WAWebLocaleSettingSync.getVersion -> 3
+        return LocaleSetting.ACTION_VERSION;
     }
 
     /**
@@ -139,7 +139,7 @@ public final class LocaleSettingHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebLocaleSettingSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: WAWebLocaleSettingSync.applyMutations
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -202,22 +202,18 @@ public final class LocaleSettingHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebLocaleSettingSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        // WAWebLocaleSettingSync.applyMutations: if (WAWebEnvironment.isWindows) return {actionState: Skipped}
         if (client.store().device() != null && client.store().device().platform() == ClientPlatformType.WINDOWS) {
             return MutationApplicationResult.skipped();
         }
 
-        // WAWebLocaleSettingSync.applyMutations: if (e.operation === "set") { ... } p++; return {actionState: Unsupported}
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
 
-        // WAWebLocaleSettingSync.applyMutations: var n = e.value, a = n.localeSetting; if (!a) { i++; return malformedActionValue(this.collectionName) }
         if (!(mutation.value().action().orElse(null) instanceof LocaleSetting setting)) {
             return MutationApplicationResult.malformed();
         }
 
-        // WAWebLocaleSettingSync.applyMutations: var s = a.locale; if (s == null) { l++; return {actionState: Skipped} }
         var newLocale = setting.locale().orElse(null);
         if (newLocale == null) {
             return MutationApplicationResult.skipped();
@@ -237,7 +233,6 @@ public final class LocaleSettingHandler implements WebAppStateActionHandler {
         // NO_WA_BASIS: the following WA Web telemetry is intentionally dropped:
         //   - i/l/p counters and the trailing WALogger.LOG/WARN calls
         //   - the bounded "_.push(s)" tracker (unused even on WA Web)
-        // WAWebLocaleSettingSync.applyMutations: return {actionState: Success}
         return MutationApplicationResult.success();
     }
 
@@ -282,6 +277,6 @@ public final class LocaleSettingHandler implements WebAppStateActionHandler {
                 timestamp,
                 version() // ADAPTED: WAWebSyncdActionUtils.buildPendingMutation: version: this.getVersion()
         );
-        return new SyncPendingMutation(pending, 0); // ADAPTED: WAWebSyncdActionUtils.buildPendingMutation
+        return new SyncPendingMutation(pending, 0);
     }
 }

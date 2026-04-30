@@ -18,11 +18,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The response variant of {@link FetchNewsletterPendingInvitesMexResponse} that exposes the data
- * returned by the server after a successful query.
- *
- * @implNote WAWebMexFetchNewsletterPendingInvitesJob: adapts the JSON root returned by the GraphQL
- * query into a Java value object.
+ * Response variant for {@link FetchNewsletterPendingInvitesMexRequest} carrying the parsed server reply.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexFetchNewsletterPendingInvitesJob")
 public final class FetchNewsletterPendingInvitesMexResponse implements MexOperation.Response.Json {
@@ -37,9 +33,6 @@ public final class FetchNewsletterPendingInvitesMexResponse implements MexOperat
     /**
      * Parses a MEX response from the given IQ response node.
      *
-     * @implNote WAWebMexFetchNewsletterPendingInvitesJob.mexFetchNewsletterPendingInvites: WA Web relies on the
-     * GraphQL client to unwrap the response. Cobalt performs the
-     * unwrapping manually from the IQ {@code <result>} child.
      * @param node the IQ response node received from the relay
      * @return an {@link Optional} containing the parsed response, or
      *         empty if the node is missing a result payload
@@ -81,7 +74,7 @@ public final class FetchNewsletterPendingInvitesMexResponse implements MexOperat
         /**
          * Returns the {@code user} field.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
          */
         public Optional<User> user() {
             return Optional.ofNullable(user);
@@ -102,7 +95,7 @@ public final class FetchNewsletterPendingInvitesMexResponse implements MexOperat
             /**
              * Returns the {@code pn} field.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
              */
             public Optional<String> pn() {
                 return Optional.ofNullable(pn);
@@ -111,7 +104,7 @@ public final class FetchNewsletterPendingInvitesMexResponse implements MexOperat
             /**
              * Returns the {@code id} field.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
              */
             public Optional<String> id() {
                 return Optional.ofNullable(id);
@@ -120,7 +113,7 @@ public final class FetchNewsletterPendingInvitesMexResponse implements MexOperat
             /**
              * Parses a {@code User} from the given JSON object.
              *
-             * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
              * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
              */
             static Optional<User> of(JSONObject obj) {
@@ -136,7 +129,7 @@ public final class FetchNewsletterPendingInvitesMexResponse implements MexOperat
             /**
              * Parses a list of {@code User} from the given JSON array.
              *
-             * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
              * @return the list of parsed results, empty if {@code arr} is {@code null}
              */
             static List<User> ofArray(JSONArray arr) {
@@ -155,7 +148,7 @@ public final class FetchNewsletterPendingInvitesMexResponse implements MexOperat
         /**
          * Parses a {@code PendingAdminInvites} from the given JSON object.
          *
-         * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
          * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
          */
         static Optional<PendingAdminInvites> of(JSONObject obj) {
@@ -170,7 +163,7 @@ public final class FetchNewsletterPendingInvitesMexResponse implements MexOperat
         /**
          * Parses a list of {@code PendingAdminInvites} from the given JSON array.
          *
-         * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
          * @return the list of parsed results, empty if {@code arr} is {@code null}
          */
         static List<PendingAdminInvites> ofArray(JSONArray arr) {
@@ -190,30 +183,21 @@ public final class FetchNewsletterPendingInvitesMexResponse implements MexOperat
      * Parses a {@link FetchNewsletterPendingInvitesMexResponse} from the raw JSON bytes of the
      * {@code <result>} child.
      *
-     * @implNote WAWebMexFetchNewsletterPendingInvitesJob.mexFetchNewsletterPendingInvites: mirrors the implicit
-     * unwrapping that WA Web performs on the GraphQL response,
-     * extracting the {@code xwa2_newsletter_admin} root.
      * @param json the UTF-8 encoded JSON payload
      * @return an {@link Optional} containing the parsed response, or
      *         empty if the envelope is missing expected fields
      */
     private static Optional<FetchNewsletterPendingInvitesMexResponse> of(byte[] json) {
-        // WAWebMexFetchNewsletterPendingInvitesJob.mexFetchNewsletterPendingInvites
-        // Parses the raw JSON payload, bailing out if fastjson2 returns null
         var jsonObject = JSON.parseObject(json);
         if (jsonObject == null) {
             return Optional.empty();
         }
 
-        // WAWebMexFetchNewsletterPendingInvitesJob.mexFetchNewsletterPendingInvites
-        // Descends into the standard GraphQL "data" envelope
         var data = jsonObject.getJSONObject("data");
         if (data == null) {
             return Optional.empty();
         }
 
-        // WAWebMexFetchNewsletterPendingInvitesJob.mexFetchNewsletterPendingInvites
-        // Extracts the operation-specific root keyed by xwa2_newsletter_admin
         var root = data.getJSONObject("xwa2_newsletter_admin");
         if (root == null) {
             return Optional.empty();

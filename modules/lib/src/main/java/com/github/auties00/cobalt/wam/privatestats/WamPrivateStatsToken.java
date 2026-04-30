@@ -1,15 +1,20 @@
 package com.github.auties00.cobalt.wam.privatestats;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+
 import java.util.Objects;
 
 /**
- * A successful {@code <sign_credential>} round-trip.
+ * Outcome of a successful {@code <sign_credential>} IQ round-trip,
+ * carrying the secret token nonce and the derived upload-time shared
+ * secret.
  *
  * @param token        the 32-byte secret nonce that the client kept
- * @param sharedSecret the 64-byte SHA-512 of {@code token ||
- *                     unblindedSignedToken}, used as the upload
- *                     authentication key
+ * @param sharedSecret the 64-byte SHA-512 of
+ *                     {@code token || unblindedSignedToken}, used as
+ *                     the upload authentication key
  */
+@WhatsAppWebModule(moduleName = "WAWebIssuePrivateStatsToken")
 public record WamPrivateStatsToken(byte[] token, byte[] sharedSecret) {
     /**
      * Length in bytes of the secret token nonce.
@@ -22,8 +27,17 @@ public record WamPrivateStatsToken(byte[] token, byte[] sharedSecret) {
     public static final int SHARED_SECRET_BYTES = 64;
 
     /**
-     * Defensive-copy compact constructor that prevents external
-     * mutation of the held byte arrays.
+     * Validates the lengths of {@code token} and {@code sharedSecret}
+     * and clones each array so external callers cannot mutate the
+     * stored state.
+     *
+     * @throws NullPointerException     if either argument is
+     *                                  {@code null}
+     * @throws IllegalArgumentException if {@code token} is not
+     *                                  {@value #TOKEN_BYTES} bytes or
+     *                                  {@code sharedSecret} is not
+     *                                  {@value #SHARED_SECRET_BYTES}
+     *                                  bytes
      */
     public WamPrivateStatsToken {
         Objects.requireNonNull(token, "token must not be null");

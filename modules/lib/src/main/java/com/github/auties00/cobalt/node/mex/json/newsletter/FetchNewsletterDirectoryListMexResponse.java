@@ -20,11 +20,7 @@ import java.util.Optional;
 import java.util.OptionalLong;
 
 /**
- * The response variant of {@link FetchNewsletterDirectoryListMexResponse} that exposes the data
- * returned by the server after a successful query.
- *
- * @implNote WAWebMexFetchNewsletterDirectoryListJob: adapts the JSON root returned by the GraphQL
- * query into a Java value object.
+ * Response variant for {@link FetchNewsletterDirectoryListMexRequest} carrying the parsed server reply.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexFetchNewsletterDirectoryListJob")
 public final class FetchNewsletterDirectoryListMexResponse implements MexOperation.Response.Json {
@@ -39,9 +35,6 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
     /**
      * Parses a MEX response from the given IQ response node.
      *
-     * @implNote WAWebMexFetchNewsletterDirectoryListJob.mexFetchNewsletterDirectoryList: WA Web relies on the
-     * GraphQL client to unwrap the response. Cobalt performs the
-     * unwrapping manually from the IQ {@code <result>} child.
      * @param node the IQ response node received from the relay
      * @return an {@link Optional} containing the parsed response, or
      *         empty if the node is missing a result payload
@@ -89,7 +82,7 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
         /**
          * Returns the {@code hasNextPage} field.
          *
-         * @return {@code true} if the value is present and true, {@code false} otherwise
+     * @return {@code true} if the value is present and true, {@code false} otherwise
          */
         public boolean hasNextPage() {
             return hasNextPage != null && hasNextPage;
@@ -98,7 +91,7 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
         /**
          * Returns the {@code hasPreviousPage} field.
          *
-         * @return {@code true} if the value is present and true, {@code false} otherwise
+     * @return {@code true} if the value is present and true, {@code false} otherwise
          */
         public boolean hasPreviousPage() {
             return hasPreviousPage != null && hasPreviousPage;
@@ -107,7 +100,7 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
         /**
          * Returns the {@code startCursor} field.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
          */
         public Optional<String> startCursor() {
             return Optional.ofNullable(startCursor);
@@ -116,7 +109,7 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
         /**
          * Returns the {@code endCursor} field.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
          */
         public Optional<String> endCursor() {
             return Optional.ofNullable(endCursor);
@@ -125,7 +118,7 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
         /**
          * Parses a {@code PageInfo} from the given JSON object.
          *
-         * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
          * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
          */
         static Optional<PageInfo> of(JSONObject obj) {
@@ -143,7 +136,7 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
         /**
          * Parses a list of {@code PageInfo} from the given JSON array.
          *
-         * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
          * @return the list of parsed results, empty if {@code arr} is {@code null}
          */
         static List<PageInfo> ofArray(JSONArray arr) {
@@ -174,7 +167,7 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
         /**
          * Returns the {@code id} field.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
          */
         public Optional<String> id() {
             return Optional.ofNullable(id);
@@ -183,7 +176,7 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
         /**
          * Returns the {@code thread_metadata} field.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
          */
         public Optional<ThreadMetadata> threadMetadata() {
             return Optional.ofNullable(threadMetadata);
@@ -216,7 +209,7 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
             /**
              * Returns the {@code creation_time} field.
              *
-             * @return an {@link Optional} containing the value as an {@link Instant}, or empty if absent
+     * @return an {@link Optional} containing the value as an {@link Instant}, or empty if absent
              */
             public Optional<Instant> creationTime() {
                 return Optional.ofNullable(creationTime).map(Instant::ofEpochSecond);
@@ -225,7 +218,7 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
             /**
              * Returns the {@code invite} field.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
              */
             public Optional<String> invite() {
                 return Optional.ofNullable(invite);
@@ -234,7 +227,7 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
             /**
              * Returns the {@code handle} field.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
              */
             public Optional<String> handle() {
                 return Optional.ofNullable(handle);
@@ -243,7 +236,7 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
             /**
              * Returns the {@code subscribers_count} field.
              *
-             * @return an {@link OptionalLong} containing the value, or empty if absent
+     * @return an {@link OptionalLong} containing the value, or empty if absent
              */
             public OptionalLong subscribersCount() {
                 return subscribersCount != null ? OptionalLong.of(subscribersCount) : OptionalLong.empty();
@@ -252,7 +245,7 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
             /**
              * Returns the {@code name} field.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
              */
             public Optional<Name> name() {
                 return Optional.ofNullable(name);
@@ -261,7 +254,7 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
             /**
              * Returns the {@code description} field.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
              */
             public Optional<Description> description() {
                 return Optional.ofNullable(description);
@@ -270,7 +263,7 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
             /**
              * Returns the {@code picture} field.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
              */
             public Optional<Picture> picture() {
                 return Optional.ofNullable(picture);
@@ -279,7 +272,7 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
             /**
              * Returns the {@code verification} field.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
              */
             public Optional<String> verification() {
                 return Optional.ofNullable(verification);
@@ -302,7 +295,7 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
                 /**
                  * Returns the {@code id} field.
                  *
-                 * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
                  */
                 public Optional<String> id() {
                     return Optional.ofNullable(id);
@@ -311,7 +304,7 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
                 /**
                  * Returns the {@code text} field.
                  *
-                 * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
                  */
                 public Optional<String> text() {
                     return Optional.ofNullable(text);
@@ -320,7 +313,7 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
                 /**
                  * Returns the {@code update_time} field.
                  *
-                 * @return an {@link Optional} containing the value as an {@link Instant}, or empty if absent
+     * @return an {@link Optional} containing the value as an {@link Instant}, or empty if absent
                  */
                 public Optional<Instant> updateTime() {
                     return Optional.ofNullable(updateTime).map(Instant::ofEpochSecond);
@@ -329,7 +322,7 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
                 /**
                  * Parses a {@code Name} from the given JSON object.
                  *
-                 * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
                  * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
                  */
                 static Optional<Name> of(JSONObject obj) {
@@ -346,7 +339,7 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
                 /**
                  * Parses a list of {@code Name} from the given JSON array.
                  *
-                 * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
                  * @return the list of parsed results, empty if {@code arr} is {@code null}
                  */
                 static List<Name> ofArray(JSONArray arr) {
@@ -379,7 +372,7 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
                 /**
                  * Returns the {@code id} field.
                  *
-                 * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
                  */
                 public Optional<String> id() {
                     return Optional.ofNullable(id);
@@ -388,7 +381,7 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
                 /**
                  * Returns the {@code text} field.
                  *
-                 * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
                  */
                 public Optional<String> text() {
                     return Optional.ofNullable(text);
@@ -397,7 +390,7 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
                 /**
                  * Returns the {@code update_time} field.
                  *
-                 * @return an {@link Optional} containing the value as an {@link Instant}, or empty if absent
+     * @return an {@link Optional} containing the value as an {@link Instant}, or empty if absent
                  */
                 public Optional<Instant> updateTime() {
                     return Optional.ofNullable(updateTime).map(Instant::ofEpochSecond);
@@ -406,7 +399,7 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
                 /**
                  * Parses a {@code Description} from the given JSON object.
                  *
-                 * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
                  * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
                  */
                 static Optional<Description> of(JSONObject obj) {
@@ -423,7 +416,7 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
                 /**
                  * Parses a list of {@code Description} from the given JSON array.
                  *
-                 * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
                  * @return the list of parsed results, empty if {@code arr} is {@code null}
                  */
                 static List<Description> ofArray(JSONArray arr) {
@@ -456,7 +449,7 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
                 /**
                  * Returns the {@code id} field.
                  *
-                 * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
                  */
                 public Optional<String> id() {
                     return Optional.ofNullable(id);
@@ -465,7 +458,7 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
                 /**
                  * Returns the {@code direct_path} field.
                  *
-                 * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
                  */
                 public Optional<String> directPath() {
                     return Optional.ofNullable(directPath);
@@ -474,7 +467,7 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
                 /**
                  * Returns the {@code type} field.
                  *
-                 * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
                  */
                 public Optional<String> type() {
                     return Optional.ofNullable(type);
@@ -483,7 +476,7 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
                 /**
                  * Parses a {@code Picture} from the given JSON object.
                  *
-                 * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
                  * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
                  */
                 static Optional<Picture> of(JSONObject obj) {
@@ -500,7 +493,7 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
                 /**
                  * Parses a list of {@code Picture} from the given JSON array.
                  *
-                 * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
                  * @return the list of parsed results, empty if {@code arr} is {@code null}
                  */
                 static List<Picture> ofArray(JSONArray arr) {
@@ -519,7 +512,7 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
             /**
              * Parses a {@code ThreadMetadata} from the given JSON object.
              *
-             * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
              * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
              */
             static Optional<ThreadMetadata> of(JSONObject obj) {
@@ -541,7 +534,7 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
             /**
              * Parses a list of {@code ThreadMetadata} from the given JSON array.
              *
-             * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
              * @return the list of parsed results, empty if {@code arr} is {@code null}
              */
             static List<ThreadMetadata> ofArray(JSONArray arr) {
@@ -560,7 +553,7 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
         /**
          * Parses a {@code Result} from the given JSON object.
          *
-         * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
          * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
          */
         static Optional<Result> of(JSONObject obj) {
@@ -576,7 +569,7 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
         /**
          * Parses a list of {@code Result} from the given JSON array.
          *
-         * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
          * @return the list of parsed results, empty if {@code arr} is {@code null}
          */
         static List<Result> ofArray(JSONArray arr) {
@@ -596,30 +589,21 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
      * Parses a {@link FetchNewsletterDirectoryListMexResponse} from the raw JSON bytes of the
      * {@code <result>} child.
      *
-     * @implNote WAWebMexFetchNewsletterDirectoryListJob.mexFetchNewsletterDirectoryList: mirrors the implicit
-     * unwrapping that WA Web performs on the GraphQL response,
-     * extracting the {@code xwa2_newsletters_directory_list} root.
      * @param json the UTF-8 encoded JSON payload
      * @return an {@link Optional} containing the parsed response, or
      *         empty if the envelope is missing expected fields
      */
     private static Optional<FetchNewsletterDirectoryListMexResponse> of(byte[] json) {
-        // WAWebMexFetchNewsletterDirectoryListJob.mexFetchNewsletterDirectoryList
-        // Parses the raw JSON payload, bailing out if fastjson2 returns null
         var jsonObject = JSON.parseObject(json);
         if (jsonObject == null) {
             return Optional.empty();
         }
 
-        // WAWebMexFetchNewsletterDirectoryListJob.mexFetchNewsletterDirectoryList
-        // Descends into the standard GraphQL "data" envelope
         var data = jsonObject.getJSONObject("data");
         if (data == null) {
             return Optional.empty();
         }
 
-        // WAWebMexFetchNewsletterDirectoryListJob.mexFetchNewsletterDirectoryList
-        // Extracts the operation-specific root keyed by xwa2_newsletters_directory_list
         var root = data.getJSONObject("xwa2_newsletters_directory_list");
         if (root == null) {
             return Optional.empty();

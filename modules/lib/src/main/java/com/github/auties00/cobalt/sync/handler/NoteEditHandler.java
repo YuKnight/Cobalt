@@ -62,7 +62,7 @@ public final class NoteEditHandler implements WebAppStateActionHandler {
      *
      * @implNote ADAPTED: WAWebNoteSync uses WALogger.WARN; Cobalt uses java.util.logging
      */
-    private static final Logger LOGGER = Logger.getLogger(NoteEditHandler.class.getName()); // ADAPTED: WAWebNoteSync — WALogger
+    private static final Logger LOGGER = Logger.getLogger(NoteEditHandler.class.getName());
 
     /**
      * Singleton instance of this handler.
@@ -94,7 +94,7 @@ public final class NoteEditHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebNoteSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return NoteEditAction.ACTION_NAME; // WAWebNoteSync.getAction
+        return NoteEditAction.ACTION_NAME;
     }
 
     /**
@@ -107,7 +107,7 @@ public final class NoteEditHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebNoteSync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return NoteEditAction.COLLECTION_NAME; // WAWebNoteSync constructor: collectionName = RegularLow
+        return NoteEditAction.COLLECTION_NAME;
     }
 
     /**
@@ -119,7 +119,7 @@ public final class NoteEditHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebNoteSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return NoteEditAction.ACTION_VERSION; // WAWebNoteSync.getVersion
+        return NoteEditAction.ACTION_VERSION;
     }
 
     /**
@@ -136,7 +136,7 @@ public final class NoteEditHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebNoteSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebNoteSync.applyMutations
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -171,85 +171,70 @@ public final class NoteEditHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebNoteSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        try { // WAWebNoteSync.applyMutations: try { ... } catch(e) { return {actionState: Failed} }
-            // WAWebNoteSync.applyMutations: if (e.operation !== "set") return a++, {actionState: Unsupported}
+        try {
             if (mutation.operation() != SyncdOperation.SET) {
                 return MutationApplicationResult.unsupported();
             }
 
-            // WAWebNoteSync.applyMutations: var t = e.indexParts, n = e.value, s = t[1]
             var indexArray = JSON.parseArray(mutation.index());
             if (indexArray.size() < 2) {
-                return malformedActionIndex(); // WAWebNoteSync.applyMutations: if (!s) return r.malformedActionIndex()
+                return malformedActionIndex();
             }
-            var noteId = indexArray.getString(1); // WAWebNoteSync.applyMutations: var s = t[1]
+            var noteId = indexArray.getString(1);
             if (noteId == null || noteId.isEmpty()) {
-                return malformedActionIndex(); // WAWebNoteSync.applyMutations: if (!s) return r.malformedActionIndex()
+                return malformedActionIndex();
             }
 
-            // WAWebNoteSync.applyMutations: var u = n.noteEditAction; if (!u) return i++, malformedActionValue(collectionName)
             if (!(mutation.value().action().orElse(null) instanceof NoteEditAction action)) {
                 return malformedActionValue();
             }
 
             var states = new HashMap<>(client.store().noteStates());
 
-            // WAWebNoteSync.applyMutations: if (u.deleted === true) {
             //     yield getNoteTable().remove(s); v.push(s); return {actionState: Success}
             // }
             if (action.deleted()) {
-                states.remove(noteId); // WAWebNoteSync.applyMutations: getNoteTable().remove(s)
+                states.remove(noteId);
                 client.store().setNoteStates(states);
-                return MutationApplicationResult.success(); // WAWebNoteSync.applyMutations: {actionState: Success}
+                return MutationApplicationResult.success();
             }
 
-            // WAWebNoteSync.applyMutations: var c = u.chatJid, d = u.createdAt, m = u.type, p = u.unstructuredContent
-            var type = action.type().orElse(null); // WAWebNoteSync.applyMutations: m = u.type
-            var rawChatJid = action.chatJid().orElse(null); // WAWebNoteSync.applyMutations: c = u.chatJid
-            var content = action.unstructuredContent().orElse(null); // WAWebNoteSync.applyMutations: p = u.unstructuredContent
-            var createdAtOpt = action.createdAt(); // WAWebNoteSync.applyMutations: d = u.createdAt
+            var type = action.type().orElse(null);
+            var rawChatJid = action.chatJid().orElse(null);
+            var content = action.unstructuredContent().orElse(null);
+            var createdAtOpt = action.createdAt();
 
-            // WAWebNoteSync.applyMutations: if (m == null) return l++, malformedActionValue(collectionName)
             if (type == null) {
                 return malformedActionValue();
             }
-            // WAWebNoteSync.applyMutations: if (c == null) return g++, malformedActionValue(collectionName)
             if (rawChatJid == null) {
                 return malformedActionValue();
             }
-            // WAWebNoteSync.applyMutations: var _ = validateChatJid(c); if (_ == null) return h++, malformedActionValue(collectionName)
             // ADAPTED: WAWebNoteSync.applyMutations — validateChatJid(c); Cobalt uses Jid.of which is more lenient than validateChatJid
             var validatedChatJid = rawChatJid;
 
-            // WAWebNoteSync.applyMutations: d == null && y++ (counter only, not a failure)
             if (createdAtOpt.isEmpty()) {
-                LOGGER.warning("noteEditAction.createdAt is empty"); // WAWebNoteSync.applyMutations: WALogger.WARN("noteEditAction.createdAt is empty for %d mutations", y)
+                LOGGER.warning("noteEditAction.createdAt is empty");
             }
-            // WAWebNoteSync.applyMutations:
             //   var f = maybeNumber(d); d != null && f == null && C++
             // ADAPTED: WAWebNoteSync.applyMutations — WALongInt.maybeNumber converts BigInt-safe numbers;
             // Cobalt's Long is already 64-bit so no conversion / safe-int check is needed.
-            // WAWebNoteSync.applyMutations: p == null && b++ (counter only, not a failure)
             if (content == null) {
-                LOGGER.warning("noteEditAction.unstructuredContent is empty"); // WAWebNoteSync.applyMutations: WALogger.WARN("noteEditAction.unstructuredContent is empty for %d mutations", b)
+                LOGGER.warning("noteEditAction.unstructuredContent is empty");
             }
 
-            // WAWebNoteSync.applyMutations: var R = yield resolveChatForMutationIndex(createWid(c))
             // if (!R.success) return {actionState: Orphan, orphanModel: R.orphanModel}
             // ADAPTED: WAWebNoteSync.applyMutations — Cobalt uses findChatByJid
             var chat = client.store().findChatByJid(validatedChatJid);
             if (chat.isEmpty()) {
-                return MutationApplicationResult.orphan(validatedChatJid.toString(), "Chat"); // WAWebNoteSync.applyMutations: {actionState: Orphan, orphanModel: R.orphanModel}
+                return MutationApplicationResult.orphan(validatedChatJid.toString(), "Chat");
             }
 
-            // WAWebNoteSync.applyMutations: var L = widToChatJid(createWid(R.chat.id))
             // ADAPTED: Cobalt's Chat.jid() already returns the canonical chat JID
             var resolvedChatJid = chat.get().jid();
 
-            // WAWebNoteSync.applyMutations: var E = yield r.resolveNoteId(_, L, s)
             var resolvedNoteId = resolveNoteId(validatedChatJid, resolvedChatJid, noteId);
 
-            // WAWebNoteSync.applyMutations: var k = {
             //     id: E,
             //     type: m === UNSTRUCTURED ? "unstructured" : "structured",
             //     chatJid: L,
@@ -262,21 +247,19 @@ public final class NoteEditHandler implements WebAppStateActionHandler {
             // stores the NoteEditAction itself in the flat noteStates map keyed by the resolved
             // note id, preserving the action's type enum and createdAt in native units (ms).
             var record = new NoteEditActionBuilder()
-                    .type(type) // WAWebNoteSync.applyMutations: type: m === UNSTRUCTURED ? "unstructured" : "structured"
-                    .chatJid(resolvedChatJid) // WAWebNoteSync.applyMutations: chatJid: L
-                    .createdAt(createdAtOpt.orElse(Instant.EPOCH)) // WAWebNoteSync.applyMutations: createdAt: Math.floor((f != null ? f : 0) / 1000)
+                    .type(type)
+                    .chatJid(resolvedChatJid)
+                    .createdAt(createdAtOpt.orElse(Instant.EPOCH))
                     .deleted(false) // ADAPTED: explicit false for the non-deleted branch
-                    .unstructuredContent(content != null ? content : "") // WAWebNoteSync.applyMutations: content: p != null ? p : ""
+                    .unstructuredContent(content != null ? content : "")
                     .build();
 
-            // WAWebNoteSync.applyMutations: yield addOrEditNote(k); S.push(k)
             states.put(resolvedNoteId, record);
             client.store().setNoteStates(states);
 
-            return MutationApplicationResult.success(); // WAWebNoteSync.applyMutations: {actionState: Success}
+            return MutationApplicationResult.success();
         } catch (Exception e) {
-            // WAWebNoteSync.applyMutations: catch(e) { return {actionState: Failed} }
-            LOGGER.warning("Note edit mutation failed: " + e.getMessage()); // ADAPTED: WAWebNoteSync — log instead of silent catch
+            LOGGER.warning("Note edit mutation failed: " + e.getMessage());
             return MutationApplicationResult.failed();
         }
     }
@@ -306,11 +289,10 @@ public final class NoteEditHandler implements WebAppStateActionHandler {
      */
     @WhatsAppWebExport(moduleName = "WAWebNoteSync", exports = "resolveNoteId", adaptation = WhatsAppAdaptation.DIRECT)
     private String resolveNoteId(Jid actionChatJid, Jid resolvedChatJid, String indexNoteId) {
-        // WAWebNoteSync.resolveNoteId: return t === e ? n : generateNoteId(t)
         if (resolvedChatJid.equals(actionChatJid)) {
             return indexNoteId;
         }
-        return generateNoteId(resolvedChatJid.toString()); // WAWebNotesIdUtils.generateNoteId -> WACryptoSha256.sha256Str
+        return generateNoteId(resolvedChatJid.toString());
     }
 
     /**
@@ -366,14 +348,13 @@ public final class NoteEditHandler implements WebAppStateActionHandler {
      */
     @WhatsAppWebExport(moduleName = "WAWebNoteSync", exports = "getNoteMutation", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncPendingMutation getNoteEditMutation(String noteId, Jid chatJid, String content, boolean deleted) {
-        var timestamp = Instant.now(); // WAWebSyncdActionUtils.buildPendingMutation: timestamp: unixTime()
-        var action = new NoteEditActionBuilder() // WAWebNoteSync: {noteEditAction: {...}}
-                .type(NoteEditAction.NoteType.UNSTRUCTURED) // WAWebNoteSync.applyMutations: type: UNSTRUCTURED
-                .chatJid(chatJid) // WAWebNoteSync.applyMutations: chatJid: c
-                // WAWebNoteSync.getNoteMutation: createdAt: e.createdAt * 1e3 (wire is milliseconds)
+        var timestamp = Instant.now();
+        var action = new NoteEditActionBuilder()
+                .type(NoteEditAction.NoteType.UNSTRUCTURED)
+                .chatJid(chatJid)
                 .createdAt(timestamp)
                 .deleted(deleted) // ADAPTED: WAWebNoteSync.getNoteMutation does not set deleted; Cobalt overloads this builder for the deletion path consumed by applyMutations (u.deleted === true)
-                .unstructuredContent(content == null ? "" : content) // WAWebNoteSync.applyMutations: unstructuredContent
+                .unstructuredContent(content == null ? "" : content)
                 .build();
         var value = new SyncActionValueBuilder()
                 .timestamp(timestamp)
@@ -383,10 +364,10 @@ public final class NoteEditHandler implements WebAppStateActionHandler {
         var mutation = new DecryptedMutation.Trusted(
                 index,
                 value,
-                SyncdOperation.SET, // WAWebNoteSync: SET-only
+                SyncdOperation.SET,
                 timestamp,
-                NoteEditAction.ACTION_VERSION // WAWebNoteSync.getVersion: 7
+                NoteEditAction.ACTION_VERSION
         );
-        return new SyncPendingMutation(mutation, 0); // WAWebSyncdActionUtils.buildPendingMutation
+        return new SyncPendingMutation(mutation, 0);
     }
 }

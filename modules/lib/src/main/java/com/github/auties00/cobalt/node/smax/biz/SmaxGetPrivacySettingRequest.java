@@ -13,7 +13,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps the empty
+ * The outbound stanza variant. Wraps the empty
  * {@code <privacy/>} payload in the canonical
  * {@code <iq xmlns="w:biz" type="get" to="s.whatsapp.net">}
  * envelope.
@@ -22,7 +22,7 @@ import java.util.Optional;
 @WhatsAppWebModule(moduleName = "WASmaxOutBizSettingsBaseIQGetRequestMixin")
 public final class SmaxGetPrivacySettingRequest implements SmaxOperation.Request {
     /**
-     * Constructs a new request — no parameters.
+     * Constructs a new request. No parameters.
      */
     public SmaxGetPrivacySettingRequest() {
     }
@@ -44,11 +44,9 @@ public final class SmaxGetPrivacySettingRequest implements SmaxOperation.Request
     @WhatsAppWebExport(moduleName = "WASmaxOutBizSettingsGetPrivacySettingRequest",
             exports = "makeGetPrivacySettingRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutBizSettingsGetPrivacySettingRequest: smax("privacy", null)
         var privacyNode = new NodeBuilder()
                 .description("privacy")
                 .build();
-        // smax("iq", {xmlns: "w:biz", to: S_WHATSAPP_NET, id: generateId(), type: "get"})
         return new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "w:biz")

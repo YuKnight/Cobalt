@@ -24,7 +24,7 @@ import java.util.Optional;
 @WhatsAppWebModule(moduleName = "WASmaxOutSpamEntitySubjectMixin")
 public final class SmaxNewsletterReportRequest implements SmaxOperation.Request {
     /**
-     * The newsletter JID being reported — routed into the
+     * The newsletter JID being reported, routed into the
      * {@code <spam_list jid>} attribute.
      */
     private final Jid spamListJid;
@@ -122,22 +122,16 @@ public final class SmaxNewsletterReportRequest implements SmaxOperation.Request 
     @WhatsAppWebExport(moduleName = "WASmaxOutSpamNewsletterReportRequest",
             exports = "makeNewsletterReportRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutSpamMessageMixin: smax("message", {from, t, id, …}) — repeated 0..65
         var children = new ArrayList<Node>(messages.size());
         for (var message : messages) {
             children.add(message.toNode());
         }
-        // WASmaxOutSpamBaseReportMixin: smax("spam_list", {spam_flow})
-        // WASmaxOutSpamEntitySubjectMixin: smax("spam_list", {subject})
-        // WASmaxOutSpamNewsletterReportRequest: smax("spam_list", {jid}, REPEATED_CHILD(message))
         var spamListBuilder = new NodeBuilder()
                 .description("spam_list")
                 .attribute("jid", spamListJid)
                 .attribute("spam_flow", spamListSpamFlow)
                 .attribute("subject", spamListSubject)
                 .content(children);
-        // WASmaxOutSpamBaseIQSetRequestMixin: smax("iq", {id: generateId(), type: "set"})
-        // WASmaxOutSpamBaseReportMixin: smax("iq", {to: S_WHATSAPP_NET, xmlns: "spam"})
         return new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "spam")

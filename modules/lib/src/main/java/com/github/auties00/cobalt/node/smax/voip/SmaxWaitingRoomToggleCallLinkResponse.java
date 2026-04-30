@@ -50,9 +50,6 @@ public sealed interface SmaxWaitingRoomToggleCallLinkResponse extends SmaxOperat
      * @param request the original outbound request
      * @return {@code true} when the envelope matches; {@code false}
      *         otherwise
-     *
-     * @implNote {@code WASmaxInVoipCallAckBaseMixin.parseCallAckBaseMixin}
-     *           — see {@link SmaxLinkCreateResponse} for the rationale.
      */
     private static boolean validateAckEnvelope(Node node, Node request) {
         if (!node.hasDescription("ack")) {
@@ -76,12 +73,8 @@ public sealed interface SmaxWaitingRoomToggleCallLinkResponse extends SmaxOperat
     }
 
     /**
-     * The {@code Success} reply variant — the relay accepted the
+     * The {@code Success} reply variant. The relay accepted the
      * toggle and echoed back the link-token of the affected link.
-     *
-     * @implNote {@code WASmaxInVoipWaitingRoomToggleCallLinkResponseWaitingRoomToggleCallLinkAck.parseWaitingRoomToggleCallLinkResponseWaitingRoomToggleCallLinkAck}
-     *           parses the {@code <waiting_room_toggle link-token/>}
-     *           child of the {@code <ack>} envelope.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInVoipWaitingRoomToggleCallLinkResponseWaitingRoomToggleCallLinkAck")
     final class Success implements SmaxWaitingRoomToggleCallLinkResponse {
@@ -166,14 +159,9 @@ public sealed interface SmaxWaitingRoomToggleCallLinkResponse extends SmaxOperat
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected the
+     * The {@code ClientError} reply variant. The relay rejected the
      * toggle, typically because the caller is not the link's creator
      * or the link no longer exists.
-     *
-     * @implNote {@code WASmaxInVoipWaitingRoomToggleCallLinkResponseWaitingRoomToggleCallLinkNack.parseWaitingRoomToggleCallLinkResponseWaitingRoomToggleCallLinkNack}
-     *           extracts the bare {@code @error} attribute on the
-     *           {@code <ack>} envelope and the {@code link-token}
-     *           attribute on the inner {@code <error/>} child.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInVoipWaitingRoomToggleCallLinkResponseWaitingRoomToggleCallLinkNack")
     final class ClientError implements SmaxWaitingRoomToggleCallLinkResponse {

@@ -58,7 +58,7 @@ public final class OutContactHandler implements WebAppStateActionHandler {
      * @implNote ADAPTED: WAWebOutContactSync uses {@code WALogger}; Cobalt uses
      *           {@code java.util.logging}
      */
-    private static final Logger LOGGER = Logger.getLogger(OutContactHandler.class.getName()); // ADAPTED: WAWebOutContactSync — WALogger
+    private static final Logger LOGGER = Logger.getLogger(OutContactHandler.class.getName());
 
     /**
      * Value of the {@code out_contact_invites_enabled} AB prop that enables the
@@ -67,7 +67,7 @@ public final class OutContactHandler implements WebAppStateActionHandler {
      * @implNote WAWebOutContactInviteGating.isOutContactInviteEnabled —
      *           {@code getABPropConfigValue("out_contact_invites_enabled") === 1}
      */
-    private static final int OUT_CONTACT_INVITES_ENABLED_VALUE = 1; // WAWebOutContactInviteGating.isOutContactInviteEnabled: ... === e where e = 1
+    private static final int OUT_CONTACT_INVITES_ENABLED_VALUE = 1;
 
     /**
      * Private constructor preventing external instantiation.
@@ -90,7 +90,7 @@ public final class OutContactHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebOutContactSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return OutContactAction.ACTION_NAME; // WAWebOutContactSync.getAction
+        return OutContactAction.ACTION_NAME;
     }
 
     /**
@@ -103,7 +103,7 @@ public final class OutContactHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebOutContactSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return OutContactAction.COLLECTION_NAME; // WAWebOutContactSync.collectionName
+        return OutContactAction.COLLECTION_NAME;
     }
 
     /**
@@ -115,7 +115,7 @@ public final class OutContactHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebOutContactSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return OutContactAction.ACTION_VERSION; // WAWebOutContactSync.getVersion
+        return OutContactAction.ACTION_VERSION;
     }
 
     /**
@@ -131,7 +131,7 @@ public final class OutContactHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebOutContactSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebOutContactSync.applyMutations
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -184,91 +184,77 @@ public final class OutContactHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebOutContactSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        // WAWebOutContactSync.applyMutations: if (!o("WAWebOutContactInviteGating").isOutContactInviteEnabled())
         //     return t.map(function() { return {actionState: Unsupported} })
-        var gateValue = client.abPropsService().getInt(ABProp.OUT_CONTACT_INVITES_ENABLED); // WAWebOutContactInviteGating.isOutContactInviteEnabled: getABPropConfigValue("out_contact_invites_enabled")
-        if (gateValue != OUT_CONTACT_INVITES_ENABLED_VALUE) { // WAWebOutContactInviteGating.isOutContactInviteEnabled: ... === e (1)
-            return MutationApplicationResult.unsupported(); // WAWebOutContactSync.applyMutations: return t.map(() => ({actionState: Unsupported}))
+        var gateValue = client.abPropsService().getInt(ABProp.OUT_CONTACT_INVITES_ENABLED);
+        if (gateValue != OUT_CONTACT_INVITES_ENABLED_VALUE) {
+            return MutationApplicationResult.unsupported();
         }
 
-        var indexArray = JSON.parseArray(mutation.index()); // WAWebOutContactSync.applyMutations: var d = l.indexParts[1]
-        var userJidString = indexArray.getString(1); // WAWebOutContactSync.applyMutations: var d = l.indexParts[1]
-        if (userJidString == null) { // WAWebOutContactSync.applyMutations: if (d == null)
-            return malformedActionValue(); // WAWebOutContactSync.applyMutations: n++; i.push(WAWebSyncdIndexUtils.malformedActionValue(this.collectionName))
+        var indexArray = JSON.parseArray(mutation.index());
+        var userJidString = indexArray.getString(1);
+        if (userJidString == null) {
+            return malformedActionValue();
         }
 
         Jid userJid;
         try {
-            userJid = Jid.of(userJidString); // WAWebOutContactSync.applyMutations: var _ = o("WAJids").interpretAndValidateJid(d)
+            userJid = Jid.of(userJidString);
         } catch (Exception e) { // ADAPTED: WAWebOutContactSync.applyMutations — WAJids.interpretAndValidateJid returns {jidType: "unknown"} instead of throwing; Cobalt's Jid.of throws WhatsAppMalformedJidException on unparsable strings
             LOGGER.fine(() -> "OutContactSync: malformed JID: " + userJidString); // ADAPTED: WAWebOutContactSync.applyMutations — WALogger.ERROR("OutContactSync: JID missing expected domain: %s", d)
-            return malformedActionValue(); // WAWebOutContactSync.applyMutations: n++; i.push(malformedActionValue(...))
+            return malformedActionValue();
         }
 
-        if (!userJid.hasUserServer()) { // WAWebOutContactSync.applyMutations: if (_.jidType !== "phoneUser")
-            LOGGER.fine(() -> "OutContactSync: JID missing expected domain: " + userJidString); // WAWebOutContactSync.applyMutations: WALogger.ERROR("OutContactSync: JID missing expected domain: %s", d)
-            return malformedActionValue(); // WAWebOutContactSync.applyMutations: n++; i.push(WAWebSyncdIndexUtils.malformedActionValue(this.collectionName))
+        if (!userJid.hasUserServer()) {
+            LOGGER.fine(() -> "OutContactSync: JID missing expected domain: " + userJidString);
+            return malformedActionValue();
         }
 
         return switch (mutation.operation()) {
-            case SET -> { // WAWebOutContactSync.applyMutations: if (l.operation === "set")
-                if (!(mutation.value().action().orElse(null) instanceof OutContactAction action)) { // WAWebOutContactSync.applyMutations: var h = l.value.outContactAction; if (h == null)
-                    yield malformedActionValue(); // WAWebOutContactSync.applyMutations: n++; i.push(malformedActionValue(this.collectionName))
+            case SET -> {
+                if (!(mutation.value().action().orElse(null) instanceof OutContactAction action)) {
+                    yield malformedActionValue();
                 }
 
-                // WAWebOutContactSync.applyMutations: var y = m(h.fullName)
-                // WAWebOutContactSync m(e): return e == null || e === "" ? null : e
-                var fullName = coalesceEmpty(action.fullName().orElse(null)); // WAWebOutContactSync.m: empty string coalesced to null
-                // WAWebOutContactSync.applyMutations: var C = (g = m(h.firstName)) != null ? g : p(y)
-                // WAWebOutContactSync p(e): return e == null ? null : (var t = e.trim().split(" ")[0]; t || null)
-                var explicitFirstName = coalesceEmpty(action.firstName().orElse(null)); // WAWebOutContactSync.m
-                var firstName = explicitFirstName != null ? explicitFirstName : deriveFirstWord(fullName); // WAWebOutContactSync.applyMutations: (g = m(h.firstName)) != null ? g : p(y)
+                var fullName = coalesceEmpty(action.fullName().orElse(null));
+                var explicitFirstName = coalesceEmpty(action.firstName().orElse(null));
+                var firstName = explicitFirstName != null ? explicitFirstName : deriveFirstWord(fullName);
 
-                // WAWebOutContactSync.applyMutations: r.push({id: f, fullName: y, firstName: C})
-                // WAWebOutContactSync routes batch writes through
-                // WAWebDBOutContactDatabaseApi.putOutContactBatch into a dedicated
                 // `out-contact` IndexedDB table (see WAWebSchemaOutContact). Cobalt now
                 // owns a parallel OutContact store on AbstractWhatsAppStore, so the
                 // record is written there directly rather than mirrored onto the
                 // shared Contact collection — preserving the (id, fullName, firstName)
                 // tuple WA Web relies on when rendering the invite-by-contact flow.
-                var outContact = new OutContactBuilder() // WAWebDBOutContactDatabaseApi.putOutContactBatch — dedicated outContacts store write
+                var outContact = new OutContactBuilder()
                         .jid(userJid)
-                        .fullName(fullName) // WAWebOutContactSync.applyMutations: record.fullName = y
-                        .firstName(firstName) // WAWebOutContactSync.applyMutations: record.firstName = C
+                        .fullName(fullName)
+                        .firstName(firstName)
                         .build();
-                client.store().addOutContact(outContact); // WAWebDBOutContactDatabaseApi.putOutContactBatch — bulk upsert into the dedicated out-contact table
+                client.store().addOutContact(outContact);
 
-                // WAWebOutContactSync.applyMutations: o("WALogger").LOG("OutContactSync: set %s", d)
                 LOGGER.fine(() -> "OutContactSync: set " + userJidString); // ADAPTED: WAWebOutContactSync.applyMutations — WALogger.LOG replaced with j.u.l FINE
 
-                // WAWebOutContactSync.applyMutations: o("WAWebBackendApi").frontendFireAndForget("bulkUpsertOutContacts", {contacts: r})
                 // SKIPPED: WA Web dispatches an IPC notification to its Electron frontend so
                 // the macOS UI can refresh the invite-by-contact list. Cobalt has no such
                 // frontend bridge and the contact mutation above is sufficient to keep the
                 // in-memory store consistent.
-                yield MutationApplicationResult.success(); // WAWebOutContactSync.applyMutations: i.push({actionState: Success})
+                yield MutationApplicationResult.success();
             }
-            case REMOVE -> { // WAWebOutContactSync.applyMutations: else if (l.operation === "remove")
-                // WAWebOutContactSync.applyMutations: a.push(f)
-                // WAWebDBOutContactDatabaseApi.removeOutContactBatch — Cobalt now drops
+            case REMOVE -> {
                 // the record from the dedicated outContacts store rather than the shared
                 // Contact collection, preserving address-book entries that happen to
                 // share the same phone JID.
-                client.store().removeOutContact(userJid); // WAWebDBOutContactDatabaseApi.removeOutContactBatch — bulk removal from the dedicated out-contact table
+                client.store().removeOutContact(userJid);
 
-                // WAWebOutContactSync.applyMutations: o("WALogger").LOG("OutContactSync: remove %s", d)
                 LOGGER.fine(() -> "OutContactSync: remove " + userJidString); // ADAPTED: WAWebOutContactSync.applyMutations — WALogger.LOG replaced with j.u.l FINE
 
-                // WAWebOutContactSync.applyMutations: o("WAWebBackendApi").frontendFireAndForget("bulkRemoveOutContacts", {ids: a})
                 // SKIPPED: Electron-frontend IPC notification; no Cobalt equivalent.
-                yield MutationApplicationResult.success(); // WAWebOutContactSync.applyMutations: i.push({actionState: Success})
+                yield MutationApplicationResult.success();
             }
-            default -> { // WAWebOutContactSync.applyMutations: else { n++; i.push(malformedActionValue(...)) }
+            default -> {
                 // SyncdOperation only has SET and REMOVE today, but mirroring WA Web's
                 // catch-all branch keeps the handler structurally aligned with the batch
                 // generator.
-                yield malformedActionValue(); // WAWebOutContactSync.applyMutations: n++; i.push(malformedActionValue(this.collectionName))
+                yield malformedActionValue();
             }
         };
     }
@@ -287,10 +273,10 @@ public final class OutContactHandler implements WebAppStateActionHandler {
      *         original value unchanged
      */
     private static String coalesceEmpty(String value) {
-        if (value == null || value.isEmpty()) { // WAWebOutContactSync.m: e == null || e === ""
-            return null; // WAWebOutContactSync.m: return null
+        if (value == null || value.isEmpty()) {
+            return null;
         }
-        return value; // WAWebOutContactSync.m: return e
+        return value;
     }
 
     /**
@@ -309,12 +295,12 @@ public final class OutContactHandler implements WebAppStateActionHandler {
      *         {@code null} when the input is {@code null} or empty after trimming
      */
     private static String deriveFirstWord(String value) {
-        if (value == null) { // WAWebOutContactSync.p: if (e == null) return null
-            return null; // WAWebOutContactSync.p: return null
+        if (value == null) {
+            return null;
         }
-        var trimmed = value.trim(); // WAWebOutContactSync.p: var t = e.trim()
-        var spaceIndex = trimmed.indexOf(' '); // WAWebOutContactSync.p: .split(" ")[0] — literal ASCII space
-        var firstToken = spaceIndex == -1 ? trimmed : trimmed.substring(0, spaceIndex); // WAWebOutContactSync.p: [0]
-        return firstToken.isEmpty() ? null : firstToken; // WAWebOutContactSync.p: return t || null (empty string is falsy)
+        var trimmed = value.trim();
+        var spaceIndex = trimmed.indexOf(' ');
+        var firstToken = spaceIndex == -1 ? trimmed : trimmed.substring(0, spaceIndex);
+        return firstToken.isEmpty() ? null : firstToken;
     }
 }

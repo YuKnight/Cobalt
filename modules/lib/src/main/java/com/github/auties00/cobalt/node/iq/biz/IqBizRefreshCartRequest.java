@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.node.iq.biz;
 
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidServer;
@@ -13,8 +14,12 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant.
+ * The outbound {@code <iq xmlns="fb:thrift_iq" type="get">} stanza that
+ * refreshes a buyer-side cart against a merchant catalog. Sends the cart's
+ * line ids to the relay, which echoes back current pricing, availability
+ * and thumbnail metadata for each line.
  */
+@WhatsAppWebModule(moduleName = "WAWebBizRefreshCartJob")
 public final class IqBizRefreshCartRequest implements IqOperation.Request {
     /**
      * The merchant catalog JID being refreshed against.

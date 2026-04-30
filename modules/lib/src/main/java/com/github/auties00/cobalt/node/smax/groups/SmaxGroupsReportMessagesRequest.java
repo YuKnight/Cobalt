@@ -75,12 +75,10 @@ public final class SmaxGroupsReportMessagesRequest implements SmaxOperation.Requ
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsReportMessagesRequest",
             exports = "makeReportMessagesRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // smax("report", {message_id: STANZA_ID(t)})
         var reportNode = new NodeBuilder()
                 .description("report")
                 .attribute("message_id", reportMessageId)
                 .build();
-        // smax("reports", null, report)
         var reportsNode = new NodeBuilder()
                 .description("reports")
                 .content(reportNode)

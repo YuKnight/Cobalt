@@ -6,21 +6,22 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * An unbounded thread-safe queue of {@link ByteBuffer} instances designed
- * for multiple-producer, single-consumer (MPSC) use.
+ * Unbounded thread-safe queue of {@link ByteBuffer} instances designed
+ * for the multiple-producer single-consumer pattern that the socket
+ * stack uses for outbound writes.
  *
- * <p>This queue orders elements FIFO with respect to each individual
- * producer.  The consumer retrieves elements in the global order in
- * which producers' stores became visible.
+ * <p>Elements are FIFO with respect to each individual producer; the
+ * consumer retrieves elements in the global order in which producer
+ * stores became visible.
  *
- * <p>The {@link #offer(ByteBuffer)} method is lock-free.  The common
- * path executes a single atomic increment and a single release-store
- * with no allocation.
+ * <p>{@link #offer(ByteBuffer)} is lock-free; the common path executes
+ * a single atomic increment and one release store with no allocation.
  *
- * <p><em>Memory consistency effects:</em> actions in a producer thread
- * prior to placing a buffer into the queue <i>happen-before</i> actions
- * subsequent to the retrieval of that buffer via {@link #claim()} in
- * the consumer thread.
+ * @implNote The chunked, append-only design avoids contention by
+ *     handing each producer its own slot through an atomic
+ *     fetch-and-add on {@code Chunk.index}; the consumer never
+ *     synchronises with producers and sees writes through release and
+ *     acquire fences on the array element {@link VarHandle}.
  */
 public final class SocketClientPendingWrites {
     private static final VarHandle ELEMENT;
@@ -43,27 +44,50 @@ public final class SocketClientPendingWrites {
     }
 
     /**
-     * A fixed-size array segment in the linked chain.
+     * One fixed-size segment in the linked chain of chunks.
      */
     static final class Chunk {
+        /**
+         * Backing array for this chunk's slots; entries are populated
+         * by producers via the {@link #ELEMENT} VarHandle and cleared
+         * by the consumer in {@link #release(int)}.
+         */
         final ByteBuffer[] data;
+
+        /**
+         * Producer claim counter, incremented atomically by
+         * {@link #offer(ByteBuffer)} to reserve the next slot.
+         */
         @SuppressWarnings("unused") volatile int index;
+
+        /**
+         * Forward pointer to the next chunk, lazily allocated when
+         * {@link #index} reaches the chunk capacity.
+         */
         @SuppressWarnings("unused") volatile Chunk next;
 
+        /**
+         * Creates a chunk with capacity {@code capacity}.
+         *
+         * @param capacity the number of slots in this chunk
+         */
         Chunk(int capacity) {
             this.data = new ByteBuffer[capacity];
         }
     }
 
     /**
-     * A zero-copy view into a chunk's backing array returned by
+     * Zero-copy view into a chunk's backing array returned by
      * {@link SocketClientPendingWrites#claim()}.
      *
-     * @param array  the chunk's internal array, not a copy
+     * @param array  the chunk's internal array, shared with the queue
      * @param offset index of the first available element
      * @param count  number of available elements starting at offset
      */
     public record Claim(ByteBuffer[] array, int offset, int count) {
+        /**
+         * Sentinel claim used when the queue has nothing to deliver.
+         */
         private static final Claim EMPTY = new Claim(new ByteBuffer[0], 0, 0);
 
         /**
@@ -76,37 +100,65 @@ public final class SocketClientPendingWrites {
         }
     }
 
+    /**
+     * Number of slots per chunk, fixed at construction time.
+     */
     private final int chunkCapacity;
+
+    /**
+     * Backpressure threshold; {@link #offer(ByteBuffer)} returns
+     * {@code false} once the queue holds this many unreleased buffers.
+     */
     private final int maxPending;
+
+    /**
+     * Counter of buffers currently in flight, used to enforce
+     * {@link #maxPending}.
+     */
     private final AtomicInteger pendingCount;
 
+    /**
+     * Tail chunk, where producers reserve slots; updated atomically
+     * via {@link #PRODUCER_CHUNK} when a chunk fills up.
+     */
     @SuppressWarnings({"unused", "FieldMayBeFinal"})
     private volatile Chunk producerChunk;
 
+    /**
+     * Head chunk, owned by the consumer thread.
+     */
     private Chunk consumerChunk;
+
+    /**
+     * Index of the next element the consumer will read from
+     * {@link #consumerChunk}.
+     */
     private int consumerOffset;
 
     /**
-     * Creates a queue with the specified chunk capacity and a default
+     * Creates a queue with the given chunk capacity and a default
      * backpressure limit of {@code chunkCapacity * 32}.
      *
-     * @param chunkCapacity the number of elements per chunk, must be a
+     * @param chunkCapacity the number of elements per chunk; must be a
      *                      power of two
-     * @throws IllegalArgumentException if chunkCapacity is not a power of two
+     * @throws IllegalArgumentException if {@code chunkCapacity} is not
+     *         a power of two
      */
     public SocketClientPendingWrites(int chunkCapacity) {
         this(chunkCapacity, chunkCapacity * 32);
     }
 
     /**
-     * Creates a queue with the specified chunk capacity and backpressure
+     * Creates a queue with the given chunk capacity and backpressure
      * limit.
      *
-     * @param chunkCapacity the number of elements per chunk, must be a
+     * @param chunkCapacity the number of elements per chunk; must be a
      *                      power of two
-     * @param maxPending    the maximum number of pending buffers before
-     *                      {@link #offer(ByteBuffer)} returns {@code false}
-     * @throws IllegalArgumentException if chunkCapacity is not a power of two
+     * @param maxPending    the maximum number of pending buffers
+     *                      before {@link #offer(ByteBuffer)} returns
+     *                      {@code false}
+     * @throws IllegalArgumentException if {@code chunkCapacity} is not
+     *         a power of two
      */
     public SocketClientPendingWrites(int chunkCapacity, int maxPending) {
         if (Integer.bitCount(chunkCapacity) != 1) {
@@ -121,15 +173,15 @@ public final class SocketClientPendingWrites {
     }
 
     /**
-     * Inserts the specified buffer at the tail of this queue.
+     * Inserts {@code buffer} at the tail of this queue.
      *
-     * <p>If the number of pending (not yet released) buffers would
-     * exceed the configured maximum, the buffer is rejected and this
-     * method returns {@code false}.
+     * <p>Returns {@code false} when accepting the buffer would push
+     * the number of unreleased entries above {@link #maxPending},
+     * giving the caller a chance to apply backpressure.
      *
-     * @param buffer the buffer to insert
-     * @return {@code true} if the buffer was enqueued, {@code false} if
-     *         the queue is at capacity
+     * @param buffer the buffer to enqueue
+     * @return {@code true} if the buffer was enqueued, {@code false}
+     *         if the queue is at capacity
      */
     public boolean offer(ByteBuffer buffer) {
         var current = pendingCount.get();
@@ -162,10 +214,11 @@ public final class SocketClientPendingWrites {
     }
 
     /**
-     * Returns {@code true} if this queue contains no elements available
-     * for consumption.
+     * Returns whether this queue currently has no elements available
+     * to the consumer.
      *
-     * @return {@code true} if no elements are currently available
+     * @return {@code true} if the queue is empty from the consumer's
+     *         point of view
      */
     public boolean isEmpty() {
         var chunk = consumerChunk;
@@ -174,7 +227,13 @@ public final class SocketClientPendingWrites {
     }
 
     /**
-     * Claims a contiguous slice of the current chunk's backing array.
+     * Claims a contiguous slice of the current chunk's backing array
+     * for the consumer to drain.
+     *
+     * <p>The returned view shares the queue's backing storage; the
+     * consumer must call {@link #release(int)} once it has finished
+     * consuming, so the entries can be cleared and the
+     * {@link #pendingCount} accounting updated.
      *
      * @return a zero-copy view into the current chunk
      */
@@ -203,8 +262,13 @@ public final class SocketClientPendingWrites {
     }
 
     /**
-     * Releases consumed elements from the head of the last claimed
-     * region.
+     * Releases the first {@code consumed} elements of the most
+     * recently claimed region.
+     *
+     * <p>Clears the entries, advances {@link #consumerOffset}, hops to
+     * the next chunk when the current one has been fully drained and
+     * decrements {@link #pendingCount} so producers blocked on
+     * backpressure can make progress.
      *
      * @param consumed the number of elements to release
      */

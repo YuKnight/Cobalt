@@ -1,5 +1,3 @@
-
-
 package com.github.auties00.cobalt.node;
 
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
@@ -11,75 +9,93 @@ import com.github.auties00.cobalt.model.jid.JidProvider;
 import java.util.*;
 
 /**
- * Fluent builder for assembling WhatsApp protocol {@link Node} instances.
+ * Fluent builder for assembling {@link Node} stanzas.
  *
- * <p>All outbound stanzas in Cobalt are built through this class: callers
- * set a tag name, attach attributes conditionally with {@code attribute()}
- * methods, then call one of the {@code content()} overloads to set the
- * payload before calling {@link #build()}. The builder picks the
- * appropriate concrete {@link Node} variant automatically based on the
- * content type.
+ * <p>Stanzas are the unit of communication with the WhatsApp server.
+ * Every outbound stanza in Cobalt is constructed through a builder by
+ * setting a tag name with {@link #description(String)}, attaching key
+ * value attributes through one of the {@code attribute} overloads, and
+ * setting the payload through one of the {@code content} overloads. A
+ * final call to {@link #build()} returns an immutable {@link Node}
+ * picked from the appropriate concrete variant based on the content type.
  *
- * <p>Attribute setters are null-safe: a {@code null} value (or a
- * {@code condition} of {@code false}) skips the attribute entirely,
- * which removes the need for per-call null checks at every call site.
+ * <p>Attribute setters are null safe. Passing a {@code null} value, or
+ * passing {@code false} for the optional {@code condition} flag, skips the
+ * attribute entirely instead of writing it as a literal {@code "null"}.
+ * This removes the need for a null check at every call site.
  *
- * @implNote WAWap.makeWapNode: equivalent to the JS factory used to
- *           construct {@code WapNode} instances with an attributes hash
- *           and a content payload. Cobalt uses a builder so optional
- *           attributes can be chained without building an intermediate
- *           map.
+ * <p>Example usage:
+ * <pre>{@code
+ * Node iq = new NodeBuilder()
+ *         .description("iq")
+ *         .attribute("id", "12345")
+ *         .attribute("to", recipient)
+ *         .attribute("type", "set")
+ *         .attribute("xmlns", "w:profile:picture")
+ *         .content(new NodeBuilder()
+ *                 .description("picture")
+ *                 .attribute("type", "image")
+ *                 .content(imageBytes)
+ *                 .build())
+ *         .build();
+ * }</pre>
+ *
+ * <p>A simple presence stanza without content:
+ * <pre>{@code
+ * Node presence = new NodeBuilder()
+ *         .description("presence")
+ *         .attribute("type", "available")
+ *         .build();
+ * }</pre>
+ *
  * @see Node
  * @see NodeAttribute
  */
 @WhatsAppWebModule(moduleName = "WAWap")
 public final class NodeBuilder {
     /**
-     * The pending tag name of the node being built.
+     * Pending tag name of the node under construction.
      */
     private String description;
 
     /**
-     * The accumulating map of attributes in insertion order.
+     * Pending attributes accumulated in insertion order.
      */
     private final SequencedMap<String, NodeAttribute> attributes;
 
     /**
-     * Pending text content, or {@code null} if not set.
+     * Pending text content, or {@code null} when not set.
      */
     private String textContent;
 
     /**
-     * Pending JID content, or {@code null} if not set.
+     * Pending JID content, or {@code null} when not set.
      */
     private JidProvider jidContent;
 
     /**
-     * Pending binary content, or {@code null} if not set.
+     * Pending binary content, or {@code null} when not set.
      */
     private byte[] bytesContent;
 
     /**
-     * Pending child-node content, or {@code null} if not set.
+     * Pending child node content, or {@code null} when not set.
      */
     private SequencedCollection<Node> childrenContent;
 
     /**
-     * Constructs a new builder with no description, no attributes, and
-     * no content.
+     * Builds a fresh builder with no description, no attributes, and no
+     * content.
      */
     public NodeBuilder() {
         this.attributes = new LinkedHashMap<>();
     }
 
     /**
-     * Sets the description (tag name) of the node.
-     * <p>
-     * The description typically represents the type or purpose of the node,
-     * similar to an XML element name.
+     * Sets the description (tag name) of the node under construction.
      *
-     * @param description the description/tag name of the node
-     * @return this builder for method chaining
+     * @param description the tag name
+     * @return this builder
      */
     public NodeBuilder description(String description) {
         this.description = description;
@@ -87,16 +103,15 @@ public final class NodeBuilder {
     }
 
     /**
-     * Adds a text attribute to the node if the value is not null.
+     * Adds a text attribute when the value is non null.
      *
-     * @implNote Implements WAWap's {@code DROP_ATTR} sentinel pattern by
-     *           skipping the attribute when {@code value} is {@code null}.
-     *           In WA Web the caller passes the {@code DROP_ATTR} sentinel
-     *           to {@code makeWapNode} which then filters it out; Cobalt's
-     *           builder turns this into a per-call null check.
-     * @param key the attribute key
-     * @param value the attribute value, or null to skip adding this attribute
-     * @return this builder for method chaining
+     * @implNote The {@code null} check mirrors WAWap's {@code DROP_ATTR}
+     *           sentinel pattern. The JS factory accepts a {@code DROP_ATTR}
+     *           placeholder which the dispatcher filters out, while the
+     *           builder folds the same intent into a per call null check.
+     * @param key   the attribute key
+     * @param value the attribute value, or {@code null} to skip
+     * @return this builder
      */
     @WhatsAppWebExport(moduleName = "WAWap", exports = "DROP_ATTR",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -108,12 +123,14 @@ public final class NodeBuilder {
     }
 
     /**
-     * Adds a text attribute to the node if the value is not null and the condition is true.
+     * Adds a text attribute when the value is non null and the condition
+     * is {@code true}.
      *
-     * @param key the attribute key
-     * @param value the attribute value, or null to skip adding this attribute
-     * @param condition the condition that must be true to add the attribute
-     * @return this builder for method chaining
+     * @param key       the attribute key
+     * @param value     the attribute value, or {@code null} to skip
+     * @param condition guard that must hold for the attribute to be
+     *                  written
+     * @return this builder
      */
     public NodeBuilder attribute(String key, String value, boolean condition) {
         if(value != null && condition) {
@@ -123,12 +140,12 @@ public final class NodeBuilder {
     }
 
     /**
-     * Adds a numeric attribute to the node if the value is not null.
-     * The number is converted to its string representation.
+     * Adds a numeric attribute when the value is non null. The number is
+     * serialised through {@link Number#toString()}.
      *
-     * @param key the attribute key
-     * @param value the numeric attribute value, or null to skip adding this attribute
-     * @return this builder for method chaining
+     * @param key   the attribute key
+     * @param value the numeric value, or {@code null} to skip
+     * @return this builder
      */
     public NodeBuilder attribute(String key, Number value) {
         if(value != null) {
@@ -138,13 +155,15 @@ public final class NodeBuilder {
     }
 
     /**
-     * Adds a numeric attribute to the node if the value is not null and the condition is true.
-     * The number is converted to its string representation.
+     * Adds a numeric attribute when the value is non null and the
+     * condition is {@code true}. The number is serialised through
+     * {@link Number#toString()}.
      *
-     * @param key the attribute key
-     * @param value the numeric attribute value, or null to skip adding this attribute
-     * @param condition the condition that must be true to add the attribute
-     * @return this builder for method chaining
+     * @param key       the attribute key
+     * @param value     the numeric value, or {@code null} to skip
+     * @param condition guard that must hold for the attribute to be
+     *                  written
+     * @return this builder
      */
     public NodeBuilder attribute(String key, Number value, boolean condition) {
         if(value != null && condition) {
@@ -154,12 +173,12 @@ public final class NodeBuilder {
     }
 
     /**
-     * Adds a boolean attribute to the node.
-     * The boolean value is converted to its string representation ("true" or "false").
+     * Adds a boolean attribute. The value is serialised as {@code "true"}
+     * or {@code "false"}.
      *
-     * @param key the attribute key
-     * @param value the boolean attribute value
-     * @return this builder for method chaining
+     * @param key   the attribute key
+     * @param value the boolean value
+     * @return this builder
      */
     public NodeBuilder attribute(String key, boolean value) {
         this.attributes.put(key, new NodeAttribute.TextAttribute(Boolean.toString(value)));
@@ -167,13 +186,14 @@ public final class NodeBuilder {
     }
 
     /**
-     * Adds a boolean attribute to the node if the condition is true.
-     * The boolean value is converted to its string representation ("true" or "false").
+     * Adds a boolean attribute when the condition is {@code true}. The
+     * value is serialised as {@code "true"} or {@code "false"}.
      *
-     * @param key the attribute key
-     * @param value the boolean attribute value
-     * @param condition the condition that must be true to add the attribute
-     * @return this builder for method chaining
+     * @param key       the attribute key
+     * @param value     the boolean value
+     * @param condition guard that must hold for the attribute to be
+     *                  written
+     * @return this builder
      */
     public NodeBuilder attribute(String key, boolean value, boolean condition) {
         if(condition) {
@@ -183,12 +203,11 @@ public final class NodeBuilder {
     }
 
     /**
-     * Adds a JID attribute to the node if the value is not null.
-     * JIDs represent WhatsApp user, group, or server identifiers.
+     * Adds a JID attribute when the value is non null.
      *
-     * @param key the attribute key
-     * @param value the JID attribute value, or null to skip adding this attribute
-     * @return this builder for method chaining
+     * @param key   the attribute key
+     * @param value the JID provider, or {@code null} to skip
+     * @return this builder
      * @see Jid
      */
     public NodeBuilder attribute(String key, JidProvider value) {
@@ -199,13 +218,14 @@ public final class NodeBuilder {
     }
 
     /**
-     * Adds a JID attribute to the node if the value is not null and the condition is true.
-     * JIDs represent WhatsApp user, group, or server identifiers.
+     * Adds a JID attribute when the value is non null and the condition is
+     * {@code true}.
      *
-     * @param key the attribute key
-     * @param value the JID attribute value, or null to skip adding this attribute
-     * @param condition the condition that must be true to add the attribute
-     * @return this builder for method chaining
+     * @param key       the attribute key
+     * @param value     the JID provider, or {@code null} to skip
+     * @param condition guard that must hold for the attribute to be
+     *                  written
+     * @return this builder
      * @see Jid
      */
     public NodeBuilder attribute(String key, JidProvider value, boolean condition) {
@@ -216,11 +236,11 @@ public final class NodeBuilder {
     }
 
     /**
-     * Adds a binary attribute to the node if the value is not null.
+     * Adds a binary attribute when the value is non null.
      *
-     * @param key the attribute key
-     * @param value the binary attribute value, or null to skip adding this attribute
-     * @return this builder for method chaining
+     * @param key   the attribute key
+     * @param value the binary value, or {@code null} to skip
+     * @return this builder
      */
     public NodeBuilder attribute(String key, byte[] value) {
         if(value != null) {
@@ -230,12 +250,14 @@ public final class NodeBuilder {
     }
 
     /**
-     * Adds a binary attribute to the node if the value is not null and the condition is true.
+     * Adds a binary attribute when the value is non null and the condition
+     * is {@code true}.
      *
-     * @param key the attribute key
-     * @param value the binary attribute value, or null to skip adding this attribute
-     * @param condition the condition that must be true to add the attribute
-     * @return this builder for method chaining
+     * @param key       the attribute key
+     * @param value     the binary value, or {@code null} to skip
+     * @param condition guard that must hold for the attribute to be
+     *                  written
+     * @return this builder
      */
     public NodeBuilder attribute(String key, byte[] value, boolean condition) {
         if(value != null && condition) {
@@ -245,11 +267,14 @@ public final class NodeBuilder {
     }
 
     /**
-     * Adds multiple attributes to the node from a map if the map is not null.
-     * All existing attributes are retained, and new attributes are added or overwrite existing ones with the same key.
+     * Copies every entry from the supplied map into the pending attribute
+     * set.
      *
-     * @param attributes the map of attributes to add, or null to skip adding any attribute
-     * @return this builder for method chaining
+     * <p>Existing attributes are preserved; entries that share a key are
+     * overwritten. A {@code null} map is skipped silently.
+     *
+     * @param attributes the entries to copy, or {@code null} to skip
+     * @return this builder
      */
     public NodeBuilder attributes(Map<String, ? extends NodeAttribute> attributes) {
         if(attributes != null) {
@@ -259,11 +284,11 @@ public final class NodeBuilder {
     }
 
     /**
-     * Sets the content of the node to a text value.
-     * This method clears any other content previously set (JID, bytes, stream, or content).
+     * Sets the node content to a text value, clearing any previously set
+     * content.
      *
-     * @param value the text content value
-     * @return this builder for method chaining
+     * @param value the textual content
+     * @return this builder
      */
     public NodeBuilder content(String value) {
         this.textContent = value;
@@ -274,11 +299,11 @@ public final class NodeBuilder {
     }
 
     /**
-     * Sets the content of the node to a numeric value converted to its string representation.
-     * This method clears any other content previously set (JID, bytes, stream, or content).
+     * Sets the node content to a numeric value, clearing any previously
+     * set content. The number is serialised through {@link Objects#toString(Object)}.
      *
-     * @param value the numeric content value
-     * @return this builder for method chaining
+     * @param value the numeric content
+     * @return this builder
      */
     public NodeBuilder content(Number value) {
         this.textContent = Objects.toString(value);
@@ -289,11 +314,12 @@ public final class NodeBuilder {
     }
 
     /**
-     * Sets the content of the node to a boolean value converted to its string representation.
-     * This method clears any other content previously set (JID, bytes, stream, or content).
+     * Sets the node content to a boolean value, clearing any previously
+     * set content. The value is serialised as {@code "true"} or
+     * {@code "false"}.
      *
-     * @param value the boolean content value
-     * @return this builder for method chaining
+     * @param value the boolean content
+     * @return this builder
      */
     public NodeBuilder content(boolean value) {
         this.textContent = Objects.toString(value);
@@ -304,11 +330,11 @@ public final class NodeBuilder {
     }
 
     /**
-     * Sets the content of the node to a JID.
-     * This method clears any other content previously set (text, bytes, stream, or content).
+     * Sets the node content to a JID, clearing any previously set
+     * content.
      *
-     * @param value the JID content value
-     * @return this builder for method chaining
+     * @param value the JID provider
+     * @return this builder
      * @see Jid
      */
     public NodeBuilder content(JidProvider value) {
@@ -318,13 +344,13 @@ public final class NodeBuilder {
         this.childrenContent = null;
         return this;
     }
-    
+
     /**
-     * Sets the content of the node to binary data as a ByteBuffer.
-     * This method clears any other content previously set (text, JID, stream, or content).
+     * Sets the node content to a binary blob, clearing any previously set
+     * content.
      *
-     * @param value the buffer content value
-     * @return this builder for method chaining
+     * @param value the binary content
+     * @return this builder
      */
     public NodeBuilder content(byte[] value) {
         this.textContent = null;
@@ -335,12 +361,15 @@ public final class NodeBuilder {
     }
 
     /**
-     * Sets the content of the node to a collection of child nodes.
-     * This method clears any other content previously set (text, JID, bytes, or stream).
-     * If a content of type content was already set, the two values will be merged into a single collection.
+     * Appends a collection of child nodes to the pending children list,
+     * clearing any non child content previously set.
      *
-     * @param nodes the collection of child nodes
-     * @return this builder for method chaining
+     * <p>The method is additive: a second call merges its argument into
+     * the children already accumulated, preserving order. {@code null}
+     * entries inside the supplied collection are skipped.
+     *
+     * @param nodes the children to append, or {@code null} to skip
+     * @return this builder
      */
     public NodeBuilder content(SequencedCollection<Node> nodes) {
         this.textContent = null;
@@ -360,12 +389,15 @@ public final class NodeBuilder {
     }
 
     /**
-     * Sets the content of the node to a varargs array of child nodes.
-     * This method clears any other content previously set (text, JID, bytes, or stream).
-     * If a content of type content was already set, the two values will be merged into a single collection.
+     * Appends a varargs sequence of child nodes to the pending children
+     * list, clearing any non child content previously set.
      *
-     * @param nodes the varargs array of child nodes
-     * @return this builder for method chaining
+     * <p>The method is additive: a second call merges its arguments into
+     * the children already accumulated, preserving order. {@code null}
+     * entries are skipped.
+     *
+     * @param nodes the children to append
+     * @return this builder
      */
     public NodeBuilder content(Node... nodes) {
         this.textContent = null;
@@ -385,28 +417,20 @@ public final class NodeBuilder {
     }
 
     /**
-     * Checks if an attribute with the specified key is present in this builder.
+     * Returns whether an attribute with the supplied key is currently set.
      *
-     * @param key the attribute key to check
-     * @return true if an attribute with the given key exists, false otherwise
+     * @param key the attribute key
+     * @return {@code true} when the attribute is present
      */
     public boolean hasAttribute(String key) {
         return attributes.containsKey(key);
     }
 
     /**
-     * Checks if any content has been set for this node.
-     * <p>
-     * This method returns true if any of the following content types have been set:
-     * <ul>
-     *   <li>Text content</li>
-     *   <li>JID content</li>
-     *   <li>ByteBuffer content</li>
-     *   <li>InputStream content</li>
-     *   <li>Children nodes</li>
-     * </ul>
+     * Returns whether any content slot has been populated.
      *
-     * @return true if any content has been set, false otherwise
+     * @return {@code true} when text, JID, binary, or child content has
+     *         been set
      */
     public boolean hasContent() {
         return textContent != null
@@ -416,20 +440,21 @@ public final class NodeBuilder {
     }
 
     /**
-     * Builds and returns the constructed Node instance.
-     * <p>
-     * The type of node returned depends on the content type that was set:
-     * <ul>
-     *   <li>{@link Node.TextNode} - if text content was set</li>
-     *   <li>{@link Node.JidNode} - if JID content was set</li>
-     *   <li>{@link Node.BytesNode} - if ByteBuffer content was set</li>
-     *   <li>{@link Node.ContainerNode} - if child nodes were set</li>
-     *   <li>{@link Node.EmptyNode} - if no content was set</li>
-     * </ul>
-     * <p>
-     * If no description was set, an empty string is used as the default.
+     * Builds and returns the constructed {@link Node}.
      *
-     * @return the constructed Node instance
+     * <p>The concrete variant is selected from the populated content slot:
+     * <ul>
+     *   <li>{@link Node.TextNode} when text content is set</li>
+     *   <li>{@link Node.JidNode} when JID content is set</li>
+     *   <li>{@link Node.BytesNode} when binary content is set</li>
+     *   <li>{@link Node.ContainerNode} when child nodes are set</li>
+     *   <li>{@link Node.EmptyNode} when no content slot is populated</li>
+     * </ul>
+     *
+     * <p>If no description was set the resulting node carries an empty
+     * tag name.
+     *
+     * @return the freshly built node
      * @see Node
      */
     @WhatsAppWebExport(moduleName = "WAWap", exports = "makeWapNode",

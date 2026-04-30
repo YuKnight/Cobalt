@@ -12,8 +12,9 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants produced by the relay in
- * response to a {@link IqClearDirtyBitsRequest}.
+ * response to an {@link IqClearDirtyBitsRequest}.
  */
+@WhatsAppWebModule(moduleName = "WAWebClearDirtyBitsJob")
 public sealed interface IqClearDirtyBitsResponse extends IqOperation.Response
         permits IqClearDirtyBitsResponse.Success, IqClearDirtyBitsResponse.ClientError, IqClearDirtyBitsResponse.ServerError {
 

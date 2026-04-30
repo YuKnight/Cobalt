@@ -12,26 +12,22 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Sealed disjunction over the v3-payments-ToS payload variants —
+ * Sealed disjunction over the v3-payments-ToS payload variants.
  * either a BR-consumer (FBPAY) shape or a UPI-consumer shape. Both
  * variants carry one or more {@code <additional_notice notice=...>}
  * children whose enum values describe the surface-specific notices
  * that must accompany the ToS acceptance.
- *
- * @implNote {@code WASmaxOutAccountSetPaymentsTOSv3BRConsumerOrSetPaymentsTOSv3UPIConsumerPaymentsTOSv3MixinGroup.mergeSetPaymentsTOSv3BRConsumerOrSetPaymentsTOSv3UPIConsumerPaymentsTOSv3MixinGroup}.
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutAccountSetPaymentsTOSv3BRConsumerOrSetPaymentsTOSv3UPIConsumerPaymentsTOSv3MixinGroup")
 public sealed interface SmaxAccountSetPaymentsTOSv3ConsumerVariant permits SmaxAccountSetPaymentsTOSv3ConsumerVariant.BrConsumer, SmaxAccountSetPaymentsTOSv3ConsumerVariant.UpiConsumer {
 
     /**
      * The BR-consumer (FBPAY) variant.
-     *
-     * @implNote {@code WASmaxOutAccountSetPaymentsTOSv3BRConsumerPaymentsTOSv3Mixin.mergeSetPaymentsTOSv3BRConsumerPaymentsTOSv3Mixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxOutAccountSetPaymentsTOSv3BRConsumerPaymentsTOSv3Mixin")
     final class BrConsumer implements SmaxAccountSetPaymentsTOSv3ConsumerVariant {
         /**
-         * The 1..10 BR-consumer notice enum literals — one of
+         * The 1..10 BR-consumer notice enum literals. One of
          * {@code "BRP2PCONSENT"}, {@code "BRPAYPRIVACYPOLICY"},
          * {@code "BRPAYTOS"}, {@code "BRPAYWATOS"}.
          */
@@ -91,13 +87,11 @@ public sealed interface SmaxAccountSetPaymentsTOSv3ConsumerVariant permits SmaxA
 
     /**
      * The UPI-consumer (Indian payments) variant.
-     *
-     * @implNote {@code WASmaxOutAccountSetPaymentsTOSv3UPIConsumerPaymentsTOSv3Mixin.mergeSetPaymentsTOSv3UPIConsumerPaymentsTOSv3Mixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxOutAccountSetPaymentsTOSv3UPIConsumerPaymentsTOSv3Mixin")
     final class UpiConsumer implements SmaxAccountSetPaymentsTOSv3ConsumerVariant {
         /**
-         * The 1..10 UPI-consumer notice enum literals — one of
+         * The 1..10 UPI-consumer notice enum literals. One of
          * {@code "PAYTOSV3"}, {@code "UPIPAYPRIVACYPOLICY"}.
          */
         private final List<String> additionalNotices;

@@ -71,7 +71,7 @@ public final class BotWelcomeRequestHandler implements WebAppStateActionHandler 
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBotWelcomeRequestSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return BotWelcomeRequestAction.ACTION_NAME; // WAWebBotWelcomeRequestSync.getAction -> WASyncdConst.Actions.BotWelcomeRequest
+        return BotWelcomeRequestAction.ACTION_NAME;
     }
 
     /**
@@ -87,7 +87,7 @@ public final class BotWelcomeRequestHandler implements WebAppStateActionHandler 
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBotWelcomeRequestSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return BotWelcomeRequestAction.COLLECTION_NAME; // WAWebBotWelcomeRequestSync.collectionName = WASyncdConst.CollectionName.RegularLow
+        return BotWelcomeRequestAction.COLLECTION_NAME;
     }
 
     /**
@@ -99,7 +99,7 @@ public final class BotWelcomeRequestHandler implements WebAppStateActionHandler 
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBotWelcomeRequestSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return BotWelcomeRequestAction.ACTION_VERSION; // WAWebBotWelcomeRequestSync.getVersion -> 2
+        return BotWelcomeRequestAction.ACTION_VERSION;
     }
 
     /**
@@ -117,7 +117,7 @@ public final class BotWelcomeRequestHandler implements WebAppStateActionHandler 
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBotWelcomeRequestSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebBotWelcomeRequestSync.applyMutations
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -146,24 +146,23 @@ public final class BotWelcomeRequestHandler implements WebAppStateActionHandler 
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBotWelcomeRequestSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        // WAWebBotWelcomeRequestSync.applyMutations: match on operation
-        if (mutation.operation() == SyncdOperation.REMOVE) { // WAWebBotWelcomeRequestSync.applyMutations: e.operation === "remove" -> i++, {actionState: Unsupported}
+        if (mutation.operation() == SyncdOperation.REMOVE) {
             return MutationApplicationResult.unsupported();
         }
 
-        if (mutation.operation() != SyncdOperation.SET) { // WAWebBotWelcomeRequestSync.applyMutations: throw Error("Match: No case...")
+        if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.failed(); // ADAPTED: WA Web throws inside try/catch, caught as Failed
         }
 
-        try { // WAWebBotWelcomeRequestSync.applyMutations: try/catch wrapping per-mutation logic
-            var indexArray = JSON.parseArray(mutation.index()); // WAWebBotWelcomeRequestSync.applyMutations: var l = t.indexParts
-            var chatJidString = indexArray.getString(1); // WAWebBotWelcomeRequestSync.applyMutations: var u = l[1]
-            if (chatJidString == null || chatJidString.isEmpty()) { // WAWebBotWelcomeRequestSync.applyMutations: if (!u) return this.malformedActionIndex()
-                return malformedActionIndex(); // WAWebBotWelcomeRequestSync.applyMutations: return r.malformedActionIndex()
+        try {
+            var indexArray = JSON.parseArray(mutation.index());
+            var chatJidString = indexArray.getString(1);
+            if (chatJidString == null || chatJidString.isEmpty()) {
+                return malformedActionIndex();
             }
 
-            if (!(mutation.value().action().orElse(null) instanceof BotWelcomeRequestAction action)) { // WAWebBotWelcomeRequestSync.applyMutations: var n = s.botWelcomeRequestAction
-                return malformedActionValue(); // WAWebBotWelcomeRequestSync.applyMutations: malformedActionValue(r.collectionName)
+            if (!(mutation.value().action().orElse(null) instanceof BotWelcomeRequestAction action)) {
+                return malformedActionValue();
             }
 
             // ADAPTED: WAWebBotWelcomeRequestSync.applyMutations: var c = n?.isSent; if (c == null) return malformedActionValue
@@ -171,25 +170,22 @@ public final class BotWelcomeRequestHandler implements WebAppStateActionHandler 
             // BotWelcomeRequestAction.isSent() coalesces null to false per project convention
             // (nullable Boolean accessors return primitive boolean). The raw Boolean field is
             // package-private and inaccessible from this package. See Issues in Context Files.
-            var chatJid = Jid.of(chatJidString); // WAWebBotWelcomeRequestSync.applyMutations: createWid(u)
-            var chat = client.store().findChatByJid(chatJid); // WAWebBotWelcomeRequestSync.applyMutations: yield resolveChatForMutationIndex(createWid(u))
-            if (chat.isEmpty()) { // WAWebBotWelcomeRequestSync.applyMutations: if (!d.success) return {actionState: Orphan, orphanModel: d.orphanModel}
-                return MutationApplicationResult.orphan(chatJidString, "Chat"); // WAWebBotWelcomeRequestSync.applyMutations: {actionState: Orphan, orphanModel: d.orphanModel}
+            var chatJid = Jid.of(chatJidString);
+            var chat = client.store().findChatByJid(chatJid);
+            if (chat.isEmpty()) {
+                return MutationApplicationResult.orphan(chatJidString, "Chat");
             }
 
-            // WAWebBotWelcomeRequestSync.applyMutations: var m = createWid(d.chat.id)
-            // WAWebBotWelcomeRequestSync.applyMutations: yield updateChatTable(m, {hasRequestedWelcomeMsg: c})
             // ADAPTED: Cobalt stores hasRequestedWelcomeMsg in a separate map rather than on the chat record
-            var resolvedJid = chat.get().toJid().toString(); // WAWebBotWelcomeRequestSync.applyMutations: createWid(d.chat.id)
+            var resolvedJid = chat.get().toJid().toString();
             var states = new HashMap<>(client.store().botWelcomeRequestStates()); // ADAPTED: Cobalt uses a separate map for bot welcome request states
-            states.put(resolvedJid, action.isSent()); // WAWebBotWelcomeRequestSync.applyMutations: {hasRequestedWelcomeMsg: c}
-            client.store().setBotWelcomeRequestStates(states); // WAWebDBUpdateChatTable.updateChatTable(m, {hasRequestedWelcomeMsg: c})
+            states.put(resolvedJid, action.isSent());
+            client.store().setBotWelcomeRequestStates(states);
 
-            // WAWebBotWelcomeRequestSync.applyMutations: frontendFireAndForget("chatCollectionUpdate", {updates: [{id: m, hasRequestedWelcomeMsg: c}]})
             // ADAPTED: Cobalt does not have frontend event dispatching; the store update is sufficient
-            return MutationApplicationResult.success(); // WAWebBotWelcomeRequestSync.applyMutations: {actionState: Success}
-        } catch (Exception e) { // WAWebBotWelcomeRequestSync.applyMutations: catch(e) { return {actionState: Failed} }
-            return MutationApplicationResult.failed(); // WAWebBotWelcomeRequestSync.applyMutations: {actionState: SyncActionState.Failed}
+            return MutationApplicationResult.success();
+        } catch (Exception e) {
+            return MutationApplicationResult.failed();
         }
     }
 
@@ -212,22 +208,22 @@ public final class BotWelcomeRequestHandler implements WebAppStateActionHandler 
      */
     @WhatsAppWebExport(moduleName = "WAWebBotWelcomeRequestSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncPendingMutation getBotWelcomeRequestSetMutation(Jid chatJid, boolean isSent) {
-        var action = new BotWelcomeRequestActionBuilder() // WAWebBotWelcomeRequestSync.getBotWelcomeRequestSetMutation: {botWelcomeRequestAction: {isSent: t}}
-                .isSent(isSent) // WAWebBotWelcomeRequestSync.getBotWelcomeRequestSetMutation: isSent: t
+        var action = new BotWelcomeRequestActionBuilder()
+                .isSent(isSent)
                 .build();
-        var timestamp = Instant.now(); // WAWebBotWelcomeRequestSync.getBotWelcomeRequestSetMutation: timestamp: unixTime()
-        var value = new SyncActionValueBuilder() // WAWebSyncdActionUtils.buildPendingMutation: encodeProtobuf(SyncActionValueSpec, {...l, timestamp: i})
-                .timestamp(timestamp) // WAWebSyncdActionUtils.buildPendingMutation: timestamp: i
-                .botWelcomeRequestAction(action) // WAWebBotWelcomeRequestSync.getBotWelcomeRequestSetMutation: {botWelcomeRequestAction: ...}
+        var timestamp = Instant.now();
+        var value = new SyncActionValueBuilder()
+                .timestamp(timestamp)
+                .botWelcomeRequestAction(action)
                 .build();
-        var index = JSON.toJSONString(List.of(actionName(), chatJid.toString())); // WAWebSyncdActionUtils.buildPendingMutation: index = JSON.stringify([action].concat(indexArgs))
-        var mutation = new DecryptedMutation.Trusted( // WAWebSyncdActionUtils.buildPendingMutation: return { collection, index, ... }
+        var index = JSON.toJSONString(List.of(actionName(), chatJid.toString()));
+        var mutation = new DecryptedMutation.Trusted(
                 index,
                 value,
-                SyncdOperation.SET, // WAWebBotWelcomeRequestSync.getBotWelcomeRequestSetMutation: operation: SyncdMutation$SyncdOperation.SET
+                SyncdOperation.SET,
                 timestamp,
                 version()
         );
-        return new SyncPendingMutation(mutation, 0); // WAWebSyncdActionUtils.buildPendingMutation
+        return new SyncPendingMutation(mutation, 0);
     }
 }

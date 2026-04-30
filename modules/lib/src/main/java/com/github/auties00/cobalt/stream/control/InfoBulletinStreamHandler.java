@@ -213,8 +213,6 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
      * Reference to the web app-state service, used to retry orphan
      * app-state mutations whenever a bulletin signals that previously
      * missing referents may now exist.
-     *
-     * @implNote WAWebSyncdOrphan.applyAllOrphansAndUnsupported
      */
     private final WebAppStateService webAppStateService;
 
@@ -294,67 +292,57 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public void handle(Node node) {
         try {
-            // WAWebHandleInfoBulletin.default parser: e.hasChild(INFO_TYPE.DIRTY)
             if (node.hasChild(INFO_TYPE_DIRTY)) {
                 handleDirty(node);
                 return;
             }
 
-            // WAWebHandleInfoBulletin.default parser: else if e.hasChild(INFO_TYPE.ROUTING)
             var routing = node.getChild(INFO_TYPE_ROUTING);
             if (routing.isPresent()) {
                 handleRouting(routing.get());
                 return;
             }
 
-            // WAWebHandleInfoBulletin.default parser: if e.hasChild(INFO_TYPE.OFFLINE)
             var offline = node.getChild(INFO_TYPE_OFFLINE);
             if (offline.isPresent()) {
                 handleOffline(offline.get());
                 return;
             }
 
-            // WAWebHandleInfoBulletin.default parser: if e.hasChild(INFO_TYPE.OFFLINE_PRIORITY_COMPLETE)
             if (node.hasChild(INFO_TYPE_OFFLINE_PRIORITY_COMPLETE)) {
                 handleOfflinePriorityComplete();
                 return;
             }
 
-            // WAWebHandleInfoBulletin.default parser: if e.hasChild(INFO_TYPE.OFFLINE_PREVIEW)
             var preview = node.getChild(INFO_TYPE_OFFLINE_PREVIEW);
             if (preview.isPresent()) {
                 handleOfflinePreview(preview.get());
                 return;
             }
 
-            // WAWebHandleInfoBulletin.default parser: else if e.hasChild(INFO_TYPE.TOS)
             var tos = node.getChild(INFO_TYPE_TOS);
             if (tos.isPresent()) {
                 handleTos(tos.get());
                 return;
             }
 
-            // WAWebHandleInfoBulletin.default parser: if e.hasChild(INFO_TYPE.THREAD_META)
             var threadMeta = node.getChild(INFO_TYPE_THREAD_META);
             if (threadMeta.isPresent()) {
                 handleThreadMeta(threadMeta.get());
                 return;
             }
 
-            // WAWebHandleInfoBulletin.default parser: if e.hasChild(INFO_TYPE.CLIENT_EXPIRATION)
             var expiration = node.getChild(INFO_TYPE_CLIENT_EXPIRATION);
             if (expiration.isPresent()) {
                 handleClientExpiration(expiration.get());
                 return;
             }
 
-            // WAWebHandleInfoBulletin.default dispatch: WARN "handleInfoBulletin unrecognized info bulletin"
             LOGGER.log(System.Logger.Level.WARNING,
                     "handleInfoBulletin unrecognized info bulletin {0}",
                     node.getAttributeAsString("id", "[missing-id]"));
         } catch (Throwable throwable) {
-            // ADAPTED: WAWebHandleInfoBulletin.default throws parse errors out to the caller;
-            // Cobalt catches so that one malformed ib cannot poison the stream reader.
+            // Cobalt catches parse failures here so that one malformed ib cannot poison the stream reader.
             LOGGER.log(System.Logger.Level.WARNING,
                     "Failed to handle info bulletin {0}: {1}",
                     node.getAttributeAsString("id", "[missing-id]"),
@@ -393,48 +381,42 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
     @WhatsAppWebExport(moduleName = "WAWebHandleDirtyBits", exports = "handleDirtyBits",
             adaptation = WhatsAppAdaptation.ADAPTED)
     private void handleDirty(Node node) {
-        var collectionsToSync = new LinkedHashSet<SyncPatchType>(); // ADAPTED: WA Web schedules WAWebSyncd.markCollectionsForSync(...); Cobalt aggregates into a single pullWebAppState call
-        var allDirtyEntries = new ArrayList<Node>(); // WAWebHandleDirtyBits.handleDirtyBits: var d = [].concat(a, r)
-        var supportedTypes = new ArrayList<String>(); // WAWebHandleDirtyBits.handleDirtyBits: i = r.map(e => e.type).join(",")
-        var unsupportedTypes = new ArrayList<String>(); // WAWebHandleDirtyBits.handleDirtyBits: l = a.map(e => e.type).join(",")
+        // Cobalt aggregates the dirty syncd_app_state collections into a single pullWebAppState call.
+        var collectionsToSync = new LinkedHashSet<SyncPatchType>();
+        var allDirtyEntries = new ArrayList<Node>();
+        var supportedTypes = new ArrayList<String>();
+        var unsupportedTypes = new ArrayList<String>();
 
-        // WAWebHandleInfoBulletin.default parser: e.forEachChildWithTag(INFO_TYPE.DIRTY, ...)
         for (var dirtyNode : node.getChildren(INFO_TYPE_DIRTY)) {
-            allDirtyEntries.add(dirtyNode); // WAWebHandleDirtyBits.handleDirtyBits: both supported and unsupported are passed to clearDirtyBits
-            var type = dirtyNode.getAttributeAsString("type", null); // WAWebHandleInfoBulletin.default parser: e.attrString("type")
+            allDirtyEntries.add(dirtyNode);
+            var type = dirtyNode.getAttributeAsString("type", null);
 
-            if (DIRTY_TYPE_ACCOUNT_SYNC.equals(type)) { // WAWebHandleDirtyBits.handleDirtyBits: SUPPORTED_DIRTY_TYPE.account_sync -> c(protocols)
+            if (DIRTY_TYPE_ACCOUNT_SYNC.equals(type)) {
                 supportedTypes.add(type);
-                // WAWebHandleInfoBulletin.default parser: var i = e.mapChildren(e => e.tag())
                 for (var child : dirtyNode.children()) {
                     var protocol = child.description();
-                    // WAWebHandleInfoBulletin.default parser: i.forEach(e => {
-                    //   if (hasOwnProperty(SUPPORTED_DIRTY_PROTOCOLS, e)) r.push(e);
-                    // })
                     if (!SUPPORTED_DIRTY_PROTOCOLS.contains(protocol)) {
                         continue;
                     }
-                    // WAWebHandleDirtyBits.c: dispatches per AccountSyncType.
-                    // Cobalt delegates to subsystem-specific sync flags; the client / device
-                    // service observes them and re-fetches lazily on the next access.
+                    // Cobalt delegates to subsystem-specific sync flags; the client and device service observe them and re-fetch lazily on the next access.
                     switch (protocol) {
-                        case "devices" -> // ADAPTED: WAWebHandleDirtyBits.c: DEVICES -> _() -> getDevices("notification")
+                        case "devices" ->
                                 LOGGER.log(System.Logger.Level.DEBUG,
                                         "Dirty bit account_sync/devices: device list refresh needed");
-                        case "picture" -> // ADAPTED: WAWebHandleDirtyBits.c: PICTURE -> getAndUpdateProfilePicture()
+                        case "picture" ->
                                 LOGGER.log(System.Logger.Level.DEBUG,
                                         "Dirty bit account_sync/picture: profile picture refresh needed");
-                        case "privacy" -> { // ADAPTED: WAWebHandleDirtyBits.c: PRIVACY -> updatePrivacySettings()
+                        case "privacy" -> {
                             whatsapp.store().setSyncedContacts(false);
                             LOGGER.log(System.Logger.Level.DEBUG,
                                     "Dirty bit account_sync/privacy: privacy settings refresh needed");
                         }
-                        case "blocklist" -> { // ADAPTED: WAWebHandleDirtyBits.c: BLOCKLIST -> fetchAndUpdateBlocklist("dirty-bit")
+                        case "blocklist" -> {
                             whatsapp.store().setSyncedContacts(false);
                             LOGGER.log(System.Logger.Level.DEBUG,
                                     "Dirty bit account_sync/blocklist: block list refresh needed");
                         }
-                        case "notice" -> // ADAPTED: WAWebHandleDirtyBits.c: NOTICE -> f() -> TosManager.run() + newsletter gating notices
+                        case "notice" ->
                                 LOGGER.log(System.Logger.Level.DEBUG,
                                         "Dirty bit account_sync/notice: notice refresh needed");
                         default -> {
@@ -442,55 +424,40 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
                         }
                     }
                 }
-                // ADAPTED: Cobalt marks status as dirty on account_sync to force a refresh
-                // the next time the caller reads the value; WA Web uses explicit imperative
-                // calls into each subsystem instead.
+                // Cobalt marks status as dirty on account_sync so that the next caller refreshes; WA Web makes explicit imperative calls instead.
                 whatsapp.store().setSyncedStatus(false);
-            } else if (DIRTY_TYPE_SYNCD_APP_STATE.equals(type)) { // WAWebHandleDirtyBits.handleDirtyBits: SUPPORTED_DIRTY_TYPE.syncd_app_state -> p()
+            } else if (DIRTY_TYPE_SYNCD_APP_STATE.equals(type)) {
                 supportedTypes.add(type);
-                // WAWebHandleDirtyBits.p: WAWebSyncd.markCollectionsForSync(Array.from(CollectionName.members()))
                 Collections.addAll(collectionsToSync, SyncPatchType.values());
-            } else if (DIRTY_TYPE_GROUPS.equals(type)) { // WAWebHandleDirtyBits.handleDirtyBits: SUPPORTED_DIRTY_TYPE.groups
+            } else if (DIRTY_TYPE_GROUPS.equals(type)) {
                 supportedTypes.add(type);
-                // ADAPTED: WA Web calls waitForOfflineDeliveryEnd().then(queryAndUpdateAllGroupMetadata);
-                // Cobalt logs and lets the caller refetch group metadata on the next read.
                 LOGGER.log(System.Logger.Level.DEBUG,
                         "Dirty bit groups: group metadata refresh needed");
-            } else if (DIRTY_TYPE_NEWSLETTER_METADATA.equals(type)) { // WAWebHandleDirtyBits.handleDirtyBits: SUPPORTED_DIRTY_TYPE.newsletter_metadata
+            } else if (DIRTY_TYPE_NEWSLETTER_METADATA.equals(type)) {
                 supportedTypes.add(type);
-                // ADAPTED: WA Web calls waitForOfflineDeliveryEnd().then(queryAndUpdateAllNewsletterMetadataAction);
-                // Cobalt logs and lets the caller refetch newsletter metadata on the next read.
                 LOGGER.log(System.Logger.Level.DEBUG,
                         "Dirty bit newsletter_metadata: newsletter metadata refresh needed");
             } else {
-                // WAWebHandleInfoBulletin.default parser: unsupported dirty types go into t = []
                 unsupportedTypes.add(type == null ? "" : type);
             }
         }
 
-        // WAWebHandleDirtyBits.handleDirtyBits: LOG "handleDirtyBits supported=... unsupported=..."
         LOGGER.log(System.Logger.Level.DEBUG,
                 "handleDirtyBits supported={0} unsupported={1}",
                 String.join(",", supportedTypes),
                 String.join(",", unsupportedTypes));
 
         if (!collectionsToSync.isEmpty()) {
-            whatsapp.store().setSyncedWebAppState(false); // ADAPTED: Cobalt gate that lets the next app-state consumer re-pull
-            // WAWebHandleDirtyBits.p: WAWebSyncd.markCollectionsForSync(...)
-            // WAWebHandleDirtyBits.p: BackendEventBus.onceAppStateSyncCompleted(e => {
-            //   var t = e.some(r => r.patches?.length > 0 || r.snapshot != null);
-            //   new MdAppStateDirtyBitsWamEvent({dirtyBitsFalsePositive: !t}).commit()
-            // });
-            // In Cobalt pullWebAppState is synchronous (virtual thread) and returns the
-            // Cobalt equivalent of `e.some(...)` directly.
+            whatsapp.store().setSyncedWebAppState(false);
+            // pullWebAppState returns the Cobalt equivalent of WA Web's `e.some(r => r.patches?.length > 0 || r.snapshot != null)` directly because it runs synchronously on a virtual thread.
             var hasAppStateChanges = whatsapp.pullWebAppState(collectionsToSync.toArray(SyncPatchType[]::new));
-            wamService.commit(new MdAppStateDirtyBitsEventBuilder() // WAWebHandleDirtyBits.p: new MdAppStateDirtyBitsWamEvent({dirtyBitsFalsePositive: !t}).commit()
+            wamService.commit(new MdAppStateDirtyBitsEventBuilder()
                     .dirtyBitsFalsePositive(!hasAppStateChanges)
                     .build());
         }
 
-        clearDirtyBits(allDirtyEntries); // WAWebHandleDirtyBits.handleDirtyBits: return WAWebClearDirtyBitsJob.clearDirtyBits(d)
-        webAppStateService.retryAllOrphanMutations(); // ADAPTED: Cobalt retries orphan app-state mutations after a dirty batch; no direct WA Web equivalent
+        clearDirtyBits(allDirtyEntries);
+        webAppStateService.retryAllOrphanMutations();
     }
 
     /**
@@ -515,11 +482,11 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
     @WhatsAppWebExport(moduleName = "WAWebClearDirtyBitsJob", exports = "clearDirtyBits",
             adaptation = WhatsAppAdaptation.DIRECT)
     private void clearDirtyBits(List<Node> dirtyEntries) {
-        if (dirtyEntries.isEmpty()) { // WAWebClearDirtyBitsJob.clearDirtyBits: if (t.length !== 0)
+        if (dirtyEntries.isEmpty()) {
             return;
         }
 
-        var cleanChildren = dirtyEntries.stream() // WAWebClearDirtyBitsJob.clearDirtyBits: t.map(e => wap("clean", {type, timestamp}))
+        var cleanChildren = dirtyEntries.stream()
                 .map(dirty -> new NodeBuilder()
                         .description("clean")
                         .attribute("type", dirty.getAttributeAsString("type", null))
@@ -528,21 +495,21 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
                 .toList();
 
         try {
-            whatsapp.sendNode(new NodeBuilder() // WAWebClearDirtyBitsJob.clearDirtyBits: deprecatedSendIq(wap("iq", {...}, children), parser)
+            whatsapp.sendNode(new NodeBuilder()
                     .description("iq")
                     .attribute("to", Jid.userServer())
                     .attribute("type", "set")
                     .attribute("xmlns", "urn:xmpp:whatsapp:dirty")
                     .content(cleanChildren));
             LOGGER.log(System.Logger.Level.DEBUG,
-                    "clearDirtyBits: success for type: {0}", // WAWebClearDirtyBitsJob.clearDirtyBits: LOG "clearDirtyBits: success for type: %s"
+                    "clearDirtyBits: success for type: {0}",
                     dirtyEntries.stream()
                             .map(d -> d.getAttributeAsString("type", "unknown"))
                             .reduce((a, b) -> a + "," + b)
                             .orElse(""));
         } catch (Exception e) {
             LOGGER.log(System.Logger.Level.WARNING,
-                    "clearDirtyBits: failed with error"); // WAWebClearDirtyBitsJob.clearDirtyBits: WARN "clearDirtyBits: failed with error"
+                    "clearDirtyBits: failed with error");
         }
     }
 
@@ -570,27 +537,23 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
     @WhatsAppWebExport(moduleName = "WAWebHandleRoutingInfo", exports = "handleRoutingInfo",
             adaptation = WhatsAppAdaptation.ADAPTED)
     private void handleRouting(Node routingNode) {
-        // WAWebHandleInfoBulletin.default parser: edgeRouting = a.child("routing_info").contentBytes()
         var edgeRouting = routingNode.getChild("routing_info")
                 .flatMap(Node::toContentBytes)
                 .orElse(null);
-        // WAWebHandleInfoBulletin.default parser: domain = a.hasChild("dns_domain") ? a.child("dns_domain").contentEnum(DOMAINS) : null
         var domain = routingNode.getChild("dns_domain")
                 .flatMap(Node::toContentString)
                 .orElse(null);
-        // WAWebHandleRoutingInfo.handleRoutingInfo: validate against DOMAINS map; unknown values fall back to null
+        // Validates against the DOMAINS map; unknown values fall back to null.
         if (domain != null && !"fb".equals(domain) && !"sl".equals(domain)) {
             domain = null;
         }
-        if (domain == null) { // WAWebHandleRoutingInfo.handleRoutingInfo: if (!n) { var r = yield getRoutingInfo(); n = r ? r.domain : s.fb }
+        if (domain == null) {
             domain = whatsapp.store().routingDomain().orElse(DEFAULT_ROUTING_DOMAIN);
         }
-        // WAWebHandleRoutingInfo.handleRoutingInfo: var a = WAHex.bytesToBuffer(t.edgeRouting)
         whatsapp.store().setRoutingInfo(edgeRouting);
-        // WAWebHandleRoutingInfo.handleRoutingInfo: setRoutingInfo({domain: n, edgeRouting: a})
         whatsapp.store().setRoutingDomain(domain);
         LOGGER.log(System.Logger.Level.DEBUG,
-                "handleInfoBulletin setting and domain: {0} and edgeRouting: {1} bytes", // WAWebHandleRoutingInfo.handleRoutingInfo: LOG "handleInfoBulletin setting and domain: %s and edgeRouting:"
+                "handleInfoBulletin setting and domain: {0} and edgeRouting: {1} bytes",
                 domain, edgeRouting == null ? 0 : edgeRouting.length);
     }
 
@@ -616,12 +579,13 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
     @WhatsAppWebExport(moduleName = "WAWebHandleInfoBulletin", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     private void handleOffline(Node offlineNode) {
-        var count = offlineNode.getAttributeAsInt("count", 0); // WAWebHandleInfoBulletin.default parser: e.child(OFFLINE).attrInt("count")
+        var count = offlineNode.getAttributeAsInt("count", 0);
         LOGGER.log(System.Logger.Level.DEBUG,
                 "Received offline bulletin with count={0}", count);
-        offlineNotificationsReporter.report(); // WAWebHandleInfoBulletin.default dispatch: WAWebHandleReportServerSyncNotification.reportOfflineNotifications()
-        if (count == 0) { // WAWebMessageDedupUtils.maybeClearPendingMessages: if (count === 0) clear the pending cache
-            webAppStateService.retryAllOrphanMutations(); // ADAPTED: Cobalt retries orphan mutations when the backlog is empty; WA Web only clears the dedup cache
+        offlineNotificationsReporter.report();
+        if (count == 0) {
+            // Cobalt retries orphan mutations when the backlog is empty; WA Web only clears the dedup cache here.
+            webAppStateService.retryAllOrphanMutations();
         }
     }
 
@@ -645,13 +609,13 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
     @WhatsAppWebExport(moduleName = "WAWebHandleInfoBulletin", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     private void handleOfflinePreview(Node previewNode) {
-        LOGGER.log(System.Logger.Level.DEBUG, // ADAPTED: WAWebHandleInfoBulletin.default dispatch: OfflineMessageHandler.processOfflinePreviewIb(n.count)
+        LOGGER.log(System.Logger.Level.DEBUG,
                 "Received offline preview bulletin count={0} message={1} receipt={2} notification={3} call={4}",
-                previewNode.getAttributeAsInt("count", 0), // WAWebHandleInfoBulletin.default parser: attrInt("count")
-                previewNode.getAttributeAsInt("message", 0), // WAWebHandleInfoBulletin.default parser: attrInt("message")
-                previewNode.getAttributeAsInt("receipt", 0), // WAWebHandleInfoBulletin.default parser: attrInt("receipt")
-                previewNode.getAttributeAsInt("notification", 0), // WAWebHandleInfoBulletin.default parser: attrInt("notification")
-                previewNode.getAttributeAsInt("call", 0)); // WAWebHandleInfoBulletin.default parser: attrInt("call")
+                previewNode.getAttributeAsInt("count", 0),
+                previewNode.getAttributeAsInt("message", 0),
+                previewNode.getAttributeAsInt("receipt", 0),
+                previewNode.getAttributeAsInt("notification", 0),
+                previewNode.getAttributeAsInt("call", 0));
     }
 
     /**
@@ -672,9 +636,10 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
     @WhatsAppWebExport(moduleName = "WAWebHandleInfoBulletin", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     private void handleOfflinePriorityComplete() {
-        LOGGER.log(System.Logger.Level.DEBUG, // WAWebHandleInfoBulletin.default dispatch: no switch case, just NO_ACK
+        LOGGER.log(System.Logger.Level.DEBUG,
                 "Received priority_offline_complete bulletin");
-        webAppStateService.retryAllOrphanMutations(); // ADAPTED: Cobalt retries orphan app-state mutations when priority offline delivery ends
+        // Cobalt retries orphan app-state mutations when priority offline delivery ends.
+        webAppStateService.retryAllOrphanMutations();
     }
 
     /**
@@ -696,11 +661,11 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
     @WhatsAppWebExport(moduleName = "WAWebHandleInfoBulletin", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     private void handleTos(Node tosNode) {
-        var notices = tosNode.getChildren("notice").stream() // WAWebHandleInfoBulletin.default parser: e.child("tos").forEachChildWithTag("notice", ...)
-                .map(entry -> entry.getAttributeAsString("id", null)) // WAWebHandleInfoBulletin.default parser: e.attrString("id")
+        var notices = tosNode.getChildren("notice").stream()
+                .map(entry -> entry.getAttributeAsString("id", null))
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
-        whatsapp.store().setTosNoticeIds(notices); // ADAPTED: WAWebHandleInfoBulletin.default dispatch: TosManager.maybeUpdateServer(noticeIds)
+        whatsapp.store().setTosNoticeIds(notices);
         LOGGER.log(System.Logger.Level.DEBUG,
                 "Received TOS bulletin notices={0}", notices);
     }
@@ -729,15 +694,14 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
             adaptation = WhatsAppAdaptation.ADAPTED)
     private void handleThreadMeta(Node threadMetaNode) {
         var itemCount = 0;
-        for (var item : threadMetaNode.getChildren("item")) { // WAWebParseThreadMetadata.parseThreadMetadata: t.forEachChildWithTag("item", ...)
-            var from = item.getAttributeAsJid("from").orElse(null); // WAWebParseThreadMetadata.parseThreadMetadata: e.attrChatJid("from")
-            var timestamp = item.getAttributeAsLong("t", (Long) null); // WAWebParseThreadMetadata.parseThreadMetadata: e.attrTime("t")
+        for (var item : threadMetaNode.getChildren("item")) {
+            var from = item.getAttributeAsJid("from").orElse(null);
+            var timestamp = item.getAttributeAsLong("t", (Long) null);
             if (from == null || timestamp == null) {
                 continue;
             }
             itemCount++;
-            // ADAPTED: WA Web stores the entry in WAWebThreadMetadata.setOfflineThreadMeta;
-            // Cobalt has no offline thread metadata store and logs per entry instead.
+            // Cobalt has no offline thread metadata store and logs per entry instead of calling WAWebThreadMetadata.setOfflineThreadMeta.
             LOGGER.log(System.Logger.Level.DEBUG,
                     "thread_metadata item chat={0} timestamp={1}",
                     from, timestamp);
@@ -774,49 +738,33 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
     @WhatsAppWebExport(moduleName = "WAWebHandleServerClientExpiration",
             exports = "handleServerClientExpiration", adaptation = WhatsAppAdaptation.ADAPTED)
     private void handleClientExpiration(Node clientExpirationNode) {
-        // WASmaxInClientExpirationClientExpirationRequest.parseClientExpirationRequest:
-        // reads the optional int attribute "t" from the client_expiration child
         var expirationAttr = clientExpirationNode.getAttributeAsLong("t", (Long) null);
-        if (expirationAttr == null) { // WAWebHandleServerClientExpiration.handleServerClientExpiration: if (e == null) clearServerClientExpirationOverride()
+        if (expirationAttr == null) {
             whatsapp.store().setClientExpiration(null);
             LOGGER.log(System.Logger.Level.DEBUG,
-                    "Cleared client expiration override"); // ADAPTED: Cobalt observability log; WA Web clears silently
+                    "Cleared client expiration override");
             return;
         }
 
-        // WATimeUtils.castToUnixTime clamps (e|0) to [MIN_INT+1, MAX_INT]. In Java the value is
-        // already a long and the clamp would only collapse invalid values, so we forward as-is.
         var newExpiration = expirationAttr;
 
-        // WAWebHandleServerClientExpiration.handleServerClientExpiration:
-        // var a = getServerClientExpirationOverride()?.timestamp
         var existingExpiration = whatsapp.store().clientExpiration().orElse(null);
 
-        // WAWebHandleServerClientExpiration.handleServerClientExpiration:
-        // if (a != null && e >= a) return;
         if (existingExpiration != null && newExpiration >= existingExpiration.getEpochSecond()) {
-            LOGGER.log(System.Logger.Level.DEBUG, // ADAPTED: Cobalt observability log; WA Web returns silently
+            LOGGER.log(System.Logger.Level.DEBUG,
                     "Ignoring client expiration {0}: not earlier than existing {1}",
                     newExpiration, existingExpiration);
             return;
         }
 
-        // WAWebHandleServerClientExpiration.handleServerClientExpiration:
-        // if (e >= t) return; (t = WAWebUpdaterHardExpireTime)
-        // ADAPTED: Cobalt has no WAWebUpdaterHardExpireTime equivalent so the hard cap is skipped.
-        // WAWebHandleServerClientExpiration.handleServerClientExpiration:
-        // var i = futureUnixTime(3 * DAY_SECONDS)
+        // Cobalt has no WAWebUpdaterHardExpireTime equivalent so WA Web's hard-cap check is skipped; the final value is max(minFloor, newExpiration).
         var minFloor = Instant.now().plusSeconds(CLIENT_EXPIRATION_MIN_FLOOR_SECONDS);
 
-        // WAWebHandleServerClientExpiration.handleServerClientExpiration:
-        // var l = Math.max(i, Math.min(e, t))
-        // Without a hard cap the inner Math.min(e, t) collapses to e, so the final value is
-        // max(minFloor, newExpiration).
         var clampedExpiration = newExpiration < minFloor.getEpochSecond()
                 ? minFloor
                 : Instant.ofEpochSecond(newExpiration);
 
-        whatsapp.store().setClientExpiration(clampedExpiration); // WAWebHandleServerClientExpiration.handleServerClientExpiration: setServerClientExpirationOverride("" + l, VERSION_BASE)
+        whatsapp.store().setClientExpiration(clampedExpiration);
         LOGGER.log(System.Logger.Level.DEBUG,
                 "Received client expiration bulletin, clamped to {0}", clampedExpiration);
     }

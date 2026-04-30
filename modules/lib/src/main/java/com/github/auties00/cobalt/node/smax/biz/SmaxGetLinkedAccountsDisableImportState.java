@@ -16,7 +16,7 @@ import java.util.Optional;
 /**
  * Documented {@code state} enum carried by the
  * {@code <profile_sync>} child of {@code <fb_page/>} and the
- * {@code <catalog>} child of {@code <fb_biz/>} — three-way toggle.
+ * {@code <catalog>} child of {@code <fb_biz/>}. Three-way toggle.
  *
  * @implNote Mirrors {@code WASmaxInBizLinkingEnums.ENUM_DISABLE_IMPORT}.
  */

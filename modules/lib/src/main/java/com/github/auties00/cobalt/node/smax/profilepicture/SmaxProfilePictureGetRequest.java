@@ -30,7 +30,7 @@ import java.util.Optional;
 @WhatsAppWebModule(moduleName = "WASmaxOutProfilePicturePrivacyTokenContentsMixin")
 public final class SmaxProfilePictureGetRequest implements SmaxOperation.Request {
     /**
-     * The target entity JID — routed verbatim into the IQ's
+     * The target entity JID. Routed verbatim into the IQ's
      * {@code target} attribute.
      */
     private final Jid iqTarget;
@@ -216,31 +216,11 @@ public final class SmaxProfilePictureGetRequest implements SmaxOperation.Request
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         the {@code <picture>} payload
-     *
-     * @implNote {@code WASmaxOutProfilePictureGetRequest.makeGetRequest}
-     *           composes the
-     *           {@code WASmaxOutProfilePictureGetIQMixin}
-     *           ({@code target=JID(t) to=S_WHATSAPP_NET}) over
-     *           {@code WASmaxOutProfilePictureBaseGetIQMixin}
-     *           ({@code xmlns="w:profile:picture"
-     *           id=generateId() type="get"}) over a
-     *           {@code <picture>} payload carrying the six
-     *           optional attributes plus three optional sub-mixin
-     *           overlays (avatar, tctoken, add-request). The avatar
-     *           overlay replaces the root {@code <picture>}'s
-     *           {@code type} with {@code "avatar"} and adds
-     *           {@code <avatar pose_id>×0..4} children; the
-     *           tctoken overlay nests a
-     *           {@code <smax$any><tctoken t?>{any}</tctoken></smax$any>}
-     *           grandchild; the add-request overlay nests a
-     *           {@code <add_request code admin? expiration/>}
-     *           grandchild.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutProfilePictureGetRequest",
             exports = "makeGetRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutProfilePictureGetRequest: smax("picture", {type? id? query? invite? persona_id? common_gid?})
         var pictureBuilder = new NodeBuilder()
                 .description("picture");
         // The avatar overlay replaces the type with "avatar" and supplies the avatar children.
@@ -269,20 +249,14 @@ public final class SmaxProfilePictureGetRequest implements SmaxOperation.Request
             pictureBuilder.attribute("common_gid", pictureCommonGid);
         }
         if (tcTokenMixinArgs != null) {
-            // WASmaxOutProfilePictureTCTokenMixin: <smax$any><tctoken t?>{any}</tctoken></smax$any>
             pictureChildren.add(tcTokenMixinArgs.toNode());
         }
         if (addRequestMixinArgs != null) {
-            // WASmaxOutProfilePictureAddRequestMixin: <add_request code admin? expiration/>
             pictureChildren.add(addRequestMixinArgs.toNode());
         }
         if (!pictureChildren.isEmpty()) {
             pictureBuilder.content(pictureChildren);
         }
-        // WASmaxOutProfilePictureBaseIQGetRequestMixin: smax("iq", {id: generateId(), type: "get"})
-        // WASmaxOutProfilePictureBaseGetIQMixin: smax("iq", {xmlns: "w:profile:picture"})
-        // WASmaxOutProfilePictureServerDomainIQMixin: smax("iq", {to: S_WHATSAPP_NET})
-        // WASmaxOutProfilePictureGetIQMixin: smax("iq", {target: JID(t)})
         return new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "w:profile:picture")

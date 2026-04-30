@@ -36,7 +36,7 @@ public sealed interface SmaxCampaignStateChangedNotificationResponse extends Sma
     }
 
     /**
-     * The {@code Notification} variant — carries the campaign
+     * The {@code Notification} variant. Carries the campaign
      * identifiers, the new status, and the standard envelope echoes.
      *
      * @implNote {@code WASmaxInSmbMeteredMessagesCampaignCampaignStateChangedNotificationRequest.parseCampaignStateChangedNotificationRequest}.
@@ -53,26 +53,26 @@ public sealed interface SmaxCampaignStateChangedNotificationResponse extends Sma
 
         /**
          * The optional {@code ad_id} attribute on the
-         * {@code <mm_campaign>} child — the Facebook ads platform
+         * {@code <mm_campaign>} child. The Facebook ads platform
          * advertisement identifier.
          */
         private final String adId;
 
         /**
-         * The optional {@code ad_group_id} attribute — the parent
+         * The optional {@code ad_group_id} attribute. The parent
          * advertisement-group identifier.
          */
         private final String adGroupId;
 
         /**
-         * The optional {@code ad_creative_id} attribute — the
+         * The optional {@code ad_creative_id} attribute. The
          * advertisement-creative identifier.
          */
         private final String adCreativeId;
 
         /**
          * The {@code status} attribute on the {@code <mm_campaign>}
-         * child — one of the documented enum literals
+         * child. One of the documented enum literals
          * {@code "ok"} (cleared) or {@code "integrityNotCleared"}
          * (held back).
          */

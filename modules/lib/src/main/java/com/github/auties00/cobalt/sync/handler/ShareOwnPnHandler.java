@@ -98,7 +98,7 @@ public final class ShareOwnPnHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebShareOwnPnSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return "shareOwnPn"; // WAWebShareOwnPnSync.getAction -> WASyncdConst.Actions.ShareOwnPn
+        return "shareOwnPn";
     }
 
     /**
@@ -110,7 +110,7 @@ public final class ShareOwnPnHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebShareOwnPnSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return SyncPatchType.REGULAR; // WAWebShareOwnPnSync: collectionName = WASyncdConst.CollectionName.Regular
+        return SyncPatchType.REGULAR;
     }
 
     /**
@@ -122,7 +122,7 @@ public final class ShareOwnPnHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebShareOwnPnSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return 8; // WAWebShareOwnPnSync.getVersion: return 8
+        return 8;
     }
 
     /**
@@ -143,7 +143,7 @@ public final class ShareOwnPnHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebShareOwnPnSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebShareOwnPnSync.applyMutations: {actionState: SyncActionState.Success}
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -189,40 +189,33 @@ public final class ShareOwnPnHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebShareOwnPnSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        // WAWebShareOwnPnSync.applyMutations: if (getABPropConfigValue("share_own_pn_sync") !== true) return t.map(() => ({actionState: Unsupported}))
         if (!client.abPropsService().getBool(ABProp.SHARE_OWN_PN_SYNC)) {
-            return MutationApplicationResult.unsupported(); // WAWebShareOwnPnSync.applyMutations: WALogger.WARN("share_own_pn sync: operation not supported"); return Unsupported batch
+            return MutationApplicationResult.unsupported();
         }
 
-        // WAWebShareOwnPnSync.applyMutations: if (e.operation !== "set") { a++; return {actionState: Unsupported} }
         if (mutation.operation() != SyncdOperation.SET) {
-            return MutationApplicationResult.unsupported(); // WAWebShareOwnPnSync.applyMutations: a++, {actionState: Unsupported}
+            return MutationApplicationResult.unsupported();
         }
 
-        // WAWebShareOwnPnSync.applyMutations: var t = e.indexParts[1]
         // ADAPTED: Cobalt parses the raw JSON index string here; WA Web's WAWebSyncdMutationParser already exposes indexParts.
-        var indexArray = JSON.parseArray(mutation.index()); // WAWebShareOwnPnSync.applyMutations: e.indexParts
-        var lidJidString = indexArray != null && indexArray.size() > 1 ? indexArray.getString(1) : null; // WAWebShareOwnPnSync.applyMutations: var t = e.indexParts[1]
-        // WAWebShareOwnPnSync.applyMutations: if (!isWidlike(t)) { i++; return n.malformedActionIndex() }
+        var indexArray = JSON.parseArray(mutation.index());
+        var lidJidString = indexArray != null && indexArray.size() > 1 ? indexArray.getString(1) : null;
         // ADAPTED: WA Web's isWidlike accepts any non-empty string that parses as a Wid; Cobalt collapses the
         // empty/null guard and the wid-likeness check into a single null/empty test, then defers the
         // strict @lid check to the JID parse below.
         if (lidJidString == null || lidJidString.isEmpty()) {
-            return malformedActionIndex(); // WAWebShareOwnPnSync.applyMutations: i++, return n.malformedActionIndex()
+            return malformedActionIndex();
         }
 
-        // WAWebShareOwnPnSync.applyMutations: var l = createUserLidOrThrow(t)
         // ADAPTED: WAWebWidFactory.createUserLidOrThrow throws if the parsed wid is not a @lid; the throw
         // propagates out of applyMutations and is caught by the upstream batch loop. Cobalt converts the
         // would-be exception into a malformedActionIndex result, which preserves the underlying MALFORMED
         // semantic without surfacing a runtime exception to the caller.
         var lidJid = Jid.of(lidJidString);
         if (!lidJid.hasLidServer()) {
-            return malformedActionIndex(); // WAWebShareOwnPnSync.applyMutations: createUserLidOrThrow throws -> modelled as malformedActionIndex
+            return malformedActionIndex();
         }
 
-        // WAWebShareOwnPnSync.applyMutations: r.push({lid: l, data: {shareOwnPn: true}})
-        // WAWebShareOwnPnSync.applyMutations: yield WAWebUpdateLidMetadataJob.updateLidMetadataJob(r)
         //   -> WAWebUpdateLidMetadataApi.updateLidMetadata({updates: r})
         //     -> WAWebApiContact.updateLidMetadata(updates)
         //       -> WAWebLidAwareContactsDB.bulkCreateOrMerge([{id: lid.toString(), shareOwnPn: true}])
@@ -232,8 +225,8 @@ public final class ShareOwnPnHandler implements WebAppStateActionHandler {
         // bulkUpdateLidContactState mirror call is omitted because Cobalt's store is the sole source of truth.
         var contact = client.store()
                 .findContactByJid(lidJid)
-                .orElseGet(() -> client.store().addNewContact(lidJid)); // WAWebApiContact.updateLidMetadata -> WAWebLidAwareContactsDB.bulkCreateOrMerge upsert
-        contact.setPhoneNumberShared(true); // WAWebShareOwnPnSync.applyMutations: data: {shareOwnPn: true}
-        return MutationApplicationResult.success(); // WAWebShareOwnPnSync.applyMutations: {actionState: SyncActionState.Success}
+                .orElseGet(() -> client.store().addNewContact(lidJid));
+        contact.setPhoneNumberShared(true);
+        return MutationApplicationResult.success();
     }
 }

@@ -18,8 +18,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants.
- *
- * @implNote {@code WASmaxBlocklistsUpdateBlockListRPC.sendUpdateBlockListRPC}.
  */
 public sealed interface SmaxUpdateBlockListResponse extends SmaxOperation.Response
         permits SmaxUpdateBlockListResponse.SuccessWithMatch,
@@ -68,9 +66,6 @@ public sealed interface SmaxUpdateBlockListResponse extends SmaxOperation.Respon
 
     /**
      * Descriptor for one entry in a mismatch reply's item list.
-     *
-     * @implNote {@code WASmaxInBlocklistsGetBlockListResponseSuccessWithMismatchListItem}
-     *           and the migrated/CAPI variants project this same shape.
      */
     record Item(Jid jid, boolean active, String displayName, String blocklistIdentifier) {
         /**
@@ -118,11 +113,9 @@ public sealed interface SmaxUpdateBlockListResponse extends SmaxOperation.Respon
     }
 
     /**
-     * The {@code SuccessWithMatch} reply variant — bare echo with
+     * The {@code SuccessWithMatch} reply variant. Bare echo with
      * {@code matched="true"}; the relay confirmed the action without
      * needing to return a re-synced list.
-     *
-     * @implNote {@code WASmaxInBlocklistsUpdateBlockListResponseSuccessWithMatch.parseUpdateBlockListResponseSuccessWithMatch}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBlocklistsUpdateBlockListResponseSuccessWithMatch")
     final class SuccessWithMatch implements SmaxUpdateBlockListResponse {
@@ -204,11 +197,9 @@ public sealed interface SmaxUpdateBlockListResponse extends SmaxOperation.Respon
     }
 
     /**
-     * The {@code SuccessWithMismatch} reply variant — the relay
+     * The {@code SuccessWithMismatch} reply variant. The relay
      * applied the action but also returned the resulting blocklist
      * because the client's cache was stale (matched="false").
-     *
-     * @implNote {@code WASmaxInBlocklistsUpdateBlockListResponseSuccessWithMismatch.parseUpdateBlockListResponseSuccessWithMismatch}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBlocklistsUpdateBlockListResponseSuccessWithMismatch")
     final class SuccessWithMismatch implements SmaxUpdateBlockListResponse {
@@ -354,11 +345,9 @@ public sealed interface SmaxUpdateBlockListResponse extends SmaxOperation.Respon
     }
 
     /**
-     * The {@code MigratedSuccessWithMismatch} reply variant — same
+     * The {@code MigratedSuccessWithMismatch} reply variant. Same
      * shape as {@link SuccessWithMismatch} but for an
      * LID-addressed blocklist.
-     *
-     * @implNote {@code WASmaxInBlocklistsUpdateBlockListResponseMigratedSuccessWithMismatch.parseUpdateBlockListResponseMigratedSuccessWithMismatch}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBlocklistsUpdateBlockListResponseMigratedSuccessWithMismatch")
     final class MigratedSuccessWithMismatch implements SmaxUpdateBlockListResponse {
@@ -480,11 +469,9 @@ public sealed interface SmaxUpdateBlockListResponse extends SmaxOperation.Respon
     }
 
     /**
-     * The {@code CAPISuccessWithMismatch} reply variant — wire-shape
+     * The {@code CAPISuccessWithMismatch} reply variant. Wire-shape
      * equivalent to {@link MigratedSuccessWithMismatch} but with
      * the inner {@code <item jid/>} attribute optional.
-     *
-     * @implNote {@code WASmaxInBlocklistsUpdateBlockListResponseCAPISuccessWithMismatch.parseUpdateBlockListResponseCAPISuccessWithMismatch}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBlocklistsUpdateBlockListResponseCAPISuccessWithMismatch")
     final class CAPISuccessWithMismatch implements SmaxUpdateBlockListResponse {
@@ -558,7 +545,7 @@ public sealed interface SmaxUpdateBlockListResponse extends SmaxOperation.Respon
          *           {@link SmaxUpdateBlockListResponse#of(Node, Node)} attempts the
          *           strict migrated variant first, so the CAPI
          *           variant only matches when the migrated parser
-         *           rejects the stanza — typically because of a
+         *           rejects the stanza. Typically because of a
          *           missing per-item jid.
          */
         @WhatsAppWebExport(moduleName = "WASmaxInBlocklistsUpdateBlockListResponseCAPISuccessWithMismatch",
@@ -615,7 +602,7 @@ public sealed interface SmaxUpdateBlockListResponse extends SmaxOperation.Respon
     }
 
     /**
-     * The {@code ClientError} reply variant — request rejected as
+     * The {@code ClientError} reply variant. Request rejected as
      * malformed, optionally carrying an addressing-mode hint.
      *
      * @implNote {@code WASmaxInBlocklistsUpdateBlockListResponseInvalidRequest.parseUpdateBlockListResponseInvalidRequest}
@@ -736,10 +723,8 @@ public sealed interface SmaxUpdateBlockListResponse extends SmaxOperation.Respon
     }
 
     /**
-     * The {@code ServerError} reply variant — transient internal
+     * The {@code ServerError} reply variant. Transient internal
      * failure.
-     *
-     * @implNote {@code WASmaxInBlocklistsUpdateBlockListResponseServerError.parseUpdateBlockListResponseServerError}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBlocklistsUpdateBlockListResponseServerError")
     final class ServerError implements SmaxUpdateBlockListResponse {

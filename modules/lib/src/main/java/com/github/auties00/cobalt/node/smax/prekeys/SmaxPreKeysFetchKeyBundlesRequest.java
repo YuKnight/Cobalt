@@ -17,7 +17,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps the per-user
+ * The outbound stanza variant. Wraps the per-user
  * {@code <user jid reason?/>} list in the canonical
  * {@code <iq xmlns="encrypt" type="get" to="s.whatsapp.net">} envelope.
  */
@@ -32,7 +32,7 @@ public final class SmaxPreKeysFetchKeyBundlesRequest implements SmaxOperation.Re
     /**
      * Constructs a request for the given list of users.
      *
-     * @param users the per-user requests; never {@code null} and never
+     * @param users the per-user requests. Never {@code null} and never
      *              empty
      * @throws NullPointerException     if {@code users} is {@code null}
      * @throws IllegalArgumentException if {@code users} is empty
@@ -48,7 +48,7 @@ public final class SmaxPreKeysFetchKeyBundlesRequest implements SmaxOperation.Re
     /**
      * Returns the list of users carried by this request.
      *
-     * @return an unmodifiable list of per-user requests; never
+     * @return an unmodifiable list of per-user requests. Never
      *         {@code null}
      */
     public List<UserKeyRequest> users() {
@@ -118,7 +118,7 @@ public final class SmaxPreKeysFetchKeyBundlesRequest implements SmaxOperation.Re
     }
 
     /**
-     * Per-user entry in the outbound {@code <key>} payload — pairs a
+     * Per-user entry in the outbound {@code <key>} payload. Pairs a
      * target user JID with the optional
      * {@code reason="identity"} hint that asks the relay to include the
      * device-identity attestation in the response.
@@ -143,7 +143,7 @@ public final class SmaxPreKeysFetchKeyBundlesRequest implements SmaxOperation.Re
         /**
          * Constructs a per-user request entry.
          *
-         * @param userJid               the target user JID; never
+         * @param userJid               the target user JID. Never
          *                              {@code null}
          * @param hasUserReasonIdentity whether to include the
          *                              identity-reason hint
@@ -158,7 +158,7 @@ public final class SmaxPreKeysFetchKeyBundlesRequest implements SmaxOperation.Re
         /**
          * Returns the target user JID.
          *
-         * @return the user JID; never {@code null}
+         * @return the user JID. Never {@code null}
          */
         public Jid userJid() {
             return userJid;

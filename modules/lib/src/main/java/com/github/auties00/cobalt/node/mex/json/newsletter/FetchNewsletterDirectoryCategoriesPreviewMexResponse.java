@@ -20,11 +20,7 @@ import java.util.Optional;
 import java.util.OptionalLong;
 
 /**
- * The response variant of {@link FetchNewsletterDirectoryCategoriesPreviewMexResponse} that exposes the data
- * returned by the server after a successful query.
- *
- * @implNote WAWebMexFetchNewsletterDirectoryCategoriesPreviewJob: adapts the JSON root returned by the GraphQL
- * query into a Java value object.
+ * Response variant for {@link FetchNewsletterDirectoryCategoriesPreviewMexRequest} carrying the parsed server reply.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexFetchNewsletterDirectoryCategoriesPreviewJob")
 public final class FetchNewsletterDirectoryCategoriesPreviewMexResponse implements MexOperation.Response.Json {
@@ -37,9 +33,6 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexResponse implemen
     /**
      * Parses a MEX response from the given IQ response node.
      *
-     * @implNote WAWebMexFetchNewsletterDirectoryCategoriesPreviewJob.mexFetchNewsletterDirectoryCategoriesPreview: WA Web relies on the
-     * GraphQL client to unwrap the response. Cobalt performs the
-     * unwrapping manually from the IQ {@code <result>} child.
      * @param node the IQ response node received from the relay
      * @return an {@link Optional} containing the parsed response, or
      *         empty if the node is missing a result payload
@@ -76,7 +69,7 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexResponse implemen
         /**
          * Returns the {@code category} field.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
          */
         public Optional<String> category() {
             return Optional.ofNullable(category);
@@ -85,7 +78,7 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexResponse implemen
         /**
          * Returns the {@code category_title} field.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
          */
         public Optional<String> categoryTitle() {
             return Optional.ofNullable(categoryTitle);
@@ -94,7 +87,7 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexResponse implemen
         /**
          * Returns the {@code newsletters} field.
          *
-         * @return the list of values, empty if absent
+     * @return the list of values, empty if absent
          */
         public List<Newsletters> newsletters() {
             return newsletters;
@@ -115,7 +108,7 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexResponse implemen
             /**
              * Returns the {@code id} field.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
              */
             public Optional<String> id() {
                 return Optional.ofNullable(id);
@@ -124,7 +117,7 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexResponse implemen
             /**
              * Returns the {@code thread_metadata} field.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
              */
             public Optional<ThreadMetadata> threadMetadata() {
                 return Optional.ofNullable(threadMetadata);
@@ -157,7 +150,7 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexResponse implemen
                 /**
                  * Returns the {@code creation_time} field.
                  *
-                 * @return an {@link Optional} containing the value as an {@link Instant}, or empty if absent
+     * @return an {@link Optional} containing the value as an {@link Instant}, or empty if absent
                  */
                 public Optional<Instant> creationTime() {
                     return Optional.ofNullable(creationTime).map(Instant::ofEpochSecond);
@@ -166,7 +159,7 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexResponse implemen
                 /**
                  * Returns the {@code invite} field.
                  *
-                 * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
                  */
                 public Optional<String> invite() {
                     return Optional.ofNullable(invite);
@@ -175,7 +168,7 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexResponse implemen
                 /**
                  * Returns the {@code handle} field.
                  *
-                 * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
                  */
                 public Optional<String> handle() {
                     return Optional.ofNullable(handle);
@@ -184,7 +177,7 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexResponse implemen
                 /**
                  * Returns the {@code subscribers_count} field.
                  *
-                 * @return an {@link OptionalLong} containing the value, or empty if absent
+     * @return an {@link OptionalLong} containing the value, or empty if absent
                  */
                 public OptionalLong subscribersCount() {
                     return subscribersCount != null ? OptionalLong.of(subscribersCount) : OptionalLong.empty();
@@ -193,7 +186,7 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexResponse implemen
                 /**
                  * Returns the {@code name} field.
                  *
-                 * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
                  */
                 public Optional<Name> name() {
                     return Optional.ofNullable(name);
@@ -202,7 +195,7 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexResponse implemen
                 /**
                  * Returns the {@code description} field.
                  *
-                 * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
                  */
                 public Optional<Description> description() {
                     return Optional.ofNullable(description);
@@ -211,7 +204,7 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexResponse implemen
                 /**
                  * Returns the {@code picture} field.
                  *
-                 * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
                  */
                 public Optional<Picture> picture() {
                     return Optional.ofNullable(picture);
@@ -220,7 +213,7 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexResponse implemen
                 /**
                  * Returns the {@code verification} field.
                  *
-                 * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
                  */
                 public Optional<String> verification() {
                     return Optional.ofNullable(verification);
@@ -243,7 +236,7 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexResponse implemen
                     /**
                      * Returns the {@code id} field.
                      *
-                     * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
                      */
                     public Optional<String> id() {
                         return Optional.ofNullable(id);
@@ -252,7 +245,7 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexResponse implemen
                     /**
                      * Returns the {@code text} field.
                      *
-                     * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
                      */
                     public Optional<String> text() {
                         return Optional.ofNullable(text);
@@ -261,7 +254,7 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexResponse implemen
                     /**
                      * Returns the {@code update_time} field.
                      *
-                     * @return an {@link Optional} containing the value as an {@link Instant}, or empty if absent
+     * @return an {@link Optional} containing the value as an {@link Instant}, or empty if absent
                      */
                     public Optional<Instant> updateTime() {
                         return Optional.ofNullable(updateTime).map(Instant::ofEpochSecond);
@@ -270,7 +263,7 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexResponse implemen
                     /**
                      * Parses a {@code Name} from the given JSON object.
                      *
-                     * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
                      * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
                      */
                     static Optional<Name> of(JSONObject obj) {
@@ -287,7 +280,7 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexResponse implemen
                     /**
                      * Parses a list of {@code Name} from the given JSON array.
                      *
-                     * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
                      * @return the list of parsed results, empty if {@code arr} is {@code null}
                      */
                     static List<Name> ofArray(JSONArray arr) {
@@ -320,7 +313,7 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexResponse implemen
                     /**
                      * Returns the {@code id} field.
                      *
-                     * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
                      */
                     public Optional<String> id() {
                         return Optional.ofNullable(id);
@@ -329,7 +322,7 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexResponse implemen
                     /**
                      * Returns the {@code text} field.
                      *
-                     * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
                      */
                     public Optional<String> text() {
                         return Optional.ofNullable(text);
@@ -338,7 +331,7 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexResponse implemen
                     /**
                      * Returns the {@code update_time} field.
                      *
-                     * @return an {@link Optional} containing the value as an {@link Instant}, or empty if absent
+     * @return an {@link Optional} containing the value as an {@link Instant}, or empty if absent
                      */
                     public Optional<Instant> updateTime() {
                         return Optional.ofNullable(updateTime).map(Instant::ofEpochSecond);
@@ -347,7 +340,7 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexResponse implemen
                     /**
                      * Parses a {@code Description} from the given JSON object.
                      *
-                     * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
                      * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
                      */
                     static Optional<Description> of(JSONObject obj) {
@@ -364,7 +357,7 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexResponse implemen
                     /**
                      * Parses a list of {@code Description} from the given JSON array.
                      *
-                     * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
                      * @return the list of parsed results, empty if {@code arr} is {@code null}
                      */
                     static List<Description> ofArray(JSONArray arr) {
@@ -397,7 +390,7 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexResponse implemen
                     /**
                      * Returns the {@code id} field.
                      *
-                     * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
                      */
                     public Optional<String> id() {
                         return Optional.ofNullable(id);
@@ -406,7 +399,7 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexResponse implemen
                     /**
                      * Returns the {@code direct_path} field.
                      *
-                     * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
                      */
                     public Optional<String> directPath() {
                         return Optional.ofNullable(directPath);
@@ -415,7 +408,7 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexResponse implemen
                     /**
                      * Returns the {@code type} field.
                      *
-                     * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
                      */
                     public Optional<String> type() {
                         return Optional.ofNullable(type);
@@ -424,7 +417,7 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexResponse implemen
                     /**
                      * Parses a {@code Picture} from the given JSON object.
                      *
-                     * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
                      * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
                      */
                     static Optional<Picture> of(JSONObject obj) {
@@ -441,7 +434,7 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexResponse implemen
                     /**
                      * Parses a list of {@code Picture} from the given JSON array.
                      *
-                     * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
                      * @return the list of parsed results, empty if {@code arr} is {@code null}
                      */
                     static List<Picture> ofArray(JSONArray arr) {
@@ -460,7 +453,7 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexResponse implemen
                 /**
                  * Parses a {@code ThreadMetadata} from the given JSON object.
                  *
-                 * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
                  * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
                  */
                 static Optional<ThreadMetadata> of(JSONObject obj) {
@@ -482,7 +475,7 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexResponse implemen
                 /**
                  * Parses a list of {@code ThreadMetadata} from the given JSON array.
                  *
-                 * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
                  * @return the list of parsed results, empty if {@code arr} is {@code null}
                  */
                 static List<ThreadMetadata> ofArray(JSONArray arr) {
@@ -501,7 +494,7 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexResponse implemen
             /**
              * Parses a {@code Newsletters} from the given JSON object.
              *
-             * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
              * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
              */
             static Optional<Newsletters> of(JSONObject obj) {
@@ -517,7 +510,7 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexResponse implemen
             /**
              * Parses a list of {@code Newsletters} from the given JSON array.
              *
-             * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
              * @return the list of parsed results, empty if {@code arr} is {@code null}
              */
             static List<Newsletters> ofArray(JSONArray arr) {
@@ -536,7 +529,7 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexResponse implemen
         /**
          * Parses a {@code Result} from the given JSON object.
          *
-         * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
          * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
          */
         static Optional<Result> of(JSONObject obj) {
@@ -553,7 +546,7 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexResponse implemen
         /**
          * Parses a list of {@code Result} from the given JSON array.
          *
-         * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
          * @return the list of parsed results, empty if {@code arr} is {@code null}
          */
         static List<Result> ofArray(JSONArray arr) {
@@ -573,30 +566,21 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexResponse implemen
      * Parses a {@link FetchNewsletterDirectoryCategoriesPreviewMexResponse} from the raw JSON bytes of the
      * {@code <result>} child.
      *
-     * @implNote WAWebMexFetchNewsletterDirectoryCategoriesPreviewJob.mexFetchNewsletterDirectoryCategoriesPreview: mirrors the implicit
-     * unwrapping that WA Web performs on the GraphQL response,
-     * extracting the {@code xwa2_newsletters_directory_category_preview} root.
      * @param json the UTF-8 encoded JSON payload
      * @return an {@link Optional} containing the parsed response, or
      *         empty if the envelope is missing expected fields
      */
     private static Optional<FetchNewsletterDirectoryCategoriesPreviewMexResponse> of(byte[] json) {
-        // WAWebMexFetchNewsletterDirectoryCategoriesPreviewJob.mexFetchNewsletterDirectoryCategoriesPreview
-        // Parses the raw JSON payload, bailing out if fastjson2 returns null
         var jsonObject = JSON.parseObject(json);
         if (jsonObject == null) {
             return Optional.empty();
         }
 
-        // WAWebMexFetchNewsletterDirectoryCategoriesPreviewJob.mexFetchNewsletterDirectoryCategoriesPreview
-        // Descends into the standard GraphQL "data" envelope
         var data = jsonObject.getJSONObject("data");
         if (data == null) {
             return Optional.empty();
         }
 
-        // WAWebMexFetchNewsletterDirectoryCategoriesPreviewJob.mexFetchNewsletterDirectoryCategoriesPreview
-        // Extracts the operation-specific root keyed by xwa2_newsletters_directory_category_preview
         var root = data.getJSONObject("xwa2_newsletters_directory_category_preview");
         if (root == null) {
             return Optional.empty();

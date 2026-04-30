@@ -77,7 +77,7 @@ public final class MarketingMessageHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPremiumMessageSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return MarketingMessageAction.ACTION_NAME; // WAWebPremiumMessageSync.getAction
+        return MarketingMessageAction.ACTION_NAME;
     }
 
     /**
@@ -89,7 +89,7 @@ public final class MarketingMessageHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPremiumMessageSync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return MarketingMessageAction.COLLECTION_NAME; // WAWebPremiumMessageSync constructor: collectionName = Regular
+        return MarketingMessageAction.COLLECTION_NAME;
     }
 
     /**
@@ -101,7 +101,7 @@ public final class MarketingMessageHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPremiumMessageSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return MarketingMessageAction.ACTION_VERSION; // WAWebPremiumMessageSync.getVersion: return 7
+        return MarketingMessageAction.ACTION_VERSION;
     }
 
     /**
@@ -125,7 +125,7 @@ public final class MarketingMessageHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPremiumMessageSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: WAWebPremiumMessageSync.applyMutations
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -191,31 +191,25 @@ public final class MarketingMessageHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPremiumMessageSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        var indexArray = JSON.parseArray(mutation.index()); // WAWebPremiumMessageSync.applyMutations: var l = e.indexParts
-        var messageId = indexArray.getString(1); // WAWebPremiumMessageSync.applyMutations: s = l[1]
+        var indexArray = JSON.parseArray(mutation.index());
+        var messageId = indexArray.getString(1);
         if (messageId == null || messageId.isEmpty()) {
-            return malformedActionIndex(); // WAWebPremiumMessageSync.applyMutations: if (!s) return t.malformedActionIndex()
+            return malformedActionIndex();
         }
 
         if (mutation.operation() != SyncdOperation.SET) {
-            // WAWebPremiumMessageSync.applyMutations: (i++, {actionState: Unsupported})
             // The `i++` counter is dead-code in WhatsApp Web (only read by `i > 0` which is itself a no-op expression).
             return MutationApplicationResult.unsupported();
         }
 
-        // WAWebPremiumMessageSync.applyMutations: u = e.value.marketingMessageAction; if (!u) ...
         if (!(mutation.value().action().orElse(null) instanceof MarketingMessageAction action)) {
-            // WAWebPremiumMessageSync.applyMutations: r++, return WAWebSyncdIndexUtils.malformedActionValue(collectionName)
             return malformedActionValue();
         }
 
-        // WAWebPremiumMessageSync.applyMutations: var _ = u.type; if (_ == null) ...
         if (action.type().isEmpty()) {
-            // WAWebPremiumMessageSync.applyMutations: a++, return WAWebSyncdIndexUtils.malformedActionValue(collectionName)
             return malformedActionValue();
         }
 
-        // WAWebPremiumMessageSync.applyMutations:
         //   n.push({id: s, name: p, type: _, isDeleted: c, message: m, mediaId: d, sentMessageIds: new Set})
         // followed (after the loop) by:
         //   yield WAWebPremiumMessageSchema.getPremiumMessageTable().bulkCreateOrMerge(n)
@@ -226,9 +220,9 @@ public final class MarketingMessageHandler implements WebAppStateActionHandler {
         // filter on it when listing live templates). The eager copy-then-replace pattern
         // mirrors how Cobalt's other handlers update store maps without holding the
         // collection lock.
-        var messages = new HashMap<>(client.store().marketingMessages()); // ADAPTED: WAWebPremiumMessageSync.applyMutations: n = []
+        var messages = new HashMap<>(client.store().marketingMessages());
         messages.put(messageId, action); // ADAPTED: WAWebPremiumMessageSync.applyMutations: n.push({id: s, ...}) + bulkCreateOrMerge + PremiumMessageCollection.add
-        client.store().setMarketingMessages(messages); // ADAPTED: WAWebPremiumMessageSync.applyMutations: bulkCreateOrMerge
-        return MutationApplicationResult.success(); // WAWebPremiumMessageSync.applyMutations: {actionState: Success}
+        client.store().setMarketingMessages(messages);
+        return MutationApplicationResult.success();
     }
 }

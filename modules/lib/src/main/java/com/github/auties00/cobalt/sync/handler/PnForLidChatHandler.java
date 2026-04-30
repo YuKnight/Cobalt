@@ -73,7 +73,7 @@ public final class PnForLidChatHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPnForLidChatSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return PnForLidChatAction.ACTION_NAME; // WAWebPnForLidChatSync.getAction -> WASyncdConst.Actions.PnForLidChat
+        return PnForLidChatAction.ACTION_NAME;
     }
 
     /**
@@ -85,7 +85,7 @@ public final class PnForLidChatHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPnForLidChatSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return PnForLidChatAction.COLLECTION_NAME; // WAWebPnForLidChatSync: collectionName = WASyncdConst.CollectionName.Regular
+        return PnForLidChatAction.COLLECTION_NAME;
     }
 
     /**
@@ -97,7 +97,7 @@ public final class PnForLidChatHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPnForLidChatSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return PnForLidChatAction.ACTION_VERSION; // WAWebPnForLidChatSync.getVersion: return 8
+        return PnForLidChatAction.ACTION_VERSION;
     }
 
     /**
@@ -117,7 +117,7 @@ public final class PnForLidChatHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPnForLidChatSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebPnForLidChatSync.applyMutations: {actionState: SyncActionState.Success}
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -160,50 +160,41 @@ public final class PnForLidChatHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPnForLidChatSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        // WAWebPnForLidChatSync.applyMutations: if (getABPropConfigValue("pnh_pn_for_lid_chat_sync") !== true) return all Unsupported
         if (!client.abPropsService().getBool(ABProp.PNH_PN_FOR_LID_CHAT_SYNC)) {
-            return MutationApplicationResult.unsupported(); // WAWebPnForLidChatSync: {actionState: SyncActionState.Unsupported}
+            return MutationApplicationResult.unsupported();
         }
 
-        // WAWebPnForLidChatSync: if (e.operation !== "set") return {actionState: SyncActionState.Unsupported}
         if (mutation.operation() != SyncdOperation.SET) {
-            return MutationApplicationResult.unsupported(); // WAWebPnForLidChatSync: a++, {actionState: SyncActionState.Unsupported}
+            return MutationApplicationResult.unsupported();
         }
 
-        // WAWebPnForLidChatSync: var s = e.indexParts[1]
         var indexArray = JSON.parseArray(mutation.index()); // ADAPTED: Cobalt parses the raw JSON index string; WA Web's WAWebSyncdMutationParser already exposes indexParts
         var lidJidString = indexArray != null && indexArray.size() > 1 ? indexArray.getString(1) : null; // ADAPTED: out-of-bounds access in WA Web returns undefined, which fails isWidlike
-        // WAWebPnForLidChatSync: if (!isWidlike(s)) return i++, n.malformedActionIndex()
         if (lidJidString == null || lidJidString.isEmpty()) {
-            return malformedActionIndex(); // WAWebPnForLidChatSync: i++, return n.malformedActionIndex()
+            return malformedActionIndex();
         }
 
-        // WAWebPnForLidChatSync: var u = (t = e.value.pnForLidChatAction) == null ? void 0 : t.pnJid
         if (!(mutation.value().action().orElse(null) instanceof PnForLidChatAction action)) {
-            return malformedActionValue(); // WAWebPnForLidChatSync: l++, return malformedActionValue(n.collectionName)
+            return malformedActionValue();
         }
 
         var pnJid = action.pnJid().orElse(null);
-        // WAWebPnForLidChatSync: if (u == null || !isWidlike(u)) return l++, malformedActionValue(n.collectionName)
         if (pnJid == null) {
-            return malformedActionValue(); // WAWebPnForLidChatSync: l++, return malformedActionValue(n.collectionName)
+            return malformedActionValue();
         }
 
-        // WAWebPnForLidChatSync: var d = createUserLidOrThrow(s)
         // ADAPTED: WA Web splits the LID check into isWidlike (above) then createUserLidOrThrow
         // which throws if the string is not a @lid JID. Cobalt collapses both into hasLidServer()
         // and reports a non-LID widlike string as malformedActionIndex rather than propagating
         // an exception, preserving the underlying MALFORMED semantic.
         var lidJid = Jid.of(lidJidString);
         if (!lidJid.hasLidServer()) {
-            return malformedActionIndex(); // WAWebPnForLidChatSync: createUserLidOrThrow would throw — modelled as malformedActionIndex
+            return malformedActionIndex();
         }
 
-        // WAWebPnForLidChatSync: var c = createUserWidOrThrow(u); r.push({lid: d, pn: c})
-        // WAWebPnForLidChatSync: yield createLidPnMappings({mappings: r, flushImmediately: true, learningSource: "other"})
         // ADAPTED: WA Web accumulates pairs and flushes once at the end of the batch;
         // Cobalt writes each pair directly to the store, which is the sole source of truth.
         client.store().registerLidMapping(pnJid, lidJid);
-        return MutationApplicationResult.success(); // WAWebPnForLidChatSync: {actionState: SyncActionState.Success}
+        return MutationApplicationResult.success();
     }
 }

@@ -18,7 +18,7 @@ import java.util.OptionalInt;
 
 /**
  * Documented {@code is_eligible} enum carried by the
- * {@code <integrity/>} child of the success response — boolean
+ * {@code <integrity/>} child of the success response. Boolean
  * surfaced as the literal {@code "true"}/{@code "false"} pair.
  *
  * @implNote Mirrors {@code WASmaxInSmbMeteredMessagingAccountEnums.ENUM_FALSE_TRUE}.
@@ -26,12 +26,12 @@ import java.util.OptionalInt;
 @WhatsAppWebModule(moduleName = "WASmaxInSmbMeteredMessagingAccountEnums")
 public enum SmaxGetSMBMeteredMessagingCheckoutIntegrityEligibility {
     /**
-     * Literal {@code "false"} — campaign held back by integrity
+     * Literal {@code "false"}. Campaign held back by integrity
      * review.
      */
     FALSE,
     /**
-     * Literal {@code "true"} — campaign cleared.
+     * Literal {@code "true"}. Campaign cleared.
      */
     TRUE;
 

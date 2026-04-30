@@ -3,63 +3,34 @@ package com.github.auties00.cobalt.exception;
 import java.util.Optional;
 
 /**
- * Exception thrown when mobile phone number registration with the WhatsApp API fails.
- * <p>
- * This exception represents failures during the mobile registration process, which is the
- * method used by WhatsApp mobile apps to register and verify phone numbers. Registration
- * involves multiple API calls to WhatsApp's registration servers.
+ * Thrown when registering a phone number against the WhatsApp mobile
+ * registration API fails.
  *
- * <h2>Registration Flow</h2>
- * Mobile registration typically follows these steps:
- * <ol>
- *   <li><b>Request code:</b> Send phone number to receive verification code via SMS or call</li>
- *   <li><b>Receive code:</b> User receives 6-digit verification code</li>
- *   <li><b>Register code:</b> Submit the verification code to complete registration</li>
- *   <li><b>Receive credentials:</b> Server returns authentication credentials on success</li>
- * </ol>
+ * <p>Registration is the flow that asks WhatsApp to issue a verification
+ * code (by SMS or voice call), submits the code the user typed, and
+ * collects the credentials used by the mobile client to authenticate
+ * subsequent sessions. Any rejection from the registration servers
+ * (invalid number, rate limit, anti-spam block, wrong code, banned
+ * account) raises this exception. When the server returned a body, the
+ * raw response is available via {@link #erroneousResponse()} so the
+ * caller can decode the specific reason and any retry hint.
  *
- * <h2>Possible Causes</h2>
- * <ul>
- *   <li><b>Invalid phone number:</b> The phone number format is incorrect or not supported</li>
- *   <li><b>Rate limiting:</b> Too many registration attempts in a short period</li>
- *   <li><b>Anti-spam blocking:</b> WhatsApp's systems detected suspicious activity</li>
- *   <li><b>Invalid code:</b> The verification code entered was incorrect or expired</li>
- *   <li><b>Network errors:</b> Communication with registration servers failed</li>
- *   <li><b>Unsupported configuration:</b> The device or platform is not supported</li>
- *   <li><b>Account banned:</b> The phone number has been permanently banned</li>
- * </ul>
- *
- * <h2>API Response</h2>
- * When available, the raw JSON response from the registration API is captured and can
- * be retrieved via {@link #erroneousResponse()}. This response often contains:
- * <ul>
- *   <li>Error codes indicating the specific failure reason</li>
- *   <li>Retry-after timestamps for rate limiting</li>
- *   <li>Human-readable error messages</li>
- *   <li>Additional metadata for debugging</li>
- * </ul>
- *
- * <h2>Fatality</h2>
- * Registration exceptions are fatal as they prevent the client from completing
- * authentication. The user must address the underlying issue before retrying.
+ * <p>Registration failures are fatal because authentication never
+ * completed.
  */
 public final class WhatsAppRegistrationException extends WhatsAppException {
 
     /**
-     * The raw API response that caused this exception, if available.
-     * May be null if the exception occurred before or without server communication.
+     * The raw response returned by the registration API, or {@code null}
+     * when the failure happened before any server reply.
      */
     private final String erroneousResponse;
 
     /**
      * Constructs a new registration exception with a message and API response.
-     * <p>
-     * This constructor should be used when a registration failure occurs and the WhatsApp API
-     * returns an error response that may contain additional diagnostic information.
      *
-     * @param message           a descriptive error message explaining the registration failure
-     * @param erroneousResponse the raw response from the WhatsApp registration API (typically JSON);
-     *                          may be null if no response is available
+     * @param message           the detail message describing the registration failure
+     * @param erroneousResponse the raw response body returned by the registration API
      */
     public WhatsAppRegistrationException(String message, String erroneousResponse) {
         super(message);
@@ -68,11 +39,8 @@ public final class WhatsAppRegistrationException extends WhatsAppException {
 
     /**
      * Constructs a new registration exception with a descriptive message.
-     * <p>
-     * This constructor should be used for registration failures that occur before or without
-     * communication with the WhatsApp API, such as validation errors or unsupported configurations.
      *
-     * @param message a descriptive error message explaining the registration failure
+     * @param message the detail message describing the registration failure
      */
     public WhatsAppRegistrationException(String message) {
         super(message);
@@ -81,9 +49,6 @@ public final class WhatsAppRegistrationException extends WhatsAppException {
 
     /**
      * Constructs a new registration exception that wraps an underlying cause.
-     * <p>
-     * This constructor should be used when a registration failure is caused by an underlying
-     * exception, such as network errors, I/O failures, or interrupted operations.
      *
      * @param cause the underlying exception that caused the registration to fail
      */
@@ -93,38 +58,24 @@ public final class WhatsAppRegistrationException extends WhatsAppException {
     }
 
     /**
-     * Returns the raw API response that caused this exception, if available.
-     * <p>
-     * The response, when present, typically contains a JSON-formatted error message from the
-     * WhatsApp registration API with details such as:
-     * <ul>
-     *   <li><b>status:</b> Error status code (e.g., "fail", "error")</li>
-     *   <li><b>reason:</b> Machine-readable reason code (e.g., "too_recent", "blocked")</li>
-     *   <li><b>retry_after:</b> Timestamp indicating when to retry (for rate limiting)</li>
-     *   <li><b>param:</b> Additional parameters related to the error</li>
-     * </ul>
+     * Returns the raw response body returned by the registration API, if any.
      *
-     * <h2>Example Response</h2>
-     * <pre>{@code
-     * {
-     *   "status": "fail",
-     *   "reason": "too_recent",
-     *   "retry_after": 1234567890
-     * }
-     * }</pre>
+     * <p>The response is the JSON the WhatsApp registration servers
+     * produced. It typically carries a status string, a reason code, and
+     * a {@code retry_after} hint when the rejection is rate-limit
+     * driven.
      *
-     * @return an {@link Optional} containing the erroneous API response,
-     *         or empty if no response is available
+     * @return the raw response when one is available, otherwise empty
      */
     public Optional<String> erroneousResponse() {
         return Optional.ofNullable(erroneousResponse);
     }
 
     /**
-     * Returns whether this exception represents a fatal error.
-     * <p>
-     * Registration exceptions are always fatal as they prevent the client from
-     * completing the authentication process.
+     * Returns whether the failure invalidates the current session.
+     *
+     * <p>Registration must complete before a session can exist, so the
+     * failure is always fatal.
      *
      * @return {@code true}
      */

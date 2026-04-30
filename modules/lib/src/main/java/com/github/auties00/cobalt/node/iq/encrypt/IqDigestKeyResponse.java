@@ -15,8 +15,9 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants produced by the relay in
- * response to a {@link IqDigestKeyRequest}.
+ * response to an {@link IqDigestKeyRequest}.
  */
+@WhatsAppWebModule(moduleName = "WAWebDigestKeyJob")
 public sealed interface IqDigestKeyResponse extends IqOperation.Response
         permits IqDigestKeyResponse.Success, IqDigestKeyResponse.ClientError, IqDigestKeyResponse.ServerError {
 

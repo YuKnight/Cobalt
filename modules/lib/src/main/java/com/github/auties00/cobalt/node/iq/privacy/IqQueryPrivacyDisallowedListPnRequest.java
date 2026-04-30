@@ -9,7 +9,7 @@ import com.github.auties00.cobalt.node.iq.IqOperation;
 import java.util.Objects;
 
 /**
- * The outbound stanza variant — wraps a single
+ * The outbound stanza variant. Wraps a single
  * {@code <list name=CATEGORY value="contact_blacklist"/>} child in
  * the canonical {@code <iq xmlns="privacy" type="get"><privacy>...
  * </privacy></iq>} envelope.
@@ -17,8 +17,8 @@ import java.util.Objects;
 @WhatsAppWebModule(moduleName = "WAWebQueryPrivacyDisallowedListPnJob")
 public final class IqQueryPrivacyDisallowedListPnRequest implements IqOperation.Request {
     /**
-     * The privacy category whose disallowed list is being queried;
-     * routed verbatim into the {@code <list>}'s {@code name}
+     * The privacy category whose disallowed list is being queried.
+     * Routed verbatim into the {@code <list>}'s {@code name}
      * attribute (e.g. {@code "last"}, {@code "profile"},
      * {@code "groupadd"}).
      */
@@ -27,7 +27,7 @@ public final class IqQueryPrivacyDisallowedListPnRequest implements IqOperation.
     /**
      * Constructs a new request.
      *
-     * @param categoryName the privacy category name; never
+     * @param categoryName the privacy category name. Never
      *                     {@code null}
      * @throws NullPointerException if {@code categoryName} is
      *                              {@code null}
@@ -39,7 +39,7 @@ public final class IqQueryPrivacyDisallowedListPnRequest implements IqOperation.
     /**
      * Returns the privacy category being queried.
      *
-     * @return the category name; never {@code null}
+     * @return the category name. Never {@code null}
      */
     public String categoryName() {
         return categoryName;

@@ -16,18 +16,18 @@ import java.util.Optional;
 
 /**
  * Documented {@code type} enum carried by both the request and the
- * response — the high-level media-kind classifier.
+ * response. The high-level media-kind classifier.
  *
  * @implNote Mirrors {@code WASmaxInBizCtwaNativeAdEnums.ENUM_IMAGE_VIDEO}.
  */
 @WhatsAppWebModule(moduleName = "WASmaxInBizCtwaNativeAdEnums")
 public enum SmaxUploadAdMediaMediaType {
     /**
-     * Still-image media — JPEG/PNG/WebP attachments.
+     * Still-image media. JPEG/PNG/WebP attachments.
      */
     IMAGE,
     /**
-     * Video media — MP4 attachments.
+     * Video media. MP4 attachments.
      */
     VIDEO;
 

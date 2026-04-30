@@ -15,7 +15,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps the {@code <messages count …>}
+ * The outbound stanza variant. Wraps the {@code <messages count …>}
  * payload in the canonical
  * {@code <iq xmlns="newsletter" type="get" to="s.whatsapp.net">}
  * envelope.
@@ -109,7 +109,6 @@ public final class SmaxNewslettersGetNewsletterMessagesRequest implements SmaxOp
     @WhatsAppWebExport(moduleName = "WASmaxOutNewslettersGetNewsletterMessagesRequest",
             exports = "makeGetNewsletterMessagesRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutNewslettersQueryNewsletterParamsMixin: smax("smax$any", {type, jid|key, view_role?})
         var anyBuilder = new NodeBuilder()
                 .description("smax$any");
         switch (queryParams) {
@@ -124,7 +123,6 @@ public final class SmaxNewslettersGetNewsletterMessagesRequest implements SmaxOp
                 byInvite.viewRole().ifPresent(role -> anyBuilder.attribute("view_role", role));
             }
         }
-        // WASmaxOutNewslettersNewsletterMessageRequestPayloadMixin: smax("messages", {count, before|after?})
         var messagesBuilder = new NodeBuilder()
                 .description("messages")
                 .attribute("count", count);
@@ -135,8 +133,6 @@ public final class SmaxNewslettersGetNewsletterMessagesRequest implements SmaxOp
             }
         }
         messagesBuilder.content(anyBuilder.build());
-        // WASmaxOutNewslettersSelfIQGetRequestMixin: smax("iq", {to: S_WHATSAPP_NET, xmlns: "newsletter"})
-        // WASmaxOutNewslettersBaseIQGetRequestMixin: smax("iq", {id: generateId(), type: "get"})
         return new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "newsletter")

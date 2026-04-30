@@ -30,10 +30,10 @@ public sealed interface IqIssuePrivateStatsTokenResponse extends IqOperation.Res
      * Tries each {@link IqIssuePrivateStatsTokenResponse} variant in priority order and
      * returns the first that parses cleanly.
      *
-     * @param node    the inbound IQ stanza received from the relay;
-     *                never {@code null}
-     * @param request the original outbound stanza — used to
-     *                validate echoed identifiers; never
+     * @param node    the inbound IQ stanza received from the relay.
+     *                Never {@code null}
+     * @param request the original outbound stanza. Used to
+     *                validate echoed identifiers. Never
      *                {@code null}
      * @return an {@link Optional} carrying the parsed variant, or
      *         {@link Optional#empty()} when no documented variant
@@ -58,7 +58,7 @@ public sealed interface IqIssuePrivateStatsTokenResponse extends IqOperation.Res
     }
 
     /**
-     * The {@code Success} reply variant — the relay accepted the
+     * The {@code Success} reply variant. The relay accepted the
      * blinded credential and returned a signed credential together
      * with the DLEQ proof and the relay's published public key.
      *
@@ -119,7 +119,7 @@ public sealed interface IqIssuePrivateStatsTokenResponse extends IqOperation.Res
          *                         coordinate
          * @param dleqProofS       the 32-byte DLEQ proof {@code s}
          *                         coordinate
-         * @param projectName      the echoed project name; never
+         * @param projectName      the echoed project name. Never
          *                         {@code null}
          * @throws NullPointerException if any byte-array argument
          *                              or {@code projectName} is
@@ -147,7 +147,7 @@ public sealed interface IqIssuePrivateStatsTokenResponse extends IqOperation.Res
         /**
          * Returns a defensive copy of the signed-credential bytes.
          *
-         * @return a clone of the signed-credential scalar; never
+         * @return a clone of the signed-credential scalar. Never
          *         {@code null}
          */
         public byte[] signedCredential() {
@@ -157,7 +157,7 @@ public sealed interface IqIssuePrivateStatsTokenResponse extends IqOperation.Res
         /**
          * Returns a defensive copy of the ACS public key bytes.
          *
-         * @return a clone of the public-key scalar; never
+         * @return a clone of the public-key scalar. Never
          *         {@code null}
          */
         public byte[] acsPublicKey() {
@@ -168,7 +168,7 @@ public sealed interface IqIssuePrivateStatsTokenResponse extends IqOperation.Res
          * Returns a defensive copy of the DLEQ proof {@code c}
          * coordinate.
          *
-         * @return a clone of the {@code c} scalar; never
+         * @return a clone of the {@code c} scalar. Never
          *         {@code null}
          */
         public byte[] dleqProofC() {
@@ -179,7 +179,7 @@ public sealed interface IqIssuePrivateStatsTokenResponse extends IqOperation.Res
          * Returns a defensive copy of the DLEQ proof {@code s}
          * coordinate.
          *
-         * @return a clone of the {@code s} scalar; never
+         * @return a clone of the {@code s} scalar. Never
          *         {@code null}
          */
         public byte[] dleqProofS() {
@@ -189,7 +189,7 @@ public sealed interface IqIssuePrivateStatsTokenResponse extends IqOperation.Res
         /**
          * Returns the echoed project name.
          *
-         * @return the project-name string; never {@code null}
+         * @return the project-name string. Never {@code null}
          */
         public String projectName() {
             return projectName;
@@ -207,7 +207,7 @@ public sealed interface IqIssuePrivateStatsTokenResponse extends IqOperation.Res
          *
          * @implNote Mirrors
          *           {@code WASmaxInPrivatestatsSignCredentialResponseSuccess.parseSignCredentialResponseSuccess}
-         *           — validates the IQ envelope, extracts every
+         *. Validates the IQ envelope, extracts every
          *           grandchild of {@code <sign_credential>},
          *           checks the 32-byte length on each scalar, and
          *           reads the {@code t} attribute.
@@ -300,14 +300,14 @@ public sealed interface IqIssuePrivateStatsTokenResponse extends IqOperation.Res
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected
+     * The {@code ClientError} reply variant. The relay rejected
      * the credential issuance request as malformed or otherwise
      * non-retryable.
      *
      * @implNote {@code WASmaxInPrivatestatsSignCredentialResponseErrorNoRetry.parseSignCredentialResponseErrorNoRetry}
      *           routes through
      *           {@code WASmaxInPrivatestatsSignCredentialNoRetryError}
-     *           to extract a per-error-code semantic enum; Cobalt
+     *           to extract a per-error-code semantic enum. Cobalt
      *           collapses to the raw {@code (code, text)} pair.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInPrivatestatsSignCredentialResponseErrorNoRetry")
@@ -327,7 +327,7 @@ public sealed interface IqIssuePrivateStatsTokenResponse extends IqOperation.Res
          * Constructs a new client-error reply.
          *
          * @param errorCode the numeric error code
-         * @param errorText the optional human-readable text; may be
+         * @param errorText the optional human-readable text. May be
          *                  {@code null}
          */
         public ClientError(int errorCode, String errorText) {
@@ -400,14 +400,14 @@ public sealed interface IqIssuePrivateStatsTokenResponse extends IqOperation.Res
     }
 
     /**
-     * The {@code ServerError} reply variant — the relay encountered
-     * a transient internal failure while issuing the credential;
-     * the caller may retry after a backoff.
+     * The {@code ServerError} reply variant. The relay encountered
+     * a transient internal failure while issuing the credential.
+     * The caller may retry after a backoff.
      *
      * @implNote {@code WASmaxInPrivatestatsSignCredentialResponseErrorRetry.parseSignCredentialResponseErrorRetry}
      *           extracts the canonical
      *           {@code <error code text/>} child via
-     *           {@code WASmaxInPrivatestatsIQErrorInternalServerErrorMixin};
+     *           {@code WASmaxInPrivatestatsIQErrorInternalServerErrorMixin}.
      *           Cobalt routes through the shared
      *           {@link SmaxBaseServerErrorMixin}.
      */
@@ -428,7 +428,7 @@ public sealed interface IqIssuePrivateStatsTokenResponse extends IqOperation.Res
          * Constructs a new server-error reply.
          *
          * @param errorCode the numeric error code
-         * @param errorText the optional human-readable text; may be
+         * @param errorText the optional human-readable text. May be
          *                  {@code null}
          */
         public ServerError(int errorCode, String errorText) {

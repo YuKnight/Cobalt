@@ -75,7 +75,7 @@ public final class ArchiveChatHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebArchiveChatSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return ArchiveChatAction.ACTION_NAME; // WAWebArchiveChatSync.getAction -> WASyncdConst.Actions.Archive
+        return ArchiveChatAction.ACTION_NAME;
     }
 
     /**
@@ -91,7 +91,7 @@ public final class ArchiveChatHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebArchiveChatSync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return ArchiveChatAction.COLLECTION_NAME; // WAWebArchiveChatSync.collectionName = WASyncdConst.CollectionName.RegularLow
+        return ArchiveChatAction.COLLECTION_NAME;
     }
 
     /**
@@ -103,7 +103,7 @@ public final class ArchiveChatHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebArchiveChatSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return ArchiveChatAction.ACTION_VERSION; // WAWebArchiveChatSync.getVersion -> 3
+        return ArchiveChatAction.ACTION_VERSION;
     }
 
     /**
@@ -121,7 +121,7 @@ public final class ArchiveChatHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebArchiveChatSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebArchiveChatSync.applyMutations
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -149,40 +149,39 @@ public final class ArchiveChatHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebArchiveChatSync", exports = {"applyMutations", "validateSyncActionValue", "getMessageRange"}, adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        if (mutation.operation() != SyncdOperation.SET) { // WAWebArchiveChatSync.applyMutations: e.operation === "set" check, else return Unsupported
-            return MutationApplicationResult.unsupported(); // WAWebArchiveChatSync.applyMutations: d++, {actionState: Unsupported}
+        if (mutation.operation() != SyncdOperation.SET) {
+            return MutationApplicationResult.unsupported();
         }
 
-        try { // WAWebArchiveChatSync.applyMutations: try/catch wrapping per-mutation logic
-            if (!(mutation.value().action().orElse(null) instanceof ArchiveChatAction action)) { // WAWebArchiveChatSync.applyMutations: var n = e.value
-                return malformedActionValue(); // WAWebArchiveChatSync.applyMutations: validateSyncActionValue returns null -> malformedActionValue(collectionName)
+        try {
+            if (!(mutation.value().action().orElse(null) instanceof ArchiveChatAction action)) {
+                return malformedActionValue();
             }
 
-            var chatJidString = JSON.parseArray(mutation.index()).getString(1); // WAWebArchiveChatSync.applyMutations: var s = t[1]
-            if (chatJidString == null || chatJidString.isEmpty()) { // WAWebArchiveChatSync.applyMutations: if (!s || !isWid(s)) return malformedActionIndex()
-                return malformedActionIndex(); // WAWebArchiveChatSync.applyMutations: this.malformedActionIndex()
+            var chatJidString = JSON.parseArray(mutation.index()).getString(1);
+            if (chatJidString == null || chatJidString.isEmpty()) {
+                return malformedActionIndex();
             }
 
-            var chatJid = Jid.of(chatJidString); // WAWebArchiveChatSync.applyMutations: createWid(s)
+            var chatJid = Jid.of(chatJidString);
             if (chatJid == null) { // ADAPTED: Jid.of returns null for null input; WA Web uses isWid() validation
-                return malformedActionIndex(); // WAWebArchiveChatSync.applyMutations: this.malformedActionIndex()
+                return malformedActionIndex();
             }
 
-            var chat = client.store().findChatByJid(chatJid); // WAWebArchiveChatSync.applyMutations: resolveChatForMutationIndex(createWid(s))
-            if (chat.isEmpty()) { // WAWebArchiveChatSync.applyMutations: if (!u.success) return orphan
-                return MutationApplicationResult.orphan(chatJidString, "Chat"); // WAWebArchiveChatSync.applyMutations: {actionState: Orphan, orphanModel: u.orphanModel}
+            var chat = client.store().findChatByJid(chatJid);
+            if (chat.isEmpty()) {
+                return MutationApplicationResult.orphan(chatJidString, "Chat");
             }
 
-            // WAWebArchiveChatSync.validateSyncActionValue: checks archived != null and messageRange != null
             // In Cobalt, archived() null-coalesces to false via ArchiveChatAction.archived(),
             // so null archived effectively means "unarchive" which is still valid behavior.
             // The messageRange validation is skipped because Cobalt does not maintain active
             // message ranges (browser-specific IndexedDB concern).
             // See $ArchiveChatSync$p_2 — the core archive state change is always applied.
             chat.get().setArchived(action.archived()); // ADAPTED: WAWebArchiveChatSync.$ArchiveChatSync$p_2 — Cobalt applies archive directly without message range gating
-            return MutationApplicationResult.success(); // WAWebArchiveChatSync.applyMutations: g.syncApplyActionResult
-        } catch (Exception e) { // WAWebArchiveChatSync.applyMutations: catch(e) { return {actionState: Failed} }
-            return MutationApplicationResult.failed(); // WAWebArchiveChatSync.applyMutations: {actionState: SyncActionState.Failed}
+            return MutationApplicationResult.success();
+        } catch (Exception e) {
+            return MutationApplicationResult.failed();
         }
     }
 
@@ -216,11 +215,11 @@ public final class ArchiveChatHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebArchiveChatSync", exports = "resolveConflicts", adaptation = WhatsAppAdaptation.ADAPTED)
     public ConflictResolution resolveConflicts(DecryptedMutation.Trusted localMutation, DecryptedMutation.Trusted remoteMutation) {
-        var localAction = localMutation.value().action() // WAWebArchiveChatSync.resolveConflicts: var u = nullthrows(a.archiveChatAction)
+        var localAction = localMutation.value().action()
                 .filter(a -> a instanceof ArchiveChatAction)
                 .map(a -> (ArchiveChatAction) a)
                 .orElse(null);
-        var remoteAction = remoteMutation.value().action() // WAWebArchiveChatSync.resolveConflicts: var c = nullthrows(i?.archiveChatAction)
+        var remoteAction = remoteMutation.value().action()
                 .filter(a -> a instanceof ArchiveChatAction)
                 .map(a -> (ArchiveChatAction) a)
                 .orElse(null);
@@ -229,46 +228,45 @@ public final class ArchiveChatHandler implements WebAppStateActionHandler {
             return ConflictResolution.of(ConflictResolutionState.APPLY_REMOTE_DROP_LOCAL); // ADAPTED: defensive fallback
         }
 
-        var localRange = localAction.messageRange().orElse(null); // WAWebArchiveChatSync.resolveConflicts: nullthrows(u.messageRange)
-        var remoteRange = remoteAction.messageRange().orElse(null); // WAWebArchiveChatSync.resolveConflicts: nullthrows(c.messageRange)
+        var localRange = localAction.messageRange().orElse(null);
+        var remoteRange = remoteAction.messageRange().orElse(null);
 
         if (localRange == null || remoteRange == null) { // ADAPTED: WA Web uses nullthrows; Cobalt gracefully falls back
             return ConflictResolution.of(ConflictResolutionState.APPLY_REMOTE_DROP_LOCAL); // ADAPTED: defensive fallback
         }
 
-        return switch (MessageRangeUtils.compareMessageRanges(remoteRange, localRange)) { // WAWebArchiveChatSync.resolveConflicts: compareMessageRanges(nullthrows(c.messageRange), nullthrows(u.messageRange))
-            case RANGE_A_ENCLOSES_RANGE_B -> // WAWebArchiveChatSync.resolveConflicts: case RangeAEnclosesRangeB -> ApplyRemoteAndDropLocal
+        return switch (MessageRangeUtils.compareMessageRanges(remoteRange, localRange)) {
+            case RANGE_A_ENCLOSES_RANGE_B ->
                     ConflictResolution.of(ConflictResolutionState.APPLY_REMOTE_DROP_LOCAL);
-            case RANGE_B_ENCLOSES_RANGE_A -> // WAWebArchiveChatSync.resolveConflicts: case RangeBEnclosesRangeA -> SkipRemote
+            case RANGE_B_ENCLOSES_RANGE_A ->
                     ConflictResolution.of(ConflictResolutionState.SKIP_REMOTE);
-            case RANGES_ARE_EQUAL -> // WAWebArchiveChatSync.resolveConflicts: case RangesAreEqual -> timestamp tiebreaker
-                    localMutation.timestamp().compareTo(remoteMutation.timestamp()) <= 0 // WAWebArchiveChatSync.resolveConflicts: l <= s
-                            ? ConflictResolution.of(ConflictResolutionState.APPLY_REMOTE_DROP_LOCAL) // WAWebArchiveChatSync.resolveConflicts: ApplyRemoteAndDropLocal
-                            : ConflictResolution.of(ConflictResolutionState.SKIP_REMOTE); // WAWebArchiveChatSync.resolveConflicts: SkipRemote
-            case RANGES_NOT_ENCLOSING -> { // WAWebArchiveChatSync.resolveConflicts: case RangesNotEnclosing
-                var localWins = localMutation.timestamp().compareTo(remoteMutation.timestamp()) > 0; // WAWebArchiveChatSync.resolveConflicts: l <= s check (inverted for localWins)
-                var archived = localWins ? localAction.archived() : remoteAction.archived(); // WAWebArchiveChatSync.resolveConflicts: l <= s ? (c.archived ?? false) : (u.archived ?? false)
-                var mergedRange = MessageRangeUtils.mergeMessageRanges(remoteRange, localRange); // WAWebArchiveChatSync.resolveConflicts: mergeMessageRanges(nullthrows(c.messageRange), nullthrows(u.messageRange))
-                var mergedAction = new ArchiveChatActionBuilder() // WAWebArchiveChatSync.resolveConflicts: var y = {archived: g, messageRange: h}
-                        .archived(archived) // WAWebArchiveChatSync.resolveConflicts: archived: g
-                        .messageRange(mergedRange) // WAWebArchiveChatSync.resolveConflicts: messageRange: h
+            case RANGES_ARE_EQUAL ->
+                    localMutation.timestamp().compareTo(remoteMutation.timestamp()) <= 0
+                            ? ConflictResolution.of(ConflictResolutionState.APPLY_REMOTE_DROP_LOCAL)
+                            : ConflictResolution.of(ConflictResolutionState.SKIP_REMOTE);
+            case RANGES_NOT_ENCLOSING -> {
+                var localWins = localMutation.timestamp().compareTo(remoteMutation.timestamp()) > 0;
+                var archived = localWins ? localAction.archived() : remoteAction.archived();
+                var mergedRange = MessageRangeUtils.mergeMessageRanges(remoteRange, localRange);
+                var mergedAction = new ArchiveChatActionBuilder()
+                        .archived(archived)
+                        .messageRange(mergedRange)
                         .build();
-                var mergedValue = new SyncActionValueBuilder() // WAWebArchiveChatSync.resolveConflicts: extends({}, i, {archiveChatAction: y})
-                        .timestamp(remoteMutation.timestamp()) // WAWebArchiveChatSync.resolveConflicts: timestamp from remote value (i)
-                        .archiveChatAction(mergedAction) // WAWebArchiveChatSync.resolveConflicts: archiveChatAction: y
+                var mergedValue = new SyncActionValueBuilder()
+                        .timestamp(remoteMutation.timestamp())
+                        .archiveChatAction(mergedAction)
                         .build();
-                var merged = new DecryptedMutation.Trusted( // WAWebArchiveChatSync.resolveConflicts: extends({}, e, {binarySyncAction: C}); delete b.id
-                        localMutation.index(), // WAWebArchiveChatSync.resolveConflicts: from local (e.index)
-                        mergedValue, // WAWebArchiveChatSync.resolveConflicts: merged binary value
-                        localMutation.operation(), // WAWebArchiveChatSync.resolveConflicts: from local (e.operation)
-                        localMutation.timestamp(), // WAWebArchiveChatSync.resolveConflicts: from local (e.timestamp)
-                        localMutation.actionVersion() // WAWebArchiveChatSync.resolveConflicts: from local (e.version)
+                var merged = new DecryptedMutation.Trusted(
+                        localMutation.index(),
+                        mergedValue,
+                        localMutation.operation(),
+                        localMutation.timestamp(),
+                        localMutation.actionVersion()
                 );
-                // WAWebArchiveChatSync.resolveConflicts: lockForMessageRangeSync -> addActiveMessageRange + setArchive
                 // ADAPTED: In WA Web, the merged mutation is applied to the chat DB immediately
                 // during conflict resolution via lockForMessageRangeSync. In Cobalt, the merged
                 // mutation is returned for the caller to apply, separating resolution from application.
-                yield ConflictResolution.merged(merged); // WAWebArchiveChatSync.resolveConflicts: return SkipRemoteAndDropLocal
+                yield ConflictResolution.merged(merged);
             }
         };
     }
@@ -303,23 +301,23 @@ public final class ArchiveChatHandler implements WebAppStateActionHandler {
             Jid chatJid,
             SyncActionMessageRange messageRange
     ) {
-        var action = new ArchiveChatActionBuilder() // WAWebArchiveChatSync.getArchiveChatMutation: {archiveChatAction: {archived: t, messageRange: ...}}
-                .archived(archived) // WAWebArchiveChatSync.getArchiveChatMutation: archived: t
-                .messageRange(messageRange) // WAWebArchiveChatSync.getArchiveChatMutation: messageRange: constructMessageRange(n, {forOutgoingMutation: true, mutationIndexJid: r})
+        var action = new ArchiveChatActionBuilder()
+                .archived(archived)
+                .messageRange(messageRange)
                 .build();
-        var value = new SyncActionValueBuilder() // WAWebSyncdActionUtils.buildPendingMutation: encodeProtobuf(SyncActionValueSpec, {...l, timestamp: i})
-                .timestamp(timestamp) // WAWebSyncdActionUtils.buildPendingMutation: timestamp: e
-                .archiveChatAction(action) // WAWebArchiveChatSync.getArchiveChatMutation: {archiveChatAction: ...}
+        var value = new SyncActionValueBuilder()
+                .timestamp(timestamp)
+                .archiveChatAction(action)
                 .build();
-        var index = JSON.toJSONString(List.of(actionName(), chatJid.toString())); // WAWebSyncdActionUtils.buildPendingMutation: index = JSON.stringify([action].concat(indexArgs)) where indexArgs = [r]
-        var mutation = new DecryptedMutation.Trusted( // WAWebSyncdActionUtils.buildPendingMutation: return { collection, index, binarySyncAction, version, operation, timestamp, action }
+        var index = JSON.toJSONString(List.of(actionName(), chatJid.toString()));
+        var mutation = new DecryptedMutation.Trusted(
                 index,
                 value,
-                SyncdOperation.SET, // WAWebArchiveChatSync.getArchiveChatMutation: operation: SyncdMutation$SyncdOperation.SET
+                SyncdOperation.SET,
                 timestamp,
                 version()
         );
-        return new SyncPendingMutation(mutation, 0); // WAWebSyncdActionUtils.buildPendingMutation
+        return new SyncPendingMutation(mutation, 0);
     }
 
     /**
@@ -347,10 +345,10 @@ public final class ArchiveChatHandler implements WebAppStateActionHandler {
             Jid chatJid,
             SyncActionMessageRange messageRange
     ) {
-        var mutations = new ArrayList<SyncPendingMutation>(); // WAWebArchiveChatSync.getMutationsForArchive: var a = [this.getArchiveChatMutation(e, t, r)]
-        mutations.add(getArchiveChatMutation(timestamp, archived, chatJid, messageRange)); // WAWebArchiveChatSync.getMutationsForArchive: this.getArchiveChatMutation(e, t, r)
-        if (archived) { // WAWebArchiveChatSync.getMutationsForArchive: t && a.push(PinChatSync.getPinMutation(e, false, r))
-            mutations.add(PinChatHandler.INSTANCE.getPinMutation(timestamp, false, chatJid)); // WAWebArchiveChatSync.getMutationsForArchive: PinChatSync.getPinMutation(e, false, r)
+        var mutations = new ArrayList<SyncPendingMutation>();
+        mutations.add(getArchiveChatMutation(timestamp, archived, chatJid, messageRange));
+        if (archived) {
+            mutations.add(PinChatHandler.INSTANCE.getPinMutation(timestamp, false, chatJid));
         }
         return mutations;
     }

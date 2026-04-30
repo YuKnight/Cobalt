@@ -60,7 +60,7 @@ public final class MerchantPaymentPartnerHandler implements WebAppStateActionHan
      */
     @Override
     public String actionName() {
-        return MerchantPaymentPartnerAction.ACTION_NAME; // WAWebMerchantPaymentPartnerSync.getAction
+        return MerchantPaymentPartnerAction.ACTION_NAME;
     }
 
     /**
@@ -72,7 +72,7 @@ public final class MerchantPaymentPartnerHandler implements WebAppStateActionHan
      */
     @Override
     public SyncPatchType collectionName() {
-        return MerchantPaymentPartnerAction.COLLECTION_NAME; // WAWebMerchantPaymentPartnerSync: collectionName = WASyncdConst.CollectionName.RegularLow
+        return MerchantPaymentPartnerAction.COLLECTION_NAME;
     }
 
     /**
@@ -83,7 +83,7 @@ public final class MerchantPaymentPartnerHandler implements WebAppStateActionHan
      */
     @Override
     public int version() {
-        return MerchantPaymentPartnerAction.ACTION_VERSION; // WAWebMerchantPaymentPartnerSync.getVersion
+        return MerchantPaymentPartnerAction.ACTION_VERSION;
     }
 
     /**
@@ -102,7 +102,7 @@ public final class MerchantPaymentPartnerHandler implements WebAppStateActionHan
      */
     @Override
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: WAWebMerchantPaymentPartnerSync.applyMutations
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -139,29 +139,24 @@ public final class MerchantPaymentPartnerHandler implements WebAppStateActionHan
      */
     @Override
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        // WAWebMerchantPaymentPartnerSync.applyMutations: if (WAWebMobilePlatforms.isSMB() !== true) return ... Unsupported
         var platform = client.store().device().platform(); // ADAPTED: WAWebMobilePlatforms.isSMB — checks c === u.SMBA || c === u.SMBI where SMBA = "smba" (ANDROID_BUSINESS) and SMBI = "smbi" (IOS_BUSINESS)
         if (platform != ClientPlatformType.IOS_BUSINESS && platform != ClientPlatformType.ANDROID_BUSINESS) {
-            return MutationApplicationResult.unsupported(); // WAWebMerchantPaymentPartnerSync.applyMutations: WALogger.WARN("[MerchantPaymentPartner] unsupported: not SMB"); return t.map(() => ({actionState: Unsupported}))
+            return MutationApplicationResult.unsupported();
         }
 
-        // WAWebMerchantPaymentPartnerSync.applyMutations: if (WAWebABProps.getABPropConfigValue("payments_br_merchant_psp_account_status_sync") !== true) return ... Unsupported
         if (!client.abPropsService().getBool(ABProp.PAYMENTS_BR_MERCHANT_PSP_ACCOUNT_STATUS_SYNC)) {
-            return MutationApplicationResult.unsupported(); // WAWebMerchantPaymentPartnerSync.applyMutations: WALogger.WARN("[MerchantPaymentPartner] unsupported: ABProp failed"); return t.map(() => ({actionState: Unsupported}))
+            return MutationApplicationResult.unsupported();
         }
 
-        // WAWebMerchantPaymentPartnerSync.applyMutations: if (e.operation !== "set") { a++; return {actionState: Unsupported} }
         if (mutation.operation() != SyncdOperation.SET) {
-            return MutationApplicationResult.unsupported(); // WAWebMerchantPaymentPartnerSync.applyMutations: a++, return {actionState: Unsupported}
+            return MutationApplicationResult.unsupported();
         }
 
-        // WAWebMerchantPaymentPartnerSync.applyMutations: var t = e.value.merchantPaymentPartnerAction; if (t == null) { i++; return malformedActionValue(n.collectionName) }
         if (!(mutation.value().action().orElse(null) instanceof MerchantPaymentPartnerAction action)) {
-            return malformedActionValue(); // WAWebSyncdIndexUtils.malformedActionValue(n.collectionName)
+            return malformedActionValue();
         }
 
-        // WAWebMerchantPaymentPartnerSync.applyMutations: r("WAWebUserPrefsMerchantPaymentPartner").setMerchantPaymentPartner(t)
         client.store().setMerchantPaymentPartner(action); // ADAPTED: WAWebUserPrefsMerchantPaymentPartner.setMerchantPaymentPartner -> WhatsAppStore.setMerchantPaymentPartner
-        return MutationApplicationResult.success(); // WAWebMerchantPaymentPartnerSync.applyMutations: {actionState: SyncActionState.Success}
+        return MutationApplicationResult.success();
     }
 }

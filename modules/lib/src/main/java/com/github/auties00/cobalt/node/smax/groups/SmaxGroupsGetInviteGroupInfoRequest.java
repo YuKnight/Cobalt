@@ -67,13 +67,10 @@ public final class SmaxGroupsGetInviteGroupInfoRequest implements SmaxOperation.
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsGetInviteGroupInfoRequest",
             exports = "makeGetInviteGroupInfoRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutGroupsGetInviteGroupInfoRequest: smax("invite", {code: CUSTOM_STRING(t)})
         var inviteNode = new NodeBuilder()
                 .description("invite")
                 .attribute("code", inviteCode)
                 .build();
-        // WASmaxOutGroupsBaseGetServerMixin: smax("iq", {to: G_US, xmlns: "w:g2"})
-        // WASmaxOutGroupsBaseIQGetRequestMixin: smax("iq", {id: generateId(), type: "get"})
         return new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "w:g2")

@@ -111,19 +111,12 @@ public final class ReceiptStreamHandler implements SocketStream.Handler {
      */
     @Override
     public void handle(Node node) {
-        // WAWebCommsHandleWorkerCompatibleStanza.handleWorkerCompatibleStanza:
-        //     if (isCallReceipt(t)) return WAWebHandleVoipCallReceipt.handleCallReceipt(t)
         if (isCallReceipt(node)) {
             callReceiptHandler.handle(node);
             return;
         }
 
-        // WAWebCommsHandleMessagingStanza.handleMessagingStanza:
-        //     if (!isCallReceipt(e) && t.type !== "retry") return WAWebHandleMsgReceipt(e)
-        // WAWebCommsHandleLoggedInStanza.handleLoggedInStanza:
-        //     if (n.type === "retry" || n.type === "enc_rekey_retry") return handleMessageRetryRequest(e)
-        // Both branches land in MessageReceiptStreamHandler, which internally
-        // splits retry vs. regular via isRetryReceipt().
+        // Both retry and regular receipts land in MessageReceiptStreamHandler, which performs the retry vs regular split via isRetryReceipt().
         messageReceiptHandler.handle(node);
     }
 
@@ -151,11 +144,7 @@ public final class ReceiptStreamHandler implements SocketStream.Handler {
      * {@code "offer"}, {@code "accept"}, and {@code "reject"}.
      */
     private boolean isCallReceipt(Node node) {
-        // WAWebCommsHandleStanzaUtils.isCallReceipt:
-        //     Array.isArray(e.content) && e.content.length > 0
         var child = node.getChild().orElse(null);
-        // WAWebCommsHandleStanzaUtils.isCallReceipt:
-        //     t === "offer" || t === "accept" || t === "reject"
         return child != null && switch (child.description()) {
             case "offer", "accept", "reject" -> true;
             default -> false;

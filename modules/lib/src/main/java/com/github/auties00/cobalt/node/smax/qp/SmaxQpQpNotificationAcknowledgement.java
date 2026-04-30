@@ -11,13 +11,13 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound acknowledgement stanza — emitted by the client back
+ * The outbound acknowledgement stanza. Emitted by the client back
  * through the socket pipeline after consuming the {@link SmaxQpQpNotificationResponse}
  * notification.
  *
  * @implNote {@code WASmaxOutQpSurfacesQPNotificationResponseAck.makeQPNotificationResponseAck}
  *           composes
- *           {@code WASmaxOutQpSurfacesNotificationClientAckMixin} —
+ *           {@code WASmaxOutQpSurfacesNotificationClientAckMixin} .
  *           an {@code <ack id to class="notification" type/>} stanza
  *           echoing the notification's {@code id},
  *           {@code from} (as the ack's {@code to}) and {@code type}
@@ -46,10 +46,10 @@ public final class SmaxQpQpNotificationAcknowledgement implements SmaxOperation.
     /**
      * Constructs an acknowledgement.
      *
-     * @param notificationId   the notification id; never {@code null}
-     * @param notificationFrom the notification's sender JID; never
+     * @param notificationId   the notification id. Never {@code null}
+     * @param notificationFrom the notification's sender JID. Never
      *                         {@code null}
-     * @param notificationType the notification type; never
+     * @param notificationType the notification type. Never
      *                         {@code null}
      * @throws NullPointerException if any argument is {@code null}
      */
@@ -63,7 +63,7 @@ public final class SmaxQpQpNotificationAcknowledgement implements SmaxOperation.
      * Constructs an acknowledgement from a parsed {@link SmaxQpQpNotificationResponse}
      * notification.
      *
-     * @param inbound the inbound notification; never {@code null}
+     * @param inbound the inbound notification. Never {@code null}
      * @return a new acknowledgement
      * @throws NullPointerException if {@code inbound} is {@code null}
      */
@@ -78,7 +78,7 @@ public final class SmaxQpQpNotificationAcknowledgement implements SmaxOperation.
      * stanza, lifting the {@code id}/{@code from}/{@code type}
      * attributes verbatim.
      *
-     * @param notification the inbound notification stanza; never
+     * @param notification the inbound notification stanza. Never
      *                     {@code null}
      * @return a new acknowledgement
      * @throws NullPointerException     if {@code notification} is
@@ -101,7 +101,7 @@ public final class SmaxQpQpNotificationAcknowledgement implements SmaxOperation.
     /**
      * Returns the notification id being acknowledged.
      *
-     * @return the id; never {@code null}
+     * @return the id. Never {@code null}
      */
     public String notificationId() {
         return notificationId;
@@ -110,7 +110,7 @@ public final class SmaxQpQpNotificationAcknowledgement implements SmaxOperation.
     /**
      * Returns the notification sender JID.
      *
-     * @return the sender JID; never {@code null}
+     * @return the sender JID. Never {@code null}
      */
     public Jid notificationFrom() {
         return notificationFrom;
@@ -119,7 +119,7 @@ public final class SmaxQpQpNotificationAcknowledgement implements SmaxOperation.
     /**
      * Returns the notification type.
      *
-     * @return the type; never {@code null}
+     * @return the type. Never {@code null}
      */
     public String notificationType() {
         return notificationType;

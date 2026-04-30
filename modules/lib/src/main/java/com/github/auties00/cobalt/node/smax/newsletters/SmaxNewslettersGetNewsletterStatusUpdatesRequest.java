@@ -15,7 +15,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps the
+ * The outbound stanza variant. Wraps the
  * {@code <status_updates count since? before|after>} payload in the
  * canonical
  * {@code <iq xmlns="newsletter" type="get" to=NEWSLETTER_JID>}
@@ -118,8 +118,6 @@ public final class SmaxNewslettersGetNewsletterStatusUpdatesRequest implements S
             exports = "makeGetNewsletterStatusUpdatesRequest",
             adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutNewslettersGetNewsletterStatusUpdatesRequest:
-        //   smax("status_updates", {count, since: OPTIONAL(INT), before|after})
         var updatesBuilder = new NodeBuilder()
                 .description("status_updates")
                 .attribute("count", count);
@@ -130,8 +128,6 @@ public final class SmaxNewslettersGetNewsletterStatusUpdatesRequest implements S
             case SmaxNewslettersGetNewsletterStatusUpdatesDirection.Before before -> updatesBuilder.attribute("before", before.pivot());
             case SmaxNewslettersGetNewsletterStatusUpdatesDirection.After after -> updatesBuilder.attribute("after", after.pivot());
         }
-        // WASmaxOutNewslettersNewsletterIQGetRequestMixin: smax("iq", {to: JID(iqTo), xmlns: "newsletter"})
-        // WASmaxOutNewslettersBaseIQGetRequestMixin: smax("iq", {id: generateId(), type: "get"})
         return new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "newsletter")

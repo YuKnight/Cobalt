@@ -13,8 +13,10 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Sealed family of inbound reply variants.
+ * Sealed family of inbound reply variants produced by the relay in
+ * response to an {@link IqQueryCtwaContextRequest}.
  */
+@WhatsAppWebModule(moduleName = "WAWebQueryCtwaContextJob")
 public sealed interface IqQueryCtwaContextResponse extends IqOperation.Response
         permits IqQueryCtwaContextResponse.Success, IqQueryCtwaContextResponse.ClientError, IqQueryCtwaContextResponse.ServerError {
 

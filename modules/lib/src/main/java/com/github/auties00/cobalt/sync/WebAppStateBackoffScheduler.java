@@ -34,21 +34,21 @@ public final class WebAppStateBackoffScheduler implements Closeable {
      *
      * @implNote WASyncdConst.BACKOFF_MIN_TIMEOUT (s = 1e3)
      */
-    private static final long BASE_DELAY_MS = 1000; // WASyncdConst.BACKOFF_MIN_TIMEOUT (s = 1e3)
+    private static final long BASE_DELAY_MS = 1000;
 
     /**
      * Maximum backoff delay in milliseconds (1 hour).
      *
      * @implNote WASyncdConst.BACKOFF_MAX_TIMEOUT (u = 1e3 * 60 * 60)
      */
-    private static final long MAX_DELAY_MS = 3_600_000; // WASyncdConst.BACKOFF_MAX_TIMEOUT (u = 1e3*60*60)
+    private static final long MAX_DELAY_MS = 3_600_000;
 
     /**
      * Exponential backoff base multiplier.
      *
      * @implNote WASyncdConst.BACKOFF_BASE (c = 2)
      */
-    private static final int MULTIPLIER = 2; // WASyncdConst.BACKOFF_BASE (c = 2)
+    private static final int MULTIPLIER = 2;
 
     /**
      * Maximum duration (in milliseconds) that a collection may remain in finite retry
@@ -56,7 +56,7 @@ public final class WebAppStateBackoffScheduler implements Closeable {
      *
      * @implNote WASyncdConst.FINITE_FAILURE_EXPIRY_DURATION (d = DAY_MILLISECONDS * 2 = 172800000)
      */
-    private static final long FINITE_FAILURE_EXPIRY_MS = 2 * 24 * 60 * 60 * 1000L; // WASyncdConst.FINITE_FAILURE_EXPIRY_DURATION (d = DAY_MILLISECONDS * 2)
+    private static final long FINITE_FAILURE_EXPIRY_MS = 2 * 24 * 60 * 60 * 1000L;
 
     /**
      * Per-collection pending retry futures, replacing WA Web's single global timeout handle.
@@ -64,14 +64,14 @@ public final class WebAppStateBackoffScheduler implements Closeable {
      * @implNote ADAPTED: WAWebSyncd.O (single setTimeout handle) mapped to per-collection map
      *     for concurrent collection-level retries on virtual threads
      */
-    private final ConcurrentHashMap<SyncPatchType, CompletableFuture<?>> pendingRetries; // ADAPTED: WAWebSyncd.O (single setTimeout handle -> per-collection map)
+    private final ConcurrentHashMap<SyncPatchType, CompletableFuture<?>> pendingRetries;
 
     /**
      * Global attempt counter shared across all collections.
      *
      * @implNote WAWebSyncd.W (var W = 0)
      */
-    private final AtomicInteger globalAttemptCounter; // WAWebSyncd.W (var W = 0)
+    private final AtomicInteger globalAttemptCounter;
 
     /**
      * Sticky server-suggested backoff floor in milliseconds. This value persists across
@@ -80,7 +80,7 @@ public final class WebAppStateBackoffScheduler implements Closeable {
      *
      * @implNote WAWebSyncd.q (var q = 0 — module-level sticky server backoff)
      */
-    private final AtomicLong stickyServerBackoffMs; // WAWebSyncd.q (var q = 0)
+    private final AtomicLong stickyServerBackoffMs;
 
     /**
      * Constructs a new {@code WebAppStateBackoffScheduler} with zeroed counters.
@@ -97,19 +97,19 @@ public final class WebAppStateBackoffScheduler implements Closeable {
      * Schedules a retry with exponential backoff using the global attempt counter,
      * optionally updating the sticky server backoff floor.
      *
-     * <p>If {@code serverBackoffMs} is non-null, the sticky server backoff floor is updated
-     * to that value before computing the delay. This preserves backward compatibility with
-     * callers that pass the server backoff directly.
+     * <p>When {@code serverBackoffMs} is non-null the sticky server backoff floor is
+     * updated to that value before computing the delay, preserving backward
+     * compatibility with callers that pass the server backoff directly.
      *
-     * @implNote WAWebSyncd.te (retry scheduling), WAWebSyncd.ne (backoff computation),
-     *     WAWebSyncd.ee (q = serverBackoff when ErrorRetry),
-     *     WAWebSyncdCollectionsStateMachine.getExpiredCollections (expiry check)
-     * @param collectionName       the collection to retry
+     * @param collectionName        the collection to retry
      * @param firstFailureTimestamp the timestamp of the first failure in this series
-     * @param serverBackoffMs      the server-suggested backoff in milliseconds, or {@code null}
-     *                             to use the existing sticky value
-     * @param retryAction          the action to execute on retry
+     * @param serverBackoffMs       the server-suggested backoff in milliseconds, or
+     *                              {@code null} to keep the existing sticky value
+     * @param retryAction           the action to execute on retry
      * @return {@code true} if the retry was scheduled, {@code false} if the failure window expired
+     * @implNote WAWebSyncd.te (retry scheduling), WAWebSyncd.ne (backoff computation),
+     *           WAWebSyncd.ee (q = serverBackoff when ErrorRetry),
+     *           WAWebSyncdCollectionsStateMachine.getExpiredCollections (expiry check).
      */
     public boolean scheduleRetry(SyncPatchType collectionName, long firstFailureTimestamp, Long serverBackoffMs, Runnable retryAction) {
         if (serverBackoffMs != null) {
@@ -122,16 +122,16 @@ public final class WebAppStateBackoffScheduler implements Closeable {
      * Schedules a retry with exponential backoff using the global attempt counter.
      *
      * <p>The global attempt counter is incremented on each call. The delay is computed
-     * using the current attempt number and the sticky server backoff floor. If the
-     * elapsed time since the first failure exceeds the finite failure expiry window,
+     * using the current attempt number and the sticky server backoff floor. When the
+     * elapsed time since the first failure exceeds the finite failure expiry window
      * the retry is rejected and this method returns {@code false}.
      *
-     * @implNote WAWebSyncd.te (retry scheduling), WAWebSyncd.ne (backoff computation),
-     *     WAWebSyncdCollectionsStateMachine.getExpiredCollections (expiry check)
-     * @param collectionName       the collection to retry
+     * @param collectionName        the collection to retry
      * @param firstFailureTimestamp the timestamp of the first failure in this series
-     * @param retryAction          the action to execute on retry
+     * @param retryAction           the action to execute on retry
      * @return {@code true} if the retry was scheduled, {@code false} if the failure window expired
+     * @implNote WAWebSyncd.te (retry scheduling), WAWebSyncd.ne (backoff computation),
+     *           WAWebSyncdCollectionsStateMachine.getExpiredCollections (expiry check).
      */
     public boolean scheduleRetry(SyncPatchType collectionName, long firstFailureTimestamp, Runnable retryAction) {
         // WAWebSyncdCollectionsStateMachine.getExpiredCollections: check finiteFailureStartTime + FINITE_FAILURE_EXPIRY_DURATION < unixTimeMs()
@@ -160,44 +160,43 @@ public final class WebAppStateBackoffScheduler implements Closeable {
     /**
      * Updates the sticky server backoff floor and resets the global attempt counter.
      *
-     * <p>Per WhatsApp Web, when the server returns an {@code ErrorRetry} result with a
-     * backoff value, the module-level {@code q} variable is updated and the attempt
-     * counter {@code W} is reset to 0. The updated {@code q} value persists across
-     * subsequent retries until explicitly updated again.
+     * <p>When the server returns an {@code ErrorRetry} result with a backoff value, the
+     * module-level {@code q} variable is updated and the attempt counter {@code W} is
+     * reset to {@code 0}. The updated {@code q} value persists across subsequent retries
+     * until explicitly updated again.
      *
-     * @implNote WAWebSyncd.ee: {@code i.length > 0 && (q = i[0].serverBackoff || 0, W = 0)}
      * @param serverBackoffMs the server-suggested backoff floor in milliseconds
+     * @implNote WAWebSyncd.ee: {@code i.length > 0 && (q = i[0].serverBackoff || 0, W = 0)}.
      */
     public void updateServerBackoff(long serverBackoffMs) {
-        stickyServerBackoffMs.set(serverBackoffMs); // WAWebSyncd.ee: q = i[0].serverBackoff || 0
-        globalAttemptCounter.set(0); // WAWebSyncd.ee: W = 0
+        stickyServerBackoffMs.set(serverBackoffMs);
+        globalAttemptCounter.set(0);
     }
 
     /**
      * Computes the backoff delay for a given attempt number and server-suggested floor.
      *
-     * <p>Per WhatsApp Web {@code WAWebSyncd.ne}: the formula is
+     * <p>The formula is
      * {@code min(max(pow(BASE, attempt) * MIN_TIMEOUT, serverBackoff), MAX_TIMEOUT)}.
      * The server backoff is used as a floor but the final result is always capped
-     * at {@code MAX_DELAY_MS}.
+     * at {@link #MAX_DELAY_MS}.
      *
-     * @implNote WAWebSyncd.ne
      * @param attemptNumber the current retry attempt (0-based)
      * @param serverBackoff the server-suggested backoff floor in milliseconds
      * @return the computed delay in milliseconds
      */
     private long calculateBackoff(int attemptNumber, long serverBackoff) {
-        var computed = (long) (BASE_DELAY_MS * Math.pow(MULTIPLIER, attemptNumber)); // WAWebSyncd.ne: Math.pow(w, e) * N
-        var delay = Math.max(computed, serverBackoff); // WAWebSyncd.ne: Math.max(n, t)
-        return Math.min(delay, MAX_DELAY_MS); // WAWebSyncd.ne: Math.min(..., M)
+        var computed = (long) (BASE_DELAY_MS * Math.pow(MULTIPLIER, attemptNumber));
+        var delay = Math.max(computed, serverBackoff);
+        return Math.min(delay, MAX_DELAY_MS);
     }
 
     /**
      * Cancels a pending retry for the specified collection.
      *
-     * @implNote WAWebSyncd.ae: {@code O != null && clearTimeout(O)}
      * @param collectionName the collection whose retry to cancel
      * @return {@code true} if a pending retry was cancelled, {@code false} otherwise
+     * @implNote WAWebSyncd.ae: {@code O != null && clearTimeout(O)}.
      */
     public boolean cancelRetry(SyncPatchType collectionName) {
         var future = pendingRetries.remove(collectionName);
@@ -211,21 +210,22 @@ public final class WebAppStateBackoffScheduler implements Closeable {
     /**
      * Resets the global attempt counter without changing the sticky server backoff.
      *
-     * <p>Should be called when a sync succeeds to reset the backoff progression.
-     * Note that this only resets {@code W}; the sticky server backoff {@code q}
-     * is preserved and will continue to be used as a floor for future retries.
+     * <p>Callers invoke this on a successful sync to reset the backoff progression.
+     * Only {@code W} is reset, the sticky server backoff {@code q} is preserved and
+     * continues to be used as a floor for future retries.
      *
-     * @implNote WAWebSyncd.ee: success path resets W indirectly by completing without error;
-     *     WAWebSyncdServerSync.S: success clears retry state
+     * @implNote WAWebSyncd.ee: the success path resets {@code W} indirectly by completing
+     *           without error. WAWebSyncdServerSync.S: success clears retry state.
      */
     public void resetAttemptCounter() {
-        globalAttemptCounter.set(0); // WAWebSyncd: W = 0
+        globalAttemptCounter.set(0);
     }
 
     /**
      * Closes this scheduler, cancelling all pending retries and resetting all state.
      *
-     * @implNote ADAPTED: no direct WA Web equivalent; Cobalt lifecycle cleanup
+     * @implNote No direct WA Web equivalent. The browser bundle relies on page unload
+     *           rather than an explicit lifecycle hook.
      */
     @Override
     public void close() {
@@ -234,6 +234,6 @@ public final class WebAppStateBackoffScheduler implements Closeable {
         }
         pendingRetries.clear();
         globalAttemptCounter.set(0);
-        stickyServerBackoffMs.set(0); // NO_WA_BASIS: cleanup for Cobalt lifecycle
+        stickyServerBackoffMs.set(0);
     }
 }

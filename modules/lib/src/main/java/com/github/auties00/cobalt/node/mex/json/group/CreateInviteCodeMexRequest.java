@@ -36,55 +36,34 @@ import java.util.Optional;
 @WhatsAppWebModule(moduleName = "WAWebMexCreateInviteCodeJob")
 public final class CreateInviteCodeMexRequest implements MexOperation.Request.Json {
     /**
-     * The numeric GraphQL query identifier assigned by the WhatsApp relay
-     * to the {@code CreateInviteCode} compiled mutation.
-     *
-     * @implNote WAWebMexCreateInviteCodeJobMutation.graphql: corresponds to
-     * the compiled document id registered for the {@code mexCreateInviteCode}
-     * mutation.
+     * The numeric GraphQL query identifier assigned by the WhatsApp relay to
+     * the compiled {@code mexCreateInviteCode} mutation.
      */
     public static final String QUERY_ID = "26155584267463745";
 
     /**
-     * The GraphQL operation name reported by WA Web's
-     * {@code MexPerfTracker} when dispatching this query, mirroring the
-     * {@code params.name} value of the compiled mexCreateInviteCode
-     * operation.
-     *
-     * <p>The constant is exposed through {@link #name()} so
-     * call sites can reach the same telemetry tag WA Web emits without
-     * duplicating the literal at every dispatch site.
-     *
-     * @implNote WAWebMexCreateInviteCodeJob: WA Web invokes the operation through
-     * {@code WAWebMexClient.fetchQuery} which forwards to
-     * {@code WAWebMexNativeClient}; the native client passes the
-     * {@code params.name} of the compiled GraphQL artifact to
-     * {@code MexPerfTracker.setOperationName}. Cobalt mirrors that
-     * scalar verbatim as {@code "mexCreateInviteCode"}.
+     * The GraphQL operation name reported by WA Web's {@code MexPerfTracker}
+     * when dispatching this query, mirroring the {@code params.name} value of
+     * the compiled {@code mexCreateInviteCode} operation.
      */
     public static final String OPERATION_NAME = "mexCreateInviteCode";
     private final String receiver;
     private final String entryPoint;
 
     /**
-     * Constructs a request that asks the relay to mint a fresh invite
-     * code for the given {@code receiver}.
+     * Constructs a request that asks the relay to mint a fresh invite code
+     * for the given {@code receiver}.
      *
-     * @implNote WAWebMexCreateInviteCodeJob.mexCreateInviteCode: WA Web's
-     * {@code function*(t, r)} accepts the receiver {@code t} and the
-     * {@code entry_point} {@code r}, then constructs
-     * {@code {input: {receiver: t, entry_point: r}}} as the GraphQL
-     * variables payload. The sole caller in WA Web
-     * ({@code WAWebOutContactInviteAction.sendInvite}) always forwards
-     * a non-{@code null} telemetry tag identifying the UI surface that
-     * triggered the action, so Cobalt enforces the contract at the API
-     * boundary rather than emitting a JSON {@code null} the server
+     * @implNote The sole caller in WA Web ({@code WAWebOutContactInviteAction.sendInvite})
+     * always forwards a non-{@code null} telemetry tag identifying the UI
+     * surface that triggered the action, so Cobalt enforces the contract at
+     * the API boundary rather than emitting a JSON {@code null} the server
      * would treat as a missing telemetry signal.
      * @param receiver   the opaque receiver identifier the code is being
-     *                   minted for; never {@code null}
+     *                   minted for, never {@code null}
      * @param entryPoint the UI-surface telemetry tag (e.g.
-     *                   {@code "CHAT_INFO_INVITE_BUTTON"}) identifying
-     *                   what triggered the rotation; never {@code null}
+     *                   {@code "CHAT_INFO_INVITE_BUTTON"}) identifying what
+     *                   triggered the rotation, never {@code null}
      * @throws NullPointerException if any argument is {@code null}
      */
     public CreateInviteCodeMexRequest(String receiver, String entryPoint) {
@@ -93,15 +72,9 @@ public final class CreateInviteCodeMexRequest implements MexOperation.Request.Js
     }
 
     /**
-     * Returns the compiled GraphQL query identifier projected from
-     * {@link #QUERY_ID}.
+     * Returns the compiled GraphQL query identifier.
      *
-     * @implNote WAWebMexCreateInviteCodeJob: WA Web reads the {@code params.id}
-     *           field of the compiled artifact and forwards it to
-     *           {@code MexPerfTracker.setQueryId}; Cobalt projects
-     *           the same scalar through this accessor.
-     * @return the constant {@link #QUERY_ID}; never
-     *         {@code null}
+     * @return the constant {@link #QUERY_ID}; never {@code null}
      */
     @Override
     public String id() {
@@ -109,17 +82,9 @@ public final class CreateInviteCodeMexRequest implements MexOperation.Request.Js
     }
 
     /**
-     * Returns the GraphQL operation name projected from
-     * {@link #OPERATION_NAME}.
+     * Returns the GraphQL operation name.
      *
-     * @implNote WAWebMexCreateInviteCodeJob: WA Web's
-     *           {@code WAWebMexNativeClient.fetchQuery} reads
-     *           {@code params.name} from the compiled GraphQL
-     *           artifact and forwards it to
-     *           {@code MexPerfTracker.setOperationName}; Cobalt
-     *           projects the same scalar through this accessor.
-     * @return the constant {@link #OPERATION_NAME};
-     *         never {@code null}
+     * @return the constant {@link #OPERATION_NAME}; never {@code null}
      */
     @Override
     public String name() {
@@ -127,14 +92,12 @@ public final class CreateInviteCodeMexRequest implements MexOperation.Request.Js
     }
 
     /**
-     * Builds the IQ stanza that dispatches this operation to the
-     * WhatsApp relay.
+     * Builds the IQ stanza that dispatches this operation to the WhatsApp relay.
      *
-     * @implNote WAWebMexCreateInviteCodeJob.mexCreateInviteCode: WA Web
-     * constructs the {@code variables} object inline as
+     * @implNote WA Web constructs the {@code variables} object inline as
      * {@code {input: {receiver: t, entry_point: r}}} and delegates to
-     * {@code WAWebMexClient.fetchQuery}. Cobalt writes the JSON
-     * directly via {@code fastjson2.JSONWriter} and wraps it through
+     * {@code WAWebMexClient.fetchQuery}. Cobalt writes the JSON directly via
+     * {@code fastjson2.JSONWriter} and wraps it through
      * {@link Json#createMexNode(String, String)}.
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         serialised GraphQL variables
@@ -143,19 +106,12 @@ public final class CreateInviteCodeMexRequest implements MexOperation.Request.Js
             adaptation = WhatsAppAdaptation.ADAPTED)
     @Override
     public NodeBuilder toNode() {
-        // WAWebMexCreateInviteCodeJob.mexCreateInviteCode
-        // Opens a UTF-8 JSON writer that will serialise the GraphQL variables envelope
         try (var writer = JSONWriter.ofUTF8()) {
-            // WAWebMexCreateInviteCodeJob.mexCreateInviteCode
-            // Begins the outer envelope and the nested "variables" object consumed by WAWebMexClient.fetchQuery
             writer.startObject();
             writer.writeName("variables");
             writer.writeColon();
             writer.startObject();
 
-            // WAWebMexCreateInviteCodeJob.mexCreateInviteCode
-            // Builds the input object: {receiver: t, entry_point: r}.
-            // Both fields are guaranteed non-null by the constructor.
             writer.writeName("input");
             writer.writeColon();
             writer.startObject();
@@ -170,8 +126,6 @@ public final class CreateInviteCodeMexRequest implements MexOperation.Request.Js
             writer.endObject();
             writer.endObject();
 
-            // ADAPTED: WAWebMexCreateInviteCodeJob.mexCreateInviteCode
-            // Flushes the JSON buffer into a StringWriter and wraps it in the shared MEX IQ envelope
             try (var output = new StringWriter()) {
                 writer.flushTo(output);
                 return Json.createMexNode(QUERY_ID, output.toString());

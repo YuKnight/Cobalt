@@ -31,32 +31,14 @@ import com.github.auties00.cobalt.wam.event.WebcMessageSendEventBuilder;
 import java.util.Objects;
 
 /**
- * Orchestrates the sending of messages through the WhatsApp protocol.
- *
- * <p>This service is the main entry point for outgoing messages.  It
- * dispatches to the appropriate send path based on the chat JID type:
- * <ul>
- *   <li><b>User chats</b> ({@code user@s.whatsapp.net}, {@code user@lid}):
- *       per-device Signal encryption with chat fanout</li>
- *   <li><b>Group chats</b> ({@code group@g.us}):
- *       sender-key encryption, serialised per group</li>
- *   <li><b>Status updates</b> ({@code status@broadcast}):
- *       sender-key encryption to the status audience list</li>
- *   <li><b>Newsletters</b> ({@code newsletter@newsletter}):
- *       plaintext via SMAX RPC (no E2E encryption)</li>
- * </ul>
- *
- * <p>Peer protocol messages (app state sync, history sync errors) sent
+ * Routes outgoing messages through the WhatsApp protocol. The service is the
+ * single entry point for the send pipeline and dispatches to the appropriate
+ * sender based on the chat JID server: 1:1 user chats use per-device Signal
+ * encryption with chat fanout, groups use sender-key encryption serialised
+ * per group, status updates use sender-key encryption against the status
+ * audience, and newsletters use plaintext SMAX. Peer protocol messages sent
  * to the user's own devices follow a dedicated path via
  * {@link #sendPeer(Jid, ChatMessageInfo)}.
- *
- * @apiNote WAWebSendMsgJob.encryptAndSendMsg: main entry point that
- * routes to encryptAndSendUserMsg (user) or encryptAndSendGroupMsg (group).
- * WAWebSendMsgJob.encryptAndSendKeyDistributionMsg: standalone sender-key
- * distribution to groups (no message content).
- * WAWebEncryptAndSendStatusMsg.encryptAndSendStatusMsg: status sending.
- * WAWebNewsletterSendMessageQueryJob.querySendNewsletterMessage: newsletter sending.
- * WAWebSendAppStateSyncMsgJob.encryptAndSendKeyMsg: peer message sending.
  */
 @WhatsAppWebModule(moduleName = "WAWebSendMsgJob")
 @WhatsAppWebModule(moduleName = "WAWebEncryptAndSendStatusMsg")
@@ -65,91 +47,63 @@ import java.util.Objects;
 @WhatsAppWebModule(moduleName = "WAWebSendMsgRecordAction")
 public final class MessageSendingService {
     /**
-     * Prepares raw {@link MessageContainer} instances into fully populated
-     * {@link MessageInfo} objects before they enter the send pipeline.
-     *
-     * @implNote ADAPTED: WAWebOutgoingMessage.createOutgoingMessageProtobuf
-     * is an inline function; Cobalt extracts it into a dedicated class.
+     * Holds the preparer that turns raw {@link MessageContainer} instances
+     * into fully populated {@link MessageInfo} objects.
      */
     private final MessagePreparer preparer;
 
     /**
-     * Tracks in-flight message IDs to prevent duplicate sends.
-     *
-     * @implNote WAWebMessageDedupUtils: checks and registers message IDs
-     * to prevent the same message from being sent concurrently.
+     * Holds the deduplication tracker used to prevent the same message id
+     * from being sent concurrently.
      */
     private final MessageDedup messageDedup;
 
     /**
-     * Sender for 1:1 user chats (PN and LID addressed).
-     *
-     * @implNote WAWebSendUserMsgJob.encryptAndSendUserMsg: per-device
-     * Signal encryption with chat fanout.
+     * Holds the sender for 1:1 user chats addressed by PN or LID.
      */
     private final UserMessageSender userSender;
 
     /**
-     * Sender for group chats (sender-key encryption).
-     *
-     * @implNote WAWebSendGroupMsgJob.encryptAndSendGroupMsg: sender-key
-     * encryption serialised per group.
+     * Holds the sender for group chats using sender-key encryption.
      */
     private final GroupMessageSender groupSender;
 
     /**
-     * Sender for status updates (sender-key encryption to status audience).
-     *
-     * @implNote WAWebEncryptAndSendStatusMsg.encryptAndSendStatusMsg:
-     * sender-key encryption to the status audience list.
+     * Holds the sender for status updates.
      */
     private final StatusMessageSender statusSender;
 
     /**
-     * Sender for newsletter messages (plaintext via SMAX).
-     *
-     * @implNote WAWebNewsletterSendMessageQueryJob.querySendNewsletterMessage:
-     * plaintext via SMAX RPC.
+     * Holds the sender for newsletter messages, which travel as plaintext over
+     * SMAX.
      */
     private final NewsletterMessageSender newsletterSender;
 
     /**
-     * Sender for peer protocol messages (app state sync, key shares).
-     *
-     * @implNote WAWebSendAppStateSyncMsgJob.encryptAndSendKeyMsg:
-     * per-device Signal encryption with category="peer".
+     * Holds the sender for peer protocol messages exchanged with the user's
+     * own devices.
      */
     private final PeerMessageSender peerSender;
 
     /**
-     * The WhatsApp client used by this service to access the shared
-     * services for outbound telemetry emissions triggered at the top of
-     * the send pipeline.
-     *
-     * @implNote ADAPTED: WA Web's {@code WAWebProcessRawMedia} calls the
-     * document-send WAM logger via a module-level import. Cobalt does not
-     * have a raw-media processing stage, so the emission is hoisted to
-     * the send pipeline entry point and the already-injected client is
-     * reused to reach the {@code WamService}.
+     * Holds the client used to reach shared services from the send-pipeline
+     * entry point.
      */
     private final WhatsAppClient client;
 
     /**
-     * The WAM telemetry service used to commit per-send WAM events.
+     * Holds the WAM telemetry service used to commit per-send events.
      */
     private final WamService wamService;
 
     /**
-     * Creates a new message sending service.
+     * Constructs a sending service and wires up all sub-senders.
      *
-     * @param client         the WhatsApp client for sending stanzas
+     * @param client         the WhatsApp client used to dispatch stanzas
      * @param encryption     the message encryption service
-     * @param deviceService  the device service for device list resolution
-     * @param abPropsService the AB props service for feature gating
+     * @param deviceService  the device service used for fanout resolution
+     * @param abPropsService the AB-props service used for feature gating
      * @param wamService     the WAM telemetry service for per-send events
-     *
-     * @implNote ADAPTED: WAWebSendMsgJob uses module-level imports for all
-     * dependencies; Cobalt uses constructor-based DI and creates all sub-senders.
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgJob", exports = "encryptAndSendMsg",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -189,31 +143,18 @@ public final class MessageSendingService {
     }
 
     /**
-     * Prepares and sends a message to the specified chat.
+     * Prepares the given container into a fully populated message info and
+     * sends it to the specified chat.
      *
-     * <p>This is the primary send API.  The raw {@link MessageContainer}
-     * is prepared into a fully-populated {@link ChatMessageInfo} or
-     * {@link NewsletterMessageInfo} before being dispatched to the
-     * appropriate sender.  Preparation includes:
-     * <ul>
-     *   <li>Generating a unique message ID</li>
-     *   <li>Generating the 32-byte messageSecret</li>
-     *   <li>Generating random padding bytes</li>
-     *   <li>Populating {@code DeviceContextInfo}</li>
-     *   <li>Validating addon encryption state</li>
-     *   <li>Auto-converting {@code ReactionMessage} to
-     *       {@code EncryptedReactionMessage} for CAG groups</li>
-     * </ul>
+     * <p>Preparation generates a unique id and message secret, populates the
+     * device-context info, validates addon encryption state, auto-converts
+     * reactions/comments to their encrypted variants for CAG groups, and
+     * decorates extended-text bodies with a link preview when applicable.
      *
      * @param chatJid   the recipient chat JID
      * @param container the raw message content
      * @return the server ack result
      * @throws NullPointerException if any argument is {@code null}
-     *
-     * @implNote ADAPTED: WAWebSendMsgJob.encryptAndSendMsg calls
-     * WAWebOutgoingMessage.createOutgoingMessageProtobuf inline before
-     * routing; Cobalt separates preparation (via {@link MessagePreparer})
-     * from routing (via {@link #send(MessageInfo)}).
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgJob", exports = "encryptAndSendMsg",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -221,8 +162,6 @@ public final class MessageSendingService {
         Objects.requireNonNull(chatJid, "chatJid");
         Objects.requireNonNull(container, "container");
 
-        // WAWebLinkPreviewChatAction: enrich extended-text bodies with a link
-        // preview before the message enters the encryption / fanout pipeline.
         if (container.content() instanceof ExtendedTextMessage extended) {
             LinkPreviewService.forClient(client).decorate(chatJid, extended);
         }
@@ -238,28 +177,18 @@ public final class MessageSendingService {
     }
 
     /**
-     * Sends a pre-prepared message directly without any preparation.
-     *
-     * <p>Use this overload when the caller has already constructed a
-     * fully-populated {@link ChatMessageInfo} or
-     * {@link NewsletterMessageInfo} with all required fields
-     * (messageSecret, deviceInfo, encryption metadata, etc.).
-     *
-     * <p>The method dispatches to the appropriate send path based on the
-     * message info type and the chat JID's server type.
+     * Sends a pre-prepared message info directly, dispatching to the
+     * appropriate sender based on the message-info subtype and the chat JID's
+     * server.
      *
      * @param messageInfo the fully-prepared outgoing message
      * @return the server ack result
-     * @throws NullPointerException                          if any argument is {@code null}
-     * @throws WhatsAppMessageException.Send.InvalidRecipient if the chat JID type is unsupported
-     *         or the message info type does not match the JID type
-     *
-     * @implNote WAWebSendMsgJob.encryptAndSendMsg: validates {@code id}
-     * and {@code to}, waits for offline delivery end, calls
-     * {@code createOutgoingMessageProtobuf}, then routes to
-     * {@code encryptAndSendUserMsg} (user) or
-     * {@code encryptAndSendGroupMsg} (group) based on JID type.
-     * Cobalt extends routing to also handle status and newsletter JIDs.
+     * @throws NullPointerException                            if any argument is {@code null}
+     * @throws IllegalArgumentException                        if the key is missing the id or parent JID
+     * @throws WhatsAppMessageException.Send.InvalidRecipient  if the chat JID type is unsupported or
+     *                                                         does not match the message-info subtype
+     * @throws WhatsAppMessageException.Send.Unknown           if a send is already in flight for the
+     *                                                         same message id
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgJob", exports = "encryptAndSendMsg",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -274,10 +203,6 @@ public final class MessageSendingService {
                 .parentJid()
                 .orElseThrow(() -> new IllegalArgumentException("parentJid is required for outgoing messages"));
 
-        // WAWebProcessRawMedia.processRawMedia -> WAWebProcessRawMediaLogging.logSendDocumentEvent:
-        // WA Web emits SendDocumentEvent (id 2172) when the user picks a document. Cobalt has no
-        // raw-media processing stage, so the emission is hoisted to the send pipeline entry point
-        // and fires once per outbound DocumentMessage send.
         if (messageInfo.message() != null
                 && messageInfo.message().content() instanceof DocumentMessage document) {
             wamService.logSendDocumentEvent(
@@ -285,7 +210,6 @@ public final class MessageSendingService {
                     document.mediaSize().orElse(0L));
         }
 
-        // WAWebMessageDedupUtils: check if this message ID is already in flight
         if (messageDedup.isPending(messageId)) {
             throw new WhatsAppMessageException.Send.Unknown(
                     "Duplicate send for message ID: " + messageId, null);
@@ -293,31 +217,20 @@ public final class MessageSendingService {
 
         messageDedup.add(messageId);
         try {
-            // WAWebSendMsgRecordAction.sendMsgRecord: builds WebcMessageSendWamEvent (id 2072)
-            // before send and commits it only on success, skipping the event entirely for
-            // protocol revoke messages (sender_revoke / admin_revoke subtypes). Newsletters go
-            // through WAWebNewsletterSendMessageQueryJob and are excluded from this emission.
             var sendEvent = buildWebcMessageSendEvent(messageInfo);
             var result = switch (messageInfo) {
                 case ChatMessageInfo chatMessage when parentJid.hasUserServer() || parentJid.hasLidServer() ->
-                    // WAWebSendMsgJob: to.isUser() → encryptAndSendUserMsg
                     userSender.send(parentJid, chatMessage);
                 case ChatMessageInfo chatMessage when parentJid.hasGroupOrCommunityServer() ->
-                    // WAWebSendMsgJob: to.isGroup() → encryptAndSendGroupMsg
                     groupSender.send(parentJid, chatMessage);
                 case ChatMessageInfo chatMessage when parentJid.isStatusBroadcastAccount() ->
-                    // WAWebEncryptAndSendStatusMsg: status@broadcast → encryptAndSendStatusMsg
                     statusSender.send(parentJid, chatMessage);
                 case NewsletterMessageInfo newsletterMessage when parentJid.hasNewsletterServer() ->
-                    // WAWebNewsletterSendMessageQueryJob: newsletter → querySendNewsletterMessage
                     newsletterSender.send(parentJid, newsletterMessage);
                 default -> throw new WhatsAppMessageException.Send.InvalidRecipient(
                     parentJid, "Unsupported combination: " + messageInfo.getClass().getSimpleName()
                             + " with JID type " + parentJid.server());
             };
-            // WAWebSendMsgRecordAction.sendMsgRecord: b.markMessageSendT(); b.commit() on the success
-            // branch. WA Web's catch blocks drop the event; Cobalt mirrors that by only committing
-            // when the send path returns normally.
             if (sendEvent != null) {
                 wamService.commit(sendEvent.stopMessageSendT().build());
             }
@@ -328,96 +241,52 @@ public final class MessageSendingService {
     }
 
     /**
-     * Builds a {@link WebcMessageSendEventBuilder} for the given outbound
-     * message, or returns {@code null} if the event must be suppressed for
-     * this send.
+     * Builds a {@link WebcMessageSendEventBuilder} pre-populated with the
+     * message classification and a started timer for the given outbound
+     * message, or returns {@code null} when the event must be suppressed.
      *
-     * <p>Mirrors the event-construction gate in
-     * {@code WAWebSendMsgRecordAction.sendMsgRecord}:
-     * <ul>
-     *   <li>The event is never built for newsletter sends — WA Web routes
-     *       newsletters through {@code WAWebNewsletterSendMessageQueryJob}
-     *       which does not log this event.</li>
-     *   <li>The event is skipped when the message is a protocol revoke
-     *       ({@code sender_revoke} / {@code admin_revoke} subtype in WA Web
-     *       maps to {@link ProtocolMessage.Type#REVOKE} in Cobalt), matching
-     *       WA Web's {@code h} guard.</li>
-     *   <li>Otherwise the builder is populated with {@code messageType} /
-     *       {@code messageMediaType} from {@link WamService},
-     *       {@code messageIsForward} from the optional
-     *       {@link ContextualMessage#contextInfo()}, and
-     *       {@link WebcMessageSendEventBuilder#startMessageSendT()} is called
-     *       so the timer begins before the network round-trip.</li>
-     * </ul>
+     * <p>The event is suppressed for newsletter sends (which go through a
+     * different WA Web logger entirely) and for protocol revoke messages.
+     * For every other chat message the builder is initialised with the
+     * resolved {@code messageType} and {@code messageMediaType}, the
+     * {@code messageIsForward} flag taken from the optional
+     * {@link ContextualMessage#contextInfo()}, and the timer is started so it
+     * can be stopped before the success-branch commit.
      *
-     * @param messageInfo the message about to be sent; must not be
-     *                    {@code null}
-     * @return a pre-configured builder with the timer started, or
-     * {@code null} when the event should not be emitted for this send
-     *
-     * @implNote WAWebSendMsgRecordAction.sendMsgRecord:
-     * {@code h = i.type === PROTOCOL && ["sender_revoke","admin_revoke"].includes(i.subtype);
-     * return h || (b = new WebcMessageSendWamEvent({messageType, messageMediaType, messageIsForward: !!i.isForwarded}));}
+     * @param messageInfo the message about to be sent
+     * @return the pre-configured builder, or {@code null} when no event should
+     *         be emitted for this send
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgRecordAction", exports = "sendMsgRecord",
             adaptation = WhatsAppAdaptation.ADAPTED)
     private WebcMessageSendEventBuilder buildWebcMessageSendEvent(MessageInfo messageInfo) {
-        // WAWebSendMsgRecordAction.sendMsgRecord: newsletters go through a different WA Web
-        // module (WAWebNewsletterSendMessageQueryJob) that does not emit WebcMessageSendWamEvent.
         if (!(messageInfo instanceof ChatMessageInfo chatMessage)) {
             return null;
         }
         var content = chatMessage.message() == null ? null : chatMessage.message().content();
-        // WAWebSendMsgRecordAction.sendMsgRecord: h = type === PROTOCOL && subtype in {sender_revoke, admin_revoke}
-        // Cobalt collapses both subtypes into ProtocolMessage.Type.REVOKE, so the REVOKE branch is
-        // the exact skip gate for this event.
         if (content instanceof ProtocolMessage protocol
                 && protocol.type().orElse(null) == ProtocolMessage.Type.REVOKE) {
             return null;
         }
-        // WAWebSendMsgRecordAction.sendMsgRecord: messageIsForward = !!i.isForwarded; the Msg
-        // field is populated from ContextInfo.isForwarded in Cobalt's contextual messages.
         var isForwarded = content instanceof ContextualMessage contextual
                 && contextual.contextInfo().map(ctx -> ctx.isForwarded()).orElse(false);
         return new WebcMessageSendEventBuilder()
-                // WAWebSendMsgRecordAction.sendMsgRecord: messageType = WAWebWamMsgUtils.getWamMessageType(i)
                 .messageType(wamService.getWamMessageType(chatMessage))
-                // WAWebSendMsgRecordAction.sendMsgRecord: messageMediaType = WAWebWamMsgUtils.getWamMediaType(i)
                 .messageMediaType(wamService.getWamMediaType(chatMessage))
-                // WAWebSendMsgRecordAction.sendMsgRecord: messageIsForward = !!i.isForwarded
                 .messageIsForward(isForwarded)
-                // WAWebSendMsgRecordAction.sendMsgRecord: the event starts timing at construction
-                // and is stopped via markMessageSendT() on the success branch before commit().
                 .startMessageSendT();
     }
 
     /**
-     * Sends a standalone sender-key distribution to a group chat without
-     * any message content.
-     *
-     * <p>This is used to pre-distribute sender keys to group participants
-     * that do not yet possess them, independent of sending an actual
-     * message.  It is the counterpart to
-     * {@code WAWebSendKeyDistributionMsgAction.sendKeyDistributionMsg},
-     * which is triggered by group membership changes or periodic key
-     * refresh operations.
-     *
-     * <p>If the group JID is not a group, this method throws.  If all
-     * devices already possess the sender key, this method returns without
-     * sending anything.
+     * Sends a standalone sender-key distribution to a group, with no message
+     * content. This pre-distributes sender keys to participants that do not
+     * yet hold them and returns silently when every participant already does.
      *
      * @param groupJid the group JID to distribute keys for
-     * @param key      the message key containing the ID and remote JID
-     * @throws NullPointerException                          if any argument is {@code null}
-     * @throws WhatsAppMessageException.Send.InvalidRecipient if the JID is not a group
-     *
-     * @implNote WAWebSendMsgJob.encryptAndSendKeyDistributionMsg: validates
-     * {@code id} and {@code remote}, checks {@code remote.isGroup()},
-     * then delegates to
-     * WAWebSendGroupKeyDistributionMsgJob.encryptAndSendGroupKeyDistributionMsg.
-     * WAWebSendKeyDistributionMsgAction.sendKeyDistributionMsg: constructs
-     * the MsgKey with the sender's JID, generates a new message ID, fetches
-     * group metadata, and calls {@code encryptAndSendKeyDistributionMsg}.
+     * @param key      the message key carrying the id and parent JID
+     * @throws NullPointerException                            if any argument is {@code null}
+     * @throws IllegalArgumentException                        if the key has no id
+     * @throws WhatsAppMessageException.Send.InvalidRecipient  if the JID does not refer to a group
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgJob", exports = "encryptAndSendKeyDistributionMsg",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -427,37 +296,28 @@ public final class MessageSendingService {
         Objects.requireNonNull(groupJid, "groupJid");
         Objects.requireNonNull(key, "key");
 
-        // WAWebSendMsgJob.encryptAndSendKeyDistributionMsg: validate id
         var messageId = key.id()
                 .orElseThrow(() -> new IllegalArgumentException(
                         "messageId is required for key distribution"));
 
-        // WAWebSendMsgJob.encryptAndSendKeyDistributionMsg: validate remote
-        // and check remote.isGroup()
         if (!groupJid.hasGroupOrCommunityServer()) {
             throw new WhatsAppMessageException.Send.InvalidRecipient(
                     groupJid, "Key distribution is only supported for group chats");
         }
 
-        // WAWebSendMsgJob.encryptAndSendKeyDistributionMsg:
-        // delegates to encryptAndSendGroupKeyDistributionMsg
         groupSender.sendKeyDistribution(groupJid, messageId);
     }
 
     /**
-     * Sends a peer protocol message to the user's own primary device.
+     * Sends a peer protocol message to one of the user's own devices. Peer
+     * messages cover app-state sync, key shares, and fatal-exception
+     * notifications, are encrypted per device, and are tagged with
+     * {@code category="peer"} on the wire.
      *
-     * <p>Peer messages include app state sync, key shares, and fatal
-     * exception notifications.  They are encrypted per-device and tagged
-     * with {@code category="peer"}.
-     *
-     * @param targetDevice the target device JID (typically the primary device)
-     * @param messageInfo  the protocol message
+     * @param targetDevice the target device JID, typically the primary device
+     * @param messageInfo  the protocol message to send
      * @return the server ack result
      * @throws NullPointerException if any argument is {@code null}
-     *
-     * @implNote WAWebSendAppStateSyncMsgJob.encryptAndSendKeyMsg: sends peer
-     * messages via createUserDeviceMsgStanza with category="peer".
      */
     @WhatsAppWebExport(moduleName = "WAWebSendAppStateSyncMsgJob", exports = "encryptAndSendKeyMsg",
             adaptation = WhatsAppAdaptation.DIRECT)

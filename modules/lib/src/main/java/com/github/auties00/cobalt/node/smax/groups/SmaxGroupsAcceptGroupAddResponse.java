@@ -144,7 +144,7 @@ public sealed interface SmaxGroupsAcceptGroupAddResponse extends SmaxOperation.R
             if (!SmaxIqResultResponseMixin.validate(node, request)) {
                 return Optional.empty();
             }
-            // Differentiate from GroupJoinRequestSuccess: must NOT have <membership_approval_request/>
+            // The membership_approval_request child discriminates GroupJoinRequestSuccess from the plain Success
             if (node.getChild("membership_approval_request").isPresent()) {
                 return Optional.empty();
             }

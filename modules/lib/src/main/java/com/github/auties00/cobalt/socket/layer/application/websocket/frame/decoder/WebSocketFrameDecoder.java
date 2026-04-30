@@ -12,40 +12,53 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 /**
- * A stateful decoder that parses WebSocket frames from a byte stream
- * according to <a href="https://datatracker.ietf.org/doc/html/rfc6455">RFC 6455</a>.
+ * Stateful incremental decoder for WebSocket frames as defined by
+ * <a href="https://datatracker.ietf.org/doc/html/rfc6455">RFC 6455</a>.
  *
- * <p>The decoder maintains internal state across calls to
- * {@link #decode(ByteBuffer)}, allowing frames to be decoded incrementally
- * as data arrives from the network.  Each call consumes as many bytes as
- * possible from the source buffer and returns the first actionable result:
- * a data chunk, a complete control frame, an indication that more bytes are
- * needed, or a protocol error.
+ * <p>The decoder keeps its state across {@link #decode(ByteBuffer)}
+ * calls so frames can be parsed as bytes trickle in from the network.
+ * Each call consumes as many bytes as possible from the source and
+ * returns the first actionable result: a data chunk, a complete
+ * control frame, a none result indicating more bytes are needed, or a
+ * protocol error.
  *
- * <p>Data payloads are delivered as {@code byte[]} slices via
- * {@link WebSocketDecodedFrame#data(ByteBuffer)}.  The backing array
- * is owned by this decoder and is reused across calls, so callers must
- * consume or copy the contents before the next invocation of
- * {@code decode}.
+ * <p>Data payloads are delivered as views over an internal
+ * {@code byte[]} that is reused across calls; callers must consume or
+ * copy the contents before the next {@link #decode(ByteBuffer)}.
  *
- * <p>Unmasking uses the Vector API (SIMD) for bulk throughput with an
- * int-wise scalar fallback for short tails, matching the strategy used by
- * {@code WebSocketFrameEncoder}.
+ * <p>Instances are <b>not</b> thread-safe; one decoder must be owned
+ * by a single reader.
  *
- * <p>Instances of this class are <b>not</b> thread-safe.  A single
- * decoder must be used by one reader thread at a time.
- *
- * @implNote No WhatsApp Web counterpart: WA Web relies on the browser's
- *     native {@code WebSocket} object, so the RFC 6455 wire format is
- *     never parsed by application code.  Cobalt implements the wire
- *     format itself because it talks to the server directly over a
- *     selector-backed socket pipeline.
+ * @implNote Unmasking uses the Vector API for bulk throughput with an
+ *     int-wise scalar fallback for short tails, matching the strategy
+ *     used by the encoder. The SIMD path is gated by
+ *     {@link #VECTORIZE_THRESHOLD} so small frames pay no vector setup
+ *     cost.
  */
 public final class WebSocketFrameDecoder {
+    /**
+     * State value for "waiting on the first header byte".
+     */
     private static final int READ_HEADER_FIRST = 0;
+
+    /**
+     * State value for "waiting on the second header byte".
+     */
     private static final int READ_HEADER_SECOND = 1;
+
+    /**
+     * State value for "reading the 2- or 8-byte extended length".
+     */
     private static final int READ_EXTENDED_LENGTH = 2;
+
+    /**
+     * State value for "reading the 4-byte masking key".
+     */
     private static final int READ_MASK = 3;
+
+    /**
+     * State value for "reading payload bytes".
+     */
     private static final int READ_PAYLOAD = 4;
 
     /**

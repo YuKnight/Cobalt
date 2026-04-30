@@ -15,7 +15,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps the primary {@code <media/>}
+ * The outbound stanza variant. Wraps the primary {@code <media/>}
  * child plus 0..10 {@code <media_list/>} children inside the canonical
  * {@code <iq xmlns="fb:thrift_iq" type="set">} envelope.
  */

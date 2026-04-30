@@ -89,8 +89,6 @@ public final class SmaxGroupsCancelGroupMembershipRequestsRequest implements Sma
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsCancelGroupMembershipRequestsRequest",
             exports = "makeCancelGroupMembershipRequestsRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutGroupsCancelGroupMembershipRequestsRequest:
-        //   smax("participant", {jid: USER_JID(t)})
         var participantNodes = new ArrayList<Node>(participants.size());
         for (var participantJid : participants) {
             var participantNode = new NodeBuilder()
@@ -99,15 +97,10 @@ public final class SmaxGroupsCancelGroupMembershipRequestsRequest implements Sma
                     .build();
             participantNodes.add(participantNode);
         }
-        // WASmaxOutGroupsCancelGroupMembershipRequestsRequest:
-        //   smax("cancel_membership_requests", null,
-        //        REPEATED_CHILD(participant, 1, 19999))
         var cancelNode = new NodeBuilder()
                 .description("cancel_membership_requests")
                 .content(participantNodes)
                 .build();
-        // WASmaxOutGroupsBaseSetGroupMixin: smax("iq", {to: GROUP_JID(t), xmlns: "w:g2"})
-        // WASmaxOutGroupsBaseIQSetRequestMixin: smax("iq", {id: generateId(), type: "set"})
         return new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "w:g2")

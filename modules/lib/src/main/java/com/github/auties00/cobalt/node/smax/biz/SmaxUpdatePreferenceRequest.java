@@ -14,7 +14,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps the feedback-update payload
+ * The outbound stanza variant. Wraps the feedback-update payload
  * in the canonical
  * {@code <iq xmlns="w:biz:msg_feedback" type="set" to="s.whatsapp.net">}
  * envelope.
@@ -22,7 +22,7 @@ import java.util.Optional;
 @WhatsAppWebModule(moduleName = "WASmaxOutBizMsgUserFeedbackUpdatePreferenceRequest")
 public final class SmaxUpdatePreferenceRequest implements SmaxOperation.Request {
     /**
-     * The feedback action — opaque on the JS side; typical values
+     * The feedback action. Opaque on the JS side; typical values
      * are {@code "block"} / {@code "unblock"} / {@code "report"}.
      * Routed verbatim into the {@code action} attribute of the
      * {@code <user_feedback>} child.
@@ -116,9 +116,6 @@ public final class SmaxUpdatePreferenceRequest implements SmaxOperation.Request 
     @WhatsAppWebExport(moduleName = "WASmaxOutBizMsgUserFeedbackUpdatePreferenceRequest",
             exports = "makeUpdatePreferenceRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutBizMsgUserFeedbackUpdatePreferenceRequest:
-        //   smax("user_feedback", {action: CUSTOM_STRING(t), jid: USER_JID(t),
-        //                          feedback: OPTIONAL(CUSTOM_STRING, t)})
         var feedbackBuilder = new NodeBuilder()
                 .description("user_feedback")
                 .attribute("action", action)
@@ -126,8 +123,6 @@ public final class SmaxUpdatePreferenceRequest implements SmaxOperation.Request 
         if (feedback != null) {
             feedbackBuilder.attribute("feedback", feedback);
         }
-        // smax("iq", {xmlns: "w:biz:msg_feedback", to: S_WHATSAPP_NET,
-        //             id: generateId(), type: "set"})
         return new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "w:biz:msg_feedback")

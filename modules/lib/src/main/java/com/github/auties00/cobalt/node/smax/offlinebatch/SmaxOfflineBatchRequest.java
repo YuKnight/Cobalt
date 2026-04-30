@@ -8,7 +8,7 @@ import com.github.auties00.cobalt.node.smax.SmaxOperation;
 import java.util.Objects;
 
 /**
- * The outbound stanza variant — wraps the {@code <offline_batch
+ * The outbound stanza variant. Wraps the {@code <offline_batch
  * count/>} payload in the bare {@code <ib>} envelope.
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutOfflineBatchRequest")
@@ -45,7 +45,7 @@ public final class SmaxOfflineBatchRequest implements SmaxOperation.Request {
      *
      * @implNote {@code WASmaxOutOfflineBatchRequest.makeBatchRequest}
      *           emits {@code <ib><offline_batch count=INT(t)/></ib>}.
-     *           No id/xmlns/to attributes are populated — the relay
+     *           No id/xmlns/to attributes are populated. The relay
      *           identifies the cast by the {@code <offline_batch/>}
      *           grandchild's tag alone.
      */

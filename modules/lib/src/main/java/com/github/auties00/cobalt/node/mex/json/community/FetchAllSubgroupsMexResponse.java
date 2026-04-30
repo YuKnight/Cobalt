@@ -20,14 +20,33 @@ import java.util.Optional;
 import java.util.OptionalLong;
 
 /**
- * The parsed response carrying the community's default subgroup and all
- * regular subgroups.
+ * Parsed response for the fetch-all-subgroups query. Carries the community's default subgroup record together with
+ * the list of regular subgroups projected from {@code data.xwa2_group_query_by_id}.
  */
+@WhatsAppWebModule(moduleName = "WAWebMexFetchAllSubgroupsJob")
 public final class FetchAllSubgroupsMexResponse implements MexOperation.Response.Json {
+    /**
+     * The community group identifier returned by the relay.
+     */
     private final String id;
+
+    /**
+     * The community's default subgroup record.
+     */
     private final DefaultSubGroup defaultSubGroup;
+
+    /**
+     * The list of regular subgroups under the community.
+     */
     private final SubGroups subGroups;
 
+    /**
+     * Constructs a new response with the given fields.
+     *
+     * @param id the community group identifier
+     * @param defaultSubGroup the default subgroup record
+     * @param subGroups the regular subgroups list
+     */
     private FetchAllSubgroupsMexResponse(String id, DefaultSubGroup defaultSubGroup, SubGroups subGroups) {
         this.id = id;
         this.defaultSubGroup = defaultSubGroup;
@@ -37,14 +56,8 @@ public final class FetchAllSubgroupsMexResponse implements MexOperation.Response
     /**
      * Parses the MEX response carried by an inbound IQ stanza.
      *
-     * @implNote WAWebMexFetchAllSubgroupsJob.mexFetchAllSubgroups: WA Web
-     * accesses {@code l.xwa2_group_query_by_id.default_sub_group} and
-     * {@code l.xwa2_group_query_by_id.sub_groups.edges} directly on the
-     * relay response; Cobalt extracts the {@code <result>} child bytes
-     * and delegates to the private {@code of(byte[])} parser.
      * @param node the inbound IQ stanza carrying the {@code <result>} child
-     * @return the parsed response, or {@code Optional.empty()} if the
-     *         expected JSON shape is absent
+     * @return the parsed response, or {@link Optional#empty()} if the expected JSON shape is absent
      */
     @WhatsAppWebExport(moduleName = "WAWebMexFetchAllSubgroupsJob", exports = "mexFetchAllSubgroups",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -55,76 +68,102 @@ public final class FetchAllSubgroupsMexResponse implements MexOperation.Response
     }
 
     /**
-     * Returns the {@code id} field.
+     * Returns the community group identifier returned by the relay.
      *
-     * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the identifier, or empty if absent
      */
     public Optional<String> id() {
         return Optional.ofNullable(id);
     }
 
     /**
-     * Returns the {@code default_sub_group} field.
+     * Returns the community's default subgroup record.
      *
-     * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the record, or empty if absent
      */
     public Optional<DefaultSubGroup> defaultSubGroup() {
         return Optional.ofNullable(defaultSubGroup);
     }
 
     /**
-     * Returns the {@code sub_groups} field.
+     * Returns the list of regular subgroups under the community.
      *
-     * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the subgroup list, or empty if absent
      */
     public Optional<SubGroups> subGroups() {
         return Optional.ofNullable(subGroups);
     }
 
     /**
-     * A parsed {@code DefaultSubGroup} object.
+     * Default subgroup record for a community. Carries the subgroup identifier and its subject metadata.
      */
     public static final class DefaultSubGroup {
+        /**
+         * The default subgroup identifier.
+         */
         private final String id;
+
+        /**
+         * The default subgroup subject metadata.
+         */
         private final Subject subject;
 
+        /**
+         * Constructs a new default-subgroup record.
+         *
+         * @param id the subgroup identifier
+         * @param subject the subject metadata
+         */
         private DefaultSubGroup(String id, Subject subject) {
             this.id = id;
             this.subject = subject;
         }
 
         /**
-         * Returns the {@code id} field.
+         * Returns the default subgroup identifier.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+         * @return an {@link Optional} containing the identifier, or empty if absent
          */
         public Optional<String> id() {
             return Optional.ofNullable(id);
         }
 
         /**
-         * Returns the {@code subject} field.
+         * Returns the default subgroup subject metadata.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+         * @return an {@link Optional} containing the subject, or empty if absent
          */
         public Optional<Subject> subject() {
             return Optional.ofNullable(subject);
         }
 
         /**
-         * A parsed {@code Subject} object.
+         * Subject metadata for a subgroup. Captures the subject value and the creation timestamp.
          */
         public static final class Subject {
+            /**
+             * The subject text value.
+             */
             private final String value;
+
+            /**
+             * The subject creation epoch-second timestamp.
+             */
             private final Long creationTime;
 
+            /**
+             * Constructs a new subject record.
+             *
+             * @param value the subject text value
+             * @param creationTime the creation epoch-second timestamp
+             */
             private Subject(String value, Long creationTime) {
                 this.value = value;
                 this.creationTime = creationTime;
             }
 
             /**
-             * Returns the {@code value} field.
+             * Returns the subject text value.
              *
              * @return an {@link Optional} containing the value, or empty if absent
              */
@@ -133,19 +172,19 @@ public final class FetchAllSubgroupsMexResponse implements MexOperation.Response
             }
 
             /**
-             * Returns the {@code creation_time} field.
+             * Returns the subject creation timestamp.
              *
-             * @return an {@link Optional} containing the value as an {@link Instant}, or empty if absent
+             * @return an {@link Optional} containing the {@link Instant}, or empty if absent
              */
             public Optional<Instant> creationTime() {
                 return Optional.ofNullable(creationTime).map(Instant::ofEpochSecond);
             }
 
             /**
-             * Parses a {@code Subject} from the given JSON object.
+             * Parses a subject record from the given JSON object.
              *
              * @param obj the JSON object to parse
-             * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+             * @return an {@link Optional} containing the parsed record, or empty if {@code obj} is {@code null}
              */
             static Optional<Subject> of(JSONObject obj) {
                 if (obj == null) {
@@ -158,10 +197,10 @@ public final class FetchAllSubgroupsMexResponse implements MexOperation.Response
             }
 
             /**
-             * Parses a list of {@code Subject} from the given JSON array.
+             * Parses a list of subject records from the given JSON array.
              *
              * @param arr the JSON array to parse
-             * @return the list of parsed results, empty if {@code arr} is {@code null}
+             * @return the list of parsed records, empty if {@code arr} is {@code null}
              */
             static List<Subject> ofArray(JSONArray arr) {
                 if (arr == null) {
@@ -177,10 +216,10 @@ public final class FetchAllSubgroupsMexResponse implements MexOperation.Response
         }
 
         /**
-         * Parses a {@code DefaultSubGroup} from the given JSON object.
+         * Parses a default-subgroup record from the given JSON object.
          *
          * @param obj the JSON object to parse
-         * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+         * @return an {@link Optional} containing the parsed record, or empty if {@code obj} is {@code null}
          */
         static Optional<DefaultSubGroup> of(JSONObject obj) {
             if (obj == null) {
@@ -193,10 +232,10 @@ public final class FetchAllSubgroupsMexResponse implements MexOperation.Response
         }
 
         /**
-         * Parses a list of {@code DefaultSubGroup} from the given JSON array.
+         * Parses a list of default-subgroup records from the given JSON array.
          *
          * @param arr the JSON array to parse
-         * @return the list of parsed results, empty if {@code arr} is {@code null}
+         * @return the list of parsed records, empty if {@code arr} is {@code null}
          */
         static List<DefaultSubGroup> ofArray(JSONArray arr) {
             if (arr == null) {
@@ -212,52 +251,92 @@ public final class FetchAllSubgroupsMexResponse implements MexOperation.Response
     }
 
     /**
-     * A parsed {@code SubGroups} object.
+     * Subgroups list. Wraps the {@code edges} array of regular subgroups under a community.
      */
     public static final class SubGroups {
+        /**
+         * The subgroup edges returned by the relay.
+         */
         private final List<Edges> edges;
 
+        /**
+         * Constructs a new subgroups list.
+         *
+         * @param edges the subgroup edges
+         */
         private SubGroups(List<Edges> edges) {
             this.edges = edges;
         }
 
         /**
-         * Returns the {@code edges} field.
+         * Returns the subgroup edges.
          *
-         * @return the list of values, empty if absent
+         * @return the list of edges, empty if absent
          */
         public List<Edges> edges() {
             return edges;
         }
 
         /**
-         * A parsed {@code Edges} object.
+         * Single edge wrapper around a subgroup node, mirroring the GraphQL connection pattern.
          */
         public static final class Edges {
+            /**
+             * The subgroup node carried by the edge.
+             */
             private final Node node;
 
+            /**
+             * Constructs a new edge wrapping the given node.
+             *
+             * @param node the subgroup node
+             */
             private Edges(Node node) {
                 this.node = node;
             }
 
             /**
-             * Returns the {@code node} field.
+             * Returns the subgroup node carried by this edge.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+             * @return an {@link Optional} containing the node, or empty if absent
              */
             public Optional<Node> node() {
                 return Optional.ofNullable(node);
             }
 
             /**
-             * A parsed {@code Node} object.
+             * Subgroup node. Captures the subgroup identifier together with subject metadata, group properties and the
+             * pending membership approval requests counter.
              */
             public static final class Node {
+                /**
+                 * The subgroup identifier.
+                 */
                 private final String id;
+
+                /**
+                 * The subgroup subject metadata.
+                 */
                 private final Subject subject;
+
+                /**
+                 * The subgroup properties (general chat, approval mode, hidden state).
+                 */
                 private final Properties properties;
+
+                /**
+                 * The pending membership approval request counter.
+                 */
                 private final MembershipApprovalRequests membershipApprovalRequests;
 
+                /**
+                 * Constructs a new subgroup node.
+                 *
+                 * @param id the subgroup identifier
+                 * @param subject the subject metadata
+                 * @param properties the subgroup properties
+                 * @param membershipApprovalRequests the pending membership approval requests counter
+                 */
                 private Node(String id, Subject subject, Properties properties, MembershipApprovalRequests membershipApprovalRequests) {
                     this.id = id;
                     this.subject = subject;
@@ -266,55 +345,68 @@ public final class FetchAllSubgroupsMexResponse implements MexOperation.Response
                 }
 
                 /**
-                 * Returns the {@code id} field.
+                 * Returns the subgroup identifier.
                  *
-                 * @return an {@link Optional} containing the value, or empty if absent
+                 * @return an {@link Optional} containing the identifier, or empty if absent
                  */
                 public Optional<String> id() {
                     return Optional.ofNullable(id);
                 }
 
                 /**
-                 * Returns the {@code subject} field.
+                 * Returns the subgroup subject metadata.
                  *
-                 * @return an {@link Optional} containing the value, or empty if absent
+                 * @return an {@link Optional} containing the subject, or empty if absent
                  */
                 public Optional<Subject> subject() {
                     return Optional.ofNullable(subject);
                 }
 
                 /**
-                 * Returns the {@code properties} field.
+                 * Returns the subgroup properties.
                  *
-                 * @return an {@link Optional} containing the value, or empty if absent
+                 * @return an {@link Optional} containing the properties, or empty if absent
                  */
                 public Optional<Properties> properties() {
                     return Optional.ofNullable(properties);
                 }
 
                 /**
-                 * Returns the {@code membership_approval_requests} field.
+                 * Returns the pending membership approval requests counter.
                  *
-                 * @return an {@link Optional} containing the value, or empty if absent
+                 * @return an {@link Optional} containing the counter record, or empty if absent
                  */
                 public Optional<MembershipApprovalRequests> membershipApprovalRequests() {
                     return Optional.ofNullable(membershipApprovalRequests);
                 }
 
                 /**
-                 * A parsed {@code Subject} object.
+                 * Subject metadata for a subgroup.
                  */
                 public static final class Subject {
+                    /**
+                     * The subject text value.
+                     */
                     private final String value;
+
+                    /**
+                     * The subject creation epoch-second timestamp.
+                     */
                     private final Long creationTime;
 
+                    /**
+                     * Constructs a new subject record.
+                     *
+                     * @param value the subject text value
+                     * @param creationTime the creation epoch-second timestamp
+                     */
                     private Subject(String value, Long creationTime) {
                         this.value = value;
                         this.creationTime = creationTime;
                     }
 
                     /**
-                     * Returns the {@code value} field.
+                     * Returns the subject text value.
                      *
                      * @return an {@link Optional} containing the value, or empty if absent
                      */
@@ -323,19 +415,19 @@ public final class FetchAllSubgroupsMexResponse implements MexOperation.Response
                     }
 
                     /**
-                     * Returns the {@code creation_time} field.
+                     * Returns the subject creation timestamp.
                      *
-                     * @return an {@link Optional} containing the value as an {@link Instant}, or empty if absent
+                     * @return an {@link Optional} containing the {@link Instant}, or empty if absent
                      */
                     public Optional<Instant> creationTime() {
                         return Optional.ofNullable(creationTime).map(Instant::ofEpochSecond);
                     }
 
                     /**
-                     * Parses a {@code Subject} from the given JSON object.
+                     * Parses a subject record from the given JSON object.
                      *
                      * @param obj the JSON object to parse
-                     * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+                     * @return an {@link Optional} containing the parsed record, or empty if {@code obj} is {@code null}
                      */
                     static Optional<Subject> of(JSONObject obj) {
                         if (obj == null) {
@@ -348,10 +440,10 @@ public final class FetchAllSubgroupsMexResponse implements MexOperation.Response
                     }
 
                     /**
-                     * Parses a list of {@code Subject} from the given JSON array.
+                     * Parses a list of subject records from the given JSON array.
                      *
                      * @param arr the JSON array to parse
-                     * @return the list of parsed results, empty if {@code arr} is {@code null}
+                     * @return the list of parsed records, empty if {@code arr} is {@code null}
                      */
                     static List<Subject> ofArray(JSONArray arr) {
                         if (arr == null) {
@@ -367,13 +459,32 @@ public final class FetchAllSubgroupsMexResponse implements MexOperation.Response
                 }
 
                 /**
-                 * A parsed {@code Properties} object.
+                 * Subgroup property flags. Captures the general-chat tag, the membership approval mode flag and the
+                 * hidden-group state.
                  */
                 public static final class Properties {
+                    /**
+                     * The general-chat tag for the subgroup.
+                     */
                     private final String generalChat;
+
+                    /**
+                     * Whether membership approval mode is enabled.
+                     */
                     private final Boolean membershipApprovalModeEnabled;
+
+                    /**
+                     * The hidden-group state tag.
+                     */
                     private final String hiddenGroup;
 
+                    /**
+                     * Constructs a new properties record.
+                     *
+                     * @param generalChat the general-chat tag
+                     * @param membershipApprovalModeEnabled whether approval mode is enabled
+                     * @param hiddenGroup the hidden-group state tag
+                     */
                     private Properties(String generalChat, Boolean membershipApprovalModeEnabled, String hiddenGroup) {
                         this.generalChat = generalChat;
                         this.membershipApprovalModeEnabled = membershipApprovalModeEnabled;
@@ -381,37 +492,37 @@ public final class FetchAllSubgroupsMexResponse implements MexOperation.Response
                     }
 
                     /**
-                     * Returns the {@code general_chat} field.
+                     * Returns the general-chat tag for the subgroup.
                      *
-                     * @return an {@link Optional} containing the value, or empty if absent
+                     * @return an {@link Optional} containing the tag, or empty if absent
                      */
                     public Optional<String> generalChat() {
                         return Optional.ofNullable(generalChat);
                     }
 
                     /**
-                     * Returns the {@code membership_approval_mode_enabled} field.
+                     * Returns whether membership approval mode is enabled for this subgroup.
                      *
-                     * @return {@code true} if the value is present and true, {@code false} otherwise
+                     * @return {@code true} when the flag is present and set, {@code false} otherwise
                      */
                     public boolean membershipApprovalModeEnabled() {
                         return membershipApprovalModeEnabled != null && membershipApprovalModeEnabled;
                     }
 
                     /**
-                     * Returns the {@code hidden_group} field.
+                     * Returns the hidden-group state tag.
                      *
-                     * @return an {@link Optional} containing the value, or empty if absent
+                     * @return an {@link Optional} containing the tag, or empty if absent
                      */
                     public Optional<String> hiddenGroup() {
                         return Optional.ofNullable(hiddenGroup);
                     }
 
                     /**
-                     * Parses a {@code Properties} from the given JSON object.
+                     * Parses a properties record from the given JSON object.
                      *
                      * @param obj the JSON object to parse
-                     * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+                     * @return an {@link Optional} containing the parsed record, or empty if {@code obj} is {@code null}
                      */
                     static Optional<Properties> of(JSONObject obj) {
                         if (obj == null) {
@@ -425,10 +536,10 @@ public final class FetchAllSubgroupsMexResponse implements MexOperation.Response
                     }
 
                     /**
-                     * Parses a list of {@code Properties} from the given JSON array.
+                     * Parses a list of properties records from the given JSON array.
                      *
                      * @param arr the JSON array to parse
-                     * @return the list of parsed results, empty if {@code arr} is {@code null}
+                     * @return the list of parsed records, empty if {@code arr} is {@code null}
                      */
                     static List<Properties> ofArray(JSONArray arr) {
                         if (arr == null) {
@@ -444,29 +555,37 @@ public final class FetchAllSubgroupsMexResponse implements MexOperation.Response
                 }
 
                 /**
-                 * A parsed {@code MembershipApprovalRequests} object.
+                 * Counter record for pending membership approval requests.
                  */
                 public static final class MembershipApprovalRequests {
+                    /**
+                     * The number of pending approval requests.
+                     */
                     private final Long totalCount;
 
+                    /**
+                     * Constructs a new counter record.
+                     *
+                     * @param totalCount the number of pending approval requests
+                     */
                     private MembershipApprovalRequests(Long totalCount) {
                         this.totalCount = totalCount;
                     }
 
                     /**
-                     * Returns the {@code total_count} field.
+                     * Returns the number of pending approval requests.
                      *
-                     * @return an {@link OptionalLong} containing the value, or empty if absent
+                     * @return an {@link OptionalLong} containing the count, or empty if absent
                      */
                     public OptionalLong totalCount() {
                         return totalCount != null ? OptionalLong.of(totalCount) : OptionalLong.empty();
                     }
 
                     /**
-                     * Parses a {@code MembershipApprovalRequests} from the given JSON object.
+                     * Parses a counter record from the given JSON object.
                      *
                      * @param obj the JSON object to parse
-                     * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+                     * @return an {@link Optional} containing the parsed record, or empty if {@code obj} is {@code null}
                      */
                     static Optional<MembershipApprovalRequests> of(JSONObject obj) {
                         if (obj == null) {
@@ -478,10 +597,10 @@ public final class FetchAllSubgroupsMexResponse implements MexOperation.Response
                     }
 
                     /**
-                     * Parses a list of {@code MembershipApprovalRequests} from the given JSON array.
+                     * Parses a list of counter records from the given JSON array.
                      *
                      * @param arr the JSON array to parse
-                     * @return the list of parsed results, empty if {@code arr} is {@code null}
+                     * @return the list of parsed records, empty if {@code arr} is {@code null}
                      */
                     static List<MembershipApprovalRequests> ofArray(JSONArray arr) {
                         if (arr == null) {
@@ -497,10 +616,10 @@ public final class FetchAllSubgroupsMexResponse implements MexOperation.Response
                 }
 
                 /**
-                 * Parses a {@code Node} from the given JSON object.
+                 * Parses a subgroup node from the given JSON object.
                  *
                  * @param obj the JSON object to parse
-                 * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+                 * @return an {@link Optional} containing the parsed node, or empty if {@code obj} is {@code null}
                  */
                 static Optional<Node> of(JSONObject obj) {
                     if (obj == null) {
@@ -515,10 +634,10 @@ public final class FetchAllSubgroupsMexResponse implements MexOperation.Response
                 }
 
                 /**
-                 * Parses a list of {@code Node} from the given JSON array.
+                 * Parses a list of subgroup nodes from the given JSON array.
                  *
                  * @param arr the JSON array to parse
-                 * @return the list of parsed results, empty if {@code arr} is {@code null}
+                 * @return the list of parsed nodes, empty if {@code arr} is {@code null}
                  */
                 static List<Node> ofArray(JSONArray arr) {
                     if (arr == null) {
@@ -534,10 +653,10 @@ public final class FetchAllSubgroupsMexResponse implements MexOperation.Response
             }
 
             /**
-             * Parses a {@code Edges} from the given JSON object.
+             * Parses an edge wrapper from the given JSON object.
              *
              * @param obj the JSON object to parse
-             * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+             * @return an {@link Optional} containing the parsed edge, or empty if {@code obj} is {@code null}
              */
             static Optional<Edges> of(JSONObject obj) {
                 if (obj == null) {
@@ -549,10 +668,10 @@ public final class FetchAllSubgroupsMexResponse implements MexOperation.Response
             }
 
             /**
-             * Parses a list of {@code Edges} from the given JSON array.
+             * Parses a list of edge wrappers from the given JSON array.
              *
              * @param arr the JSON array to parse
-             * @return the list of parsed results, empty if {@code arr} is {@code null}
+             * @return the list of parsed edges, empty if {@code arr} is {@code null}
              */
             static List<Edges> ofArray(JSONArray arr) {
                 if (arr == null) {
@@ -568,10 +687,10 @@ public final class FetchAllSubgroupsMexResponse implements MexOperation.Response
         }
 
         /**
-         * Parses a {@code SubGroups} from the given JSON object.
+         * Parses a subgroups list from the given JSON object.
          *
          * @param obj the JSON object to parse
-         * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+         * @return an {@link Optional} containing the parsed list, or empty if {@code obj} is {@code null}
          */
         static Optional<SubGroups> of(JSONObject obj) {
             if (obj == null) {
@@ -583,10 +702,10 @@ public final class FetchAllSubgroupsMexResponse implements MexOperation.Response
         }
 
         /**
-         * Parses a list of {@code SubGroups} from the given JSON array.
+         * Parses a list of subgroups containers from the given JSON array.
          *
          * @param arr the JSON array to parse
-         * @return the list of parsed results, empty if {@code arr} is {@code null}
+         * @return the list of parsed containers, empty if {@code arr} is {@code null}
          */
         static List<SubGroups> ofArray(JSONArray arr) {
             if (arr == null) {
@@ -601,6 +720,12 @@ public final class FetchAllSubgroupsMexResponse implements MexOperation.Response
         }
     }
 
+    /**
+     * Parses the response from the raw JSON payload bytes.
+     *
+     * @param json the raw JSON bytes from the {@code <result>} child
+     * @return an {@link Optional} containing the parsed response, or empty if the envelope is missing
+     */
     private static Optional<FetchAllSubgroupsMexResponse> of(byte[] json) {
         var jsonObject = JSON.parseObject(json);
         if (jsonObject == null) {

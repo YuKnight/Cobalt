@@ -1,40 +1,25 @@
 package com.github.auties00.cobalt.exception;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+
 /**
- * Exception thrown when the periodic ADV (Advanced Device Verification) check fails.
- * <p>
- * The ADV check scheduler runs every 24 hours to verify device list freshness and
- * prevent device list expiration. This exception is thrown when the check encounters
- * an error during processing.
+ * Thrown when the periodic Advanced Device Verification (ADV) maintenance
+ * job fails.
  *
- * <h2>ADV Check Process</h2>
- * The check job performs the following operations:
- * <ol>
- *   <li><b>Expiration check:</b> Identifies device lists that have exceeded the
- *       expiration threshold (default 35 days)</li>
- *   <li><b>Staleness check:</b> Detects device lists with stale expectedTs values
- *       (not updated within 25 hours)</li>
- *   <li><b>Proactive sync:</b> Schedules device syncs for lists approaching expiration
- *       (within warning threshold, default 7 days before expiry)</li>
- *   <li><b>Cleanup:</b> Clears expired device records and associated Signal sessions</li>
- * </ol>
+ * <p>WhatsApp tracks the freshness of every device list (the set of
+ * companion devices linked to an account) and runs a daily check that
+ * marks expired entries, schedules proactive resyncs for entries about
+ * to expire, and clears the Signal sessions that belonged to evicted
+ * devices. When that job cannot complete because the local store is
+ * unreachable, an AB prop is missing, or a triggered resync fails, this
+ * exception is raised so the configurable error handler can decide
+ * whether to log the failure, retry early, or escalate.
  *
- * <h2>Possible Causes</h2>
- * <ul>
- *   <li><b>Store access failure:</b> Unable to read device lists from storage</li>
- *   <li><b>AB prop retrieval failure:</b> Unable to fetch expiration thresholds</li>
- *   <li><b>Device sync failure:</b> Error scheduling proactive device syncs</li>
- *   <li><b>Session cleanup failure:</b> Error clearing expired Signal sessions</li>
- * </ul>
- *
- * <h2>Fatality</h2>
- * ADV check exceptions are non-fatal. The scheduler will retry on the next interval,
- * and the client can continue operating normally. Failed checks do not affect
- * message sending or receiving.
- *
- * @apiNote WAWebAdvDeviceInfoCheckJob: manages automated periodic verification and
- * expiration of device information lists for Advanced Device Verification.
+ * <p>The failure does not break the session. {@link #isFatal()} always
+ * returns {@code false}: the next scheduled run can recover and message
+ * traffic in the meantime is unaffected.
  */
+@WhatsAppWebModule(moduleName = "WAWebAdvDeviceInfoCheckJob")
 public final class WhatsAppAdvCheckException extends WhatsAppException {
 
     /**
@@ -73,11 +58,10 @@ public final class WhatsAppAdvCheckException extends WhatsAppException {
     }
 
     /**
-     * Returns whether this exception represents a fatal error.
-     * <p>
-     * ADV check exceptions are non-fatal. The scheduler will automatically
-     * retry on the next 24-hour interval, and the client can continue
-     * operating normally in the meantime.
+     * Returns whether the failure invalidates the current session.
+     *
+     * <p>The periodic ADV check runs in the background and a single
+     * failure does not affect message sending or receiving.
      *
      * @return {@code false}
      */

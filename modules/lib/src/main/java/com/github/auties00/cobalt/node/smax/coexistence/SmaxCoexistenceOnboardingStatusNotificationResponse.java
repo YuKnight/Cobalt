@@ -28,14 +28,14 @@ public final class SmaxCoexistenceOnboardingStatusNotificationResponse implement
     private final Jid notificationFrom;
 
     /**
-     * The {@code status} attribute on {@code <onboarding_status/>} —
+     * The {@code status} attribute on {@code <onboarding_status/>} .
      * one of {@code "completed"}, {@code "failed"}.
      */
     private final String onboardingStatusStatus;
 
     /**
      * The {@code product_surface} attribute on
-     * {@code <onboarding_status/>} — one of {@code "ai_from_meta"},
+     * {@code <onboarding_status/>} . one of {@code "ai_from_meta"},
      * {@code "automation"}, {@code "business_platform"}.
      */
     private final String onboardingStatusProductSurface;
@@ -48,11 +48,11 @@ public final class SmaxCoexistenceOnboardingStatusNotificationResponse implement
     /**
      * Constructs a new {@code SmaxCoexistenceOnboardingStatusNotificationResponse} projection.
      *
-     * @param notificationId                 the notification id; never {@code null}
-     * @param notificationFrom               the from JID; never {@code null}
-     * @param onboardingStatusStatus         the status enum literal; never {@code null}
-     * @param onboardingStatusProductSurface the product-surface enum literal; never {@code null}
-     * @param onboardingStatusProviderInfo   the provider-info projection; never {@code null}
+     * @param notificationId                 the notification id. Never {@code null}
+     * @param notificationFrom               the from JID. Never {@code null}
+     * @param onboardingStatusStatus         the status enum literal. Never {@code null}
+     * @param onboardingStatusProductSurface the product-surface enum literal. Never {@code null}
+     * @param onboardingStatusProviderInfo   the provider-info projection. Never {@code null}
      * @throws NullPointerException if any argument is {@code null}
      */
     public SmaxCoexistenceOnboardingStatusNotificationResponse(String notificationId,
@@ -70,7 +70,7 @@ public final class SmaxCoexistenceOnboardingStatusNotificationResponse implement
     /**
      * Returns the notification id.
      *
-     * @return the id; never {@code null}
+     * @return the id. Never {@code null}
      */
     public String notificationId() {
         return notificationId;
@@ -79,7 +79,7 @@ public final class SmaxCoexistenceOnboardingStatusNotificationResponse implement
     /**
      * Returns the notification from JID.
      *
-     * @return the JID; never {@code null}
+     * @return the JID. Never {@code null}
      */
     public Jid notificationFrom() {
         return notificationFrom;
@@ -88,7 +88,7 @@ public final class SmaxCoexistenceOnboardingStatusNotificationResponse implement
     /**
      * Returns the status enum literal.
      *
-     * @return the literal; never {@code null}
+     * @return the literal. Never {@code null}
      */
     public String onboardingStatusStatus() {
         return onboardingStatusStatus;
@@ -97,7 +97,7 @@ public final class SmaxCoexistenceOnboardingStatusNotificationResponse implement
     /**
      * Returns the product-surface enum literal.
      *
-     * @return the literal; never {@code null}
+     * @return the literal. Never {@code null}
      */
     public String onboardingStatusProductSurface() {
         return onboardingStatusProductSurface;
@@ -106,7 +106,7 @@ public final class SmaxCoexistenceOnboardingStatusNotificationResponse implement
     /**
      * Returns the provider-info projection.
      *
-     * @return the projection; never {@code null}
+     * @return the projection. Never {@code null}
      */
     public SmaxCoexistenceOffboardingNotificationProviderInfo onboardingStatusProviderInfo() {
         return onboardingStatusProviderInfo;
@@ -115,7 +115,7 @@ public final class SmaxCoexistenceOnboardingStatusNotificationResponse implement
     /**
      * Tries to parse a {@link SmaxCoexistenceOnboardingStatusNotificationResponse} projection.
      *
-     * @param node the inbound notification stanza; never {@code null}
+     * @param node the inbound notification stanza. Never {@code null}
      * @return an {@link Optional} carrying the projection
      * @throws NullPointerException if {@code node} is {@code null}
      */

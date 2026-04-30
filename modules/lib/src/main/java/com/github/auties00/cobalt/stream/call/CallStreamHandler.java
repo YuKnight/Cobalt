@@ -42,30 +42,19 @@ import java.time.Instant;
 @WhatsAppWebModule(moduleName = "WAWebVoipLidUtils")
 public final class CallStreamHandler implements SocketStream.Handler {
     /**
-     * The logger for this handler.
-     *
-     * @implNote WAWebHandleVoipCall references {@code WALogger} for parse
-     *           errors and signaling traces.
+     * Logger for parse errors and signaling traces.
      */
     private static final System.Logger LOGGER = System.getLogger(CallStreamHandler.class.getName());
 
     /**
-     * The WhatsApp client instance used for sending stanzas and accessing the
-     * store.
-     *
-     * @implNote WAWebHandleVoipCall resolves its dependencies through module
-     *           imports; Cobalt injects them via the constructor.
+     * The WhatsApp client used for sending stanzas and accessing the store.
      */
     private final WhatsAppClient whatsapp;
 
     /**
      * Constructs a new {@code CallStreamHandler} with the specified client.
      *
-     * @param whatsapp the WhatsApp client used for sending stanzas and store
-     *                 access
-     * @implNote WA Web does not have an explicit constructor for this module;
-     *           Cobalt replaces the module-level dependencies with constructor
-     *           injection.
+     * @param whatsapp the WhatsApp client used for sending stanzas and store access
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleVoipCall", exports = "handleCall",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -74,14 +63,9 @@ public final class CallStreamHandler implements SocketStream.Handler {
     }
 
     /**
-     * Handles a raw call stanza received from the socket stream.
-     *
-     * <p>Delegates to {@link #handleCall(Node)} for processing.
+     * Handles a raw call stanza received from the socket stream by delegating to {@link #handleCall(Node)}.
      *
      * @param node the incoming call stanza node
-     * @implNote Cobalt dispatches stanzas to handlers through
-     *           {@link SocketStream.Handler#handle(Node)}; WA Web registers
-     *           handler objects keyed by stanza tag instead.
      */
     @Override
     public void handle(Node node) {
@@ -139,65 +123,56 @@ public final class CallStreamHandler implements SocketStream.Handler {
     @WhatsAppWebExport(moduleName = "WAWebHandleVoipCall", exports = "handleCall",
             adaptation = WhatsAppAdaptation.ADAPTED)
     private void handleCall(Node node) {
-        // WAWebHandleVoipCall parser g: e.assertTag("call") is implicit — the
-        // dispatcher only routes <call> stanzas here.
-        var from = node.getAttributeAsJid("from", null); // WAWebHandleVoipCall.g: c = jidWithTypeToWid(e.attrJidWithType("from"))
-        var payload = node.getChild().orElse(null); // WAWebHandleVoipCall.g: m = e.mapFirstChild(e => e)
+        var from = node.getAttributeAsJid("from", null);
+        var payload = node.getChild().orElse(null);
         if (from == null || payload == null) {
-            // WAWebHandleVoipCall.g: throw err("Unrecognized call stanza") → WAWebHandleVoipCall.h returns null → handleCall resolves "NO_ACK"
             LOGGER.log(System.Logger.Level.DEBUG, "Ignoring malformed call stanza: {0}", node);
             return;
         }
 
-        var senderLid = node.getAttributeAsJid("sender_lid", null); // WAWebHandleVoipCall.g: d = hasAttr("sender_lid") ? jidWithTypeToWid(attrJidWithType("sender_lid")) : null
+        var senderLid = node.getAttributeAsJid("sender_lid", null);
 
-        var callId = payload.getAttributeAsString("call-id", null); // WAWebHandleVoipCall.g: p = m.attrString("call-id")
-        var callCreator = payload.getAttributeAsJid("call-creator", null); // WAWebHandleVoipCall.g: _ = jidWithTypeToWid(m.attrJidWithType("call-creator"))
+        var callId = payload.getAttributeAsString("call-id", null);
+        var callCreator = payload.getAttributeAsJid("call-creator", null);
         if (callId == null || callCreator == null) {
-            // WAWebHandleVoipCall.g: attrString / attrJidWithType throw on missing attributes; the outer h() catches and returns null → handleCall resolves "NO_ACK".
-            // No ack is sent in this case.
             LOGGER.log(System.Logger.Level.DEBUG, "Ignoring call stanza with missing call-id or call-creator: {0}", node);
             return;
         }
 
-        var offline = node.hasAttribute("offline"); // WAWebHandleVoipCall.g: is_offline = e.hasAttr("offline")
-        var callerPn = payload.getAttributeAsJid("caller_pn", null); // WAWebHandleVoipCall.g: h = hasAttr("caller_pn") ? jidWithTypeToWid(attrJidWithType("caller_pn")) : null
-        var groupJid = payload.getAttributeAsJid("group-jid", null); // WAWebHandleVoipCall.g: g = hasAttr("group-jid") ? jidWithTypeToWid(attrJidWithType("group-jid")) : null
-        var callerPushName = payload.getAttributeAsString("notify", null); // WAWebHandleVoipCall.g: b = m.maybeAttrString("notify") → message.caller_push_name
+        var offline = node.hasAttribute("offline");
+        var callerPn = payload.getAttributeAsJid("caller_pn", null);
+        var groupJid = payload.getAttributeAsJid("group-jid", null);
+        var callerPushName = payload.getAttributeAsString("notify", null);
 
-        // WAWebHandleVoipCall.handleCall (v): senderLid != null && (yield WAWebVoipLidUtils.attemptPersistLidMappingAndUserAttributes({jid: senderLid, phoneNumber: from, flushImmediately: true}))
         if (senderLid != null) {
             attemptPersistLidMappingAndUserAttributes(senderLid, from, null);
         }
 
-        // WAWebHandleVoipCall.handleCall (v): yield WAWebVoipLidUtils.persistAttributesAndLidMappingsForCall(a)
         persistAttributesAndLidMappingsForCall(callCreator, callerPn, callerPushName, payload, offline);
 
         switch (payload.description()) {
-            case "offer" -> handleOffer(node, payload, from, callId, callCreator, groupJid, offline); // WAWebHandleVoipCall.C: case TYPE.OFFER
-            case "accept" -> { // WAWebHandleVoipCall.C: case TYPE.ACCEPT
-                sendCallReceipt(node, from, callId, callCreator, "accept"); // WAWebHandleVoipCall.C: S(t,a,h,g,TYPE.ACCEPT)
+            case "offer" -> handleOffer(node, payload, from, callId, callCreator, groupJid, offline);
+            case "accept" -> {
+                sendCallReceipt(node, from, callId, callCreator, "accept");
                 updateCall(node, callId, payload, from, callCreator, groupJid, CallOffer.Status.ACCEPTED, offline);
             }
-            case "reject" -> { // WAWebHandleVoipCall.C: case TYPE.REJECT
-                sendCallReceipt(node, from, callId, callCreator, "reject"); // WAWebHandleVoipCall.C: S(t,a,h,g,TYPE.REJECT)
+            case "reject" -> {
+                sendCallReceipt(node, from, callId, callCreator, "reject");
                 updateCall(node, callId, payload, from, callCreator, groupJid, CallOffer.Status.REJECTED, offline);
             }
-            case "enc_rekey" -> { // WAWebHandleVoipCall.C: case TYPE.ENC_REKEY
-                // WAWebHandleVoipCall.C: retry-receipt logic (shouldRetry) omitted — Cobalt has no VoIP media runtime that can request a rekey retry, so we always send the normal S(...) receipt branch.
-                sendCallReceipt(node, from, callId, callCreator, "enc_rekey"); // WAWebHandleVoipCall.C: S(t,a,h,g,TYPE.ENC_REKEY)
+            case "enc_rekey" -> {
+                // WA Web's retry-receipt branch is omitted because Cobalt has no VoIP media runtime that can request a rekey retry.
+                sendCallReceipt(node, from, callId, callCreator, "enc_rekey");
             }
             case "terminate" -> {
-                // ADAPTED: WAWebHandleVoipCall.C default case handles TERMINATE by calling handleVoipIncomingSignalingMessage and returning R(t,a,l) (ack).
-                // Cobalt explicitly tracks the call lifecycle status for terminate stanzas before ack'ing.
                 var reason = payload.getAttributeAsString("reason", null);
                 var status = "timeout".equals(reason)
                         ? CallOffer.Status.TIMED_OUT
                         : CallOffer.Status.CANCELLED;
                 updateCall(node, callId, payload, from, callCreator, groupJid, status, offline);
-                sendCallAck(node, payload.description()); // WAWebHandleVoipCall.C default: R(t,a,l)
+                sendCallAck(node, payload.description());
             }
-            default -> sendCallAck(node, payload.description()); // WAWebHandleVoipCall.C default: R(t,a,l)
+            default -> sendCallAck(node, payload.description());
         }
     }
 
@@ -225,15 +200,15 @@ public final class CallStreamHandler implements SocketStream.Handler {
     @WhatsAppWebExport(moduleName = "WAWebHandleVoipCall", exports = "handleCall",
             adaptation = WhatsAppAdaptation.ADAPTED)
     private void handleOffer(Node node, Node payload, Jid from, String callId, Jid callCreator, Jid groupJid, boolean offline) {
-        sendCallReceipt(node, from, callId, callCreator, "offer"); // WAWebHandleVoipCall.C: S(t,a,h,g,TYPE.OFFER)
+        sendCallReceipt(node, from, callId, callCreator, "offer");
 
-        var call = buildOrUpdateCall(node, callId, payload, from, callCreator, groupJid, CallOffer.Status.RINGING, offline); // ADAPTED: WA Web hands the message off to WAWebHandleVoipCallOffer which maintains VoIP state; Cobalt persists the call model and notifies listeners.
+        var call = buildOrUpdateCall(node, callId, payload, from, callCreator, groupJid, CallOffer.Status.RINGING, offline);
         if (call == null) {
             return;
         }
 
         if (!call.outgoing()) {
-            notifyCall(call); // ADAPTED: Cobalt listener notification pattern
+            notifyCall(call);
         }
     }
 
@@ -273,7 +248,7 @@ public final class CallStreamHandler implements SocketStream.Handler {
             CallOffer.Status status,
             boolean offline
     ) {
-        var chatJid = groupJid != null ? groupJid : canonicalUserJid(from); // WAWebHandleVoipCall.g: chat context is peer_jid for 1:1 or group_jid for group calls
+        var chatJid = groupJid != null ? groupJid : canonicalUserJid(from);
         if (chatJid == null) {
             return null;
         }
@@ -285,7 +260,7 @@ public final class CallStreamHandler implements SocketStream.Handler {
         if (existing != null) {
             existing.setChatJid(chatJid);
             existing.setCallerJid(callCreator);
-            existing.setVideo(payload.hasChild("video")); // WAWebHandleVoipCall.g: isVideoCall = m.hasChild("video")
+            existing.setVideo(payload.hasChild("video"));
             existing.setOfflineOffer(offline);
             existing.setGroup(groupJid != null);
             existing.setGroupJid(groupJid);
@@ -387,24 +362,19 @@ public final class CallStreamHandler implements SocketStream.Handler {
     @WhatsAppWebExport(moduleName = "WAWebVoipLidUtils", exports = "persistAttributesAndLidMappingsForCall",
             adaptation = WhatsAppAdaptation.ADAPTED)
     private void persistAttributesAndLidMappingsForCall(Jid callCreator, Jid callerPn, String callerPushName, Node payload, boolean offline) {
-        // WAWebVoipLidUtils.s: var t = !e.is_offline (flushImmediately flag — ignored by Cobalt as mappings are written synchronously)
-        // WAWebVoipLidUtils.s: yield c({jid: e.call_creator, phoneNumber: e.caller_pn, username: e.caller_username, countryCode: e.caller_country_code, pushName: e.caller_push_name, flushImmediately: t})
         attemptPersistLidMappingAndUserAttributes(callCreator, callerPn, callerPushName);
 
-        // WAWebVoipLidUtils.s: var r = e.group_info_updates; r != null && yield WAPromiseEach.promiseEach(r, ...)
         var groupInfo = payload.getChild("group_info").orElse(null);
         if (groupInfo == null) {
             return;
         }
-        // WAWebHandleVoipCall.g: group_info_updates = t.mapChildren(e => ({jid, user_pn, username, guest_name}))
         for (var participant : groupInfo.children()) {
             var participantJid = participant.getAttributeAsJid("jid", null);
             if (participantJid == null) {
                 continue;
             }
             var participantPn = participant.getAttributeAsJid("user_pn", null);
-            // WAWebVoipLidUtils.s: yield c({jid: e.jid, phoneNumber: e.user_pn, username: e.username, flushImmediately: t && o})
-            // Note: no pushName for participants — WA Web does not forward it from group_info.
+            // WA Web does not forward a pushName for participants from group_info.
             attemptPersistLidMappingAndUserAttributes(participantJid, participantPn, null);
         }
     }
@@ -448,19 +418,16 @@ public final class CallStreamHandler implements SocketStream.Handler {
             return;
         }
 
-        // WAWebVoipLidUtils.d: var c = WAWebWidFactory.asUserWidOrThrow(i) — strips the device suffix.
         var userJid = jid.toUserJid();
 
-        // WAWebVoipLidUtils.d: isStringNullOrEmpty(s) || WAWebHandlePushnameUpdate.updatePushname(i, s, false)
         if (pushName != null && !pushName.isBlank()) {
             updatePushname(userJid, pushName);
         }
 
-        // WAWebVoipLidUtils.d: if (!!c.isLid()) { ... WAWebDBCreateLidPnMappings.createLidPnMappings({mappings: [{lid: c, pn: asUserWidOrThrow(l)}], flushImmediately: a, learningSource: "other"}) ... }
         if (!userJid.hasLidServer() || phoneNumber == null) {
             return;
         }
-        // WAWebVoipLidUtils.d: username + usernameCallingPhoneNumberPrivacyEnabled short-circuit is omitted; Cobalt has no username runtime and always writes the mapping.
+        // The WA Web username + usernameCallingPhoneNumberPrivacyEnabled short-circuit is omitted because Cobalt has no username runtime and always writes the mapping.
         whatsapp.store().registerLidMapping(phoneNumber.toUserJid(), userJid);
     }
 
@@ -507,25 +474,25 @@ public final class CallStreamHandler implements SocketStream.Handler {
     @WhatsAppWebExport(moduleName = "WAWebHandleVoipCall", exports = "handleCall",
             adaptation = WhatsAppAdaptation.ADAPTED)
     private void sendCallReceipt(Node node, Jid to, String callId, Jid callCreator, String childTag) {
-        var from = resolveReceiptFrom(to); // WAWebHandleVoipCall.S: from: e.isLid() ? getMeDeviceLidOrThrow() : getMePnUserOrThrow_DO_NOT_USE()
-        var stanzaId = node.getAttributeAsString("id", null); // WAWebHandleVoipCall.g: stanzaId = e.attrString("id")
+        var from = resolveReceiptFrom(to);
+        var stanzaId = node.getAttributeAsString("id", null);
         if (from == null || stanzaId == null) {
             return;
         }
 
-        var child = new NodeBuilder() // WAWebHandleVoipCall.S: i = WAWap.wap(childTag, {"call-id": p, "call-creator": JID(r)})
+        var child = new NodeBuilder()
                 .description(childTag)
                 .attribute("call-id", callId)
                 .attribute("call-creator", callCreator)
                 .build();
-        var receipt = new NodeBuilder() // WAWebHandleVoipCall.S: WAWap.wap("receipt", {to: JID(e), id: t, from: ...}, i)
+        var receipt = new NodeBuilder()
                 .description("receipt")
                 .attribute("to", to)
                 .attribute("from", from)
                 .attribute("id", stanzaId)
                 .content(child)
                 .build();
-        whatsapp.sendNodeWithNoResponse(receipt); // WAWebHandleVoipCall.S: WADeprecatedSendIq.deprecatedCastStanza(...)
+        whatsapp.sendNodeWithNoResponse(receipt);
     }
 
     /**
@@ -587,14 +554,12 @@ public final class CallStreamHandler implements SocketStream.Handler {
             return null;
         }
 
-        if (remote.hasLidServer()) { // WAWebHandleVoipCall.S: e.isLid()
-            // WAWebUserPrefsMeUser.getMeDeviceLidOrThrow preserves the device suffix on outgoing LID receipts.
-            // Cobalt stores the meLid exactly as the server sends it in <success lid="...">, so store.lid()
-            // is the closest equivalent; the self-device PN fallback kicks in only when setLid was never called.
-            return whatsapp.store().lid().orElse(self.toUserJid()); // WAWebUserPrefsMeUser.getMeDeviceLidOrThrow
+        if (remote.hasLidServer()) {
+            // store.lid() preserves the device suffix on outgoing LID receipts; the PN fallback only kicks in when setLid was never called.
+            return whatsapp.store().lid().orElse(self.toUserJid());
         }
 
-        return self.toUserJid(); // WAWebUserPrefsMeUser.getMePnUserOrThrow_DO_NOT_USE = asUserWidOrThrow(meDevicePn)
+        return self.toUserJid();
     }
 
     /**

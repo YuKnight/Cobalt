@@ -193,7 +193,6 @@ public final class DeepLinkParser {
      *               AB-prop and resolve the SMB flag
      * @param url    the URL to inspect
      * @return the parsed deep-link, or {@code NotApplicable}
-     * @implNote WAWebApiParse.parseAPICmd.
      */
     @WhatsAppWebExport(moduleName = "WAWebApiParse", exports = "parseAPICmd",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -293,9 +292,15 @@ public final class DeepLinkParser {
          * The URL is a regular web link, not a WhatsApp deep-link.
          */
         final class NotApplicable implements DeepLink {
-            /** Singleton instance. */
+            /**
+             * Shared singleton returned for any URL that is not a
+             * recognised WhatsApp deep-link.
+             */
             public static final NotApplicable INSTANCE = new NotApplicable();
 
+            /**
+             * Hidden constructor that enforces the singleton.
+             */
             private NotApplicable() {
             }
         }

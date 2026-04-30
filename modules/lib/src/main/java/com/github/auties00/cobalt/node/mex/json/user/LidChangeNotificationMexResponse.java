@@ -14,12 +14,27 @@ import java.io.UncheckedIOException;
 import java.util.Optional;
 
 /**
- * The parsed response for this MEX query.
+ * Parsed response for the LID-change notification query. Carries the previous and current linked-identity values
+ * projected from {@code data.xwa2_notify_lid_change}.
  */
+@WhatsAppWebModule(moduleName = "WAWebMexLidChangeNotification")
 public final class LidChangeNotificationMexResponse implements MexOperation.Response.Json {
+    /**
+     * The previous LID value reported by the relay.
+     */
     private final String oldValue;
+
+    /**
+     * The new LID value reported by the relay.
+     */
     private final String newValue;
 
+    /**
+     * Constructs a new response with the given old and new LID values.
+     *
+     * @param oldValue the previous LID value
+     * @param newValue the new LID value
+     */
     private LidChangeNotificationMexResponse(String oldValue, String newValue) {
         this.oldValue = oldValue;
         this.newValue = newValue;
@@ -28,16 +43,10 @@ public final class LidChangeNotificationMexResponse implements MexOperation.Resp
     /**
      * Parses the MEX response carried by an inbound IQ stanza.
      *
-     * @implNote WAWebMexLidChangeNotificationQuery.graphql: the compiled
-     * Relay {@code selections} array selects the {@code XWA2LidChange}
-     * linked field {@code xwa2_notify_lid_change} carrying the scalar
-     * children {@code old} and {@code new}; this method extracts both
-     * straight from the JSON payload of the {@code <result>} child.
      * @param node the inbound IQ stanza carrying the {@code <result>} child
-     * @return the parsed response, or {@code Optional.empty()} if the
-     *         expected JSON shape is absent
+     * @return the parsed response, or {@link Optional#empty()} if the expected JSON shape is absent
      */
-    @WhatsAppWebExport(moduleName = "WAWebMexLidChangeNotificationQuery.graphql", exports = "selections",
+    @WhatsAppWebExport(moduleName = "WAWebMexLidChangeNotification", exports = "parseLidChangeNotification",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public static Optional<LidChangeNotificationMexResponse> of(Node node) {
         return node.getChild("result")
@@ -46,35 +55,30 @@ public final class LidChangeNotificationMexResponse implements MexOperation.Resp
     }
 
     /**
-     * Returns the previous LID value carried by the GraphQL response.
+     * Returns the previous LID value reported by the relay.
      *
-     * @implNote WAWebMexLidChangeNotificationQuery.graphql: corresponds to
-     * the scalar selection {@code selections[0].selections[0].name = "old"}
-     * inside the {@code xwa2_notify_lid_change} linked field.
-     * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the previous LID, or empty if absent
      */
-    @WhatsAppWebExport(moduleName = "WAWebMexLidChangeNotificationQuery.graphql", exports = "selections",
-            adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<String> oldValue() {
         return Optional.ofNullable(oldValue);
     }
 
     /**
-     * Returns the new LID value carried by the GraphQL response.
+     * Returns the new LID value reported by the relay.
      *
-     * @implNote WAWebMexLidChangeNotificationQuery.graphql: corresponds to
-     * the scalar selection {@code selections[0].selections[1].name = "new"}
-     * inside the {@code xwa2_notify_lid_change} linked field. Renamed to
-     * {@code newValue()} to avoid clashing with the Java {@code new}
-     * keyword.
-     * @return an {@link Optional} containing the value, or empty if absent
+     * @apiNote The accessor is named {@code newValue()} to avoid clashing with the Java {@code new} keyword.
+     * @return an {@link Optional} containing the new LID, or empty if absent
      */
-    @WhatsAppWebExport(moduleName = "WAWebMexLidChangeNotificationQuery.graphql", exports = "selections",
-            adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<String> newValue() {
         return Optional.ofNullable(newValue);
     }
 
+    /**
+     * Parses the response from the raw JSON payload bytes.
+     *
+     * @param json the raw JSON bytes from the {@code <result>} child
+     * @return an {@link Optional} containing the parsed response, or empty if the envelope is missing
+     */
     private static Optional<LidChangeNotificationMexResponse> of(byte[] json) {
         var jsonObject = JSON.parseObject(json);
         if (jsonObject == null) {

@@ -15,7 +15,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps the companion-finish payload
+ * The outbound stanza variant. Wraps the companion-finish payload
  * in the canonical {@code <iq xmlns="md" type="set" to="s.whatsapp.net">}
  * envelope.
  */

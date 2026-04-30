@@ -15,18 +15,20 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * USync {@code bot} protocol.
- *
- * @implNote WAWebUsyncBotProfile.USyncBotProfileProtocol.
+ * USync {@code bot} protocol descriptor. Wraps a {@code <bot>} query carrying
+ * an inner {@code <profile v="1"/>} child to request the peer's bot profile
+ * metadata.
  */
 @WhatsAppWebModule(moduleName = "WAWebUsyncBotProfile")
 public final class UsyncBotProfileProtocol implements UsyncProtocol {
-    /** Wire literal for the protocol tag name. */
+    /**
+     * Wire literal for the protocol tag name.
+     */
     public static final String NAME = "bot";
 
     /**
-     * Wire-protocol version emitted on the {@code v} attribute of the
-     * inner {@code <profile/>} query element.
+     * Wire-protocol version emitted on the {@code v} attribute of the inner
+     * {@code <profile/>} query element.
      */
     public static final String PROFILE_VERSION = "1";
 
@@ -38,6 +40,11 @@ public final class UsyncBotProfileProtocol implements UsyncProtocol {
     public UsyncBotProfileProtocol() {
     }
 
+    /**
+     * Returns the wire literal for this protocol's tag name.
+     *
+     * @return the tag name
+     */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUsyncBotProfile",
             exports = "USyncBotProfileProtocol.getName", adaptation = WhatsAppAdaptation.DIRECT)
@@ -45,6 +52,12 @@ public final class UsyncBotProfileProtocol implements UsyncProtocol {
         return NAME;
     }
 
+    /**
+     * Builds the {@code <bot>} query element wrapping a versioned
+     * {@code <profile/>} child.
+     *
+     * @return the query-element node
+     */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUsyncBotProfile",
             exports = "USyncBotProfileProtocol.getQueryElement", adaptation = WhatsAppAdaptation.DIRECT)
@@ -58,6 +71,13 @@ public final class UsyncBotProfileProtocol implements UsyncProtocol {
                 .build();
     }
 
+    /**
+     * Builds the per-user {@code <bot>} child wrapping a {@code <profile/>}
+     * element optionally carrying the {@code persona_id} attribute.
+     *
+     * @param user the user the {@code <user>} entry refers to
+     * @return the per-user element
+     */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUsyncBotProfile",
             exports = "USyncBotProfileProtocol.getUserElement", adaptation = WhatsAppAdaptation.DIRECT)
@@ -70,6 +90,14 @@ public final class UsyncBotProfileProtocol implements UsyncProtocol {
                 .build());
     }
 
+    /**
+     * Parses the {@code <bot>} child of a {@code <user>} response into a
+     * {@link BotProfileResult} or a per-protocol error.
+     *
+     * @param child the protocol-tagged response node
+     * @return the parsed result
+     * @throws IllegalStateException if the node tag is not {@link #NAME}
+     */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUsyncBotProfile",
             exports = "botProfileParser", adaptation = WhatsAppAdaptation.ADAPTED)
@@ -112,8 +140,12 @@ public final class UsyncBotProfileProtocol implements UsyncProtocol {
 
     /**
      * Reads the inline text content of the supplied node, falling back to
-     * {@code defaultValue} when the node is {@code null} or carries no
-     * text.
+     * {@code defaultValue} when the node is {@code null} or carries no text.
+     *
+     * @param node         the node to read
+     * @param defaultValue the value to return when the node is {@code null}
+     *                     or empty
+     * @return the inline text or the fallback
      */
     private static String textOf(Node node, String defaultValue) {
         return node == null ? defaultValue : node.toContentString().orElse(defaultValue);
@@ -122,6 +154,9 @@ public final class UsyncBotProfileProtocol implements UsyncProtocol {
     /**
      * Parses the optional {@code <prompts>} child into a list of
      * {@link BotProfileResult.Prompt} entries.
+     *
+     * @param promptsChild the optional {@code <prompts>} child
+     * @return the parsed prompts, never {@code null}
      */
     private static List<BotProfileResult.Prompt> parsePrompts(Optional<Node> promptsChild) {
         if (promptsChild.isEmpty()) {
@@ -139,6 +174,9 @@ public final class UsyncBotProfileProtocol implements UsyncProtocol {
     /**
      * Parses the optional {@code <commands>} child into a list of
      * {@link BotProfileResult.Command} entries plus a descriptive header.
+     *
+     * @param commandsChild the optional {@code <commands>} child
+     * @return the parsed commands and their header
      */
     private static CommandsParsed parseCommands(Optional<Node> commandsChild) {
         if (commandsChild.isEmpty()) {
@@ -158,6 +196,9 @@ public final class UsyncBotProfileProtocol implements UsyncProtocol {
     /**
      * Maps the {@code type} attribute on the {@code <posing_as_professional>}
      * child to the corresponding {@link BotProfileResult.PosingAsProfessional}.
+     *
+     * @param wire the wire literal
+     * @return the matching enum value
      */
     private BotProfileResult.PosingAsProfessional posingFromWire(String wire) {
         return switch (wire) {
@@ -168,7 +209,11 @@ public final class UsyncBotProfileProtocol implements UsyncProtocol {
     }
 
     /**
-     * Internal pair returned by {@link #parseCommands(Optional)}.
+     * Internal pair returned by {@link #parseCommands(Optional)} that bundles
+     * the parsed command list with its descriptive header.
+     *
+     * @param commands            the parsed command list
+     * @param commandsDescription the free-form header above the command list
      */
     private record CommandsParsed(List<BotProfileResult.Command> commands, String commandsDescription) {
     }

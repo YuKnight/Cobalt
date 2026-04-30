@@ -56,10 +56,7 @@ import java.util.Optional;
 @WhatsAppWebModule(moduleName = "WAWebAdvSignatureConstants")
 public final class DeviceADVValidator {
     /**
-     * Header for E2EE account signature verification.
-     *
-     * @implNote WAWebAdvSignatureConstants.ADV_PREFIX_DEVICE_IDENTITY_ACCOUNT_SIGNATURE: header
-     * bytes [6, 0] for E2EE account signatures.
+     * Domain-separation header for E2EE account signature verification ({@code [6, 0]}).
      */
     @WhatsAppWebExport(moduleName = "WAWebAdvSignatureConstants",
             exports = "ADV_PREFIX_DEVICE_IDENTITY_ACCOUNT_SIGNATURE",
@@ -67,10 +64,8 @@ public final class DeviceADVValidator {
     private static final byte[] E2EE_ACCOUNT_SIGNATURE_HEADER = {6, 0};
 
     /**
-     * Header for E2EE device signature verification/creation.
-     *
-     * @implNote WAWebAdvSignatureConstants.ADV_PREFIX_DEVICE_IDENTITY_DEVICE_SIGNATURE: header
-     * bytes [6, 1] for E2EE device signatures.
+     * Domain-separation header for E2EE device signature verification and generation
+     * ({@code [6, 1]}).
      */
     @WhatsAppWebExport(moduleName = "WAWebAdvSignatureConstants",
             exports = "ADV_PREFIX_DEVICE_IDENTITY_DEVICE_SIGNATURE",
@@ -78,10 +73,7 @@ public final class DeviceADVValidator {
     private static final byte[] E2EE_DEVICE_SIGNATURE_HEADER = {6, 1};
 
     /**
-     * Header for key index list account signature verification.
-     *
-     * @implNote WAWebAdvSignatureConstants.ADV_PREFIX_KEY_INDEX_LIST_ACCOUNT_SIGNATURE: header
-     * bytes [6, 2] for signed key index lists.
+     * Domain-separation header for signed key index lists ({@code [6, 2]}).
      */
     @WhatsAppWebExport(moduleName = "WAWebAdvSignatureConstants",
             exports = "ADV_PREFIX_KEY_INDEX_LIST_ACCOUNT_SIGNATURE",
@@ -89,10 +81,8 @@ public final class DeviceADVValidator {
     private static final byte[] KEY_INDEX_LIST_SIGNATURE_HEADER = {6, 2};
 
     /**
-     * Header for hosted account signature verification.
-     *
-     * @implNote WAWebAdvSignatureConstants.ADV_HOSTED_PREFIX_DEVICE_IDENTITY_ACCOUNT_SIGNATURE:
-     * header bytes [6, 5] for hosted account signatures.
+     * Domain-separation header for hosted account signature verification
+     * ({@code [6, 5]}).
      */
     @WhatsAppWebExport(moduleName = "WAWebAdvSignatureConstants",
             exports = "ADV_HOSTED_PREFIX_DEVICE_IDENTITY_ACCOUNT_SIGNATURE",
@@ -100,11 +90,9 @@ public final class DeviceADVValidator {
     private static final byte[] HOSTED_ACCOUNT_SIGNATURE_HEADER = {6, 5};
 
     /**
-     * Header for hosted device signature verification.
-     * Only used for verification, not generation. WA Web always generates with [6, 1].
-     *
-     * @implNote WAWebAdvSignatureConstants.ADV_HOSTED_PREFIX_DEVICE_IDENTITY_DEVICE_SIGNATURE:
-     * header bytes [6, 6] for hosted device signatures.
+     * Domain-separation header for hosted device signature verification
+     * ({@code [6, 6]}). Only used for verification. WA Web always generates with
+     * {@link #E2EE_DEVICE_SIGNATURE_HEADER}.
      */
     @WhatsAppWebExport(moduleName = "WAWebAdvSignatureConstants",
             exports = "ADV_HOSTED_PREFIX_DEVICE_IDENTITY_DEVICE_SIGNATURE",
@@ -112,22 +100,22 @@ public final class DeviceADVValidator {
     private static final byte[] HOSTED_DEVICE_SIGNATURE_HEADER = {6, 6};
 
     /**
-     * The store providing access to stored identities, advSecretKey, and local device info.
+     * The store providing the local identity key pair, advSecretKey, and stored
+     * peer identities.
      */
     private final WhatsAppStore store;
 
     /**
-     * The AB props service for reading the {@code bizHostedDevicesEnabled} gate.
+     * The AB props service used to gate hosted-device behaviour.
      */
     private final ABPropsService abProps;
 
     /**
-     * Creates a new ADV validator service.
+     * Constructs a new ADV validator.
      *
-     * @implNote WAWebAdvSignatureApi: instantiated with store and AB props dependencies for
-     * signature verification gated by {@code bizHostedDevicesEnabled}.
-     * @param store   the WhatsApp store for accessing keys and identity
-     * @param abProps the AB props service for feature gating
+     * @param store   the store
+     * @param abProps the AB props service
+     * @throws NullPointerException if any argument is {@code null}
      */
     @WhatsAppWebExport(moduleName = "WAWebAdvSignatureApi",
             exports = "validateADVwithIdentityKey",
@@ -138,17 +126,14 @@ public final class DeviceADVValidator {
     }
 
     /**
-     * Checks if hosted device validation is enabled.
+     * Returns whether hosted-device signature handling is enabled.
      *
-     * @implNote WAWebBizCoexGatingUtils.bizHostedDevicesEnabled: returns
-     * {@code getABPropConfigValue("adv_accept_hosted_devices")}.
-     * @return {@code true} if hosted devices should be validated with HOSTED headers
+     * @return {@code true} when {@code adv_accept_hosted_devices} is set
      */
     @WhatsAppWebExport(moduleName = "WAWebBizCoexGatingUtils",
             exports = "bizHostedDevicesEnabled",
             adaptation = WhatsAppAdaptation.DIRECT)
     public boolean isBizHostedDevicesEnabled() {
-        // Don't wait for sync
         return abProps.getBool(ABProp.ADV_ACCEPT_HOSTED_DEVICES, false);
     }
 
@@ -182,38 +167,32 @@ public final class DeviceADVValidator {
         }
 
         try {
-            // WAWebHandlePairSuccess: extracts device-identity from pair-success response
             var deviceIdentityHmacBytes = deviceIdentityNode.getChild("device-identity")
                     .orElseThrow(() -> new WhatsAppAdvValidationException.MissingDeviceIdentity(localJid))
                     .toContentBytes()
                     .orElseThrow(() -> new WhatsAppAdvValidationException.EmptyDeviceIdentity(localJid));
 
-            // WAWebHandlePairSuccess: decode ADVSignedDeviceIdentityHMACSpec
             var deviceIdentityHmac = ADVSignedDeviceIdentityHMACSpec.decode(deviceIdentityHmacBytes);
             var details = deviceIdentityHmac.details()
                     .orElseThrow(() -> new NullPointerException("details cannot be null"));
             var hmac = deviceIdentityHmac.hmac()
                     .orElseThrow(() -> new NullPointerException("hmac cannot be null"));
 
-            // WAWebHandlePairSuccess: determine HMAC input based on platform and encryption type
-            // The HOSTED header is ONLY prepended when:
-            // 1. The PRIMARY device is SMB (WhatsApp Business) - checked via smbHostedPrimaryPairingAllowed()
-            // 2. AND the accountType in the protobuf is HOSTED
-            // For regular consumer accounts (android/iphone), the header is never prepended
+            // The HOSTED header is prepended only when the primary device is SMB (WhatsApp
+            // Business) and the protobuf accountType is HOSTED. Consumer accounts always
+            // pass details directly.
             byte[] hmacInput;
             var outerEncryptionType = deviceIdentityHmac.accountType()
                     .orElse(ADVEncryptionType.E2EE);
             var platform = store.device().platform();
             var isSMB = platform == ClientPlatformType.ANDROID_BUSINESS || platform == ClientPlatformType.IOS_BUSINESS;
             if (isSMB && outerEncryptionType == ADVEncryptionType.HOSTED) {
-                // WAWebHandlePairSuccess: Binary.build(ADV_HOSTED_PREFIX_DEVICE_IDENTITY_ACCOUNT_SIGNATURE, details)
                 hmacInput = DataUtils.concatByteArrays(HOSTED_ACCOUNT_SIGNATURE_HEADER, details);
             } else {
-                // E2EE, null, or non-SMB defaults to using details directly
                 hmacInput = details;
             }
 
-            // WAWebHandlePairSuccess: verifies HMAC using advSecretKey (NOT companion public key)
+            // HMAC verification uses advSecretKey, not the companion public key.
             var mac = Mac.getInstance("HmacSHA256");
             var secretKey = new SecretKeySpec(advSecretKey, "HmacSHA256");
             mac.init(secretKey);
@@ -222,7 +201,6 @@ public final class DeviceADVValidator {
                 throw new WhatsAppAdvValidationException.HmacValidationFailed(localJid);
             }
 
-            // Decode the inner SignedDeviceIdentity
             var deviceIdentity = ADVSignedDeviceIdentitySpec.decode(details);
             var deviceIdentityDetails = deviceIdentity.details()
                     .orElseThrow(() -> new NullPointerException("details cannot be null"));
@@ -231,8 +209,8 @@ public final class DeviceADVValidator {
             var deviceIdentityAccountSignature = deviceIdentity.accountSignature()
                     .orElseThrow(() -> new NullPointerException("AccountSignature cannot be null"));
 
-            // WAWebAdvSignatureApi.verifyDeviceIdentityAccountSignature: select account signature
-            // header based on deviceType from the INNER ADVDeviceIdentitySpec, gated by bizHostedDevicesEnabled
+            // The account signature header is selected from the inner deviceType, gated by
+            // the hosted-devices feature flag.
             var accountSignatureHeader = E2EE_ACCOUNT_SIGNATURE_HEADER;
             if (isBizHostedDevicesEnabled()) {
                 try {
@@ -243,20 +221,18 @@ public final class DeviceADVValidator {
                         accountSignatureHeader = HOSTED_ACCOUNT_SIGNATURE_HEADER;
                     }
                 } catch (ProtobufDeserializationException e) {
-                    // If decoding fails, fall back to E2EE header
+                    // Fall back to the E2EE header on decode failure.
                 }
             }
 
-            // WAWebAdvSignatureApi: verifies account signature: sign(header + details + identityKey)
             var localIdentityKey = localIdentityKeyPair.publicKey().toEncodedPoint();
             var message = DataUtils.concatByteArrays(accountSignatureHeader, deviceIdentityDetails, localIdentityKey);
             if (!Curve25519.verifySignature(deviceIdentityAccountSignatureKey, message, deviceIdentityAccountSignature)) {
                 throw new WhatsAppAdvValidationException.AccountSignatureFailed(localJid);
             }
 
-            // WAWebAdvSignatureApi.generateDeviceSignature: creates device signature: sign(header + details + identityKey + accountSignatureKey)
-            // IMPORTANT: WA Web ALWAYS uses E2EE header [6, 1] for device signature GENERATION
-            // The HOSTED header [6, 6] is only used for VERIFICATION of remote devices
+            // Device signature generation always uses the E2EE header. The HOSTED device
+            // header is only used during verification of remote devices.
             var deviceSignatureMessage = DataUtils.concatByteArrays(
                     E2EE_DEVICE_SIGNATURE_HEADER,
                     deviceIdentityDetails,
@@ -305,19 +281,17 @@ public final class DeviceADVValidator {
         Objects.requireNonNull(remoteIdentityNode, "remoteIdentityNode cannot be null");
         Objects.requireNonNull(remoteIdentityKey, "remoteIdentityKey cannot be null");
 
-        // WAWebAdvSignatureApi: ADV validation only required for companion devices (device != 0)
+        // ADV validation is required only for companion devices.
         if (!requiresValidation(remoteJid)) {
             return Optional.empty();
         }
 
-        // WAWebAdvSignatureApi: early exit optimization - if we already have this device's
-        // identity key stored and it matches, skip full ADV validation
+        // Skip full validation when the stored device identity already matches.
         var storedDeviceIdentityKey = findStoredDeviceIdentityKey(remoteJid);
         if (storedDeviceIdentityKey.isPresent() && Arrays.equals(storedDeviceIdentityKey.get(), remoteIdentityKey)) {
             return Optional.empty();
         }
 
-        // Get stored identity key for user (device 0) for fallback
         var storedUserIdentityKey = findStoredUserIdentityKey(remoteJid);
 
         var remoteIdentityBytes = remoteIdentityNode.getChild("device-identity")
@@ -326,13 +300,12 @@ public final class DeviceADVValidator {
                 .orElseThrow(() -> new WhatsAppAdvValidationException.EmptyDeviceIdentity(remoteJid));
         var remoteIdentity = ADVSignedDeviceIdentitySpec.decode(remoteIdentityBytes);
 
-        // WAWebAdvSignatureApi.verifyDeviceIdentityAccountSignature: for account signature, decode
-        // details and check deviceType. This is different from device signature which uses isHosted from WID
         var remoteIdentityDetails = remoteIdentity.details()
                 .orElseThrow(() -> new NullPointerException("details cannot be null"));
 
-        // WAWebAdvSignatureApi.verifyDeviceIdentityAccountSignature: select account signature header
-        // based on deviceType from protobuf. Only check deviceType if bizHostedDevicesEnabled
+        // The account signature header derives from the protobuf deviceType; the device
+        // signature header derives from the JID hosted flag. Both checks are gated by
+        // the hosted-devices feature.
         var accountSignatureHeader = E2EE_ACCOUNT_SIGNATURE_HEADER;
         if (isBizHostedDevicesEnabled()) {
             try {
@@ -343,41 +316,32 @@ public final class DeviceADVValidator {
                     accountSignatureHeader = HOSTED_ACCOUNT_SIGNATURE_HEADER;
                 }
             } catch (ProtobufDeserializationException e) {
-                // If decoding fails, fall back to E2EE header
+                // Fall back to the E2EE header on decode failure.
             }
         }
 
-        // WAWebAdvSignatureApi.validateADVwithIdentityKey: select device signature header based on
-        // isHosted from WID. Also gated by bizHostedDevicesEnabled
         var deviceSignatureHeader = E2EE_DEVICE_SIGNATURE_HEADER;
         if (isBizHostedDevicesEnabled() && isHostedFromJid) {
             deviceSignatureHeader = HOSTED_DEVICE_SIGNATURE_HEADER;
         }
 
-        // WAWebAdvSignatureApi.validateADVwithIdentityKey (internal function P): determine account
-        // signature key with fallback logic. Always use protobuf's accountSignatureKey first, then
-        // fallback to stored user identity key
+        // The protobuf accountSignatureKey takes precedence; the stored user identity
+        // key is the fallback when the embedded value is missing or empty.
         var remoteIdentityAccountSignatureKey = remoteIdentity.accountSignatureKey()
                 .orElse(null);
-
-        // WAWebAdvSignatureApi.validateADVwithIdentityKey (internal function P): fallback to stored if null
         if (remoteIdentityAccountSignatureKey == null) {
             remoteIdentityAccountSignatureKey = storedUserIdentityKey.orElse(null);
         }
-
-        // WAWebAdvSignatureApi.validateADVwithIdentityKey (internal function P): for bizHostedDevicesEnabled,
-        // also check if empty (r && r.byteLength > 0 ? r : t) - fallback to stored if empty
-        if (isBizHostedDevicesEnabled()) {
-            if (remoteIdentityAccountSignatureKey != null && remoteIdentityAccountSignatureKey.length == 0) {
-                remoteIdentityAccountSignatureKey = storedUserIdentityKey.orElse(null);
-            }
+        if (isBizHostedDevicesEnabled()
+                && remoteIdentityAccountSignatureKey != null
+                && remoteIdentityAccountSignatureKey.length == 0) {
+            remoteIdentityAccountSignatureKey = storedUserIdentityKey.orElse(null);
         }
 
         if (remoteIdentityAccountSignatureKey == null || remoteIdentityAccountSignatureKey.length == 0) {
             return Optional.empty();
         }
 
-        // WAWebAdvSignatureApi.verifyDeviceIdentityAccountSignature: verify account signature: sign(header + details + identityKey)
         var remoteIdentityAccountSignature = remoteIdentity.accountSignature()
                 .orElseThrow(() -> new NullPointerException("accountSignature cannot be null"));
         var accountMessage = DataUtils.concatByteArrays(accountSignatureHeader, remoteIdentityDetails, remoteIdentityKey);
@@ -385,7 +349,6 @@ public final class DeviceADVValidator {
             throw new WhatsAppAdvValidationException.AccountSignatureFailed(remoteJid);
         }
 
-        // WAWebAdvSignatureApi.validateADVwithIdentityKey: verify device signature: sign(header + details + identityKey + accountSignatureKey)
         var remoteIdentityDeviceSignature = remoteIdentity.deviceSignature()
                 .orElseThrow(() -> new NullPointerException("deviceSignature cannot be null"));
         var deviceMessage = DataUtils.concatByteArrays(deviceSignatureHeader, remoteIdentityDetails, remoteIdentityKey, remoteIdentityAccountSignatureKey);
@@ -414,36 +377,30 @@ public final class DeviceADVValidator {
         Objects.requireNonNull(signedKeyIndexBytes, "signedKeyIndexBytes cannot be null");
 
         try {
-            // WAWebHandleAdvDeviceNotificationUtils: decode outer SignedKeyIndexList protobuf
             var signedKeyIndexList = ADVSignedKeyIndexListSpec.decode(signedKeyIndexBytes);
             var details = signedKeyIndexList.details();
             if (details.isEmpty()) {
                 return Optional.empty();
             }
 
-            // WAWebHandleAdvDeviceNotificationUtils.verifySKeyIndexWithAccSigKey: use ONLY embedded accountSignatureKey
-            // No fallback to stored key - return empty if missing
+            // The embedded accountSignatureKey is the only source: no fallback to stored.
             var accountSignatureKey = signedKeyIndexList.accountSignatureKey();
             if (accountSignatureKey.isEmpty() || accountSignatureKey.get().length == 0) {
                 return Optional.empty();
             }
 
-            // WAWebHandleAdvDeviceNotificationUtils: verify account signature
             var accountSignature = signedKeyIndexList.accountSignature();
             if (accountSignature.isEmpty() || accountSignature.get().length == 0) {
                 return Optional.empty();
             }
 
-            // WAWebAdvKeyIndexSignatureVerify.verifyKeyIndexListSignature: verify signature with [6, 2] header
             var message = DataUtils.concatByteArrays(KEY_INDEX_LIST_SIGNATURE_HEADER, details.get());
             if (!Curve25519.verifySignature(accountSignatureKey.get(), message, accountSignature.get())) {
                 return Optional.empty();
             }
 
-            // WAWebHandleAdvDeviceNotificationUtils: decode inner KeyIndexList protobuf
             var keyIndexList = ADVKeyIndexListSpec.decode(details.get());
 
-            // WAWebHandleAdvDeviceNotificationUtils.verifySKeyIndexWithAccSigKey: return null if timestamp OR rawId is null
             var keyIndexListRawId = keyIndexList.rawId();
             var keyIndexListTimestamp = keyIndexList.timestamp();
             if (keyIndexListRawId.isEmpty() || keyIndexListTimestamp.isEmpty()) {
@@ -471,13 +428,10 @@ public final class DeviceADVValidator {
     }
 
     /**
-     * Finds a stored identity key for a specific device.
+     * Returns the stored identity key for the exact device.
      *
-     * @implNote WAWebAdvSignatureApi.validateADVwithIdentityKey: loads the stored identity key
-     * via {@code WAWebSignalProtocolStore.loadIdentityKey(createSignalAddress(t))} for the early
-     * exit optimization when the device's identity key is already known and matches.
-     * @param deviceJid the device JID (with device number)
-     * @return the identity key bytes, or empty if not found
+     * @param deviceJid the device JID, including the device number
+     * @return the identity key bytes, or empty when no key is stored
      */
     @WhatsAppWebExport(moduleName = "WAWebAdvSignatureApi",
             exports = "validateADVwithIdentityKey",
@@ -492,14 +446,13 @@ public final class DeviceADVValidator {
     }
 
     /**
-     * Finds a stored identity key for a user (device 0).
+     * Returns the stored identity key for the user (device 0).
      *
-     * @implNote WAWebAdvSignatureApi.validateADVwithIdentityKey: loads the stored identity key
-     * for the user (device 0) via
-     * {@code WAWebSignalProtocolStore.loadIdentityKey(createSignalAddress(asUserWidOrThrow(t)))}.
-     * Used as fallback for {@code accountSignatureKey} when missing from protobuf.
-     * @param jid the JID (device number is ignored, always looks up device 0)
-     * @return the identity key bytes, or empty if not found
+     * <p>Used as a fallback for {@code accountSignatureKey} when the protobuf field is
+     * missing.
+     *
+     * @param jid the JID; the device number is ignored
+     * @return the identity key bytes, or empty when no key is stored
      */
     @WhatsAppWebExport(moduleName = "WAWebAdvSignatureApi",
             exports = "validateADVwithIdentityKey",
@@ -514,13 +467,12 @@ public final class DeviceADVValidator {
     }
 
     /**
-     * Checks if a device requires ADV validation.
+     * Returns whether the JID points to a device that requires ADV validation.
      *
-     * @implNote WAWebAdvSignatureApi.validateADVwithIdentityKey: only companion devices
-     * (device != 0) require ADV validation. Primary device identity is established
-     * through the main account verification.
-     * @param jid the JID to check
-     * @return {@code true} if the device requires ADV validation
+     * @param jid the JID to test
+     * @return {@code true} for companion devices (device id different from the
+     *         primary id)
+     * @throws NullPointerException if {@code jid} is {@code null}
      */
     @WhatsAppWebExport(moduleName = "WAWebAdvSignatureApi",
             exports = "validateADVwithIdentityKey",

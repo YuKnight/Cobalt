@@ -13,13 +13,15 @@ import com.github.auties00.cobalt.node.usync.result.StatusResult;
 import java.util.Optional;
 
 /**
- * USync {@code status} protocol.
- *
- * @implNote WAWebUsyncStatus.USyncStatusProtocol.
+ * USync {@code status} protocol descriptor. Asks the relay for each peer's
+ * legacy status string. Distinguishes "no status set" from "status hidden by
+ * peer privacy" via a {@code code="401"} marker on the response.
  */
 @WhatsAppWebModule(moduleName = "WAWebUsyncStatus")
 public final class UsyncStatusProtocol implements UsyncProtocol {
-    /** Wire literal for the protocol tag name. */
+    /**
+     * Wire literal for the protocol tag name.
+     */
     public static final String NAME = "status";
 
     /**
@@ -30,6 +32,11 @@ public final class UsyncStatusProtocol implements UsyncProtocol {
     public UsyncStatusProtocol() {
     }
 
+    /**
+     * Returns the wire literal for this protocol's tag name.
+     *
+     * @return the tag name
+     */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUsyncStatus",
             exports = "USyncStatusProtocol.getName", adaptation = WhatsAppAdaptation.DIRECT)
@@ -37,6 +44,11 @@ public final class UsyncStatusProtocol implements UsyncProtocol {
         return NAME;
     }
 
+    /**
+     * Builds an empty {@code <status/>} query element.
+     *
+     * @return the query-element node
+     */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUsyncStatus",
             exports = "USyncStatusProtocol.getQueryElement", adaptation = WhatsAppAdaptation.DIRECT)
@@ -44,6 +56,14 @@ public final class UsyncStatusProtocol implements UsyncProtocol {
         return new NodeBuilder().description(NAME).build();
     }
 
+    /**
+     * Builds a per-user {@code <tctoken>} child carrying the trusted-contact
+     * token attached to the user entry. Returns empty when the user carries
+     * no token.
+     *
+     * @param user the user the {@code <user>} entry refers to
+     * @return the per-user element, or empty
+     */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUsyncStatus",
             exports = "USyncStatusProtocol.getUserElement", adaptation = WhatsAppAdaptation.ADAPTED)
@@ -54,6 +74,17 @@ public final class UsyncStatusProtocol implements UsyncProtocol {
                 .build());
     }
 
+    /**
+     * Parses the {@code <status>} child of a {@code <user>} response into a
+     * {@link StatusResult} or a per-protocol error. Distinguishes three
+     * states: live status text, privacy-blocked (preserved as the empty
+     * string when the relay returns {@code code="401"}), and no status set
+     * (preserved as {@code null}).
+     *
+     * @param child the protocol-tagged response node
+     * @return the parsed result
+     * @throws IllegalStateException if the node tag is not {@link #NAME}
+     */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUsyncStatus",
             exports = "statusParser", adaptation = WhatsAppAdaptation.ADAPTED)

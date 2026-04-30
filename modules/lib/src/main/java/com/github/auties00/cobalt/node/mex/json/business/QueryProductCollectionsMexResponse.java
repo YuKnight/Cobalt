@@ -16,13 +16,9 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The response variant of the {@code queryProductCollections} MEX
- * operation that parses the JSON returned by the relay.
- *
- * @implNote WAWebQueryProductCollections: adapts the
- * {@code xwa_product_catalog_get_collections.collections} array into a
- * list of {@link BusinessCatalog}; the GraphQL {@code paging.after}
- * cursor is surfaced so callers can paginate.
+ * Parsed response of the {@code queryProductCollections} MEX query carrying
+ * the {@code xwa_product_catalog_get_collections.collections} array along
+ * with the {@code paging.after} cursor.
  */
 @WhatsAppWebModule(moduleName = "WAWebQueryProductCollections")
 public final class QueryProductCollectionsMexResponse implements MexOperation.Response.Json {
@@ -43,16 +39,14 @@ public final class QueryProductCollectionsMexResponse implements MexOperation.Re
     /**
      * Parses the MEX response carried by an inbound IQ stanza.
      *
-     * @implNote WAWebQueryProductCollections.default: the WA Web helper
-     * reads {@code data.xwa_product_catalog_get_collections.collections}
-     * and the sibling {@code paging.after} cursor. When the relay
-     * returns a GraphQL error with code {@code 2498052} WA Web surfaces
-     * an empty response; Cobalt applies the same behaviour by treating
-     * a missing {@code xwa_product_catalog_get_collections} field as
-     * an empty page.
+     * @implNote When the relay returns a GraphQL error with code
+     *           {@code 2498052} WA Web surfaces an empty response. Cobalt
+     *           applies the same behaviour by treating a missing
+     *           {@code xwa_product_catalog_get_collections} field as an
+     *           empty page.
      * @param node the inbound IQ stanza carrying the {@code <result>} child
-     * @return the parsed response, or {@code Optional.empty()} if the
-     *         expected JSON shape is absent
+     * @return the parsed response, or empty if the expected JSON shape is
+     *         absent
      */
     @WhatsAppWebExport(moduleName = "WAWebQueryProductCollections", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -72,10 +66,10 @@ public final class QueryProductCollectionsMexResponse implements MexOperation.Re
     }
 
     /**
-     * Returns the {@code paging.after} cursor usable to request the
-     * next page of collections.
+     * Returns the {@code paging.after} cursor usable to request the next
+     * page of collections.
      *
-     * @return an {@link Optional} containing the cursor when the relay
+     * @return an {@link Optional} carrying the cursor when the relay
      *         returned a non-empty value, or empty otherwise
      */
     public Optional<String> afterCursor() {
@@ -83,12 +77,11 @@ public final class QueryProductCollectionsMexResponse implements MexOperation.Re
     }
 
     /**
-     * Parses the raw JSON bytes of the {@code <result>} child into a
-     * structured response.
+     * Parses the raw JSON bytes of the {@code <result>} child.
      *
      * @param json the UTF-8 encoded JSON payload
-     * @return an {@link Optional} containing the parsed response, or
-     *         empty if the envelope is missing the expected fields
+     * @return the parsed response, or empty if the envelope is missing the
+     *         expected fields
      */
     private static Optional<QueryProductCollectionsMexResponse> of(byte[] json) {
         var root = JSON.parseObject(json);
@@ -101,7 +94,6 @@ public final class QueryProductCollectionsMexResponse implements MexOperation.Re
         }
         var getResult = data.getJSONObject("xwa_product_catalog_get_collections");
         if (getResult == null) {
-            // WAWebQueryProductCollections.default: missing field is treated as an empty page
             return Optional.of(new QueryProductCollectionsMexResponse(List.of(), ""));
         }
         var paging = getResult.getJSONObject("paging");
@@ -115,13 +107,11 @@ public final class QueryProductCollectionsMexResponse implements MexOperation.Re
      * Parses an array of GraphQL collection objects into a list of
      * {@link BusinessCatalog} values.
      *
-     * @implNote WAWebQueryProductCollections.default: each collection is
-     * mapped onto {@code {id, name, products, ...}}; Cobalt drops the
-     * {@code status_info} and {@code canAppeal} side-channels since
-     * {@link BusinessCatalog} does not expose them yet. The inner
-     * {@code products} array is parsed via
-     * {@link CatalogProductParser#parseProducts(JSONArray)} to share the
-     * same field projection with the catalog query.
+     * @implNote Cobalt drops the {@code status_info} and {@code canAppeal}
+     *           side-channels since {@link BusinessCatalog} does not expose
+     *           them yet. The inner {@code products} array is parsed via
+     *           {@link CatalogProductParser#parseProducts(JSONArray)} to
+     *           share field handling with the catalog query.
      * @param array the GraphQL collections array, possibly {@code null}
      * @return the parsed collections, never {@code null}
      */
@@ -143,20 +133,16 @@ public final class QueryProductCollectionsMexResponse implements MexOperation.Re
      * {@link BusinessCatalog}.
      *
      * @param obj the GraphQL collection object, possibly {@code null}
-     * @return the parsed collection, or {@link Optional#empty()} if
-     *         {@code obj} is {@code null}
+     * @return the parsed collection, or empty when {@code obj} is
+     *         {@code null}
      */
     private static Optional<BusinessCatalog> parseCollection(JSONObject obj) {
         if (obj == null) {
             return Optional.empty();
         }
-        // WAWebQueryProductCollections.default: id defaults to empty string
         var id = Optional.ofNullable(obj.getString("id")).orElse("");
-        // WAWebQueryProductCollections.default: name defaults to empty string
         var name = Optional.ofNullable(obj.getString("name")).orElse("");
-        // WAWebQueryProductCollections.default: products parsed via parseProductGraphQL
         var products = CatalogProductParser.parseProducts(obj.getJSONArray("products"));
-        // ADAPTED: BusinessCatalog constructor is package-private so Cobalt uses the generated builder
         var collection = new BusinessCatalogBuilder()
                 .id(id)
                 .name(name)

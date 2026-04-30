@@ -76,7 +76,7 @@ public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebMarkChatAsReadSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return MarkChatAsReadAction.ACTION_NAME; // WAWebMarkChatAsReadSync.getAction -> WASyncdConst.Actions.MarkChatAsRead
+        return MarkChatAsReadAction.ACTION_NAME;
     }
 
     /**
@@ -92,7 +92,7 @@ public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebMarkChatAsReadSync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return MarkChatAsReadAction.COLLECTION_NAME; // WAWebMarkChatAsReadSync.collectionName = WASyncdConst.CollectionName.RegularLow
+        return MarkChatAsReadAction.COLLECTION_NAME;
     }
 
     /**
@@ -104,7 +104,7 @@ public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebMarkChatAsReadSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return MarkChatAsReadAction.ACTION_VERSION; // WAWebMarkChatAsReadSync.getVersion -> 3
+        return MarkChatAsReadAction.ACTION_VERSION;
     }
 
     /**
@@ -123,7 +123,7 @@ public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebMarkChatAsReadSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebMarkChatAsReadSync.applyMutations
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -168,52 +168,49 @@ public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebMarkChatAsReadSync", exports = {"applyMutations", "validateSyncActionValue", "$MarkChatAsReadSync$p_3", "$MarkChatAsReadSync$p_1", "$MarkChatAsReadSync$p_2", "getMessageRange"}, adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        if (mutation.operation() != SyncdOperation.SET) { // WAWebMarkChatAsReadSync.applyMutations: e.operation === "set" check, else l++ and return Unsupported
-            return MutationApplicationResult.unsupported(); // WAWebMarkChatAsReadSync.applyMutations: {actionState: SyncActionState.Unsupported}
+        if (mutation.operation() != SyncdOperation.SET) {
+            return MutationApplicationResult.unsupported();
         }
 
-        try { // WAWebMarkChatAsReadSync.applyMutations: try/catch wrapping per-mutation logic
-            if (!(mutation.value().action().orElse(null) instanceof MarkChatAsReadAction action)) { // WAWebMarkChatAsReadSync.validateSyncActionValue: var e = t.markChatAsReadAction
-                return malformedActionValue(); // WAWebMarkChatAsReadSync.applyMutations: i++ and WAWebSyncdIndexUtils.malformedActionValue(a.collectionName)
+        try {
+            if (!(mutation.value().action().orElse(null) instanceof MarkChatAsReadAction action)) {
+                return malformedActionValue();
             }
 
-            var chatJidString = JSON.parseArray(mutation.index()).getString(1); // WAWebMarkChatAsReadSync.applyMutations: var s = t[1]
-            if (chatJidString == null || chatJidString.isEmpty()) { // WAWebMarkChatAsReadSync.applyMutations: if (!s) return a.malformedActionIndex()
-                return malformedActionIndex(); // WAWebMarkChatAsReadSync.applyMutations: this.malformedActionIndex()
+            var chatJidString = JSON.parseArray(mutation.index()).getString(1);
+            if (chatJidString == null || chatJidString.isEmpty()) {
+                return malformedActionIndex();
             }
 
-            var chatJid = Jid.of(chatJidString); // WAWebMarkChatAsReadSync.applyMutations: o("WAWebWidFactory").createWid(s)
+            var chatJid = Jid.of(chatJidString);
             if (chatJid == null) { // ADAPTED: Jid.of returns null for null input; WA Web uses isWid() validation
-                return malformedActionIndex(); // WAWebMarkChatAsReadSync.applyMutations: !isWid(s) -> malformedActionIndex()
+                return malformedActionIndex();
             }
 
-            var chat = client.store().findChatByJid(chatJid); // WAWebMarkChatAsReadSync.applyMutations: yield resolveChatForMutationIndex(createWid(s))
-            if (chat.isEmpty()) { // WAWebMarkChatAsReadSync.applyMutations: if (!m.success) return {actionState: Orphan, orphanModel: m.orphanModel}
-                return MutationApplicationResult.orphan(chatJidString, "Chat"); // WAWebMarkChatAsReadSync.applyMutations: {actionState: SyncActionState.Orphan, orphanModel: {modelType: Chat, modelId: s}}
+            var chat = client.store().findChatByJid(chatJid);
+            if (chat.isEmpty()) {
+                return MutationApplicationResult.orphan(chatJidString, "Chat");
             }
 
-            // WAWebMarkChatAsReadSync.validateSyncActionValue: checks read != null and messageRange != null.
             // In Cobalt, MarkChatAsReadAction.read() null-coalesces to false, so a missing read
             // is treated as "mark as unread" which is still a meaningful state. The messageRange
             // validation is skipped because Cobalt does not maintain active message ranges
             // (browser-specific IndexedDB concern). See $MarkChatAsReadSync$p_3 — the core
             // read-state change is always applied.
-            // WAWebMarkChatAsReadSync.$MarkChatAsReadSync$p_1: frontendSendAndReceive("updateChatReadStatus", {id: e, read: t})
             // ADAPTED: Cobalt applies the read-state change directly on the local chat, matching
             // the backend behavior that $p_1 would have triggered (unreadCount=0 / markedAsUnread=false
             // for read=true; unreadCount=-1 / markedAsUnread=true for read=false, per
-            // WAWebConstantsDeprecated.MARKED_AS_UNREAD).
-            if (action.read()) { // WAWebMarkChatAsReadSync.applyMutations: t === true branch
+            if (action.read()) {
                 chat.get().setMarkedAsUnread(false); // ADAPTED: $p_1 -> backend updateChatReadStatus clears markedAsUnread
                 chat.get().setUnreadCount(0); // ADAPTED: $p_1 -> backend updateChatReadStatus zeroes unreadCount
-            } else { // WAWebMarkChatAsReadSync.applyMutations: t === false branch
+            } else {
                 chat.get().setMarkedAsUnread(true); // ADAPTED: $p_1 -> backend updateChatReadStatus sets markedAsUnread
-                chat.get().setUnreadCount(-1); // ADAPTED: WAWebConstantsDeprecated.MARKED_AS_UNREAD = -1
+                chat.get().setUnreadCount(-1);
             }
 
-            return MutationApplicationResult.success(); // WAWebMarkChatAsReadSync.applyMutations: g.syncApplyActionResult / _(e, l) Success branch
-        } catch (Exception e) { // WAWebMarkChatAsReadSync.applyMutations: catch(e) { return {actionState: Failed} }
-            return MutationApplicationResult.failed(); // WAWebMarkChatAsReadSync.applyMutations: {actionState: SyncActionState.Failed}
+            return MutationApplicationResult.success();
+        } catch (Exception e) {
+            return MutationApplicationResult.failed();
         }
     }
 
@@ -254,11 +251,11 @@ public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebMarkChatAsReadSync", exports = "resolveConflicts", adaptation = WhatsAppAdaptation.ADAPTED)
     public ConflictResolution resolveConflicts(DecryptedMutation.Trusted localMutation, DecryptedMutation.Trusted remoteMutation) {
-        var localAction = localMutation.value().action() // WAWebMarkChatAsReadSync.resolveConflicts: var c = WANullthrows(i.markChatAsReadAction)
+        var localAction = localMutation.value().action()
                 .filter(a -> a instanceof MarkChatAsReadAction)
                 .map(a -> (MarkChatAsReadAction) a)
                 .orElse(null);
-        var remoteAction = remoteMutation.value().action() // WAWebMarkChatAsReadSync.resolveConflicts: var p = WANullthrows(l?.markChatAsReadAction)
+        var remoteAction = remoteMutation.value().action()
                 .filter(a -> a instanceof MarkChatAsReadAction)
                 .map(a -> (MarkChatAsReadAction) a)
                 .orElse(null);
@@ -267,46 +264,45 @@ public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
             return ConflictResolution.of(ConflictResolutionState.APPLY_REMOTE_DROP_LOCAL); // ADAPTED: defensive fallback
         }
 
-        var localRange = localAction.messageRange().orElse(null); // WAWebMarkChatAsReadSync.resolveConflicts: WANullthrows(c.messageRange)
-        var remoteRange = remoteAction.messageRange().orElse(null); // WAWebMarkChatAsReadSync.resolveConflicts: WANullthrows(p.messageRange)
+        var localRange = localAction.messageRange().orElse(null);
+        var remoteRange = remoteAction.messageRange().orElse(null);
 
         if (localRange == null || remoteRange == null) { // ADAPTED: WA Web uses WANullthrows; Cobalt gracefully falls back
             return ConflictResolution.of(ConflictResolutionState.APPLY_REMOTE_DROP_LOCAL); // ADAPTED: defensive fallback
         }
 
-        return switch (MessageRangeUtils.compareMessageRanges(remoteRange, localRange)) { // WAWebMarkChatAsReadSync.resolveConflicts: compareMessageRanges(WANullthrows(p.messageRange), WANullthrows(c.messageRange))
-            case RANGE_A_ENCLOSES_RANGE_B -> // WAWebMarkChatAsReadSync.resolveConflicts: case RangeAEnclosesRangeB -> ApplyRemoteAndDropLocal
+        return switch (MessageRangeUtils.compareMessageRanges(remoteRange, localRange)) {
+            case RANGE_A_ENCLOSES_RANGE_B ->
                     ConflictResolution.of(ConflictResolutionState.APPLY_REMOTE_DROP_LOCAL);
-            case RANGE_B_ENCLOSES_RANGE_A -> // WAWebMarkChatAsReadSync.resolveConflicts: case RangeBEnclosesRangeA -> SkipRemote
+            case RANGE_B_ENCLOSES_RANGE_A ->
                     ConflictResolution.of(ConflictResolutionState.SKIP_REMOTE);
-            case RANGES_ARE_EQUAL -> // WAWebMarkChatAsReadSync.resolveConflicts: case RangesAreEqual -> s <= u tiebreaker
-                    localMutation.timestamp().compareTo(remoteMutation.timestamp()) <= 0 // WAWebMarkChatAsReadSync.resolveConflicts: s <= u
-                            ? ConflictResolution.of(ConflictResolutionState.APPLY_REMOTE_DROP_LOCAL) // WAWebMarkChatAsReadSync.resolveConflicts: ApplyRemoteAndDropLocal
-                            : ConflictResolution.of(ConflictResolutionState.SKIP_REMOTE); // WAWebMarkChatAsReadSync.resolveConflicts: SkipRemote
-            case RANGES_NOT_ENCLOSING -> { // WAWebMarkChatAsReadSync.resolveConflicts: case RangesNotEnclosing
-                var localWins = localMutation.timestamp().compareTo(remoteMutation.timestamp()) > 0; // WAWebMarkChatAsReadSync.resolveConflicts: s <= u check (inverted for localWins)
-                var read = localWins ? localAction.read() : remoteAction.read(); // WAWebMarkChatAsReadSync.resolveConflicts: s <= u ? (p.read ?? false) : (c.read ?? false)
-                var mergedRange = MessageRangeUtils.mergeMessageRanges(remoteRange, localRange); // WAWebMarkChatAsReadSync.resolveConflicts: mergeMessageRanges(WANullthrows(p.messageRange), WANullthrows(c.messageRange))
-                var mergedAction = new MarkChatAsReadActionBuilder() // WAWebMarkChatAsReadSync.resolveConflicts: var C = {read: h, messageRange: y}
-                        .read(read) // WAWebMarkChatAsReadSync.resolveConflicts: read: h
-                        .messageRange(mergedRange) // WAWebMarkChatAsReadSync.resolveConflicts: messageRange: y
+            case RANGES_ARE_EQUAL ->
+                    localMutation.timestamp().compareTo(remoteMutation.timestamp()) <= 0
+                            ? ConflictResolution.of(ConflictResolutionState.APPLY_REMOTE_DROP_LOCAL)
+                            : ConflictResolution.of(ConflictResolutionState.SKIP_REMOTE);
+            case RANGES_NOT_ENCLOSING -> {
+                var localWins = localMutation.timestamp().compareTo(remoteMutation.timestamp()) > 0;
+                var read = localWins ? localAction.read() : remoteAction.read();
+                var mergedRange = MessageRangeUtils.mergeMessageRanges(remoteRange, localRange);
+                var mergedAction = new MarkChatAsReadActionBuilder()
+                        .read(read)
+                        .messageRange(mergedRange)
                         .build();
-                var mergedValue = new SyncActionValueBuilder() // WAWebMarkChatAsReadSync.resolveConflicts: extends({}, l, {markChatAsReadAction: C}), l is the remote SyncActionDataSpec value
+                var mergedValue = new SyncActionValueBuilder()
                         .timestamp(remoteMutation.timestamp()) // ADAPTED: WA Web spreads all of l; in practice only timestamp and markChatAsReadAction are meaningful for this handler's collection
-                        .markChatAsReadAction(mergedAction) // WAWebMarkChatAsReadSync.resolveConflicts: markChatAsReadAction: C
+                        .markChatAsReadAction(mergedAction)
                         .build();
-                var merged = new DecryptedMutation.Trusted( // WAWebMarkChatAsReadSync.resolveConflicts: extends({}, e, {binarySyncAction: b}); delete v.id
-                        localMutation.index(), // WAWebMarkChatAsReadSync.resolveConflicts: from local (e.index)
-                        mergedValue, // WAWebMarkChatAsReadSync.resolveConflicts: merged binary value
-                        localMutation.operation(), // WAWebMarkChatAsReadSync.resolveConflicts: from local (e.operation)
-                        localMutation.timestamp(), // WAWebMarkChatAsReadSync.resolveConflicts: from local (e.timestamp)
-                        localMutation.actionVersion() // WAWebMarkChatAsReadSync.resolveConflicts: from local (e.version)
+                var merged = new DecryptedMutation.Trusted(
+                        localMutation.index(),
+                        mergedValue,
+                        localMutation.operation(),
+                        localMutation.timestamp(),
+                        localMutation.actionVersion()
                 );
-                // WAWebMarkChatAsReadSync.resolveConflicts: lockForMessageRangeSync -> addActiveMessageRange + $MarkChatAsReadSync$p_1
                 // ADAPTED: In WA Web, the merged mutation is applied to the chat DB immediately
                 // during conflict resolution via lockForMessageRangeSync. In Cobalt, the merged
                 // mutation is returned for the caller to apply, separating resolution from application.
-                yield ConflictResolution.merged(merged); // WAWebMarkChatAsReadSync.resolveConflicts: return SkipRemoteAndDropLocal
+                yield ConflictResolution.merged(merged);
             }
         };
     }
@@ -345,22 +341,22 @@ public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
             Jid chatJid,
             SyncActionMessageRange messageRange
     ) {
-        var action = new MarkChatAsReadActionBuilder() // WAWebMarkChatAsReadSync.getMarkChatAsReadMutation: {markChatAsReadAction: {read: t, messageRange: ...}}
-                .read(read) // WAWebMarkChatAsReadSync.getMarkChatAsReadMutation: read: t
-                .messageRange(messageRange) // WAWebMarkChatAsReadSync.getMarkChatAsReadMutation: messageRange: constructMessageRange(n, {forOutgoingMutation: true, mutationIndexJid: r})
+        var action = new MarkChatAsReadActionBuilder()
+                .read(read)
+                .messageRange(messageRange)
                 .build();
-        var value = new SyncActionValueBuilder() // WAWebSyncdActionUtils.buildPendingMutation: encodeProtobuf(SyncActionValueSpec, {...l, timestamp: i})
-                .timestamp(timestamp) // WAWebSyncdActionUtils.buildPendingMutation: timestamp: e
-                .markChatAsReadAction(action) // WAWebMarkChatAsReadSync.getMarkChatAsReadMutation: {markChatAsReadAction: ...}
+        var value = new SyncActionValueBuilder()
+                .timestamp(timestamp)
+                .markChatAsReadAction(action)
                 .build();
-        var index = JSON.toJSONString(List.of(actionName(), chatJid.toString())); // WAWebSyncdActionUtils.buildPendingMutation: index = JSON.stringify([action].concat(indexArgs)) where indexArgs = [r]
-        var mutation = new DecryptedMutation.Trusted( // WAWebSyncdActionUtils.buildPendingMutation: return { collection, index, binarySyncAction, version, operation, timestamp, action }
+        var index = JSON.toJSONString(List.of(actionName(), chatJid.toString()));
+        var mutation = new DecryptedMutation.Trusted(
                 index,
                 value,
-                SyncdOperation.SET, // WAWebMarkChatAsReadSync.getMarkChatAsReadMutation: operation: SyncdMutation$SyncdOperation.SET
+                SyncdOperation.SET,
                 timestamp,
                 version()
         );
-        return new SyncPendingMutation(mutation, 0); // WAWebSyncdActionUtils.buildPendingMutation
+        return new SyncPendingMutation(mutation, 0);
     }
 }

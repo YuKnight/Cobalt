@@ -8,43 +8,29 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 /**
- * A buffered byte reader for HTTP-style response parsing.
+ * A buffered byte reader for HTTP-style response parsing used by proxy
+ * CONNECT and WebSocket upgrade handshakes.
  *
- * <p>This utility centralizes status-line parsing, header scanning, and
- * timeout/EOF handling used by CONNECT and WebSocket upgrade handshakes.
- *
- * <p>The internal read buffer is backed by a raw {@code byte[]} with
- * manual position/limit tracking, so the per-byte fast path in
+ * <p>The reader centralises status-line parsing, header scanning, and
+ * timeout or EOF handling. The internal buffer is a raw {@code byte[]}
+ * with manual position and limit tracking so the per-byte fast path in
  * {@link #nextByte(long)} reduces to a bounds check and an array load
  * with no virtual dispatch.
  *
- * <p>In addition to the byte-at-a-time API ({@link #nextByte(long)},
- * {@link #nextHeaderByte(long)}), bulk buffer primitives are exposed
- * so that call sites can implement zero-resize, exact-sized piece
- * collection for header value reads:
- * {@link #distanceToLineFeed()},
+ * <p>In addition to the byte-at-a-time API ({@link #nextByte(long)} and
+ * {@link #nextHeaderByte(long)}), bulk primitives are exposed so callers
+ * can build zero-resize header readers via {@link #distanceToLineFeed()},
  * {@link #getBuffered(byte[], int, int)}, {@link #skipBuffered(int)},
  * {@link #bufferedRemaining()}, {@link #refillBuffered(long)}, and
  * {@link #accountHeaderBytes(int)}.
  *
- * <p><strong>Performance notes (Java 25):</strong>
- * <ul>
- *   <li>The buffer is allocated lazily on first refill and reused across
- *       parses — {@link #reset()} only clears cursors, never the array.</li>
- *   <li>{@link #nextByte(long)} splits the slow (refill) path into a
- *       separate method so the JIT can always inline the fast path.</li>
- *   <li>Status-line parsing uses {@link #ensureBuffered(int, long)} to
- *       batch the entire {@code HTTP/1.x NNN} prefix into direct array
- *       accesses instead of per-byte method calls.</li>
- *   <li>{@link #skipHeaders(long)} and {@link #skipToEndOfLine(long)}
- *       use vectorized LF scanning when the remaining buffer is large
- *       enough to amortize the vector setup cost, falling back to a
- *       scalar loop otherwise.</li>
- * </ul>
- *
- * @implNote Cobalt-specific helper that parses the HTTP responses emitted
- *     during proxy CONNECT and WebSocket upgrade handshakes; WhatsApp Web
- *     relies on the browser to handle the equivalent negotiations.
+ * @implNote The buffer is allocated lazily on first refill and reused
+ *     across parses, since {@link #reset()} only clears cursors and never
+ *     the array. {@link #skipHeaders(long)} and {@link #skipToEndOfLine(long)}
+ *     use vectorised LF scanning when the remaining buffer is large enough
+ *     to amortise the vector setup cost and fall back to scalar otherwise.
+ *     WhatsApp Web has no counterpart because the browser handles the
+ *     equivalent negotiations.
  */
 public final class HttpResponseReader {
     private static final int HTTP_VERSION_MAJOR = 1;
@@ -55,9 +41,9 @@ public final class HttpResponseReader {
     private static final byte SPACE = ' ';
 
     /**
-     * The capacity of the internal read buffer.  Sized to hold typical
-     * HTTP response headers in a single refill, reducing transport-layer
-     * crossings and deadline checks.
+     * The capacity of the internal read buffer. Sized to hold typical HTTP
+     * response headers in a single refill so that transport-layer crossings
+     * and deadline checks are minimised.
      */
     private static final int BUFFER_SIZE = 8192;
 
@@ -72,17 +58,16 @@ public final class HttpResponseReader {
     private static final int SPECIES_LENGTH = BYTE_SPECIES.length();
 
     /**
-     * Broadcast vector containing {@link #LINE_FEED} in every lane,
-     * reused across all vectorised scans.
+     * Broadcast vector containing {@link #LINE_FEED} in every lane, reused
+     * across all vectorised scans.
      */
     private static final ByteVector LF_VEC =
             ByteVector.broadcast(BYTE_SPECIES, LINE_FEED);
 
     /**
-     * Minimum number of bytes remaining before we use vector scan
-     * instead of the scalar fallback.  Below this threshold the vector
-     * setup/teardown overhead is not amortized.  Two full vector widths
-     * is a conservative breakeven point on most micro-architectures.
+     * Minimum number of bytes remaining before the vector scan path is
+     * preferred over the scalar fallback. Two full vector widths is a
+     * conservative breakeven point on most micro-architectures.
      */
     private static final int VECTOR_SCAN_THRESHOLD = SPECIES_LENGTH * 2;
 
@@ -118,9 +103,9 @@ public final class HttpResponseReader {
     private final int maxStatusLineSpaces;
 
     /**
-     * The raw read buffer.  Bytes from the transport layer are read into
+     * The raw read buffer. Bytes from the transport layer are read into
      * this array via {@link #bufWrapper} and then consumed directly with
-     * {@link #bufPos}/{@link #bufLimit}.
+     * {@link #bufPos} and {@link #bufLimit}.
      *
      * <p>Allocated lazily on the first {@link #refillBuffered(long)} call
      * and retained across {@link #reset()} calls to avoid repeated
@@ -222,10 +207,9 @@ public final class HttpResponseReader {
     /**
      * Reads and parses an HTTP status line from the current stream position.
      *
-     * <p>After skipping leading whitespace, this method ensures the entire
-     * {@code HTTP/1.x NNN} prefix is buffered and then parses it with
-     * direct array accesses — no per-byte method calls or refill branches
-     * on the fast path.
+     * <p>After skipping leading whitespace, the entire {@code HTTP/1.x NNN}
+     * prefix is buffered in one shot and parsed with direct array accesses
+     * to keep the fast path free of per-byte method calls or refill branches.
      *
      * @param deadline absolute deadline in epoch milliseconds
      * @return the parsed status code
@@ -310,11 +294,10 @@ public final class HttpResponseReader {
     /**
      * Skips response headers until the terminating empty line.
      *
-     * <p>Uses vectorized LF scanning to leap over non-LF bytes (the vast
-     * majority of header content) and only performs scalar work around
-     * each LF to maintain the consecutive-empty-line state machine.  Falls
-     * back to scalar scanning when the remaining buffer is too small to
-     * amortize vector setup.
+     * <p>Uses vectorised LF scanning to leap over non-LF bytes and only
+     * performs scalar work around each LF to maintain the
+     * consecutive-empty-line state machine. Falls back to scalar scanning
+     * when the remaining buffer is too small to amortise vector setup.
      *
      * @param deadline absolute deadline in epoch milliseconds
      * @throws IOException on timeout, EOF, or size overflow
@@ -381,9 +364,9 @@ public final class HttpResponseReader {
     /**
      * Skips bytes until and including the next LF.
      *
-     * <p>Uses the vectorized {@link #distanceToLineFeed()} scan when the
-     * buffer is large enough, falling back to per-byte reads only when
-     * a refill is needed.
+     * <p>Uses the vectorised {@link #distanceToLineFeed()} scan when the
+     * buffer is large enough, falling back to per-byte reads only when a
+     * refill is needed.
      *
      * @param deadline absolute deadline in epoch milliseconds
      * @throws IOException on timeout, EOF, or size overflow
@@ -446,10 +429,9 @@ public final class HttpResponseReader {
      * starting at {@code bufPos + offset} against a lowercase ASCII
      * {@code pattern}.
      *
-     * <p>Case folding uses {@code (b | 0x20)}, which is correct for
-     * ASCII letters and is a no-op for digits, hyphens, colons, and
-     * other non-letter bytes whose bit 5 is already set or irrelevant.
-     *
+     * @implNote Case folding uses {@code (b | 0x20)}, correct for ASCII
+     *     letters and a no-op for digits, hyphens, colons, and other
+     *     non-letter bytes whose bit 5 is already set or irrelevant.
      * @param offset     the zero-based offset from the current position
      * @param pattern    the expected bytes, already lowercase
      * @param patternLen the number of bytes to compare
@@ -505,8 +487,8 @@ public final class HttpResponseReader {
      *
      * <p>Call sites that perform bulk reads via
      * {@link #getBuffered(byte[], int, int)} must use this method to
-     * maintain the header size limit that
-     * {@link #nextHeaderByte(long)} enforces per byte.
+     * maintain the header size limit that {@link #nextHeaderByte(long)}
+     * enforces per byte.
      *
      * @param count the number of header bytes consumed
      * @throws IOException if the header size limit is exceeded
@@ -522,8 +504,8 @@ public final class HttpResponseReader {
      * Fills the read buffer from the transport layer.
      *
      * <p>After a successful refill, the buffer position is {@code 0} and
-     * the limit is the number of bytes read.  Allocates the buffer on
-     * first use.
+     * the limit is the number of bytes read. The buffer array is allocated
+     * on first use.
      *
      * @param deadline absolute deadline in epoch milliseconds
      * @throws IOException on timeout, EOF, or zero-length read
@@ -550,10 +532,9 @@ public final class HttpResponseReader {
     /**
      * Reads the next byte from the response stream using buffered refills.
      *
-     * <p>The fast path is a single array bounds check and load, with no
-     * virtual dispatch.  The slow path (buffer refill) is split into a
-     * separate method so the JIT can always inline this method at call
-     * sites.
+     * <p>The fast path is a single array bounds check and load with no
+     * virtual dispatch. The buffer-refill slow path lives in a separate
+     * method so the JIT can always inline this method at call sites.
      *
      * @param deadline absolute deadline in epoch milliseconds
      * @return the next byte
@@ -567,9 +548,13 @@ public final class HttpResponseReader {
     }
 
     /**
-     * Slow path for {@link #nextByte(long)}: refills the buffer and
-     * returns the first byte.  Separated to keep the fast-path bytecode
-     * small enough for the JIT to inline unconditionally.
+     * Refills the buffer and returns the first byte. This is the slow
+     * path for {@link #nextByte(long)}, separated to keep the fast-path
+     * bytecode small enough for the JIT to inline unconditionally.
+     *
+     * @param deadline absolute deadline in epoch milliseconds
+     * @return the next byte
+     * @throws IOException on timeout, EOF, or zero-length read
      */
     private byte nextByteSlow(long deadline) throws IOException {
         refillBuffered(deadline);
@@ -619,12 +604,10 @@ public final class HttpResponseReader {
      * Scans for a {@link #LINE_FEED} byte starting at {@code from},
      * dynamically choosing between a SIMD vector scan and a scalar loop.
      *
-     * <p>When the number of bytes to scan is below
-     * {@link #VECTOR_SCAN_THRESHOLD} (two full vector widths), the scalar
-     * fallback is used directly — the vector lane setup, mask extraction,
-     * and tail handling would cost more than a simple byte loop over such
-     * a small range.
-     *
+     * @implNote When the number of bytes to scan is below
+     *     {@link #VECTOR_SCAN_THRESHOLD}, the scalar fallback is used
+     *     because vector lane setup, mask extraction, and tail handling
+     *     would cost more than a simple byte loop over such a small range.
      * @param from the buffer index to start scanning from
      * @return the distance from {@code from} to the first LF (exclusive),
      *         or {@code -1} if no LF is found before {@link #bufLimit}
@@ -680,11 +663,10 @@ public final class HttpResponseReader {
      * given {@link StringBuilder} as ISO-8859-1 characters and advances
      * the buffer position.
      *
-     * <p>ISO-8859-1 is a 1:1 byte→char mapping so no decoding state is
-     * needed.  This is intended for slow-path header value reads where
-     * the value spans multiple buffer refills and a {@code byte[]}
-     * accumulator is undesirable.
-     *
+     * @implNote ISO-8859-1 is a 1:1 byte to char mapping so no decoding
+     *     state is needed. Intended for slow-path header value reads where
+     *     the value spans multiple buffer refills and a {@code byte[]}
+     *     accumulator is undesirable.
      * @param sb    the target builder
      * @param count the number of bytes to append
      */

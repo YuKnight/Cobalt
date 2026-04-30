@@ -1,28 +1,33 @@
 package com.github.auties00.cobalt.wam.privatestats.ed25519;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+
 import java.security.MessageDigest;
 
 /**
  * Edwards-curve point arithmetic on Ed25519, implemented over
  * {@link Ed25519Field}.
  *
- * <p>Points are held in extended twisted-Edwards coordinates as a 4-element
- * array of {@link Ed25519Field#LIMBS}-limb field elements
+ * <p>Points are held in extended twisted-Edwards coordinates as a
+ * 4-element array of {@link Ed25519Field#LIMBS}-limb field elements
  * {@code {X, Y, Z, T}} satisfying {@code x = X/Z}, {@code y = Y/Z},
- * {@code x*y = T/Z}. This matches the {@code p3Element} layout of
- * {@code WACryptoEd25519} and the {@code lowlevel} routines of
+ * and {@code x*y = T/Z}. This matches the {@code p3Element} layout
+ * of {@code WACryptoEd25519} and the {@code lowlevel} routines of
  * {@code tweetnacl-js}.
  *
- * <p>The {@link #add}, {@link #scalarMult}, and {@link #scalarMultBase}
- * routines mirror {@code lowlevel.add}, {@code lowlevel.scalarmult}, and
- * {@code lowlevel.scalarbase} byte for byte. {@link #pack}, {@link #par25519},
- * {@link #unpackNeg} and {@link #neq25519} reproduce the corresponding
+ * <p>The {@link #add}, {@link #scalarMult}, and
+ * {@link #scalarMultBase} routines mirror {@code lowlevel.add},
+ * {@code lowlevel.scalarmult}, and {@code lowlevel.scalarbase} byte
+ * for byte. {@link #pack}, {@link #par25519}, {@link #unpackNeg},
+ * and {@link #neq25519} reproduce the corresponding
  * compressed-encoding helpers.
  *
- * <p>All operations are constant time with respect to point coordinates and
- * scalar bits. Branches on point or scalar data are implemented as masked
- * {@link Ed25519Field#sel25519} swaps.
+ * <p>All operations are constant time with respect to point
+ * coordinates and scalar bits. Branches on point or scalar data are
+ * implemented as masked {@link Ed25519Field#sel25519} swaps.
  */
+@WhatsAppWebModule(moduleName = "WACryptoEd25519")
+@WhatsAppWebModule(moduleName = "WACryptoPrimitives")
 public final class Ed25519Point {
     /**
      * Edwards-curve constant {@code d = -121665 / 121666 (mod p)}, encoded

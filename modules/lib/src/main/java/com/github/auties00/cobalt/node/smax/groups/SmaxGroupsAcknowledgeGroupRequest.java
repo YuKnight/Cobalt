@@ -62,12 +62,9 @@ public final class SmaxGroupsAcknowledgeGroupRequest implements SmaxOperation.Re
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsAcknowledgeGroupRequest",
             exports = "makeAcknowledgeGroupRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutGroupsAcknowledgeGroupRequest: smax("ack", null)
         var ackNode = new NodeBuilder()
                 .description("ack")
                 .build();
-        // WASmaxOutGroupsBaseSetGroupMixin: smax("iq", {to: GROUP_JID(t), xmlns: "w:g2"})
-        // WASmaxOutGroupsBaseIQSetRequestMixin: smax("iq", {id: generateId(), type: "set"})
         return new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "w:g2")

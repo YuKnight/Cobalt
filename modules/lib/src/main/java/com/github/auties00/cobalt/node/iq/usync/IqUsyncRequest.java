@@ -15,7 +15,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps the {@code <usync/>}
+ * The outbound stanza variant. Wraps the {@code <usync/>}
  * envelope with the per-protocol query elements and the per-user
  * list.
  */
@@ -27,7 +27,7 @@ public final class IqUsyncRequest implements IqOperation.Request {
     private final IqUsyncMode mode;
 
     /**
-     * The {@code context} attribute — free-form caller-supplied
+     * The {@code context} attribute. Free-form caller-supplied
      * tag describing why the query is being issued (the WA Web
      * {@code USyncQuery} default is {@code "interactive"}).
      */
@@ -37,9 +37,9 @@ public final class IqUsyncRequest implements IqOperation.Request {
      * The list of bare protocol-tag descriptions to query for
      * each user. Routed into one bare grandchild of the
      * {@code <query/>} child per entry (e.g. an entry of
-     * {@code "devices"} yields {@code <devices/>}; the WA Web
+     * {@code "devices"} yields {@code <devices/>}). The WA Web
      * usync child modules are the canonical source of valid
-     * tags).
+     * tags.
      */
     private final List<String> protocols;
 
@@ -51,11 +51,11 @@ public final class IqUsyncRequest implements IqOperation.Request {
     /**
      * Constructs a new usync request.
      *
-     * @param mode      the query mode; never {@code null}
-     * @param context   the context tag; never {@code null}
-     * @param protocols the protocol tags; never {@code null} and
+     * @param mode      the query mode. Never {@code null}
+     * @param context   the context tag. Never {@code null}
+     * @param protocols the protocol tags. Never {@code null} and
      *                  never empty
-     * @param users     the users to query; never {@code null}
+     * @param users     the users to query. Never {@code null}
      * @throws NullPointerException     if any reference argument
      *                                  is {@code null}
      * @throws IllegalArgumentException if {@code protocols} is
@@ -76,7 +76,7 @@ public final class IqUsyncRequest implements IqOperation.Request {
     /**
      * Returns the query mode.
      *
-     * @return the mode; never {@code null}
+     * @return the mode. Never {@code null}
      */
     public IqUsyncMode mode() {
         return mode;
@@ -85,7 +85,7 @@ public final class IqUsyncRequest implements IqOperation.Request {
     /**
      * Returns the context tag.
      *
-     * @return the tag; never {@code null}
+     * @return the tag. Never {@code null}
      */
     public String context() {
         return context;
@@ -94,7 +94,7 @@ public final class IqUsyncRequest implements IqOperation.Request {
     /**
      * Returns the unmodifiable list of protocol tags.
      *
-     * @return the tags; never {@code null} or empty
+     * @return the tags. Never {@code null} or empty
      */
     public List<String> protocols() {
         return protocols;
@@ -103,7 +103,7 @@ public final class IqUsyncRequest implements IqOperation.Request {
     /**
      * Returns the unmodifiable list of users.
      *
-     * @return the users; never {@code null}
+     * @return the users. Never {@code null}
      */
     public List<User> users() {
         return users;
@@ -194,17 +194,17 @@ public final class IqUsyncRequest implements IqOperation.Request {
 
     /**
      * Typed user entry inside the outbound {@code <list/>}
-     * envelope — one {@code <user jid pn_jid>} subtree carrying
+     * envelope. One {@code <user jid pn_jid>} subtree carrying
      * any protocol-specific user-element payloads.
      *
      * <p>Both {@link #userJid()} and {@link #pnJid()} are
      * optional because some user shapes (e.g. username-lookup,
      * phone-only-lookup) carry exactly one of the two
-     * identifiers; at least one must be present otherwise WA
+     * identifiers. At least one must be present otherwise WA
      * Web's {@code USyncQuery.validate} drops the entry.
      *
      * @implNote {@code WAWebUsync.USyncUser} is a richer builder
-     *           with {@code withLid}/{@code withPhone} setters;
+     *           with {@code withLid}/{@code withPhone} setters.
      *           Cobalt collapses to a flat
      *           {@code (userJid, pnJid, payloads)} triple.
      */
@@ -212,13 +212,13 @@ public final class IqUsyncRequest implements IqOperation.Request {
     @WhatsAppWebModule(moduleName = "WAWebUsyncUser")
     public static final class User {
         /**
-         * The primary user JID — emitted in the {@code jid}
+         * The primary user JID. Emitted in the {@code jid}
          * attribute when present.
          */
         private final Jid userJid;
 
         /**
-         * The secondary phone-number JID — emitted in the
+         * The secondary phone-number JID. Emitted in the
          * {@code pn_jid} attribute when present. Used for the
          * dual-jid (LID + PN) flow.
          */
@@ -235,14 +235,14 @@ public final class IqUsyncRequest implements IqOperation.Request {
         /**
          * Constructs a new user entry.
          *
-         * @param userJid      the primary JID; may be
+         * @param userJid      the primary JID. May be
          *                     {@code null} when only
          *                     {@code pnJid} is supplied
-         * @param pnJid        the phone-number JID; may be
+         * @param pnJid        the phone-number JID. May be
          *                     {@code null} when only
          *                     {@code userJid} is supplied
-         * @param userPayloads the per-protocol payload nodes;
-         *                     never {@code null}
+         * @param userPayloads the per-protocol payload nodes.
+         *                     Never {@code null}
          * @throws NullPointerException if {@code userPayloads}
          *                              is {@code null}
          */
@@ -277,7 +277,7 @@ public final class IqUsyncRequest implements IqOperation.Request {
          * Returns the unmodifiable list of per-protocol payload
          * nodes.
          *
-         * @return the payloads; never {@code null}
+         * @return the payloads. Never {@code null}
          */
         public List<Node> userPayloads() {
             return userPayloads;

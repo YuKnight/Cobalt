@@ -58,8 +58,6 @@ final class NotificationServerCryptoStreamHandler implements SocketStream.Handle
     /**
      * The set of notification types supported by this handler, used to filter
      * incoming notification stanzas before dispatching.
-     *
-     * @implNote WAWebCommsHandleLoggedInStanza.handleLoggedInStanza
      */
     private static final Set<String> SUPPORTED_TYPES = Set.of(
             "encrypt",
@@ -105,7 +103,6 @@ final class NotificationServerCryptoStreamHandler implements SocketStream.Handle
      * @param whatsapp       the WhatsApp client instance
      * @param abPropsService the AB props synchronization service
      * @param wamService     the WAM telemetry service used to commit server-crypto events
-     * @implNote WAWebHandlePreKeyLow.default, WAWebHandleServerNotification.handleServerNotification
      */
     NotificationServerCryptoStreamHandler(WhatsAppClient whatsapp, ABPropsService abPropsService, WamService wamService) {
         this.whatsapp = whatsapp;
@@ -124,7 +121,6 @@ final class NotificationServerCryptoStreamHandler implements SocketStream.Handle
      * of whether the handler succeeds or fails.
      *
      * @param node the incoming notification stanza to handle
-     * @implNote WAWebCommsHandleLoggedInStanza.handleLoggedInStanza
      */
     @Override
     public void handle(Node node) {
@@ -188,7 +184,7 @@ final class NotificationServerCryptoStreamHandler implements SocketStream.Handle
 
         switch (firstChild.description()) {
             case "count" -> handlePreKeyLow(node, firstChild.getAttributeAsLong("value", 0L));
-            case "digest" -> LOGGER.log(System.Logger.Level.DEBUG, // ADAPTED: WAWebHandleDigestKey.default
+            case "digest" -> LOGGER.log(System.Logger.Level.DEBUG,
                     "Ignoring unsupported digest-key notification {0}",
                     node.getAttributeAsString("id", "<missing>"));
             case "identity" -> handleIdentityChange(node);
@@ -209,18 +205,17 @@ final class NotificationServerCryptoStreamHandler implements SocketStream.Handle
      *
      * @param node      the encrypt notification stanza containing the count child
      * @param keysCount the number of remaining pre-keys on the server
-     * @implNote WAWebHandlePreKeyLow.default
      */
     private void handlePreKeyLow(Node node, long keysCount) {
-        var stanzaId = node.getAttributeAsString("id", null); // WAWebHandlePreKeyLow.default
-        if (stanzaId == null || !preKeyUploadGuard.add(stanzaId)) { // WAWebHandlePreKeyLow.default - s.has(n) / s.add(n)
+        var stanzaId = node.getAttributeAsString("id", null);
+        if (stanzaId == null || !preKeyUploadGuard.add(stanzaId)) {
             return;
         }
 
         try {
-            whatsapp.sendPreKeys(keysCount); // WAWebHandlePreKeyLow.default - o("WAWebUploadPreKeysJob").uploadPreKeys()
+            whatsapp.sendPreKeys(keysCount);
         } finally {
-            preKeyUploadGuard.remove(stanzaId); // WAWebHandlePreKeyLow.default - s.delete(n)
+            preKeyUploadGuard.remove(stanzaId);
         }
     }
 
@@ -242,45 +237,44 @@ final class NotificationServerCryptoStreamHandler implements SocketStream.Handle
      * </ul>
      *
      * @param node the encrypt notification stanza with an {@code identity} child
-     * @implNote WAWebHandleIdentityChange.handleE2eIdentityChange
      */
     private void handleIdentityChange(Node node) {
-        var deviceJid = node.getAttributeAsJid("from").orElse(null); // WAWebHandleIdentityChange.handleE2eIdentityChange - wid
-        if (deviceJid == null || deviceJid.device() != 0) { // WAWebHandleIdentityChange.handleE2eIdentityChange - h.device !== DEFAULT_DEVICE_ID
+        var deviceJid = node.getAttributeAsJid("from").orElse(null);
+        if (deviceJid == null || deviceJid.device() != 0) {
             return;
         }
 
-        var userJid = deviceJid.toUserJid(); // WAWebHandleIdentityChange.handleE2eIdentityChange - asUserWidOrThrow(h)
+        var userJid = deviceJid.toUserJid();
         var selfJid = whatsapp.store().jid()
                 .map(Jid::toUserJid)
                 .orElse(null);
-        if (selfJid != null && selfJid.equals(userJid)) { // WAWebHandleIdentityChange.handleE2eIdentityChange - isMePrimary(h)
+        if (selfJid != null && selfJid.equals(userJid)) {
             LOGGER.log(System.Logger.Level.WARNING,
                     "Ignoring self primary identity-change notification");
             return;
         }
 
-        var lid = node.getAttributeAsJid("lid") // WAWebHandleIdentityChange.handleE2eIdentityChange - e.hasAttr("lid") ? deviceJidToDeviceWid(e.attrDeviceJid("lid")) : null
+        var lid = node.getAttributeAsJid("lid")
                 .map(Jid::toUserJid)
                 .orElse(null);
         if (lid != null) {
-            whatsapp.store().registerLidMapping(userJid, lid); // ADAPTED: WAWebCreateOrReplaceDisplayNamesAndLidPnMappingsJob.createOrReplaceDisplayNamesAndLidPnMappings
+            whatsapp.store().registerLidMapping(userJid, lid);
         }
 
-        var displayName = node.getAttributeAsString("display_name", null); // WAWebHandleIdentityChange.handleE2eIdentityChange - i.displayName
+        var displayName = node.getAttributeAsString("display_name", null);
         var contact = whatsapp.store()
                 .findContactByJid(userJid)
                 .orElseGet(() -> whatsapp.store().addNewContact(userJid));
-        if (displayName != null && !displayName.isBlank()) { // ADAPTED: WAWebCreateOrReplaceDisplayNamesAndLidPnMappingsJob
+        if (displayName != null && !displayName.isBlank()) {
             contact.setChosenName(displayName);
         }
         whatsapp.store().addContact(contact);
 
-        whatsapp.store().markIdentityChange(deviceJid); // ADAPTED: WAWebIdentityChangeApiFactory.clearDeviceRecordForIdentityChange
-        whatsapp.store().cleanupSignalSessions(deviceJid); // WAWebHandleIdentityChange.handleE2eIdentityChange - Session.deleteRemoteInfo(h)
-        whatsapp.store().clearSenderKeyDistributionForParticipant(deviceJid); // ADAPTED: WAWebUserPrefsStatus.markStatusSenderKeyRotate + WAWebBroadcastSenderKeyManager.markBroadcastSenderKeyRotateForUser
-        whatsapp.store().markKeyRotation(userJid); // ADAPTED: WAWebUserPrefsStatus.markStatusSenderKeyRotate
-        fireListeners(listener -> listener.onDeviceIdentityChanged(whatsapp, userJid, Set.of(deviceJid))); // ADAPTED: WAWebSecurityCodeApi.addSecurityCodeChangedNotifications
+        whatsapp.store().markIdentityChange(deviceJid);
+        whatsapp.store().cleanupSignalSessions(deviceJid);
+        whatsapp.store().clearSenderKeyDistributionForParticipant(deviceJid);
+        whatsapp.store().markKeyRotation(userJid);
+        fireListeners(listener -> listener.onDeviceIdentityChanged(whatsapp, userJid, Set.of(deviceJid)));
     }
 
     /**
@@ -294,46 +288,45 @@ final class NotificationServerCryptoStreamHandler implements SocketStream.Handle
      * the media provider's direct path.
      *
      * @param node the media retry notification stanza
-     * @implNote WAWebHandleMediaRetryNotification.default
      */
     private void handleMediaRetry(Node node) {
-        if (node.hasChild("error")) { // WAWebHandleMediaRetryNotification.default - errorCode != null
+        if (node.hasChild("error")) {
             return;
         }
 
-        var encryptNode = node.getChild("encrypt").orElse(null); // WAWebHandleMediaRetryNotification.default - e.child("encrypt")
+        var encryptNode = node.getChild("encrypt").orElse(null);
         if (encryptNode == null) {
             return;
         }
 
-        var message = findMessageById(node.getAttributeAsString("id", null)); // WAWebHandleMediaRetryNotification.default - a.msgId
+        var message = findMessageById(node.getAttributeAsString("id", null));
         if (message == null || !(message.message().content() instanceof MediaProvider mediaProvider)) {
             return;
         }
 
-        var mediaKey = mediaProvider.mediaKey().orElse(null); // WAWebHandleMediaRetryNotification.default - getMediaKey(msgId)
-        var encP = encryptNode.getChild("enc_p").flatMap(Node::toContentBytes).orElse(null); // WAWebHandleMediaRetryNotification.default - a.child("enc_p").contentBytes()
-        var encIv = encryptNode.getChild("enc_iv").flatMap(Node::toContentBytes).orElse(null); // WAWebHandleMediaRetryNotification.default - a.child("enc_iv").contentBytes(ENC_IV_SIZE)
+        var mediaKey = mediaProvider.mediaKey().orElse(null);
+        var encP = encryptNode.getChild("enc_p").flatMap(Node::toContentBytes).orElse(null);
+        var encIv = encryptNode.getChild("enc_iv").flatMap(Node::toContentBytes).orElse(null);
         if (mediaKey == null || encP == null || encIv == null) {
             return;
         }
 
         try {
-            var hkdf = KDF.getInstance("HKDF-SHA256"); // WAWebCryptoMediaRetry.extractAndExpand
+            var hkdf = KDF.getInstance("HKDF-SHA256");
             var params = HKDFParameterSpec.ofExtract()
                     .addIKM(mediaKey)
-                    .thenExpand("WhatsApp Media Retry Notification".getBytes(StandardCharsets.UTF_8), 32); // WAWebCryptoMediaRetry - _ = "WhatsApp Media Retry Notification"
+                    .thenExpand("WhatsApp Media Retry Notification".getBytes(StandardCharsets.UTF_8), 32);
             var retryKey = hkdf.deriveKey("AES", params);
-            var cipher = Cipher.getInstance("AES/GCM/NoPadding"); // WAWebCryptoMediaRetry.decryptMediaRetryNotification - gcmDecrypt
+            var cipher = Cipher.getInstance("AES/GCM/NoPadding");
             cipher.init(Cipher.DECRYPT_MODE, retryKey, new GCMParameterSpec(128, encIv));
-            cipher.updateAAD(message.key().id().orElse("").getBytes(StandardCharsets.UTF_8)); // WAWebCryptoMediaRetry.decryptMediaRetryNotification - gcmDecrypt(a, n, r, t) where t is stanzaId
+            cipher.updateAAD(message.key().id().orElse("").getBytes(StandardCharsets.UTF_8));
             var decoded = cipher.doFinal(encP);
-            var notification = MediaRetryNotificationSpec.decode(decoded); // WAWebCryptoMediaRetry.decryptMediaRetryNotification - decodeProtobuf(MediaRetryNotificationSpec, i)
-            notification.directPath().ifPresent(directPath -> { // WAWebHandleMediaRetryNotification.default - resolveMediaReupload({msgId, result, directPath})
+            var notification = MediaRetryNotificationSpec.decode(decoded);
+            notification.directPath().ifPresent(directPath -> {
                 mediaProvider.setMediaUrl(null);
                 mediaProvider.setMediaDirectPath(directPath);
             });
-        } catch (Exception ignored) { // ADAPTED: WAWebHandleMediaRetryNotification.default - error handling
+        } catch (Exception ignored) {
         }
     }
 
@@ -348,15 +341,14 @@ final class NotificationServerCryptoStreamHandler implements SocketStream.Handle
      * </ul>
      *
      * @param node the server notification stanza
-     * @implNote WAWebHandleServerNotification.handleServerNotification
      */
     private void handleServer(Node node) {
-        var firstChild = node.getChild().map(Node::description).orElse(null); // WAWebHandleServerNotification.handleServerNotification
+        var firstChild = node.getChild().map(Node::description).orElse(null);
         switch (firstChild) {
-            case "log" -> LOGGER.log(System.Logger.Level.WARNING, // ADAPTED: WAWebCrashlog.upload({reason: SERVER_REQUESTED, ...})
+            case "log" -> LOGGER.log(System.Logger.Level.WARNING,
                     "Ignoring server log-request notification");
-            case "abprops" -> abPropsService.sync(); // WAWebHandleServerNotification.handleServerNotification - syncABPropsTask({shouldSendHash: false})
-            case null, default -> LOGGER.log(System.Logger.Level.DEBUG, // WAWebHandleServerNotification.handleServerNotification - type == null case
+            case "abprops" -> abPropsService.sync();
+            case null, default -> LOGGER.log(System.Logger.Level.DEBUG,
                     "Ignoring unknown server notification child {0}", firstChild);
         }
     }
@@ -372,10 +364,9 @@ final class NotificationServerCryptoStreamHandler implements SocketStream.Handle
      * listeners via {@code onRegistrationCode}.
      *
      * @param node the registration notification stanza
-     * @implNote WAWebHandleDeviceSwitchingNotification.default
      */
     private void handleRegistration(Node node) {
-        var registration = node.getChild("wa_old_registration").orElse(null); // WAWebHandleDeviceSwitchingNotification.default - e.child("wa_old_registration")
+        var registration = node.getChild("wa_old_registration").orElse(null);
         if (registration == null) {
             LOGGER.log(System.Logger.Level.WARNING,
                     "Ignoring unsupported registration notification {0}",
@@ -383,25 +374,22 @@ final class NotificationServerCryptoStreamHandler implements SocketStream.Handle
             return;
         }
 
-        var code = registration.getAttributeAsString("code", null); // WAWebHandleDeviceSwitchingNotification.default - r.attrString("code")
-        var expiry = registration.getAttributeAsLong("expiry_t", (Long) null); // WAWebHandleDeviceSwitchingNotification.default - r.attrTime("expiry_t")
-        var now = Instant.now().getEpochSecond(); // WAWebHandleDeviceSwitchingNotification.default - o("WATimeUtils").unixTime()
-        if (code == null || expiry == null || now > expiry) { // WAWebHandleDeviceSwitchingNotification.default - l > i
+        var code = registration.getAttributeAsString("code", null);
+        var expiry = registration.getAttributeAsLong("expiry_t", (Long) null);
+        var now = Instant.now().getEpochSecond();
+        if (code == null || expiry == null || now > expiry) {
             return;
         }
 
         try {
-            var numericCode = Long.parseLong(code); // ADAPTED: WAWebHandleDeviceSwitchingNotification.default - code is string, Cobalt listener uses long
-            fireListeners(listener -> listener.onRegistrationCode(whatsapp, numericCode)); // ADAPTED: WAWebBackendApi.frontendFireAndForget("showDeviceSwitchOtp", {otpCode: c})
+            var numericCode = Long.parseLong(code);
+            fireListeners(listener -> listener.onRegistrationCode(whatsapp, numericCode));
         } catch (NumberFormatException exception) {
             LOGGER.log(System.Logger.Level.DEBUG,
                     "Ignoring non-numeric device-switch code {0}",
                     code);
         }
 
-        // WAWebHandleDeviceSwitchingNotification.default:
-        //   var d = o("WAWebUserPrefsMeUser").getMeDevicePnOrThrow_DO_NOT_USE().getDeviceId().toString();
-        //   new(o("WAWebWaOldCodeWamEvent")).WaOldCodeWamEvent({deviceId: d}).commit();
         var meDeviceId = whatsapp.store().jid()
                 .map(Jid::device)
                 .map(String::valueOf)
@@ -415,11 +403,10 @@ final class NotificationServerCryptoStreamHandler implements SocketStream.Handle
      * Fires an event to all registered listeners on separate virtual threads.
      *
      * @param consumer the listener callback to invoke
-     * @implNote WAWebBackendApi.frontendFireAndForget
      */
     private void fireListeners(Consumer<WhatsAppClientListener> consumer) {
         for (var listener : whatsapp.store().listeners()) {
-            Thread.startVirtualThread(() -> consumer.accept(listener)); // ADAPTED: WAWebBackendApi.frontendFireAndForget
+            Thread.startVirtualThread(() -> consumer.accept(listener));
         }
     }
 
@@ -479,8 +466,8 @@ final class NotificationServerCryptoStreamHandler implements SocketStream.Handle
      *           WAWebHandleDeviceSwitchingNotification.default
      */
     private void sendNotificationAck(Node node, String type) {
-        var stanzaId = node.getAttributeAsString("id", null); // WAWebHandlePreKeyLow.default - a.stanzaId
-        var stanzaFrom = node.getAttributeAsJid("from", null); // WAWebHandlePreKeyLow.default - to: S_WHATSAPP_NET (from server)
+        var stanzaId = node.getAttributeAsString("id", null);
+        var stanzaFrom = node.getAttributeAsJid("from", null);
         if (stanzaId == null || stanzaFrom == null) {
             return;
         }
@@ -488,17 +475,16 @@ final class NotificationServerCryptoStreamHandler implements SocketStream.Handle
         var ackBuilder = new NodeBuilder()
                 .description("ack")
                 .attribute("id", stanzaId)
-                .attribute("class", "notification") // WAWebHandlePreKeyLow.default - class: "notification"
+                .attribute("class", "notification")
                 .attribute("to", stanzaFrom);
 
-        // WAWebHandlePreKeyLow.default and WAWebHandleIdentityChange.handleE2eIdentityChange
         // do NOT include a type attribute in their acks. The other handlers do.
-        if (!"encrypt".equals(type)) { // WAWebHandleMediaRetryNotification.default, WAWebHandleServerNotification.handleServerNotification, WAWebHandleDeviceSwitchingNotification.default
+        if (!"encrypt".equals(type)) {
             ackBuilder.attribute("type", type);
         }
 
         // Include participant for mediaretry acks
-        if ("mediaretry".equals(type)) { // WAWebHandleMediaRetryNotification.default - participant: f || DROP_ATTR
+        if ("mediaretry".equals(type)) {
             var participant = node.getAttributeAsJid("participant", null);
             if (participant != null) {
                 ackBuilder.attribute("participant", participant);

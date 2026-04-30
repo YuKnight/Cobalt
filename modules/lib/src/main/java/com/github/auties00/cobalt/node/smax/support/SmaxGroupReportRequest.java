@@ -18,7 +18,7 @@ import java.util.Optional;
 /**
  * The outbound stanza variant.
  *
- * <p>The wire shape is intentionally extensible — the WA Web
+ * <p>The wire shape is intentionally extensible. The WA Web
  * {@code makeGroupReportRequest} layers up to six optional mixins
  * over the base envelope, and the {@link Builder} surface mirrors
  * each one.
@@ -31,7 +31,7 @@ import java.util.Optional;
 @WhatsAppWebModule(moduleName = "WASmaxOutSpamIsKnownChatMixin")
 public final class SmaxGroupReportRequest implements SmaxOperation.Request {
     /**
-     * The group JID being reported — routed into the
+     * The group JID being reported, routed into the
      * {@code <spam_list jid>} attribute.
      */
     private final Jid spamListJid;
@@ -42,7 +42,7 @@ public final class SmaxGroupReportRequest implements SmaxOperation.Request {
     private final String spamListSpamFlow;
 
     /**
-     * The optional adder JID — when supplied, routed into the
+     * The optional adder JID. When supplied, routed into the
      * {@code <spam_list source>} attribute (the user who added the
      * reporter to the group).
      */
@@ -55,14 +55,14 @@ public final class SmaxGroupReportRequest implements SmaxOperation.Request {
     private final String spamListSubject;
 
     /**
-     * The optional {@code is_known_chat} marker — surfaces whether
+     * The optional {@code is_known_chat} marker, surfaces whether
      * the reporter has a prior history with the group.
      */
     private final String spamListIsKnownChat;
 
     /**
-     * The optional FRX (free-form reporting extensions) bundle —
-     * pre-built {@code <frx>} child including tagset / context /
+     * The optional FRX (free-form reporting extensions) bundle. A
+     * pre-built {@code <frx>} child including tagset, context and
      * parameters; embedded verbatim when supplied.
      */
     private final Node frxChild;
@@ -202,10 +202,8 @@ public final class SmaxGroupReportRequest implements SmaxOperation.Request {
     @WhatsAppWebExport(moduleName = "WASmaxOutSpamGroupReportRequest",
             exports = "makeGroupReportRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutSpamBaseReportMixin: smax("spam_list", {spam_flow})
         // WASmaxOutSpamEntitySubjectMixin (optional): smax("spam_list", {subject})
         // WASmaxOutSpamIsKnownChatMixin (optional): smax("spam_list", {is_known_chat})
-        // WASmaxOutSpamGroupReportRequest: smax("spam_list", {jid, source?},
         //   REPEATED_CHILD(message, 0, 210), REPEATED_CHILD(call, 0, 5))
         var spamListBuilder = new NodeBuilder()
                 .description("spam_list")
@@ -226,12 +224,9 @@ public final class SmaxGroupReportRequest implements SmaxOperation.Request {
         if (!spamListChildren.isEmpty()) {
             spamListBuilder.content(spamListChildren);
         }
-        // WASmaxOutSpamBaseIQSetRequestMixin: smax("iq", {id: generateId(), type: "set"})
-        // WASmaxOutSpamBaseReportMixin: smax("iq", {to: S_WHATSAPP_NET, xmlns: "spam"})
         var iqChildren = new ArrayList<Node>();
         iqChildren.add(spamListBuilder.build());
         if (frxChild != null) {
-            // WASmaxOutSpamFRXMixin: smax("iq", null, smax("spam_list", {reportee}), smax("frx", null, …))
             iqChildren.add(frxChild);
         }
         return new NodeBuilder()
@@ -279,7 +274,7 @@ public final class SmaxGroupReportRequest implements SmaxOperation.Request {
     }
 
     /**
-     * Builder for {@link SmaxGroupReportRequest} — the canonical entry point for
+     * Builder for {@link SmaxGroupReportRequest}. The canonical entry point for
      * assembling a group spam report.
      */
     public static final class Builder {

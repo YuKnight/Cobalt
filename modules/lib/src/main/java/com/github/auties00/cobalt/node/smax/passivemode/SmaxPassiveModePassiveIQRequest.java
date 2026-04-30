@@ -12,7 +12,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps the bare {@code <passive/>}
+ * The outbound stanza variant. Wraps the bare {@code <passive/>}
  * payload in the canonical {@code <iq xmlns="passive" type="set"
  * to="s.whatsapp.net">} envelope.
  */

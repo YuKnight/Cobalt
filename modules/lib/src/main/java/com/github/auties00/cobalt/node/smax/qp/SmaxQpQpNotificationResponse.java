@@ -11,14 +11,14 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The inbound notification — the relay's PSA-class push carrying the
+ * The inbound notification. The relay's PSA-class push carrying the
  * {@code <surfaces/>} subtree.
  *
  * @implNote {@code WASmaxInQpSurfacesQPNotificationRequest.parseQPNotificationRequest}
  *           validates the {@code <notification type="psa" from=USER_JID>}
  *           envelope, requires a {@code <surfaces/>} child, and projects
  *           the deeply-nested surfaces/promotion subtree. Cobalt
- *           exposes only the raw {@code <surfaces/>} node — consumers
+ *           exposes only the raw {@code <surfaces/>} node. Consumers
  *           re-parse it through the dedicated protobuf pipeline.
  */
 @WhatsAppWebModule(moduleName = "WASmaxInQpSurfacesQPNotificationRequest")
@@ -26,24 +26,24 @@ import java.util.Optional;
 @WhatsAppWebModule(moduleName = "WASmaxInQpSurfacesServerNotificationMixin")
 public final class SmaxQpQpNotificationResponse implements SmaxOperation.Response {
     /**
-     * The notification id; echoed verbatim into the ack stanza.
+     * The notification id. Echoed verbatim into the ack stanza.
      */
     private final String notificationId;
 
     /**
-     * The notification sender JID; becomes the ack's {@code to}.
+     * The notification sender JID. Becomes the ack's {@code to}.
      */
     private final Jid notificationFrom;
 
     /**
-     * The notification type; always {@code "psa"} on the QP surface
+     * The notification type. Always {@code "psa"} on the QP surface
      * channel but kept as a typed field so the ack can echo it.
      */
     private final String notificationType;
 
     /**
      * The raw {@code <surfaces/>} subtree carrying the QP surfaces /
-     * promotion / triggers payload; consumers re-parse it through the
+     * promotion / triggers payload. Consumers re-parse it through the
      * dedicated protobuf pipeline.
      */
     private final Node surfacesNode;
@@ -51,10 +51,10 @@ public final class SmaxQpQpNotificationResponse implements SmaxOperation.Respons
     /**
      * Constructs a new inbound projection.
      *
-     * @param notificationId   the notification id; never {@code null}
-     * @param notificationFrom the notification sender JID; never
+     * @param notificationId   the notification id. Never {@code null}
+     * @param notificationFrom the notification sender JID. Never
      *                         {@code null}
-     * @param notificationType the notification type; never
+     * @param notificationType the notification type. Never
      *                         {@code null}
      * @param surfacesNode     the raw {@code <surfaces/>} subtree;
      *                         never {@code null}
@@ -71,7 +71,7 @@ public final class SmaxQpQpNotificationResponse implements SmaxOperation.Respons
     /**
      * Returns the notification id.
      *
-     * @return the id; never {@code null}
+     * @return the id. Never {@code null}
      */
     public String notificationId() {
         return notificationId;
@@ -80,7 +80,7 @@ public final class SmaxQpQpNotificationResponse implements SmaxOperation.Respons
     /**
      * Returns the notification sender JID.
      *
-     * @return the sender JID; never {@code null}
+     * @return the sender JID. Never {@code null}
      */
     public Jid notificationFrom() {
         return notificationFrom;
@@ -89,7 +89,7 @@ public final class SmaxQpQpNotificationResponse implements SmaxOperation.Respons
     /**
      * Returns the notification type.
      *
-     * @return the type; never {@code null}
+     * @return the type. Never {@code null}
      */
     public String notificationType() {
         return notificationType;
@@ -98,7 +98,7 @@ public final class SmaxQpQpNotificationResponse implements SmaxOperation.Respons
     /**
      * Returns the raw {@code <surfaces/>} subtree.
      *
-     * @return the {@code <surfaces/>} node; never {@code null}
+     * @return the {@code <surfaces/>} node. Never {@code null}
      */
     public Node surfacesNode() {
         return surfacesNode;
@@ -108,7 +108,7 @@ public final class SmaxQpQpNotificationResponse implements SmaxOperation.Respons
      * Tries to parse an {@link SmaxQpQpNotificationResponse} projection from the given
      * {@code <notification/>} stanza.
      *
-     * @param node the inbound notification stanza; never {@code null}
+     * @param node the inbound notification stanza. Never {@code null}
      * @return an {@link Optional} carrying the projection, or empty
      *         when the stanza doesn't match the expected shape
      * @throws NullPointerException if {@code node} is {@code null}

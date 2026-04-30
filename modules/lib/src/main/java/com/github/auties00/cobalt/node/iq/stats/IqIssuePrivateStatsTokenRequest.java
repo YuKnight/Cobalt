@@ -10,7 +10,7 @@ import java.util.Arrays;
 import java.util.Objects;
 
 /**
- * The outbound stanza variant — wraps the {@code <sign_credential>}
+ * The outbound stanza variant. Wraps the {@code <sign_credential>}
  * payload (carrying the blinded credential point and the project
  * name) in the canonical
  * {@code <iq xmlns="privatestats" type="get" to="s.whatsapp.net">}
@@ -20,7 +20,7 @@ import java.util.Objects;
 public final class IqIssuePrivateStatsTokenRequest implements IqOperation.Request {
     /**
      * The protocol version advertised on the {@code <sign_credential>}
-     * tag — currently fixed at {@code "2"} in WA Web.
+     * tag. Currently fixed at {@code "2"} in WA Web.
      */
     private static final String SIGN_CREDENTIAL_VERSION = "2";
 
@@ -41,9 +41,9 @@ public final class IqIssuePrivateStatsTokenRequest implements IqOperation.Reques
     /**
      * Constructs a new request.
      *
-     * @param blindedCredential the blinded credential bytes; never
+     * @param blindedCredential the blinded credential bytes. Never
      *                          {@code null}
-     * @param projectName       the project-name bytes; never
+     * @param projectName       the project-name bytes. Never
      *                          {@code null}
      * @throws NullPointerException if either argument is {@code null}
      */
@@ -56,7 +56,7 @@ public final class IqIssuePrivateStatsTokenRequest implements IqOperation.Reques
      * Returns a defensive copy of the blinded-credential bytes
      * routed into the {@code <blinded_credential>} child.
      *
-     * @return a clone of the blinded-credential bytes; never
+     * @return a clone of the blinded-credential bytes. Never
      *         {@code null}
      */
     public byte[] blindedCredential() {
@@ -67,7 +67,7 @@ public final class IqIssuePrivateStatsTokenRequest implements IqOperation.Reques
      * Returns a defensive copy of the project-name bytes routed
      * into the {@code <project_name>} child.
      *
-     * @return a clone of the project-name bytes; never {@code null}
+     * @return a clone of the project-name bytes. Never {@code null}
      */
     public byte[] projectName() {
         return projectName.clone();

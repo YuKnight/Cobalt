@@ -84,7 +84,7 @@ public final class QuickReplyHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebQuickRepliesSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return QuickReplyAction.ACTION_NAME; // WAWebQuickRepliesSync.getAction -> WASyncdConst.Actions.QuickReply
+        return QuickReplyAction.ACTION_NAME;
     }
 
     /**
@@ -97,7 +97,7 @@ public final class QuickReplyHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebQuickRepliesSync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return QuickReplyAction.COLLECTION_NAME; // WAWebQuickRepliesSync.collectionName = WASyncdConst.CollectionName.Regular
+        return QuickReplyAction.COLLECTION_NAME;
     }
 
     /**
@@ -109,7 +109,7 @@ public final class QuickReplyHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebQuickRepliesSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return QuickReplyAction.ACTION_VERSION; // WAWebQuickRepliesSync.getVersion -> 2
+        return QuickReplyAction.ACTION_VERSION;
     }
 
     /**
@@ -130,7 +130,7 @@ public final class QuickReplyHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebQuickRepliesSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebQuickRepliesSync.applyMutations
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -195,53 +195,47 @@ public final class QuickReplyHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebQuickRepliesSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        if (mutation.operation() != SyncdOperation.SET) { // WAWebQuickRepliesSync.applyMutations: if (e.operation === "set") {...} return i++, {actionState: Unsupported}
-            return MutationApplicationResult.unsupported(); // WAWebQuickRepliesSync.applyMutations: i++, {actionState: SyncActionState.Unsupported}
+        if (mutation.operation() != SyncdOperation.SET) {
+            return MutationApplicationResult.unsupported();
         }
 
-        try { // WAWebQuickRepliesSync.applyMutations: try { ... } catch (e) { return {actionState: Failed} }
-            var indexArray = JSON.parseArray(mutation.index()); // WAWebQuickRepliesSync.applyMutations: var t = e.indexParts
-            var quickReplyId = indexArray.size() > 1 ? indexArray.getString(1) : null; // WAWebQuickRepliesSync.applyMutations: var l = t[1]
-            if (quickReplyId == null || quickReplyId.isEmpty()) { // WAWebQuickRepliesSync.applyMutations: if (!l) return r.malformedActionIndex()
-                return malformedActionIndex(); // WAWebQuickRepliesSync.applyMutations: r.malformedActionIndex()
+        try {
+            var indexArray = JSON.parseArray(mutation.index());
+            var quickReplyId = indexArray.size() > 1 ? indexArray.getString(1) : null;
+            if (quickReplyId == null || quickReplyId.isEmpty()) {
+                return malformedActionIndex();
             }
 
-            // WAWebQuickRepliesSync.applyMutations: var n = e.value, s = n.quickReplyAction; if (!s) return a++, malformedActionValue(r.collectionName)
-            if (!(mutation.value().action().orElse(null) instanceof QuickReplyAction action)) { // WAWebQuickRepliesSync.applyMutations: var s = n.quickReplyAction; if (!s)
-                return malformedActionValue(); // WAWebQuickRepliesSync.applyMutations: a++, WAWebSyncdIndexUtils.malformedActionValue(r.collectionName)
+            if (!(mutation.value().action().orElse(null) instanceof QuickReplyAction action)) {
+                return malformedActionValue();
             }
 
-            if (action.deleted()) { // WAWebQuickRepliesSync.applyMutations: if (s.deleted === true)
-                // WAWebQuickRepliesSync.applyMutations: yield WAWebSchemaQuickReply.getQuickReplyTable().remove(l)
-                client.store().removeQuickReply(quickReplyId); // WAWebQuickRepliesSync.applyMutations: getQuickReplyTable().remove(l) — Cobalt's QuickReply is now keyed by id
-                // WAWebQuickRepliesSync.applyMutations: WAWebBackendApi.frontendFireAndForget("removeQuickReplyFromCollection", {id: l})
+            if (action.deleted()) {
+                client.store().removeQuickReply(quickReplyId);
                 // ADAPTED: Cobalt has no frontend bridge; the fire-and-forget call is omitted.
-                return MutationApplicationResult.success(); // WAWebQuickRepliesSync.applyMutations: {actionState: SyncActionState.Success}
+                return MutationApplicationResult.success();
             }
 
-            var message = action.message().orElse(null); // WAWebQuickRepliesSync.applyMutations: var u = s.message
-            var shortcut = action.shortcut().orElse(null); // WAWebQuickRepliesSync.applyMutations: var c = s.shortcut
-            if (shortcut == null || shortcut.isEmpty() || message == null || message.isEmpty()) { // WAWebQuickRepliesSync.applyMutations: if (c == null || c === "" || u == null || u === "")
-                return malformedActionValue(); // WAWebQuickRepliesSync.applyMutations: a++, WAWebSyncdIndexUtils.malformedActionValue(r.collectionName)
+            var message = action.message().orElse(null);
+            var shortcut = action.shortcut().orElse(null);
+            if (shortcut == null || shortcut.isEmpty() || message == null || message.isEmpty()) {
+                return malformedActionValue();
             }
 
-            var keywords = action.keywords(); // WAWebQuickRepliesSync.applyMutations: var d = s.keywords || [] — Cobalt's keywords() defaults to List.of()
-            var count = action.count().orElse(0); // WAWebQuickRepliesSync.applyMutations: var m = s.count || 0
-            // WAWebQuickRepliesSync.applyMutations: var p = {id: l, shortcut: c, count: m, message: u, keywords: d}
+            var keywords = action.keywords();
+            var count = action.count().orElse(0);
             var quickReply = new QuickReplyBuilder()
-                    .id(quickReplyId) // WAWebQuickRepliesSync.applyMutations: id: l
-                    .shortcut(shortcut) // WAWebQuickRepliesSync.applyMutations: shortcut: c
-                    .message(message) // WAWebQuickRepliesSync.applyMutations: message: u
-                    .keywords(keywords) // WAWebQuickRepliesSync.applyMutations: keywords: d
-                    .count(count) // WAWebQuickRepliesSync.applyMutations: count: m
+                    .id(quickReplyId)
+                    .shortcut(shortcut)
+                    .message(message)
+                    .keywords(keywords)
+                    .count(count)
                     .build();
-            // WAWebQuickRepliesSync.applyMutations: yield WAWebSchemaQuickReply.getQuickReplyTable().createOrReplace(p)
-            client.store().addQuickReply(quickReply); // WAWebQuickRepliesSync.applyMutations: createOrReplace(p)
-            // WAWebQuickRepliesSync.applyMutations: WAWebBackendApi.frontendFireAndForget("updateQuickReplyCollection", {count: m, id: l, keywords: d, message: u, shortcut: c})
+            client.store().addQuickReply(quickReply);
             // ADAPTED: Cobalt has no frontend bridge; the fire-and-forget call is omitted.
-            return MutationApplicationResult.success(); // WAWebQuickRepliesSync.applyMutations: {actionState: SyncActionState.Success}
-        } catch (Exception e) { // WAWebQuickRepliesSync.applyMutations: catch (e) { return {actionState: Failed} }
-            return MutationApplicationResult.failed(); // WAWebQuickRepliesSync.applyMutations: {actionState: SyncActionState.Failed}
+            return MutationApplicationResult.success();
+        } catch (Exception e) {
+            return MutationApplicationResult.failed();
         }
     }
 
@@ -271,27 +265,26 @@ public final class QuickReplyHandler implements WebAppStateActionHandler {
     public SyncPendingMutation getQuickReplyDeleteMutation(String quickReplyId, Instant timestamp) {
         Objects.requireNonNull(quickReplyId, "quickReplyId cannot be null"); // ADAPTED: defensive null check not present in WA Web
         Objects.requireNonNull(timestamp, "timestamp cannot be null"); // ADAPTED: defensive null check not present in WA Web
-        var action = new QuickReplyActionBuilder() // WAWebQuickRepliesSync.getQuickReplyDeleteMutation: var e = {quickReplyAction: {deleted: true, keywords: [], shortcut: "", message: "", count: 0}}
-                .deleted(true) // WAWebQuickRepliesSync.getQuickReplyDeleteMutation: deleted: true
-                .keywords(List.of()) // WAWebQuickRepliesSync.getQuickReplyDeleteMutation: keywords: []
-                .shortcut("") // WAWebQuickRepliesSync.getQuickReplyDeleteMutation: shortcut: ""
-                .message("") // WAWebQuickRepliesSync.getQuickReplyDeleteMutation: message: ""
-                .count(0) // WAWebQuickRepliesSync.getQuickReplyDeleteMutation: count: 0
+        var action = new QuickReplyActionBuilder()
+                .deleted(true)
+                .keywords(List.of())
+                .shortcut("")
+                .message("")
+                .count(0)
                 .build();
-        var value = new SyncActionValueBuilder() // WAWebSyncdActionUtils.buildPendingMutation: encodeProtobuf(SyncActionValueSpec, {...l, timestamp: i})
-                .timestamp(timestamp) // WAWebSyncdActionUtils.buildPendingMutation: timestamp: e
-                .quickReplyAction(action) // WAWebQuickRepliesSync.getQuickReplyDeleteMutation: {quickReplyAction: ...}
+        var value = new SyncActionValueBuilder()
+                .timestamp(timestamp)
+                .quickReplyAction(action)
                 .build();
-        // WAWebSyncdActionUtils.buildPendingMutation: index = JSON.stringify([action].concat(indexArgs)) where indexArgs = [t]
         var index = JSON.toJSONString(List.of(actionName(), quickReplyId));
-        var pendingMutation = new DecryptedMutation.Trusted( // WAWebSyncdActionUtils.buildPendingMutation: return {collection, index, binarySyncAction, version, operation, timestamp, action}
+        var pendingMutation = new DecryptedMutation.Trusted(
                 index,
                 value,
-                SyncdOperation.SET, // WAWebQuickRepliesSync.getQuickReplyDeleteMutation: operation: SyncdMutation$SyncdOperation.SET
+                SyncdOperation.SET,
                 timestamp,
-                version() // WAWebQuickRepliesSync.getQuickReplyDeleteMutation: version: this.getVersion()
+                version()
         );
-        return new SyncPendingMutation(pendingMutation, 0); // WAWebSyncdActionUtils.buildPendingMutation
+        return new SyncPendingMutation(pendingMutation, 0);
     }
 
     /**
@@ -334,26 +327,25 @@ public final class QuickReplyHandler implements WebAppStateActionHandler {
         Objects.requireNonNull(message, "message cannot be null"); // ADAPTED: defensive null check not present in WA Web
         Objects.requireNonNull(keywords, "keywords cannot be null"); // ADAPTED: defensive null check not present in WA Web
         Objects.requireNonNull(timestamp, "timestamp cannot be null"); // ADAPTED: defensive null check not present in WA Web
-        var action = new QuickReplyActionBuilder() // WAWebQuickRepliesSync.getQuickReplyAddOrEditMutation: var e = {quickReplyAction: {deleted: false, keywords: i, shortcut: n, message: r, count: a}}
-                .deleted(false) // WAWebQuickRepliesSync.getQuickReplyAddOrEditMutation: deleted: false
-                .keywords(keywords) // WAWebQuickRepliesSync.getQuickReplyAddOrEditMutation: keywords: i
-                .shortcut(shortcut) // WAWebQuickRepliesSync.getQuickReplyAddOrEditMutation: shortcut: n
-                .message(message) // WAWebQuickRepliesSync.getQuickReplyAddOrEditMutation: message: r
-                .count(count) // WAWebQuickRepliesSync.getQuickReplyAddOrEditMutation: count: a
+        var action = new QuickReplyActionBuilder()
+                .deleted(false)
+                .keywords(keywords)
+                .shortcut(shortcut)
+                .message(message)
+                .count(count)
                 .build();
-        var value = new SyncActionValueBuilder() // WAWebSyncdActionUtils.buildPendingMutation: encodeProtobuf(SyncActionValueSpec, {...l, timestamp: i})
-                .timestamp(timestamp) // WAWebSyncdActionUtils.buildPendingMutation: timestamp: e
-                .quickReplyAction(action) // WAWebQuickRepliesSync.getQuickReplyAddOrEditMutation: {quickReplyAction: ...}
+        var value = new SyncActionValueBuilder()
+                .timestamp(timestamp)
+                .quickReplyAction(action)
                 .build();
-        // WAWebSyncdActionUtils.buildPendingMutation: index = JSON.stringify([action].concat(indexArgs)) where indexArgs = [t]
         var index = JSON.toJSONString(List.of(actionName(), quickReplyId));
-        var pendingMutation = new DecryptedMutation.Trusted( // WAWebSyncdActionUtils.buildPendingMutation: return {collection, index, binarySyncAction, version, operation, timestamp, action}
+        var pendingMutation = new DecryptedMutation.Trusted(
                 index,
                 value,
-                SyncdOperation.SET, // WAWebQuickRepliesSync.getQuickReplyAddOrEditMutation: operation: SyncdMutation$SyncdOperation.SET
+                SyncdOperation.SET,
                 timestamp,
-                version() // WAWebQuickRepliesSync.getQuickReplyAddOrEditMutation: version: this.getVersion()
+                version()
         );
-        return new SyncPendingMutation(pendingMutation, 0); // WAWebSyncdActionUtils.buildPendingMutation
+        return new SyncPendingMutation(pendingMutation, 0);
     }
 }

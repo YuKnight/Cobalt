@@ -65,7 +65,7 @@ public final class DisableLinkPreviewsHandler implements WebAppStateActionHandle
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDisableLinkPreviewsSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return PrivacySettingDisableLinkPreviewsAction.ACTION_NAME; // WAWebDisableLinkPreviewsSync.getAction
+        return PrivacySettingDisableLinkPreviewsAction.ACTION_NAME;
     }
 
     /**
@@ -78,18 +78,16 @@ public final class DisableLinkPreviewsHandler implements WebAppStateActionHandle
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDisableLinkPreviewsSync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return PrivacySettingDisableLinkPreviewsAction.COLLECTION_NAME; // WAWebDisableLinkPreviewsSync.collectionName
+        return PrivacySettingDisableLinkPreviewsAction.COLLECTION_NAME;
     }
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote WAWebDisableLinkPreviewsSync.getVersion — returns {@code 8}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDisableLinkPreviewsSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return PrivacySettingDisableLinkPreviewsAction.ACTION_VERSION; // WAWebDisableLinkPreviewsSync.getVersion
+        return PrivacySettingDisableLinkPreviewsAction.ACTION_VERSION;
     }
 
     /**
@@ -108,7 +106,7 @@ public final class DisableLinkPreviewsHandler implements WebAppStateActionHandle
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDisableLinkPreviewsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: WAWebDisableLinkPreviewsSync.applyMutations
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -135,27 +133,27 @@ public final class DisableLinkPreviewsHandler implements WebAppStateActionHandle
             return List.of();
         }
 
-        Boolean lastValid = null; // WAWebDisableLinkPreviewsSync.applyMutations: var r
-        var results = new ArrayList<MutationApplicationResult>(mutations.size()); // WAWebDisableLinkPreviewsSync.applyMutations: var a = [], c = t.map(function(e) { ... })
-        for (var mutation : mutations) { // WAWebDisableLinkPreviewsSync.applyMutations: t.map(function(e) { ... })
-            if (mutation.operation() != SyncdOperation.SET) { // WAWebDisableLinkPreviewsSync.applyMutations: if (e.operation !== "set") return i++, ... {actionState: Unsupported}
-                results.add(MutationApplicationResult.unsupported()); // WAWebDisableLinkPreviewsSync.applyMutations: {actionState: SyncActionState.Unsupported}
+        Boolean lastValid = null;
+        var results = new ArrayList<MutationApplicationResult>(mutations.size());
+        for (var mutation : mutations) {
+            if (mutation.operation() != SyncdOperation.SET) {
+                results.add(MutationApplicationResult.unsupported());
                 continue;
             }
 
-            if (mutation.value().action().orElse(null) instanceof PrivacySettingDisableLinkPreviewsAction action) { // WAWebDisableLinkPreviewsSync.applyMutations: var s = (t = e.value.privacySettingDisableLinkPreviewsAction) == null ? void 0 : t.isPreviewsDisabled
-                lastValid = action.isPreviewsDisabled(); // WAWebDisableLinkPreviewsSync.applyMutations: r = s
-                results.add(MutationApplicationResult.success()); // WAWebDisableLinkPreviewsSync.applyMutations: {actionState: SyncActionState.Success}
+            if (mutation.value().action().orElse(null) instanceof PrivacySettingDisableLinkPreviewsAction action) {
+                lastValid = action.isPreviewsDisabled();
+                results.add(MutationApplicationResult.success());
             } else {
-                results.add(MutationApplicationResult.malformed()); // WAWebDisableLinkPreviewsSync.applyMutations: malformedActionValue(n.collectionName)
+                results.add(MutationApplicationResult.malformed());
             }
         }
 
-        if (lastValid != null) { // WAWebDisableLinkPreviewsSync.applyMutations: r != null
+        if (lastValid != null) {
             client.store().setDisableLinkPreviews(lastValid); // ADAPTED: WAWebDisableLinkPreviewsAction.setDisableLinkPreviewsToUserPrefs(r) -> direct store call
         }
 
-        return results; // WAWebDisableLinkPreviewsSync.applyMutations: return c
+        return results;
     }
 
     /**
@@ -181,16 +179,16 @@ public final class DisableLinkPreviewsHandler implements WebAppStateActionHandle
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDisableLinkPreviewsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        if (mutation.operation() != SyncdOperation.SET) { // WAWebDisableLinkPreviewsSync.applyMutations: if (e.operation !== "set")
-            return MutationApplicationResult.unsupported(); // WAWebDisableLinkPreviewsSync.applyMutations: {actionState: SyncActionState.Unsupported}
+        if (mutation.operation() != SyncdOperation.SET) {
+            return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof PrivacySettingDisableLinkPreviewsAction action)) { // WAWebDisableLinkPreviewsSync.applyMutations: (t = e.value.privacySettingDisableLinkPreviewsAction) == null
-            return MutationApplicationResult.malformed(); // WAWebDisableLinkPreviewsSync.applyMutations: malformedActionValue(n.collectionName)
+        if (!(mutation.value().action().orElse(null) instanceof PrivacySettingDisableLinkPreviewsAction action)) {
+            return MutationApplicationResult.malformed();
         }
 
         client.store().setDisableLinkPreviews(action.isPreviewsDisabled()); // ADAPTED: WAWebDisableLinkPreviewsAction.setDisableLinkPreviewsToUserPrefs(s) -> direct store call
-        return MutationApplicationResult.success(); // WAWebDisableLinkPreviewsSync.applyMutations: {actionState: SyncActionState.Success}
+        return MutationApplicationResult.success();
     }
 
     /**
@@ -218,21 +216,21 @@ public final class DisableLinkPreviewsHandler implements WebAppStateActionHandle
      */
     @WhatsAppWebExport(moduleName = "WAWebDisableLinkPreviewsSync", exports = "getMutation", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncPendingMutation getMutation(Instant timestamp, boolean isPreviewsDisabled) {
-        var action = new PrivacySettingDisableLinkPreviewsActionBuilder() // WAWebDisableLinkPreviewsSync.getMutation: {privacySettingDisableLinkPreviewsAction: {isPreviewsDisabled: n}}
-                .isPreviewsDisabled(isPreviewsDisabled) // WAWebDisableLinkPreviewsSync.getMutation: isPreviewsDisabled: n
+        var action = new PrivacySettingDisableLinkPreviewsActionBuilder()
+                .isPreviewsDisabled(isPreviewsDisabled)
                 .build();
-        var value = new SyncActionValueBuilder() // WAWebSyncdActionUtils.buildPendingMutation: encodeProtobuf(SyncActionValueSpec, {...l, timestamp: i})
-                .timestamp(timestamp) // WAWebSyncdActionUtils.buildPendingMutation: timestamp: t
-                .privacySettingDisableLinkPreviewsAction(action) // WAWebDisableLinkPreviewsSync.getMutation: value: {privacySettingDisableLinkPreviewsAction: {...}}
+        var value = new SyncActionValueBuilder()
+                .timestamp(timestamp)
+                .privacySettingDisableLinkPreviewsAction(action)
                 .build();
-        var index = JSON.toJSONString(List.of(actionName())); // WAWebSyncdActionUtils.buildPendingMutation: index = JSON.stringify([action].concat(indexArgs)) where indexArgs = []
-        var mutation = new DecryptedMutation.Trusted( // WAWebSyncdActionUtils.buildPendingMutation: return { collection, index, binarySyncAction, version, operation, timestamp, action }
-                index, // WAWebSyncdActionUtils.buildPendingMutation: index
-                value, // WAWebSyncdActionUtils.buildPendingMutation: binarySyncAction
-                SyncdOperation.SET, // WAWebDisableLinkPreviewsSync.getMutation: operation: SyncdMutation$SyncdOperation.SET
-                timestamp, // WAWebSyncdActionUtils.buildPendingMutation: timestamp
-                version() // WAWebSyncdActionUtils.buildPendingMutation: version: this.getVersion()
+        var index = JSON.toJSONString(List.of(actionName()));
+        var mutation = new DecryptedMutation.Trusted(
+                index,
+                value,
+                SyncdOperation.SET,
+                timestamp,
+                version()
         );
-        return new SyncPendingMutation(mutation, 0); // WAWebSyncdActionUtils.buildPendingMutation
+        return new SyncPendingMutation(mutation, 0);
     }
 }

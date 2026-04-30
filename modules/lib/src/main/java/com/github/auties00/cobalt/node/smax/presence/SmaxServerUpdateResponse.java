@@ -13,8 +13,8 @@ import java.util.Optional;
  * Sealed family of inbound presence-update variants.
  *
  * @implNote The five permits track
- *           {@code WASmaxInPresencePresenceUpdates.parsePresenceUpdates}
- *           — try {@code GroupAvailable}, then
+ *           {@code WASmaxInPresencePresenceUpdates.parsePresenceUpdates}.
+ *           Try {@code GroupAvailable}, then
  *           {@code GroupUnavailable}, then
  *           {@code LastSeenWithOtherValue}, then
  *           {@code UserUnavailable}, then {@code Available}.
@@ -30,7 +30,7 @@ public sealed interface SmaxServerUpdateResponse extends SmaxOperation.Response
      * Tries each {@link SmaxServerUpdateResponse} variant in the WA Web declared
      * order and returns the first that parses cleanly.
      *
-     * @param node the inbound {@code <presence/>} stanza; never
+     * @param node the inbound {@code <presence/>} stanza. Never
      *             {@code null}
      * @return an {@link Optional} carrying the parsed variant, or
      *         {@link Optional#empty()} when no documented variant
@@ -63,7 +63,7 @@ public sealed interface SmaxServerUpdateResponse extends SmaxOperation.Response
     }
 
     /**
-     * The {@code GroupAvailable} variant — the relay reports how
+     * The {@code GroupAvailable} variant. The relay reports how
      * many members of a group are currently online.
      *
      * @implNote {@code WASmaxInPresenceGroupAvailableMixin.parseGroupAvailableMixin}
@@ -88,7 +88,7 @@ public sealed interface SmaxServerUpdateResponse extends SmaxOperation.Response
         /**
          * Constructs a new {@code GroupAvailable} projection.
          *
-         * @param from  the group JID; never {@code null}
+         * @param from  the group JID. Never {@code null}
          * @param count the online-member count
          * @throws NullPointerException if {@code from} is
          *                              {@code null}
@@ -101,7 +101,7 @@ public sealed interface SmaxServerUpdateResponse extends SmaxOperation.Response
         /**
          * Returns the group JID.
          *
-         * @return the group JID; never {@code null}
+         * @return the group JID. Never {@code null}
          */
         public Jid from() {
             return from;
@@ -174,7 +174,7 @@ public sealed interface SmaxServerUpdateResponse extends SmaxOperation.Response
     }
 
     /**
-     * The {@code GroupUnavailable} variant — the relay reports the
+     * The {@code GroupUnavailable} variant. The relay reports the
      * group has dropped to zero online members.
      *
      * @implNote {@code WASmaxInPresenceGroupUnavailableMixin.parseGroupUnavailableMixin}
@@ -192,7 +192,7 @@ public sealed interface SmaxServerUpdateResponse extends SmaxOperation.Response
         /**
          * Constructs a new {@code GroupUnavailable} projection.
          *
-         * @param from the group JID; never {@code null}
+         * @param from the group JID. Never {@code null}
          * @throws NullPointerException if {@code from} is
          *                              {@code null}
          */
@@ -203,7 +203,7 @@ public sealed interface SmaxServerUpdateResponse extends SmaxOperation.Response
         /**
          * Returns the group JID.
          *
-         * @return the group JID; never {@code null}
+         * @return the group JID. Never {@code null}
          */
         public Jid from() {
             return from;
@@ -262,7 +262,7 @@ public sealed interface SmaxServerUpdateResponse extends SmaxOperation.Response
     }
 
     /**
-     * The {@code LastSeenWithOtherValue} variant — the relay reports
+     * The {@code LastSeenWithOtherValue} variant. The relay reports
      * the peer is offline and the last-seen value is a
      * privacy-suppressed sentinel ({@code "deny"} / {@code "error"}
      * / {@code "none"}).
@@ -292,8 +292,8 @@ public sealed interface SmaxServerUpdateResponse extends SmaxOperation.Response
          * Constructs a new {@code LastSeenWithOtherValue}
          * projection.
          *
-         * @param from the user JID; never {@code null}
-         * @param last the optional sentinel; may be {@code null}
+         * @param from the user JID. Never {@code null}
+         * @param last the optional sentinel. May be {@code null}
          * @throws NullPointerException if {@code from} is
          *                              {@code null}
          */
@@ -305,7 +305,7 @@ public sealed interface SmaxServerUpdateResponse extends SmaxOperation.Response
         /**
          * Returns the user JID.
          *
-         * @return the user JID; never {@code null}
+         * @return the user JID. Never {@code null}
          */
         public Jid from() {
             return from;
@@ -382,9 +382,9 @@ public sealed interface SmaxServerUpdateResponse extends SmaxOperation.Response
     }
 
     /**
-     * The {@code UserUnavailable} variant — the relay reports the
+     * The {@code UserUnavailable} variant. The relay reports the
      * peer is offline with a free-form {@code last} string (a
-     * Unix-timestamp-as-text — the actual last-seen moment).
+     * Unix-timestamp-as-text. The actual last-seen moment).
      *
      * @implNote {@code WASmaxInPresenceUserUnavailableMixin.parseUserUnavailableMixin}
      *           validates the user JID, asserts
@@ -407,8 +407,8 @@ public sealed interface SmaxServerUpdateResponse extends SmaxOperation.Response
         /**
          * Constructs a new {@code UserUnavailable} projection.
          *
-         * @param from the user JID; never {@code null}
-         * @param last the optional free-form {@code last}; may be
+         * @param from the user JID. Never {@code null}
+         * @param last the optional free-form {@code last}. May be
          *             {@code null}
          * @throws NullPointerException if {@code from} is
          *                              {@code null}
@@ -421,7 +421,7 @@ public sealed interface SmaxServerUpdateResponse extends SmaxOperation.Response
         /**
          * Returns the user JID.
          *
-         * @return the user JID; never {@code null}
+         * @return the user JID. Never {@code null}
          */
         public Jid from() {
             return from;
@@ -494,7 +494,7 @@ public sealed interface SmaxServerUpdateResponse extends SmaxOperation.Response
     }
 
     /**
-     * The {@code Available} variant — the relay reports the peer
+     * The {@code Available} variant. The relay reports the peer
      * is online (group or user JID), with optional {@code type}
      * {@code "available"} literal and optional free-form
      * {@code last}.
@@ -508,7 +508,7 @@ public sealed interface SmaxServerUpdateResponse extends SmaxOperation.Response
     @WhatsAppWebModule(moduleName = "WASmaxInPresenceAvailableMixin")
     final class Available implements SmaxServerUpdateResponse {
         /**
-         * The peer JID — either a group or a user.
+         * The peer JID. Either a group or a user.
          */
         private final Jid from;
 
@@ -525,10 +525,10 @@ public sealed interface SmaxServerUpdateResponse extends SmaxOperation.Response
         /**
          * Constructs a new {@code Available} projection.
          *
-         * @param from the peer JID; never {@code null}
+         * @param from the peer JID. Never {@code null}
          * @param type the optional literal {@code "available"}
-         *             type tag; may be {@code null}
-         * @param last the optional free-form {@code last}; may be
+         *             type tag. May be {@code null}
+         * @param last the optional free-form {@code last}. May be
          *             {@code null}
          * @throws NullPointerException if {@code from} is
          *                              {@code null}
@@ -542,7 +542,7 @@ public sealed interface SmaxServerUpdateResponse extends SmaxOperation.Response
         /**
          * Returns the peer JID.
          *
-         * @return the JID; never {@code null}
+         * @return the JID. Never {@code null}
          */
         public Jid from() {
             return from;

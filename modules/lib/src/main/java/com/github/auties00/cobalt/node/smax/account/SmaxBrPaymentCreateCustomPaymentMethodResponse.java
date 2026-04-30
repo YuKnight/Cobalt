@@ -31,7 +31,7 @@ public sealed interface SmaxBrPaymentCreateCustomPaymentMethodResponse extends S
      *
      * @param node    the inbound IQ stanza received from the relay;
      *                never {@code null}
-     * @param request the original outbound stanza — used to
+     * @param request the original outbound stanza. Used to
      *                validate echoed identifiers; never
      *                {@code null}
      * @return an {@link Optional} carrying the parsed variant, or
@@ -62,8 +62,6 @@ public sealed interface SmaxBrPaymentCreateCustomPaymentMethodResponse extends S
      * @param reply   the inbound IQ stanza
      * @param request the original outbound IQ
      * @return {@code true} when the envelope echo-checks pass
-     *
-     * @implNote {@code WASmaxInBrPaymentIQResultResponseMixin.parseIQResultResponseMixin}.
      */
     @WhatsAppWebExport(moduleName = "WASmaxInBrPaymentIQResultResponseMixin",
             exports = "parseIQResultResponseMixin", adaptation = WhatsAppAdaptation.ADAPTED)
@@ -86,16 +84,9 @@ public sealed interface SmaxBrPaymentCreateCustomPaymentMethodResponse extends S
     }
 
     /**
-     * The {@code Success} reply variant — the relay registered the
+     * The {@code Success} reply variant. The relay registered the
      * custom payment method and echoed the canonical
      * {@code <custom_payment_method/>} projection back.
-     *
-     * @implNote {@code WASmaxInBrPaymentCreateCustomPaymentMethodResponseSuccess.parseCreateCustomPaymentMethodResponseSuccess}
-     *           validates the {@code <iq type="result">} envelope,
-     *           cross-checks the {@code <account action/>} echo
-     *           against the request, and projects the
-     *           {@code <custom_payment_method/>} child via
-     *           {@code WASmaxInBrPaymentCustomPaymentMethodMixin.parseCustomPaymentMethodMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBrPaymentCreateCustomPaymentMethodResponseSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxInBrPaymentCustomPaymentMethodMixin")
@@ -104,7 +95,7 @@ public sealed interface SmaxBrPaymentCreateCustomPaymentMethodResponse extends S
     @WhatsAppWebModule(moduleName = "WASmaxInBrPaymentCustomPaymentMethodMetaDataMixin")
     final class Success implements SmaxBrPaymentCreateCustomPaymentMethodResponse {
         /**
-         * The echoed custom-payment-method type — one of
+         * The echoed custom-payment-method type. One of
          * {@code "PAYONDELIVERY"}, {@code "PIXKEY"}.
          */
         private final String customPaymentMethodType;
@@ -122,7 +113,7 @@ public sealed interface SmaxBrPaymentCreateCustomPaymentMethodResponse extends S
         private final String created;
 
         /**
-         * The optional flow enum literal — {@code "P2P"} or
+         * The optional flow enum literal, {@code "P2P"} or
          * {@code "P2M"}.
          */
         private final String flow;
@@ -133,13 +124,13 @@ public sealed interface SmaxBrPaymentCreateCustomPaymentMethodResponse extends S
         private final String credentialId;
 
         /**
-         * The optional {@code p2p-eligible} flag — {@code "0"} /
+         * The optional {@code p2p-eligible} flag, {@code "0"} /
          * {@code "1"}.
          */
         private final String p2pEligible;
 
         /**
-         * The optional {@code p2m-eligible} flag — {@code "0"} /
+         * The optional {@code p2m-eligible} flag, {@code "0"} /
          * {@code "1"}.
          */
         private final String p2mEligible;
@@ -390,17 +381,9 @@ public sealed interface SmaxBrPaymentCreateCustomPaymentMethodResponse extends S
     }
 
     /**
-     * The {@code IqError} reply variant — the relay rejected the
+     * The {@code IqError} reply variant. The relay rejected the
      * registration with an {@code <iq type="error"/>} envelope
      * carrying the canonical {@code (code, text)} pair.
-     *
-     * @implNote {@code WASmaxInBrPaymentCreateCustomPaymentMethodResponseIQErrorWithCodeAndReason.parseCreateCustomPaymentMethodResponseIQErrorWithCodeAndReason}
-     *           composes
-     *           {@code WASmaxInBrPaymentIQErrorGenericResponseMixin.parseIQErrorGenericResponseMixin}
-     *           which validates the IQ envelope echo, asserts
-     *           {@code type="error"}, then extracts the
-     *           {@code <error code="…" text="…"/>} child requiring
-     *           {@code code >= 1}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBrPaymentCreateCustomPaymentMethodResponseIQErrorWithCodeAndReason")
     @WhatsAppWebModule(moduleName = "WASmaxInBrPaymentIQErrorGenericResponseMixin")

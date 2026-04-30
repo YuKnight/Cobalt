@@ -25,11 +25,10 @@ public enum WhatsAppClientType {
      * A web companion client that attaches to a primary mobile device via
      * QR code or pairing code, mirroring WhatsApp Web and Desktop.
      *
-     * <p>In this mode the client does not own the phone number: it exchanges
-     * identity with an existing primary account and operates as a linked
-     * device. This is the flavour used by
-     * {@link com.google.zxing.BarcodeFormat#QR_CODE QR code} based
-     * authentication handlers from {@link WhatsAppClientVerificationHandler.Web}.
+     * <p>In this mode the client does not own the phone number: it
+     * exchanges identity with an existing primary account and operates as
+     * a linked device. The companion-linking ceremony is driven by
+     * {@link WhatsAppClientVerificationHandler.Web}.
      */
     WEB,
 

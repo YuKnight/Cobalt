@@ -57,9 +57,9 @@ public sealed interface SmaxPushConfigSetConfigVariant
         /**
          * Constructs a new FB-client config.
          *
-         * @param configAppid    the appid; never {@code null}
-         * @param configDeviceid the device id; never {@code null}
-         * @param configFbid     the optional FB id; may be
+         * @param configAppid    the appid. Never {@code null}
+         * @param configDeviceid the device id. Never {@code null}
+         * @param configFbid     the optional FB id. May be
          *                       {@code null}
          * @throws NullPointerException if any required argument is
          *                              {@code null}
@@ -73,7 +73,7 @@ public sealed interface SmaxPushConfigSetConfigVariant
         /**
          * Returns the appid.
          *
-         * @return the appid; never {@code null}
+         * @return the appid. Never {@code null}
          */
         public String configAppid() {
             return configAppid;
@@ -82,7 +82,7 @@ public sealed interface SmaxPushConfigSetConfigVariant
         /**
          * Returns the device id.
          *
-         * @return the device id; never {@code null}
+         * @return the device id. Never {@code null}
          */
         public String configDeviceid() {
             return configDeviceid;
@@ -146,7 +146,7 @@ public sealed interface SmaxPushConfigSetConfigVariant
     }
 
     /**
-     * The Android-client {@code <config>} variant — wraps a list of
+     * The Android-client {@code <config>} variant. Wraps a list of
      * per-group mute items.
      *
      * @implNote {@code WASmaxOutPushConfigAndroidClientMixin.mergeAndroidClientMixin}
@@ -168,7 +168,7 @@ public sealed interface SmaxPushConfigSetConfigVariant
         /**
          * Constructs a new Android-client config.
          *
-         * @param itemArgs the mute items; never {@code null}
+         * @param itemArgs the mute items. Never {@code null}
          * @throws NullPointerException if {@code itemArgs} is
          *                              {@code null}
          */
@@ -180,7 +180,7 @@ public sealed interface SmaxPushConfigSetConfigVariant
         /**
          * Returns the mute items.
          *
-         * @return an unmodifiable list; never {@code null}
+         * @return an unmodifiable list. Never {@code null}
          */
         public List<AndroidMuteItem> itemArgs() {
             return itemArgs;
@@ -246,7 +246,7 @@ public sealed interface SmaxPushConfigSetConfigVariant
             /**
              * Constructs a new mute item.
              *
-             * @param itemJid  the group JID; never {@code null}
+             * @param itemJid  the group JID. Never {@code null}
              * @param itemMute the mute marker
              * @throws NullPointerException if {@code itemJid} is
              *                              {@code null}
@@ -259,7 +259,7 @@ public sealed interface SmaxPushConfigSetConfigVariant
             /**
              * Returns the group JID.
              *
-             * @return the JID; never {@code null}
+             * @return the JID. Never {@code null}
              */
             public Jid itemJid() {
                 return itemJid;
@@ -317,7 +317,7 @@ public sealed interface SmaxPushConfigSetConfigVariant
     }
 
     /**
-     * The Apple-client {@code <config platform>} variant — a thick
+     * The Apple-client {@code <config platform>} variant. A thick
      * record of APNs / iOS-specific attributes.
      *
      * @implNote {@code WASmaxOutPushConfigAppleClientMixin.mergeAppleClientMixin}
@@ -451,24 +451,24 @@ public sealed interface SmaxPushConfigSetConfigVariant
         /**
          * Constructs a new Apple-client config.
          *
-         * @param configPlatform           the platform; never
+         * @param configPlatform           the platform. Never
          *                                 {@code null}
          * @param hasConfigVersion2        whether {@code version="2"}
          * @param configId                 the optional id
          * @param configVoip               the optional voip token
-         * @param configPreview            the preview marker; never
+         * @param configPreview            the preview marker. Never
          *                                 {@code null}
-         * @param configDefault            the default marker; never
+         * @param configDefault            the default marker. Never
          *                                 {@code null}
-         * @param configGroups             the groups marker; never
+         * @param configGroups             the groups marker. Never
          *                                 {@code null}
-         * @param configCall               the call marker; never
+         * @param configCall               the call marker. Never
          *                                 {@code null}
          * @param configStatusSound        the optional status-sound
          *                                 marker
-         * @param configLg                 the language; never
+         * @param configLg                 the language. Never
          *                                 {@code null}
-         * @param configLc                 the locale; never
+         * @param configLc                 the locale. Never
          *                                 {@code null}
          * @param configBackgroundLocation the optional bg-location
          *                                 marker
@@ -538,7 +538,7 @@ public sealed interface SmaxPushConfigSetConfigVariant
         /**
          * Returns the platform marker.
          *
-         * @return the marker; never {@code null}
+         * @return the marker. Never {@code null}
          */
         public String configPlatform() {
             return configPlatform;
@@ -574,7 +574,7 @@ public sealed interface SmaxPushConfigSetConfigVariant
         /**
          * Returns the preview marker.
          *
-         * @return the marker; never {@code null}
+         * @return the marker. Never {@code null}
          */
         public String configPreview() {
             return configPreview;
@@ -583,7 +583,7 @@ public sealed interface SmaxPushConfigSetConfigVariant
         /**
          * Returns the default marker.
          *
-         * @return the marker; never {@code null}
+         * @return the marker. Never {@code null}
          */
         public String configDefault() {
             return configDefault;
@@ -592,7 +592,7 @@ public sealed interface SmaxPushConfigSetConfigVariant
         /**
          * Returns the groups marker.
          *
-         * @return the marker; never {@code null}
+         * @return the marker. Never {@code null}
          */
         public String configGroups() {
             return configGroups;
@@ -601,7 +601,7 @@ public sealed interface SmaxPushConfigSetConfigVariant
         /**
          * Returns the call marker.
          *
-         * @return the marker; never {@code null}
+         * @return the marker. Never {@code null}
          */
         public String configCall() {
             return configCall;
@@ -619,7 +619,7 @@ public sealed interface SmaxPushConfigSetConfigVariant
         /**
          * Returns the language tag.
          *
-         * @return the tag; never {@code null}
+         * @return the tag. Never {@code null}
          */
         public String configLg() {
             return configLg;
@@ -628,7 +628,7 @@ public sealed interface SmaxPushConfigSetConfigVariant
         /**
          * Returns the locale tag.
          *
-         * @return the tag; never {@code null}
+         * @return the tag. Never {@code null}
          */
         public String configLc() {
             return configLc;
@@ -700,7 +700,7 @@ public sealed interface SmaxPushConfigSetConfigVariant
         /**
          * Returns the voip payload type.
          *
-         * @return the type; never {@code null}
+         * @return the type. Never {@code null}
          */
         public String configVoipPayloadType() {
             return configVoipPayloadType;
@@ -745,7 +745,7 @@ public sealed interface SmaxPushConfigSetConfigVariant
         /**
          * Returns the per-item entries.
          *
-         * @return an unmodifiable list; never {@code null}
+         * @return an unmodifiable list. Never {@code null}
          */
         public List<AppleItem> itemArgs() {
             return itemArgs;
@@ -924,12 +924,12 @@ public sealed interface SmaxPushConfigSetConfigVariant
             /**
              * Constructs a new entry.
              *
-             * @param itemJid    the target JID; never {@code null}
-             * @param itemMute   the optional mute marker; may be
+             * @param itemJid    the target JID. Never {@code null}
+             * @param itemMute   the optional mute marker. May be
              *                   {@code null}
-             * @param itemNotify the optional notify marker; may be
+             * @param itemNotify the optional notify marker. May be
              *                   {@code null}
-             * @param itemCall   the optional call marker; may be
+             * @param itemCall   the optional call marker. May be
              *                   {@code null}
              * @throws NullPointerException if {@code itemJid} is
              *                              {@code null}
@@ -944,7 +944,7 @@ public sealed interface SmaxPushConfigSetConfigVariant
             /**
              * Returns the target JID.
              *
-             * @return the JID; never {@code null}
+             * @return the JID. Never {@code null}
              */
             public Jid itemJid() {
                 return itemJid;
@@ -1050,9 +1050,9 @@ public sealed interface SmaxPushConfigSetConfigVariant
         /**
          * Constructs a new WNS config.
          *
-         * @param configVersion the optional version; may be
+         * @param configVersion the optional version. May be
          *                      {@code null}
-         * @param configId      the WNS id; never {@code null}
+         * @param configId      the WNS id. Never {@code null}
          * @throws NullPointerException if {@code configId} is
          *                              {@code null}
          */
@@ -1073,7 +1073,7 @@ public sealed interface SmaxPushConfigSetConfigVariant
         /**
          * Returns the WNS id.
          *
-         * @return the id; never {@code null}
+         * @return the id. Never {@code null}
          */
         public String configId() {
             return configId;
@@ -1138,7 +1138,7 @@ public sealed interface SmaxPushConfigSetConfigVariant
         /**
          * Constructs a new enterprise-client config.
          *
-         * @param configId the enterprise id; never {@code null}
+         * @param configId the enterprise id. Never {@code null}
          * @throws NullPointerException if {@code configId} is
          *                              {@code null}
          */
@@ -1149,7 +1149,7 @@ public sealed interface SmaxPushConfigSetConfigVariant
         /**
          * Returns the enterprise id.
          *
-         * @return the id; never {@code null}
+         * @return the id. Never {@code null}
          */
         public String configId() {
             return configId;
@@ -1196,8 +1196,8 @@ public sealed interface SmaxPushConfigSetConfigVariant
     }
 
     /**
-     * The Web-client {@code <config platform="web">} variant —
-     * carries the W3C Push API endpoint, auth secret, and P-256
+     * The Web-client {@code <config platform="web">} variant.
+     * Carries the W3C Push API endpoint, auth secret, and P-256
      * application server key.
      */
     @WhatsAppWebModule(moduleName = "WASmaxOutPushConfigWebClientMixin")
@@ -1230,13 +1230,13 @@ public sealed interface SmaxPushConfigSetConfigVariant
         /**
          * Constructs a new web-client config.
          *
-         * @param configEndpoint the endpoint URL; never
+         * @param configEndpoint the endpoint URL. Never
          *                       {@code null}
-         * @param configAuth     the auth secret; never {@code null}
-         * @param configP256dh   the P-256 key; never {@code null}
-         * @param configLg       the optional language; may be
+         * @param configAuth     the auth secret. Never {@code null}
+         * @param configP256dh   the P-256 key. Never {@code null}
+         * @param configLg       the optional language. May be
          *                       {@code null}
-         * @param configLc       the optional locale; may be
+         * @param configLc       the optional locale. May be
          *                       {@code null}
          * @throws NullPointerException if any required argument is
          *                              {@code null}
@@ -1253,7 +1253,7 @@ public sealed interface SmaxPushConfigSetConfigVariant
         /**
          * Returns the endpoint URL.
          *
-         * @return the URL; never {@code null}
+         * @return the URL. Never {@code null}
          */
         public String configEndpoint() {
             return configEndpoint;
@@ -1262,7 +1262,7 @@ public sealed interface SmaxPushConfigSetConfigVariant
         /**
          * Returns the auth secret.
          *
-         * @return the secret; never {@code null}
+         * @return the secret. Never {@code null}
          */
         public String configAuth() {
             return configAuth;
@@ -1271,7 +1271,7 @@ public sealed interface SmaxPushConfigSetConfigVariant
         /**
          * Returns the P-256 key.
          *
-         * @return the key; never {@code null}
+         * @return the key. Never {@code null}
          */
         public String configP256dh() {
             return configP256dh;

@@ -106,7 +106,7 @@ public interface WebAppStateActionHandler {
     @WhatsAppWebExport(moduleName = "WAWebSyncdAction", exports = "MessageSyncdActionBase", adaptation = WhatsAppAdaptation.ADAPTED)
     @WhatsAppWebExport(moduleName = "WAWebSyncdAction", exports = "ChatMessageRangeSyncdActionBase", adaptation = WhatsAppAdaptation.ADAPTED)
     default MutationApplicationResult malformedActionIndex() {
-        return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName()); // WAWebSyncdAction.malformedActionIndex -> WAWebSyncdIndexUtils.malformedActionIndex(e.collectionName, e.getAction())
+        return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
     }
 
     /**
@@ -123,7 +123,7 @@ public interface WebAppStateActionHandler {
      * @return a {@link MutationApplicationResult} with {@code MALFORMED} state
      */
     default MutationApplicationResult malformedActionValue() {
-        return SyncdIndexUtils.malformedActionValue(collectionName().name()); // WAWebSyncdIndexUtils.malformedActionValue(a.collectionName)
+        return SyncdIndexUtils.malformedActionValue(collectionName().name());
     }
 
     /**

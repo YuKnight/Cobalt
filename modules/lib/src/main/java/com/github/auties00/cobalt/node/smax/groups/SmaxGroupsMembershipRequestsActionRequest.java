@@ -108,8 +108,6 @@ public final class SmaxGroupsMembershipRequestsActionRequest implements SmaxOper
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsMembershipRequestsActionRequest",
             exports = "makeMembershipRequestsActionRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutGroupsMembershipRequestsActionRequest: smax("membership_requests_action",
-        //   null, OPTIONAL_CHILD(approve), OPTIONAL_CHILD(reject))
         var actionBuilder = new NodeBuilder().description("membership_requests_action");
         if (!participantsToApprove.isEmpty()) {
             var approveChildren = new ArrayList<Node>(participantsToApprove.size());
@@ -141,8 +139,6 @@ public final class SmaxGroupsMembershipRequestsActionRequest implements SmaxOper
                     .build();
             actionBuilder.content(rejectNode);
         }
-        // WASmaxOutGroupsBaseSetGroupMixin: smax("iq", {to: GROUP_JID(t), xmlns: "w:g2"})
-        // WASmaxOutGroupsBaseIQSetRequestMixin: smax("iq", {id: generateId(), type: "set"})
         return new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "w:g2")

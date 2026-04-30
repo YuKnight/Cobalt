@@ -45,7 +45,7 @@ public final class IqSyncdServerSyncRequestCollection {
     /**
      * Constructs a new outbound collection entry.
      *
-     * @param name    the collection name; never {@code null}
+     * @param name    the collection name. Never {@code null}
      * @param version the locally-known version, or {@code null} when
      *                the caller has never synced this collection
      * @param patch   the encoded {@code SyncdPatch} bytes carrying
@@ -62,7 +62,7 @@ public final class IqSyncdServerSyncRequestCollection {
     /**
      * Returns the collection name.
      *
-     * @return the name; never {@code null}
+     * @return the name. Never {@code null}
      */
     public String name() {
         return name;

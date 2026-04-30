@@ -10,59 +10,48 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 /**
- * Default implementation of {@link SocketClientTunnelLayerContext} that handles
- * the pre-tunnel and post-tunnel phases of a connection.
+ * Default implementation of {@link SocketClientTunnelLayerContext}.
  *
- * <p>Before the connection is fully established ({@code tunnelled = false}),
- * this context handles blocking reads posted by handshake threads (proxy
- * handshake, WebSocket upgrade, etc.).  After the connection transitions
- * to asynchronous mode ({@code tunnelled = true}), it becomes a pure
- * passthrough to the next layer above.
+ * <p>While {@link #tunnelled} is {@code false} the context routes
+ * inbound bytes into the blocking reads posted by handshake threads
+ * (proxy handshake, WebSocket upgrade); once tunnelled it becomes a
+ * transparent passthrough to the next layer above.
  */
 final class CommonSocketTunnelLayerContext implements SocketClientTunnelLayerContext {
     /**
-     * The next layer context in the chain (above tunnel).
-     * Set via {@link #setNextLayer(SocketClientLayerContext)} by auto-chaining.
+     * Layer above the tunnel; receives the decoded bytes once the
+     * tunnel is established.
      */
     private volatile SocketClientLayerContext nextLayer;
 
     /**
-     * The previous layer context in the chain (below tunnel).
-     * Set via {@link #setPrevLayer(SocketClientLayerContext)} by auto-chaining.
+     * Layer below the tunnel; receives outbound bytes on their way to
+     * the channel.
      */
     private volatile SocketClientLayerContext prevLayer;
 
     /**
      * Whether the tunnel has been established.
      *
-     * <p>Transitions from {@code false} to {@code true} exactly once
-     * after the handshake phase succeeds.  Once {@code true}, never
-     * reverts.  Read and written exclusively by the selector thread.
+     * <p>Latches from {@code false} to {@code true} exactly once when
+     * the handshake succeeds and never reverts. Read and written
+     * exclusively by the selector thread.
      */
     private boolean tunnelled;
 
     /**
-     * The pending binary read request, or {@code null} if no read is
-     * in progress.
-     *
-     * <p>Used only during the pre-tunnel phase.  Written by the thread
-     * calling {@code readBinary}; read and cleared by the selector thread.
+     * Pending binary read request, or {@code null} when no read is in
+     * flight. Used only during the pre-tunnel phase.
      */
     private volatile SocketClientPendingRead pendingBinaryRead;
 
     /**
-     * Creates a tunnel layer context in the pre-tunnel (not yet
-     * tunnelled) state.
+     * Creates a tunnel context in the pre-tunnel state.
      */
     public CommonSocketTunnelLayerContext() {
         this.tunnelled = false;
     }
 
-    /**
-     * Sets the next layer context in the inbound processing chain.
-     *
-     * @param next the next layer context
-     */
     @Override
     public void setNextLayer(SocketClientLayerContext next) {
         this.nextLayer = next;
@@ -79,12 +68,12 @@ final class CommonSocketTunnelLayerContext implements SocketClientTunnelLayerCon
     }
 
     /**
-     * Returns the inbound target buffer.
+     * Returns the buffer to read into.
      *
-     * <p>When this tunnel is currently serving a proxy-handshake pending
-     * read, returns that read's buffer directly.  Otherwise delegates to
-     * the next layer so post-handshake bytes flow through to the next
-     * protocol layer (for example a TLS layer above the tunnel).
+     * <p>While a proxy-handshake pending read is in flight, returns
+     * that read's destination buffer; otherwise delegates to the next
+     * layer so post-handshake bytes flow up the chain (typically into
+     * a TLS layer above the tunnel).
      *
      * @return the buffer to read into
      */
@@ -101,11 +90,12 @@ final class CommonSocketTunnelLayerContext implements SocketClientTunnelLayerCon
     /**
      * Processes inbound bytes.
      *
-     * <p>When this tunnel is currently serving a proxy-handshake pending
-     * read, updates that read and notifies the waiting handshake thread.
-     * Otherwise delegates to the next layer so bytes continue up the chain.
+     * <p>When a pending read is active, updates it and notifies the
+     * waiting handshake thread; otherwise delegates straight to the
+     * next layer so bytes continue up the chain.
      *
-     * @param bytesRead the number of bytes read, or -1 for end-of-stream
+     * @param bytesRead the number of bytes read, or {@code -1} on
+     *                  end-of-stream
      * @return the processing result
      * @throws IOException if layer processing fails
      */
@@ -122,9 +112,11 @@ final class CommonSocketTunnelLayerContext implements SocketClientTunnelLayerCon
     }
 
     /**
-     * Processes a pre-tunnel read completion.
+     * Updates the pending read with the bytes that just arrived and
+     * notifies its waiter when the request has been satisfied.
      *
-     * @param bytesRead the number of bytes read, or -1 for EOS
+     * @param bytesRead the number of bytes read, or {@code -1} on
+     *                  end-of-stream
      * @return the processing result
      */
     private SocketClientInboundResult processPreTunnelRead(int bytesRead) {
@@ -161,14 +153,14 @@ final class CommonSocketTunnelLayerContext implements SocketClientTunnelLayerCon
     }
 
     /**
-     * Sets the pending binary read request.
+     * Posts a pending blocking read request to this tunnel.
      *
-     * <p>Refused if another read is already pending or if this tunnel
-     * has already been marked tunnelled (meaning any future handshake
-     * reads belong to a higher layer, not to the proxy).
+     * <p>Refused if a read is already in flight or if the tunnel has
+     * already been marked tunnelled, since post-tunnel reads belong
+     * to a higher layer.
      *
      * @param read the pending read request
-     * @return {@code true} if the read was accepted
+     * @return {@code true} if the request was accepted
      */
     @Override
     public boolean setPendingRead(SocketClientPendingRead read) {

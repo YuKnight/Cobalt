@@ -71,7 +71,7 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
     @Override
     @WhatsAppWebExport(moduleName = "WAWebInteractiveMessageSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return InteractiveMessageAction.ACTION_NAME; // WAWebInteractiveMessageSync.getAction
+        return InteractiveMessageAction.ACTION_NAME;
     }
 
     /**
@@ -84,7 +84,7 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
     @Override
     @WhatsAppWebExport(moduleName = "WAWebInteractiveMessageSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return InteractiveMessageAction.COLLECTION_NAME; // WAWebInteractiveMessageSync: collectionName = RegularLow
+        return InteractiveMessageAction.COLLECTION_NAME;
     }
 
     /**
@@ -96,7 +96,7 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
     @Override
     @WhatsAppWebExport(moduleName = "WAWebInteractiveMessageSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return InteractiveMessageAction.ACTION_VERSION; // WAWebInteractiveMessageSync.getVersion: return 1
+        return InteractiveMessageAction.ACTION_VERSION;
     }
 
     /**
@@ -112,7 +112,7 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
     @Override
     @WhatsAppWebExport(moduleName = "WAWebInteractiveMessageSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebInteractiveMessageSync.applyMutations
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -164,114 +164,97 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
     @WhatsAppWebExport(moduleName = "WAWebInteractiveMessageSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
         try {
-            // WAWebInteractiveMessageSync.applyMutations: if (e.operation === "set") { ... } return b++, {actionState: Unsupported}
             if (mutation.operation() != SyncdOperation.SET) {
-                return MutationApplicationResult.unsupported(); // WAWebInteractiveMessageSync.applyMutations: Unsupported
+                return MutationApplicationResult.unsupported();
             }
 
-            // WAWebInteractiveMessageSync.applyMutations: var t = e.indexParts, n = e.value, i = t[1], s = t[2], u = t[3], c = t[4], d = t[5]
             var indexArray = JSON.parseArray(mutation.index());
-            if (indexArray.size() < 6) { // WAWebInteractiveMessageSync.applyMutations: if (!i || !s || !u || !c || !d) — array too small
-                return malformedActionIndex(); // WAWebInteractiveMessageSync.applyMutations: return a.malformedActionIndex()
+            if (indexArray.size() < 6) {
+                return malformedActionIndex();
             }
 
-            var chatJidString = indexArray.getString(1); // WAWebInteractiveMessageSync.applyMutations: i = t[1]
-            var messageId = indexArray.getString(2); // WAWebInteractiveMessageSync.applyMutations: s = t[2]
-            var fromMeString = indexArray.getString(3); // WAWebInteractiveMessageSync.applyMutations: u = t[3]
-            var participantString = indexArray.getString(4); // WAWebInteractiveMessageSync.applyMutations: c = t[4]
-            var subIdString = indexArray.getString(5); // WAWebInteractiveMessageSync.applyMutations: d = t[5]
+            var chatJidString = indexArray.getString(1);
+            var messageId = indexArray.getString(2);
+            var fromMeString = indexArray.getString(3);
+            var participantString = indexArray.getString(4);
+            var subIdString = indexArray.getString(5);
 
-            // WAWebInteractiveMessageSync.applyMutations: if (!i || !s || !u || !c || !d) return a.malformedActionIndex()
             if (isNullOrEmpty(chatJidString) || isNullOrEmpty(messageId)
                     || isNullOrEmpty(fromMeString) || isNullOrEmpty(participantString)
                     || isNullOrEmpty(subIdString)) {
-                return malformedActionIndex(); // WAWebInteractiveMessageSync.applyMutations: return a.malformedActionIndex()
+                return malformedActionIndex();
             }
 
-            // WAWebInteractiveMessageSync.applyMutations: var m = n.interactiveMessageAction
-            // WAWebInteractiveMessageSync.applyMutations: if (m == null) return _++, malformedActionValue(a.collectionName)
             if (!(mutation.value().action().orElse(null) instanceof InteractiveMessageAction action)) {
-                return malformedActionValue(); // WAWebInteractiveMessageSync.applyMutations: _++ (malformed mutations counter — counter logging skipped)
+                return malformedActionValue();
             }
 
-            // WAWebInteractiveMessageSync.applyMutations: var S = syncKeyToMsgKey(i, s, u, c)
             var incomingMsgKey = SyncdIndexUtils.syncKeyToMsgKey(
                     client.store(), chatJidString, messageId, fromMeString, participantString
             );
-            if (incomingMsgKey.isEmpty()) { // WAWebInteractiveMessageSync.applyMutations: if (S == null) return a.malformedActionIndex()
-                return malformedActionIndex(); // WAWebInteractiveMessageSync.applyMutations: return a.malformedActionIndex()
+            if (incomingMsgKey.isEmpty()) {
+                return malformedActionIndex();
             }
 
-            // WAWebInteractiveMessageSync.applyMutations: var v = l.get(i) — resolved local chat JID from incomingRemoteToLocalChatId
             // ADAPTED: Cobalt resolves chat directly from the index JID without the
             // incomingRemoteToLocalChatId cache used by WAWebSyncdResolveMessages
-            var chatJid = Jid.of(chatJidString); // WAWebInteractiveMessageSync.applyMutations: index remote JID
+            var chatJid = Jid.of(chatJidString);
             var localChat = client.store().findChatByJid(chatJid); // ADAPTED: WAWebSyncdResolveMessages.resolveMessagesForMutations -> WAWebSyncdGetChat.resolveChatForMutationIndex
 
-            var agmId = action.agmId().orElse(null); // WAWebInteractiveMessageSync.applyMutations: var k = m.agmId
+            var agmId = action.agmId().orElse(null);
 
-            // WAWebInteractiveMessageSync.applyMutations: if (v == null) { ... return {actionState: Orphan, orphanModel: {modelId: S.toString(), modelType: SyncModelType.Msg}} }
             if (localChat.isEmpty()) {
-                // WAWebInteractiveMessageSync.applyMutations: k != null && v != null -> addGalaxyDisableCTAByAgmId (NOT reached here since v == null)
-                // WAWebInteractiveMessageSync.applyMutations: if (!Lid1X1MigrationUtils.isLidMigrated()) { R = getChatTable().get(S.remote.toString()); if (R != null) f++ } — fallback chat lookup for metric only, skipped in Cobalt
-                return MutationApplicationResult.orphan( // WAWebInteractiveMessageSync.applyMutations: {actionState: Orphan, orphanModel: {modelId: S.toString(), modelType: Msg}}
-                        SyncdIndexUtils.serializeMessageKey(incomingMsgKey.get()), // WAWebInteractiveMessageSync.applyMutations: S.toString()
-                        "Msg" // WAWebInteractiveMessageSync.applyMutations: SyncModelType.Msg
+                return MutationApplicationResult.orphan(
+                        SyncdIndexUtils.serializeMessageKey(incomingMsgKey.get()),
+                        "Msg"
                 );
             }
 
-            // WAWebInteractiveMessageSync.applyMutations: var L = nullthrows(syncKeyToMsgKey(v, s, u, c)) — local msg key using resolved chat
-            // WAWebInteractiveMessageSync.applyMutations: var E = p.find(e => e.startsWith(msgKeyToDbIdWithoutFromMeParticipant(L)))
             // ADAPTED: Cobalt uses findMessageById directly since messages are keyed by (chatJid, messageId)
             // Note: findMessageById(Chat, String) returns Optional<ChatMessageInfo>, which is the
             // equivalent of WA Web's MsgCollection.get(E) — newsletter messages do not flow through
             // this path.
             var maybeMessage = client.store().findMessageById(localChat.get(), messageId);
 
-            // WAWebInteractiveMessageSync.applyMutations: if (k != null && v != null) frontendFireAndForget("addGalaxyDisableCTAByAgmId", {agmId: k, chatId: v})
             // ADAPTED: Cobalt backend records the agmId->action state directly (no frontend bridge).
             // Snapshot the current states once so both agmId and messageId writes land atomically.
             var states = new HashMap<>(client.store().interactiveMessageStates()); // ADAPTED: unmodifiable map -> mutable snapshot
-            if (agmId != null) { // WAWebInteractiveMessageSync.applyMutations: if (k != null && v != null) — v != null enforced above
+            if (agmId != null) {
                 states.put("agmId|" + agmId, action); // ADAPTED: WAWebBackendApi.frontendFireAndForget("addGalaxyDisableCTAByAgmId", {agmId: k, chatId: v})
             }
 
-            // WAWebInteractiveMessageSync.applyMutations: if (E == null) return k != null && v != null ? {Success} : {Orphan, ...}
             if (maybeMessage.isEmpty()) {
-                if (agmId != null) { // WAWebInteractiveMessageSync.applyMutations: k != null && v != null — v != null enforced above
+                if (agmId != null) {
                     client.store().setInteractiveMessageStates(states); // ADAPTED: commit agmId state
-                    return MutationApplicationResult.success(); // WAWebInteractiveMessageSync.applyMutations: {actionState: Success}
+                    return MutationApplicationResult.success();
                 }
 
-                return MutationApplicationResult.orphan( // WAWebInteractiveMessageSync.applyMutations: {actionState: Orphan, orphanModel: {modelId: S.toString(), modelType: Msg}}
-                        SyncdIndexUtils.serializeMessageKey(incomingMsgKey.get()), // WAWebInteractiveMessageSync.applyMutations: S.toString()
-                        "Msg" // WAWebInteractiveMessageSync.applyMutations: SyncModelType.Msg
+                return MutationApplicationResult.orphan(
+                        SyncdIndexUtils.serializeMessageKey(incomingMsgKey.get()),
+                        "Msg"
                 );
             }
 
-            var chatMessage = maybeMessage.get(); // WAWebInteractiveMessageSync.applyMutations: var I = MsgCollection.get(E)
+            var chatMessage = maybeMessage.get();
 
-            // WAWebInteractiveMessageSync.applyMutations: if (I && m.type === DISABLE_CTA) { ... Success } else { y++, C.push..., Skipped }
             if (action.type() != InteractiveMessageActionMode.DISABLE_CTA) {
                 if (agmId != null) {
                     client.store().setInteractiveMessageStates(states); // ADAPTED: still commit agmId state before returning skipped
                 }
-                return MutationApplicationResult.skipped(); // WAWebInteractiveMessageSync.applyMutations: {actionState: Skipped}
+                return MutationApplicationResult.skipped();
             }
 
-            // WAWebInteractiveMessageSync.applyMutations: frontendFireAndForget("addGalaxyDisableCTAMessageId", {messageId: I.id.toString()})
             // ADAPTED: Cobalt backend records the messageId->action state and the full composite index->action state
-            var messageKeyId = chatMessage.key().id().orElse(messageId); // WAWebInteractiveMessageSync.applyMutations: I.id.toString()
+            var messageKeyId = chatMessage.key().id().orElse(messageId);
             states.put("messageId|" + messageKeyId, action); // ADAPTED: WAWebBackendApi.frontendFireAndForget("addGalaxyDisableCTAMessageId", {messageId: I.id.toString()})
             states.put( // ADAPTED: composite index key for per-subId lookups
                     "%s|%s|%s|%s|%s".formatted(chatJidString, messageId, fromMeString, participantString, subIdString),
                     action
             );
             client.store().setInteractiveMessageStates(states); // ADAPTED: commit all state writes
-            return MutationApplicationResult.success(); // WAWebInteractiveMessageSync.applyMutations: {actionState: Success}
+            return MutationApplicationResult.success();
         } catch (Exception e) {
-            // WAWebInteractiveMessageSync.applyMutations: catch (e) return {actionState: Failed}
-            return MutationApplicationResult.failed(); // WAWebInteractiveMessageSync.applyMutations: {actionState: Failed}
+            return MutationApplicationResult.failed();
         }
     }
 
@@ -302,10 +285,9 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
      */
     @WhatsAppWebExport(moduleName = "WAWebInteractiveMessageSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public InteractiveMessageAction buildDisableCTAAction(InteractiveMessageActionMode type, String agmId) {
-        // WAWebInteractiveMessageSync.$InteractiveMessageSync$p_1: var l = extends({type: n}, a != null ? {agmId: a} : {})
-        var builder = new InteractiveMessageActionBuilder().type(type); // WAWebInteractiveMessageSync.p_1: {type: n}
-        if (agmId != null) { // WAWebInteractiveMessageSync.p_1: a != null ? {agmId: a} : {}
-            builder.agmId(agmId); // WAWebInteractiveMessageSync.p_1: {agmId: a}
+        var builder = new InteractiveMessageActionBuilder().type(type);
+        if (agmId != null) {
+            builder.agmId(agmId);
         }
         return builder.build();
     }

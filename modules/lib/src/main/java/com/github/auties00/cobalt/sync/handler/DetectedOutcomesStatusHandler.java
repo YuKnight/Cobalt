@@ -59,7 +59,7 @@ public final class DetectedOutcomesStatusHandler implements WebAppStateActionHan
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDetectedOutcomesStatusSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return DetectedOutcomesStatusAction.ACTION_NAME; // WAWebDetectedOutcomesStatusSync.getAction
+        return DetectedOutcomesStatusAction.ACTION_NAME;
     }
 
     /**
@@ -71,18 +71,16 @@ public final class DetectedOutcomesStatusHandler implements WebAppStateActionHan
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDetectedOutcomesStatusSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return DetectedOutcomesStatusAction.COLLECTION_NAME; // WAWebDetectedOutcomesStatusSync — this.collectionName
+        return DetectedOutcomesStatusAction.COLLECTION_NAME;
     }
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote WAWebDetectedOutcomesStatusSync.getVersion — returns {@code 1}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDetectedOutcomesStatusSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return DetectedOutcomesStatusAction.ACTION_VERSION; // WAWebDetectedOutcomesStatusSync.getVersion
+        return DetectedOutcomesStatusAction.ACTION_VERSION;
     }
 
     /**
@@ -95,7 +93,7 @@ public final class DetectedOutcomesStatusHandler implements WebAppStateActionHan
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDetectedOutcomesStatusSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebDetectedOutcomesStatusSync.applyMutations
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -121,12 +119,12 @@ public final class DetectedOutcomesStatusHandler implements WebAppStateActionHan
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDetectedOutcomesStatusSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        if (mutation.operation() != SyncdOperation.SET) { // WAWebDetectedOutcomesStatusSync.applyMutations: else branch — i++, return {actionState: Unsupported}
+        if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof DetectedOutcomesStatusAction action)) { // WAWebDetectedOutcomesStatusSync.applyMutations: var l = r.detectedOutcomesStatusAction; (l == null) check
-            return MutationApplicationResult.malformed(); // WAWebDetectedOutcomesStatusSync.applyMutations: a++, malformedActionValue(t.collectionName)
+        if (!(mutation.value().action().orElse(null) instanceof DetectedOutcomesStatusAction action)) {
+            return MutationApplicationResult.malformed();
         }
 
         // ADAPTED: WAWebDetectedOutcomesStatusSync.applyMutations: (l?.isEnabled) == null -> malformedActionValue
@@ -134,6 +132,6 @@ public final class DetectedOutcomesStatusHandler implements WebAppStateActionHan
         // nullable boolean accessor convention, so a null protobuf field is treated as false rather
         // than malformed. This matches Cobalt's broader policy for Boolean-backed action fields.
         client.store().setDetectedOutcomesEnabled(action.isEnabled()); // ADAPTED: WAWebDetectedOutcomesStatusSync.applyMutations: frontendSendAndReceive("ctwaDetectedOutcomeOnboardingStatusUpdate", {onboardingStatus: l.isEnabled}) — Cobalt stores locally instead of sending to frontend
-        return MutationApplicationResult.success(); // WAWebDetectedOutcomesStatusSync.applyMutations: return {actionState: Success}
+        return MutationApplicationResult.success();
     }
 }

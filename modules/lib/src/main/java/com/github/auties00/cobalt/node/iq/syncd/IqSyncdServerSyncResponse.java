@@ -19,7 +19,7 @@ import java.util.Optional;
  * @implNote {@code WAWebSyncdServerSync.serverSync} encodes the
  *           failure modes as either fatal-vs-retryable based on the
  *           top-level error code, or as per-collection state on
- *           success; Cobalt collapses to the standard
+ *           success. Cobalt collapses to the standard
  *           {@code Success} (carrying the raw node for downstream
  *           parsing) / {@code ClientError} / {@code ServerError}
  *           split.
@@ -31,10 +31,10 @@ public sealed interface IqSyncdServerSyncResponse extends IqOperation.Response
      * Tries each {@link IqSyncdServerSyncResponse} variant in priority order and returns
      * the first that parses cleanly.
      *
-     * @param node    the inbound IQ stanza received from the relay;
-     *                never {@code null}
-     * @param request the original outbound stanza — used to validate
-     *                echoed identifiers; never {@code null}
+     * @param node    the inbound IQ stanza received from the relay.
+     *                Never {@code null}
+     * @param request the original outbound stanza. Used to validate
+     *                echoed identifiers. Never {@code null}
      * @return an {@link Optional} carrying the parsed variant, or
      *         {@link Optional#empty()} when no documented variant
      *         matched the stanza shape
@@ -57,7 +57,7 @@ public sealed interface IqSyncdServerSyncResponse extends IqOperation.Response
     }
 
     /**
-     * The {@code Success} reply variant — the relay returned the
+     * The {@code Success} reply variant. The relay returned the
      * per-collection sync state, projected into a typed list of
      * {@link IqSyncdServerSyncResponseCollection} entries.
      */
@@ -65,7 +65,7 @@ public sealed interface IqSyncdServerSyncResponse extends IqOperation.Response
     @WhatsAppWebModule(moduleName = "WAWebSyncdResponseParser")
     final class Success implements IqSyncdServerSyncResponse {
         /**
-         * The list of typed collection projections — one per
+         * The list of typed collection projections. One per
          * {@code <collection/>} child of the inbound
          * {@code <sync/>} envelope.
          */
@@ -74,7 +74,7 @@ public sealed interface IqSyncdServerSyncResponse extends IqOperation.Response
         /**
          * Constructs a new successful reply.
          *
-         * @param collections the typed collection projections; never
+         * @param collections the typed collection projections. Never
          *                    {@code null}, possibly empty
          * @throws NullPointerException if {@code collections} is
          *                              {@code null}
@@ -87,7 +87,7 @@ public sealed interface IqSyncdServerSyncResponse extends IqOperation.Response
         /**
          * Returns the typed list of per-collection projections.
          *
-         * @return an unmodifiable view of the collections; never
+         * @return an unmodifiable view of the collections. Never
          *         {@code null}, possibly empty
          */
         public java.util.SequencedCollection<IqSyncdServerSyncResponseCollection> collections() {
@@ -133,7 +133,7 @@ public sealed interface IqSyncdServerSyncResponse extends IqOperation.Response
          * Projects a single {@code <collection/>} child into a typed
          * {@link IqSyncdServerSyncResponseCollection}.
          *
-         * @param child the {@code <collection/>} node; never
+         * @param child the {@code <collection/>} node. Never
          *              {@code null}
          * @return an {@link Optional} carrying the projection, or
          *         empty when the child lacks a {@code name} attribute
@@ -142,7 +142,7 @@ public sealed interface IqSyncdServerSyncResponse extends IqOperation.Response
          *           the inline state classifier maps
          *           {@code type="error"} + {@code <error code/>} +
          *           {@code has_more_patches} onto the
-         *           {@link IqSyncdServerSyncCollectionState} enum;
+         *           {@link IqSyncdServerSyncCollectionState} enum.
          *           Cobalt mirrors the same lookup verbatim.
          */
         private static Optional<IqSyncdServerSyncResponseCollection> parseCollection(Node child) {
@@ -213,7 +213,7 @@ public sealed interface IqSyncdServerSyncResponse extends IqOperation.Response
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected the
+     * The {@code ClientError} reply variant. The relay rejected the
      * sync as fatal. Codes {@code 400, 404, 405, 406} map to
      * {@code SyncdFatalError} in WA Web (no retry).
      */
@@ -233,7 +233,7 @@ public sealed interface IqSyncdServerSyncResponse extends IqOperation.Response
          * Constructs a new client-error reply.
          *
          * @param errorCode the numeric error code
-         * @param errorText the optional human-readable text; may be
+         * @param errorText the optional human-readable text. May be
          *                  {@code null}
          */
         public ClientError(int errorCode, String errorText) {
@@ -306,9 +306,9 @@ public sealed interface IqSyncdServerSyncResponse extends IqOperation.Response
     }
 
     /**
-     * The {@code ServerError} reply variant — the relay encountered a
+     * The {@code ServerError} reply variant. The relay encountered a
      * transient internal failure (codes {@code >= 500}) while
-     * processing the sync; WA Web maps this to
+     * processing the sync. WA Web maps this to
      * {@code SyncdRetryableError} which the sync loop retries with
      * exponential backoff.
      */
@@ -328,7 +328,7 @@ public sealed interface IqSyncdServerSyncResponse extends IqOperation.Response
          * Constructs a new server-error reply.
          *
          * @param errorCode the numeric error code
-         * @param errorText the optional human-readable text; may be
+         * @param errorText the optional human-readable text. May be
          *                  {@code null}
          */
         public ServerError(int errorCode, String errorText) {

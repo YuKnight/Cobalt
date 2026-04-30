@@ -50,65 +50,41 @@ import java.util.concurrent.StructuredTaskScope.Subtask;
 @WhatsAppWebModule(moduleName = "WAWebGetIdentityKeysJob")
 public final class DevicePreKeyHandler {
     /**
-     * Maximum number of devices included in a single pre-key IQ query.
+     * Maximum number of devices included in a single pre-key IQ.
      *
-     * <p>WA Web does not impose a per-IQ device cap of its own: the smax schema
-     * {@code WASmaxOutPreKeysFetchKeyBundlesRequest} declares the {@code <user>}
-     * children as {@code REPEATED_CHILD(..., 1, 1e5)}, i.e. between 1 and 100,000
-     * users per request, and {@code WAWebFetchPrekeysJob.fetchPrekeys} sends every
-     * caller-provided device in a single IQ. Cobalt batches at 100 to keep individual
-     * request payloads manageable and to fan out across virtual threads.
-     *
-     * @implNote NO_WA_BASIS: the {@code length} entry indexed against
-     * {@code WAWebFetchPrekeysJob} is a static-analysis artefact (there is no
-     * exported numeric constant; the bundle contains {@code l.length===0} array
-     * checks on local arrays). The real upstream cap is {@code 1e5} from the smax
-     * request mixin; Cobalt's 100 is a prudence ceiling chosen so failures affect
-     * fewer devices and so the parallel scope has multiple subtasks to dispatch.
+     * <p>WA Web's smax schema accepts up to {@code 1e5} users per request and Cobalt
+     * caps at 100 so a partial failure only affects a small batch and the parallel
+     * scope has more subtasks to dispatch.
      */
     private static final int MAX_DEVICES_PER_QUERY = 100;
 
     /**
-     * XML namespace for pre-key and identity-key IQs.
-     *
-     * @implNote WAWebFetchPrekeysJob.fetchPrekeys: uses {@code xmlns="encrypt"} on the IQ.
+     * XML namespace used on pre-key and identity-key IQs.
      */
     private static final String ENCRYPT_XMLNS = "encrypt";
 
     /**
-     * The WhatsApp client providing network access and the Signal store.
+     * The WhatsApp client used for store access and IQ dispatch.
      */
     private final WhatsAppClient client;
 
     /**
-     * The Signal session cipher used to install freshly fetched pre-key bundles.
-     *
-     * @implNote WAWebProcessKeyBundle: converts raw pre-key bundle bytes into an initialised
-     * Signal session; Cobalt delegates that step to {@link SignalSessionCipher#process}.
+     * The Signal session cipher used to materialise sessions from pre-key bundles.
      */
     private final SignalSessionCipher sessionCipher;
 
     /**
-     * Tracks in-flight prekey fetch requests by device JID to prevent duplicate concurrent
-     * session establishment requests.
-     *
-     * <p>When multiple message sends target the same device simultaneously, this ensures
-     * only one IQ is dispatched and other callers wait on the same future.
-     *
-     * @implNote WAWebManageE2ESessionsJob.ensureE2ESessions: deduplicates concurrent
-     * {@code getE2ESession} calls using a module-level WaitableMap; Cobalt uses a
-     * {@link ConcurrentHashMap} keyed by device JID.
+     * Tracks in-flight prekey fetches by device JID so concurrent senders to the same
+     * device share a single IQ.
      */
     private final ConcurrentHashMap<Jid, CompletableFuture<SignalPreKeyBundle>> inFlightRequests = new ConcurrentHashMap<>();
 
     /**
-     * Creates a new pre-key handler.
+     * Constructs a new pre-key handler.
      *
-     * @param client        the WhatsApp client for network and store access
-     * @param sessionCipher the Signal session cipher for installing pre-key bundles
+     * @param client        the WhatsApp client
+     * @param sessionCipher the Signal session cipher
      * @throws NullPointerException if any argument is {@code null}
-     * @implNote ADAPTED: WAWebFetchPrekeysJob and WAWebManageE2ESessionsJob access store and
-     * network via module-level imports; Cobalt injects them through the constructor.
      */
     @WhatsAppWebExport(moduleName = "WAWebManageE2ESessionsJob",
             exports = "ensureE2ESessions",
@@ -196,8 +172,6 @@ public final class DevicePreKeyHandler {
             return new PreKeyFetchResult(Map.of(), 0);
         }
 
-        // WAWebManageE2ESessionsJob.ensureE2ESessions
-        // Separates devices into those with in-flight requests and those needing new fetches
         var devicesNeedingFetch = new ArrayList<Jid>();
         var existingFutures = new HashMap<Jid, CompletableFuture<SignalPreKeyBundle>>();
 
@@ -210,8 +184,6 @@ public final class DevicePreKeyHandler {
             }
         }
 
-        // WAWebManageE2ESessionsJob.ensureE2ESessions
-        // Registers new futures for devices about to be fetched, handling race conditions
         var newFutures = new HashMap<Jid, CompletableFuture<SignalPreKeyBundle>>();
         for (var deviceJid : devicesNeedingFetch) {
             var future = new CompletableFuture<SignalPreKeyBundle>();
@@ -230,8 +202,6 @@ public final class DevicePreKeyHandler {
             var devicesToFetch = new ArrayList<>(newFutures.keySet());
             var batches = batchDevices(devicesToFetch);
 
-            // WAWebFetchPrekeysJob.fetchPrekeys
-            // Fans out one virtual-thread subtask per batch to dispatch IQs in parallel
             try (var scope = StructuredTaskScope.open()) {
                 var subtasks = new ArrayList<Subtask<PreKeyBatchResult>>();
                 for (var batch : batches) {
@@ -242,8 +212,6 @@ public final class DevicePreKeyHandler {
                 for (var subtask : subtasks) {
                     if (subtask.state() == Subtask.State.SUCCESS) {
                         var batchResult = subtask.get();
-                        // WAWebProcessKeyBundle.processKeyBundles: aggregates depletedPrekeyCount
-                        // across batches (E += (N=w.depletedPrekeyCount)!=null?N:0)
                         depletedPrekeyCount += batchResult.depletedPrekeyCount();
                         var fetchedBundles = batchResult.bundles();
                         allBundles.putAll(fetchedBundles);
@@ -257,8 +225,7 @@ public final class DevicePreKeyHandler {
                     }
                 }
 
-                // WAWebFetchPrekeysJob.fetchPrekeys
-                // Completes any remaining futures with null when the server omitted the device
+                // Devices whose entry the server omitted resolve to a null bundle.
                 for (var entry : newFutures.entrySet()) {
                     if (!entry.getValue().isDone()) {
                         entry.getValue().complete(null);
@@ -277,10 +244,7 @@ public final class DevicePreKeyHandler {
             }
         }
 
-        // WAWebManageE2ESessionsJob.ensureE2ESessions
-        // Waits for previously in-flight requests to complete so deduplicated callers get the same bundle.
-        // Depleted counts are NOT re-attributed here: WA Web dedupes via its WaitableMap so only the
-        // originating caller contributes to the depletion metric for a given device.
+        // Depleted counts are not re-attributed here: only the originating caller counts.
         for (var entry : existingFutures.entrySet()) {
             try {
                 var bundle = entry.getValue().join();
@@ -288,12 +252,11 @@ public final class DevicePreKeyHandler {
                     allBundles.put(entry.getKey(), bundle);
                 }
             } catch (Exception e) {
-                // Failed in-flight fetch: the device simply will not have a bundle
+                // A failed in-flight fetch leaves the device without a bundle.
             }
         }
 
-        // WAWebProcessKeyBundle.processKeyBundle
-        // Sorts bundles so primary devices are processed before companions to avoid races on shared state
+        // Primary devices are installed before companions to avoid shared-state races.
         var sortedEntries = allBundles.entrySet().stream()
                 .sorted((a, b) -> {
                     var deviceA = a.getKey().device();
@@ -306,13 +269,10 @@ public final class DevicePreKeyHandler {
                 })
                 .toList();
 
-        // WAWebProcessKeyBundle.processKeyBundle
-        // Installs each bundle into the Signal session store in sorted order
         for (var entry : sortedEntries) {
             var deviceJid = entry.getKey();
             var bundle = entry.getValue();
-            var address = deviceJid.toSignalAddress();
-            sessionCipher.process(address, bundle);
+            sessionCipher.process(deviceJid.toSignalAddress(), bundle);
         }
 
         return new PreKeyFetchResult(allBundles, depletedPrekeyCount);
@@ -460,9 +420,7 @@ public final class DevicePreKeyHandler {
             try {
                 var deviceJid = userNode.getRequiredAttributeAsJid("jid");
 
-                // WAWebProcessKeyBundle.splitKeyBundles: !i.key && !i.wid.isBot()
-                // Counts devices whose server-side one-time pre-key pool is depleted,
-                // excluding bot JIDs which never carry one-time pre-keys.
+                // Bot JIDs never carry one-time pre-keys and are excluded from the count.
                 if (userNode.getChild("key").isEmpty() && !deviceJid.isBot()) {
                     depletedPrekeyCount++;
                 }
@@ -496,9 +454,7 @@ public final class DevicePreKeyHandler {
             exports = "fetchPrekeys",
             adaptation = WhatsAppAdaptation.DIRECT)
     private SignalPreKeyBundle parseUserPreKeyBundle(Node userNode) {
-        // WAWebFetchPrekeysJob.fetchPrekeys via WASmaxInPreKeysRegistrationIDMixin:
-        // <registration> content is exactly 4 raw bytes parsed as a big-endian
-        // unsigned integer, NOT an ASCII number string.
+        // The registration id is 4 raw big-endian unsigned bytes, not an ASCII number.
         var registrationId = userNode.getChild("registration")
                 .flatMap(Node::toContentBytes)
                 .map(bytes -> convertBytesToUint(bytes, 4))
@@ -512,8 +468,7 @@ public final class DevicePreKeyHandler {
         var signedPreKeyNode = userNode.getChild("skey")
                 .orElseThrow(() -> new IllegalArgumentException("Missing signed prekey"));
 
-        // WAWebFetchPrekeysJob.fetchPrekeys via WASmaxInPreKeysKeyIDMixin:
-        // <id> content is exactly 3 raw bytes parsed as a big-endian unsigned integer.
+        // Pre-key ids are 3 raw big-endian unsigned bytes.
         var signedPreKeyId = signedPreKeyNode.getChild("id")
                 .flatMap(Node::toContentBytes)
                 .map(bytes -> convertBytesToUint(bytes, 3))
@@ -536,12 +491,10 @@ public final class DevicePreKeyHandler {
                 .signedPreKeySignature(signedPreKeySignature)
                 .identityKey(identityKey);
 
-        // WAWebFetchPrekeysJob.fetchPrekeys
-        // One-time pre-key is optional: when the server ran out, only skey is returned
+        // The one-time pre-key is optional. When the server's pool is empty only
+        // skey is returned.
         var preKeyNode = userNode.getChild("key");
         if (preKeyNode.isPresent()) {
-            // WAWebFetchPrekeysJob.fetchPrekeys via WASmaxInPreKeysKeyIDMixin:
-            // <id> content is 3 raw bytes parsed as a big-endian unsigned integer.
             var preKeyId = preKeyNode.get().getChild("id")
                     .flatMap(Node::toContentBytes)
                     .map(bytes -> convertBytesToUint(bytes, 3))
@@ -632,8 +585,6 @@ public final class DevicePreKeyHandler {
             exports = "ensureE2ESessions",
             adaptation = WhatsAppAdaptation.DIRECT)
     public int ensureSessions(Collection<Jid> deviceJids) {
-        // WAWebManageE2ESessionsJob.ensureE2ESessions
-        // Only fetches pre-keys for devices without an existing Signal session
         var devicesNeedingSessions = findDevicesNeedingSessions(deviceJids);
         if (devicesNeedingSessions.isEmpty()) {
             return 0;
@@ -669,9 +620,6 @@ public final class DevicePreKeyHandler {
 
         var store = client.store();
 
-        // WAWebGetIdentityKeysJob.getAndStoreIdentityKeys
-        // Filters users whose primary device already has a stored identity key via
-        // bulkLoadIdentityKey (mirrored here as a per-address findIdentityByAddress lookup)
         var usersNeedingKeys = new ArrayList<Jid>();
         for (var userJid : userJids) {
             var primaryDeviceJid = userJid.toUserJid().withDevice(0);
@@ -685,8 +633,6 @@ public final class DevicePreKeyHandler {
             return;
         }
 
-        // WAWebGetIdentityKeysJob.getAndStoreIdentityKeys
-        // Batches users and fans out one virtual-thread subtask per batch
         var batches = batchUsers(usersNeedingKeys, MAX_DEVICES_PER_QUERY);
 
         try (var scope = StructuredTaskScope.open()) {
@@ -793,8 +739,6 @@ public final class DevicePreKeyHandler {
 
                 var address = deviceJid.toSignalAddress();
                 var identityKey = SignalIdentityPublicKey.ofDirect(identityKeyBytes);
-                // WAWebGetIdentityKeysJob.getAndStoreIdentityKeys: bulkCreateIdentity ->
-                // WAWebSignalProtocolStore.saveIdentity persists the identity key
                 store.saveIdentity(address, identityKey);
 
             } catch (Exception e) {

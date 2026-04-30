@@ -58,11 +58,9 @@ public final class SmaxGroupsDeleteParentGroupRequest implements SmaxOperation.R
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsDeleteParentGroupRequest",
             exports = "makeDeleteParentGroupRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutGroupsDeleteParentGroupRequest: smax("delete_parent", null)
         var deleteParentNode = new NodeBuilder()
                 .description("delete_parent")
                 .build();
-        // WASmaxOutGroupsBaseSetGroupMixin + WASmaxOutGroupsBaseIQSetRequestMixin
         return new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "w:g2")

@@ -40,9 +40,9 @@ public final class SmaxCoexistenceOffboardingNotificationProviderInfo {
     /**
      * Constructs a new provider-info projection.
      *
-     * @param logoUrl the optional logo-URL bytes; may be {@code null}
-     * @param name    the optional name bytes; may be {@code null}
-     * @param id      the optional provider id; may be {@code null}
+     * @param logoUrl the optional logo-URL bytes. May be {@code null}
+     * @param name    the optional name bytes. May be {@code null}
+     * @param id      the optional provider id. May be {@code null}
      */
     public SmaxCoexistenceOffboardingNotificationProviderInfo(byte[] logoUrl, byte[] name, Integer id) {
         this.logoUrl = logoUrl;
@@ -82,7 +82,7 @@ public final class SmaxCoexistenceOffboardingNotificationProviderInfo {
      * parent node.
      *
      * @param parent the parent node carrying the {@code <provider_info/>}
-     *               child; never {@code null}
+     *               child. Never {@code null}
      * @return an {@link Optional} carrying the parsed projection, or
      *         empty when the child is missing
      * @throws NullPointerException if {@code parent} is {@code null}

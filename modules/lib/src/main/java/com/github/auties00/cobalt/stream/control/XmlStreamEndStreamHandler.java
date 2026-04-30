@@ -62,8 +62,6 @@ public final class XmlStreamEndStreamHandler implements SocketStream.Handler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebCommsHandleLoggedInStanza", exports = "handleLoggedInStanza", adaptation = WhatsAppAdaptation.ADAPTED)
     public void handle(Node node) {
-        // WAWebCommsHandleLoggedInStanza.handleLoggedInStanza: case "xmlstreamend" -> WALogger.LOG("Comms.handleStanza received xmlstreamend, return NO_ACK")
         LOGGER.log(System.Logger.Level.INFO, "Comms.handleStanza received xmlstreamend, return NO_ACK");
-        // WAWebCommsHandleLoggedInStanza.handleLoggedInStanza: case "xmlstreamend" -> return "NO_ACK" (no ack node is dispatched)
     }
 }

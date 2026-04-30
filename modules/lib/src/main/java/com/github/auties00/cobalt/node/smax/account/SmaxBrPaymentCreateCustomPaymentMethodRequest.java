@@ -14,7 +14,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps the
+ * The outbound stanza variant. Wraps the
  * {@code <custom_payment_method/>} child inside an
  * {@code <iq xmlns="w:pay" type="set" to="s.whatsapp.net">} envelope
  * with an {@code <account action="create-custom-payment-method"
@@ -32,7 +32,7 @@ public final class SmaxBrPaymentCreateCustomPaymentMethodRequest implements Smax
     private final String accountDeviceId;
 
     /**
-     * The custom-payment-method type — one of
+     * The custom-payment-method type. One of
      * {@code "PAYONDELIVERY"} or {@code "PIXKEY"}.
      */
     private final String customPaymentMethodType;
@@ -45,7 +45,7 @@ public final class SmaxBrPaymentCreateCustomPaymentMethodRequest implements Smax
 
     /**
      * The optional {@code flow} attribute on
-     * {@code <custom_payment_method/>} — one of {@code "P2M"} or
+     * {@code <custom_payment_method/>}. One of {@code "P2M"} or
      * {@code "P2P"}.
      */
     private final String customPaymentMethodFlow;
@@ -145,20 +145,6 @@ public final class SmaxBrPaymentCreateCustomPaymentMethodRequest implements Smax
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         the {@code <account>} → {@code <custom_payment_method>}
      *         payload
-     *
-     * @implNote {@code WASmaxOutBrPaymentCreateCustomPaymentMethodRequest.makeCreateCustomPaymentMethodRequest}
-     *           composes
-     *           {@code WASmaxOutBrPaymentSetIQMixin}
-     *           ({@code xmlns="w:pay"}, {@code type="set"},
-     *           {@code to=S_WHATSAPP_NET}, {@code id=generateId()})
-     *           over an {@code <account
-     *           action="create-custom-payment-method"
-     *           device_id=CUSTOM_STRING(t) country="BR">} wrapper
-     *           around a
-     *           {@code <custom_payment_method type
-     *           update?  flow?>} child plus a
-     *           {@code WASmaxOutBrPaymentCustomPaymentMethodMetaDataInfoMixin}
-     *           overlay.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutBrPaymentCreateCustomPaymentMethodRequest",

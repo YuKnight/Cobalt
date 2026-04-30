@@ -1,22 +1,27 @@
 package com.github.auties00.cobalt.wam.privatestats.ed25519;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+
 /**
- * Reduction of arbitrary-length unsigned integers modulo the Ed25519 group
- * order
+ * Reduction of arbitrary-length unsigned integers modulo the Ed25519
+ * group order
  * {@code L = 2^252 + 27742317777372353535851937790883648493}.
  *
- * <p>Used to bring a 64-byte hash output (or any wide intermediate scalar)
- * into the canonical {@code [0, L)} range required for scalar multiplication
- * on the prime-order subgroup. Without this reduction, scalar multiplication
- * is still defined but no longer constant-time and may leak information
- * through subgroup-component drift.
+ * <p>Used to bring a 64-byte hash output, or any wide intermediate
+ * scalar, into the canonical {@code [0, L)} range required for
+ * scalar multiplication on the prime-order subgroup. Without this
+ * reduction, scalar multiplication is still defined but no longer
+ * constant-time and may leak information through subgroup-component
+ * drift.
  *
  * <p>Mirrors {@code lowlevel.modL} and {@code lowlevel.reduce} from
- * {@code tweetnacl-js} byte for byte. The work buffer is {@code long[]}
- * rather than {@code Float64Array} because intermediate values can go
- * negative; Java's arithmetic right shift sign-extends correctly to match
- * {@code Math.floor(v / 256)} on {@code Number} values.
+ * {@code tweetnacl-js} byte for byte. The work buffer is
+ * {@code long[]} rather than {@code Float64Array} because
+ * intermediate values can go negative. Java's arithmetic right shift
+ * sign-extends correctly to match {@code Math.floor(v / 256)} on
+ * {@code Number} values.
  */
+@WhatsAppWebModule(moduleName = "WACryptoPrimitives")
 public final class Ed25519Scalar {
     /**
      * The Ed25519 group order {@code L} as 32 little-endian bytes.

@@ -13,28 +13,16 @@ import java.util.Optional;
 
 /**
  * Sealed family of outbound ack variants the client emits in
- * response to an {@link SmaxMessageDeliverNewsletterResponse} delivery — either a positive
+ * response to an {@link SmaxMessageDeliverNewsletterResponse} delivery. Either a positive
  * {@link SuccessAck} or a negative {@link ErrorAck} carrying the
  * fixed {@code error="406"} marker.
- *
- * @implNote {@code WASmaxMessageDeliverNewsletterRPC.receiveNewsletterRPC}
- *           returns a closure pair
- *           ({@code makeNewsletterResponseSuccess},
- *           {@code makeNewsletterResponseError}) that compose
- *           {@code WASmaxOutMessageDeliverCommonAckMixin} over a
- *           bare {@code <ack/>} child (success) or one with
- *           {@code error="406"} (error).
  */
 public sealed interface SmaxMessageDeliverNewsletterAcknowledgement extends SmaxOperation.Request
         permits SmaxMessageDeliverNewsletterAcknowledgement.SuccessAck, SmaxMessageDeliverNewsletterAcknowledgement.ErrorAck {
 
     /**
-     * The positive acknowledgement variant — the client successfully
+     * The positive acknowledgement variant. The client successfully
      * decoded and persisted the inbound newsletter message.
-     *
-     * @implNote {@code WASmaxOutMessageDeliverNewsletterResponseSuccess.makeNewsletterResponseSuccess}
-     *           composes {@code WASmaxOutMessageDeliverCommonAckMixin}
-     *           over a bare {@code <ack/>} child.
      */
     @WhatsAppWebModule(moduleName = "WASmaxOutMessageDeliverNewsletterResponseSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxOutMessageDeliverCommonAckMixin")
@@ -102,18 +90,12 @@ public sealed interface SmaxMessageDeliverNewsletterAcknowledgement extends Smax
          * Builds the outbound positive ack stanza.
          *
          * @param inbound the {@code <message/>} stanza being
-         *                acknowledged; never {@code null} — required
+         *                acknowledged; never {@code null}. Required
          *                so the relay can correlate the ack back to
          *                the source delivery
          * @return a {@link NodeBuilder} carrying the ack envelope
          * @throws NullPointerException if {@code inbound} is
          *                              {@code null}
-         *
-         * @implNote {@code WASmaxOutMessageDeliverNewsletterResponseSuccess.makeNewsletterResponseSuccess}
-         *           wraps {@code WASmaxOutMessageDeliverCommonAckMixin}
-         *           around a bare {@code <ack/>} child, producing
-         *           {@code <ack to=JID(from) class="message"
-         *           id=STANZA_ID(id) type=CUSTOM_STRING(type)/>}.
          */
         @WhatsAppWebExport(moduleName = "WASmaxOutMessageDeliverNewsletterResponseSuccess",
                 exports = "makeNewsletterResponseSuccess",
@@ -156,13 +138,9 @@ public sealed interface SmaxMessageDeliverNewsletterAcknowledgement extends Smax
     }
 
     /**
-     * The negative acknowledgement variant — emitted by the client
+     * The negative acknowledgement variant. Emitted by the client
      * when the inbound newsletter message could not be processed
      * (decryption failure, malformed payload, schema mismatch).
-     *
-     * @implNote {@code WASmaxOutMessageDeliverNewsletterResponseError.makeNewsletterResponseError}
-     *           composes {@code WASmaxOutMessageDeliverCommonAckMixin}
-     *           over an {@code <ack error="406"/>} child.
      */
     @WhatsAppWebModule(moduleName = "WASmaxOutMessageDeliverNewsletterResponseError")
     @WhatsAppWebModule(moduleName = "WASmaxOutMessageDeliverCommonAckMixin")
@@ -235,10 +213,6 @@ public sealed interface SmaxMessageDeliverNewsletterAcknowledgement extends Smax
          *         with the fixed {@code error="406"} attribute
          * @throws NullPointerException if {@code inbound} is
          *                              {@code null}
-         *
-         * @implNote {@code WASmaxOutMessageDeliverNewsletterResponseError.makeNewsletterResponseError}
-         *           wraps {@code WASmaxOutMessageDeliverCommonAckMixin}
-         *           around an {@code <ack error="406"/>} child.
          */
         @WhatsAppWebExport(moduleName = "WASmaxOutMessageDeliverNewsletterResponseError",
                 exports = "makeNewsletterResponseError",

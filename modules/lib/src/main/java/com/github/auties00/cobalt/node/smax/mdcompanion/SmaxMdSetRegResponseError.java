@@ -12,7 +12,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The error reply variant — emitted when the companion declines
+ * The error reply variant. Emitted when the companion declines
  * to complete the link.
  *
  * @implNote {@code WASmaxOutMdSetRegResponseError.makeSetRegResponseError}

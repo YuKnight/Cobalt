@@ -29,7 +29,7 @@ public sealed interface SmaxPsaChatBlockSetResponse extends SmaxOperation.Respon
      *
      * @param node    the inbound IQ stanza received from the relay;
      *                never {@code null}
-     * @param request the original outbound stanza — used to validate
+     * @param request the original outbound stanza. Used to validate
      *                echoed identifiers; never {@code null}
      * @return an {@link Optional} carrying the parsed variant, or
      *         {@link Optional#empty()} when no documented variant
@@ -49,14 +49,8 @@ public sealed interface SmaxPsaChatBlockSetResponse extends SmaxOperation.Respon
     }
 
     /**
-     * The {@code Success} reply variant — the relay accepted the
+     * The {@code Success} reply variant. The relay accepted the
      * write and echoed back the resulting blocking status.
-     *
-     * @implNote {@code WASmaxInPsaChatBlockSetResponseSuccess.parseChatBlockSetResponseSuccess}
-     *           validates the IQ-result envelope, asserts the
-     *           {@code <blocking>} child exists, then projects its
-     *           {@code status} attribute through
-     *           {@code ENUM_BLOCKED_UNBLOCKED}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInPsaChatBlockSetResponseSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxInPsaIQResultResponseMixin")
@@ -143,7 +137,7 @@ public sealed interface SmaxPsaChatBlockSetResponse extends SmaxOperation.Respon
     }
 
     /**
-     * The {@code ServerError} reply variant — the relay encountered an
+     * The {@code ServerError} reply variant. The relay encountered an
      * internal failure while processing the request.
      *
      * <p>The PSA domain projects four documented {@code 5xx}/{@code 4xx}

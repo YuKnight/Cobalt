@@ -69,7 +69,7 @@ public final class ChatAssignmentHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebChatAssignmentSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return ChatAssignmentAction.ACTION_NAME; // WAWebChatAssignmentSync.getAction
+        return ChatAssignmentAction.ACTION_NAME;
     }
 
     /**
@@ -82,7 +82,7 @@ public final class ChatAssignmentHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebChatAssignmentSync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return ChatAssignmentAction.COLLECTION_NAME; // WAWebChatAssignmentSync.collectionName
+        return ChatAssignmentAction.COLLECTION_NAME;
     }
 
     /**
@@ -95,7 +95,7 @@ public final class ChatAssignmentHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebChatAssignmentSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return ChatAssignmentAction.ACTION_VERSION; // WAWebChatAssignmentSync.getVersion
+        return ChatAssignmentAction.ACTION_VERSION;
     }
 
     /**
@@ -111,7 +111,7 @@ public final class ChatAssignmentHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebChatAssignmentSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebChatAssignmentSync.applyMutations
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -138,46 +138,43 @@ public final class ChatAssignmentHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebChatAssignmentSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        try { // WAWebChatAssignmentSync.applyMutations: try { ... } catch(e) { return {actionState: Failed} }
-            var indexArray = JSON.parseArray(mutation.index()); // WAWebChatAssignmentSync.applyMutations: var t = e.indexParts
-            var chatJidString = indexArray.getString(1); // WAWebChatAssignmentSync.applyMutations: n = t[1]
-            if (chatJidString == null || chatJidString.isEmpty()) { // WAWebChatAssignmentSync.applyMutations: if (!n) return a.malformedActionIndex()
-                return malformedActionIndex(); // WAWebChatAssignmentSync.applyMutations: return a.malformedActionIndex()
+        try {
+            var indexArray = JSON.parseArray(mutation.index());
+            var chatJidString = indexArray.getString(1);
+            if (chatJidString == null || chatJidString.isEmpty()) {
+                return malformedActionIndex();
             }
 
-            if (mutation.operation() != SyncdOperation.SET) { // WAWebChatAssignmentSync.applyMutations: if (e.operation === "set") { ... } return {actionState: Unsupported}
-                return MutationApplicationResult.unsupported(); // WAWebChatAssignmentSync.applyMutations: return {actionState: Unsupported}
+            if (mutation.operation() != SyncdOperation.SET) {
+                return MutationApplicationResult.unsupported();
             }
 
-            if (!(mutation.value().action().orElse(null) instanceof ChatAssignmentAction action)) { // WAWebChatAssignmentSync.applyMutations: var c = e.value.chatAssignment; if (!c) return malformedActionValue
-                return malformedActionValue(); // WAWebChatAssignmentSync.applyMutations: return o("WAWebSyncdIndexUtils").malformedActionValue(a.collectionName)
+            if (!(mutation.value().action().orElse(null) instanceof ChatAssignmentAction action)) {
+                return malformedActionValue();
             }
 
-            var agentId = action.deviceAgentID().orElse(""); // WAWebChatAssignmentSync.applyMutations: var d = (u = c.deviceAgentID) != null ? u : ""
-            if (!agentId.isEmpty() && !client.store().agentStates().containsKey(agentId)) { // WAWebChatAssignmentSync.applyMutations: var m = o("WAWebAgentCollection").AgentCollection.get(d); if (d !== "" && m == null)
-                return MutationApplicationResult.orphan(agentId, "Agent"); // WAWebChatAssignmentSync.applyMutations: return {actionState: Orphan, orphanModel: {modelId: d, modelType: Agent}}
+            var agentId = action.deviceAgentID().orElse("");
+            if (!agentId.isEmpty() && !client.store().agentStates().containsKey(agentId)) {
+                return MutationApplicationResult.orphan(agentId, "Agent");
             }
 
-            var chatJid = Jid.of(chatJidString); // WAWebChatAssignmentSync.applyMutations: yield o("WAWebSyncdGetChat").resolveChatForMutationIndex(o("WAWebWidFactory").createWid(n))
+            var chatJid = Jid.of(chatJidString);
             var chat = client.store().findChatByJid(chatJid); // ADAPTED: WAWebChatAssignmentSync.applyMutations: resolveChatForMutationIndex, Cobalt uses findChatByJid
-            if (chat.isEmpty()) { // WAWebChatAssignmentSync.applyMutations: if (!p.success) return {actionState: Orphan, orphanModel: p.orphanModel}
-                return MutationApplicationResult.orphan(chatJidString, "Chat"); // WAWebChatAssignmentSync.applyMutations: return {actionState: Orphan, orphanModel: p.orphanModel}
+            if (chat.isEmpty()) {
+                return MutationApplicationResult.orphan(chatJidString, "Chat");
             }
 
-            var resolvedChatJid = chat.get().toJid().toString(); // WAWebChatAssignmentSync.applyMutations: var _ = o("WAWebWidFactory").createWid(p.chat.id); _.toJid()
+            var resolvedChatJid = chat.get().toJid().toString();
             var states = new HashMap<>(client.store().chatAssignmentStates()); // ADAPTED: WAWebChatAssignmentSync.applyMutations, batch bulkCreateOrMerge/bulkRemove/processChatAssignments simplified to inline map update
-            if (agentId.isEmpty()) { // WAWebChatAssignmentSync.applyMutations: d !== "" && i.push({...}), empty agentId means unassign (no add), only remove existing
+            if (agentId.isEmpty()) {
                 states.remove(resolvedChatJid); // ADAPTED: WAWebChatAssignmentSync.applyMutations: getAgentCollectionForChatId(_).filter(e => e.id !== d).forEach(e => l.push(...)) + bulkRemove(l), removes all existing assignments for this chat
             } else {
                 states.put(resolvedChatJid, agentId); // ADAPTED: WAWebChatAssignmentSync.applyMutations: i.push({id: _.toJid()+"_"+d, chatId: _.toJid(), agentId: d, chatOpenedByAgent: false}) + bulkCreateOrMerge(i)
             }
             client.store().setChatAssignmentStates(states); // ADAPTED: WAWebChatAssignmentSync.applyMutations: yield getChatAssignmentTable().bulkCreateOrMerge(i) + processChatAssignments(i) + bulkRemove(l) + remove(l)
-            // WAWebChatAssignmentSync.applyMutations: createChatAssignmentSystemMsgs(s), system messages skipped (business UI feature)
-            // WAWebChatAssignmentSync.applyMutations: triggerChatAssignmentNotification(i, ...), notifications skipped (business UI feature)
-            // WAWebChatAssignmentSync.applyMutations: checkOrphanChatAssignments(c), orphan re-check skipped (handled at higher level in Cobalt)
-            return MutationApplicationResult.success(); // WAWebChatAssignmentSync.applyMutations: return {actionState: Success}
-        } catch (Exception e) { // WAWebChatAssignmentSync.applyMutations: catch(e) { return {actionState: Failed} }
-            return MutationApplicationResult.failed(); // WAWebChatAssignmentSync.applyMutations: return {actionState: Failed}
+            return MutationApplicationResult.success();
+        } catch (Exception e) {
+            return MutationApplicationResult.failed();
         }
     }
 
@@ -204,20 +201,20 @@ public final class ChatAssignmentHandler implements WebAppStateActionHandler {
             String agentId,
             Instant timestamp
     ) {
-        var action = new ChatAssignmentActionBuilder() // WAWebChatAssignmentSync.createChatAssignmentMutations: {chatAssignment: {deviceAgentID: t}}
-                .deviceAgentID(agentId) // WAWebChatAssignmentSync.createChatAssignmentMutations: deviceAgentID: t
+        var action = new ChatAssignmentActionBuilder()
+                .deviceAgentID(agentId)
                 .build();
         var value = new SyncActionValueBuilder()
-                .timestamp(timestamp) // WAWebSyncdActionUtils.buildPendingMutation: timestamp
-                .chatAssignment(action) // WAWebChatAssignmentSync.createChatAssignmentMutations: value: {chatAssignment: ...}
+                .timestamp(timestamp)
+                .chatAssignment(action)
                 .build();
-        var index = JSON.toJSONString(List.of(actionName(), chatJid.toString())); // WAWebChatAssignmentSync.createChatAssignmentMutations: indexArgs: [getChatJidMutationIndexForChat(chatWid, ChatAssignment)]
+        var index = JSON.toJSONString(List.of(actionName(), chatJid.toString()));
         var mutation = new DecryptedMutation.Trusted(
                 index,
                 value,
-                SyncdOperation.SET, // WAWebChatAssignmentSync.createChatAssignmentMutations: SyncdMutation$SyncdOperation.SET
+                SyncdOperation.SET,
                 timestamp,
-                version() // WAWebChatAssignmentSync.createChatAssignmentMutations: version: CHAT_ASSIGNMENT_SYNC_VERSION
+                version()
         );
         return new SyncPendingMutation(mutation, 0);
     }

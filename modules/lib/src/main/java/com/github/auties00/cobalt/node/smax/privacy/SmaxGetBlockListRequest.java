@@ -17,7 +17,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps an optional {@code <item dhash/>}
+ * The outbound stanza variant. Wraps an optional {@code <item dhash/>}
  * child in the canonical {@code <iq xmlns="blocklist" type="get">}
  * envelope.
  */
@@ -25,7 +25,7 @@ import java.util.Optional;
 public final class SmaxGetBlockListRequest implements SmaxOperation.Request {
     /**
      * The optional client-side {@code dhash} digest of the cached
-     * blocklist — supplied so the relay can return
+     * blocklist. Supplied so the relay can return
      * {@link SmaxGetBlockListResponse.SuccessWithMatch} when the client's cache is
      * up to date, avoiding a re-download of the full list.
      */
@@ -55,25 +55,17 @@ public final class SmaxGetBlockListRequest implements SmaxOperation.Request {
      * Builds the outbound IQ stanza ready for dispatch.
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope
-     *
-     * @implNote {@code WASmaxOutBlocklistsGetBlockListRequest.makeGetBlockListRequest}
-     *           composes {@code <iq to="s.whatsapp.net" xmlns="blocklist"
-     *           type="get" id="…"><item dhash/></iq>}; the
-     *           {@code <item/>} child is omitted entirely when no dhash
-     *           is supplied.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutBlocklistsGetBlockListRequest",
             exports = "makeGetBlockListRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutBlocklistsGetBlockListRequest: smax("iq", {to: S_WHATSAPP_NET, xmlns: "blocklist", type: "get", id: generateId()})
         var iqBuilder = new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "blocklist")
                 .attribute("to", JidServer.user())
                 .attribute("type", "get");
         if (itemDhash != null) {
-            // WASmaxOutBlocklistsGetBlockListRequest: smax("item", {dhash})
             var itemNode = new NodeBuilder()
                     .description("item")
                     .attribute("dhash", itemDhash)

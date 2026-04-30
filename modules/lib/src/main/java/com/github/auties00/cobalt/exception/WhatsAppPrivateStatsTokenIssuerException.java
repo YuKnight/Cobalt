@@ -1,31 +1,24 @@
 package com.github.auties00.cobalt.exception;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+
 /**
- * Exception thrown when the private-stats token issuance flow fails.
+ * Thrown when Cobalt cannot obtain a private-stats authentication token
+ * from the WhatsApp servers.
  *
- * <p>The flow is the {@code <sign_credential>} IQ round-trip against
- * {@code s.whatsapp.net} that produces the single-use authentication token
- * used by the WAM private-stats upload backend (mirrors
- * {@code WAWebIssuePrivateStatsToken.getToken}). It can fail for several
- * reasons:
+ * <p>The private-stats upload backend (used by the WAM telemetry
+ * pipeline) gates uploads with a single-use, blinded credential issued
+ * by the {@code <sign_credential>} IQ exchange. Failures fall into
+ * three buckets: the IQ comes back with {@code type="error"}, a
+ * required child element is missing or malformed, or the returned
+ * Ed25519 material does not decode as a valid curve point so the
+ * unblinding step cannot run.
  *
- * <ul>
- *   <li><b>Server error:</b> the IQ response carries a {@code type="error"}
- *       attribute, indicating the server rejected the request (transient
- *       overload, missing capability gate, or banned account).</li>
- *   <li><b>Malformed response:</b> a required child element
- *       ({@code <signed_credential>}, {@code <acs_public_key>}) is missing
- *       or carries content of the wrong length.</li>
- *   <li><b>Invalid credential:</b> the {@code <signed_credential>} or
- *       {@code <acs_public_key>} fails to decode as a valid Ed25519 point,
- *       so the unblinding step cannot proceed.</li>
- * </ul>
- *
- * <h2>Fatality</h2>
- * Token-issuance failures are non-fatal. They affect only the specific
- * upload buffer that needed authentication; the client session remains
- * usable and a subsequent retry may succeed against the same server.
+ * <p>Token issuance failures only block the specific upload they were
+ * meant to authenticate. The session keeps running and the upload can
+ * be retried independently.
  */
+@WhatsAppWebModule(moduleName = "WAWebIssuePrivateStatsToken")
 public final class WhatsAppPrivateStatsTokenIssuerException extends WhatsAppException {
 
     /**
@@ -50,10 +43,10 @@ public final class WhatsAppPrivateStatsTokenIssuerException extends WhatsAppExce
     }
 
     /**
-     * Returns whether this exception represents a fatal error.
+     * Returns whether the failure invalidates the current session.
      *
-     * <p>Token-issuance failures are non-fatal: the client session remains
-     * usable and a retry may succeed.
+     * <p>Token issuance is scoped to a single upload, not to the
+     * session as a whole.
      *
      * @return {@code false}
      */

@@ -12,7 +12,7 @@ import java.io.IOException;
  * Static facade over the format-specific plist parsers and writers.
  *
  * <p>{@link #parse(byte[])} auto-detects between the binary and XML
- * formats by looking at the magic bytes; the {@code writeXml} and
+ * formats by looking at the magic bytes. The {@code writeXml} and
  * {@code writeBinary} methods delegate to the corresponding
  * format-specific writer. Callers should route through this class
  * rather than the implementation classes directly.
@@ -21,7 +21,7 @@ import java.io.IOException;
  */
 public final class Plist {
     /**
-     * Hidden constructor — the class is a stateless namespace.
+     * Hidden constructor. The class is a stateless namespace.
      */
     private Plist() {
     }

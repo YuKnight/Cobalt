@@ -15,8 +15,10 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Sealed family of inbound reply variants produced by the relay.
+ * Sealed family of inbound reply variants produced by the relay in
+ * response to an {@link IqGetIdentityKeysRequest}.
  */
+@WhatsAppWebModule(moduleName = "WAWebGetIdentityKeysJob")
 public sealed interface IqGetIdentityKeysResponse extends IqOperation.Response
         permits IqGetIdentityKeysResponse.Success, IqGetIdentityKeysResponse.ClientError, IqGetIdentityKeysResponse.ServerError {
 

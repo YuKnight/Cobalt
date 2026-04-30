@@ -13,7 +13,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Sealed family of inbound notification variants — carries a single
+ * Sealed family of inbound notification variants. Carries a single
  * {@link Notification} permit because {@code Receive}-shape SMAX RPCs
  * have no outbound counterpart.
  */
@@ -38,7 +38,7 @@ public sealed interface SmaxBannerSuggestionResponse extends SmaxOperation.Respo
     }
 
     /**
-     * The {@code Notification} variant — carries the banner
+     * The {@code Notification} variant. Carries the banner
      * suggestion plus envelope echoes.
      *
      * @implNote {@code WASmaxInBizCtwaActionBannerSuggestionRequest.parseBannerSuggestionRequest}.
@@ -47,7 +47,7 @@ public sealed interface SmaxBannerSuggestionResponse extends SmaxOperation.Respo
     @WhatsAppWebModule(moduleName = "WASmaxInBizCtwaActionServerNotificationMixin")
     final class Notification implements SmaxBannerSuggestionResponse {
         /**
-         * The {@code from} attribute — always the literal
+         * The {@code from} attribute. Always the literal
          * {@code s.whatsapp.net} server JID.
          */
         private final Jid from;
@@ -59,14 +59,14 @@ public sealed interface SmaxBannerSuggestionResponse extends SmaxOperation.Respo
         private final Jid to;
 
         /**
-         * The {@code type} attribute — always the literal
+         * The {@code type} attribute. Always the literal
          * {@code "business"}.
          */
         private final String type;
 
         /**
          * The {@code target_entity_id} attribute on the
-         * {@code <ctwa_suggestion/>} child — identifies the source
+         * {@code <ctwa_suggestion/>} child. Identifies the source
          * CTWA entity (ad, account, message thread).
          */
         private final String targetEntityId;

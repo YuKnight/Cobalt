@@ -21,12 +21,9 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The response variant of the {@code queryOrder} MEX operation that
- * parses the JSON returned by the relay into a structured order.
- *
- * @implNote WAWebBizQueryOrderJob.queryOrder: adapts the
- * {@code xwa_checkout_get_order_info.order} projection into a Cobalt
- * {@link BusinessOrder} and its nested {@link BusinessOrderItem} list.
+ * Parsed response of the {@code queryOrder} MEX query carrying the
+ * {@code xwa_checkout_get_order_info.order} projection mapped onto a Cobalt
+ * {@link BusinessOrder} with its nested {@link BusinessOrderItem} list.
  */
 @WhatsAppWebModule(moduleName = "WAWebBizQueryOrderJob")
 public final class QueryOrderMexResponse implements MexOperation.Response.Json {
@@ -44,15 +41,13 @@ public final class QueryOrderMexResponse implements MexOperation.Response.Json {
     /**
      * Parses the MEX response carried by an inbound IQ stanza.
      *
-     * @implNote WAWebBizQueryOrderJob.queryOrder: WA Web reads
-     * {@code data.xwa_checkout_get_order_info.order} and builds the
-     * response object in-place; when the projection is missing it raises
-     * a {@code ServerStatusCodeError(500)}. Cobalt returns
-     * {@link Optional#empty()} instead so callers can branch on absence
-     * without try/catch.
+     * @implNote WA Web reads {@code data.xwa_checkout_get_order_info.order}
+     *           and raises {@code ServerStatusCodeError(500)} when the
+     *           projection is missing. Cobalt returns empty so callers can
+     *           branch on absence without a try/catch.
      * @param node the inbound IQ stanza carrying the {@code <result>} child
-     * @return the parsed response, or {@link Optional#empty()} if the
-     *         expected JSON shape is absent
+     * @return the parsed response, or empty if the expected JSON shape is
+     *         absent
      */
     @WhatsAppWebExport(moduleName = "WAWebBizQueryOrderJob", exports = "queryOrder",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -72,12 +67,11 @@ public final class QueryOrderMexResponse implements MexOperation.Response.Json {
     }
 
     /**
-     * Parses the raw JSON bytes of the {@code <result>} child into a
-     * structured response.
+     * Parses the raw JSON bytes of the {@code <result>} child.
      *
      * @param json the UTF-8 encoded JSON payload
-     * @return an {@link Optional} containing the parsed response, or
-     *         empty if the envelope is missing the expected fields
+     * @return the parsed response, or empty if the envelope is missing the
+     *         expected fields
      */
     private static Optional<QueryOrderMexResponse> of(byte[] json) {
         var root = JSON.parseObject(json);
@@ -96,7 +90,6 @@ public final class QueryOrderMexResponse implements MexOperation.Response.Json {
         if (orderObj == null) {
             return Optional.empty();
         }
-        // WAWebBizQueryOrderJob.queryOrder: createdAt: Number(g.creation_time_stamp)
         Long createdAt = null;
         var ts = orderObj.getString("creation_time_stamp");
         if (ts != null && !ts.isEmpty()) {
@@ -106,7 +99,6 @@ public final class QueryOrderMexResponse implements MexOperation.Response.Json {
                 createdAt = null;
             }
         }
-        // WAWebBizQueryOrderJob.queryOrder: currency / subtotal / total from g.price_details
         String currency = null;
         Long subtotal = null;
         Long total = null;
@@ -146,17 +138,17 @@ public final class QueryOrderMexResponse implements MexOperation.Response.Json {
     }
 
     /**
-     * Parses a single GraphQL product object into an {@link BusinessOrderItem}.
+     * Parses a single GraphQL product object into a
+     * {@link BusinessOrderItem}.
      *
      * @param obj the GraphQL product object, possibly {@code null}
-     * @return the parsed item, or {@link Optional#empty()} when {@code obj}
-     *         is {@code null}
+     * @return the parsed item, or empty when {@code obj} is {@code null} or
+     *         lacks the required {@code id} or {@code name} fields
      */
     private static Optional<BusinessOrderItem> parseProduct(JSONObject obj) {
         if (obj == null) {
             return Optional.empty();
         }
-        // WAWebBizQueryOrderJob.queryOrder: product mapping
         var id = obj.getString("id");
         var name = obj.getString("name");
         if (id == null || name == null) {
@@ -215,8 +207,8 @@ public final class QueryOrderMexResponse implements MexOperation.Response.Json {
      * Parses a non-empty decimal string into a {@link Long}.
      *
      * @param value the value to parse, possibly {@code null}
-     * @return the parsed long, or {@code null} when the input is missing
-     *         or unparseable
+     * @return the parsed long, or {@code null} when the input is missing or
+     *         unparseable
      */
     private static Long parseLong(String value) {
         if (value == null || value.isEmpty()) {
@@ -233,8 +225,8 @@ public final class QueryOrderMexResponse implements MexOperation.Response.Json {
      * Parses a non-empty decimal string into an {@link Integer}.
      *
      * @param value the value to parse, possibly {@code null}
-     * @return the parsed integer, or {@code null} when the input is
-     *         missing or unparseable
+     * @return the parsed integer, or {@code null} when the input is missing
+     *         or unparseable
      */
     private static Integer parseInt(String value) {
         if (value == null || value.isEmpty()) {

@@ -69,7 +69,7 @@ public final class AgentActionHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebAgentSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return AgentAction.ACTION_NAME; // WAWebAgentSync.getAction -> WASyncdConst.Actions.Agent = "deviceAgent"
+        return AgentAction.ACTION_NAME;
     }
 
     /**
@@ -81,18 +81,16 @@ public final class AgentActionHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebAgentSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return AgentAction.COLLECTION_NAME; // WAWebAgentSync.collectionName = WASyncdConst.CollectionName.Regular = "regular"
+        return AgentAction.COLLECTION_NAME;
     }
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote WAWebAgentSync.getVersion — returns {@code 7}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebAgentSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return AgentAction.ACTION_VERSION; // WAWebAgentSync.getVersion -> 7
+        return AgentAction.ACTION_VERSION;
     }
 
     /**
@@ -111,7 +109,7 @@ public final class AgentActionHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebAgentSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebAgentSync.applyMutations -> SyncActionState.Success
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -153,29 +151,29 @@ public final class AgentActionHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebAgentSync", exports = {"applyMutations", "getValidatedContentSet", "getValidatedContentRemove"}, adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        var indexArray = JSON.parseArray(mutation.index()); // WAWebAgentSync.getValidatedContentSet/getValidatedContentRemove — indexParts
-        var agentId = indexArray.getString(1); // WAWebAgentSync — var n = t[1]
-        if (agentId == null || agentId.isEmpty()) { // WAWebAgentSync — if (!n) return {result: "malformed_index"}
-            return malformedActionIndex(); // WAWebAgentSync.getValidatedContentSet/getValidatedContentRemove -> {result: "malformed_index"}
+        var indexArray = JSON.parseArray(mutation.index());
+        var agentId = indexArray.getString(1);
+        if (agentId == null || agentId.isEmpty()) {
+            return malformedActionIndex();
         }
 
         var states = new HashMap<>(client.store().agentStates()); // ADAPTED: WAWebAgentCollection/WAWebSchemaAgent — Cobalt uses ConcurrentHashMap store
-        if (mutation.operation() == SyncdOperation.REMOVE) { // WAWebAgentSync.applyMutations — n.operation === "remove"
-            states.remove(agentId); // WAWebAgentSync.applyMutations — i.push(t) -> AgentCollection.remove(i) + bulkRemove(i)
+        if (mutation.operation() == SyncdOperation.REMOVE) {
+            states.remove(agentId);
             client.store().setAgentStates(states);
-            return MutationApplicationResult.success(); // WAWebAgentSync.applyMutations — {actionState: SyncActionState.Success}
+            return MutationApplicationResult.success();
         }
 
         if (mutation.operation() != SyncdOperation.SET) { // NO_WA_BASIS — defensive guard for unknown operation types
             return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof AgentAction action)) { // WAWebAgentSync.getValidatedContentSet — var r = e.value.agentAction; return r ? ... : {result: "malformed_value"}
-            return malformedActionValue(); // WAWebAgentSync.getValidatedContentSet -> {result: "malformed_value"}
+        if (!(mutation.value().action().orElse(null) instanceof AgentAction action)) {
+            return malformedActionValue();
         }
 
-        states.put(agentId, action); // WAWebAgentSync.applyMutations — a.push({id:t, name:c, deviceId:..., isDeleted:!!u.isDeleted}) -> AgentCollection.add(a, {merge: true}) + bulkCreateOrMerge(a)
+        states.put(agentId, action);
         client.store().setAgentStates(states);
-        return MutationApplicationResult.success(); // WAWebAgentSync.applyMutations — {actionState: SyncActionState.Success}
+        return MutationApplicationResult.success();
     }
 }

@@ -76,7 +76,7 @@ public final class CallLogHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebCallLogSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return CallLogAction.ACTION_NAME; // WAWebCallLogSync.getAction -> WASyncdConst.Actions.CallLog
+        return CallLogAction.ACTION_NAME;
     }
 
     /**
@@ -92,7 +92,7 @@ public final class CallLogHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebCallLogSync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return CallLogAction.COLLECTION_NAME; // WAWebCallLogSync.collectionName = WASyncdConst.CollectionName.Regular
+        return CallLogAction.COLLECTION_NAME;
     }
 
     /**
@@ -104,7 +104,7 @@ public final class CallLogHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebCallLogSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return CallLogAction.ACTION_VERSION; // WAWebCallLogSync.getVersion -> 1
+        return CallLogAction.ACTION_VERSION;
     }
 
     /**
@@ -122,7 +122,7 @@ public final class CallLogHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebCallLogSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebCallLogSync.applyMutations
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -164,15 +164,15 @@ public final class CallLogHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebCallLogSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        try { // WAWebCallLogSync.applyMutations: try/catch wrapping per-mutation logic
-            if (mutation.operation() == SyncdOperation.SET) { // WAWebCallLogSync.applyMutations: if (e.operation === "set")
-                if (!(mutation.value().action().orElse(null) instanceof CallLogAction action)) { // WAWebCallLogSync.applyMutations: var n = e.value, s = (t = n.callLogAction) != null ? t : {}
-                    return malformedActionValue(); // WAWebCallLogSync.applyMutations: return malformedActionValue(r.collectionName)
+        try {
+            if (mutation.operation() == SyncdOperation.SET) {
+                if (!(mutation.value().action().orElse(null) instanceof CallLogAction action)) {
+                    return malformedActionValue();
                 }
 
-                var log = action.log().orElse(null); // WAWebCallLogSync.applyMutations: var u = s.callLogRecord
-                if (log == null) { // WAWebCallLogSync.applyMutations: if (!u)
-                    return malformedActionValue(); // WAWebCallLogSync.applyMutations: return a++, malformedActionValue(r.collectionName)
+                var log = action.log().orElse(null);
+                if (log == null) {
+                    return malformedActionValue();
                 }
 
                 // ADAPTED: WA Web checks pairingTimestamp and happenedWithin(timestamp, MINUTE_SECONDS)
@@ -180,44 +180,44 @@ public final class CallLogHandler implements WebAppStateActionHandler {
                 // behavior (shouldHideInConversation). In Cobalt, we store the log unconditionally.
                 // ADAPTED: WA Web calls generateCallLogFromCallSyncRecord to write a VoIP call log
                 // message to a chat. Cobalt stores the record in callLogStates keyed by index parts.
-                var indexArray = JSON.parseArray(mutation.index()); // ADAPTED: extract index parts for store key
-                if (indexArray.size() < 4) { // ADAPTED: defensive index validation
-                    return malformedActionValue(); // ADAPTED: treat malformed index same as malformed value for store keying
+                var indexArray = JSON.parseArray(mutation.index());
+                if (indexArray.size() < 4) {
+                    return malformedActionValue();
                 }
 
-                var peer = indexArray.getString(1); // ADAPTED: peerJid from index
-                var callId = indexArray.getString(2); // ADAPTED: callId from index
-                var fromMe = indexArray.getString(3); // ADAPTED: fromMe from index
-                if (peer == null || callId == null || fromMe == null) { // ADAPTED: defensive null checks
-                    return malformedActionValue(); // ADAPTED: treat missing parts as malformed
+                var peer = indexArray.getString(1);
+                var callId = indexArray.getString(2);
+                var fromMe = indexArray.getString(3);
+                if (peer == null || callId == null || fromMe == null) {
+                    return malformedActionValue();
                 }
 
-                var key = peer + "|" + callId + "|" + fromMe; // ADAPTED: composite store key from index parts
-                var states = new HashMap<>(client.store().callLogStates()); // ADAPTED: copy-modify-set pattern for unmodifiable store map
-                states.put(key, log); // ADAPTED: WAWebVoipActionWriteCallLogSync.generateCallLogFromCallSyncRecord
-                client.store().setCallLogStates(states); // ADAPTED: persist updated map
+                var key = peer + "|" + callId + "|" + fromMe;
+                var states = new HashMap<>(client.store().callLogStates());
+                states.put(key, log);
+                client.store().setCallLogStates(states);
 
-                return MutationApplicationResult.success(); // WAWebCallLogSync.applyMutations: {actionState: SyncActionState.Success}
-            } else if (mutation.operation() == SyncdOperation.REMOVE) { // WAWebCallLogSync.applyMutations: else if (e.operation === "remove")
+                return MutationApplicationResult.success();
+            } else if (mutation.operation() == SyncdOperation.REMOVE) {
                 // ADAPTED: WA Web simply returns Success for remove. Cobalt also removes from store.
-                var indexArray = JSON.parseArray(mutation.index()); // ADAPTED: extract index parts for store key
-                if (indexArray.size() >= 4) { // ADAPTED: only remove if index is valid
+                var indexArray = JSON.parseArray(mutation.index());
+                if (indexArray.size() >= 4) {
                     var peer = indexArray.getString(1);
                     var callId = indexArray.getString(2);
                     var fromMe = indexArray.getString(3);
                     if (peer != null && callId != null && fromMe != null) {
                         var key = peer + "|" + callId + "|" + fromMe;
-                        var states = new HashMap<>(client.store().callLogStates()); // ADAPTED: copy-modify-set pattern
-                        states.remove(key); // ADAPTED: remove from store
-                        client.store().setCallLogStates(states); // ADAPTED: persist updated map
+                        var states = new HashMap<>(client.store().callLogStates());
+                        states.remove(key);
+                        client.store().setCallLogStates(states);
                     }
                 }
-                return MutationApplicationResult.success(); // WAWebCallLogSync.applyMutations: {actionState: SyncActionState.Success}
+                return MutationApplicationResult.success();
             }
 
-            return MutationApplicationResult.unsupported(); // WAWebCallLogSync.applyMutations: return l++, {actionState: SyncActionState.Unsupported}
-        } catch (Exception e) { // WAWebCallLogSync.applyMutations: catch (e) { return {actionState: Failed} }
-            return MutationApplicationResult.failed(); // WAWebCallLogSync.applyMutations: {actionState: SyncActionState.Failed}
+            return MutationApplicationResult.unsupported();
+        } catch (Exception e) {
+            return MutationApplicationResult.failed();
         }
     }
 
@@ -256,22 +256,22 @@ public final class CallLogHandler implements WebAppStateActionHandler {
             boolean fromMe,
             CallLog log
     ) {
-        var action = new CallLogActionBuilder() // WAWebCallLogSync.getCallLogMutation: {callLogAction: {callLogRecord: f}}
-                .log(log) // WAWebCallLogSync.getCallLogMutation: callLogRecord: f
+        var action = new CallLogActionBuilder()
+                .log(log)
                 .build();
-        var value = new SyncActionValueBuilder() // WAWebSyncdActionUtils.buildPendingMutation: encodeProtobuf(SyncActionValueSpec, {...l, timestamp: i})
-                .timestamp(timestamp) // WAWebSyncdActionUtils.buildPendingMutation: timestamp: t
-                .callLogAction(action) // WAWebCallLogSync.getCallLogMutation: {callLogAction: ...}
+        var value = new SyncActionValueBuilder()
+                .timestamp(timestamp)
+                .callLogAction(action)
                 .build();
-        var fromMeStr = fromMe ? "1" : "0"; // WAWebCallLogSync.getCallLogMutation: var m = n.fromMe ? "1" : "0"
-        var index = JSON.toJSONString(List.of(actionName(), callerJid.toString(), callId, fromMeStr)); // WAWebSyncdActionUtils.buildPendingMutation: index = buildIndex(action, [d, p, m])
-        var mutation = new DecryptedMutation.Trusted( // WAWebSyncdActionUtils.buildPendingMutation: return { collection, index, binarySyncAction, version, operation, timestamp, action }
+        var fromMeStr = fromMe ? "1" : "0";
+        var index = JSON.toJSONString(List.of(actionName(), callerJid.toString(), callId, fromMeStr));
+        var mutation = new DecryptedMutation.Trusted(
                 index,
                 value,
-                SyncdOperation.SET, // WAWebCallLogSync.getCallLogMutation: operation: SyncdMutation$SyncdOperation.SET
+                SyncdOperation.SET,
                 timestamp,
                 version()
         );
-        return new SyncPendingMutation(mutation, 0); // WAWebSyncdActionUtils.buildPendingMutation
+        return new SyncPendingMutation(mutation, 0);
     }
 }

@@ -29,7 +29,7 @@ public sealed interface SmaxMessagePublishNewsletterResponse extends SmaxOperati
      *
      * @param node    the inbound ack stanza received from the
      *                relay; never {@code null}
-     * @param request the original outbound stanza — used to validate
+     * @param request the original outbound stanza. Used to validate
      *                echoed identifiers; never {@code null}
      * @return an {@link Optional} carrying the parsed variant, or
      *         {@link Optional#empty()} when no documented variant
@@ -56,8 +56,6 @@ public sealed interface SmaxMessagePublishNewsletterResponse extends SmaxOperati
      * @param reply   the inbound ack stanza
      * @param request the original outbound message
      * @return {@code true} when the envelope echo-checks pass
-     *
-     * @implNote {@code WASmaxInMessagePublishAckMixin.parseAckMixin}.
      */
     @WhatsAppWebExport(moduleName = "WASmaxInMessagePublishAckMixin",
             exports = "parseAckMixin", adaptation = WhatsAppAdaptation.ADAPTED)
@@ -87,23 +85,14 @@ public sealed interface SmaxMessagePublishNewsletterResponse extends SmaxOperati
     }
 
     /**
-     * The {@code Success} reply variant — the relay accepted the
+     * The {@code Success} reply variant. The relay accepted the
      * publish.
-     *
-     * @implNote {@code WASmaxInMessagePublishNewsletterResponseSuccess.parseNewsletterResponseSuccess}
-     *           composes
-     *           {@code WASmaxInMessagePublishNewsletterQuestionResponseOrNewsletterMessageAckMixinGroup}
-     *           over the standard ack envelope. The disjunction
-     *           selects between {@code QuestionResponseAck} (carries
-     *           a {@code response_server_id}) and {@code MessageAck}
-     *           (carries an optional {@code server_id} + sender RCAT
-     *           ack mixin).
      */
     @WhatsAppWebModule(moduleName = "WASmaxInMessagePublishNewsletterResponseSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxInMessagePublishNewsletterQuestionResponseOrNewsletterMessageAckMixinGroup")
     final class Success implements SmaxMessagePublishNewsletterResponse {
         /**
-         * The success-disjunction variant name — either
+         * The success-disjunction variant name. Either
          * {@code "QuestionResponseAck"} or {@code "MessageAck"}.
          */
         private final String variantName;
@@ -253,17 +242,9 @@ public sealed interface SmaxMessagePublishNewsletterResponse extends SmaxOperati
     }
 
     /**
-     * The {@code Negative} reply variant — the relay rejected the
+     * The {@code Negative} reply variant. The relay rejected the
      * publish with an application-level error code, optionally
      * carrying a retry backoff.
-     *
-     * @implNote {@code WASmaxInMessagePublishNewsletterResponseNegative.parseNewsletterResponseNegative}
-     *           composes
-     *           {@code WASmaxInMessagePublishNegativeAckMixin.parseNegativeAckMixin}
-     *           which extracts the {@code error} attribute, the
-     *           standard ack envelope, the optional
-     *           {@code application_error} integer, and the optional
-     *           {@code backoff} integer (0..86400 seconds).
      */
     @WhatsAppWebModule(moduleName = "WASmaxInMessagePublishNewsletterResponseNegative")
     @WhatsAppWebModule(moduleName = "WASmaxInMessagePublishNegativeAckMixin")

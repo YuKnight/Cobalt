@@ -19,11 +19,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The response variant of {@link FetchNewsletterFollowersMexResponse} that exposes the data
- * returned by the server after a successful query.
- *
- * @implNote WAWebMexFetchNewsletterFollowersJob: adapts the JSON root returned by the GraphQL
- * query into a Java value object.
+ * Response variant for {@link FetchNewsletterFollowersMexRequest} carrying the parsed server reply.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexFetchNewsletterFollowersJob")
 public final class FetchNewsletterFollowersMexResponse implements MexOperation.Response.Json {
@@ -36,9 +32,6 @@ public final class FetchNewsletterFollowersMexResponse implements MexOperation.R
     /**
      * Parses a MEX response from the given IQ response node.
      *
-     * @implNote WAWebMexFetchNewsletterFollowersJob.mexFetchNewsletterFollowers: WA Web relies on the
-     * GraphQL client to unwrap the response. Cobalt performs the
-     * unwrapping manually from the IQ {@code <result>} child.
      * @param node the IQ response node received from the relay
      * @return an {@link Optional} containing the parsed response, or
      *         empty if the node is missing a result payload
@@ -71,7 +64,7 @@ public final class FetchNewsletterFollowersMexResponse implements MexOperation.R
         /**
          * Returns the {@code edges} field.
          *
-         * @return the list of values, empty if absent
+     * @return the list of values, empty if absent
          */
         public List<Edges> edges() {
             return edges;
@@ -94,7 +87,7 @@ public final class FetchNewsletterFollowersMexResponse implements MexOperation.R
             /**
              * Returns the {@code node} field.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
              */
             public Optional<Node> node() {
                 return Optional.ofNullable(node);
@@ -103,7 +96,7 @@ public final class FetchNewsletterFollowersMexResponse implements MexOperation.R
             /**
              * Returns the {@code follow_time} field.
              *
-             * @return an {@link Optional} containing the value as an {@link Instant}, or empty if absent
+     * @return an {@link Optional} containing the value as an {@link Instant}, or empty if absent
              */
             public Optional<Instant> followTime() {
                 return Optional.ofNullable(followTime).map(Instant::ofEpochSecond);
@@ -112,7 +105,7 @@ public final class FetchNewsletterFollowersMexResponse implements MexOperation.R
             /**
              * Returns the {@code role} field.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
              */
             public Optional<String> role() {
                 return Optional.ofNullable(role);
@@ -137,7 +130,7 @@ public final class FetchNewsletterFollowersMexResponse implements MexOperation.R
                 /**
                  * Returns the {@code id} field.
                  *
-                 * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
                  */
                 public Optional<String> id() {
                     return Optional.ofNullable(id);
@@ -146,7 +139,7 @@ public final class FetchNewsletterFollowersMexResponse implements MexOperation.R
                 /**
                  * Returns the {@code display_name} field.
                  *
-                 * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
                  */
                 public Optional<String> displayName() {
                     return Optional.ofNullable(displayName);
@@ -155,7 +148,7 @@ public final class FetchNewsletterFollowersMexResponse implements MexOperation.R
                 /**
                  * Returns the {@code pn} field.
                  *
-                 * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
                  */
                 public Optional<String> pn() {
                     return Optional.ofNullable(pn);
@@ -164,7 +157,7 @@ public final class FetchNewsletterFollowersMexResponse implements MexOperation.R
                 /**
                  * Returns the {@code username_info} field.
                  *
-                 * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
                  */
                 public Optional<UsernameInfo> usernameInfo() {
                     return Optional.ofNullable(usernameInfo);
@@ -183,7 +176,7 @@ public final class FetchNewsletterFollowersMexResponse implements MexOperation.R
                     /**
                      * Returns the {@code username} field.
                      *
-                     * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
                      */
                     public Optional<String> username() {
                         return Optional.ofNullable(username);
@@ -192,7 +185,7 @@ public final class FetchNewsletterFollowersMexResponse implements MexOperation.R
                     /**
                      * Parses a {@code UsernameInfo} from the given JSON object.
                      *
-                     * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
                      * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
                      */
                     static Optional<UsernameInfo> of(JSONObject obj) {
@@ -207,7 +200,7 @@ public final class FetchNewsletterFollowersMexResponse implements MexOperation.R
                     /**
                      * Parses a list of {@code UsernameInfo} from the given JSON array.
                      *
-                     * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
                      * @return the list of parsed results, empty if {@code arr} is {@code null}
                      */
                     static List<UsernameInfo> ofArray(JSONArray arr) {
@@ -226,7 +219,7 @@ public final class FetchNewsletterFollowersMexResponse implements MexOperation.R
                 /**
                  * Parses a {@code Node} from the given JSON object.
                  *
-                 * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
                  * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
                  */
                 static Optional<Node> of(JSONObject obj) {
@@ -244,7 +237,7 @@ public final class FetchNewsletterFollowersMexResponse implements MexOperation.R
                 /**
                  * Parses a list of {@code Node} from the given JSON array.
                  *
-                 * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
                  * @return the list of parsed results, empty if {@code arr} is {@code null}
                  */
                 static List<Node> ofArray(JSONArray arr) {
@@ -263,7 +256,7 @@ public final class FetchNewsletterFollowersMexResponse implements MexOperation.R
             /**
              * Parses a {@code Edges} from the given JSON object.
              *
-             * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
              * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
              */
             static Optional<Edges> of(JSONObject obj) {
@@ -280,7 +273,7 @@ public final class FetchNewsletterFollowersMexResponse implements MexOperation.R
             /**
              * Parses a list of {@code Edges} from the given JSON array.
              *
-             * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
              * @return the list of parsed results, empty if {@code arr} is {@code null}
              */
             static List<Edges> ofArray(JSONArray arr) {
@@ -299,7 +292,7 @@ public final class FetchNewsletterFollowersMexResponse implements MexOperation.R
         /**
          * Parses a {@code Followers} from the given JSON object.
          *
-         * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
          * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
          */
         static Optional<Followers> of(JSONObject obj) {
@@ -314,7 +307,7 @@ public final class FetchNewsletterFollowersMexResponse implements MexOperation.R
         /**
          * Parses a list of {@code Followers} from the given JSON array.
          *
-         * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
          * @return the list of parsed results, empty if {@code arr} is {@code null}
          */
         static List<Followers> ofArray(JSONArray arr) {
@@ -334,30 +327,21 @@ public final class FetchNewsletterFollowersMexResponse implements MexOperation.R
      * Parses a {@link FetchNewsletterFollowersMexResponse} from the raw JSON bytes of the
      * {@code <result>} child.
      *
-     * @implNote WAWebMexFetchNewsletterFollowersJob.mexFetchNewsletterFollowers: mirrors the implicit
-     * unwrapping that WA Web performs on the GraphQL response,
-     * extracting the {@code xwa2_newsletter_followers} root.
      * @param json the UTF-8 encoded JSON payload
      * @return an {@link Optional} containing the parsed response, or
      *         empty if the envelope is missing expected fields
      */
     private static Optional<FetchNewsletterFollowersMexResponse> of(byte[] json) {
-        // WAWebMexFetchNewsletterFollowersJob.mexFetchNewsletterFollowers
-        // Parses the raw JSON payload, bailing out if fastjson2 returns null
         var jsonObject = JSON.parseObject(json);
         if (jsonObject == null) {
             return Optional.empty();
         }
 
-        // WAWebMexFetchNewsletterFollowersJob.mexFetchNewsletterFollowers
-        // Descends into the standard GraphQL "data" envelope
         var data = jsonObject.getJSONObject("data");
         if (data == null) {
             return Optional.empty();
         }
 
-        // WAWebMexFetchNewsletterFollowersJob.mexFetchNewsletterFollowers
-        // Extracts the operation-specific root keyed by xwa2_newsletter_followers
         var root = data.getJSONObject("xwa2_newsletter_followers");
         if (root == null) {
             return Optional.empty();

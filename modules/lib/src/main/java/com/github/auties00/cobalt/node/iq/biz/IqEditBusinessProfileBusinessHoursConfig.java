@@ -4,7 +4,10 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * One business-hours configuration row.
+ * One per-day configuration row inside an
+ * {@link IqEditBusinessProfileBusinessHours} payload. Carries the day of
+ * week, the open/closed mode and the optional opening and closing times
+ * as minutes since midnight.
  */
 public final class IqEditBusinessProfileBusinessHoursConfig {
     /**

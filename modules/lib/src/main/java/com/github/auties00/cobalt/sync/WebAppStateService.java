@@ -160,22 +160,75 @@ import java.util.logging.Logger;
 public final class WebAppStateService {
     private static final Logger LOGGER = Logger.getLogger(WebAppStateService.class.getName());
 
+    /**
+     * The WhatsApp client used for store access and for sending nodes.
+     */
     private final WhatsAppClient whatsapp;
+
+    /**
+     * Cached reference to {@link WhatsAppClient#store()}.
+     */
     private final WhatsAppStore store;
+
+    /**
+     * Builds outgoing sync IQ nodes and encrypts pending mutations.
+     */
     private final MutationRequestBuilder requestBuilder;
+
+    /**
+     * Parses incoming sync IQ responses into {@link MutationSyncResponse} records.
+     */
     private final MutationResponseParser responseParser;
+
+    /**
+     * Verifies snapshot and patch MACs against the local key state.
+     */
     private final MutationIntegrityVerifier integrityVerifier;
+
+    /**
+     * Lookup table mapping action names to their registered handlers.
+     */
     private final WebAppStateHandlerRegistry handlerRegistry;
+
+    /**
+     * Schedules retries for failed sync rounds with exponential backoff.
+     */
     private final WebAppStateBackoffScheduler retryScheduler;
+
+    /**
+     * Schedules timeout checks for missing sync keys.
+     */
     private final MissingSyncKeyTimeoutScheduler missingSyncKeyTimeoutScheduler;
+
+    /**
+     * Sends key request peer messages for missing sync keys.
+     */
     private final MissingSyncKeyRequestService missingSyncKeyRequestService;
+
+    /**
+     * Manages sync key rotation and key share handling.
+     */
     private final SyncKeyRotationService syncKeyRotationService;
+
+    /**
+     * Source of A/B-tested configuration values.
+     */
     private final ABPropsService abPropsService;
+
+    /**
+     * Drives snapshot recovery when a snapshot MAC validation fails.
+     */
     private final SnapshotRecoveryService snapshotRecoveryService;
+
     /**
      * The WAM telemetry service used to commit app-state sync events.
      */
     private final WamService wamService;
+
+    /**
+     * Handle of the currently scheduled periodic sync job, or {@code null}
+     * when none is scheduled.
+     */
     private volatile CompletableFuture<?> periodicSyncJob;
     /**
      * Handle of the currently scheduled daily syncd stats reporting job, or
@@ -194,13 +247,14 @@ public final class WebAppStateService {
     private volatile CompletableFuture<?> periodicReportSyncdKeyStatsJob;
 
     /**
-     * Creates a new WebAppStateService instance.
+     * Creates a new {@code WebAppStateService} instance.
      *
-     * @implNote WAWebSyncd (module initialization — constructor DI replaces module-level imports)
-     * @param whatsapp               the WhatsApp client instance for store access and node sending
-     * @param abPropsService         the AB props service for configuration values
+     * @param whatsapp                the WhatsApp client instance for store access and node sending
+     * @param abPropsService          the A/B props service for configuration values
      * @param snapshotRecoveryService the snapshot recovery service for peer recovery
-     * @param wamService             the WAM telemetry service for committing sync events
+     * @param wamService              the WAM telemetry service for committing sync events
+     * @implNote WA Web reads the equivalent collaborators as module-level imports of
+     *           {@code WAWebSyncd}; Cobalt receives them via constructor injection.
      */
     public WebAppStateService(WhatsAppClient whatsapp, ABPropsService abPropsService, SnapshotRecoveryService snapshotRecoveryService, WamService wamService) {
         this.whatsapp = whatsapp;

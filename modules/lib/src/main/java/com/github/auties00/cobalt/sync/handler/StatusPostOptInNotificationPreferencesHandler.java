@@ -80,7 +80,7 @@ public final class StatusPostOptInNotificationPreferencesHandler implements WebA
      *           used by every other Cobalt sync handler.
      */
     public static final StatusPostOptInNotificationPreferencesHandler INSTANCE =
-            new StatusPostOptInNotificationPreferencesHandler(); // NO_WA_BASIS: no WA Web counterpart singleton
+            new StatusPostOptInNotificationPreferencesHandler();
 
     /**
      * Private constructor that enforces the singleton pattern.
@@ -109,7 +109,7 @@ public final class StatusPostOptInNotificationPreferencesHandler implements WebA
      */
     @Override
     public String actionName() {
-        return StatusPostOptInNotificationPreferencesAction.ACTION_NAME; // NO_WA_BASIS: WAWebProtobufSyncAction.pb only declares the protobuf action-name string
+        return StatusPostOptInNotificationPreferencesAction.ACTION_NAME;
     }
 
     /**
@@ -130,7 +130,7 @@ public final class StatusPostOptInNotificationPreferencesHandler implements WebA
      */
     @Override
     public SyncPatchType collectionName() {
-        return SyncPatchType.REGULAR_HIGH; // WAWebProtobufSyncAction.pb collection resolver: STATUS_POST_OPT_IN_NOTIFICATION_PREFERENCES_ACTION -> u.REGULAR_HIGH
+        return SyncPatchType.REGULAR_HIGH;
     }
 
     /**
@@ -145,7 +145,7 @@ public final class StatusPostOptInNotificationPreferencesHandler implements WebA
      */
     @Override
     public int version() {
-        return StatusPostOptInNotificationPreferencesAction.ACTION_VERSION; // NO_WA_BASIS: WA Web has no status-post-opt-in version constant; defaults to 1
+        return StatusPostOptInNotificationPreferencesAction.ACTION_VERSION;
     }
 
     /**
@@ -216,15 +216,15 @@ public final class StatusPostOptInNotificationPreferencesHandler implements WebA
      */
     @Override
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        if (mutation.operation() != SyncdOperation.SET) { // NO_WA_BASIS: only SET makes sense for a single-boolean opt-in flag
+        if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof StatusPostOptInNotificationPreferencesAction action)) { // NO_WA_BASIS: payload type guard
+        if (!(mutation.value().action().orElse(null) instanceof StatusPostOptInNotificationPreferencesAction action)) {
             return MutationApplicationResult.malformed();
         }
 
-        client.store().setStatusPostOptInNotificationPreferencesEnabled(action.enabled()); // NO_WA_BASIS: persist the opt-in flag on the flattened Cobalt store
+        client.store().setStatusPostOptInNotificationPreferencesEnabled(action.enabled());
         return MutationApplicationResult.success();
     }
 }

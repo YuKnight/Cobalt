@@ -15,7 +15,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Sealed disjunction over the newsletter addressing modes — either a
+ * Sealed disjunction over the newsletter addressing modes. Either a
  * JID-keyed query or an invite-key query.
  *
  * @implNote {@code WASmaxOutNewslettersQueryNewsletterParams.mergeQueryNewsletterParams}.

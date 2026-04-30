@@ -7,7 +7,7 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
  * attribute is sent on the wire.
  *
  * @implNote {@code WAWebSetWindowsPushConfig} local helper {@code m(e)}
- *           switches on the literal ring name — {@code "uwp_public"}
+ *           switches on the literal ring name. {@code "uwp_public"}
  *           drops the attribute (relay default), every other ring is
  *           routed verbatim. Cobalt models the four documented rings
  *           explicitly and exposes the wire-string mapping via
@@ -16,21 +16,21 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 @WhatsAppWebModule(moduleName = "WAWebSetWindowsPushConfig")
 public enum IqSetWindowsPushConfigRing {
     /**
-     * The internal hybrid-dogfooding ring — wire value
+     * The internal hybrid-dogfooding ring. Wire value
      * {@code "uwp_hybrid_dogfooding"}.
      */
     HYBRID_DOGFOODING("uwp_hybrid_dogfooding"),
     /**
-     * The pre-release alpha ring — wire value {@code "uwp_alpha"}.
+     * The pre-release alpha ring. Wire value {@code "uwp_alpha"}.
      */
     ALPHA("uwp_alpha"),
     /**
-     * The beta ring — wire value {@code "uwp_beta"}; this is also
+     * The beta ring. Wire value {@code "uwp_beta"}. This is also
      * the WA Web fallback when an unrecognised ring name is supplied.
      */
     BETA("uwp_beta"),
     /**
-     * The public-release ring — the relay treats the missing
+     * The public-release ring. The relay treats the missing
      * attribute as the public ring, so {@link #wireValue()} returns
      * {@code null} for this case.
      */

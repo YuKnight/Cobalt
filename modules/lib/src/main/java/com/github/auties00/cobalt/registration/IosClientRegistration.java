@@ -44,7 +44,7 @@ import java.util.Objects;
  * assertionFor:path:]} together with {@code -[NSMutableURLRequest
  * setHTTPBody:]} on a real device, {@link #attestationFields()}
  * returns just the APNS {@code push_token} and the attestor passed at
- * construction is stored but never consulted; it stays in the API
+ * construction is stored but never consulted. It stays in the API
  * surface so that embedders can wire a real attestor today and have it
  * activate the moment the wire shape is filled in here without any
  * builder change.
@@ -108,7 +108,7 @@ final class IosClientRegistration extends MobileClientRegistration {
      * @param path the API sub-path ({@code /exist}, {@code /code},
      *             {@code /register})
      * @param body the fully-assembled request body
-     * @param authorizationHeader ignored by the iOS flow; retained for
+     * @param authorizationHeader ignored by the iOS flow. Retained for
      *                            interface compatibility
      * @return a ready-to-send HTTP request
      */
@@ -126,16 +126,16 @@ final class IosClientRegistration extends MobileClientRegistration {
     }
 
     /**
-     * Returns {@link BodyAttestation#EMPTY} — the iOS flow does not
+     * Returns {@link BodyAttestation#EMPTY}. The iOS flow does not
      * attach an {@code H=} body suffix or an {@code Authorization}
      * request header.
      *
      * <p>This is not a stub. Static analysis of the native iOS binary
      * confirms it: the only {@code H=%s} format string in the binary
-     * is unrelated debug formatting; the {@code "H"} CFString in the
-     * iOS form-field master table has no code xrefs; the
+     * is unrelated debug formatting. The {@code "H"} CFString in the
+     * iOS form-field master table has no code xrefs. The
      * {@code "Authorization"} string has no xrefs from any function in
-     * the registration / URL-builder / attestation address ranges; and
+     * the registration / URL-builder / attestation address ranges. And
      * {@code -[NSMutableURLRequest setValue:forHTTPHeaderField:]} is
      * never called from those ranges. The Android keystore-signature
      * mechanism that produces both legs simply does not exist on iOS,
@@ -143,7 +143,7 @@ final class IosClientRegistration extends MobileClientRegistration {
      * and {@link #createRequest createRequest}'s
      * {@code authorizationHeader} parameter is permanently {@code null}.
      *
-     * @param encBodyBytes the UTF-8 bytes of the base64 ENC body; unused
+     * @param encBodyBytes the UTF-8 bytes of the base64 ENC body. Unused
      * @return {@link BodyAttestation#EMPTY}
      */
     @Override
@@ -185,14 +185,14 @@ final class IosClientRegistration extends MobileClientRegistration {
 
     /**
      * Returns the iOS-specific attestation-time fields that ship on
-     * every attested endpoint — currently just the APNS device token.
+     * every attested endpoint, currently just the APNS device token.
      *
      * <p>App Attest payloads (the attestation+assertion CBOR pair the
      * configured {@link WhatsAppDeviceAttestor.Ios} can mint) are not
-     * emitted: the wire-field names under which those payloads ship in
-     * {@code /v2/exist}, {@code /v2/code}, {@code /v2/register},
+     * emitted because the wire-field names under which those payloads
+     * ship in {@code /v2/exist}, {@code /v2/code}, {@code /v2/register},
      * {@code /v2/challenge}, {@code /v2/security} cannot be determined
-     * from static analysis of the native iOS binary — every emission
+     * from static analysis of the native iOS binary. Every emission
      * path goes through Swift protocol-witness dispatch
      * ({@code attestationPayloadForRegistrationFor:} and
      * {@code assertionFor:path:} on

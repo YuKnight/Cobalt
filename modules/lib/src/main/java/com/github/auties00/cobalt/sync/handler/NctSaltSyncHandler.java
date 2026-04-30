@@ -38,7 +38,7 @@ public final class NctSaltSyncHandler implements WebAppStateActionHandler {
      * @implNote ADAPTED: WAWebNctSaltSync uses {@code WALogger}; Cobalt uses
      *           {@link Logger}
      */
-    private static final Logger LOGGER = Logger.getLogger(NctSaltSyncHandler.class.getName()); // ADAPTED: WAWebNctSaltSync — WALogger
+    private static final Logger LOGGER = Logger.getLogger(NctSaltSyncHandler.class.getName());
 
     /**
      * The singleton instance of {@code NctSaltSyncHandler}.
@@ -74,7 +74,7 @@ public final class NctSaltSyncHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebNctSaltSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return NctSaltSyncAction.ACTION_NAME; // WAWebNctSaltSync.getAction: o("WASyncdConst").Actions.NctSaltSync
+        return NctSaltSyncAction.ACTION_NAME;
     }
 
     /**
@@ -87,7 +87,7 @@ public final class NctSaltSyncHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebNctSaltSync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return NctSaltSyncAction.COLLECTION_NAME; // WAWebNctSaltSync: e.collectionName = CollectionName.RegularHigh
+        return NctSaltSyncAction.COLLECTION_NAME;
     }
 
     /**
@@ -99,7 +99,7 @@ public final class NctSaltSyncHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebNctSaltSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return NctSaltSyncAction.ACTION_VERSION; // WAWebNctSaltSync.getVersion: return 1
+        return NctSaltSyncAction.ACTION_VERSION;
     }
 
     /**
@@ -118,7 +118,7 @@ public final class NctSaltSyncHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebNctSaltSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebNctSaltSync.applyMutations: countWhere(i, e => e.actionState === Success)
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -153,45 +153,40 @@ public final class NctSaltSyncHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebNctSaltSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.DIRECT)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        // WAWebNctSaltSync.$NctSaltSync$p_1: if (e.operation === "remove")
         if (mutation.operation() == SyncdOperation.REMOVE) {
-            LOGGER.fine("[nct-salt-sync] Removing stored NCT salt"); // WAWebNctSaltSync.$NctSaltSync$p_1: WALogger.LOG("[nct-salt-sync] Removing stored NCT salt")
-            // WAWebNctSaltSync.$NctSaltSync$p_1:
+            LOGGER.fine("[nct-salt-sync] Removing stored NCT salt");
             //   yield WAWebUserPrefsIndexedDBStorage.userPrefsIdb.remove(BACKEND_ONLY_KEYS.NCT_SALT)
             // ADAPTED: Cobalt's WhatsAppStore holds the raw byte[]; clearing the field
             // is equivalent to removing the userPrefsIdb entry.
-            client.store().setNctSalt(null); // WAWebNctSaltSync.$NctSaltSync$p_1: userPrefsIdb.remove(NCT_SALT)
-            return MutationApplicationResult.success(); // WAWebNctSaltSync.$NctSaltSync$p_1: {actionState: SyncActionState.Success}
+            client.store().setNctSalt(null);
+            return MutationApplicationResult.success();
         }
 
-        // WAWebNctSaltSync.$NctSaltSync$p_1: if (e.operation !== "set")
         if (mutation.operation() != SyncdOperation.SET) {
-            LOGGER.warning(() -> "[nct-salt-sync] Unsupported operation: " + mutation.operation()); // WAWebNctSaltSync.$NctSaltSync$p_1: WALogger.WARN("[nct-salt-sync] Unsupported operation: %s", e.operation)
-            return MutationApplicationResult.unsupported(); // WAWebNctSaltSync.$NctSaltSync$p_1: {actionState: SyncActionState.Unsupported}
+            LOGGER.warning(() -> "[nct-salt-sync] Unsupported operation: " + mutation.operation());
+            return MutationApplicationResult.unsupported();
         }
 
-        // WAWebNctSaltSync.$NctSaltSync$p_1:
         //   var n = (t = e.value) == null || (t = t.nctSaltSyncAction) == null ? void 0 : t.salt
         // In Cobalt, a missing nctSaltSyncAction oneof variant is equivalent to
         // value?.nctSaltSyncAction being null, so the resulting salt is null and
         // the malformedActionIndex() branch is taken below.
-        var salt = mutation.value().action() // WAWebNctSaltSync.$NctSaltSync$p_1: e.value
-                .filter(NctSaltSyncAction.class::isInstance) // WAWebNctSaltSync.$NctSaltSync$p_1: value?.nctSaltSyncAction
+        var salt = mutation.value().action()
+                .filter(NctSaltSyncAction.class::isInstance)
                 .map(NctSaltSyncAction.class::cast)
-                .flatMap(NctSaltSyncAction::salt) // WAWebNctSaltSync.$NctSaltSync$p_1: ?.salt
+                .flatMap(NctSaltSyncAction::salt)
                 .orElse(null);
         if (salt == null) {
-            LOGGER.warning("[nct-salt-sync] Missing salt in nctSaltSyncAction"); // WAWebNctSaltSync.$NctSaltSync$p_1: WALogger.WARN("[nct-salt-sync] Missing salt in nctSaltSyncAction")
-            return malformedActionIndex(); // WAWebNctSaltSync.$NctSaltSync$p_1: return this.malformedActionIndex()
+            LOGGER.warning("[nct-salt-sync] Missing salt in nctSaltSyncAction");
+            return malformedActionIndex();
         }
 
-        // WAWebNctSaltSync.$NctSaltSync$p_1: var r = WABase64.encodeB64(n)
         //   yield userPrefsIdb.set(BACKEND_ONLY_KEYS.NCT_SALT, r)
         // ADAPTED: Cobalt's WhatsAppStore persists the raw byte[]; the base64
         // round-trip is a WA Web userPrefsIdb serialization requirement and has
         // no equivalent in a typed in-memory store.
-        client.store().setNctSalt(salt); // WAWebNctSaltSync.$NctSaltSync$p_1: userPrefsIdb.set(NCT_SALT, encodeB64(n))
-        LOGGER.fine("[nct-salt-sync] Stored NCT salt"); // WAWebNctSaltSync.$NctSaltSync$p_1: WALogger.LOG("[nct-salt-sync] Stored NCT salt")
-        return MutationApplicationResult.success(); // WAWebNctSaltSync.$NctSaltSync$p_1: {actionState: SyncActionState.Success}
+        client.store().setNctSalt(salt);
+        LOGGER.fine("[nct-salt-sync] Stored NCT salt");
+        return MutationApplicationResult.success();
     }
 }

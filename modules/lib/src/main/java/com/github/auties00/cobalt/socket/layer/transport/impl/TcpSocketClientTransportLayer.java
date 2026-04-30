@@ -12,20 +12,22 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 
 /**
- * A transport layer implementation that manages a non-blocking TCP
- * {@link SocketChannel} registered with the central
- * {@link SocketClientSelector}.
+ * TCP transport layer backed by a non-blocking {@link SocketChannel}
+ * registered with the central {@link SocketClientSelector}.
  *
- * <p>This is the only layer that directly interacts with NIO types.
- * All other layers delegate to this one for raw I/O and transport-control
- * operations.
+ * <p>This is the only layer that talks directly to NIO; every other
+ * layer delegates to this one for byte movement and selector control.
  */
 public final class TcpSocketClientTransportLayer implements SocketClientTransportLayer {
     /**
-     * The underlying NIO socket channel.
+     * Underlying NIO socket channel, opened on
+     * {@link #connect(InetSocketAddress, SocketClientLayerListener)}.
      */
     private SocketChannel channel;
 
+    /**
+     * Creates an unconnected TCP transport layer.
+     */
     public TcpSocketClientTransportLayer() {
 
     }

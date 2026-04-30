@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.node.iq.biz;
 
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.JidServer;
 import com.github.auties00.cobalt.node.Node;
@@ -12,8 +13,11 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant.
+ * The outbound {@code <iq xmlns="fb:thrift_iq" type="get">} stanza that
+ * fetches the typed detail of a single business order, identified by id
+ * and authenticated via a merchant-supplied token.
  */
+@WhatsAppWebModule(moduleName = "WAWebBizQueryOrderJob")
 public final class IqBizQueryOrderRequest implements IqOperation.Request {
     /**
      * The order id to fetch.

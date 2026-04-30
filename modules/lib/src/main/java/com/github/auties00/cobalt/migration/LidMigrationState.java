@@ -1,115 +1,101 @@
 package com.github.auties00.cobalt.migration;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import it.auties.protobuf.annotation.ProtobufEnum;
 import it.auties.protobuf.annotation.ProtobufEnumIndex;
 
 /**
- * Tracks the progress of the LID (Long ID) migration pipeline for a single
- * WhatsApp account.
+ * Represents the position of a single account inside the 1:1 LID migration
+ * pipeline.
  *
- * <p>LID migration replaces phone-number addressing with privacy-preserving
- * Long IDs for 1:1 chats. The pipeline starts when a paired client receives
- * the AB prop enabling migration, waits for the primary device to sync its
- * mapping tables, executes the migration over the stored chats, and finally
- * marks the account as fully migrated.
- *
- * <p>This state machine is the Cobalt equivalent of WhatsApp Web's
- * {@code LidThreadMigrationStatus} enum, with three additional Cobalt-only
- * states ({@link #NOT_STARTED}, {@link #FAILED}, {@link #DISABLED}) used
- * for initialisation and the configurable error model.
- *
- * @implNote WAWebLid1X1ThreadAccountMigrations.flow.LidThreadMigrationStatus.
+ * <p>The pipeline starts when a paired client receives the AB prop that
+ * enables migration, waits for the primary device to deliver its mapping
+ * tables, runs the rewrite over the local chat store, and finally records
+ * the account as fully migrated. This enum encodes the same six values that
+ * WhatsApp Web's {@code LidThreadMigrationStatus} enum exposes, plus three
+ * Cobalt-only states ({@link #NOT_STARTED}, {@link #FAILED},
+ * {@link #DISABLED}) that exist because Cobalt drives the migration through
+ * an explicit state machine rather than through ad-hoc UserPrefs flags and
+ * because the Cobalt error model surfaces failures as terminal states.
  */
 @ProtobufEnum
 @WhatsAppWebModule(moduleName = "WAWebLid1X1ThreadAccountMigrations.flow")
 public enum LidMigrationState {
     /**
-     * Migration has not been initiated.
-     * This is the initial state before any migration activity begins.
-     *
-     * @implNote NO_WA_BASIS — Cobalt-specific initial state for state machine tracking
+     * Initial state before any migration activity has begun.
      */
     NOT_STARTED(0),
 
     /**
-     * Waiting for the AB prop to enable LID migration.
-     * The client checks server-sent feature flags to determine if migration is enabled.
-     *
-     * @implNote WAWebLid1X1ThreadAccountMigrations.flow.LidThreadMigrationStatus.WAITING_PROP
+     * Waiting for the AB prop that enables LID migration to flip on.
      */
+    @WhatsAppWebExport(moduleName = "WAWebLid1X1ThreadAccountMigrations.flow",
+            exports = "LidThreadMigrationStatus", adaptation = WhatsAppAdaptation.DIRECT)
     WAITING_PROP(1),
 
     /**
-     * Waiting for LID mappings from the primary device.
-     * The primary device sends mappings via LIDMigrationMappingSyncMessage.
-     *
-     * @implNote WAWebLid1X1ThreadAccountMigrations.flow.LidThreadMigrationStatus.WAITING_MAPPINGS
+     * Waiting for the primary device to send the LID mapping sync message.
      */
+    @WhatsAppWebExport(moduleName = "WAWebLid1X1ThreadAccountMigrations.flow",
+            exports = "LidThreadMigrationStatus", adaptation = WhatsAppAdaptation.DIRECT)
     WAITING_MAPPINGS(2),
 
     /**
-     * Mappings received and validated, ready to start migration.
-     * The client has all necessary data to perform the migration.
-     *
-     * @implNote WAWebLid1X1ThreadAccountMigrations.flow.LidThreadMigrationStatus.READY
+     * Mappings have been received and validated, the migration is ready to
+     * run.
      */
+    @WhatsAppWebExport(moduleName = "WAWebLid1X1ThreadAccountMigrations.flow",
+            exports = "LidThreadMigrationStatus", adaptation = WhatsAppAdaptation.DIRECT)
     READY(3),
 
     /**
-     * Migration is currently in progress.
-     * Threads are being migrated from PN to LID addressing.
-     *
-     * @implNote WAWebLid1X1ThreadAccountMigrations.flow.LidThreadMigrationStatus.IN_PROGRESS
+     * Migration is currently rewriting threads from PN to LID addressing.
      */
+    @WhatsAppWebExport(moduleName = "WAWebLid1X1ThreadAccountMigrations.flow",
+            exports = "LidThreadMigrationStatus", adaptation = WhatsAppAdaptation.DIRECT)
     IN_PROGRESS(4),
 
     /**
-     * Migration completed successfully.
-     * All eligible threads have been migrated to LID addressing.
-     *
-     * @implNote WAWebLid1X1ThreadAccountMigrations.flow.LidThreadMigrationStatus.COMPLETE
+     * Migration finished successfully and every eligible thread has been
+     * rewritten.
      */
+    @WhatsAppWebExport(moduleName = "WAWebLid1X1ThreadAccountMigrations.flow",
+            exports = "LidThreadMigrationStatus", adaptation = WhatsAppAdaptation.DIRECT)
     COMPLETE(5),
 
     /**
-     * Migration failed due to a critical error.
-     * This may require session termination or re-pairing.
-     *
-     * @implNote NO_WA_BASIS — Cobalt-specific error state for configurable error handling
+     * Migration aborted because of a fatal error surfaced through the
+     * configurable error handler.
      */
     FAILED(6),
 
     /**
-     * Migration is disabled and will not proceed.
-     *
-     * @implNote NO_WA_BASIS — Cobalt-specific disabled state for configurable error handling
+     * Migration is disabled and will not run for this session.
      */
     DISABLED(7);
 
     /**
-     * The protobuf index value for this migration state.
-     *
-     * @implNote WAWebLid1X1ThreadAccountMigrations.flow.LidThreadMigrationStatus
+     * The protobuf wire index assigned to this state.
      */
     final int index;
 
     /**
-     * Creates a new LID migration state with the specified protobuf index.
+     * Constructs a new state with the given protobuf index.
      *
-     * @param index the protobuf index value
-     * @implNote WAWebLid1X1ThreadAccountMigrations.flow.LidThreadMigrationStatus
+     * @param index the protobuf wire index
      */
     LidMigrationState(@ProtobufEnumIndex int index) {
         this.index = index;
     }
 
     /**
-     * Returns whether this state indicates migration has finished, whether
-     * successfully, with failure, or by being disabled.
+     * Returns whether this state is terminal, meaning the migration will
+     * not progress further without an explicit external transition.
      *
-     * @return {@code true} if migration is in a terminal state
-     * @implNote ADAPTED: WAWebLid1X1ThreadAccountMigrations.flow — convenience for Cobalt state machine
+     * @return {@code true} if this state is {@link #COMPLETE},
+     *         {@link #FAILED}, or {@link #DISABLED}
      */
     public boolean isTerminal() {
         return this == DISABLED || this == COMPLETE || this == FAILED;

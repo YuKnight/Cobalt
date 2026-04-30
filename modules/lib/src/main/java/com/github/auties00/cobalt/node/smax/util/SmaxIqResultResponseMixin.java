@@ -13,7 +13,7 @@ import java.util.Objects;
  * {@code Success}-shape response variant.
  *
  * <p>WhatsApp Web's {@code WASmaxIn*IQResultResponseMixin} family ships one
- * copy of this exact validation per (domain, RPC) pair — every module looks
+ * copy of this exact validation per (domain, RPC) pair. Every module looks
  * the same: assert the {@code iq} tag, echo-check the {@code id} attribute
  * against the request reference, echo-check the {@code from}/{@code to}
  * attribute, and assert {@code type="result"}. Cobalt deduplicates the
@@ -31,7 +31,7 @@ import java.util.Objects;
  *
  * @implNote {@code WASmaxInGroupsIQResultResponseMixin.parseIQResultResponseMixin}
  *           and the equally-shaped {@code parseIQErrorResponseMixin} share
- *           this very same envelope — Cobalt provides a single
+ *           this very same envelope. Cobalt provides a single
  *           {@link #validate(Node, Node)} for the success case and a
  *           companion {@link SmaxIqErrorResponseMixin} for the error case
  *           rather than re-emitting one mixin per RPC.
@@ -40,7 +40,7 @@ import java.util.Objects;
 public final class SmaxIqResultResponseMixin {
 
     /**
-     * Private constructor — the class is a static-only utility.
+     * Private constructor. The class is a static-only utility.
      */
     private SmaxIqResultResponseMixin() {
         throw new AssertionError("SmaxIqResultResponseMixin cannot be instantiated");
@@ -51,24 +51,24 @@ public final class SmaxIqResultResponseMixin {
      * {@code <iq type="result">} echoing the request's {@code id} and
      * {@code to} attributes.
      *
-     * <p>Returns {@code true} only when every check passes — the reply has
+     * <p>Returns {@code true} only when every check passes. The reply has
      * the {@code iq} tag, carries {@code type="result"}, and echoes the
      * request's {@code id} verbatim. The {@code from} echo check is applied
      * only when the request actually carries a {@code to} attribute (some
      * SMAX requests omit it because the relay defaults to the implicit
      * {@code g.us} server).
      *
-     * @param reply   the inbound stanza received from the relay; never
+     * @param reply   the inbound stanza received from the relay. Never
      *                {@code null}
-     * @param request the outbound stanza emitted by the caller — used to
+     * @param request the outbound stanza emitted by the caller. Used to
      *                cross-check the echoed {@code id} and {@code from}
-     *                attributes; never {@code null}
+     *                attributes. Never {@code null}
      * @return {@code true} when {@code reply} is a result envelope echoing
      *         {@code request}'s identifiers; {@code false} otherwise
      * @throws NullPointerException if either argument is {@code null}
      *
      * @implNote {@code WASmaxInGroupsIQResultResponseMixin.parseIQResultResponseMixin}
-     *           returns the structured result of the same checks; Cobalt
+     *           returns the structured result of the same checks. Cobalt
      *           collapses to a boolean since none of its callers consume
      *           the parsed projection (the {@code type} field is always
      *           {@code "result"} when the function succeeds and the

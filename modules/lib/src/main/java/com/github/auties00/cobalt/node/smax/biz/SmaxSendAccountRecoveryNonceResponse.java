@@ -26,7 +26,7 @@ public sealed interface SmaxSendAccountRecoveryNonceResponse extends SmaxOperati
      *
      * @param node    the inbound IQ stanza received from the relay;
      *                never {@code null}
-     * @param request the original outbound stanza — used to validate
+     * @param request the original outbound stanza. Used to validate
      *                echoed identifiers; never {@code null}
      * @return an {@link Optional} carrying the parsed variant, or
      *         {@link Optional#empty()} when no documented variant
@@ -50,7 +50,7 @@ public sealed interface SmaxSendAccountRecoveryNonceResponse extends SmaxOperati
     }
 
     /**
-     * The {@code Success} reply variant — the relay accepted the
+     * The {@code Success} reply variant. The relay accepted the
      * request and tried (or actually managed) to dispatch the
      * recovery email; the embedded {@code status} indicates which.
      *
@@ -66,8 +66,8 @@ public sealed interface SmaxSendAccountRecoveryNonceResponse extends SmaxOperati
     @WhatsAppWebModule(moduleName = "WASmaxInBizCtwaAdAccountSendAccountRecoveryNonceResponseMixin")
     final class Success implements SmaxSendAccountRecoveryNonceResponse {
         /**
-         * The {@code <Result><status>...</status></Result>} content —
-         * either {@code "SUCCESS"} (recovery email dispatched) or
+         * The {@code <Result><status>...</status></Result>} content.
+         * Either {@code "SUCCESS"} (recovery email dispatched) or
          * {@code "FAIL"} (the relay tried and gave up).
          */
         private final String status;
@@ -152,7 +152,7 @@ public sealed interface SmaxSendAccountRecoveryNonceResponse extends SmaxOperati
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected the
+     * The {@code ClientError} reply variant. The relay rejected the
      * request with a documented common-ad-account error code in the
      * {@code 4xx} range.
      *
@@ -253,7 +253,7 @@ public sealed interface SmaxSendAccountRecoveryNonceResponse extends SmaxOperati
     }
 
     /**
-     * The {@code ServerError} reply variant — the relay encountered a
+     * The {@code ServerError} reply variant. The relay encountered a
      * transient internal failure ({@code 5xx}) while processing the
      * request.
      *

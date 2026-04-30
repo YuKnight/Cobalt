@@ -43,7 +43,7 @@ public final class BusinessBroadcastCampaignHandler implements WebAppStateAction
      *
      * @implNote ADAPTED: WAWebBroadcastCampaignSync uses WALogger; Cobalt uses java.util.logging
      */
-    private static final Logger LOGGER = Logger.getLogger(BusinessBroadcastCampaignHandler.class.getName()); // ADAPTED: WALogger
+    private static final Logger LOGGER = Logger.getLogger(BusinessBroadcastCampaignHandler.class.getName());
 
     /**
      * The singleton instance of {@code BusinessBroadcastCampaignHandler}.
@@ -75,7 +75,7 @@ public final class BusinessBroadcastCampaignHandler implements WebAppStateAction
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBroadcastCampaignSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return BusinessBroadcastCampaignAction.ACTION_NAME; // WAWebBroadcastCampaignSync.getAction
+        return BusinessBroadcastCampaignAction.ACTION_NAME;
     }
 
     /**
@@ -87,18 +87,16 @@ public final class BusinessBroadcastCampaignHandler implements WebAppStateAction
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBroadcastCampaignSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return BusinessBroadcastCampaignAction.COLLECTION_NAME; // WAWebBroadcastCampaignSync: collectionName = Regular
+        return BusinessBroadcastCampaignAction.COLLECTION_NAME;
     }
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote WAWebBroadcastCampaignSync.getVersion — returns {@code 1}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBroadcastCampaignSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return BusinessBroadcastCampaignAction.ACTION_VERSION; // WAWebBroadcastCampaignSync.getVersion
+        return BusinessBroadcastCampaignAction.ACTION_VERSION;
     }
 
     /**
@@ -125,7 +123,7 @@ public final class BusinessBroadcastCampaignHandler implements WebAppStateAction
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBroadcastCampaignSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebBroadcastCampaignSync.applyMutations
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -154,37 +152,37 @@ public final class BusinessBroadcastCampaignHandler implements WebAppStateAction
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBroadcastCampaignSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        try { // WAWebBroadcastCampaignSync.applyMutations: try { ... } catch(e) { return {actionState: Failed} }
+        try {
             var indexArray = JSON.parseArray(mutation.index()); // ADAPTED: WAWebBroadcastCampaignSync uses e.indexParts (pre-parsed); Cobalt parses from JSON string
-            var campaignId = indexArray.getString(1); // WAWebBroadcastCampaignSync.applyMutations: var n = t[1]
-            if (campaignId == null || campaignId.isEmpty()) { // WAWebBroadcastCampaignSync.applyMutations: if (!n) return r.malformedActionIndex()
-                return malformedActionIndex(); // WAWebBroadcastCampaignSync.applyMutations: r.malformedActionIndex()
+            var campaignId = indexArray.getString(1);
+            if (campaignId == null || campaignId.isEmpty()) {
+                return malformedActionIndex();
             }
 
             var campaigns = new HashMap<>(client.store().businessBroadcastCampaigns()); // ADAPTED: WAWebBroadcastCampaignSync uses IndexedDB table; Cobalt uses ConcurrentHashMap store
-            if (mutation.operation() == SyncdOperation.SET) { // WAWebBroadcastCampaignSync.applyMutations: l.operation === "set"
-                if (!(mutation.value().action().orElse(null) instanceof BusinessBroadcastCampaignAction action)) { // WAWebBroadcastCampaignSync.applyMutations: var c = s.businessBroadcastCampaignAction; if (!c || ...)
-                    return malformedActionValue(); // WAWebBroadcastCampaignSync.applyMutations: return a++, o("WAWebSyncdIndexUtils").malformedActionValue(r.collectionName)
+            if (mutation.operation() == SyncdOperation.SET) {
+                if (!(mutation.value().action().orElse(null) instanceof BusinessBroadcastCampaignAction action)) {
+                    return malformedActionValue();
                 }
 
-                if (action.broadcastJid().isEmpty() || action.deviceId().isEmpty() || action.status().isEmpty()) { // WAWebBroadcastCampaignSync.applyMutations: c.broadcastJid == null || c.deviceId == null || c.status == null
-                    return malformedActionValue(); // WAWebBroadcastCampaignSync.applyMutations: return a++, o("WAWebSyncdIndexUtils").malformedActionValue(r.collectionName)
+                if (action.broadcastJid().isEmpty() || action.deviceId().isEmpty() || action.status().isEmpty()) {
+                    return malformedActionValue();
                 }
 
                 campaigns.put(campaignId, action); // ADAPTED: WAWebBroadcastCampaignSync.applyMutations: yield o("WAWebBizBroadcastCampaignStorageUtils").upsertCampaignStorage(n, c, u)
-                client.store().setBusinessBroadcastCampaigns(campaigns); // ADAPTED: store update via setter
-                return MutationApplicationResult.success(); // WAWebBroadcastCampaignSync.applyMutations: {actionState: Success}
+                client.store().setBusinessBroadcastCampaigns(campaigns);
+                return MutationApplicationResult.success();
             }
 
-            if (mutation.operation() == SyncdOperation.REMOVE) { // WAWebBroadcastCampaignSync.applyMutations: l.operation === "remove"
+            if (mutation.operation() == SyncdOperation.REMOVE) {
                 campaigns.remove(campaignId); // ADAPTED: WAWebBroadcastCampaignSync.applyMutations: yield o("WAWebBizBroadcastCampaignStorageUtils").removeCampaignStorage(n)
-                client.store().setBusinessBroadcastCampaigns(campaigns); // ADAPTED: store update via setter
-                return MutationApplicationResult.success(); // WAWebBroadcastCampaignSync.applyMutations: {actionState: Success}
+                client.store().setBusinessBroadcastCampaigns(campaigns);
+                return MutationApplicationResult.success();
             }
 
-            return MutationApplicationResult.failed(); // WAWebBroadcastCampaignSync.applyMutations: throw Error("Match: No case succesfully matched...") — caught by outer try/catch returning Failed
-        } catch (Exception e) { // WAWebBroadcastCampaignSync.applyMutations: catch(e) { return {actionState: Failed} }
-            return MutationApplicationResult.failed(); // WAWebBroadcastCampaignSync.applyMutations: {actionState: o("WASyncdConst").SyncActionState.Failed}
+            return MutationApplicationResult.failed();
+        } catch (Exception e) {
+            return MutationApplicationResult.failed();
         }
     }
 
@@ -215,17 +213,17 @@ public final class BusinessBroadcastCampaignHandler implements WebAppStateAction
     public List<Boolean> applyMutationBatch(WhatsAppClient client, WamService wamService, List<DecryptedMutation.Trusted> mutations) {
         // ADAPTED: WAWebBroadcastCampaignSync.applyMutations checks isBizBroadcastSendWebEnabledNoExposure()
         // and returns all Unsupported if false — Cobalt omits AB prop gating
-        var malformedCount = 0; // WAWebBroadcastCampaignSync.applyMutations: var a = 0
+        var malformedCount = 0;
         var results = new ArrayList<Boolean>(mutations.size());
         for (var mutation : mutations) { // ADAPTED: WAWebBroadcastCampaignSync.applyMutations uses Promise.all(t.map(...))
             var result = applyMutationResult(client, wamService, mutation);
-            if (result.actionState() == SyncActionState.MALFORMED) { // WAWebBroadcastCampaignSync.applyMutations: a++ on malformed
+            if (result.actionState() == SyncActionState.MALFORMED) {
                 malformedCount++;
             }
             results.add(result.actionState() == SyncActionState.SUCCESS);
         }
-        if (malformedCount > 0) { // WAWebBroadcastCampaignSync.applyMutations: a > 0 && o("WALogger").WARN(...)
-            LOGGER.warning("broadcast campaign sync: " + malformedCount + " malformed mutations"); // WAWebBroadcastCampaignSync.applyMutations: WALogger.WARN("broadcast campaign sync: N malformed mutations")
+        if (malformedCount > 0) {
+            LOGGER.warning("broadcast campaign sync: " + malformedCount + " malformed mutations");
         }
         // ADAPTED: WAWebBroadcastCampaignSync.applyMutations: i.size > 0 && o("WAWebBackendApi").frontendFireAndForget("refreshBroadcastCampaignState", ...)
         // — frontend UI refresh omitted, no Cobalt equivalent
@@ -258,19 +256,19 @@ public final class BusinessBroadcastCampaignHandler implements WebAppStateAction
             BusinessBroadcastCampaignAction action,
             Instant timestamp
     ) {
-        var value = new SyncActionValueBuilder() // WAWebBroadcastCampaignSync.getCampaignMutation: var e = {businessBroadcastCampaignAction: n}
-                .timestamp(timestamp) // WAWebSyncdActionUtils.buildPendingMutation: timestamp: r
-                .businessBroadcastCampaignAction(action) // WAWebBroadcastCampaignSync.getCampaignMutation: businessBroadcastCampaignAction: n
+        var value = new SyncActionValueBuilder()
+                .timestamp(timestamp)
+                .businessBroadcastCampaignAction(action)
                 .build();
-        var index = JSON.toJSONString(List.of(actionName(), campaignId)); // WAWebSyncdActionUtils.buildPendingMutation: index = JSON.stringify([action].concat(indexArgs)) where indexArgs = [t]
-        var mutation = new DecryptedMutation.Trusted( // WAWebSyncdActionUtils.buildPendingMutation: return { collection, index, binarySyncAction, version, operation, timestamp, action }
+        var index = JSON.toJSONString(List.of(actionName(), campaignId));
+        var mutation = new DecryptedMutation.Trusted(
                 index,
                 value,
-                SyncdOperation.SET, // WAWebBroadcastCampaignSync.getCampaignMutation: operation: SyncdMutation$SyncdOperation.SET
+                SyncdOperation.SET,
                 timestamp,
                 version()
         );
-        return new SyncPendingMutation(mutation, 0); // WAWebSyncdActionUtils.buildPendingMutation
+        return new SyncPendingMutation(mutation, 0);
     }
 
     /**
@@ -291,17 +289,17 @@ public final class BusinessBroadcastCampaignHandler implements WebAppStateAction
      */
     @WhatsAppWebExport(moduleName = "WAWebBroadcastCampaignSync", exports = "getDeleteCampaignMutation", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncPendingMutation getDeleteCampaignMutation(String campaignId, Instant timestamp) {
-        var value = new SyncActionValueBuilder() // WAWebBroadcastCampaignSync.getDeleteCampaignMutation: value: {}
-                .timestamp(timestamp) // WAWebSyncdActionUtils.buildPendingMutation: timestamp: n
+        var value = new SyncActionValueBuilder()
+                .timestamp(timestamp)
                 .build();
-        var index = JSON.toJSONString(List.of(actionName(), campaignId)); // WAWebSyncdActionUtils.buildPendingMutation: index = JSON.stringify([action].concat(indexArgs)) where indexArgs = [t]
-        var mutation = new DecryptedMutation.Trusted( // WAWebSyncdActionUtils.buildPendingMutation
+        var index = JSON.toJSONString(List.of(actionName(), campaignId));
+        var mutation = new DecryptedMutation.Trusted(
                 index,
                 value,
-                SyncdOperation.REMOVE, // WAWebBroadcastCampaignSync.getDeleteCampaignMutation: operation: SyncdMutation$SyncdOperation.REMOVE
+                SyncdOperation.REMOVE,
                 timestamp,
                 version()
         );
-        return new SyncPendingMutation(mutation, 0); // WAWebSyncdActionUtils.buildPendingMutation
+        return new SyncPendingMutation(mutation, 0);
     }
 }

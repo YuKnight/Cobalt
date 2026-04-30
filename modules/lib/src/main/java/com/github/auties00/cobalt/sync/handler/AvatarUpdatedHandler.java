@@ -67,7 +67,7 @@ public final class AvatarUpdatedHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebStickersAvatarUpdatedSyncAction", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return AvatarUpdatedAction.ACTION_NAME; // WAWebStickersAvatarUpdatedSyncAction.getAction
+        return AvatarUpdatedAction.ACTION_NAME;
     }
 
     /**
@@ -80,7 +80,7 @@ public final class AvatarUpdatedHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebStickersAvatarUpdatedSyncAction", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return AvatarUpdatedAction.COLLECTION_NAME; // WAWebStickersAvatarUpdatedSyncAction: this.collectionName = Regular
+        return AvatarUpdatedAction.COLLECTION_NAME;
     }
 
     /**
@@ -92,7 +92,7 @@ public final class AvatarUpdatedHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebStickersAvatarUpdatedSyncAction", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return AvatarUpdatedAction.ACTION_VERSION; // WAWebStickersAvatarUpdatedSyncAction.getVersion: return 7
+        return AvatarUpdatedAction.ACTION_VERSION;
     }
 
     /**
@@ -133,33 +133,28 @@ public final class AvatarUpdatedHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebStickersAvatarUpdatedSyncAction", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        // WAWebStickersAvatarUpdatedSyncAction.applyMutations:
         //   if (!WAWebAvatarGatingUtils.avatarsOnWebEnabled())
         //     return mutations.map(() => ({actionState: Unsupported}))
-        // WAWebAvatarGatingUtils.avatarsOnWebEnabled:
         //   return WAWebABProps.getABPropConfigValue("enable_avatars_on_web_companion")
-        if (!client.abPropsService().getBool(ABProp.ENABLE_AVATARS_ON_WEB_COMPANION)) { // WAWebAvatarGatingUtils.avatarsOnWebEnabled
-            return MutationApplicationResult.unsupported(); // WAWebStickersAvatarUpdatedSyncAction.applyMutations: {actionState: Unsupported}
+        if (!client.abPropsService().getBool(ABProp.ENABLE_AVATARS_ON_WEB_COMPANION)) {
+            return MutationApplicationResult.unsupported();
         }
 
-        // WAWebStickersAvatarUpdatedSyncAction.applyMutations:
         //   if (e.operation !== "set") return notSupported++, {actionState: Unsupported}
-        if (mutation.operation() != SyncdOperation.SET) { // WAWebStickersAvatarUpdatedSyncAction.applyMutations: e.operation !== "set"
-            return MutationApplicationResult.unsupported(); // WAWebStickersAvatarUpdatedSyncAction.applyMutations: {actionState: Unsupported}
+        if (mutation.operation() != SyncdOperation.SET) {
+            return MutationApplicationResult.unsupported();
         }
 
-        // WAWebStickersAvatarUpdatedSyncAction.applyMutations:
         //   var l = e.value.avatarUpdatedAction?.eventType
         //   if (l == null) return malformed++, malformedActionValue(this.collectionName)
-        if (!(mutation.value().action().orElse(null) instanceof AvatarUpdatedAction action)) { // WAWebStickersAvatarUpdatedSyncAction.applyMutations: e.value.avatarUpdatedAction == null
-            return malformedActionValue(); // WAWebSyncdIndexUtils.malformedActionValue(this.collectionName)
+        if (!(mutation.value().action().orElse(null) instanceof AvatarUpdatedAction action)) {
+            return malformedActionValue();
         }
-        var eventType = action.eventType().orElse(null); // WAWebStickersAvatarUpdatedSyncAction.applyMutations: var l = ...?.eventType
-        if (eventType == null) { // WAWebStickersAvatarUpdatedSyncAction.applyMutations: if (l == null)
-            return malformedActionValue(); // WAWebSyncdIndexUtils.malformedActionValue(this.collectionName)
+        var eventType = action.eventType().orElse(null);
+        if (eventType == null) {
+            return malformedActionValue();
         }
 
-        // WAWebStickersAvatarUpdatedSyncAction.applyMutations:
         //   var s = WAWebUserPrefsMultiDevice.getPairingTimestamp()
         //   if (s != null) {
         //     var u = WATimeUtils.castMilliSecondsToUnixTime(e.timestamp)
@@ -170,23 +165,19 @@ public final class AvatarUpdatedHandler implements WebAppStateActionHandler {
             return MutationApplicationResult.skipped();
         }
 
-        // WAWebStickersAvatarUpdatedSyncAction.applyMutations switch (l):
         //   case CREATED: case UPDATED: WAWebHasAvatar.saveHasAvatarOnTempStorage(true); break
         //   case DELETED: WAWebHasAvatar.saveHasAvatarOnTempStorage(false); break
         //
-        // WAWebHasAvatar.saveHasAvatarOnTempStorage:
-        //   WAWebUserPrefsStore.setTS(WAWebUserPrefsKeys.UserPrefs.UserHasAvatar, e)
         //
         // Cobalt collapses the UserPrefsStore "UserHasAvatar" key into
         // WhatsAppStore.setHasAvatar(Boolean) (Optional<Boolean> hasAvatar() getter).
         switch (eventType) {
-            case CREATED, UPDATED -> client.store().setHasAvatar(true); // WAWebHasAvatar.saveHasAvatarOnTempStorage(true)
-            case DELETED -> client.store().setHasAvatar(false); // WAWebHasAvatar.saveHasAvatarOnTempStorage(false)
+            case CREATED, UPDATED -> client.store().setHasAvatar(true);
+            case DELETED -> client.store().setHasAvatar(false);
         }
 
-        // WAWebStickersAvatarUpdatedSyncAction.applyMutations:
         //   WAWebRecentStickerCollectionMd.RecentStickerCollectionMd.removeAllRecentAvatarStickers()
         client.store().removeAllRecentAvatarStickers();
-        return MutationApplicationResult.success(); // WAWebStickersAvatarUpdatedSyncAction.applyMutations: {actionState: Success}
+        return MutationApplicationResult.success();
     }
 }

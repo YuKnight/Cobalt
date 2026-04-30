@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.node.iq.biz;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.iq.IqOperation;
 import com.github.auties00.cobalt.node.smax.util.SmaxBaseServerErrorMixin;
@@ -9,9 +10,10 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Sealed family of inbound reply variants produced by the relay for an
- * {@link IqDeleteCoverPhotoRequest}.
+ * Sealed family of inbound reply variants produced by the relay in
+ * response to an {@link IqDeleteCoverPhotoRequest}.
  */
+@WhatsAppWebModule(moduleName = "WAWebBusinessProfileJob")
 public sealed interface IqDeleteCoverPhotoResponse extends IqOperation.Response
         permits IqDeleteCoverPhotoResponse.Success,
         IqDeleteCoverPhotoResponse.ClientError,

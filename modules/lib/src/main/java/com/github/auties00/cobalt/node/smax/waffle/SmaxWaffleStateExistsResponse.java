@@ -50,13 +50,8 @@ public sealed interface SmaxWaffleStateExistsResponse extends SmaxOperation.Resp
     }
 
     /**
-     * The {@code Success} reply variant — the relay reported the
+     * The {@code Success} reply variant. The relay reported the
      * client's Waffle state machine code.
-     *
-     * @implNote {@code WASmaxInWaffleStateExistsResponseSuccess.parseStateExistsResponseSuccess}
-     *           projects the {@code <wf_state>INT</wf_state>}
-     *           content plus an optional
-     *           {@code <suspended_state npr?/>} child.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInWaffleStateExistsResponseSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxInWaffleIQResultResponseMixin")
@@ -196,7 +191,7 @@ public sealed interface SmaxWaffleStateExistsResponse extends SmaxOperation.Resp
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected the
+     * The {@code ClientError} reply variant. The relay rejected the
      * request as malformed or unauthorised.
      *
      * @implNote {@code WASmaxInWaffleStateExistsResponseError.parseStateExistsResponseError}
@@ -292,7 +287,7 @@ public sealed interface SmaxWaffleStateExistsResponse extends SmaxOperation.Resp
     }
 
     /**
-     * The {@code ServerError} reply variant — the relay encountered a
+     * The {@code ServerError} reply variant. The relay encountered a
      * transient internal failure.
      *
      * @implNote Same wire-shape as {@link ClientError}; Cobalt routes

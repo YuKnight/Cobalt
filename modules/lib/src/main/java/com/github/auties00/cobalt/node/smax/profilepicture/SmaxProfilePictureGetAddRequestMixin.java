@@ -18,10 +18,6 @@ import java.util.Optional;
 /**
  * The optional {@code <add_request code admin? expiration/>}
  * payload carried by a {@link SmaxProfilePictureGetRequest}.
- *
- * @implNote {@code WASmaxOutProfilePictureAddRequestMixin.mergeAddRequestMixin}
- *           wraps the bare {@code <add_request/>} element under a
- *           {@code <picture>} root.
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutProfilePictureAddRequestMixin")
 public final class SmaxProfilePictureGetAddRequestMixin {

@@ -15,7 +15,7 @@ import java.util.Optional;
  * algorithm="rsa2048">} subtree shared by every {@code WASmaxOut/InWaffle*}
  * RPC that exchanges encrypted payloads.
  *
- * <p>The mixin carries four opaque byte blobs — the RSA-2048 wrapped
+ * <p>The mixin carries four opaque byte blobs. The RSA-2048 wrapped
  * symmetric key, the AES-GCM nonce, the AES-GCM ciphertext, and the
  * AES-GCM authentication tag. Cobalt collapses the WA Web {@code
  * WASmaxOutWaffleRSAEncryptionMetadataMixin}/{@code
@@ -114,14 +114,6 @@ public final class SmaxWaffleRsaEncryptionMetadata {
      *
      * @return the {@code <encryption_metadata/>} {@link Node}; never
      *         {@code null}
-     *
-     * @implNote {@code WASmaxOutWaffleRSAEncryptionMetadataMixin.mergeRSAEncryptionMetadataMixin}
-     *           produces the same XML shape — four {@code <encrypted_key>},
-     *           {@code <nonce>}, {@code <encrypted_data>},
-     *           {@code <auth_tag>} children carrying their respective byte
-     *           blobs as content under an
-     *           {@code <encryption_metadata version="1"
-     *           algorithm="rsa2048">} envelope.
      */
     @WhatsAppWebExport(moduleName = "WASmaxOutWaffleRSAEncryptionMetadataMixin",
             exports = "mergeRSAEncryptionMetadataMixin", adaptation = WhatsAppAdaptation.DIRECT)

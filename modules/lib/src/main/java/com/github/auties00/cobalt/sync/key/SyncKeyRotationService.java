@@ -111,20 +111,34 @@ public final class SyncKeyRotationService {
      */
     private final Object rotationLock = new Object();
 
-    private final WhatsAppClient whatsapp;
     /**
-     * Reference to the web app-state service used for missing-key
-     * follow-up scheduling (all-devices-responded grace period and
-     * missing-key timeout rescheduling).
+     * The WhatsApp client used for store access and for sending peer messages.
+     */
+    private final WhatsAppClient whatsapp;
+
+    /**
+     * Reference to the web app-state service used for missing-key follow-up
+     * scheduling, covering both the all-devices-responded grace period and
+     * the missing-key timeout rescheduling.
      *
-     * @implNote WAWebSyncdStoreMissingKeys (missing-key follow-ups)
+     * @implNote WAWebSyncdStoreMissingKeys (missing-key follow-ups).
      */
     private final WebAppStateService webAppStateService;
+
+    /**
+     * Source of A/B-tested configuration values for rotation thresholds.
+     */
     private final ABPropsService abPropsService;
+
     /**
      * The WAM telemetry service used to commit key rotation events.
      */
     private final WamService wamService;
+
+    /**
+     * Handle of the currently scheduled periodic rotation job, or {@code null}
+     * when none is scheduled.
+     */
     private volatile CompletableFuture<?> periodicRotationJob;
 
     /**

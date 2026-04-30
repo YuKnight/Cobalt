@@ -70,7 +70,7 @@ public final class DeleteMessageForMeHandler implements WebAppStateActionHandler
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDeleteMessageForMeSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return DeleteMessageForMeAction.ACTION_NAME; // WAWebDeleteMessageForMeSync.getAction
+        return DeleteMessageForMeAction.ACTION_NAME;
     }
 
     /**
@@ -83,7 +83,7 @@ public final class DeleteMessageForMeHandler implements WebAppStateActionHandler
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDeleteMessageForMeSync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return DeleteMessageForMeAction.COLLECTION_NAME; // WAWebDeleteMessageForMeSync: collectionName = RegularHigh
+        return DeleteMessageForMeAction.COLLECTION_NAME;
     }
 
     /**
@@ -95,7 +95,7 @@ public final class DeleteMessageForMeHandler implements WebAppStateActionHandler
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDeleteMessageForMeSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return DeleteMessageForMeAction.ACTION_VERSION; // WAWebDeleteMessageForMeSync.getVersion
+        return DeleteMessageForMeAction.ACTION_VERSION;
     }
 
     /**
@@ -111,7 +111,7 @@ public final class DeleteMessageForMeHandler implements WebAppStateActionHandler
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDeleteMessageForMeSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebDeleteMessageForMeSync.applyMutations
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -138,69 +138,62 @@ public final class DeleteMessageForMeHandler implements WebAppStateActionHandler
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDeleteMessageForMeSync", exports = {"applyMutations", "getMessageKey"}, adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        // WAWebDeleteMessageForMeSync.applyMutations: if (e.operation === "set") { ... } else { return Unsupported }
         if (mutation.operation() != SyncdOperation.SET) {
-            return MutationApplicationResult.unsupported(); // WAWebDeleteMessageForMeSync.applyMutations: b++, {actionState: Unsupported}
+            return MutationApplicationResult.unsupported();
         }
 
-        // WAWebDeleteMessageForMeSync.applyMutations: var n = e.indexParts, i = n[1], s = n[2], u = n[3], f = n[4]
         var indexArray = JSON.parseArray(mutation.index());
-        if (indexArray.size() < 5) { // WAWebDeleteMessageForMeSync.applyMutations: if (!i || !s || !u || !f) — array too small
-            return malformedActionIndex(); // WAWebDeleteMessageForMeSync.applyMutations: return t.malformedActionIndex()
+        if (indexArray.size() < 5) {
+            return malformedActionIndex();
         }
 
-        var chatJidString = indexArray.getString(1); // WAWebDeleteMessageForMeSync.applyMutations: i = n[1]
-        var messageId = indexArray.getString(2); // WAWebDeleteMessageForMeSync.applyMutations: s = n[2]
-        var fromMeString = indexArray.getString(3); // WAWebDeleteMessageForMeSync.applyMutations: u = n[3]
-        var participantString = indexArray.getString(4); // WAWebDeleteMessageForMeSync.applyMutations: f = n[4]
+        var chatJidString = indexArray.getString(1);
+        var messageId = indexArray.getString(2);
+        var fromMeString = indexArray.getString(3);
+        var participantString = indexArray.getString(4);
 
-        // WAWebDeleteMessageForMeSync.applyMutations: if (!i || !s || !u || !f) — check all parts are truthy
         if (isNullOrEmpty(chatJidString) || isNullOrEmpty(messageId)
                 || isNullOrEmpty(fromMeString) || isNullOrEmpty(participantString)) {
-            return malformedActionIndex(); // WAWebDeleteMessageForMeSync.applyMutations: return t.malformedActionIndex()
+            return malformedActionIndex();
         }
 
-        // WAWebDeleteMessageForMeSync.applyMutations: var R = syncKeyToMsgKey(i, s, u, f)
         var msgKey = SyncdIndexUtils.syncKeyToMsgKey(
                 client.store(), chatJidString, messageId, fromMeString, participantString
         );
-        if (msgKey.isEmpty()) { // WAWebDeleteMessageForMeSync.applyMutations: if (!R) return malformedActionIndex()
-            return malformedActionIndex(); // WAWebDeleteMessageForMeSync.applyMutations: t.malformedActionIndex()
+        if (msgKey.isEmpty()) {
+            return malformedActionIndex();
         }
 
-        // WAWebDeleteMessageForMeSync.applyMutations: var S = l.get(i) — resolved local chat JID
         // ADAPTED: Cobalt resolves chat directly from the index JID without the
         // incomingRemoteToLocalChatId cache used by WAWebSyncdResolveMessages
-        var chatJid = Jid.of(chatJidString); // WAWebDeleteMessageForMeSync.applyMutations: index remote JID
+        var chatJid = Jid.of(chatJidString);
         var chat = client.store().findChatByJid(chatJid);
-        if (chat.isEmpty()) { // WAWebDeleteMessageForMeSync.applyMutations: if (S == null) return Orphan
-            return MutationApplicationResult.orphan( // WAWebDeleteMessageForMeSync.applyMutations: {actionState: Orphan, orphanModel: {modelId: R.toString(), modelType: Msg}}
-                    SyncdIndexUtils.serializeMessageKey(msgKey.get()), // WAWebDeleteMessageForMeSync.applyMutations: R.toString()
-                    "Msg" // WAWebDeleteMessageForMeSync.applyMutations: SyncModelType.Msg
+        if (chat.isEmpty()) {
+            return MutationApplicationResult.orphan(
+                    SyncdIndexUtils.serializeMessageKey(msgKey.get()),
+                    "Msg"
             );
         }
 
-        // WAWebDeleteMessageForMeSync.applyMutations: var E = C.find(function(e) { return e.startsWith(...) })
         // ADAPTED: Cobalt uses findMessageById + filter instead of msgKeyToDbIdWithoutFromMeParticipant prefix match
-        var fromMe = "1".equals(fromMeString); // WAWebDeleteMessageForMeSync.applyMutations: fromMe from index
-        var participant = !"0".equals(participantString) ? Jid.of(participantString) : null; // WAWebDeleteMessageForMeSync.applyMutations: participant from index ("0" means no participant)
+        var fromMe = "1".equals(fromMeString);
+        var participant = !"0".equals(participantString) ? Jid.of(participantString) : null;
         var removed = client.store()
                 .findMessageById(chat.get(), messageId)
                 .filter(msg -> msg.key().fromMe() == fromMe)
                 .filter(msg -> participant == null || participant.toUserJid().equals(msg.key().senderJid().map(Jid::toUserJid).orElse(null)))
                 .flatMap(info -> info.key().id())
                 .map(id -> {
-                    chat.get().removeMessage(id); // WAWebDeleteMessageForMeSync.applyMutations: frontendSendAndReceive("deleteMessageFromCollectionForSync", {msgKey: E})
+                    chat.get().removeMessage(id);
                     return id;
                 })
                 .isPresent();
 
-        // WAWebDeleteMessageForMeSync.applyMutations: if (E == null) return Orphan, else return Success
         return removed
-                ? MutationApplicationResult.success() // WAWebDeleteMessageForMeSync.applyMutations: {actionState: Success}
-                : MutationApplicationResult.orphan( // WAWebDeleteMessageForMeSync.applyMutations: {actionState: Orphan, orphanModel: {modelId: R.toString(), modelType: Msg}}
-                        SyncdIndexUtils.serializeMessageKey(msgKey.get()), // WAWebDeleteMessageForMeSync.applyMutations: R.toString()
-                        "Msg" // WAWebDeleteMessageForMeSync.applyMutations: SyncModelType.Msg
+                ? MutationApplicationResult.success()
+                : MutationApplicationResult.orphan(
+                        SyncdIndexUtils.serializeMessageKey(msgKey.get()),
+                        "Msg"
                 );
     }
 
@@ -227,23 +220,20 @@ public final class DeleteMessageForMeHandler implements WebAppStateActionHandler
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDeleteMessageForMeSync", exports = "resolveConflicts", adaptation = WhatsAppAdaptation.DIRECT)
     public ConflictResolution resolveConflicts(DecryptedMutation.Trusted localMutation, DecryptedMutation.Trusted remoteMutation) {
-        // WAWebDeleteMessageForMeSync.resolveConflicts: u = WANullthrows(l.deleteMessageForMeAction?.deleteMedia)
         var localDeleteMedia = localMutation.value().action()
                 .filter(a -> a instanceof DeleteMessageForMeAction)
                 .map(a -> ((DeleteMessageForMeAction) a).deleteMedia())
                 .orElse(false); // ADAPTED: WANullthrows would throw on null; Cobalt coalesces to false
-        // WAWebDeleteMessageForMeSync.resolveConflicts: c = WANullthrows(s?.deleteMessageForMeAction?.deleteMedia)
         var remoteDeleteMedia = remoteMutation.value().action()
                 .filter(a -> a instanceof DeleteMessageForMeAction)
                 .map(a -> ((DeleteMessageForMeAction) a).deleteMedia())
                 .orElse(false); // ADAPTED: WANullthrows would throw on null; Cobalt coalesces to false
 
-        // WAWebDeleteMessageForMeSync.resolveConflicts: return !c && u ? SkipRemote : SkipRemoteAndDropLocal
         if (!remoteDeleteMedia && localDeleteMedia) {
-            return ConflictResolution.of(ConflictResolutionState.SKIP_REMOTE); // WAWebDeleteMessageForMeSync.resolveConflicts: SkipRemote
+            return ConflictResolution.of(ConflictResolutionState.SKIP_REMOTE);
         }
 
-        return ConflictResolution.of(ConflictResolutionState.SKIP_REMOTE_DROP_LOCAL); // WAWebDeleteMessageForMeSync.resolveConflicts: SkipRemoteAndDropLocal
+        return ConflictResolution.of(ConflictResolutionState.SKIP_REMOTE_DROP_LOCAL);
     }
 
     /**
@@ -275,42 +265,37 @@ public final class DeleteMessageForMeHandler implements WebAppStateActionHandler
             boolean fromMe,
             Jid participant
     ) {
-        // WAWebDeleteMessageForMeSync.buildDeleteForMeMutation: var l = {deleteMessageForMeAction: {deleteMedia: t, messageTimestamp: r}}
         var action = new DeleteMessageForMeActionBuilder()
-                .deleteMedia(deleteMedia) // WAWebDeleteMessageForMeSync.buildDeleteForMeMutation: deleteMedia: t
-                .messageTimestamp(messageTimestamp) // WAWebDeleteMessageForMeSync.buildDeleteForMeMutation: messageTimestamp: r
+                .deleteMedia(deleteMedia)
+                .messageTimestamp(messageTimestamp)
                 .build();
 
-        // WAWebSyncdActionUtils.buildPendingMutation: encodeProtobuf(SyncActionValueSpec, {...l, timestamp: i})
         var value = new SyncActionValueBuilder()
-                .timestamp(timestamp) // WAWebSyncdActionUtils.buildPendingMutation: timestamp: a
-                .deleteMessageForMeAction(action) // WAWebDeleteMessageForMeSync.buildDeleteForMeMutation: {deleteMessageForMeAction: ...}
+                .timestamp(timestamp)
+                .deleteMessageForMeAction(action)
                 .build();
 
-        // WAWebSyncdActionUtils.buildMessageKey: [remoteJid, id, fromMe?"1":"0", (participant != null && !fromMe) ? participant : "0"]
-        var fromMeStr = fromMe ? "1" : "0"; // WAWebSyncdActionUtils.buildMessageKey: t ? "1" : "0"
-        var participantStr = participant != null && !fromMe // WAWebSyncdActionUtils.buildMessageKey: r != null && !t ? r : "0"
+        var fromMeStr = fromMe ? "1" : "0";
+        var participantStr = participant != null && !fromMe
                 ? participant.toString()
                 : "0";
 
-        // WAWebSyncdActionUtils.buildPendingMutation: index = JSON.stringify([action].concat(indexArgs))
         var index = JSON.toJSONString(List.of(
-                actionName(), // WAWebSyncdActionUtils.buildIndex: [action, ...indexArgs]
-                remoteJid.toString(), // WAWebSyncdActionUtils.buildMessageKey: o (remoteJid)
-                id, // WAWebSyncdActionUtils.buildMessageKey: n (id)
-                fromMeStr, // WAWebSyncdActionUtils.buildMessageKey: fromMe
-                participantStr // WAWebSyncdActionUtils.buildMessageKey: participant
+                actionName(),
+                remoteJid.toString(),
+                id,
+                fromMeStr,
+                participantStr
         ));
 
-        // WAWebSyncdActionUtils.buildPendingMutation: return { collection, index, binarySyncAction, version, operation, timestamp, action }
         var mutation = new DecryptedMutation.Trusted(
                 index,
                 value,
-                SyncdOperation.SET, // WAWebDeleteMessageForMeSync.buildDeleteForMeMutation: operation: SET
+                SyncdOperation.SET,
                 timestamp,
                 version()
         );
-        return new SyncPendingMutation(mutation, 0); // WAWebSyncdActionUtils.buildPendingMutation
+        return new SyncPendingMutation(mutation, 0);
     }
 
     /**
@@ -340,35 +325,31 @@ public final class DeleteMessageForMeHandler implements WebAppStateActionHandler
             List<Instant> messageTimestamps,
             List<Boolean> isGroupMessages
     ) {
-        // WAWebDeleteMessageForMeSync.getDeleteForMeMutations: var a = unixTimeMs()
-        var now = Instant.now(); // WAWebDeleteMessageForMeSync.getDeleteForMeMutations: var a = o("WATimeUtils").unixTimeMs()
+        var now = Instant.now();
         var results = new ArrayList<SyncPendingMutation>(keys.size());
-        for (var i = 0; i < keys.size(); i++) { // WAWebDeleteMessageForMeSync.getDeleteForMeMutations: t.map(function(t) { ... })
+        for (var i = 0; i < keys.size(); i++) {
             var key = keys.get(i);
             var messageTimestamp = messageTimestamps.get(i);
             var isGroup = isGroupMessages.get(i);
 
-            // WAWebDeleteMessageForMeSync.getDeleteForMeMutations: var i = getSender(t), l = i ? widToUserJid(i) : null
             var senderJid = key.senderJid().map(Jid::toUserJid).orElse(null); // ADAPTED: WAWebDeleteMessageForMeSync.getDeleteForMeMutations — getSender + widToUserJid
 
-            // WAWebDeleteMessageForMeSync.getDeleteForMeMutations: participant = getIsGroupMsg(t) && !t.id.fromMe ? l : null
-            var participant = isGroup && !key.fromMe() ? senderJid : null; // WAWebDeleteMessageForMeSync.getDeleteForMeMutations: participant logic
+            var participant = isGroup && !key.fromMe() ? senderJid : null;
 
-            // WAWebDeleteMessageForMeSync.getDeleteForMeMutations: var s = yield C(n) — resolve chat JID for mutation index
             // ADAPTED: Cobalt uses the message's parentJid directly
-            var remoteJid = key.parentJid().orElse(null); // WAWebDeleteMessageForMeSync.getDeleteForMeMutations: var n = t.id.remote
+            var remoteJid = key.parentJid().orElse(null);
             if (remoteJid == null) {
                 continue; // ADAPTED: defensive null check — WA Web would throw via getChatJidMutationIndexForChat
             }
 
-            results.add(buildDeleteForMeMutation( // WAWebDeleteMessageForMeSync.getDeleteForMeMutations: return e.buildDeleteForMeMutation({...})
-                    now, // WAWebDeleteMessageForMeSync.getDeleteForMeMutations: timestamp: a
-                    deleteMedia, // WAWebDeleteMessageForMeSync.getDeleteForMeMutations: deleteMedia: r
-                    messageTimestamp, // WAWebDeleteMessageForMeSync.getDeleteForMeMutations: messageTimestamp: getT(t)
-                    remoteJid, // WAWebDeleteMessageForMeSync.getDeleteForMeMutations: remoteJid: s (resolved)
-                    key.id().orElse(""), // WAWebDeleteMessageForMeSync.getDeleteForMeMutations: id: t.id.id
-                    key.fromMe(), // WAWebDeleteMessageForMeSync.getDeleteForMeMutations: fromMe: t.id.fromMe
-                    participant // WAWebDeleteMessageForMeSync.getDeleteForMeMutations: participant
+            results.add(buildDeleteForMeMutation(
+                    now,
+                    deleteMedia,
+                    messageTimestamp,
+                    remoteJid,
+                    key.id().orElse(""),
+                    key.fromMe(),
+                    participant
             ));
         }
         return results;

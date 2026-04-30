@@ -62,29 +62,20 @@ import static java.lang.System.Logger.Level.WARNING;
 import static java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor;
 
 /**
- * Fully in-memory implementation of {@link WhatsAppStore} that persists its
- * state to protobuf files on disk.
+ * In-memory implementation of {@link WhatsAppStore} that persists its state
+ * to protobuf files on disk.
  *
- * <p>This class specialises {@link AbstractWhatsAppStore} by:
- * <ul>
- *   <li>holding all chats and newsletters in {@link ConcurrentHashMap}s
- *       that are also serialised as protobuf {@code MAP} fields on the
- *       outer store message</li>
- *   <li>serialising the root store to {@code store.proto} and every chat
- *       or newsletter to its own {@code chat_*.proto} or
- *       {@code newsletter_*.proto} file so that per-entity writes do not
- *       require rewriting the whole store</li>
- *   <li>tracking per-entity hash codes so that {@link #save()} only
- *       rewrites files whose content has changed</li>
- *   <li>starting a virtual-thread worker to deserialise chats and
- *       newsletters in the background after loading, keeping the boot
- *       path fast for sessions with a large history</li>
- * </ul>
+ * <p>This class specialises {@link AbstractWhatsAppStore} by holding all
+ * chats and newsletters in {@link ConcurrentHashMap}s that are also serialised
+ * as protobuf {@code MAP} fields on the outer store message. The root store
+ * is serialised to {@code store.proto}, and every chat or newsletter is
+ * serialised to its own {@code chat_*.proto} or {@code newsletter_*.proto}
+ * file so that per-entity writes do not require rewriting the whole store.
  *
- * @implNote Cobalt merges WA Web's IndexedDB-backed chat/newsletter/message
- * tables into these in-memory maps; the dirty-checking save pattern mimics
- * IndexedDB's record-level put semantics without requiring a full embedded
- * database.
+ * <p>{@link #save()} tracks per-entity hash codes and only rewrites files
+ * whose content has changed. After loading, a virtual-thread worker
+ * deserialises chats and newsletters in the background, keeping the boot
+ * path fast for sessions with a large history.
  */
 @SuppressWarnings({"unused", "UnusedReturnValue"})
 @ProtobufMessage
@@ -101,20 +92,133 @@ final class InMemoryStore extends AbstractWhatsAppStore {
      */
     private static final String NEWSLETTER_PREFIX = "newsletter_";
 
+    /**
+     * The chats keyed by their JID.
+     */
     @ProtobufProperty(index = 82, type = ProtobufType.MAP, mapKeyType =  ProtobufType.STRING, mapValueType = ProtobufType.MESSAGE)
     final ConcurrentHashMap<Jid, Chat> chats;
 
+    /**
+     * The newsletters keyed by their JID.
+     */
     @ProtobufProperty(index = 83, type = ProtobufType.MAP, mapKeyType =  ProtobufType.STRING, mapValueType = ProtobufType.MESSAGE)
     final ConcurrentHashMap<Jid, Newsletter> newsletters;
 
+    /**
+     * The status updates keyed by their message identifier.
+     */
     private final ConcurrentHashMap<String, ChatMessageInfo> status;
 
+    /**
+     * The hash code of the root store at the time of the last successful save.
+     */
     private volatile Integer storeHashCode;
 
+    /**
+     * The hash codes of every chat and newsletter at the time of the last
+     * successful save, keyed by the {@code (storeId, jid)} pair.
+     */
     private final ConcurrentMap<StoreJidPair, Integer> jidsHashCodes;
 
+    /**
+     * The virtual thread used to deserialise per-chat and per-newsletter
+     * files in the background after loading.
+     */
     private volatile Thread attributionThread;
 
+    /**
+     * Constructs a new in-memory store from the protobuf-decoded fields and
+     * the per-chat and per-newsletter maps.
+     *
+     * @param uuid                                the session UUID
+     * @param phoneNumber                         the associated phone number, or {@code null}
+     * @param clientType                          the client type, must not be {@code null}
+     * @param initializationTimeStamp             the moment at which the store was first created
+     * @param device                              the device descriptor, must not be {@code null}
+     * @param releaseChannel                      the release channel, may be {@code null}
+     * @param online                              whether the user appears online
+     * @param locale                              the locale code, may be {@code null}
+     * @param name                                the display name, may be {@code null}
+     * @param verifiedName                        the verified business name, may be {@code null}
+     * @param profilePicture                      the profile picture URI, may be {@code null}
+     * @param about                               the about text, may be {@code null}
+     * @param jid                                 the user JID, may be {@code null}
+     * @param lid                                 the user LID, may be {@code null}
+     * @param businessAddress                     the business address, may be {@code null}
+     * @param businessLongitude                   the business longitude, may be {@code null}
+     * @param businessLatitude                    the business latitude, may be {@code null}
+     * @param businessDescription                 the business description, may be {@code null}
+     * @param businessWebsite                     the business website URL, may be {@code null}
+     * @param businessEmail                       the business email, may be {@code null}
+     * @param businessCategory                    the business category, may be {@code null}
+     * @param contacts                            the contact map, must not be {@code null}
+     * @param calls                               the call map, must not be {@code null}
+     * @param privacySettings                     the privacy settings map, must not be {@code null}
+     * @param unarchiveChats                      whether chats unarchive on new messages
+     * @param twentyFourHourFormat                whether the 24-hour time format is preferred
+     * @param newChatsEphemeralTimer              the default ephemeral timer for new chats
+     * @param webHistoryPolicy                    the history sync policy for web clients, may be {@code null}
+     * @param automaticPresenceUpdates            whether automatic presence updates are enabled
+     * @param automaticMessageReceipts            whether automatic message receipts are enabled
+     * @param checkPatchMacs                      whether patch MAC verification is enabled
+     * @param syncedChats                         whether chats have been synced
+     * @param syncedContacts                      whether contacts have been synced
+     * @param syncedNewsletters                   whether newsletters have been synced
+     * @param syncedStatus                        whether status updates have been synced
+     * @param syncedWebAppState                   whether web app state has been synced
+     * @param syncedBusinessCertificate           whether the business certificate has been synced
+     * @param registrationId                      the Signal registration id, may be {@code null} to be generated
+     * @param noiseKeyPair                        the Noise key pair, may be {@code null} to be generated
+     * @param identityKeyPair                     the Signal identity key pair, may be {@code null} to be generated
+     * @param signedDeviceIdentity                the signed device identity, may be {@code null}
+     * @param signedKeyPair                       the signed pre-key pair, may be {@code null} to be derived
+     * @param preKeys                             the pre-key map, must not be {@code null}
+     * @param fdid                                the FDID, may be {@code null} to be generated
+     * @param deviceId                            the device id, may be {@code null} to be generated
+     * @param advertisingId                       the advertising id, may be {@code null} to be generated
+     * @param identityId                          the identity id, may be {@code null} to be generated
+     * @param backupToken                         the backup token, may be {@code null} to be generated
+     * @param senderKeys                          the sender key map, must not be {@code null}
+     * @param appStateKeys                        the app state sync key map, must not be {@code null}
+     * @param sessions                            the Signal session map, must not be {@code null}
+     * @param hashStates                          the patch hash state map, must not be {@code null}
+     * @param registered                          whether registration completed
+     * @param showSecurityNotifications           whether security notifications are shown
+     * @param recentStickers                      the recent sticker map
+     * @param favouriteStickers                   the favourite sticker map
+     * @param quickReplies                        the quick reply map
+     * @param labels                              the label map
+     * @param clientVersion                       the client version, may be {@code null}
+     * @param companionVersion                    the companion version, may be {@code null}
+     * @param lastAdvCheckTime                    the last ADV check time, may be {@code null}
+     * @param remoteIdentities                    the remote identity key map, may be {@code null}
+     * @param missingSyncKeys                     the missing sync key map, may be {@code null}
+     * @param advSecretKey                        the ADV HMAC secret, may be {@code null}
+     * @param verifiedBusinessNames               the verified business name map, may be {@code null}
+     * @param directory                           the session directory, must not be {@code null}
+     * @param primaryDeviceSupportsSyncdRecovery  whether the primary device supports syncd recovery
+     * @param disableLinkPreviews                 whether link previews are disabled
+     * @param relayAllCalls                       whether all calls are relayed through WhatsApp servers
+     * @param externalWebBeta                     whether the user has opted into the external web beta
+     * @param chatLockSettings                    the chat lock settings, may be {@code null}
+     * @param favoriteChats                       the ordered list of favourite chat JIDs, may be {@code null}
+     * @param primaryFeatures                     the primary device feature flags, may be {@code null}
+     * @param mentionEveryoneMuteExpirations      the mention-everyone mute expirations, may be {@code null}
+     * @param orphanMutationEntries               the orphan mutation entries map
+     * @param outContacts                         the outgoing contact map, may be {@code null}
+     * @param clockSkewSeconds                    the server-vs-local clock skew in seconds
+     * @param groupAbPropsEmergencyPushTimestamp  the timestamp of the last group AB-props push
+     * @param abPropsAbKey                        the AB-props {@code abKey}, may be {@code null}
+     * @param abPropsHash                         the AB-props hash, may be {@code null}
+     * @param abPropsRefresh                      the AB-props refresh interval in seconds
+     * @param abPropsLastSyncTime                 the AB-props last sync timestamp
+     * @param abPropsRefreshId                    the AB-props refresh id
+     * @param abPropsWebRefreshId                 the web-only AB-props refresh id
+     * @param groupAbPropsRefreshId               the group AB-props refresh id
+     * @param baseKeys                            the X3DH base-key dedupe map, may be {@code null}
+     * @param chats                               the chat map keyed by JID
+     * @param newsletters                         the newsletter map keyed by JID
+     */
     InMemoryStore(
             UUID uuid, Long phoneNumber, WhatsAppClientType clientType, Instant initializationTimeStamp, WhatsAppDevice device, ClientPayload.ClientReleaseChannel releaseChannel, boolean online, String locale, String name, String verifiedName, URI profilePicture, String about, Jid jid, Jid lid, String businessAddress, Double businessLongitude, Double businessLatitude, String businessDescription, String businessWebsite, String businessEmail, BusinessCategory businessCategory, ConcurrentHashMap<Jid, Contact> contacts, ConcurrentHashMap<String, CallOffer> calls, ConcurrentHashMap<PrivacySettingType, PrivacySettingEntry> privacySettings, boolean unarchiveChats, boolean twentyFourHourFormat, ChatEphemeralTimer newChatsEphemeralTimer, WhatsAppWebClientHistory webHistoryPolicy, boolean automaticPresenceUpdates, boolean automaticMessageReceipts, boolean checkPatchMacs, boolean syncedChats, boolean syncedContacts, boolean syncedNewsletters, boolean syncedStatus, boolean syncedWebAppState, boolean syncedBusinessCertificate, Integer registrationId, SignalIdentityKeyPair noiseKeyPair, SignalIdentityKeyPair identityKeyPair, ADVSignedDeviceIdentity signedDeviceIdentity, SignalSignedKeyPair signedKeyPair, LinkedHashMap<Integer, SignalPreKeyPair> preKeys, UUID fdid, byte[] deviceId, UUID advertisingId, byte[] identityId, byte[] backupToken, ConcurrentMap<SignalSenderKeyName, SignalSenderKeyRecord> senderKeys, LinkedHashMap<String, AppStateSyncKey> appStateKeys, ConcurrentMap<SignalProtocolAddress, SignalSessionRecord> sessions, ConcurrentMap<SyncPatchType, SyncHashValue> hashStates, boolean registered, boolean showSecurityNotifications, ConcurrentMap<String, Sticker> recentStickers, ConcurrentMap<String, Sticker> favouriteStickers, ConcurrentMap<String, QuickReply> quickReplies, ConcurrentMap<String, Label> labels, ClientAppVersion clientVersion, ClientAppVersion companionVersion, Instant lastAdvCheckTime, ConcurrentMap<SignalProtocolAddress, SignalIdentityPublicKey> remoteIdentities, ConcurrentMap<String, MissingDeviceSyncKey> missingSyncKeys, byte[] advSecretKey, ConcurrentMap<Jid, BusinessVerifiedName> verifiedBusinessNames, Path directory, boolean primaryDeviceSupportsSyncdRecovery, boolean disableLinkPreviews, boolean relayAllCalls, boolean externalWebBeta, ChatLockSettings chatLockSettings, List<Jid> favoriteChats, List<String> primaryFeatures, ConcurrentMap<Jid, ChatMute> mentionEveryoneMuteExpirations, ConcurrentMap<SyncPatchType, AbstractWhatsAppStore.OrphanMutationEntries> orphanMutationEntries, ConcurrentHashMap<Jid, OutContact> outContacts, long clockSkewSeconds, Instant groupAbPropsEmergencyPushTimestamp, String abPropsAbKey, String abPropsHash, long abPropsRefresh, Instant abPropsLastSyncTime, long abPropsRefreshId, long abPropsWebRefreshId, long groupAbPropsRefreshId, ConcurrentMap<String, byte[]> baseKeys,
             ConcurrentHashMap<Jid, Chat> chats,
@@ -127,6 +231,14 @@ final class InMemoryStore extends AbstractWhatsAppStore {
         this.jidsHashCodes = new ConcurrentHashMap<>();
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Compares the live store hash code against the value captured at the
+     * last save. When the store has changed, dispatches one virtual-thread
+     * task per chat, per newsletter, and one for the root store, then waits
+     * for all of them to complete via the auto-closing executor.
+     */
     @Override
     public WhatsAppStore save() {
         var newHashCode = hashCode();
@@ -166,6 +278,12 @@ final class InMemoryStore extends AbstractWhatsAppStore {
         return this;
     }
 
+    /**
+     * Serialises the root store to {@code store.proto} via a temp file and
+     * an atomic move.
+     *
+     * @throws IOException if the file cannot be created, written or moved
+     */
     private void serializeStore() throws IOException {
         var path = StorePathUtils.getSessionFile(clientType, directory, uuid.toString(), "store.proto");
         Files.createDirectories(path.getParent());
@@ -196,6 +314,11 @@ final class InMemoryStore extends AbstractWhatsAppStore {
         }
     }
 
+    /**
+     * Spawns the virtual thread that lazily deserialises every per-chat and
+     * per-newsletter file under the session directory. Idempotent: subsequent
+     * calls do nothing once the worker has been started.
+     */
     void startBackgroundDeserialization() {
         if(attributionThread == null) {
             synchronized (this) {
@@ -206,6 +329,10 @@ final class InMemoryStore extends AbstractWhatsAppStore {
         }
     }
 
+    /**
+     * Walks the session directory and dispatches one deserialisation task
+     * per file matching the chat or newsletter naming convention.
+     */
     private void deserializeChatsAndNewsletters() {
         try {
             var sessionDirectory = StorePathUtils.getSessionDirectory(clientType, directory, uuid.toString());
@@ -223,6 +350,13 @@ final class InMemoryStore extends AbstractWhatsAppStore {
         }
     }
 
+    /**
+     * Dispatches a single file to the chat or newsletter deserialiser based
+     * on its file-name prefix, ignoring files that do not match either.
+     *
+     * @param path the file to inspect
+     * @throws IOException if the file cannot be read or decoded
+     */
     private void deserializeChatOrNewsletter(Path path) throws IOException {
         var fileName = path.getFileName().toString();
         if (fileName.startsWith(CHAT_PREFIX)) {
@@ -232,6 +366,13 @@ final class InMemoryStore extends AbstractWhatsAppStore {
         }
     }
 
+    /**
+     * Decodes one chat protobuf file and inserts it into {@link #chats},
+     * recording its hash for the dirty-checking save path.
+     *
+     * @param chatFile the chat protobuf file to decode
+     * @throws IOException if the file cannot be read or decoded
+     */
     private void deserializeChat(Path chatFile) throws IOException {
         try (var stream = Files.newInputStream(chatFile)) {
             var chat = InMemoryStoreChatSpec.decode(ProtobufInputStream.fromStream(stream));
@@ -241,6 +382,14 @@ final class InMemoryStore extends AbstractWhatsAppStore {
         }
     }
 
+    /**
+     * Decodes one newsletter protobuf file and inserts it into
+     * {@link #newsletters}, recording its hash for the dirty-checking save
+     * path.
+     *
+     * @param newsletterFile the newsletter protobuf file to decode
+     * @throws IOException if the file cannot be read or decoded
+     */
     private void deserializeNewsletter(Path newsletterFile) throws IOException {
         try (var stream = Files.newInputStream(newsletterFile)) {
             var newsletter = InMemoryStoreNewsletterSpec.decode(ProtobufInputStream.fromStream(stream));
@@ -250,6 +399,14 @@ final class InMemoryStore extends AbstractWhatsAppStore {
         }
     }
 
+    /**
+     * Serialises the given chat to its dedicated protobuf file when its hash
+     * has changed since the last save. Writes go through a temp file followed
+     * by an atomic move.
+     *
+     * @param chat the chat to serialise
+     * @throws IOException if the file cannot be created, written or moved
+     */
     private void serializeChat(Chat chat) throws IOException {
         var outputFile = getMessagesContainerPathIfUpdated(chat.jid(), chat.hashCode(), CHAT_PREFIX);
         if (outputFile == null) {
@@ -263,6 +420,14 @@ final class InMemoryStore extends AbstractWhatsAppStore {
         Files.move(tempFile, outputFile, StandardCopyOption.REPLACE_EXISTING);
     }
 
+    /**
+     * Serialises the given newsletter to its dedicated protobuf file when its
+     * hash has changed since the last save. Writes go through a temp file
+     * followed by an atomic move.
+     *
+     * @param newsletter the newsletter to serialise
+     * @throws IOException if the file cannot be created, written or moved
+     */
     private void serializeNewsletter(Newsletter newsletter) throws IOException {
         var outputFile = getMessagesContainerPathIfUpdated(newsletter.jid(), newsletter.hashCode(), NEWSLETTER_PREFIX);
         if(outputFile == null) {
@@ -276,6 +441,17 @@ final class InMemoryStore extends AbstractWhatsAppStore {
         Files.move(tempFile, outputFile, StandardCopyOption.REPLACE_EXISTING);
     }
 
+    /**
+     * Returns the destination path for the given chat or newsletter when its
+     * content has changed since the last save, or {@code null} when the
+     * captured hash matches.
+     *
+     * @param jid        the chat or newsletter JID
+     * @param hashCode   the current hash code of the entity
+     * @param filePrefix the file-name prefix
+     * @return the destination path, or {@code null} when the entity is up to date
+     * @throws IOException if the path cannot be resolved
+     */
     private Path getMessagesContainerPathIfUpdated(Jid jid, int hashCode, String filePrefix) throws IOException {
         var identifier = new StoreJidPair(uuid, jid);
         var oldHashCode = jidsHashCodes.getOrDefault(identifier, -1);
@@ -287,11 +463,24 @@ final class InMemoryStore extends AbstractWhatsAppStore {
         return StorePathUtils.getSessionFile(clientType, directory, uuid.toString(), fileName);
     }
 
+    /**
+     * Logs an error encountered during serialisation at the {@code ERROR}
+     * level.
+     *
+     * @param error the error to log
+     */
     private void handleSerializeError(Throwable error) {
 
         logger.log(ERROR, error);
     }
 
+    /**
+     * Composite key identifying a chat or newsletter entry in
+     * {@link #jidsHashCodes}.
+     *
+     * @param storeId the owning session UUID
+     * @param jid     the chat or newsletter JID
+     */
     private record StoreJidPair(UUID storeId, Jid jid) {
 
     }
@@ -514,8 +703,18 @@ final class InMemoryStore extends AbstractWhatsAppStore {
         return hashCode;
     }
 
+    /**
+     * Chat variant used by {@link InMemoryStore} that drops the in-memory
+     * messages list. Per-chat messages are read on demand from the dedicated
+     * protobuf file rather than being kept resident.
+     */
     @ProtobufMessage
     static final class Chat extends com.github.auties00.cobalt.model.chat.Chat {
+        /**
+         * Constructs a new in-memory chat with no in-memory message backing.
+         * Forwards every chat-level field to the
+         * {@link com.github.auties00.cobalt.model.chat.Chat} super constructor.
+         */
         Chat(Jid jid, Jid newJid, Jid oldJid, Instant lastMsgTimestamp, Integer unreadCount, Boolean readOnly, Boolean endOfHistoryTransfer, ChatEphemeralTimer ephemeralExpiration, Instant ephemeralSettingTimestamp, EndOfHistoryTransferType endOfHistoryTransferType, Instant conversationTimestamp, String name, String pHash, Boolean notSpam, Boolean archived, ChatDisappearingMode disappearingMode, Integer unreadMentionCount, Boolean markedAsUnread, List<GroupParticipant> participant, byte[] tcToken, Instant tcTokenTimestamp, byte[] contactPrimaryIdentityKey, Instant pinned, ChatMute mute, WallpaperSettings wallpaper, MediaVisibility mediaVisibility, Instant tcTokenSenderTimestamp, Boolean suspended, Boolean terminated, Instant createdAt, String createdBy, String description, Boolean support, Boolean isParentGroup, String parentGroupId, Boolean isDefaultSubgroup, String displayName, Jid phoneNumberJid, Boolean shareOwnPhoneNumber, Boolean phoneNumberhDuplicateLidThread, Jid lid, String username, String lidOriginType, Integer commentsCount, Boolean locked, PrivacySystemMessage systemMessageToInsert, Boolean capiCreatedGroup, Jid accountLid, Boolean limitSharing, Instant limitSharingSettingTimestamp, ChatLimitSharing.TriggerType limitSharingTrigger, Boolean limitSharingInitiatedByMe, Boolean maibaAiThreadEnabled) {
             super(jid, newJid, oldJid, lastMsgTimestamp, unreadCount, readOnly, endOfHistoryTransfer, ephemeralExpiration, ephemeralSettingTimestamp, endOfHistoryTransferType, conversationTimestamp, name, pHash, notSpam, archived, disappearingMode, unreadMentionCount, markedAsUnread, participant, tcToken, tcTokenTimestamp, contactPrimaryIdentityKey, pinned, mute, wallpaper, mediaVisibility, tcTokenSenderTimestamp, suspended, terminated, createdAt, createdBy, description, support, isParentGroup, parentGroupId, isDefaultSubgroup, displayName, phoneNumberJid, shareOwnPhoneNumber, phoneNumberhDuplicateLidThread, lid, username, lidOriginType, commentsCount, locked, systemMessageToInsert, capiCreatedGroup, accountLid, limitSharing, limitSharingSettingTimestamp, limitSharingTrigger, limitSharingInitiatedByMe, maibaAiThreadEnabled);
         }
@@ -556,8 +755,19 @@ final class InMemoryStore extends AbstractWhatsAppStore {
         }
     }
 
+    /**
+     * Newsletter variant used by {@link InMemoryStore} that drops the
+     * in-memory messages list. Per-newsletter messages are read on demand
+     * from the dedicated protobuf file rather than being kept resident.
+     */
     @ProtobufMessage
     static final class Newsletter extends com.github.auties00.cobalt.model.newsletter.Newsletter {
+        /**
+         * Constructs a new in-memory newsletter with no in-memory message
+         * backing. Forwards every newsletter-level field to the
+         * {@link com.github.auties00.cobalt.model.newsletter.Newsletter} super
+         * constructor.
+         */
         Newsletter(Jid jid, NewsletterState state, NewsletterMetadata metadata, NewsletterViewerMetadata viewerMetadata, int unreadMessagesCount, Instant timestamp) {
             super(jid, state, metadata, viewerMetadata, unreadMessagesCount, timestamp);
         }

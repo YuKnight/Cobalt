@@ -73,7 +73,7 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
     @Override
     @WhatsAppWebExport(moduleName = "WAWebArchiveSettingSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return UnarchiveChatsSetting.ACTION_NAME; // WAWebArchiveSettingSync.getAction -> WASyncdConst.Actions.UnarchiveChatsSetting
+        return UnarchiveChatsSetting.ACTION_NAME;
     }
 
     /**
@@ -89,7 +89,7 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
     @Override
     @WhatsAppWebExport(moduleName = "WAWebArchiveSettingSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return UnarchiveChatsSetting.COLLECTION_NAME; // WAWebArchiveSettingSync.collectionName = WASyncdConst.CollectionName.RegularLow
+        return UnarchiveChatsSetting.COLLECTION_NAME;
     }
 
     /**
@@ -101,7 +101,7 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
     @Override
     @WhatsAppWebExport(moduleName = "WAWebArchiveSettingSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return UnarchiveChatsSetting.ACTION_VERSION; // WAWebArchiveSettingSync.getVersion -> 4
+        return UnarchiveChatsSetting.ACTION_VERSION;
     }
 
     /**
@@ -119,7 +119,7 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
     @Override
     @WhatsAppWebExport(moduleName = "WAWebArchiveSettingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebArchiveSettingSync.applyMutations
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -143,15 +143,15 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
     @Override
     @WhatsAppWebExport(moduleName = "WAWebArchiveSettingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public List<MutationApplicationResult> applyMutationBatchResults(WhatsAppClient client, WamService wamService, List<DecryptedMutation.Trusted> mutations) {
-        if (mutations.isEmpty()) { // WAWebArchiveSettingSync.applyMutations: if (e.length > 0) check, else return [{actionState: Failed}]
+        if (mutations.isEmpty()) {
             return List.of();
         }
 
         var results = new ArrayList<MutationApplicationResult>(mutations.size());
-        for (var i = 0; i < mutations.size() - 1; i++) { // WAWebArchiveSettingSync.applyMutations: only processes e[e.length - 1]
+        for (var i = 0; i < mutations.size() - 1; i++) {
             results.add(MutationApplicationResult.skipped());
         }
-        results.add(applyMutationResult(client, wamService, mutations.getLast())); // WAWebArchiveSettingSync.applyMutations: var l = e[e.length - 1]
+        results.add(applyMutationResult(client, wamService, mutations.getLast()));
         return results;
     }
 
@@ -180,29 +180,29 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
     @Override
     @WhatsAppWebExport(moduleName = "WAWebArchiveSettingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        if (mutation.operation() != SyncdOperation.SET) { // WAWebArchiveSettingSync.applyMutations: l.operation === "set" check
-            return MutationApplicationResult.unsupported(); // WAWebArchiveSettingSync.applyMutations: {actionState: Unsupported}
+        if (mutation.operation() != SyncdOperation.SET) {
+            return MutationApplicationResult.unsupported();
         }
 
-        try { // WAWebArchiveSettingSync.applyMutations: try/catch wrapping, catch returns {actionState: Failed}
-            if (!(mutation.value().action().orElse(null) instanceof UnarchiveChatsSetting setting)) { // WAWebArchiveSettingSync.applyMutations: var _ = p.unarchiveChatsSetting; if (_ == null) -> malformed
-                return malformedActionValue(); // WAWebArchiveSettingSync.applyMutations: return [malformedActionValue(this.collectionName)]
+        try {
+            if (!(mutation.value().action().orElse(null) instanceof UnarchiveChatsSetting setting)) {
+                return malformedActionValue();
             }
 
             // ADAPTED: WA Web checks (_.unarchiveChats == null) and returns malformedActionValue.
             // Cobalt's UnarchiveChatsSetting.unarchiveChats() coalesces null to false via
             // existing boolean accessor pattern. A null unarchiveChats in a valid protobuf
             // message is treated as false rather than malformed.
-            var unarchiveChats = setting.unarchiveChats(); // WAWebArchiveSettingSync.applyMutations: var f = _.unarchiveChats
-            client.store().setUnarchiveChats(unarchiveChats); // WAWebArchiveSettingSync.applyMutations: yield setUnarchiveChatsSetting(f)
+            var unarchiveChats = setting.unarchiveChats();
+            client.store().setUnarchiveChats(unarchiveChats);
             // ADAPTED: WAWebArchiveSettingSync.applyMutations also sets archiveV2EnabledSetting
             // to true if not already set, and fires frontendFireAndForget("applyAppSetting", ...).
             // Cobalt does not have an archiveV2Enabled setting (archive v2 is always enabled)
             // and frontend fire-and-forget calls are UI-only browser concerns.
-            updateSideEffectOnChats(client, unarchiveChats); // WAWebArchiveSettingSync.applyMutations: yield this.updateSideEffectOnChats(f, i)
-            return MutationApplicationResult.success(); // WAWebArchiveSettingSync.applyMutations: {actionState: Success}
-        } catch (Exception e) { // WAWebArchiveSettingSync.applyMutations: catch(e) { return [{actionState: Failed}] }
-            return MutationApplicationResult.failed(); // WAWebArchiveSettingSync.applyMutations: {actionState: Failed}
+            updateSideEffectOnChats(client, unarchiveChats);
+            return MutationApplicationResult.success();
+        } catch (Exception e) {
+            return MutationApplicationResult.failed();
         }
     }
 
@@ -226,10 +226,10 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
      */
     @WhatsAppWebExport(moduleName = "WAWebArchiveSettingSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     private void updateSideEffectOnChats(WhatsAppClient client, boolean unarchiveChats) {
-        if (unarchiveChats) { // WAWebArchiveSettingSync.updateSideEffectOnChats: t ? this.$ArchiveSettingSync$p_1(n) : this.$ArchiveSettingSync$p_2(n)
-            applyUnarchiveSideEffect(client); // WAWebArchiveSettingSync.$ArchiveSettingSync$p_1
+        if (unarchiveChats) {
+            applyUnarchiveSideEffect(client);
         } else {
-            applyArchiveSideEffect(client); // WAWebArchiveSettingSync.$ArchiveSettingSync$p_2
+            applyArchiveSideEffect(client);
         }
     }
 
@@ -280,43 +280,42 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
         // The adapted logic looks up archive sync action entries directly and
         // unarchives chats that have a successful archived=true entry, which
         // is the conservative equivalent of the WA Web behavior.
-        var archiveEntries = client.store().getSyncActionEntries(SyncPatchType.REGULAR_LOW); // WAWebArchiveSettingSync.$ArchiveSettingSync$p_1: getSyncAction(a)
-        for (var entry : archiveEntries) { // WAWebArchiveSettingSync.$ArchiveSettingSync$p_1: d.filter(...)
-            if (entry.actionState() != SyncActionState.SUCCESS // WAWebArchiveSettingSync.$ArchiveSettingSync$p_1: _.includes(e.actionState) where _ = [Success, Orphan]
+        var archiveEntries = client.store().getSyncActionEntries(SyncPatchType.REGULAR_LOW);
+        for (var entry : archiveEntries) {
+            if (entry.actionState() != SyncActionState.SUCCESS
                     && entry.actionState() != SyncActionState.ORPHAN) {
                 continue;
             }
 
-            var actionValue = entry.actionValue(); // WAWebArchiveSettingSync.$ArchiveSettingSync$p_1: t.decodeValue(e)
+            var actionValue = entry.actionValue();
             if (actionValue == null) {
                 continue;
             }
 
-            var action = actionValue.action().orElse(null); // WAWebArchiveSettingSync.$ArchiveSettingSync$p_1: r.archiveChatAction
+            var action = actionValue.action().orElse(null);
             if (!(action instanceof ArchiveChatAction archiveAction)) {
                 continue;
             }
 
-            if (!archiveAction.archived()) { // WAWebArchiveSettingSync.$ArchiveSettingSync$p_1: r.archived === true
+            if (!archiveAction.archived()) {
                 continue;
             }
 
-            if (archiveAction.messageRange().isEmpty()) { // WAWebArchiveSettingSync.$ArchiveSettingSync$p_1: r.messageRange check
+            if (archiveAction.messageRange().isEmpty()) {
                 continue;
             }
 
-            // WAWebArchiveSettingSync.$ArchiveSettingSync$p_1: extract chat JID from index
-            var actionIndex = entry.actionIndex(); // WAWebArchiveSettingSync.$ArchiveSettingSync$p_1: JSON.parse(e.index)[1]
+            var actionIndex = entry.actionIndex();
             if (actionIndex == null) {
                 continue;
             }
 
-            var chatJid = extractChatJidFromArchiveIndex(actionIndex); // WAWebArchiveSettingSync.$ArchiveSettingSync$p_1: var o = JSON.parse(e.index)[1]
+            var chatJid = extractChatJidFromArchiveIndex(actionIndex);
             if (chatJid == null) {
                 continue;
             }
 
-            var chat = client.store().findChatByJid(chatJid); // WAWebArchiveSettingSync.$ArchiveSettingSync$p_1: WAWebWidFactory.createWid(e)
+            var chat = client.store().findChatByJid(chatJid);
             if (chat.isEmpty()) {
                 continue;
             }
@@ -331,7 +330,7 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
             // Without constructMessageRange infrastructure, Cobalt unarchives the chat directly
             // since the setting change to unarchiveChats=true indicates the user wants
             // archived chats to auto-unarchive when messages arrive.
-            chat.get().setArchived(false); // WAWebArchiveSettingSync.$ArchiveSettingSync$p_1: r.push({id: l.toString({legacy: false}), archive: false})
+            chat.get().setArchived(false);
         }
     }
 
@@ -356,44 +355,42 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
      */
     @WhatsAppWebExport(moduleName = "WAWebArchiveSettingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private void applyArchiveSideEffect(WhatsAppClient client) {
-        var archiveEntries = client.store().getSyncActionEntries(SyncPatchType.REGULAR_LOW); // WAWebArchiveSettingSync.$ArchiveSettingSync$p_2: getSyncActionsRows(["action"], [Actions.Archive])
-        for (var entry : archiveEntries) { // WAWebArchiveSettingSync.$ArchiveSettingSync$p_2: u.filter(...)
-            if (entry.actionState() != SyncActionState.SUCCESS) { // WAWebArchiveSettingSync.$ArchiveSettingSync$p_2: e.actionState === Success
+        var archiveEntries = client.store().getSyncActionEntries(SyncPatchType.REGULAR_LOW);
+        for (var entry : archiveEntries) {
+            if (entry.actionState() != SyncActionState.SUCCESS) {
                 continue;
             }
 
-            var actionValue = entry.actionValue(); // WAWebArchiveSettingSync.$ArchiveSettingSync$p_2: t.decodeValue(e)
+            var actionValue = entry.actionValue();
             if (actionValue == null) {
                 continue;
             }
 
-            var action = actionValue.action().orElse(null); // WAWebArchiveSettingSync.$ArchiveSettingSync$p_2: r.archiveChatAction
+            var action = actionValue.action().orElse(null);
             if (!(action instanceof ArchiveChatAction archiveAction)) {
                 continue;
             }
 
-            if (!archiveAction.archived()) { // WAWebArchiveSettingSync.$ArchiveSettingSync$p_2: n.archived === true
+            if (!archiveAction.archived()) {
                 continue;
             }
 
-            // WAWebArchiveSettingSync.$ArchiveSettingSync$p_2: extract chat JID from index
-            var actionIndex = entry.actionIndex(); // WAWebArchiveSettingSync.$ArchiveSettingSync$p_2: var t = JSON.parse(e.index)[1]
+            var actionIndex = entry.actionIndex();
             if (actionIndex == null) {
                 continue;
             }
 
-            var chatJid = extractChatJidFromArchiveIndex(actionIndex); // WAWebArchiveSettingSync.$ArchiveSettingSync$p_2: createWid(t)
+            var chatJid = extractChatJidFromArchiveIndex(actionIndex);
             if (chatJid == null) {
                 continue;
             }
 
-            // WAWebArchiveSettingSync.$ArchiveSettingSync$p_2: resolveChatForMutationIndex(e)
             var chat = client.store().findChatByJid(chatJid);
-            if (chat.isEmpty()) { // WAWebArchiveSettingSync.$ArchiveSettingSync$p_2: if (t.success) return createWid(t.chat.id)
+            if (chat.isEmpty()) {
                 continue;
             }
 
-            chat.get().setArchived(true); // WAWebArchiveSettingSync.$ArchiveSettingSync$p_2: r.push({id: e.toString({legacy: false}), archive: true})
+            chat.get().setArchived(true);
         }
     }
 
@@ -412,15 +409,15 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
      */
     private Jid extractChatJidFromArchiveIndex(String actionIndex) {
         try {
-            var parsed = JSON.parseArray(actionIndex); // WAWebArchiveSettingSync: JSON.parse(e.index)
+            var parsed = JSON.parseArray(actionIndex);
             if (parsed == null || parsed.size() < 2) {
                 return null;
             }
-            var jidString = parsed.getString(1); // WAWebArchiveSettingSync: JSON.parse(e.index)[1]
+            var jidString = parsed.getString(1);
             if (jidString == null || jidString.isEmpty()) {
                 return null;
             }
-            return Jid.of(jidString); // WAWebArchiveSettingSync: createWid(t)
+            return Jid.of(jidString);
         } catch (Exception e) {
             return null;
         }

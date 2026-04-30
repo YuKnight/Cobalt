@@ -37,8 +37,8 @@ public final class FcmMcsLoginRequest {
     String user;
 
     /**
-     * MCS resource, also the decimal {@code androidId} as a string —
-     * the native client uses the same value here as in {@link #user}.
+     * MCS resource, also the decimal {@code androidId} as a string.
+     * The native client uses the same value here as in {@link #user}.
      */
     @ProtobufProperty(index = 4, type = ProtobufType.STRING)
     String resource;
@@ -64,34 +64,34 @@ public final class FcmMcsLoginRequest {
     List<Setting> settings;
 
     /**
-     * Persistent ids the client has already acked locally; the server
+     * Persistent ids the client has already acked locally. The server
      * uses this list to skip redelivery of those messages.
      */
     @ProtobufProperty(index = 10, type = ProtobufType.STRING)
     List<String> persistentIds;
 
     /**
-     * Whether to use adaptive heartbeats; the native client sends
+     * Whether to use adaptive heartbeats. The native client sends
      * {@code false}.
      */
     @ProtobufProperty(index = 12, type = ProtobufType.BOOL)
     boolean adaptiveHeartbeat;
 
     /**
-     * Whether to use the RMQ2 ack scheme; the native client sends
+     * Whether to use the RMQ2 ack scheme. The native client sends
      * {@code true}.
      */
     @ProtobufProperty(index = 14, type = ProtobufType.BOOL)
     boolean useRmq2;
 
     /**
-     * Auth service id; the native client sends {@code 2}.
+     * Auth service id. The native client sends {@code 2}.
      */
     @ProtobufProperty(index = 16, type = ProtobufType.INT64)
     long authService;
 
     /**
-     * Network type id; the native client sends {@code 1}.
+     * Network type id. The native client sends {@code 1}.
      */
     @ProtobufProperty(index = 17, type = ProtobufType.INT64)
     long networkType;

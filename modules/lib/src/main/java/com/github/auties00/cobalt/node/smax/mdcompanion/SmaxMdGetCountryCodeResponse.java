@@ -48,7 +48,7 @@ public sealed interface SmaxMdGetCountryCodeResponse extends SmaxOperation.Respo
     }
 
     /**
-     * The {@code Success} reply variant — the relay echoed back the
+     * The {@code Success} reply variant. The relay echoed back the
      * geo-derived ISO country code.
      *
      * @implNote {@code WASmaxInMdGetCountryCodeResponseGetCountryCodeResponse.parseGetCountryCodeResponseGetCountryCodeResponse}
@@ -129,7 +129,7 @@ public sealed interface SmaxMdGetCountryCodeResponse extends SmaxOperation.Respo
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected the
+     * The {@code ClientError} reply variant. The relay rejected the
      * request with a {@code 4xx} bad-request or internal-error mapped
      * to client range.
      *
@@ -225,7 +225,7 @@ public sealed interface SmaxMdGetCountryCodeResponse extends SmaxOperation.Respo
     }
 
     /**
-     * The {@code ServerError} reply variant — the relay encountered
+     * The {@code ServerError} reply variant. The relay encountered
      * a {@code 5xx} transient internal failure.
      *
      * @implNote layered onto Cobalt's domain via the shared

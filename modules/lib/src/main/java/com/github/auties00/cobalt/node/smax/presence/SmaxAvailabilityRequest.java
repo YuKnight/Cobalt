@@ -9,7 +9,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps the optional {@code type}
+ * The outbound stanza variant. Wraps the optional {@code type}
  * (e.g. {@code "available"} or {@code "unavailable"}) and {@code name}
  * (the local push-name) attributes into the bare
  * {@code <presence/>} envelope.
@@ -32,9 +32,9 @@ public final class SmaxAvailabilityRequest implements SmaxOperation.Request {
     /**
      * Constructs a new availability broadcast.
      *
-     * @param presenceType the optional presence type; may be
+     * @param presenceType the optional presence type. May be
      *                     {@code null}
-     * @param presenceName the optional push-name; may be {@code null}
+     * @param presenceName the optional push-name. May be {@code null}
      */
     public SmaxAvailabilityRequest(String presenceType, String presenceName) {
         this.presenceType = presenceType;
@@ -69,7 +69,7 @@ public final class SmaxAvailabilityRequest implements SmaxOperation.Request {
      *
      * @implNote {@code WASmaxOutPresenceAvailabilityRequest.makeAvailabilityRequest}
      *           emits {@code smax("presence", {type:OPTIONAL,
-     *           name:OPTIONAL})}; both attributes are dropped when
+     *           name:OPTIONAL})}. Both attributes are dropped when
      *           the caller passes {@code null}.
      */
     @Override

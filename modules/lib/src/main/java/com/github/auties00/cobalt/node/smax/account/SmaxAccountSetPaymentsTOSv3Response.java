@@ -29,7 +29,7 @@ public sealed interface SmaxAccountSetPaymentsTOSv3Response extends SmaxOperatio
      *
      * @param node    the inbound IQ stanza received from the relay;
      *                never {@code null}
-     * @param request the original outbound stanza — used to
+     * @param request the original outbound stanza. Used to
      *                validate echoed identifiers; never
      *                {@code null}
      * @return an {@link Optional} carrying the parsed variant, or
@@ -59,13 +59,9 @@ public sealed interface SmaxAccountSetPaymentsTOSv3Response extends SmaxOperatio
      *
      * @param reply        the inbound IQ stanza
      * @param request      the original outbound IQ
-     * @param expectedType the expected {@code type} attribute —
+     * @param expectedType the expected {@code type} attribute.
      *                     either {@code "result"} or {@code "error"}
      * @return {@code true} when the envelope echo-checks pass
-     *
-     * @implNote {@code WASmaxInAccountIQResultResponseMixin.parseIQResultResponseMixin}
-     *           and
-     *           {@code WASmaxInAccountIQErrorResponseMixin.parseIQErrorResponseMixin}.
      */
     @WhatsAppWebExport(moduleName = "WASmaxInAccountIQResultResponseMixin",
             exports = "parseIQResultResponseMixin", adaptation = WhatsAppAdaptation.ADAPTED)
@@ -93,16 +89,8 @@ public sealed interface SmaxAccountSetPaymentsTOSv3Response extends SmaxOperatio
     }
 
     /**
-     * The {@code Success} reply variant — the relay accepted the
+     * The {@code Success} reply variant. The relay accepted the
      * ToS-v3 acceptance.
-     *
-     * @implNote {@code WASmaxInAccountSetPaymentsTOSv3ResponseSuccess.parseSetPaymentsTOSv3ResponseSuccess}
-     *           validates the {@code <iq type="result">} envelope,
-     *           parses the optional {@code outage="1"} and
-     *           {@code sandbox="1"} markers on the
-     *           {@code <accept_pay/>} child, and routes the consumer
-     *           variant through
-     *           {@code WASmaxInAccountSetPaymentsTOSv3BRConsumerOrSetPaymentsTOSv3UPIConsumerPaymentsTOSv3ResponseMixinGroup}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInAccountSetPaymentsTOSv3ResponseSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxInAccountSetPaymentsTOSv3BRConsumerOrSetPaymentsTOSv3UPIConsumerPaymentsTOSv3ResponseMixinGroup")
@@ -120,14 +108,14 @@ public sealed interface SmaxAccountSetPaymentsTOSv3Response extends SmaxOperatio
         private final boolean sandbox;
 
         /**
-         * The echoed consumer-variant name — either
+         * The echoed consumer-variant name. Either
          * {@code "BRConsumerPaymentsTOSv3Response"} or
          * {@code "UPIConsumerPaymentsTOSv3Response"}.
          */
         private final String consumerVariantName;
 
         /**
-         * The echoed {@code service} literal — {@code "FBPAY"} or
+         * The echoed {@code service} literal, {@code "FBPAY"} or
          * {@code "UPI"}.
          */
         private final String service;
@@ -288,7 +276,7 @@ public sealed interface SmaxAccountSetPaymentsTOSv3Response extends SmaxOperatio
     }
 
     /**
-     * The {@code Error} reply variant — the relay rejected the
+     * The {@code Error} reply variant. The relay rejected the
      * ToS-v3 acceptance with one of the documented error codes
      * (internal-server-error 500, service-unavailable 503,
      * upgrade-required 443, config-mismatch 453, forbidden 403,
@@ -318,7 +306,7 @@ public sealed interface SmaxAccountSetPaymentsTOSv3Response extends SmaxOperatio
         private final String errorText;
 
         /**
-         * The classified variant name — one of
+         * The classified variant name. One of
          * {@code "IQErrorBadRequest"},
          * {@code "IQErrorForbidden"},
          * {@code "IQErrorPayUpgradeRequired"},
@@ -417,8 +405,6 @@ public sealed interface SmaxAccountSetPaymentsTOSv3Response extends SmaxOperatio
          *             {@code null}
          * @return the variant name, or {@code null} when the pair
          *         does not match any documented variant
-         *
-         * @implNote {@code WASmaxInAccountSetPaymentsTosErrors.parseSetPaymentsTosErrors}.
          */
         @WhatsAppWebExport(moduleName = "WASmaxInAccountSetPaymentsTosErrors",
                 exports = "parseSetPaymentsTosErrors",

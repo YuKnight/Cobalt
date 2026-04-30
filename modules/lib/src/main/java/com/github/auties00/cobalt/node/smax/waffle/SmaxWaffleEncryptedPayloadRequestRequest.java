@@ -14,7 +14,9 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant.
+ * Outbound Waffle {@code encrypted_payload_request} IQ. Carries the encrypted action that
+ * the relay forwards to the Facebook side together with the RSA encryption metadata, the
+ * client wall clock and the linked Facebook account id.
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutWaffleEncryptedPayloadRequestRequest")
 @WhatsAppWebModule(moduleName = "WASmaxOutWaffleBaseIQGetRequestMixin")
@@ -25,18 +27,18 @@ public final class SmaxWaffleEncryptedPayloadRequestRequest implements SmaxOpera
     private final SmaxWaffleRsaEncryptionMetadata encryptionMetadata;
 
     /**
-     * The client's wall-clock at request time.
+     * The client wall clock at request time, in seconds since the UNIX epoch.
      */
     private final long timestamp;
 
     /**
-     * The linked Facebook account id.
+     * The linked Facebook account id, as opaque bytes.
      */
     private final byte[] fbid;
 
     /**
-     * The opaque encrypted action bytes — the CRUD operation the
-     * relay should run on the Facebook side.
+     * The opaque encrypted action bytes representing the CRUD operation that the relay
+     * should run on the Facebook side.
      */
     private final byte[] action;
 
@@ -98,18 +100,10 @@ public final class SmaxWaffleEncryptedPayloadRequestRequest implements SmaxOpera
     }
 
     /**
-     * Builds the outbound IQ stanza.
+     * Builds the outbound {@code <iq xmlns="waffle" smax_id="47" type="get">} envelope wrapping
+     * the encryption metadata, timestamp, fbid and encrypted action children.
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope
-     *
-     * @implNote {@code WASmaxOutWaffleEncryptedPayloadRequestRequest.makeEncryptedPayloadRequestRequest}
-     *           composes
-     *           {@code WASmaxOutWaffleBaseIQGetRequestMixin}
-     *           ({@code id=generateId()}, {@code type="get"}) over the
-     *           {@code <encryption_metadata/>}/{@code <timestamp/>}/{@code <fbid/>}/{@code <action/>}
-     *           quadruple inside an
-     *           {@code <iq xmlns="waffle" smax_id="47"
-     *           to=S_WHATSAPP_NET>} envelope.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutWaffleEncryptedPayloadRequestRequest",

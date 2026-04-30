@@ -14,7 +14,7 @@ import java.util.Optional;
 
 /**
  * The two documented values of the {@code <blocking status>} attribute
- * — the WA Web parser asserts {@code attrStringEnum(ENUM_BLOCKED_UNBLOCKED)}
+ *. The WA Web parser asserts {@code attrStringEnum(ENUM_BLOCKED_UNBLOCKED)}
  * so any other literal results in a parse failure.
  */
 @WhatsAppWebModule(moduleName = "WASmaxInPsaEnums")

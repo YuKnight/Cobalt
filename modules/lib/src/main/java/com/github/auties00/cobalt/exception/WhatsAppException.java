@@ -1,100 +1,20 @@
 package com.github.auties00.cobalt.exception;
 
 /**
- * Base exception for all WhatsApp-related errors in the Cobalt library.
+ * Root of every exception thrown by Cobalt while talking to WhatsApp.
  *
- * <p>This is a sealed abstract class that serves as the root of the exception hierarchy
- * for all WhatsApp protocol and client errors. The sealed hierarchy enables exhaustive
- * pattern matching on exception types and ensures all exception categories are explicitly
- * defined.
-
- * <p>Unlike WhatsApp Web, which handles errors inline via try/catch with hard-coded
- * recovery actions, Cobalt throws a typed exception subtype and delegates recovery
- * to a pluggable {@code WhatsAppClientErrorHandler}. This allows applications to
- * decide whether a given failure should cause a disconnect, reconnect, log out,
- * or be silently discarded.
+ * <p>The hierarchy is sealed so callers can pattern-match on the concrete
+ * subtype to react to a specific failure mode (a session conflict, a media
+ * download failure, an account device verification mismatch, and so on).
+ * Each subtype documents the WhatsApp feature it relates to and whether
+ * it should be treated as fatal via {@link #isFatal()}.
  *
- * <h2>Exception Hierarchy</h2>
- * The exception hierarchy is organized by error domain:
- * <ul>
- *   <li><b>Connection errors:</b>
- *     <ul>
- *       <li>{@link WhatsAppConnectionException} - Initial connection failures</li>
- *       <li>{@link WhatsAppReconnectionException} - Reconnection attempt failures</li>
- *     </ul>
- *   </li>
- *   <li><b>Session errors:</b>
- *     <ul>
- *       <li>{@link WhatsAppSessionException} - Session-level protocol errors (bad MAC, conflict, closed)</li>
- *     </ul>
- *   </li>
- *   <li><b>Stream errors:</b>
- *     <ul>
- *       <li>{@link WhatsAppStreamException} - Protocol stream errors (malformed nodes, timeouts)</li>
- *     </ul>
- *   </li>
- *   <li><b>Message errors:</b>
- *     <ul>
- *       <li>{@link WhatsAppMessageException} - Message decryption and parsing failures</li>
- *     </ul>
- *   </li>
- *   <li><b>Media errors:</b>
- *     <ul>
- *       <li>{@link WhatsAppMediaException} - Media upload, download, and processing failures</li>
- *     </ul>
- *   </li>
- *   <li><b>Sync errors:</b>
- *     <ul>
- *       <li>{@link WhatsAppWebAppStateSyncException} - Web app state synchronization failures</li>
- *       <li>{@link WhatsAppHistorySyncException} - Message history synchronization failures</li>
- *     </ul>
- *   </li>
- *   <li><b>Device errors:</b>
- *     <ul>
- *       <li>{@link WhatsAppAdvCheckException} - Periodic ADV check failures</li>
- *       <li>{@link WhatsAppAdvValidationException} - Account device verification failures</li>
- *       <li>{@link WhatsAppOwnDeviceListExpiredException} - Device list staleness errors</li>
- *       <li>{@link WhatsAppLidMigrationException} - LID migration failures</li>
- *     </ul>
- *   </li>
- *   <li><b>Registration errors:</b>
- *     <ul>
- *       <li>{@link WhatsAppRegistrationException} - Mobile registration failures</li>
- *     </ul>
- *   </li>
- *   <li><b>Other errors:</b>
- *     <ul>
- *       <li>{@link WhatsAppMalformedJidException} - Invalid JID format</li>
- *       <li>{@link WhatsAppABPropTypeMismatchException} - Configuration type mismatches</li>
- *     </ul>
- *   </li>
- * </ul>
- *
- * <h2>Fatal vs Non-Fatal Errors</h2>
- * Each exception indicates whether it is fatal via the {@link #isFatal()} method:
- * <ul>
- *   <li><b>Fatal errors:</b> Require the client to disconnect. The session cannot be recovered
- *       and a new connection must be established. Examples include session conflicts, bad MAC
- *       errors, and critical protocol violations.</li>
- *   <li><b>Non-fatal errors:</b> The client can continue operating. These errors affect individual
- *       operations (like a single message or media transfer) but don't compromise the session.
- *       The client should handle the error and continue processing.</li>
- * </ul>
- *
- * <h2>Usage Example</h2>
- * <pre>{@code
- * try {
- *     client.sendMessage(message);
- * } catch (WhatsAppException e) {
- *     if (e.isFatal()) {
- *         // Must reconnect
- *         client.reconnect();
- *     } else {
- *         // Can continue with error handling
- *         logger.warn("Non-fatal error: " + e.getMessage());
- *     }
- * }
- * }</pre>
+ * <p>Cobalt does not pin a recovery action to any exception. When a
+ * subtype is thrown, the configurable {@code WhatsAppClientErrorHandler}
+ * decides whether the client should discard the event, disconnect,
+ * reconnect, log out, or treat the account as banned. Callers therefore
+ * normally observe these exceptions through that handler rather than
+ * through {@code try}/{@code catch} blocks around individual calls.
  *
  * @see #isFatal()
  */
@@ -137,30 +57,16 @@ public abstract sealed class WhatsAppException extends RuntimeException
     }
 
     /**
-     * Returns whether this exception represents a fatal error that requires client disconnection.
-     * <p>
-     * Fatal errors indicate that the current session is no longer viable and the client must
-     * disconnect and potentially re-authenticate. Non-fatal errors can be handled locally
-     * without affecting the overall session.
+     * Returns whether the failure invalidates the current WhatsApp session.
      *
-     * <h2>Fatal Error Examples</h2>
-     * <ul>
-     *   <li>Session conflict (another device logged in)</li>
-     *   <li>Bad MAC (cryptographic integrity failure)</li>
-     *   <li>Stream protocol errors</li>
-     *   <li>ADV validation failures</li>
-     * </ul>
+     * <p>A fatal failure means the session can no longer be trusted to
+     * exchange messages correctly and the client should be torn down before
+     * any retry. A non-fatal failure is scoped to a single operation (a
+     * single message, media transfer, or sync request) and the rest of the
+     * session can keep running.
      *
-     * <h2>Non-Fatal Error Examples</h2>
-     * <ul>
-     *   <li>Individual message decryption failures</li>
-     *   <li>Media download/upload failures</li>
-     *   <li>Malformed JID parsing errors</li>
-     *   <li>Configuration type mismatches</li>
-     * </ul>
-     *
-     * @return {@code true} if this is a fatal error requiring disconnection,
-     *         {@code false} if the client can continue operating
+     * @return {@code true} if the current session can no longer be used,
+     *         {@code false} if the failure is local to one operation
      */
     public abstract boolean isFatal();
 }

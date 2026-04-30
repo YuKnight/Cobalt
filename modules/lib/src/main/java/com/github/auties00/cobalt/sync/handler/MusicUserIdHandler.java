@@ -95,7 +95,7 @@ public final class MusicUserIdHandler implements WebAppStateActionHandler {
      */
     @Override
     public String actionName() {
-        return MusicUserIdAction.ACTION_NAME; // NO_WA_BASIS: WAWebProtobufSyncAction.pb only declares the protobuf field musicUserIdAction
+        return MusicUserIdAction.ACTION_NAME;
     }
 
     /**
@@ -132,7 +132,7 @@ public final class MusicUserIdHandler implements WebAppStateActionHandler {
      */
     @Override
     public int version() {
-        return MusicUserIdAction.ACTION_VERSION; // NO_WA_BASIS: WA Web has no music user id version constant; defaults to 1
+        return MusicUserIdAction.ACTION_VERSION;
     }
 
     /**
@@ -205,19 +205,19 @@ public final class MusicUserIdHandler implements WebAppStateActionHandler {
      */
     @Override
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        if (mutation.operation() != SyncdOperation.SET) { // NO_WA_BASIS: only SET makes sense for an identifier-style action
+        if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof MusicUserIdAction action)) { // NO_WA_BASIS: payload type guard
+        if (!(mutation.value().action().orElse(null) instanceof MusicUserIdAction action)) {
             return MutationApplicationResult.malformed();
         }
 
-        if (action.musicUserId().isEmpty() && action.musicUserIdMap().isEmpty()) { // NO_WA_BASIS: at least one of the two protobuf fields must be present
+        if (action.musicUserId().isEmpty() && action.musicUserIdMap().isEmpty()) {
             return MutationApplicationResult.malformed();
         }
 
-        client.store().setMusicUserIdState(action); // NO_WA_BASIS: persist the action on the flattened Cobalt store
+        client.store().setMusicUserIdState(action);
         return MutationApplicationResult.success();
     }
 }

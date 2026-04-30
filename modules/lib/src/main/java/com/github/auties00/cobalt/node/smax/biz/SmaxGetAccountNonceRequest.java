@@ -12,7 +12,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps the optional {@code <identifier>}
+ * The outbound stanza variant. Wraps the optional {@code <identifier>}
  * child inside the canonical
  * {@code <iq xmlns="fb:thrift_iq" type="get">} envelope.
  */
@@ -71,8 +71,6 @@ public final class SmaxGetAccountNonceRequest implements SmaxOperation.Request {
     @WhatsAppWebExport(moduleName = "WASmaxOutBizLinkingGetAccountNonceRequest",
             exports = "makeGetAccountNonceRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutBizLinkingGetAccountNonceRequest:
-        //   smax("iq", {xmlns: "fb:thrift_iq", smax_id: 12}, OPTIONAL_CHILD(identifier))
         var builder = new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "fb:thrift_iq")

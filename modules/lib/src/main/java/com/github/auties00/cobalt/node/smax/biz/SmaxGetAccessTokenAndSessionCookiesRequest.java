@@ -15,7 +15,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps the verification-code payload
+ * The outbound stanza variant. Wraps the verification-code payload
  * in the canonical
  * {@code <iq xmlns="fb:thrift_iq" type="get" to="s.whatsapp.net">}
  * envelope.
@@ -101,19 +101,14 @@ public final class SmaxGetAccessTokenAndSessionCookiesRequest implements SmaxOpe
             exports = "makeGetAccessTokenAndSessionCookiesRequest",
             adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutBizCtwaAdAccountGetAccessTokenAndSessionCookiesRequest:
-        //   smax("code", null, t) -- code element with the verification code as content
         var codeNode = new NodeBuilder()
                 .description("code")
                 .content(code)
                 .build();
-        // smax("parameters", null, smax("code", null, t))
         var parametersNode = new NodeBuilder()
                 .description("parameters")
                 .content(codeNode)
                 .build();
-        // WASmaxOutBizCtwaAdAccountHackBaseIQGetRequestMixin: smax("iq", {from: OPTIONAL(USER_JID, t), to: S_WHATSAPP_NET})
-        // WASmaxOutBizCtwaAdAccountBaseIQGetRequestMixin: smax("iq", {id: generateId(), type: "get"})
         var builder = new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "fb:thrift_iq")

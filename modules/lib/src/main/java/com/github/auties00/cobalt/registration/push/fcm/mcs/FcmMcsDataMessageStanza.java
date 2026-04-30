@@ -29,7 +29,7 @@ public final class FcmMcsDataMessageStanza {
     String from;
 
     /**
-     * Push category — typically the receiving app package or the topic
+     * Push category. Typically the receiving app package or the topic
      * name on topic-style pushes.
      */
     @ProtobufProperty(index = 5, type = ProtobufType.STRING)
@@ -42,7 +42,7 @@ public final class FcmMcsDataMessageStanza {
     String token;
 
     /**
-     * The application-level key/value payload — the FCM HTTP API's
+     * The application-level key/value payload. The FCM HTTP API's
      * {@code data} JSON object lands here.
      */
     @ProtobufProperty(index = 7, type = ProtobufType.MESSAGE)

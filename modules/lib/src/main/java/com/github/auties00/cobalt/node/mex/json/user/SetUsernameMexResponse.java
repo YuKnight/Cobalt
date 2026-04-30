@@ -15,11 +15,21 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The parsed response for this MEX mutation.
+ * Parsed response for the set-username mutation. Carries the relay's status token from
+ * {@code data.xwa2_username_set}.
  */
+@WhatsAppWebModule(moduleName = "WAWebMexSetUsernameJob")
 public final class SetUsernameMexResponse implements MexOperation.Response.Json {
+    /**
+     * The status token reported by the relay after the mutation runs.
+     */
     private final String result;
 
+    /**
+     * Constructs a new response with the given status token.
+     *
+     * @param result the status token reported by the relay
+     */
     private SetUsernameMexResponse(String result) {
         this.result = result;
     }
@@ -27,11 +37,8 @@ public final class SetUsernameMexResponse implements MexOperation.Response.Json 
     /**
      * Parses the MEX response carried by an inbound IQ stanza.
      *
-     * @implNote WAWebMexSetUsernameJob.mexSetUsernameQueryJob: reads the
-     * {@code result} status token from the mutation payload.
      * @param node the inbound IQ stanza carrying the {@code <result>} child
-     * @return the parsed response, or {@code Optional.empty()} if the
-     *         expected JSON shape is absent
+     * @return the parsed response, or {@link Optional#empty()} if the expected JSON shape is absent
      */
     @WhatsAppWebExport(moduleName = "WAWebMexSetUsernameJob", exports = "mexSetUsernameQueryJob",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -42,34 +49,32 @@ public final class SetUsernameMexResponse implements MexOperation.Response.Json 
     }
 
     /**
-     * Returns the {@code result} field.
+     * Returns the status token reported by the relay.
      *
-     * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the status token, or empty if absent
      */
     public Optional<String> result() {
         return Optional.ofNullable(result);
     }
 
     /**
-     * Returns whether the username mutation succeeded.
+     * Returns whether the username mutation succeeded. Mirrors the WA Web check
+     * {@code result?.xwa2_username_set?.result === "SUCCESS"}.
      *
-     * <p>Mirrors the WA Web {@code mexSetUsernameQueryJob} return value,
-     * which evaluates {@code result?.xwa2_username_set?.result === "SUCCESS"}
-     * after awaiting the relay response.
-     *
-     * @implNote WAWebMexSetUsernameJob.mexSetUsernameQueryJob: returns
-     * {@code ((a=l.xwa2_username_set)==null?void 0:a.result)==="SUCCESS"}.
-     * @return {@code true} if the {@code result} field equals
-     *         {@code "SUCCESS"}, {@code false} otherwise (including when
-     *         the field is absent)
+     * @return {@code true} if the {@code result} field equals {@code "SUCCESS"}, {@code false} otherwise
      */
     @WhatsAppWebExport(moduleName = "WAWebMexSetUsernameJob", exports = "mexSetUsernameQueryJob",
             adaptation = WhatsAppAdaptation.DIRECT)
     public boolean isSuccess() {
-        // WAWebMexSetUsernameJob.mexSetUsernameQueryJob: (a==null?void 0:a.result)==="SUCCESS"
         return Objects.equals(result, "SUCCESS");
     }
 
+    /**
+     * Parses the response from the raw JSON payload bytes.
+     *
+     * @param json the raw JSON bytes from the {@code <result>} child
+     * @return an {@link Optional} containing the parsed response, or empty if the envelope is missing
+     */
     private static Optional<SetUsernameMexResponse> of(byte[] json) {
         var jsonObject = JSON.parseObject(json);
         if (jsonObject == null) {

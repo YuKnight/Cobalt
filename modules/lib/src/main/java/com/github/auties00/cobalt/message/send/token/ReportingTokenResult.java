@@ -7,16 +7,20 @@ import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import java.util.Objects;
 
 /**
- * The result of generating a reporting token: the version and
- * the token bytes.
+ * The result of generating a reporting token: the version paired with the token bytes.
  *
- * @implNote WAWebReportingTokenUtils.genReportingToken: returns
- * {@code {version, reportingToken}}.
  * @see ReportingToken
  */
 @WhatsAppWebModule(moduleName = "WAWebReportingTokenUtils")
 public final class ReportingTokenResult {
+    /**
+     * The reporting token version that was used to derive the HMAC key.
+     */
     private final int version;
+
+    /**
+     * The 16-byte truncated HMAC tag.
+     */
     private final byte[] token;
 
     /**
@@ -25,9 +29,6 @@ public final class ReportingTokenResult {
      * @param version the reporting token version
      * @param token   the token bytes
      * @throws NullPointerException if {@code token} is {@code null}
-     *
-     * @implNote WAWebReportingTokenUtils.genReportingToken: returns
-     * {@code {version: c, reportingToken: new Uint8Array(f)}}.
      */
     @WhatsAppWebExport(moduleName = "WAWebReportingTokenUtils", exports = "genReportingToken",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -40,9 +41,6 @@ public final class ReportingTokenResult {
      * Returns the reporting token version.
      *
      * @return the version
-     *
-     * @implNote WAWebReportingTokenConstants.REPORTING_TOKEN_VERSION:
-     * {@code {DEFAULT: 1, HISTORY_SYNC: -1}}.
      */
     @WhatsAppWebExport(moduleName = "WAWebReportingTokenUtils", exports = "genReportingToken",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -54,9 +52,6 @@ public final class ReportingTokenResult {
      * Returns the token bytes.
      *
      * @return the 16-byte reporting token
-     *
-     * @implNote WAWebReportingTokenUtils.genReportingToken:
-     * {@code reportingToken} field of the return value.
      */
     @WhatsAppWebExport(moduleName = "WAWebReportingTokenUtils", exports = "genReportingToken",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -68,8 +63,6 @@ public final class ReportingTokenResult {
      * Returns a string representation of this reporting token result.
      *
      * @return a string containing the version and token length
-     *
-     * @implNote NO_WA_BASIS: Java-specific debugging aid.
      */
     @Override
     public String toString() {

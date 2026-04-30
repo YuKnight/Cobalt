@@ -11,16 +11,9 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound acknowledgement stanza — emitted by the client back
+ * The outbound acknowledgement stanza. Emitted by the client back
  * through the socket pipeline after consuming the {@link SmaxPsaResetSmbLastQpPrefetchTimestampResponse}
  * notification.
- *
- * @implNote {@code WASmaxOutPsaResetSmbLastQpPrefetchTimestampResponseAck.makeResetSmbLastQpPrefetchTimestampResponseAck}
- *           composes
- *           {@code WASmaxOutPsaNotificationClientAckMixin} — an
- *           {@code <ack id to class="notification" type/>} stanza
- *           echoing the notification's {@code id}, {@code from} (as
- *           the ack's {@code to}) and {@code type} attributes.
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutPsaResetSmbLastQpPrefetchTimestampResponseAck")
 @WhatsAppWebModule(moduleName = "WASmaxOutPsaNotificationClientAckMixin")
@@ -38,7 +31,7 @@ public final class SmaxPsaResetSmbLastQpPrefetchTimestampAcknowledgement impleme
 
     /**
      * The {@code type} of the notification (echoed back into the
-     * ack) — always {@code "psa"} for this RPC.
+     * ack). Always {@code "psa"} for this RPC.
      */
     private final String notificationType;
 
@@ -62,7 +55,7 @@ public final class SmaxPsaResetSmbLastQpPrefetchTimestampAcknowledgement impleme
      * notification.
      *
      * <p>Lifts the {@code id}/{@code from}/{@code type} attributes
-     * verbatim from the supplied {@code <notification/>} stanza —
+     * verbatim from the supplied {@code <notification/>} stanza.
      * convenience factory mirroring the WA Web closure-builder
      * surface.
      *
@@ -117,11 +110,6 @@ public final class SmaxPsaResetSmbLastQpPrefetchTimestampAcknowledgement impleme
      * Builds the outbound ack stanza.
      *
      * @return a {@link NodeBuilder} carrying the ack envelope
-     *
-     * @implNote {@code WASmaxOutPsaNotificationClientAckMixin.mergeNotificationClientAckMixin}
-     *           produces
-     *           {@code <ack id=STANZA_ID(t) to=JID(n)
-     *           class="notification" type=CUSTOM_STRING(r)/>}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutPsaResetSmbLastQpPrefetchTimestampResponseAck",

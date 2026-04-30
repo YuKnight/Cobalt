@@ -41,7 +41,7 @@ public final class BusinessBroadcastInsightsHandler implements WebAppStateAction
      *
      * @implNote ADAPTED: WAWebBusinessBroadcastInsightsSync uses WALogger; Cobalt uses java.util.logging
      */
-    private static final Logger LOGGER = Logger.getLogger(BusinessBroadcastInsightsHandler.class.getName()); // ADAPTED: WALogger
+    private static final Logger LOGGER = Logger.getLogger(BusinessBroadcastInsightsHandler.class.getName());
 
     /**
      * The singleton instance of {@code BusinessBroadcastInsightsHandler}.
@@ -73,7 +73,7 @@ public final class BusinessBroadcastInsightsHandler implements WebAppStateAction
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBusinessBroadcastInsightsSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return BusinessBroadcastInsightsAction.ACTION_NAME; // WAWebBusinessBroadcastInsightsSync.getAction
+        return BusinessBroadcastInsightsAction.ACTION_NAME;
     }
 
     /**
@@ -85,18 +85,16 @@ public final class BusinessBroadcastInsightsHandler implements WebAppStateAction
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBusinessBroadcastInsightsSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return BusinessBroadcastInsightsAction.COLLECTION_NAME; // WAWebBusinessBroadcastInsightsSync: collectionName = Regular
+        return BusinessBroadcastInsightsAction.COLLECTION_NAME;
     }
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote WAWebBusinessBroadcastInsightsSync.getVersion — returns {@code 1}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBusinessBroadcastInsightsSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return BusinessBroadcastInsightsAction.ACTION_VERSION; // WAWebBusinessBroadcastInsightsSync.getVersion
+        return BusinessBroadcastInsightsAction.ACTION_VERSION;
     }
 
     /**
@@ -115,7 +113,7 @@ public final class BusinessBroadcastInsightsHandler implements WebAppStateAction
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBusinessBroadcastInsightsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebBusinessBroadcastInsightsSync.applyMutations
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -145,33 +143,33 @@ public final class BusinessBroadcastInsightsHandler implements WebAppStateAction
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBusinessBroadcastInsightsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        try { // WAWebBusinessBroadcastInsightsSync.applyMutations: try { ... } catch(e) { return {actionState: Failed} }
+        try {
             var indexArray = JSON.parseArray(mutation.index()); // ADAPTED: WAWebBusinessBroadcastInsightsSync uses e.indexParts (pre-parsed); Cobalt parses from JSON string
-            var campaignId = indexArray.getString(1); // WAWebBusinessBroadcastInsightsSync.applyMutations: var n = t[1]
-            if (campaignId == null || campaignId.isEmpty()) { // WAWebBusinessBroadcastInsightsSync.applyMutations: if (!n) return r.malformedActionIndex()
-                return malformedActionIndex(); // WAWebBusinessBroadcastInsightsSync.applyMutations: r.malformedActionIndex()
+            var campaignId = indexArray.getString(1);
+            if (campaignId == null || campaignId.isEmpty()) {
+                return malformedActionIndex();
             }
 
             var insights = new HashMap<>(client.store().businessBroadcastInsights()); // ADAPTED: WAWebBusinessBroadcastInsightsSync uses IndexedDB table; Cobalt uses ConcurrentHashMap store
-            if (mutation.operation() == SyncdOperation.SET) { // WAWebBusinessBroadcastInsightsSync.applyMutations: s.operation === "set" && "value" in s && "timestamp" in s
-                if (!(mutation.value().action().orElse(null) instanceof BusinessBroadcastInsightsAction action)) { // WAWebBusinessBroadcastInsightsSync.applyMutations: var p = u.businessBroadcastInsightsAction; if (!p)
-                    return malformedActionValue(); // WAWebBusinessBroadcastInsightsSync.applyMutations: return a++, o("WAWebSyncdIndexUtils").malformedActionValue(r.collectionName)
+            if (mutation.operation() == SyncdOperation.SET) {
+                if (!(mutation.value().action().orElse(null) instanceof BusinessBroadcastInsightsAction action)) {
+                    return malformedActionValue();
                 }
 
                 insights.put(campaignId, action); // ADAPTED: WAWebBusinessBroadcastInsightsSync.applyMutations: yield o("WAWebBizBroadcastInsightsStorageUtils").upsertInsightsStorage(n, {...}, c)
-                client.store().setBusinessBroadcastInsights(insights); // ADAPTED: store update via setter
-                return MutationApplicationResult.success(); // WAWebBusinessBroadcastInsightsSync.applyMutations: {actionState: Success}
+                client.store().setBusinessBroadcastInsights(insights);
+                return MutationApplicationResult.success();
             }
 
-            if (mutation.operation() == SyncdOperation.REMOVE) { // WAWebBusinessBroadcastInsightsSync.applyMutations: s.operation === "remove"
+            if (mutation.operation() == SyncdOperation.REMOVE) {
                 insights.remove(campaignId); // ADAPTED: WAWebBusinessBroadcastInsightsSync.applyMutations: yield o("WAWebBizBroadcastInsightsStorageUtils").removeInsightsStorage(n)
-                client.store().setBusinessBroadcastInsights(insights); // ADAPTED: store update via setter
-                return MutationApplicationResult.success(); // WAWebBusinessBroadcastInsightsSync.applyMutations: {actionState: Success}
+                client.store().setBusinessBroadcastInsights(insights);
+                return MutationApplicationResult.success();
             }
 
-            return MutationApplicationResult.failed(); // WAWebBusinessBroadcastInsightsSync.applyMutations: throw Error("Match: No case succesfully matched...") — caught by outer try/catch returning Failed
-        } catch (Exception e) { // WAWebBusinessBroadcastInsightsSync.applyMutations: catch(e) { return {actionState: Failed} }
-            return MutationApplicationResult.failed(); // WAWebBusinessBroadcastInsightsSync.applyMutations: {actionState: o("WASyncdConst").SyncActionState.Failed}
+            return MutationApplicationResult.failed();
+        } catch (Exception e) {
+            return MutationApplicationResult.failed();
         }
     }
 
@@ -203,34 +201,33 @@ public final class BusinessBroadcastInsightsHandler implements WebAppStateAction
     public List<Boolean> applyMutationBatch(WhatsAppClient client, WamService wamService, List<DecryptedMutation.Trusted> mutations) {
         // ADAPTED: WAWebBusinessBroadcastInsightsSync.applyMutations checks isBizBroadcastSendWebEnabledNoExposure()
         // and returns all Unsupported if false — Cobalt omits AB prop gating
-        var malformedCount = 0; // WAWebBusinessBroadcastInsightsSync.applyMutations: var a = 0
-        var setCount = 0; // WAWebBusinessBroadcastInsightsSync.applyMutations: var i = 0
-        var removeCount = 0; // WAWebBusinessBroadcastInsightsSync.applyMutations: var d = 0
+        var malformedCount = 0;
+        var setCount = 0;
+        var removeCount = 0;
         var results = new ArrayList<Boolean>(mutations.size());
         for (var mutation : mutations) { // ADAPTED: WAWebBusinessBroadcastInsightsSync.applyMutations uses Promise.all(t.map(...))
             var result = applyMutationResult(client, wamService, mutation);
-            // WAWebBusinessBroadcastInsightsSync.applyMutations: `a` is incremented ONLY inside the SET branch
             // when `p` (businessBroadcastInsightsAction) is missing — i.e. malformedActionValue path.
             // The malformedActionIndex path (missing indexParts[1]) returns without bumping `a`.
-            if (result.actionState() == SyncActionState.MALFORMED && mutation.operation() == SyncdOperation.SET) { // WAWebBusinessBroadcastInsightsSync.applyMutations: a++ on malformedActionValue in SET branch
+            if (result.actionState() == SyncActionState.MALFORMED && mutation.operation() == SyncdOperation.SET) {
                 malformedCount++;
             }
-            if (result.actionState() == SyncActionState.SUCCESS && mutation.operation() == SyncdOperation.SET) { // WAWebBusinessBroadcastInsightsSync.applyMutations: i++ on SET success
+            if (result.actionState() == SyncActionState.SUCCESS && mutation.operation() == SyncdOperation.SET) {
                 setCount++;
             }
-            if (result.actionState() == SyncActionState.SUCCESS && mutation.operation() == SyncdOperation.REMOVE) { // WAWebBusinessBroadcastInsightsSync.applyMutations: d++ on REMOVE success
+            if (result.actionState() == SyncActionState.SUCCESS && mutation.operation() == SyncdOperation.REMOVE) {
                 removeCount++;
             }
             results.add(result.actionState() == SyncActionState.SUCCESS);
         }
-        if (setCount > 0) { // WAWebBusinessBroadcastInsightsSync.applyMutations: i > 0 && o("WALogger").WARN(...)
-            LOGGER.warning("BBI SyncD received " + setCount + " SET operations"); // WAWebBusinessBroadcastInsightsSync.applyMutations: WALogger.WARN("BBI SyncD received N SET operations => ...")
+        if (setCount > 0) {
+            LOGGER.warning("BBI SyncD received " + setCount + " SET operations");
         }
-        if (removeCount > 0) { // WAWebBusinessBroadcastInsightsSync.applyMutations: d > 0 && o("WALogger").WARN(...)
-            LOGGER.warning("BBI SyncD received " + removeCount + " REMOVE operations"); // WAWebBusinessBroadcastInsightsSync.applyMutations: WALogger.WARN("BBI SyncD received N REMOVE operations for campaigns => ...")
+        if (removeCount > 0) {
+            LOGGER.warning("BBI SyncD received " + removeCount + " REMOVE operations");
         }
-        if (malformedCount > 0) { // WAWebBusinessBroadcastInsightsSync.applyMutations: a > 0 && o("WALogger").WARN(...)
-            LOGGER.warning("BBI sync: " + malformedCount + " malformed mutations"); // WAWebBusinessBroadcastInsightsSync.applyMutations: WALogger.WARN("BBI sync: N malformed mutations")
+        if (malformedCount > 0) {
+            LOGGER.warning("BBI sync: " + malformedCount + " malformed mutations");
         }
         // ADAPTED: WAWebBusinessBroadcastInsightsSync.applyMutations: (i > 0 || d > 0) && o("WAWebBackendApi").frontendFireAndForget("refreshBroadcastCampaignState", {broadcastJids: []})
         // — frontend UI refresh omitted, no Cobalt equivalent

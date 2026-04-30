@@ -51,7 +51,7 @@ public sealed interface SmaxMdCompanionFinishResponse extends SmaxOperation.Resp
     }
 
     /**
-     * The {@code Success} reply variant — the relay accepted the
+     * The {@code Success} reply variant. The relay accepted the
      * finish step and the device is now linked.
      *
      * @implNote {@code WASmaxInMdCompanionFinishResponseSuccess.parseCompanionFinishResponseSuccess}
@@ -103,7 +103,7 @@ public sealed interface SmaxMdCompanionFinishResponse extends SmaxOperation.Resp
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected the
+     * The {@code ClientError} reply variant. The relay rejected the
      * request with a {@code 4xx} bad-request or internal-error mapped
      * to client range.
      *
@@ -200,7 +200,7 @@ public sealed interface SmaxMdCompanionFinishResponse extends SmaxOperation.Resp
     }
 
     /**
-     * The {@code ServerError} reply variant — the relay encountered
+     * The {@code ServerError} reply variant. The relay encountered
      * a transient internal failure ({@code 5xx}).
      *
      * @implNote Layered onto Cobalt's domain via the shared

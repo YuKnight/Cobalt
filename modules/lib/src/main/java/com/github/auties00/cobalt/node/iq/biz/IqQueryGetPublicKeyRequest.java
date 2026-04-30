@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.node.iq.biz;
 
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidServer;
@@ -9,8 +10,12 @@ import com.github.auties00.cobalt.node.iq.IqOperation;
 import java.util.Objects;
 
 /**
- * The outbound stanza variant.
+ * The outbound {@code <iq xmlns="w:biz:catalog" type="get">} stanza that
+ * fetches a merchant's catalog public key. Cobalt models the legacy IQ
+ * variant; the GraphQL counterpart lives in
+ * {@code WAWebGraphQLProductCatalogGetPublicKeyJob}.
  */
+@WhatsAppWebModule(moduleName = "WAWebQueryGetPublicKeyJob")
 public final class IqQueryGetPublicKeyRequest implements IqOperation.Request {
     /**
      * The business JID whose public key is being requested. Routed

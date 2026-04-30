@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.node.iq.biz;
 
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidServer;
@@ -13,8 +14,10 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant.
+ * The outbound {@code <iq xmlns="w:biz:catalog" type="get">} stanza that
+ * fetches a list of products from a merchant catalog by id.
  */
+@WhatsAppWebModule(moduleName = "WAWebQueryProductListCatalogJob")
 public final class IqQueryProductListCatalogRequest implements IqOperation.Request {
     /**
      * The merchant catalog JID being queried.

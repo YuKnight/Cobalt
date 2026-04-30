@@ -13,7 +13,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps the {@code <link_create/>}
+ * The outbound stanza variant. Wraps the {@code <link_create/>}
  * payload in the canonical {@code <call to="call">} envelope.
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutVoipLinkCreateRequest")
@@ -26,13 +26,13 @@ public final class SmaxLinkCreateRequest implements SmaxOperation.Request {
     private final String linkCreateMedia;
 
     /**
-     * The optional call-creator device JID — supplied when the caller
+     * The optional call-creator device JID. Supplied when the caller
      * already knows which of its own devices will host the call.
      */
     private final Jid linkCreateCallCreator;
 
     /**
-     * The optional pre-allocated call identifier — used by clients
+     * The optional pre-allocated call identifier. Used by clients
      * that issue {@code link_create} as a follow-up to an in-flight
      * call rather than a fresh call.
      */
@@ -40,7 +40,7 @@ public final class SmaxLinkCreateRequest implements SmaxOperation.Request {
 
     /**
      * The optional username the call link should display as the
-     * creator — surfaced in the join-prompt UI.
+     * creator. Surfaced in the join-prompt UI.
      */
     private final String linkCreateLinkCreatorUsername;
 
@@ -52,7 +52,7 @@ public final class SmaxLinkCreateRequest implements SmaxOperation.Request {
     private final boolean linkCreateWaitingRoomEnabled;
 
     /**
-     * The optional event-start timestamp — supplied when the link is
+     * The optional event-start timestamp. Supplied when the link is
      * created for a scheduled call rather than an immediate call.
      */
     private final Instant eventStartTime;
@@ -155,19 +155,11 @@ public final class SmaxLinkCreateRequest implements SmaxOperation.Request {
      *
      * @return a {@link NodeBuilder} carrying the {@code <call>}
      *         envelope around a {@code <link_create/>} payload
-     *
-     * @implNote {@code WASmaxOutVoipLinkCreateRequest.makeLinkCreateRequest}
-     *           composes {@code <call to="call" id="…"><link_create
-     *           media call-creator call-id link_creator_username
-     *           waiting_room_enabled><event start_time/></link_create></call>}.
-     *           The optional {@code <event start_time>} child is
-     *           emitted only when {@link #eventStartTime} is set.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutVoipLinkCreateRequest",
             exports = "makeLinkCreateRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutVoipLinkCreateRequest: smax("link_create", {media, call-creator, call-id, link_creator_username, waiting_room_enabled})
         var linkCreateBuilder = new NodeBuilder()
                 .description("link_create");
         if (linkCreateMedia != null) {
@@ -186,14 +178,12 @@ public final class SmaxLinkCreateRequest implements SmaxOperation.Request {
             linkCreateBuilder.attribute("waiting_room_enabled", "1");
         }
         if (eventStartTime != null) {
-            // WASmaxOutVoipLinkCreateRequest: smax("event", {start_time: INT(t)})
             var eventNode = new NodeBuilder()
                     .description("event")
                     .attribute("start_time", eventStartTime.getEpochSecond())
                     .build();
             linkCreateBuilder.content(eventNode);
         }
-        // WASmaxOutVoipLinkCreateRequest: smax("call", {id: generateId(), to: JID("call")})
         return new NodeBuilder()
                 .description("call")
                 .attribute("to", JidServer.call())

@@ -21,11 +21,11 @@ import java.util.Optional;
 @WhatsAppWebModule(moduleName = "WASmaxInBizCtwaActionEnums")
 public enum SmaxBannerSuggestionFalseTrueFlag {
     /**
-     * Literal {@code "false"} — banner still active.
+     * Literal {@code "false"}. Banner still active.
      */
     FALSE,
     /**
-     * Literal {@code "true"} — banner has been revoked server-side.
+     * Literal {@code "true"}. Banner has been revoked server-side.
      */
     TRUE;
 

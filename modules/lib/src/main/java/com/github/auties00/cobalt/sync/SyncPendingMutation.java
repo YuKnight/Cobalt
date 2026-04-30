@@ -20,8 +20,19 @@ import java.util.UUID;
  */
 @WhatsAppWebModule(moduleName = "WAWebSyncdPendingMutations")
 public final class SyncPendingMutation {
+    /**
+     * Stable identifier for tracking this mutation through the sync cycle.
+     */
     private final String mutationId;
+
+    /**
+     * The decrypted mutation queued for upload.
+     */
     private final DecryptedMutation.Trusted mutation;
+
+    /**
+     * Number of sync attempts already made for this mutation.
+     */
     private final int attemptCount;
 
     /**
@@ -86,6 +97,12 @@ public final class SyncPendingMutation {
         return attemptCount;
     }
 
+    /**
+     * Compares this pending mutation to the given object for equality on every field.
+     *
+     * @param o the object to compare against
+     * @return {@code true} when both instances carry the same id, mutation and attempt count
+     */
     @Override
     public boolean equals(Object o) {
         return o == this || o instanceof SyncPendingMutation that
@@ -94,11 +111,21 @@ public final class SyncPendingMutation {
                             && Objects.equals(mutation, that.mutation);
     }
 
+    /**
+     * Computes a hash consistent with {@link #equals(Object)}.
+     *
+     * @return the combined hash of the id, mutation and attempt count
+     */
     @Override
     public int hashCode() {
         return Objects.hash(mutationId, mutation, attemptCount);
     }
 
+    /**
+     * Returns a debug-only representation listing every field.
+     *
+     * @return a single-line bracketed string for diagnostic logging
+     */
     @Override
     public String toString() {
         return "SyncPendingMutation[" +

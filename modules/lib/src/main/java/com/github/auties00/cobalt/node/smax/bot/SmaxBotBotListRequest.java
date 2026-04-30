@@ -16,7 +16,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps an optional list of scoping
+ * The outbound stanza variant. Wraps an optional list of scoping
  * {@code <bot jid/>} children and the version / digest attributes
  * in the canonical {@code <iq xmlns="bot" type="get"
  * to="s.whatsapp.net">} envelope.
@@ -26,7 +26,7 @@ import java.util.Optional;
 @WhatsAppWebModule(moduleName = "WASmaxOutBotBaseIQGetRequestMixin")
 public final class SmaxBotBotListRequest implements SmaxOperation.Request {
     /**
-     * The optional protocol revision the client supports — typically
+     * The optional protocol revision the client supports. Typically
      * {@code "2"} or {@code "3"}; may be {@code null}.
      */
     private final String botV;
@@ -91,22 +91,11 @@ public final class SmaxBotBotListRequest implements SmaxOperation.Request {
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         the {@code <bot/>} payload
-     *
-     * @implNote {@code WASmaxOutBotBotListRequest.makeBotListRequest}
-     *           composes
-     *           {@code WASmaxOutBotBotListIQMixin}
-     *           ({@code xmlns="bot"}, {@code to="s.whatsapp.net"})
-     *           with
-     *           {@code WASmaxOutBotBaseIQGetRequestMixin}
-     *           ({@code id=generateId()}, {@code type="get"}) over
-     *           a {@code <bot v? bhash?>REPEATED_CHILD(bot, args, 0, ∞)</bot>}
-     *           payload.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutBotBotListRequest",
             exports = "makeBotListRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutBotBotListRequest: smax("bot", {v?, bhash?}, REPEATED_CHILD(bot, args, 0, ∞))
         var topBotBuilder = new NodeBuilder()
                 .description("bot");
         if (botV != null) {
@@ -116,7 +105,6 @@ public final class SmaxBotBotListRequest implements SmaxOperation.Request {
             topBotBuilder.attribute("bhash", botBhash);
         }
         for (var argJid : botArgs) {
-            // WASmaxOutBotBotListRequest: smax("bot", {jid: JID(t)})
             var argNode = new NodeBuilder()
                     .description("bot")
                     .attribute("jid", argJid)

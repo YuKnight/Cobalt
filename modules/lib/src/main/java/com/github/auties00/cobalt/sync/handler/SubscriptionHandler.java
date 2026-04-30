@@ -46,14 +46,14 @@ public final class SubscriptionHandler implements WebAppStateActionHandler {
      *           {@code o("WASyncdConst").Actions.SubscriptionsSyncV2}, which is
      *           {@code "subscriptions_sync_v2"}
      */
-    private static final String ACTION_NAME = "subscriptions_sync_v2"; // WAWebSubscriptionsSyncV2Sync.getAction: return o("WASyncdConst").Actions.SubscriptionsSyncV2
+    private static final String ACTION_NAME = "subscriptions_sync_v2";
 
     /**
      * Canonical WhatsApp Web mutation format version for this handler.
      *
      * @implNote WAWebSubscriptionsSyncV2Sync.getVersion returns {@code 1}
      */
-    private static final int ACTION_VERSION = 1; // WAWebSubscriptionsSyncV2Sync.getVersion: return 1
+    private static final int ACTION_VERSION = 1;
 
     /**
      * Canonical WhatsApp Web collection this handler's mutations belong to.
@@ -61,14 +61,14 @@ public final class SubscriptionHandler implements WebAppStateActionHandler {
      * @implNote WAWebSubscriptionsSyncV2Sync constructor sets
      *           {@code this.collectionName = o("WASyncdConst").CollectionName.Regular}
      */
-    private static final SyncPatchType COLLECTION_NAME = SyncPatchType.REGULAR; // WAWebSubscriptionsSyncV2Sync: e.collectionName = o("WASyncdConst").CollectionName.Regular
+    private static final SyncPatchType COLLECTION_NAME = SyncPatchType.REGULAR;
 
     /**
      * Logger for subscriptions sync v2 operations.
      *
      * @implNote ADAPTED: WAWebSubscriptionsSyncV2Sync uses WALogger; Cobalt uses {@code java.util.logging}
      */
-    private static final Logger LOGGER = Logger.getLogger(SubscriptionHandler.class.getName()); // ADAPTED: WAWebSubscriptionsSyncV2Sync: o("WALogger").WARN(...)
+    private static final Logger LOGGER = Logger.getLogger(SubscriptionHandler.class.getName());
 
     /**
      * The singleton instance of {@code SubscriptionHandler}.
@@ -77,7 +77,7 @@ public final class SubscriptionHandler implements WebAppStateActionHandler {
      *           exported as {@code l.default = c}
      */
     @WhatsAppWebExport(moduleName = "WAWebSubscriptionsSyncV2Sync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public static final SubscriptionHandler INSTANCE = new SubscriptionHandler(); // WAWebSubscriptionsSyncV2Sync: var c = new u()
+    public static final SubscriptionHandler INSTANCE = new SubscriptionHandler();
 
     /**
      * Private constructor to enforce the singleton pattern.
@@ -100,7 +100,7 @@ public final class SubscriptionHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSubscriptionsSyncV2Sync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return ACTION_NAME; // WAWebSubscriptionsSyncV2Sync.getAction
+        return ACTION_NAME;
     }
 
     /**
@@ -112,18 +112,16 @@ public final class SubscriptionHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSubscriptionsSyncV2Sync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return COLLECTION_NAME; // WAWebSubscriptionsSyncV2Sync: collectionName = Regular
+        return COLLECTION_NAME;
     }
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote WAWebSubscriptionsSyncV2Sync.getVersion — returns {@code 1}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSubscriptionsSyncV2Sync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return ACTION_VERSION; // WAWebSubscriptionsSyncV2Sync.getVersion
+        return ACTION_VERSION;
     }
 
     /**
@@ -142,7 +140,7 @@ public final class SubscriptionHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSubscriptionsSyncV2Sync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebSubscriptionsSyncV2Sync.applyMutations
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -195,54 +193,53 @@ public final class SubscriptionHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSubscriptionsSyncV2Sync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        try { // WAWebSubscriptionsSyncV2Sync.applyMutations: try { e: { ... } } catch(e) { return {actionState: Failed} }
-            if (mutation.operation() == SyncdOperation.SET) { // WAWebSubscriptionsSyncV2Sync.applyMutations: t.operation === "set" && "value" in t
-                if (!(mutation.value().action().orElse(null) instanceof SubscriptionsSyncV2Action action)) { // WAWebSubscriptionsSyncV2Sync.applyMutations: var l = n.subscriptionsSyncV2Action; if (!l) return malformedActionValue(a.collectionName)
-                    return malformedActionValue(); // WAWebSubscriptionsSyncV2Sync.applyMutations: return r("WAWebODS").incr("web.app.subscription_sync.syncd.malformed"), o("WAWebSyncdIndexUtils").malformedActionValue(a.collectionName)
+        try {
+            if (mutation.operation() == SyncdOperation.SET) {
+                if (!(mutation.value().action().orElse(null) instanceof SubscriptionsSyncV2Action action)) {
+                    return malformedActionValue();
                 }
 
-                // WAWebSubscriptionsSyncV2Sync.applyMutations: yield o("WAWebSubscriptions").applySubscriptionsAndFeatureFlags(subs, features, "rewrite")
                 // ADAPTED: WA Web rewrites the subscription table and feature flag table via WAWebSubscriptions;
                 // Cobalt rewrites four flat ConcurrentHashMaps held on WhatsAppStore directly.
-                var featureFlags = new HashMap<String, Boolean>(); // WAWebSubscriptions.applySubscriptionsAndFeatureFlags("rewrite"): rebuild feature flag table from scratch
-                for (var feature : action.paidFeatures()) { // WAWebSubscriptions.applySubscriptionsAndFeatureFlags: iterate paidFeature list
-                    feature.name().ifPresent(name -> featureFlags.put(name, feature.enabled())); // WAWebSubscriptions.applySubscriptionsAndFeatureFlags: featureFlags[name] = enabled
+                var featureFlags = new HashMap<String, Boolean>();
+                for (var feature : action.paidFeatures()) {
+                    feature.name().ifPresent(name -> featureFlags.put(name, feature.enabled()));
                 }
-                client.store().setBusinessFeatureFlags(featureFlags); // WAWebSubscriptions.applySubscriptionsAndFeatureFlags("rewrite"): replace stored feature flag table
+                client.store().setBusinessFeatureFlags(featureFlags);
 
-                var statuses = new HashMap<String, String>(); // WAWebSubscriptions.applySubscriptionsAndFeatureFlags("rewrite"): rebuild subscription status table
-                var expirations = new HashMap<String, Long>(); // WAWebSubscriptions.applySubscriptionsAndFeatureFlags("rewrite"): rebuild subscription expiration table
-                var creationTimes = new HashMap<String, Long>(); // WAWebSubscriptions.applySubscriptionsAndFeatureFlags("rewrite"): rebuild subscription creation-time table
-                for (var subscription : action.subscriptions()) { // WAWebSubscriptions.applySubscriptionsAndFeatureFlags: iterate subscriptions list
+                var statuses = new HashMap<String, String>();
+                var expirations = new HashMap<String, Long>();
+                var creationTimes = new HashMap<String, Long>();
+                for (var subscription : action.subscriptions()) {
                     var idOpt = subscription.id();
-                    if (idOpt.isEmpty()) { // WAWebSubscriptions.applySubscriptionsAndFeatureFlags: skip entries with no id (defensive — id is the primary key)
+                    if (idOpt.isEmpty()) {
                         continue;
                     }
                     var id = idOpt.get();
-                    subscription.status().ifPresent(status -> statuses.put(id, status)); // WAWebSubscriptions.applySubscriptionsAndFeatureFlags: subscription.status mapped by id
+                    subscription.status().ifPresent(status -> statuses.put(id, status));
                     var endTime = subscription.endTime();
-                    if (endTime.isPresent()) { // WAWebSubscriptions.applySubscriptionsAndFeatureFlags: subscription.endTime is the expiration timestamp
+                    if (endTime.isPresent()) {
                         expirations.put(id, endTime.getAsLong());
                     }
                     var creationTime = subscription.creationTime();
-                    if (creationTime.isPresent()) { // WAWebSubscriptions.applySubscriptionsAndFeatureFlags: subscription.creationTime mapped by id
+                    if (creationTime.isPresent()) {
                         creationTimes.put(id, creationTime.getAsLong());
                     }
                 }
-                client.store().setBusinessSubscriptionStatuses(statuses); // WAWebSubscriptions.applySubscriptionsAndFeatureFlags("rewrite"): replace stored status table
-                client.store().setBusinessSubscriptionExpirations(expirations); // WAWebSubscriptions.applySubscriptionsAndFeatureFlags("rewrite"): replace stored expiration table
-                client.store().setBusinessSubscriptionCreationTimes(creationTimes); // WAWebSubscriptions.applySubscriptionsAndFeatureFlags("rewrite"): replace stored creation-time table
+                client.store().setBusinessSubscriptionStatuses(statuses);
+                client.store().setBusinessSubscriptionExpirations(expirations);
+                client.store().setBusinessSubscriptionCreationTimes(creationTimes);
 
-                return MutationApplicationResult.success(); // WAWebSubscriptionsSyncV2Sync.applyMutations: return r("WAWebODS").incr("web.app.subscription_sync.syncd.success"), {actionState: Success}
+                return MutationApplicationResult.success();
             }
 
-            if (mutation.operation() == SyncdOperation.REMOVE) { // WAWebSubscriptionsSyncV2Sync.applyMutations: t.operation === "remove"
-                return MutationApplicationResult.success(); // WAWebSubscriptionsSyncV2Sync.applyMutations: return i++, {actionState: Success}
+            if (mutation.operation() == SyncdOperation.REMOVE) {
+                return MutationApplicationResult.success();
             }
 
-            return MutationApplicationResult.failed(); // WAWebSubscriptionsSyncV2Sync.applyMutations: throw Error("Match: No case succesfully matched...") — caught by outer try/catch returning Failed
-        } catch (Exception e) { // WAWebSubscriptionsSyncV2Sync.applyMutations: catch(e) { return {actionState: Failed} }
-            return MutationApplicationResult.failed(); // WAWebSubscriptionsSyncV2Sync.applyMutations: r("WAWebODS").incr("web.app.subscription_sync.syncd.error"), {actionState: Failed}
+            return MutationApplicationResult.failed();
+        } catch (Exception e) {
+            return MutationApplicationResult.failed();
         }
     }
 
@@ -276,19 +273,19 @@ public final class SubscriptionHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSubscriptionsSyncV2Sync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public List<MutationApplicationResult> applyMutationBatchResults(WhatsAppClient client, WamService wamService, List<DecryptedMutation.Trusted> mutations) {
-        var removeCount = 0; // WAWebSubscriptionsSyncV2Sync.applyMutations: var i = 0
-        var results = new ArrayList<MutationApplicationResult>(mutations.size()); // WAWebSubscriptionsSyncV2Sync.applyMutations: var l = yield Promise.all(...)
+        var removeCount = 0;
+        var results = new ArrayList<MutationApplicationResult>(mutations.size());
         for (var mutation : mutations) { // ADAPTED: WAWebSubscriptionsSyncV2Sync.applyMutations uses Promise.all(t.map(...)) — virtual-thread blocking loop
-            var result = applyMutationResult(client, wamService, mutation); // WAWebSubscriptionsSyncV2Sync.applyMutations: the per-mutation async generator body
-            if (result.actionState() == SyncActionState.SUCCESS && mutation.operation() == SyncdOperation.REMOVE) { // WAWebSubscriptionsSyncV2Sync.applyMutations: i++ inside the REMOVE branch
+            var result = applyMutationResult(client, wamService, mutation);
+            if (result.actionState() == SyncActionState.SUCCESS && mutation.operation() == SyncdOperation.REMOVE) {
                 removeCount++;
             }
             results.add(result);
         }
-        if (removeCount > 0) { // WAWebSubscriptionsSyncV2Sync.applyMutations: i > 0 && o("WALogger").WARN(...)
-            LOGGER.warning("[SubscriptionsSyncV2Sync] " + removeCount + " REMOVE ops (singleton)"); // WAWebSubscriptionsSyncV2Sync.applyMutations: WALogger.WARN("[SubscriptionsSyncV2Sync] N REMOVE ops (singleton)")
+        if (removeCount > 0) {
+            LOGGER.warning("[SubscriptionsSyncV2Sync] " + removeCount + " REMOVE ops (singleton)");
         }
-        return results; // WAWebSubscriptionsSyncV2Sync.applyMutations: return l
+        return results;
     }
 
     /**
@@ -310,7 +307,7 @@ public final class SubscriptionHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSubscriptionsSyncV2Sync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public List<Boolean> applyMutationBatch(WhatsAppClient client, WamService wamService, List<DecryptedMutation.Trusted> mutations) {
-        var detailed = applyMutationBatchResults(client, wamService, mutations); // ADAPTED: delegate to detailed-result override so REMOVE counter logging runs once per batch
+        var detailed = applyMutationBatchResults(client, wamService, mutations);
         var results = new ArrayList<Boolean>(detailed.size());
         for (var result : detailed) {
             results.add(result.actionState() == SyncActionState.SUCCESS);

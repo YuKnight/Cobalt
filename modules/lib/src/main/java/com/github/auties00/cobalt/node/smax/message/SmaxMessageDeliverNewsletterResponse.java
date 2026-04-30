@@ -58,7 +58,7 @@ public final class SmaxMessageDeliverNewsletterResponse implements SmaxOperation
     private final long timestamp;
 
     /**
-     * Whether the {@code is_sender="true"} attribute was present —
+     * Whether the {@code is_sender="true"} attribute was present.
      * i.e. the connected client authored the post.
      */
     private final boolean fromSelf;
@@ -93,7 +93,7 @@ public final class SmaxMessageDeliverNewsletterResponse implements SmaxOperation
     private final Integer offline;
 
     /**
-     * The fanout-content variant name — one of {@code "NewsletterText"},
+     * The fanout-content variant name. One of {@code "NewsletterText"},
      * {@code "NewsletterMedia"}, {@code "NewsletterReaction"},
      * {@code "NewsletterReactionRevoke"}, {@code "NewsletterEdit"},
      * {@code "NewsletterRevoke"}, {@code "NewsletterPollCreation"},
@@ -107,7 +107,7 @@ public final class SmaxMessageDeliverNewsletterResponse implements SmaxOperation
     private final String fanoutContentName;
 
     /**
-     * The {@code mediatype} on the {@code <plaintext/>} child —
+     * The {@code mediatype} on the {@code <plaintext/>} child.
      * always {@code "url"} per the relay schema.
      */
     private final String plaintextMediatype;
@@ -118,7 +118,7 @@ public final class SmaxMessageDeliverNewsletterResponse implements SmaxOperation
     private final byte[] rcatBytes;
 
     /**
-     * The raw underlying {@code <message/>} {@link Node} — exposed so
+     * The raw underlying {@code <message/>} {@link Node}. Exposed so
      * callers can project the variable-shape fanout-content children
      * (text body, media descriptor, poll metadata, etc.) without
      * Cobalt having to model 14 distinct payload variants here.
@@ -416,7 +416,7 @@ public final class SmaxMessageDeliverNewsletterResponse implements SmaxOperation
         if (rcatBytes == null) {
             return Optional.empty();
         }
-        // fanout-content disjunction — pick the first matching content child as a label.
+        // fanout-content disjunction. Pick the first matching content child as a label.
         var fanoutContentName = classifyFanoutContent(node);
         if (fanoutContentName == null) {
             return Optional.empty();
@@ -444,7 +444,7 @@ public final class SmaxMessageDeliverNewsletterResponse implements SmaxOperation
      *
      * <p>Mirrors
      * {@code WASmaxInMessageDeliverNewsletterMessageFanoutContent.parseNewsletterMessageFanoutContent}'s
-     * disjunctive try-cascade — we walk the same priority order
+     * disjunctive try-cascade. We walk the same priority order
      * (question → question-response → edit → question-reply → revoke
      * → text → media → reaction → reaction-revoke → poll-creation →
      * quiz-creation → poll-vote → poll-result-snapshot → wamo-empty)
@@ -453,14 +453,12 @@ public final class SmaxMessageDeliverNewsletterResponse implements SmaxOperation
      * @param node the message stanza; never {@code null}
      * @return the variant name, or {@code null} when no variant
      *         matched
-     *
-     * @implNote {@code WASmaxInMessageDeliverNewsletterMessageFanoutContent.parseNewsletterMessageFanoutContent}.
      */
     @WhatsAppWebExport(moduleName = "WASmaxInMessageDeliverNewsletterMessageFanoutContent",
             exports = "parseNewsletterMessageFanoutContent",
             adaptation = WhatsAppAdaptation.ADAPTED)
     private static String classifyFanoutContent(Node node) {
-        // Disjunction is structural — Cobalt collapses to a label-only classifier
+        // Disjunction is structural. Cobalt collapses to a label-only classifier
         // since downstream code re-walks the raw node for content extraction.
         if (node.hasChild("question")) {
             return "NewsletterQuestion";
@@ -500,7 +498,7 @@ public final class SmaxMessageDeliverNewsletterResponse implements SmaxOperation
         if (node.hasChild("wamo")) {
             return "NewsletterWAMOEmpty";
         }
-        // Plaintext + rcat with no other child: text/media variant — distinguished
+        // Plaintext + rcat with no other child: text/media variant. Distinguished
         // by the inner protobuf shape that downstream code parses from <plaintext/>.
         return "NewsletterText";
     }

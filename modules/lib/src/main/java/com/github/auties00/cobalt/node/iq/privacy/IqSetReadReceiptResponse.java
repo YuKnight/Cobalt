@@ -19,8 +19,8 @@ public sealed interface IqSetReadReceiptResponse extends IqOperation.Response
     /**
      * Tries each {@link IqSetReadReceiptResponse} variant in priority order.
      *
-     * @param node    the inbound IQ stanza; never {@code null}
-     * @param request the original outbound stanza; never {@code null}
+     * @param node    the inbound IQ stanza. Never {@code null}
+     * @param request the original outbound stanza. Never {@code null}
      * @return an {@link Optional} carrying the parsed variant, or
      *         empty when no documented variant matched
      * @throws NullPointerException if either argument is
@@ -43,12 +43,12 @@ public sealed interface IqSetReadReceiptResponse extends IqOperation.Response
     }
 
     /**
-     * The {@code Success} reply variant — the relay echoes the new
+     * The {@code Success} reply variant. The relay echoes the new
      * read-receipts category value.
      *
      * @implNote {@code WAWebSetReadReceiptJob.photoResponseParser}
      *           extracts the {@code <category name="readreceipts"
-     *           value=...>} grandchild and projects {@code {value}};
+     *           value=...>} grandchild and projects {@code {value}}.
      *           Cobalt collapses the wire string into the
      *           {@code enabled} boolean using the inverse of the
      *           request mapping ({@code "all"} -> {@code true},
@@ -145,7 +145,7 @@ public sealed interface IqSetReadReceiptResponse extends IqOperation.Response
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected
+     * The {@code ClientError} reply variant. The relay rejected
      * the request with a {@code 4xx} error code.
      */
     @WhatsAppWebModule(moduleName = "WAWebSetReadReceiptJob")
@@ -164,7 +164,7 @@ public sealed interface IqSetReadReceiptResponse extends IqOperation.Response
          * Constructs a client-error reply.
          *
          * @param errorCode the numeric error code
-         * @param errorText the optional text; may be {@code null}
+         * @param errorText the optional text. May be {@code null}
          */
         public ClientError(int errorCode, String errorText) {
             this.errorCode = errorCode;
@@ -235,7 +235,7 @@ public sealed interface IqSetReadReceiptResponse extends IqOperation.Response
     }
 
     /**
-     * The {@code ServerError} reply variant — transient internal
+     * The {@code ServerError} reply variant. Transient internal
      * failure ({@code 5xx} error code).
      */
     @WhatsAppWebModule(moduleName = "WAWebSetReadReceiptJob")
@@ -254,7 +254,7 @@ public sealed interface IqSetReadReceiptResponse extends IqOperation.Response
          * Constructs a server-error reply.
          *
          * @param errorCode the numeric error code
-         * @param errorText the optional text; may be {@code null}
+         * @param errorText the optional text. May be {@code null}
          */
         public ServerError(int errorCode, String errorText) {
             this.errorCode = errorCode;

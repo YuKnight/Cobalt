@@ -36,13 +36,8 @@ public sealed interface SmaxServerNotificationStateType permits SmaxServerNotifi
     }
 
     /**
-     * The {@code Composing} state-type — the peer is currently
+     * The {@code Composing} state-type. The peer is currently
      * typing.
-     *
-     * @implNote {@code WASmaxInChatstateComposingMixin.parseComposingMixin}
-     *           extracts the {@code <composing/>} child and parses
-     *           the optional {@code media} attribute as the literal
-     *           {@code "audio"}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInChatstateComposingMixin")
     final class Composing implements SmaxServerNotificationStateType {
@@ -122,11 +117,7 @@ public sealed interface SmaxServerNotificationStateType permits SmaxServerNotifi
     }
 
     /**
-     * The {@code Paused} state-type — the peer has stopped typing.
-     *
-     * @implNote {@code WASmaxInChatstatePausedMixin.parsePausedMixin}
-     *           validates the presence of a bare
-     *           {@code <paused/>} child.
+     * The {@code Paused} state-type. The peer has stopped typing.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInChatstatePausedMixin")
     final class Paused implements SmaxServerNotificationStateType {

@@ -19,8 +19,8 @@ public sealed interface IqSetAboutResponse extends IqOperation.Response
     /**
      * Tries each {@link IqSetAboutResponse} variant in priority order.
      *
-     * @param node    the inbound IQ stanza; never {@code null}
-     * @param request the original outbound stanza; never {@code null}
+     * @param node    the inbound IQ stanza. Never {@code null}
+     * @param request the original outbound stanza. Never {@code null}
      * @return an {@link Optional} carrying the parsed variant, or
      *         empty when no documented variant matched
      * @throws NullPointerException if either argument is
@@ -43,7 +43,7 @@ public sealed interface IqSetAboutResponse extends IqOperation.Response
     }
 
     /**
-     * The {@code Success} reply variant — carries the integer
+     * The {@code Success} reply variant. Carries the integer
      * revision identifier the relay assigned to the new about-text
      * version.
      *
@@ -122,7 +122,7 @@ public sealed interface IqSetAboutResponse extends IqOperation.Response
     }
 
     /**
-     * The {@code ClientError} reply variant — {@code 4xx} rejection
+     * The {@code ClientError} reply variant. {@code 4xx} rejection
      * (typically {@code 406} for an about-text that exceeds the
      * relay-side length cap, or {@code 400} for invalid Unicode).
      */
@@ -142,7 +142,7 @@ public sealed interface IqSetAboutResponse extends IqOperation.Response
          * Constructs a client-error reply.
          *
          * @param errorCode the numeric error code
-         * @param errorText the optional text; may be {@code null}
+         * @param errorText the optional text. May be {@code null}
          */
         public ClientError(int errorCode, String errorText) {
             this.errorCode = errorCode;
@@ -213,7 +213,7 @@ public sealed interface IqSetAboutResponse extends IqOperation.Response
     }
 
     /**
-     * The {@code ServerError} reply variant — {@code 5xx} transient
+     * The {@code ServerError} reply variant. {@code 5xx} transient
      * failure.
      */
     @WhatsAppWebModule(moduleName = "WAWebSetAboutJob")
@@ -232,7 +232,7 @@ public sealed interface IqSetAboutResponse extends IqOperation.Response
          * Constructs a server-error reply.
          *
          * @param errorCode the numeric error code
-         * @param errorText the optional text; may be {@code null}
+         * @param errorText the optional text. May be {@code null}
          */
         public ServerError(int errorCode, String errorText) {
             this.errorCode = errorCode;

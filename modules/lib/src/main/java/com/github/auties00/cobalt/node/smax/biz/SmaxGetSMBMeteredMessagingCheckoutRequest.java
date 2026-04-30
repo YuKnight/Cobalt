@@ -17,7 +17,7 @@ import java.util.Optional;
 import java.util.OptionalInt;
 
 /**
- * The outbound stanza variant — wraps the {@code <participants/>}
+ * The outbound stanza variant. Wraps the {@code <participants/>}
  * payload and the four optional toggles inside the canonical
  * {@code <iq xmlns="w:biz" type="get">} envelope.
  *

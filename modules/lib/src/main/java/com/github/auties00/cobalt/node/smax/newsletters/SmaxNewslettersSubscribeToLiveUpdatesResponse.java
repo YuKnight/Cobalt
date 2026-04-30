@@ -30,7 +30,7 @@ public sealed interface SmaxNewslettersSubscribeToLiveUpdatesResponse extends Sm
      *
      * @param node    the inbound IQ stanza received from the relay;
      *                never {@code null}
-     * @param request the original outbound stanza — used to validate
+     * @param request the original outbound stanza, used to validate
      *                echoed identifiers; never {@code null}
      * @return an {@link Optional} carrying the parsed variant, or
      *         {@link Optional#empty()} when no documented variant
@@ -54,12 +54,12 @@ public sealed interface SmaxNewslettersSubscribeToLiveUpdatesResponse extends Sm
     }
 
     /**
-     * The {@code Success} reply variant — the relay accepted the
+     * The {@code Success} reply variant. The relay accepted the
      * subscription and returned the chosen TTL.
      *
      * @implNote {@code WASmaxInNewslettersSubscribeToLiveUpdatesResponseSuccess.parseSubscribeToLiveUpdatesResponseSuccess}
      *           validates the {@code <iq>} envelope through
-     *           {@code parseIQResultResponseMixin}, asserts the
+     *           {@code parseIQResultResponseMixin}. Asserts the
      *           {@code <live_updates>} child exists, then projects its
      *           {@code duration} attribute through
      *           {@code attrIntRange(value, 30, 600)}.
@@ -142,7 +142,7 @@ public sealed interface SmaxNewslettersSubscribeToLiveUpdatesResponse extends Sm
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected the
+     * The {@code ClientError} reply variant. The relay rejected the
      * subscription as malformed, unauthorised, or referencing a
      * non-existent newsletter.
      *
@@ -160,7 +160,7 @@ public sealed interface SmaxNewslettersSubscribeToLiveUpdatesResponse extends Sm
         private final int errorCode;
 
         /**
-         * The human-readable error text, when the relay supplied one.
+         * The human-readable error text. When the relay supplied one.
          */
         private final String errorText;
 
@@ -241,7 +241,7 @@ public sealed interface SmaxNewslettersSubscribeToLiveUpdatesResponse extends Sm
     }
 
     /**
-     * The {@code ServerError} reply variant — the relay encountered a
+     * The {@code ServerError} reply variant. The relay encountered a
      * transient internal failure while processing the subscription.
      *
      * @implNote {@code WASmaxInNewslettersSubscribeToLiveUpdatesResponseServerError.parseSubscribeToLiveUpdatesResponseServerError}
@@ -258,7 +258,7 @@ public sealed interface SmaxNewslettersSubscribeToLiveUpdatesResponse extends Sm
         private final int errorCode;
 
         /**
-         * The human-readable error text, when the relay supplied one.
+         * The human-readable error text. When the relay supplied one.
          */
         private final String errorText;
 

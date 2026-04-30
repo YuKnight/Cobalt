@@ -10,19 +10,18 @@ import java.io.IOException;
 import java.util.Objects;
 
 /**
- * A security layer that provides optional encryption over an existing
+ * Security layer that adds optional encryption over an existing
  * connection.
  *
- * <p>Two factories are provided: {@link #newTls(SocketClientLayer,
- * WhatsAppSslEngineFactory)} for TLS encryption, and
- * {@link #newPlain(SocketClientLayer)} for a transparent passthrough used
- * when the position in the stack does not require encryption.
+ * <p>Two factories are exposed: {@link #newTls(SocketClientLayer, WhatsAppSslEngineFactory)}
+ * for TLS encryption and {@link #newPlain(SocketClientLayer)} for a
+ * transparent pass-through used when this position in the stack does
+ * not need encryption.
  *
- * <p>The security layer is positionally polymorphic — the same concrete
- * implementation is reused wherever encryption is needed, whether that is
- * the proxy hop (client-to-proxy) or the end-to-end hop (client-to-target).
- * The position is determined entirely by how the caller composes the stack,
- * not by the layer type.
+ * <p>The security layer is positionally polymorphic: the same
+ * implementation is reused at both the proxy hop (client-to-proxy)
+ * and the end-to-end hop (client-to-target). The role is determined
+ * entirely by where the caller places the layer in the stack.
  */
 public interface SocketClientSecurityLayer extends SocketClientLayer<SocketClientLayerContext> {
     /**
@@ -33,10 +32,10 @@ public interface SocketClientSecurityLayer extends SocketClientLayer<SocketClien
     void startHandshake() throws IOException;
 
     /**
-     * Creates a TLS security layer wrapping the given inner layer.
+     * Creates a TLS security layer wrapping {@code innerLayer}.
      *
-     * @param innerLayer    the layer below (typically the transport or a tunnel)
-     * @param engineFactory the factory for creating {@link javax.net.ssl.SSLEngine} instances
+     * @param innerLayer    the layer below (transport or tunnel)
+     * @param engineFactory the factory used to create the {@link javax.net.ssl.SSLEngine}
      * @return a new TLS security layer
      */
     static SocketClientSecurityLayer newTls(SocketClientLayer<?> innerLayer, WhatsAppSslEngineFactory engineFactory) {
@@ -46,7 +45,8 @@ public interface SocketClientSecurityLayer extends SocketClientLayer<SocketClien
     }
 
     /**
-     * Creates a plain (no-op) security layer wrapping the given inner layer.
+     * Creates a no-op security layer that simply delegates to
+     * {@code innerLayer}.
      *
      * @param innerLayer the layer below
      * @return a new plain security layer

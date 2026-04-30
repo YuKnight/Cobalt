@@ -13,17 +13,17 @@ import java.util.Optional;
  * every SMAX RPC.
  *
  * <p>Every domain in WA Web ships a {@code WASmaxIn*BaseServerErrorMixin}
- * module — these are all near-identical: assert the {@code <iq>} tag,
+ * module. These are all near-identical: assert the {@code <iq>} tag,
  * delegate envelope validation to {@link SmaxIqErrorResponseMixin#validate},
  * then route the {@code <error/>} child through {@code WASmaxIn*ServerErrors}
  * to extract a transient-internal-failure projection. Cobalt deduplicates
- * the family into the single helper here; per-domain enums layer the
+ * the family into the single helper here. Per-domain enums layer the
  * {@code 5xx} → semantic-name mapping where callers need it, but the bulk
  * of {@code ServerError} variants only need the {@code (code, text)} pair.
  *
  * @implNote {@code WASmaxInGroupsBaseServerErrorMixin.parseBaseServerErrorMixin}
  *           and the equivalents from other domains all share the same
- *           wire-shape; Cobalt's
+ *           wire-shape. Cobalt's
  *           {@link #parseServerError(Node, Node)} produces the same
  *           projection (envelope-validated {@code (code, text)} pair) without
  *           the {@code WAResultOrError} indirection.
@@ -33,7 +33,7 @@ import java.util.Optional;
 public final class SmaxBaseServerErrorMixin {
 
     /**
-     * Private constructor — the class is a static-only utility.
+     * Private constructor. The class is a static-only utility.
      */
     private SmaxBaseServerErrorMixin() {
         throw new AssertionError("SmaxBaseServerErrorMixin cannot be instantiated");
@@ -48,9 +48,9 @@ public final class SmaxBaseServerErrorMixin {
      * malformed, or the parsed code is below the {@code 500} threshold
      * that distinguishes server-side from client-side errors.
      *
-     * @param reply   the inbound error stanza; never {@code null}
-     * @param request the outbound request — used to validate echoed
-     *                identifiers; never {@code null}
+     * @param reply   the inbound error stanza. Never {@code null}
+     * @param request the outbound request. Used to validate echoed
+     *                identifiers. Never {@code null}
      * @return an {@link Optional} carrying the parsed envelope, or empty
      *         when the stanza does not match the server-error schema
      * @throws NullPointerException if either argument is {@code null}
@@ -82,12 +82,12 @@ public final class SmaxBaseServerErrorMixin {
     /**
      * Tries to parse a client-error envelope (codes in {@code [400, 500)}).
      *
-     * <p>Used by the {@code ClientError} variants of every SMAX RPC; the
+     * <p>Used by the {@code ClientError} variants of every SMAX RPC. The
      * complementary range to {@link #parseServerError(Node, Node)}.
      *
-     * @param reply   the inbound error stanza; never {@code null}
-     * @param request the outbound request — used to validate echoed
-     *                identifiers; never {@code null}
+     * @param reply   the inbound error stanza. Never {@code null}
+     * @param request the outbound request. Used to validate echoed
+     *                identifiers. Never {@code null}
      * @return an {@link Optional} carrying the parsed envelope, or empty
      *         when the stanza does not match the client-error schema
      * @throws NullPointerException if either argument is {@code null}

@@ -9,92 +9,72 @@ import java.util.Optional;
 import java.util.OptionalInt;
 
 /**
- * The result of parsing a server acknowledgement node returned after
- * sending a message stanza.
+ * Holds the result of parsing the {@code <ack>} stanza that the server returns after
+ * an outgoing message has been processed.
  *
- * <p>The server always returns the same set of attributes; some are
- * optional and represented here via {@link Optional} accessors.  The
- * presence of an {@linkplain #error() error code} indicates a
- * server-side rejection, while a non-empty {@linkplain #phash() phash}
- * indicates a device-list mismatch requiring a resend.
+ * <p>A non-empty {@linkplain #error() error} indicates a server-side rejection. A
+ * non-empty {@linkplain #phash() phash} signals a device-list mismatch that requires
+ * a resend to the new devices.
  *
- * @implNote WAWebSendMsgCommonApi.sendMsgAckSyncParser: the parsed ack
- * structure.  A non-null {@code error} indicates a server-side rejection
- * (e.g., 421 for stale group addressing mode).
  * @see AckParser
  * @see NackReason
  */
 @WhatsAppWebModule(moduleName = "WAWebSendMsgCommonApi")
 public final class AckResult {
     /**
-     * The server timestamp from the {@code t} attribute.
-     *
-     * @implNote WAWebSendMsgCommonApi: {@code e.attrTime("t")}
+     * Holds the server timestamp from the {@code t} attribute, or {@code null} when
+     * the attribute was absent.
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "sendMsgAckSyncParser",
             adaptation = WhatsAppAdaptation.DIRECT)
     private final Instant timestamp;
 
     /**
-     * The sync attribute value.
-     *
-     * @implNote WAWebSendMsgCommonApi: {@code e.maybeAttrString("sync")}
+     * Holds the {@code sync} attribute, or {@code null} when absent.
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "sendMsgAckSyncParser",
             adaptation = WhatsAppAdaptation.DIRECT)
     private final String sync;
 
     /**
-     * The participant hash for device-list verification.
-     *
-     * @implNote WAWebSendMsgCommonApi: {@code e.maybeAttrString("phash")}
+     * Holds the participant hash returned for group sends, or {@code null} when the
+     * server's view matches the client's.
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "sendMsgAckSyncParser",
             adaptation = WhatsAppAdaptation.DIRECT)
     private final String phash;
 
     /**
-     * Whether the server requests a LID refresh.
-     *
-     * @implNote WAWebSendMsgCommonApi:
-     * {@code e.hasAttr("refresh_lid") ? e.attrString("refresh_lid") === "true" : false}
+     * Indicates whether the server is requesting a LID refresh for the recipient.
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "sendMsgAckSyncParser",
             adaptation = WhatsAppAdaptation.DIRECT)
     private final boolean refreshLid;
 
     /**
-     * The addressing mode the server expects.
-     *
-     * @implNote WAWebSendMsgCommonApi: {@code e.maybeAttrString("addressing_mode")}
+     * Holds the addressing mode the server expects, or {@code null} when not reported.
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "sendMsgAckSyncParser",
             adaptation = WhatsAppAdaptation.DIRECT)
     private final String addressingMode;
 
     /**
-     * The recipient count reported by the server.
-     *
-     * @implNote WAWebSendMsgCommonApi: {@code e.maybeAttrInt("count")}
+     * Holds the recipient count reported by the server, or {@code null} when absent.
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "sendMsgAckSyncParser",
             adaptation = WhatsAppAdaptation.DIRECT)
     private final Integer count;
 
     /**
-     * The error code included by the server, or {@code null} for success.
-     *
-     * @implNote WAWebSendMsgCommonApi: {@code e.maybeAttrInt("error")}
+     * Holds the server error code, or {@code null} when the send succeeded.
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "sendMsgAckSyncParser",
             adaptation = WhatsAppAdaptation.DIRECT)
     private final Integer error;
 
     /**
-     * Constructs a new ack result with the given attribute values.
+     * Constructs an ack result with the parsed attribute values.
      *
-     * @implNote WAWebSendMsgCommonApi.sendMsgAckSyncParser.parse: maps
-     * each ack attribute into this structure.
      * @param timestamp      the server timestamp, or {@code null}
      * @param sync           the sync attribute, or {@code null}
      * @param phash          the participant hash, or {@code null}
@@ -124,10 +104,9 @@ public final class AckResult {
     }
 
     /**
-     * Returns the server timestamp.
+     * Returns the server timestamp recorded against the message.
      *
-     * @implNote WAWebSendMsgCommonApi: {@code e.attrTime("t")}
-     * @return the timestamp, or empty if absent
+     * @return the timestamp, or empty when the attribute was absent
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "sendMsgAckSyncParser",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -136,10 +115,9 @@ public final class AckResult {
     }
 
     /**
-     * Returns the sync attribute.
+     * Returns the {@code sync} attribute carried on the ack.
      *
-     * @implNote WAWebSendMsgCommonApi: {@code e.maybeAttrString("sync")}
-     * @return the sync value, or empty if absent
+     * @return the sync value, or empty when absent
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "sendMsgAckSyncParser",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -148,16 +126,12 @@ public final class AckResult {
     }
 
     /**
-     * Returns the participant hash returned by the server for group messages.
+     * Returns the participant hash sent back by the server for group messages.
      *
-     * <p>A non-empty value indicates the server's participant list differs
-     * from the client's, requiring a device-list resync and message resend.
+     * <p>A non-empty value indicates the server's participant list differs from the
+     * client's, requiring a device-list resync and a resend to the delta devices.
      *
-     * @implNote WAWebSendMsgCommonApi: {@code e.maybeAttrString("phash")}.
-     * WAWebSendGroupSkmsgJob: triggers resendPersistedGroupMsgWrapper when
-     * {@code phash != null && phash !== localPhash}.
-     * WAWebSendUserMsgJob: triggers resendUserMsg when {@code phash != null}.
-     * @return the server phash, or empty if the hashes matched
+     * @return the server phash, or empty when the hashes matched
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "sendMsgAckSyncParser",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -166,13 +140,9 @@ public final class AckResult {
     }
 
     /**
-     * Returns whether the server requests a LID refresh for the recipient.
+     * Returns whether the server requested a LID refresh for the recipient.
      *
-     * @implNote WAWebSendMsgCommonApi:
-     * {@code e.hasAttr("refresh_lid") ? e.attrString("refresh_lid") === "true" : false}.
-     * WAWebSendUserMsgJob.maybeRefreshLid: triggers a contact list sync
-     * when {@code true}.
-     * @return {@code true} if a LID refresh is requested
+     * @return {@code true} when a LID refresh is requested
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "sendMsgAckSyncParser",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -183,15 +153,10 @@ public final class AckResult {
     /**
      * Returns the addressing mode the server expects for this chat.
      *
-     * <p>When the returned mode differs from the mode the client used to
-     * send the message, the client must migrate the group's participant
-     * data and resend.
+     * <p>When the returned mode differs from the mode the client used, the client
+     * must migrate the group's participant data and resend.
      *
-     * @implNote WAWebSendMsgCommonApi: {@code e.maybeAttrString("addressing_mode")}.
-     * WAWebSendGroupSkmsgJob: compares against local addressing mode and
-     * calls handleAddressingModeMismatch on difference.
-     * @return the addressing mode ({@code "pn"} or {@code "lid"}),
-     *         or empty if absent
+     * @return the addressing mode ({@code "pn"} or {@code "lid"}), or empty when absent
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "sendMsgAckSyncParser",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -202,9 +167,7 @@ public final class AckResult {
     /**
      * Returns the recipient count reported by the server.
      *
-     * @implNote WAWebSendMsgCommonApi: {@code e.maybeAttrInt("count")}.
-     * WAWebSendGroupSkmsgJob: merges into the message table when present.
-     * @return the count, or empty if absent
+     * @return the count, or empty when absent
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "sendMsgAckSyncParser",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -215,14 +178,10 @@ public final class AckResult {
     }
 
     /**
-     * Returns the error code included by the server.
+     * Returns the error code carried on the ack. An empty value means the send was
+     * accepted by the server.
      *
-     * <p>An empty return value indicates success.
-     *
-     * @implNote WAWebSendMsgCommonApi: {@code e.maybeAttrInt("error")}.
-     * WAWebSendGroupSkmsgJob: checks for
-     * {@link NackReason#STALE_GROUP_ADDRESSING_MODE} (421).
-     * @return the error code, or empty if successful
+     * @return the error code, or empty on success
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "sendMsgAckSyncParser",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -233,26 +192,29 @@ public final class AckResult {
     }
 
     /**
-     * Returns whether the ack indicates success (no error code).
+     * Returns whether the ack indicates a successful send.
      *
-     * @implNote NO_WA_BASIS: convenience method derived from {@link #error()}.
-     * @return {@code true} if {@link #error()} is empty
+     * @return {@code true} when no error code was returned
      */
     public boolean isSuccess() {
         return error == null;
     }
 
     /**
-     * Returns whether the server's participant hash differs from the
-     * client's, indicating a device-list mismatch that requires a resend.
+     * Returns whether the server reported a participant-hash mismatch that requires
+     * a resend to the delta devices.
      *
-     * @implNote NO_WA_BASIS: convenience method derived from {@link #phash()}.
-     * @return {@code true} if a phash is present
+     * @return {@code true} when a phash is present
      */
     public boolean hasPhashMismatch() {
         return phash != null;
     }
 
+    /**
+     * Returns a debug representation of all parsed attributes.
+     *
+     * @return a string with every field value
+     */
     @Override
     public String toString() {
         return "AckResult[" +

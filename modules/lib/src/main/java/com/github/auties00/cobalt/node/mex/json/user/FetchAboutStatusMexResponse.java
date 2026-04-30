@@ -18,11 +18,21 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The parsed response for this MEX query.
+ * Parsed response for the about-status fetch query. Carries the per-user about-status update history projected from
+ * {@code data.xwa2_users_updates_since}.
  */
+@WhatsAppWebModule(moduleName = "WAWebMexFetchAboutStatusJob")
 public final class FetchAboutStatusMexResponse implements MexOperation.Response.Json {
+    /**
+     * The per-user about-status records returned by the relay.
+     */
     private final List<Item> items;
 
+    /**
+     * Constructs a new response carrying the given items.
+     *
+     * @param items the per-user about-status records
+     */
     private FetchAboutStatusMexResponse(List<Item> items) {
         this.items = items;
     }
@@ -30,13 +40,10 @@ public final class FetchAboutStatusMexResponse implements MexOperation.Response.
     /**
      * Parses the MEX response carried by an inbound IQ stanza.
      *
-     * @implNote WAWebMexFetchAboutStatusJobQuery.graphql: reads the
-     * {@code items[].updates[]} array containing about-status entries.
      * @param node the inbound IQ stanza carrying the {@code <result>} child
-     * @return the parsed response, or {@code Optional.empty()} if the
-     *         expected JSON shape is absent
+     * @return the parsed response, or {@link Optional#empty()} if the expected JSON shape is absent
      */
-    @WhatsAppWebExport(moduleName = "WAWebMexFetchAboutStatusJobQuery.graphql", exports = "params.id",
+    @WhatsAppWebExport(moduleName = "WAWebMexFetchAboutStatusJob", exports = "mexGetAbout",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public static Optional<FetchAboutStatusMexResponse> of(Node node) {
         return node.getChild("result")
@@ -45,7 +52,7 @@ public final class FetchAboutStatusMexResponse implements MexOperation.Response.
     }
 
     /**
-     * Returns the list of items in this response.
+     * Returns the per-user records carried by this response.
      *
      * @return the list of items, empty if absent
      */
@@ -54,48 +61,65 @@ public final class FetchAboutStatusMexResponse implements MexOperation.Response.
     }
 
     /**
-     * A parsed {@code Item} object.
+     * Single {@code xwa2_users_updates_since} entry. Wraps the chronological list of about-status updates known for a
+     * single user.
      */
     public static final class Item {
+        /**
+         * The chronological list of about-status updates for this user.
+         */
         private final List<Updates> updates;
 
+        /**
+         * Constructs a new entry with the given updates list.
+         *
+         * @param updates the chronological list of updates
+         */
         private Item(List<Updates> updates) {
             this.updates = updates;
         }
 
         /**
-         * Returns the {@code updates} field.
+         * Returns the chronological list of about-status updates for this user.
          *
-         * @return the list of values, empty if absent
+         * @return the list of updates, empty if absent
          */
         public List<Updates> updates() {
             return updates;
         }
 
         /**
-         * A parsed {@code Updates} object.
+         * A single about-status update entry.
          */
         public static final class Updates {
+            /**
+             * The about-status text recorded by this update.
+             */
             private final String text;
 
+            /**
+             * Constructs a new update entry.
+             *
+             * @param text the about-status text
+             */
             private Updates(String text) {
                 this.text = text;
             }
 
             /**
-             * Returns the {@code text} field.
+             * Returns the about-status text recorded by this update.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+             * @return an {@link Optional} containing the text, or empty if absent
              */
             public Optional<String> text() {
                 return Optional.ofNullable(text);
             }
 
             /**
-             * Parses a {@code Updates} from the given JSON object.
+             * Parses a single update entry from the given JSON object.
              *
              * @param obj the JSON object to parse
-             * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+             * @return an {@link Optional} containing the parsed entry, or empty if {@code obj} is {@code null}
              */
             static Optional<Updates> of(JSONObject obj) {
                 if (obj == null) {
@@ -107,10 +131,10 @@ public final class FetchAboutStatusMexResponse implements MexOperation.Response.
             }
 
             /**
-             * Parses a list of {@code Updates} from the given JSON array.
+             * Parses a list of update entries from the given JSON array.
              *
              * @param arr the JSON array to parse
-             * @return the list of parsed results, empty if {@code arr} is {@code null}
+             * @return the list of parsed entries, empty if {@code arr} is {@code null}
              */
             static List<Updates> ofArray(JSONArray arr) {
                 if (arr == null) {
@@ -126,10 +150,10 @@ public final class FetchAboutStatusMexResponse implements MexOperation.Response.
         }
 
         /**
-         * Parses a {@code Item} from the given JSON object.
+         * Parses a single {@code Item} from the given JSON object.
          *
          * @param obj the JSON object to parse
-         * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+         * @return an {@link Optional} containing the parsed item, or empty if {@code obj} is {@code null}
          */
         static Optional<Item> of(JSONObject obj) {
             if (obj == null) {
@@ -141,10 +165,10 @@ public final class FetchAboutStatusMexResponse implements MexOperation.Response.
         }
 
         /**
-         * Parses a list of {@code Item} from the given JSON array.
+         * Parses a list of items from the given JSON array.
          *
          * @param arr the JSON array to parse
-         * @return the list of parsed results, empty if {@code arr} is {@code null}
+         * @return the list of parsed items, empty if {@code arr} is {@code null}
          */
         static List<Item> ofArray(JSONArray arr) {
             if (arr == null) {
@@ -159,6 +183,12 @@ public final class FetchAboutStatusMexResponse implements MexOperation.Response.
         }
     }
 
+    /**
+     * Parses the response from the raw JSON payload bytes.
+     *
+     * @param json the raw JSON bytes from the {@code <result>} child
+     * @return an {@link Optional} containing the parsed response, or empty if the envelope is missing
+     */
     private static Optional<FetchAboutStatusMexResponse> of(byte[] json) {
         var jsonObject = JSON.parseObject(json);
         if (jsonObject == null) {

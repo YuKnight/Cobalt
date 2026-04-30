@@ -15,7 +15,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps the {@code <question_responses>}
+ * The outbound stanza variant. Wraps the {@code <question_responses>}
  * payload in the canonical
  * {@code <iq xmlns="newsletter" type="get" to=NEWSLETTER_JID>}
  * envelope.
@@ -46,7 +46,7 @@ public final class SmaxNewslettersGetNewsletterResponsesRequest implements SmaxO
     private final int questionResponsesCount;
 
     /**
-     * The optional opaque pagination cursor — a previous slice's
+     * The optional opaque pagination cursor, a previous slice's
      * tail-cursor handed back verbatim by the caller.
      */
     private final String questionResponsesBefore;
@@ -170,9 +170,6 @@ public final class SmaxNewslettersGetNewsletterResponsesRequest implements SmaxO
     @WhatsAppWebExport(moduleName = "WASmaxOutNewslettersGetNewsletterResponsesRequest",
             exports = "makeGetNewsletterResponsesRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutNewslettersFilterQuestionResponseMixinMixin: smax("question_responses", null,
-        //   mergeContactsOrRepliedFilterMixinMixinGroup(smax("filters", null), filterArgs))
-        // -> the <filters> child is a sibling of any <search> child under <question_responses>
         var children = new ArrayList<Node>();
         if (filter != null) {
             var filtersBuilder = new NodeBuilder()
@@ -188,26 +185,21 @@ public final class SmaxNewslettersGetNewsletterResponsesRequest implements SmaxO
             children.add(filtersBuilder.build());
         }
         if (searchText != null) {
-            // WASmaxOutNewslettersSearchQuestionResponseMixinMixin: smax("search", {text})
             children.add(new NodeBuilder()
                     .description("search")
                     .attribute("text", searchText)
                     .build());
         }
-        // smax("question_responses", {server_id, count, before?})
         var qrBuilder = new NodeBuilder()
                 .description("question_responses")
                 .attribute("server_id", questionResponsesServerId)
                 .attribute("count", questionResponsesCount);
         if (questionResponsesBefore != null) {
-            // WASmaxOutNewslettersBeforeQuestionResponseMixinMixin: smax("question_responses", {before})
             qrBuilder.attribute("before", questionResponsesBefore);
         }
         if (!children.isEmpty()) {
             qrBuilder.content(children);
         }
-        // WASmaxOutNewslettersNewsletterIQGetRequestMixin: smax("iq", {to: NEWSLETTER_JID, xmlns: "newsletter"})
-        // WASmaxOutNewslettersBaseIQGetRequestMixin: smax("iq", {id: generateId(), type: "get"})
         return new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "newsletter")

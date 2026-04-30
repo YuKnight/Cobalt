@@ -82,11 +82,6 @@ public final class SmaxWaffleRefreshAccessTokensRequest implements SmaxOperation
      * Builds the outbound IQ stanza.
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope
-     *
-     * @implNote {@code WASmaxOutWaffleRefreshAccessTokensRequest.makeRefreshAccessTokensRequest}
-     *           composes the same shape as
-     *           {@link SmaxWaffleWFPingRequest#toNode()} but with
-     *           {@code smax_id="46"}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutWaffleRefreshAccessTokensRequest",

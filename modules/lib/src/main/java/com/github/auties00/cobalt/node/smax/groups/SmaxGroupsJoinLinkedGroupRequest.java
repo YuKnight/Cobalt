@@ -103,7 +103,6 @@ public final class SmaxGroupsJoinLinkedGroupRequest implements SmaxOperation.Req
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsJoinLinkedGroupRequest",
             exports = "makeJoinLinkedGroupRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutGroupsJoinLinkedGroupRequest: smax("join_linked_group", {jid, type?})
         var joinBuilder = new NodeBuilder()
                 .description("join_linked_group")
                 .attribute("jid", joinLinkedGroupJid);
@@ -111,7 +110,6 @@ public final class SmaxGroupsJoinLinkedGroupRequest implements SmaxOperation.Req
             joinBuilder.attribute("type", joinLinkedGroupType);
         }
         var joinNode = joinBuilder.build();
-        // WASmaxOutGroupsBaseSetGroupMixin + WASmaxOutGroupsBaseIQSetRequestMixin
         return new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "w:g2")

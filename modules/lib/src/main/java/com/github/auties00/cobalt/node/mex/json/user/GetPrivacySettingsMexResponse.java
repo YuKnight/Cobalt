@@ -18,11 +18,20 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The parsed response for this MEX query.
+ * Parsed response for the privacy settings fetch query. Carries the per-feature privacy preferences projected from
+ * {@code data.xwa2_fetch_wa_users}.
  */
 public final class GetPrivacySettingsMexResponse implements MexOperation.Response.Json {
+    /**
+     * The user records returned by the relay, each carrying the requesting user's privacy settings.
+     */
     private final List<Item> items;
 
+    /**
+     * Constructs a new response carrying the given items.
+     *
+     * @param items the user records returned by the relay
+     */
     private GetPrivacySettingsMexResponse(List<Item> items) {
         this.items = items;
     }
@@ -30,11 +39,8 @@ public final class GetPrivacySettingsMexResponse implements MexOperation.Respons
     /**
      * Parses the MEX response carried by an inbound IQ stanza.
      *
-     * @implNote WAWebMexGetPrivacySettingsQuery.graphql: reads the
-     * {@code items[]} array of privacy settings records.
      * @param node the inbound IQ stanza carrying the {@code <result>} child
-     * @return the parsed response, or {@code Optional.empty()} if the
-     *         expected JSON shape is absent
+     * @return the parsed response, or {@link Optional#empty()} if the expected JSON shape is absent
      */
     @WhatsAppWebExport(moduleName = "WAWebMexGetPrivacySettingsQuery.graphql", exports = "params.id",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -45,7 +51,7 @@ public final class GetPrivacySettingsMexResponse implements MexOperation.Respons
     }
 
     /**
-     * Returns the list of items in this response.
+     * Returns the user records carried by this response.
      *
      * @return the list of items, empty if absent
      */
@@ -54,89 +60,123 @@ public final class GetPrivacySettingsMexResponse implements MexOperation.Respons
     }
 
     /**
-     * A parsed {@code Item} object.
+     * Single user record carrying the privacy settings record alongside the user identifier.
      */
     public static final class Item {
+        /**
+         * The privacy settings record for the user.
+         */
         private final PrivacySettings privacySettings;
+
+        /**
+         * The opaque user identifier returned by the relay.
+         */
         private final String id;
 
+        /**
+         * Constructs a new item with the given fields.
+         *
+         * @param privacySettings the privacy settings record
+         * @param id the opaque user identifier
+         */
         private Item(PrivacySettings privacySettings, String id) {
             this.privacySettings = privacySettings;
             this.id = id;
         }
 
         /**
-         * Returns the {@code privacy_settings} field.
+         * Returns the privacy settings record for the user.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+         * @return an {@link Optional} containing the record, or empty if absent
          */
         public Optional<PrivacySettings> privacySettings() {
             return Optional.ofNullable(privacySettings);
         }
 
         /**
-         * Returns the {@code id} field.
+         * Returns the opaque user identifier.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+         * @return an {@link Optional} containing the identifier, or empty if absent
          */
         public Optional<String> id() {
             return Optional.ofNullable(id);
         }
 
         /**
-         * A parsed {@code PrivacySettings} object.
+         * Privacy settings record. Carries the per-feature settings list projected from {@code privacy_settings}.
          */
         public static final class PrivacySettings {
+            /**
+             * The per-feature settings entries.
+             */
             private final List<Settings> settings;
 
+            /**
+             * Constructs a new privacy settings record with the given entries.
+             *
+             * @param settings the per-feature settings entries
+             */
             private PrivacySettings(List<Settings> settings) {
                 this.settings = settings;
             }
 
             /**
-             * Returns the {@code settings} field.
+             * Returns the per-feature settings entries.
              *
-             * @return the list of values, empty if absent
+             * @return the list of entries, empty if absent
              */
             public List<Settings> settings() {
                 return settings;
             }
 
             /**
-             * A parsed {@code Settings} object.
+             * Single settings entry pairing a privacy feature with its current setting value.
              */
             public static final class Settings {
+                /**
+                 * The privacy feature key, for example {@code last_seen} or {@code profile}.
+                 */
                 private final String feature;
+
+                /**
+                 * The setting value for the feature, for example {@code all} or {@code contacts}.
+                 */
                 private final String setting;
 
+                /**
+                 * Constructs a new settings entry with the given fields.
+                 *
+                 * @param feature the privacy feature key
+                 * @param setting the setting value
+                 */
                 private Settings(String feature, String setting) {
                     this.feature = feature;
                     this.setting = setting;
                 }
 
                 /**
-                 * Returns the {@code feature} field.
+                 * Returns the privacy feature key.
                  *
-                 * @return an {@link Optional} containing the value, or empty if absent
+                 * @return an {@link Optional} containing the feature key, or empty if absent
                  */
                 public Optional<String> feature() {
                     return Optional.ofNullable(feature);
                 }
 
                 /**
-                 * Returns the {@code setting} field.
+                 * Returns the setting value associated with the feature.
                  *
-                 * @return an {@link Optional} containing the value, or empty if absent
+                 * @return an {@link Optional} containing the setting value, or empty if absent
                  */
                 public Optional<String> setting() {
                     return Optional.ofNullable(setting);
                 }
 
                 /**
-                 * Parses a {@code Settings} from the given JSON object.
+                 * Parses a settings entry from the given JSON object.
                  *
                  * @param obj the JSON object to parse
-                 * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+                 * @return an {@link Optional} containing the parsed entry, or empty if {@code obj} is {@code null}
                  */
                 static Optional<Settings> of(JSONObject obj) {
                     if (obj == null) {
@@ -149,10 +189,10 @@ public final class GetPrivacySettingsMexResponse implements MexOperation.Respons
                 }
 
                 /**
-                 * Parses a list of {@code Settings} from the given JSON array.
+                 * Parses a list of settings entries from the given JSON array.
                  *
                  * @param arr the JSON array to parse
-                 * @return the list of parsed results, empty if {@code arr} is {@code null}
+                 * @return the list of parsed entries, empty if {@code arr} is {@code null}
                  */
                 static List<Settings> ofArray(JSONArray arr) {
                     if (arr == null) {
@@ -168,10 +208,10 @@ public final class GetPrivacySettingsMexResponse implements MexOperation.Respons
             }
 
             /**
-             * Parses a {@code PrivacySettings} from the given JSON object.
+             * Parses a privacy settings record from the given JSON object.
              *
              * @param obj the JSON object to parse
-             * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+             * @return an {@link Optional} containing the parsed record, or empty if {@code obj} is {@code null}
              */
             static Optional<PrivacySettings> of(JSONObject obj) {
                 if (obj == null) {
@@ -183,10 +223,10 @@ public final class GetPrivacySettingsMexResponse implements MexOperation.Respons
             }
 
             /**
-             * Parses a list of {@code PrivacySettings} from the given JSON array.
+             * Parses a list of privacy settings records from the given JSON array.
              *
              * @param arr the JSON array to parse
-             * @return the list of parsed results, empty if {@code arr} is {@code null}
+             * @return the list of parsed records, empty if {@code arr} is {@code null}
              */
             static List<PrivacySettings> ofArray(JSONArray arr) {
                 if (arr == null) {
@@ -202,10 +242,10 @@ public final class GetPrivacySettingsMexResponse implements MexOperation.Respons
         }
 
         /**
-         * Parses a {@code Item} from the given JSON object.
+         * Parses a single item from the given JSON object.
          *
          * @param obj the JSON object to parse
-         * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+         * @return an {@link Optional} containing the parsed item, or empty if {@code obj} is {@code null}
          */
         static Optional<Item> of(JSONObject obj) {
             if (obj == null) {
@@ -218,10 +258,10 @@ public final class GetPrivacySettingsMexResponse implements MexOperation.Respons
         }
 
         /**
-         * Parses a list of {@code Item} from the given JSON array.
+         * Parses a list of items from the given JSON array.
          *
          * @param arr the JSON array to parse
-         * @return the list of parsed results, empty if {@code arr} is {@code null}
+         * @return the list of parsed items, empty if {@code arr} is {@code null}
          */
         static List<Item> ofArray(JSONArray arr) {
             if (arr == null) {
@@ -236,6 +276,12 @@ public final class GetPrivacySettingsMexResponse implements MexOperation.Respons
         }
     }
 
+    /**
+     * Parses the response from the raw JSON payload bytes.
+     *
+     * @param json the raw JSON bytes from the {@code <result>} child
+     * @return an {@link Optional} containing the parsed response, or empty if the envelope is missing
+     */
     private static Optional<GetPrivacySettingsMexResponse> of(byte[] json) {
         var jsonObject = JSON.parseObject(json);
         if (jsonObject == null) {

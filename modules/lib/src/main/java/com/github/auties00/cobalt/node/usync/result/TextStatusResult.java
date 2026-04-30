@@ -6,30 +6,29 @@ import java.time.Duration;
 import java.util.Optional;
 
 /**
- * Success result of {@code WAWebUsyncTextStatus.textStatusParser}.
- *
- * @implNote WAWebUsyncTextStatus.textStatusParser: success branch returns
- *     {@code {text?, emoji?, ephemeralDurationSeconds?, lastUpdateTime?}}.
+ * Success result of {@code WAWebUsyncTextStatus.textStatusParser}. Carries
+ * the peer's modern text-status payload (text, leading emoji, ephemeral
+ * lifetime, last-update timestamp) with every field nullable on the wire.
  */
 @WhatsAppWebModule(moduleName = "WAWebUsyncTextStatus")
 public final class TextStatusResult implements UsyncProtocolResponse {
     /**
-     * The status text, or {@code null} when absent.
+     * Holds the status text, or {@code null} when absent.
      */
     private final String text;
 
     /**
-     * The leading emoji glyph, or {@code null} when absent.
+     * Holds the leading emoji glyph, or {@code null} when absent.
      */
     private final String emoji;
 
     /**
-     * The status's ephemeral lifetime, or {@code null} when absent.
+     * Holds the status's ephemeral lifetime, or {@code null} when absent.
      */
     private final Duration ephemeralDuration;
 
     /**
-     * The last-update timestamp string the relay echoes back, or
+     * Holds the last-update timestamp string the relay echoes back, or
      * {@code null} when absent.
      */
     private final String lastUpdateTime;

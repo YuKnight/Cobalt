@@ -17,8 +17,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants.
- *
- * @implNote {@code WASmaxBlocklistsUpdateOptOutListRPC.sendUpdateOptOutListRPC}.
  */
 public sealed interface SmaxUpdateOptOutListResponse extends SmaxOperation.Response
         permits SmaxUpdateOptOutListResponse.SuccessWithMatch,
@@ -110,15 +108,9 @@ public sealed interface SmaxUpdateOptOutListResponse extends SmaxOperation.Respo
     }
 
     /**
-     * The {@code SuccessWithMatch} reply variant — the relay applied
+     * The {@code SuccessWithMatch} reply variant. The relay applied
      * the action and the client's cache is up to date
      * ({@code matched="true"}).
-     *
-     * @implNote {@code WASmaxInBlocklistsUpdateOptOutListResponseSuccessWithMatch.parseUpdateOptOutListResponseSuccessWithMatch}
-     *           validates the {@code <iq from id type="result">}
-     *           envelope, asserts {@code <list matched="true" dhash>}
-     *           and the inner {@code <item>} child, then projects the
-     *           single item via {@code parseBizOptOutResponseMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBlocklistsUpdateOptOutListResponseSuccessWithMatch")
     final class SuccessWithMatch implements SmaxUpdateOptOutListResponse {
@@ -222,12 +214,10 @@ public sealed interface SmaxUpdateOptOutListResponse extends SmaxOperation.Respo
     }
 
     /**
-     * The {@code SuccessWithMismatch} reply variant — the relay
+     * The {@code SuccessWithMismatch} reply variant. The relay
      * applied the action but the client's cache was stale
      * ({@code matched="false"}); the relay returned the resulting
      * opt-out list.
-     *
-     * @implNote {@code WASmaxInBlocklistsUpdateOptOutListResponseSuccessWithMismatch.parseUpdateOptOutListResponseSuccessWithMismatch}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBlocklistsUpdateOptOutListResponseSuccessWithMismatch")
     final class SuccessWithMismatch implements SmaxUpdateOptOutListResponse {
@@ -352,7 +342,7 @@ public sealed interface SmaxUpdateOptOutListResponse extends SmaxOperation.Respo
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected the
+     * The {@code ClientError} reply variant. The relay rejected the
      * request as malformed.
      *
      * @implNote {@code WASmaxInBlocklistsUpdateOptOutListResponseInvalidRequest.parseUpdateOptOutListResponseInvalidRequest}
@@ -445,10 +435,8 @@ public sealed interface SmaxUpdateOptOutListResponse extends SmaxOperation.Respo
     }
 
     /**
-     * The {@code ServerError} reply variant — transient internal
+     * The {@code ServerError} reply variant. Transient internal
      * failure.
-     *
-     * @implNote {@code WASmaxInBlocklistsUpdateOptOutListResponseServerError.parseUpdateOptOutListResponseServerError}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBlocklistsUpdateOptOutListResponseServerError")
     final class ServerError implements SmaxUpdateOptOutListResponse {

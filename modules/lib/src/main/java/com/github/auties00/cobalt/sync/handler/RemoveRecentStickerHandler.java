@@ -65,7 +65,7 @@ public final class RemoveRecentStickerHandler implements WebAppStateActionHandle
      * @implNote WAWebMiscGatingUtils.isRecentStickersMDEnabled — primary feature key
      */
     @WhatsAppWebExport(moduleName = "WAWebMiscGatingUtils", exports = "isRecentStickersMDEnabled", adaptation = WhatsAppAdaptation.ADAPTED)
-    private static final String RECENT_STICKER_FEATURE = "recent_sticker"; // WAWebMiscGatingUtils.isRecentStickersMDEnabled: primaryFeatureEnabled("recent_sticker")
+    private static final String RECENT_STICKER_FEATURE = "recent_sticker";
 
     /**
      * The singleton instance of {@code RemoveRecentStickerHandler}.
@@ -97,7 +97,7 @@ public final class RemoveRecentStickerHandler implements WebAppStateActionHandle
     @Override
     @WhatsAppWebExport(moduleName = "WAWebStickersRemoveRecentSyncAction", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return RemoveRecentStickerAction.ACTION_NAME; // WAWebStickersRemoveRecentSyncAction.getAction
+        return RemoveRecentStickerAction.ACTION_NAME;
     }
 
     /**
@@ -110,7 +110,7 @@ public final class RemoveRecentStickerHandler implements WebAppStateActionHandle
     @Override
     @WhatsAppWebExport(moduleName = "WAWebStickersRemoveRecentSyncAction", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return RemoveRecentStickerAction.COLLECTION_NAME; // WAWebStickersRemoveRecentSyncAction constructor: this.collectionName = RegularLow
+        return RemoveRecentStickerAction.COLLECTION_NAME;
     }
 
     /**
@@ -122,7 +122,7 @@ public final class RemoveRecentStickerHandler implements WebAppStateActionHandle
     @Override
     @WhatsAppWebExport(moduleName = "WAWebStickersRemoveRecentSyncAction", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return RemoveRecentStickerAction.ACTION_VERSION; // WAWebStickersRemoveRecentSyncAction.getVersion: return 7
+        return RemoveRecentStickerAction.ACTION_VERSION;
     }
 
     /**
@@ -158,47 +158,40 @@ public final class RemoveRecentStickerHandler implements WebAppStateActionHandle
     @Override
     @WhatsAppWebExport(moduleName = "WAWebStickersRemoveRecentSyncAction", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        // WAWebStickersRemoveRecentSyncAction.applyMutations:
         //   if (!WAWebMiscGatingUtils.isRecentStickersMDEnabled())
         //     return WALogger.WARN("syncd: remove recent sticker operation not supported"),
         //            t.map(() => ({actionState: Unsupported}))
-        // WAWebMiscGatingUtils.isRecentStickersMDEnabled:
         //   return WAWebPrimaryFeatures.primaryFeatureEnabled("recent_sticker")
-        if (!client.store().primaryFeatures().contains(RECENT_STICKER_FEATURE)) { // WAWebMiscGatingUtils.isRecentStickersMDEnabled
-            return MutationApplicationResult.unsupported(); // WAWebStickersRemoveRecentSyncAction.applyMutations: t.map(() => ({actionState: Unsupported}))
+        if (!client.store().primaryFeatures().contains(RECENT_STICKER_FEATURE)) {
+            return MutationApplicationResult.unsupported();
         }
 
-        // WAWebStickersRemoveRecentSyncAction.applyMutations:
         //   if (e.operation !== "set") return r++, {actionState: Unsupported}
-        if (mutation.operation() != SyncdOperation.SET) { // WAWebStickersRemoveRecentSyncAction.applyMutations: e.operation !== "set"
-            return MutationApplicationResult.unsupported(); // WAWebStickersRemoveRecentSyncAction.applyMutations: r++, {actionState: Unsupported}
+        if (mutation.operation() != SyncdOperation.SET) {
+            return MutationApplicationResult.unsupported();
         }
 
-        // WAWebStickersRemoveRecentSyncAction.applyMutations:
         //   var i = e.indexParts, l = i[1]
         //   if (l == null) return a++, n.malformedActionIndex()
-        var indexArray = JSON.parseArray(mutation.index()); // WAWebStickersRemoveRecentSyncAction.applyMutations: var i = e.indexParts
-        var stickerHash = indexArray.getString(1); // WAWebStickersRemoveRecentSyncAction.applyMutations: var l = i[1]
-        if (stickerHash == null) { // WAWebStickersRemoveRecentSyncAction.applyMutations: if (l == null)
-            return malformedActionIndex(); // WAWebStickersRemoveRecentSyncAction.applyMutations: a++, n.malformedActionIndex()
+        var indexArray = JSON.parseArray(mutation.index());
+        var stickerHash = indexArray.getString(1);
+        if (stickerHash == null) {
+            return malformedActionIndex();
         }
 
-        // WAWebStickersRemoveRecentSyncAction.applyMutations:
         //   var s = (t = e.value.removeRecentStickerAction) == null ? void 0 : t.lastStickerSentTs
         // The optional-chain returns undefined when either the sub-message OR the
         // lastStickerSentTs field is missing; both cases collapse into c == null below.
-        var action = mutation.value().action().orElse(null) instanceof RemoveRecentStickerAction entry ? entry : null; // WAWebStickersRemoveRecentSyncAction.applyMutations: t = e.value.removeRecentStickerAction
-        var lastStickerSentTs = action == null ? null : action.lastStickerSentTs().orElse(null); // WAWebStickersRemoveRecentSyncAction.applyMutations: s = t == null ? void 0 : t.lastStickerSentTs
+        var action = mutation.value().action().orElse(null) instanceof RemoveRecentStickerAction entry ? entry : null;
+        var lastStickerSentTs = action == null ? null : action.lastStickerSentTs().orElse(null);
 
-        // WAWebStickersRemoveRecentSyncAction.applyMutations:
         //   var u = WAWebRecentStickerCollectionMd.RecentStickerCollectionMd.get(l)
         //   if (!u) return {actionState: Orphan}
-        var sticker = client.store().findRecentSticker(stickerHash); // WAWebStickersRemoveRecentSyncAction.applyMutations: WAWebRecentStickerCollectionMd.RecentStickerCollectionMd.get(l)
-        if (sticker.isEmpty()) { // WAWebStickersRemoveRecentSyncAction.applyMutations: if (!u)
-            return MutationApplicationResult.orphan(); // WAWebStickersRemoveRecentSyncAction.applyMutations: {actionState: Orphan}
+        var sticker = client.store().findRecentSticker(stickerHash);
+        if (sticker.isEmpty()) {
+            return MutationApplicationResult.orphan();
         }
 
-        // WAWebStickersRemoveRecentSyncAction.applyMutations:
         //   var c = WALongInt.maybeNumberOrThrowIfTooLarge(s)
         //   (c == null || WALongInt.numberOrThrowIfTooLarge(u.timestamp) <= c)
         //     && WAWebRecentStickerCollectionMd.RecentStickerCollectionMd.removeAndSave(u)
@@ -207,12 +200,12 @@ public final class RemoveRecentStickerHandler implements WebAppStateActionHandle
         // otherwise asserts the value is a safe Number and returns it.
         // WALongInt.numberOrThrowIfTooLarge: asserts the value is a safe Number and returns it.
         // In Cobalt both timestamps are already plain longs, so the safe-integer guard is a no-op.
-        var stickerTimestamp = sticker.get().timestamp().orElse(0L); // WAWebStickersRemoveRecentSyncAction.applyMutations: u.timestamp
-        if (lastStickerSentTs == null || stickerTimestamp <= toEpochComparable(lastStickerSentTs)) { // WAWebStickersRemoveRecentSyncAction.applyMutations: c == null || u.timestamp <= c
-            client.store().removeRecentSticker(stickerHash); // WAWebStickersRemoveRecentSyncAction.applyMutations: WAWebRecentStickerCollectionMd.RecentStickerCollectionMd.removeAndSave(u)
+        var stickerTimestamp = sticker.get().timestamp().orElse(0L);
+        if (lastStickerSentTs == null || stickerTimestamp <= toEpochComparable(lastStickerSentTs)) {
+            client.store().removeRecentSticker(stickerHash);
         }
 
-        return MutationApplicationResult.success(); // WAWebStickersRemoveRecentSyncAction.applyMutations: {actionState: Success}
+        return MutationApplicationResult.success();
     }
 
     /**
@@ -244,7 +237,7 @@ public final class RemoveRecentStickerHandler implements WebAppStateActionHandle
      */
     @WhatsAppWebExport(moduleName = "WAWebStickersRemoveRecentSyncAction", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     private static long toEpochComparable(Instant instant) {
-        return instant.getEpochSecond(); // WAWebStickersRemoveRecentSyncAction.applyMutations: numeric value of lastStickerSentTs
+        return instant.getEpochSecond();
     }
 
     /**
@@ -269,22 +262,22 @@ public final class RemoveRecentStickerHandler implements WebAppStateActionHandle
      */
     @WhatsAppWebExport(moduleName = "WAWebStickersRemoveRecentSyncAction", exports = "generateRemoveStickerMutation", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncPendingMutation getRemoveRecentStickerMutation(String stickerHash) {
-        var timestamp = Instant.now(); // WAWebSyncdActionUtils.buildPendingMutation: timestamp: unixTime()
-        var action = new RemoveRecentStickerActionBuilder() // WAWebStickersRemoveRecentSyncAction: {removeRecentStickerAction: {lastStickerSentTs: ...}}
-                .lastStickerSentTs(timestamp) // WAWebStickersRemoveRecentSyncAction.applyMutations: lastStickerSentTs field
+        var timestamp = Instant.now();
+        var action = new RemoveRecentStickerActionBuilder()
+                .lastStickerSentTs(timestamp)
                 .build();
-        var value = new SyncActionValueBuilder() // WAWebSyncdActionUtils.buildPendingMutation
-                .timestamp(timestamp) // WAWebSyncdActionUtils.buildPendingMutation: timestamp: i
-                .removeRecentStickerAction(action) // WAWebStickersRemoveRecentSyncAction: {removeRecentStickerAction: ...}
+        var value = new SyncActionValueBuilder()
+                .timestamp(timestamp)
+                .removeRecentStickerAction(action)
                 .build();
-        var index = JSON.toJSONString(List.of(RemoveRecentStickerAction.ACTION_NAME, stickerHash)); // WAWebSyncdActionUtils.buildPendingMutation
+        var index = JSON.toJSONString(List.of(RemoveRecentStickerAction.ACTION_NAME, stickerHash));
         var mutation = new DecryptedMutation.Trusted(
                 index,
                 value,
-                SyncdOperation.SET, // WAWebStickersRemoveRecentSyncAction: operation: SyncdOperation.SET
+                SyncdOperation.SET,
                 timestamp,
-                RemoveRecentStickerAction.ACTION_VERSION // WAWebStickersRemoveRecentSyncAction.getVersion: 7
+                RemoveRecentStickerAction.ACTION_VERSION
         );
-        return new SyncPendingMutation(mutation, 0); // WAWebSyncdActionUtils.buildPendingMutation
+        return new SyncPendingMutation(mutation, 0);
     }
 }

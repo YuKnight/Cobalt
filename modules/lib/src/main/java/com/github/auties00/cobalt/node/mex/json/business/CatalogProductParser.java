@@ -16,27 +16,29 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Shared utility that parses GraphQL product objects into Cobalt
+ * Stateless utility that parses GraphQL product objects into Cobalt
  * {@link BusinessCatalogEntry} values.
  *
  * <p>The parsing logic mirrors WA Web's
- * {@code WAWebBizParseProductGraphql.parseProductGraphQL} which is invoked
- * from both the catalog query and the product-collections query response
- * decoders. Cobalt centralises the projection into a single helper class so
- * the two decoders can share the exact same projection logic.
+ * {@code WAWebBizParseProductGraphql.parseProductGraphQL}, invoked from both
+ * the catalog query and the product-collections query response decoders.
+ * Cobalt centralises the projection here so that the two decoders share the
+ * same field handling.
  *
- * @implNote WAWebBizParseProductGraphql: this helper restricts the parse to
- * the fields surfaced by {@link BusinessCatalogEntry} (id, retailer_id,
- * name, description, url, currency, price, visibility, first image URL,
- * status, stock availability). The remaining WA Web fields (variants,
- * compliance, videos, sale price) are intentionally dropped since Cobalt
- * does not expose them yet.
+ * @implNote Restricts the parse to the fields surfaced by
+ *           {@link BusinessCatalogEntry} (id, retailer_id, name, description,
+ *           url, currency, price, visibility, first image URL, status, stock
+ *           availability). The remaining WA Web fields (variants, compliance,
+ *           videos, sale price) are intentionally dropped since Cobalt does
+ *           not expose them yet.
  */
 @WhatsAppWebModule(moduleName = "WAWebBizParseProductGraphql")
 @WhatsAppWebModule(moduleName = "WAWebBizParseProductGraphql_product.graphql")
 public final class CatalogProductParser {
     /**
-     * Private constructor — this is a stateless utility class.
+     * Prevents instantiation of this stateless utility class.
+     *
+     * @throws AssertionError always
      */
     private CatalogProductParser() {
         throw new AssertionError("No CatalogProductParser instances for you!");
@@ -46,18 +48,6 @@ public final class CatalogProductParser {
      * Parses an array of GraphQL product objects into a list of
      * {@link BusinessCatalogEntry} values.
      *
-     * <p>This helper is shared between {@link QueryCatalogMexResponse} and
-     * {@link QueryProductCollectionsMexResponse} since WA Web's
-     * {@code WAWebBizParseProductGraphql.parseProductGraphQL} applies to
-     * both response shapes.
-     *
-     * @implNote WAWebBizParseProductGraphql.parseProductGraphQL: Cobalt
-     * restricts the parse to the fields surfaced by
-     * {@link BusinessCatalogEntry} (id, retailer_id, name, description,
-     * url, currency, price, visibility, first image URL, status, stock
-     * availability). The remaining WA Web fields (variants, compliance,
-     * videos, sale price) are intentionally dropped since Cobalt does not
-     * expose them yet.
      * @param array the GraphQL products array, possibly {@code null}
      * @return the parsed entries, never {@code null}
      */
@@ -79,48 +69,39 @@ public final class CatalogProductParser {
      * {@link BusinessCatalogEntry}.
      *
      * @param obj the GraphQL product object, possibly {@code null}
-     * @return the parsed entry, or {@link Optional#empty()} if {@code obj}
-     *         is {@code null}
+     * @return the parsed entry, or empty when {@code obj} is {@code null}
      */
     private static Optional<BusinessCatalogEntry> parseProduct(JSONObject obj) {
         if (obj == null) {
             return Optional.empty();
         }
-        // WAWebBizParseProductGraphql.parseProductGraphQL: id
         var id = obj.getString("id");
-        // WAWebBizParseProductGraphql.parseProductGraphQL: retailer_id
         var retailerId = obj.getString("retailer_id");
-        // WAWebBizParseProductGraphql.parseProductGraphQL: name defaults to empty string in WA Web via WANullthrows
         var name = obj.getString("name");
-        // WAWebBizParseProductGraphql.parseProductGraphQL: description defaults to empty string
         var description = obj.getString("description");
-        // WAWebBizParseProductGraphql.parseProductGraphQL: url defaults to empty string
         var urlString = obj.getString("url");
         URI url = null;
         if (urlString != null && !urlString.isEmpty()) {
             try {
                 url = URI.create(urlString);
             } catch (IllegalArgumentException ignored) {
-                // url stays null
+                // url stays null when the relay sends a malformed URI
             }
         }
-        // WAWebBizParseProductGraphql.parseProductGraphQL: currency
         var currency = obj.getString("currency");
-        // WAWebBizParseProductGraphql.parseProductGraphQL: price arrives as a stringified decimal amount
+        // WAWebBizParseProductGraphql.parseProductGraphQL: price arrives as a stringified decimal
         long price = 0L;
         var priceString = obj.getString("price");
         if (priceString != null && !priceString.isEmpty()) {
             try {
                 price = Long.parseLong(priceString);
             } catch (NumberFormatException ignored) {
-                // price stays 0L
+                // price stays 0L on parse failure
             }
         }
-        // WAWebBizParseProductGraphql.parseProductGraphQL: is_hidden is expressed as the "ISHIDDEN_TRUE" enum string
+        // WAWebBizParseProductGraphql.parseProductGraphQL: is_hidden is the "ISHIDDEN_TRUE" enum literal
         var hidden = "ISHIDDEN_TRUE".equals(obj.getString("is_hidden"));
-        // WAWebBizParseProductGraphql.parseProductGraphQL: product_availability enum mapped via pretty name lookup
         var availability = parseAvailability(obj.getString("product_availability"));
-        // WAWebBizParseProductGraphql.parseProductGraphQL: capability_to_review_status defaults to "APPROVED"
         BusinessReviewStatus reviewStatus = null;
         var statusInfo = obj.getJSONObject("status_info");
         if (statusInfo != null) {
@@ -129,7 +110,6 @@ public final class CatalogProductParser {
                 reviewStatus = BusinessReviewStatus.ofName(status).orElse(null);
             }
         }
-        // WAWebBizParseProductGraphql.parseProductGraphQL: image_cdn_urls "full" entry
         URI encryptedImage = null;
         var media = obj.getJSONObject("media");
         if (media != null) {
@@ -142,13 +122,12 @@ public final class CatalogProductParser {
                         try {
                             encryptedImage = URI.create(originalUrl);
                         } catch (IllegalArgumentException ignored) {
-                            // encryptedImage stays null
+                            // encryptedImage stays null on parse failure
                         }
                     }
                 }
             }
         }
-        // ADAPTED: BusinessCatalogEntry constructor is package-private so Cobalt uses the generated builder
         var entry = new BusinessCatalogEntryBuilder()
                 .id(id)
                 .encryptedImage(encryptedImage)
@@ -166,20 +145,19 @@ public final class CatalogProductParser {
     }
 
     /**
-     * Maps the WA Web {@code product_availability} enum string to the
-     * Cobalt {@link BusinessItemAvailability} constant.
+     * Maps the WA Web {@code product_availability} enum string to the Cobalt
+     * {@link BusinessItemAvailability} constant.
      *
-     * <p>WA Web uses the prefixed enum literals {@code PRODUCTAVAILABILITY_IN_STOCK},
+     * <p>WA Web uses the prefixed enum literals
+     * {@code PRODUCTAVAILABILITY_IN_STOCK},
      * {@code PRODUCTAVAILABILITY_OUT_OF_STOCK} and
      * {@code PRODUCTAVAILABILITY_UNKNOWN}. The prefix is stripped before
-     * feeding the value into {@link BusinessItemAvailability#ofName(String)}
+     * feeding the value into {@link BusinessItemAvailability#ofName(String)},
      * which expects the pretty-printed form ({@code "in stock"}).
      *
-     * @implNote WAWebProductTypes.flow: defines the ProductAvailability
-     * enum values; Cobalt keeps only the user-visible states.
-     * @param raw the raw enum string, or {@code null}
-     * @return the matched constant, or {@code null} when the input is
-     *         absent or unknown
+     * @param raw the raw enum string, may be {@code null}
+     * @return the matched constant, or {@code null} when the input is absent
+     *         or unknown
      */
     @WhatsAppWebExport(moduleName = "WAWebProductTypes.flow", exports = "ProductAvailability",
             adaptation = WhatsAppAdaptation.ADAPTED)

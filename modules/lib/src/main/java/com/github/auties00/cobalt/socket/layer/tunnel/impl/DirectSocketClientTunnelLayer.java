@@ -10,37 +10,36 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 
 /**
- * A direct (no-proxy) tunnel layer that provides the
- * {@link CommonSocketTunnelLayerContext} required by all connections for blocking
- * reads during the handshake phase.
+ * No-op tunnel layer used when no proxy is configured.
  *
- * <p>This layer is a pure passthrough: all I/O methods delegate to
- * the inner layer.  Its only purpose is to register a
- * {@link CommonSocketTunnelLayerContext} during {@link #connect(InetSocketAddress,
- * SocketClientLayerListener)} so that {@code readBinary()} calls work
- * before the connection transitions to asynchronous mode.
+ * <p>Acts as a pass-through: every I/O method delegates straight to
+ * the inner layer. Its only purpose is to register a
+ * {@link CommonSocketTunnelLayerContext} during connection setup so
+ * blocking {@code readBinary()} calls work during the handshake
+ * phase before the connection transitions to asynchronous mode.
  */
 public final class DirectSocketClientTunnelLayer implements SocketClientTunnelLayer {
     /**
-     * The inner layer that provides raw I/O.
+     * The inner layer that performs the actual I/O.
      */
     private final SocketClientLayer<?> innerLayer;
 
     /**
-     * Creates a direct tunnel layer wrapping the given inner layer.
+     * Creates a direct tunnel layer wrapping {@code innerLayer}.
      *
-     * @param innerLayer the layer below (typically a transport layer)
+     * @param innerLayer the layer below, typically a transport layer
      */
     public DirectSocketClientTunnelLayer(SocketClientLayer<?> innerLayer) {
         this.innerLayer = innerLayer;
     }
 
     /**
-     * Connects the inner layer and registers a {@link CommonSocketTunnelLayerContext}
-     * in pre-tunnel mode for blocking reads during handshakes.
+     * Connects the inner layer and registers a
+     * {@link CommonSocketTunnelLayerContext} so blocking reads work
+     * during the handshake phase.
      *
      * @param address  the remote endpoint
-     * @param listener the callback for events
+     * @param listener the listener that receives inbound events
      * @throws IOException if the connection fails
      */
     @Override

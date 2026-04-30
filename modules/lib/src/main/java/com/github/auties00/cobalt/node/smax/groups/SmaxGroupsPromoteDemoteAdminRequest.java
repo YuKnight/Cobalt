@@ -107,8 +107,6 @@ public final class SmaxGroupsPromoteDemoteAdminRequest implements SmaxOperation.
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsPromoteDemoteAdminRequest",
             exports = "makePromoteDemoteAdminRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutGroupsPromoteDemoteAdminRequest: smax("admin", null,
-        //   OPTIONAL_CHILD(promote), OPTIONAL_CHILD(demote))
         var adminBuilder = new NodeBuilder().description("admin");
         if (!participantsToPromote.isEmpty()) {
             var promoteChildren = new ArrayList<Node>(participantsToPromote.size());
@@ -140,8 +138,6 @@ public final class SmaxGroupsPromoteDemoteAdminRequest implements SmaxOperation.
                     .build();
             adminBuilder.content(demoteNode);
         }
-        // WASmaxOutGroupsBaseSetGroupMixin: smax("iq", {to: GROUP_JID(t), xmlns: "w:g2"})
-        // WASmaxOutGroupsBaseIQSetRequestMixin: smax("iq", {id: generateId(), type: "set"})
         return new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "w:g2")

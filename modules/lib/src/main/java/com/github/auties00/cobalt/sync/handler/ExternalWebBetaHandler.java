@@ -65,7 +65,7 @@ public final class ExternalWebBetaHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebExternalWebBetaSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return ExternalWebBetaAction.ACTION_NAME; // WAWebExternalWebBetaSync.getAction -> WASyncdConst.Actions.ExternalWebBeta
+        return ExternalWebBetaAction.ACTION_NAME;
     }
 
     /**
@@ -78,7 +78,7 @@ public final class ExternalWebBetaHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebExternalWebBetaSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return ExternalWebBetaAction.COLLECTION_NAME; // WAWebExternalWebBetaSync constructor -> WASyncdConst.CollectionName.Regular
+        return ExternalWebBetaAction.COLLECTION_NAME;
     }
 
     /**
@@ -90,7 +90,7 @@ public final class ExternalWebBetaHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebExternalWebBetaSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return ExternalWebBetaAction.ACTION_VERSION; // WAWebExternalWebBetaSync.getVersion -> 3
+        return ExternalWebBetaAction.ACTION_VERSION;
     }
 
     /**
@@ -134,15 +134,15 @@ public final class ExternalWebBetaHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebExternalWebBetaSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        if (!client.abPropsService().getBool(ABProp.EXTERNAL_BETA_CAN_JOIN)) { // WAWebExternalWebBetaSync.applyMutations: getABPropConfigValue("external_beta_can_join") !== true
+        if (!client.abPropsService().getBool(ABProp.EXTERNAL_BETA_CAN_JOIN)) {
             return MutationApplicationResult.unsupported();
         }
 
-        if (mutation.operation() != SyncdOperation.SET) { // WAWebExternalWebBetaSync.applyMutations: e.operation === "set"
+        if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof ExternalWebBetaAction action)) { // WAWebExternalWebBetaSync.applyMutations: !r -> malformedActionValue
+        if (!(mutation.value().action().orElse(null) instanceof ExternalWebBetaAction action)) {
             return malformedActionValue();
         }
 

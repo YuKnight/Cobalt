@@ -8,15 +8,14 @@ import java.util.Optional;
 /**
  * Success result of {@code WAWebUsyncLid.lidParser}.
  *
- * @implNote WAWebUsyncLid.lidParser: returns
- *     {@code e.maybeAttrLidUserJid("val")}.
+ * @implNote Mirrors {@code e.maybeAttrLidUserJid("val")} from the JS parser.
  */
 @WhatsAppWebModule(moduleName = "WAWebUsyncLid")
 public final class LidResult implements UsyncProtocolResponse {
     /**
-     * The resolved LID, or {@code null} when the relay omitted the
-     * {@code val} attribute (e.g. the peer has not yet been migrated to
-     * LID).
+     * Holds the resolved LID, or {@code null} when the relay omitted the
+     * {@code val} attribute (for instance because the peer has not yet been
+     * migrated to LID).
      */
     private final Jid lid;
 

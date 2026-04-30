@@ -47,102 +47,57 @@ import java.util.function.Supplier;
 @WhatsAppWebModule(moduleName = "WAWebHandleSuccess")
 public final class SuccessStreamHandler implements SocketStream.Handler {
     /**
-     * The WhatsApp client instance used for store access, listener
-     * notification, and outbound IQ sending (active-mode transition).
-     *
-     * @implNote WAWebHandleSuccess.default accesses store/services via
-     *           module-level imports such as {@code WAWebUserPrefsMeUser};
-     *           Cobalt injects the client through the constructor.
+     * The WhatsApp client used for store access, listener notification, and outbound IQ sending (active-mode transition).
      */
     private final WhatsAppClient whatsapp;
 
     /**
      * Service for synchronising A/B testing properties from the server.
-     *
-     * @implNote Maps to the WA Web call
-     *           {@code WAWebAbPropsSyncJob.syncABPropsTask({localRefreshId, shouldSendHash:false})}.
      */
     private final ABPropsService abPropsService;
 
     /**
-     * Service for device management operations such as the ADV check
-     * scheduler, pending device-sync retries, and missing-key device
-     * tracking.
-     *
-     * @implNote These device-housekeeping tasks are registered in WA Web
-     *           through {@code WAWebRegisterPassiveTasks} and
-     *           {@code WAWebPassiveModeManager.executePassiveTasks}; Cobalt
-     *           invokes them directly here as part of the success bootstrap.
+     * Service for device management operations such as the ADV check scheduler, pending device-sync retries, and missing-key device tracking.
      */
     private final DeviceService deviceService;
 
     /**
      * Service managing LID-based one-on-one chat migration.
-     *
-     * @implNote WA Web checks the {@code lid_one_on_one_migration_enabled}
-     *           AB prop after sync and either schedules the peer-mapping
-     *           timeout or leaves the migration disabled; Cobalt routes the
-     *           same decision through this service.
      */
     private final LidMigrationService lidMigrationService;
 
     /**
      * Service migrating inactive group chats to LID addressing.
-     *
-     * @implNote WA Web triggers inactive-group LID migration through event
-     *           listeners attached to the {@code BackendEventBus}; Cobalt
-     *           invokes the equivalent service directly during bootstrap.
      */
     private final InactiveGroupLidMigrationService inactiveGroupLidMigrationService;
 
     /**
-     * Service for WAM (WhatsApp Analytics/Metrics) event recording.
-     *
-     * @implNote WAM globals are populated in WA Web by
-     *           {@code WAWebABPropsWamGlobals.setAbPropDependingGlobalWamAttributes}
-     *           after the AB-props sync task; Cobalt initialises the WAM
-     *           service explicitly so that every event committed after
-     *           {@code <success>} carries the up-to-date attributes.
+     * Service for WAM (WhatsApp Analytics and Metrics) event recording.
      */
     private final WamService wamService;
 
     /**
-     * Service for managing web app state synchronisation (syncd).
-     *
-     * @implNote WA Web resumes the syncd state machine and starts the
-     *           periodic app-state sync job through passive tasks scheduled
-     *           after success; Cobalt calls them directly here.
+     * Service managing web app-state synchronisation (syncd).
      */
     private final WebAppStateService webAppStateService;
 
     /**
-     * Guard ensuring the full bootstrap runs at most once per connection.
-     * Reset by {@link #reset()} on socket teardown.
+     * Guard ensuring the full bootstrap runs at most once per connection. Reset by {@link #reset()} on socket teardown.
      *
-     * @implNote ADAPTED: WAWebHandleSuccess.default has no explicit guard
-     *           because the JS module is a single function fired exactly
-     *           once per connection by the parser registry. Cobalt reuses
-     *           handler instances across reconnects, so the guard is needed
-     *           to avoid double bootstrap if the server sends two success
-     *           stanzas on the same socket.
+     * @implNote Cobalt reuses handler instances across reconnects, so the guard is needed to avoid double bootstrap if the server sends two success stanzas on the same socket.
      */
     private final AtomicBoolean started;
 
     /**
-     * Constructs a new success stream handler with the specified
-     * dependencies.
+     * Constructs a new success stream handler with the specified dependencies.
      *
      * @param whatsapp                         the WhatsApp client instance
-     * @param abPropsService                   service for A/B prop
-     *                                         synchronisation
+     * @param abPropsService                   service for A/B prop synchronisation
      * @param deviceService                    service for device management
      * @param lidMigrationService              service for LID migration
-     * @param inactiveGroupLidMigrationService service for inactive group LID
-     *                                         migration
+     * @param inactiveGroupLidMigrationService service for inactive-group LID migration
      * @param wamService                       service for WAM initialisation
-     * @param webAppStateService               service for web app state sync
-     * @implNote ADAPTED: WAWebHandleSuccess.default uses module-level
-     *           imports; Cobalt uses constructor DI.
+     * @param webAppStateService               service for web app-state sync
      */
     public SuccessStreamHandler(
             WhatsAppClient whatsapp,
@@ -168,31 +123,18 @@ public final class SuccessStreamHandler implements SocketStream.Handler {
      * {@link #bootstrap(Node)} on the first invocation per connection.
      *
      * @param node the {@code <success>} stanza node
-     * @implNote WA Web registers this function via
-     *           {@code WADeprecatedWapParser("successParser", ...)} inside
-     *           the {@code WAWebCommsRouter} bootstrap and dispatches to it
-     *           directly when a {@code <success>} node arrives.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebHandleSuccess", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public void handle(Node node) {
-        // ADAPTED: defensive guard; WA Web has no explicit guard because the
-        // JS module is invoked at most once per connection by the parser
-        // registry, but Cobalt reuses handler instances across reconnects.
         if (started.compareAndSet(false, true)) {
             bootstrap(node);
         }
     }
 
     /**
-     * Resets the handler state so that the next {@code <success>} stanza
-     * will trigger a full bootstrap. Called when the socket stream is torn
-     * down.
-     *
-     * @implNote NO_WA_BASIS: WA Web does not reset handler state explicitly
-     *           because each new socket connection creates fresh module
-     *           instances. Cobalt reuses handler instances across reconnects.
+     * Resets the handler state so that the next {@code <success>} stanza will trigger a full bootstrap. Called when the socket stream is torn down.
      */
     @Override
     public void reset() {
@@ -231,231 +173,96 @@ public final class SuccessStreamHandler implements SocketStream.Handler {
      * </ol>
      *
      * @param node the parsed {@code <success>} stanza node
-     * @implNote WAWebHandleSuccess.default
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleSuccess", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     private void bootstrap(Node node) {
         var store = whatsapp.store();
 
-        // ADAPTED: WAWebHandleSuccess.default ->
-        // WAWebPageLoadLogging.addPageLoadQplPoint("success_received") and
-        // WAWebQplFlowWrapper.QPL.markerPoint(p, "SuccessReceived").
-        // Cobalt has no QPL/page-load instrumentation, so these telemetry
-        // markers have no equivalent.
-
-        // NO_WA_BASIS: Cobalt-specific lifecycle state — flips the store
-        // out of the "connecting" state once authentication has succeeded.
+        // Cobalt-specific lifecycle state. Flips the store out of the "connecting" state once authentication has succeeded.
         store.setOnline(true);
         store.setRegistered(true);
 
-        // WAWebHandleSuccess.default: WAWebUpdateClockSkewUtils.updateClockSkew(u.ts)
-        // WA Web records the difference between server time and local time so
-        // subsequent stamps and timeouts can be rebased. Cobalt now persists
-        // the skew in seconds on the store; callers read it through
-        // store.clockSkewSeconds().
+        // Records the difference between server and local time so later timestamps and timeouts can be rebased through store.clockSkewSeconds().
         var serverTimestampSeconds = node.getAttributeAsLong("t", 0L);
         if (serverTimestampSeconds > 0) {
-            // WAWebUpdateClockSkewUtils.updateClockSkew:
-            //   t = Date.now()/1e3, n = Math.round(t - e), r = Math.round(n / HOUR_SECONDS)
-            //   if (r !== 0 && getABPropConfigValue("log_clock_skew"))
-            //       new ClockSkewDifferenceTWamEvent({clockSkewHourly: r * -1}).commit()
-            //   WATimeUtils.setClockSkew(n)
-            // Cobalt stores the skew as (server - local) seconds so the
-            // hourly value computed below is already the WA Web "r * -1".
             var localSeconds = Instant.now().getEpochSecond();
             var skewSeconds = serverTimestampSeconds - localSeconds;
-            // WAWebUpdateClockSkewUtils.updateClockSkew: r = Math.round(n/HOUR_SECONDS);
-            // we compute Math.round((server-local)/3600) = -r so that -r is the
-            // clockSkewHourly value WA Web emits (r * -1).
+            // Math.round((server-local)/3600) is already WA Web's clockSkewHourly value (r * -1).
             var clockSkewHourly = (int) Math.round(skewSeconds / 3600.0);
             if (clockSkewHourly != 0 && abPropsService.getBool(ABProp.LOG_CLOCK_SKEW)) {
-                // WAWebUpdateClockSkewUtils.updateClockSkew: new ClockSkewDifferenceTWamEvent({clockSkewHourly:r*-1}).commit()
                 wamService.commit(new ClockSkewDifferenceTEventBuilder()
                         .clockSkewHourly(clockSkewHourly)
                         .build());
             }
-            store.setClockSkewSeconds(skewSeconds); // WAWebUpdateClockSkewUtils.updateClockSkew: WATimeUtils.setClockSkew(n)
+            store.setClockSkewSeconds(skewSeconds);
         }
 
-        // WAWebHandleSuccess.default: WAWebUpdateMeLidUtils.updateMeLid
-        // updateMeLid only writes when transitioning null -> value or value
-        // -> different value; it never clears an existing LID. Using
-        // ifPresent on getAttributeAsJid mirrors that semantics because the
-        // setter is only invoked when the attribute is present and parses
-        // as a valid JID.
+        // updateMeLid only writes when transitioning null to value or value to a different value; it never clears an existing LID. Using ifPresent mirrors that semantics.
         node.getAttributeAsJid("lid").ifPresent(store::setLid);
 
-        // WAWebHandleSuccess.default: WAWebUserPrefsMeUser.setMeDisplayName
-        // WA Web checks displayName != null only; Cobalt also rejects blank
-        // strings to avoid persisting an empty pushname.
+        // Cobalt also rejects blank display names to avoid persisting an empty pushname; WA Web only checks for null.
         var displayName = node.getAttributeAsString("display_name", null);
         if (displayName != null && !displayName.isBlank()) {
             var oldName = store.name();
             store.setName(displayName);
             if (!Objects.equals(oldName, displayName)) {
-                // ADAPTED: WAWebHandleSuccess.default just stores the name;
-                // Cobalt notifies registered listeners of name changes.
                 for (var listener : store.listeners()) {
                     Thread.startVirtualThread(() -> listener.onNameChanged(whatsapp, oldName, displayName));
                 }
             }
         }
 
-        // ADAPTED: WAWebHandleSuccess.default ->
-        // WAWebSyncdGetActionHandler.setActionHandlers(WAWebCollectionHandlerActions.ActionHandlers)
-        // WA Web installs the collection action handler registry as a global
-        // singleton. Cobalt wires the equivalent registry into
-        // WebAppStateService at construction time, so no explicit call is
-        // required here.
-        // ADAPTED: WAWebHandleSuccess.default ->
-        // BackendEventBus.triggerTemporaryBan({banned:false})
-        // WA Web fires a frontend bridge event so the UI can dismiss any
-        // "temporarily banned" banner. Cobalt does not surface that UI
-        // banner because it is a headless library; the equivalent state is
-        // implied by the fact that authentication succeeded.
-        // ADAPTED: WAWebHandleSuccess.default ->
-        // WAWebUserPrefsGeneral.setOfflinePushDisabled(false)
-        // WA Web re-enables offline push notifications on every successful
-        // login. Cobalt has no offline push subsystem (the project does not
-        // ship a service worker), so the call has no equivalent.
-        // ADAPTED: WAWebHandleSuccess.default ->
-        // WAWebDbEncryptionKey.DbEncKeyStore.generateFinalDbEncryptionAndFtsKey(c)
-        // and generateFinalDbEncryptionAndFtsKeyForInvoker(c). WA Web uses
-        // the companion_enc_static attribute as a salt to finalise IndexedDB
-        // encryption keys. Cobalt persists session data via Java
-        // serialization without an at-rest encryption layer, so the
-        // companion_enc_static attribute is intentionally ignored.
-        // ADAPTED: WAWebHandleSuccess.default -> WAWebPassiveModeManager
-        // .executePassiveTasks runs LID-migration init as a passive task;
-        // Cobalt calls it directly to keep ordering explicit.
+        // WA Web's passive-task pipeline (collection action handlers, temporary-ban banner reset, offline push toggle, IndexedDB key derivation) has no Cobalt equivalent because Cobalt is headless and uses Java serialization without at-rest encryption.
         lidMigrationService.initialize();
 
-        // WAWebHandleSuccess.default -> WAWebAbPropsSyncJob.syncABPropsTask(
-        //     {localRefreshId: g!==d ? g : C, shouldSendHash:false})
-        // WA Web only syncs when the server's abprops refresh id differs
-        // from the locally stored one (or the web refresh id changed via
-        // the justknobx 2086 flag). Cobalt always syncs because the
-        // refresh-id state is not persisted across runs; this is a strict
-        // superset of the WA Web behaviour and never under-syncs.
+        // Cobalt always syncs AB props (refresh-id state is not persisted across runs); this is a strict superset of WA Web's conditional sync and never under-syncs.
         var abPropsSynced = abPropsService.sync();
 
-        // WAWebHandleSuccess.default ->
-        // checkIfMigrationEnabled (read after the sync so the latest value
-        // of lid_one_on_one_migration_enabled is honoured).
         if (abPropsSynced && abPropsService.getBool(ABProp.LID_ONE_ON_ONE_MIGRATION_ENABLED)) {
             lidMigrationService.enableMigration();
         } else {
             lidMigrationService.disableMigration();
         }
 
-        // ADAPTED: WAWebHandleSuccess.default -> the WAM globals are
-        // populated by passive tasks (WAWebABPropsWamGlobals); Cobalt
-        // explicitly initialises the WAM service after the AB-prop sync so
-        // the abKey/sampling overrides are picked up before the first
-        // event is committed.
+        // Initialised after the AB-prop sync so the abKey and sampling overrides are picked up before the first event is committed.
         wamService.initialize();
 
-        // ADAPTED: WAWebHandleSuccess.default -> the device housekeeping
-        // suite (WAWebAdvDeviceInfoCheckJob.scheduleAdvDeviceInfoCheck,
-        // WAWebApiPendingDeviceSync.doPendingDeviceSync,
-        // WAWebSyncdStoreMissingKeys.updateMissingKeyDevices) is scheduled
-        // via passive tasks and event listeners in WA Web; Cobalt fires
-        // them directly here so the post-success ordering is deterministic.
         deviceService.startAdvCheckScheduler();
         deviceService.retryPendingSyncs();
         deviceService.updateMissingKeyDevices();
 
-        // ADAPTED: WAWebHandleSuccess.default -> inactive-group LID
-        // migration runs through BackendEventBus listeners in WA Web;
-        // Cobalt starts it explicitly here.
         inactiveGroupLidMigrationService.start();
 
-        // WAWebHandleSuccess.default -> WAWebABPropsLocalStorage
-        //     .setGroupAbPropsEmergencyPushTimestamp(u.ts)
-        // WA Web compares the server-supplied group_abprops refresh id against
-        // its locally-persisted copy via WAWebABPropsLocalStorage
-        //     .getGroupAbPropsRefreshId(), and when they differ it writes the
-        // stanza's server timestamp so a future sync can detect the push.
-        // Cobalt now persists the refresh id on the store via
-        // WhatsAppStore.setGroupAbPropsRefreshId, so we mirror the JS
-        // exact comparison instead of stamping unconditionally.
+        // Stamps the emergency push timestamp only when the refresh id actually changed, mirroring WA Web's getGroupAbPropsRefreshId comparison.
         var groupAbpropsRefreshId = node.getAttributeAsLong("group_abprops", 0L);
         if (groupAbpropsRefreshId != 0L && serverTimestampSeconds > 0
                 && groupAbpropsRefreshId != store.groupAbPropsRefreshId()) {
-            store.setGroupAbPropsEmergencyPushTimestamp(Instant.ofEpochSecond(serverTimestampSeconds)); // WAWebABPropsLocalStorage.setGroupAbPropsEmergencyPushTimestamp
-            store.setGroupAbPropsRefreshId(groupAbpropsRefreshId); // WAWebABPropsLocalStorage.setGroupAbPropsRefreshId
+            store.setGroupAbPropsEmergencyPushTimestamp(Instant.ofEpochSecond(serverTimestampSeconds));
+            store.setGroupAbPropsRefreshId(groupAbpropsRefreshId);
         }
 
-        // ADAPTED: WAWebHandleSuccess.default -> WA Web resumes syncd and
-        // starts the periodic app-state sync job through passive tasks;
-        // Cobalt calls them directly so the order is explicit.
         webAppStateService.resumeAfterRestart();
         webAppStateService.startPeriodicSyncJob();
 
-        // ADAPTED: WAWebHandleSuccess.default -> b(1000) which calls
-        // mediaHosts.forceRefresh(signal) with a 1-second timeout to
-        // pre-warm the media-conn cache for the next outgoing media
-        // request. Cobalt's media subsystem fetches the conn lazily on the
-        // first media operation; pre-warming is omitted to keep the
-        // success handler synchronous and side-effect free for tests.
-        // WAWebHandleSuccess.default -> WAWebPassiveModeManager
-        //     .executePassiveTasks ends with WASendPassiveModeProtocol
-        //     .sendPassiveModeProtocol("active"), which sends
-        //     <iq xmlns="passive" type="set"><active/></iq> to tell the
-        // server the client is ready to leave passive-mode. The Cobalt
-        // login payload sets passive=true (see WhatsAppSocketClient
-        // .getClientPayloadForLogin), so the server holds offline traffic
-        // until the active iq is sent. Sending it here keeps the bootstrap
-        // sequence in lockstep with WA Web.
+        // The Cobalt login payload sets passive=true so the server buffers offline traffic until the active iq is sent here.
         sendActiveModeIq();
 
-        // WAWebStartBackend post-launch housekeeping ->
-        //   WAWebGetReachoutTimelockJob.fetchReachoutTimelock(): probes the
-        //   account-level reachout timelock so the server records the same
-        //   compliance ping the official client emits at app launch. Cobalt
-        //   has no store slot for the response yet; the call is fire-and-log
-        //   so the server-observable behaviour matches WA Web.
+        // Compliance probes mirror the housekeeping the official client emits at app launch. Cobalt has no store slots for the responses yet so the calls are fire-and-log to match the server-observable behaviour.
         runComplianceProbe("reachout timelock", whatsapp::queryReachoutTimelock);
 
-        // WAWebGetNewChatMessageCappingInfoJob.getNewChatMessageCapping ->
-        //   WAWebMexFetchNewChatMessageCappingInfoJob.mexFetchNewChatMessageCapping:
-        //   probes the new-chat messaging quota so the server registers the
-        //   same compliance ping the official client emits at app launch.
-        //   Cobalt has no store slot for the response yet; the call is
-        //   fire-and-log so the server-observable behaviour matches WA Web.
         runComplianceProbe("new-chat capping info", whatsapp::queryNewChatMessageCappingInfo);
 
-        // WAWebAccountSyncJob.updatePrivacySettings ->
-        //   WAWebSyncPrivacyDisallowedLists.syncPrivacyDisallowedLists:
-        //   reconciles the per-category privacy disallowed lists through the
-        //   MEX/GraphQL transport. WA Web invokes this for the four
-        //   PrivacyDisallowedListType enum values (ABOUT, GROUPADD, LAST,
-        //   PROFILE) so the server records the same compliance ping the
-        //   official client emits at app launch. Cobalt currently has no
-        //   store slot for the per-category dhash, so the local cache digest
-        //   is sent as the empty string on every probe; the result is logged
-        //   and discarded.
         syncPrivacyDisallowedListsMex();
 
-        // ADAPTED: WAWebHandleSuccess.default -> Cobalt notifies registered
-        // listeners; WA Web has no equivalent {@code onLoggedIn} callback
-        // because consumers of the JS code are inside the same bundle and
-        // observe state via reactive collections.
         for (var listener : store.listeners()) {
             Thread.startVirtualThread(() -> listener.onLoggedIn(whatsapp));
         }
 
-        // ADAPTED: WAWebHandleSuccess.default -> Cobalt persists the store
-        // to disk so the next process can restart from the post-success
-        // state. WA Web persists individual prefs via IndexedDB and
-        // localStorage throughout the bootstrap, so there is no single
-        // equivalent flush.
+        // Persisting the store is best-effort; the bootstrap must not fail if the underlying serializer is unhappy.
         try {
             store.save();
         } catch (Exception ignored) {
-            // Persisting the store is best-effort; the bootstrap must not
-            // fail if the underlying serializer is unhappy.
         }
     }
 
@@ -486,12 +293,7 @@ public final class SuccessStreamHandler implements SocketStream.Handler {
             adaptation = WhatsAppAdaptation.ADAPTED)
     private void sendActiveModeIq() {
         try {
-            // Use sendNode(NodeBuilder) so an `id` attribute is auto-injected
-            // when one is not provided; the server expects an id on every
-            // type="set" iq because WAWap.generateId() is invoked by
-            // WASmaxOutPassiveModeActiveIQRequest.makeActiveIQRequest. The
-            // returned response is ignored — Cobalt only needs the server to
-            // observe the request so it transitions out of passive mode.
+            // sendNode auto-injects an id when none is provided; the server expects an id on every type="set" iq.
             var iq = new NodeBuilder()
                     .description("iq")
                     .attribute("xmlns", "passive")
@@ -502,8 +304,7 @@ public final class SuccessStreamHandler implements SocketStream.Handler {
                             .build());
             whatsapp.sendNode(iq);
         } catch (Exception ignored) {
-            // Best-effort: the server will start streaming after its own
-            // passive timeout even if the active iq never reaches it.
+            // Best-effort. The server will start streaming after its own passive timeout even if the active iq never reaches it.
         }
     }
 
@@ -566,26 +367,19 @@ public final class SuccessStreamHandler implements SocketStream.Handler {
      * every probe; the server therefore always returns the full roster (or
      * {@code match} when empty), but the round trip itself is sufficient
      * for compliance. The reply is logged and discarded.
-     *
-     * @implNote WAWebSyncPrivacyDisallowedLists.syncPrivacyDisallowedLists
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncPrivacyDisallowedLists",
             exports = "syncPrivacyDisallowedLists", adaptation = WhatsAppAdaptation.ADAPTED)
     private void syncPrivacyDisallowedListsMex() {
         var meLid = whatsapp.store().lid().orElse(null);
         if (meLid == null) {
-            // WAWebQueryPrivacyDisallowedListUtil.queryPrivacyDisallowedList:
-            //   getMaybeMeDeviceLid() == null -> skip MEX path entirely
+            // WA Web's getMaybeMeDeviceLid == null check skips the MEX path entirely.
             return;
         }
-        // WAWebQueryPrivacyDisallowedListMexJob: maps the JS PrivacyDisallowedListType
-        //   enum to the MEX category strings:
-        //     About -> "ABOUT", GroupAdd -> "GROUPADD",
-        //     LastSeen -> "LAST", ProfilePicture -> "PROFILE"
+        // PrivacyDisallowedListType enum maps to MEX category strings: About to ABOUT, GroupAdd to GROUPADD, LastSeen to LAST, ProfilePicture to PROFILE.
         var categories = List.of("ABOUT", "GROUPADD", "LAST", "PROFILE");
         for (var category : categories) {
             try {
-                // WAWebMexGetPrivacyList.fetchPrivacyList({jid, dhash:"", category, type:"DENYLIST"})
                 whatsapp.queryPrivacyDisallowedListMex(meLid, "", category, "DENYLIST");
             } catch (Throwable throwable) {
                 LOGGER_COMPLIANCE.log(System.Logger.Level.WARNING,

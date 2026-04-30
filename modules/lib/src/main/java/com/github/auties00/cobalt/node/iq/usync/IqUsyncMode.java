@@ -11,23 +11,23 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
  * refresh ignoring any caches.
  *
  * @implNote Mirrors {@code WAWebUsync.USyncQuery.mode} which is a
- *           free-form string; Cobalt narrows to the three
+ *           free-form string. Cobalt narrows to the three
  *           documented values that appear in WA Web call sites.
  */
 @WhatsAppWebModule(moduleName = "WAWebUsync")
 public enum IqUsyncMode {
     /**
-     * The default {@code "query"} mode — fetches state for the
+     * The default {@code "query"} mode. Fetches state for the
      * requested protocols.
      */
     QUERY("query"),
     /**
-     * The {@code "delta"} mode — fetches only the entries that
+     * The {@code "delta"} mode. Fetches only the entries that
      * have changed since the prior query.
      */
     DELTA("delta"),
     /**
-     * The {@code "full"} mode — forces a complete refresh
+     * The {@code "full"} mode. Forces a complete refresh
      * ignoring any caches.
      */
     FULL("full");
@@ -50,7 +50,7 @@ public enum IqUsyncMode {
     /**
      * Returns the wire-side string.
      *
-     * @return the wire string; never {@code null}
+     * @return the wire string. Never {@code null}
      */
     public String wireValue() {
         return wireValue;

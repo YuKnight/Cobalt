@@ -14,13 +14,15 @@ import java.time.Duration;
 import java.util.Optional;
 
 /**
- * USync {@code text_status} protocol.
- *
- * @implNote WAWebUsyncTextStatus.USyncTextStatusProtocol.
+ * USync {@code text_status} protocol descriptor. Asks the relay for each
+ * peer's modern text-status payload (text, emoji, ephemeral lifetime, last
+ * update timestamp).
  */
 @WhatsAppWebModule(moduleName = "WAWebUsyncTextStatus")
 public final class UsyncTextStatusProtocol implements UsyncProtocol {
-    /** Wire literal for the protocol tag name. */
+    /**
+     * Wire literal for the protocol tag name.
+     */
     public static final String NAME = "text_status";
 
     /**
@@ -31,6 +33,11 @@ public final class UsyncTextStatusProtocol implements UsyncProtocol {
     public UsyncTextStatusProtocol() {
     }
 
+    /**
+     * Returns the wire literal for this protocol's tag name.
+     *
+     * @return the tag name
+     */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUsyncTextStatus",
             exports = "USyncTextStatusProtocol.getName", adaptation = WhatsAppAdaptation.DIRECT)
@@ -38,6 +45,11 @@ public final class UsyncTextStatusProtocol implements UsyncProtocol {
         return NAME;
     }
 
+    /**
+     * Builds an empty {@code <text_status/>} query element.
+     *
+     * @return the query-element node
+     */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUsyncTextStatus",
             exports = "USyncTextStatusProtocol.getQueryElement", adaptation = WhatsAppAdaptation.DIRECT)
@@ -45,6 +57,13 @@ public final class UsyncTextStatusProtocol implements UsyncProtocol {
         return new NodeBuilder().description(NAME).build();
     }
 
+    /**
+     * Returns no per-user element because the text-status protocol carries
+     * no per-user payload on the request side.
+     *
+     * @param user the user the {@code <user>} entry refers to
+     * @return always {@link Optional#empty()}
+     */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUsyncTextStatus",
             exports = "USyncTextStatusProtocol.getUserElement", adaptation = WhatsAppAdaptation.DIRECT)
@@ -52,6 +71,14 @@ public final class UsyncTextStatusProtocol implements UsyncProtocol {
         return Optional.empty();
     }
 
+    /**
+     * Parses the {@code <text_status>} child of a {@code <user>} response
+     * into a {@link TextStatusResult} or a per-protocol error.
+     *
+     * @param child the protocol-tagged response node
+     * @return the parsed result
+     * @throws IllegalStateException if the node tag is not {@link #NAME}
+     */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUsyncTextStatus",
             exports = "textStatusParser", adaptation = WhatsAppAdaptation.ADAPTED)

@@ -3,13 +3,12 @@ package com.github.auties00.cobalt.socket.layer.application.websocket.frame.deco
 import java.nio.ByteBuffer;
 
 /**
- * A decoded WebSocket frame, produced by {@link WebSocketFrameDecoder}.
+ * Algebraic result type produced by {@link WebSocketFrameDecoder} on
+ * every {@code decode} call.
  *
- * @implNote No WhatsApp Web counterpart: WA Web relies on the browser's
- *     native {@code WebSocket} object, which surfaces complete frames as
- *     {@code ArrayBuffer} payloads on {@code onmessage}.  Cobalt builds
- *     this algebraic result type to propagate decoder outcomes through
- *     the selector pipeline.
+ * <p>The variants describe the four outcomes the selector pipeline has
+ * to react to: a complete data chunk, a complete control frame, a
+ * partial decoder state that needs more bytes, and a protocol error.
  */
 public sealed interface WebSocketDecodedFrame permits WebSocketDecodedFrame.None,
         WebSocketDecodedFrame.Invalid,

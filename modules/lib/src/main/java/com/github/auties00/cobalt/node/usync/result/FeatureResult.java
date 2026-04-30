@@ -9,17 +9,16 @@ import java.util.Map;
  * Success result of {@code WAWebUsyncFeature.featureParser}.
  *
  * <p>Carries a map from feature key to the relay-reported support status.
- * Keys that the relay omits from the response do not appear in the map;
+ * Keys that the relay omits from the response do not appear in the map and
  * present keys carry the {@code value} attribute verbatim.
  *
- * @implNote WAWebUsyncFeature.featureParser: returns a flat object keyed
- *     by feature name. Cobalt promotes the keys to enum constants for
- *     type-safe lookup.
+ * @implNote The JS parser returns a flat object keyed by feature name. Cobalt
+ *     promotes the keys to enum constants for type-safe lookup.
  */
 @WhatsAppWebModule(moduleName = "WAWebUsyncFeature")
 public final class FeatureResult implements UsyncProtocolResponse {
     /**
-     * Map from feature key to the relay-reported support status.
+     * Maps each feature key to the relay-reported support status.
      */
     private final Map<UsyncFeatureProtocol.FeatureQuery, String> features;
 

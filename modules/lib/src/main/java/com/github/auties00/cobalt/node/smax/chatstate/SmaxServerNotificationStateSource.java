@@ -35,12 +35,8 @@ public sealed interface SmaxServerNotificationStateSource permits SmaxServerNoti
     }
 
     /**
-     * The {@code FromUser} variant — the chat-state event was
+     * The {@code FromUser} variant. The chat-state event was
      * raised by a 1:1 peer.
-     *
-     * @implNote {@code WASmaxInChatstateFromUserMixin.parseFromUserMixin}
-     *           validates the user JID against the
-     *           {@code USERJID_USERJID_USERJID_USERJID} enum.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInChatstateFromUserMixin")
     final class FromUser implements SmaxServerNotificationStateSource {
@@ -117,14 +113,8 @@ public sealed interface SmaxServerNotificationStateSource permits SmaxServerNoti
     }
 
     /**
-     * The {@code FromGroup} variant — the chat-state event was
+     * The {@code FromGroup} variant. The chat-state event was
      * raised by a participant of a group chat.
-     *
-     * @implNote {@code WASmaxInChatstateFromGroupMixin.parseFromGroupMixin}
-     *           validates the group {@code from} JID, the
-     *           participant's lid/wid {@code participant} JID, and
-     *           the optional phone-number-form
-     *           {@code participant_pn}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInChatstateFromGroupMixin")
     final class FromGroup implements SmaxServerNotificationStateSource {

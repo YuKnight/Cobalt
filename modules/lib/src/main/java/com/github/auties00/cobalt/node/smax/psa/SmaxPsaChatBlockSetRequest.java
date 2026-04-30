@@ -13,12 +13,12 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps a {@code <blocking action="…"/>}
+ * The outbound stanza variant. Wraps a {@code <blocking action="…"/>}
  * payload in the canonical {@code <iq xmlns="w:comms:chat" type="set"
  * to="s.whatsapp.net">} envelope.
  *
  * <p>The {@code blockingAction} field is a free-form opaque string at
- * the WA Web wire layer ({@code CUSTOM_STRING}) — typed callers
+ * the WA Web wire layer ({@code CUSTOM_STRING}). Typed callers
  * generally pass one of {@link SmaxPsaChatBlockGet.BlockingStatus}'s
  * literals to flip the flag, but the relay accepts any non-empty
  * string and rejects unknown literals server-side rather than at the
@@ -58,18 +58,11 @@ public final class SmaxPsaChatBlockSetRequest implements SmaxOperation.Request {
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <blocking action="…"/>} child
-     *
-     * @implNote {@code WASmaxOutPsaChatBlockSetRequest.makeChatBlockSetRequest}
-     *           composes {@code WASmaxOutPsaBaseIQSetRequestMixin}
-     *           ({@code id=generateId()}, {@code type="set"}) over
-     *           {@code <iq xmlns="w:comms:chat" to="s.whatsapp.net">}
-     *           with a single {@code <blocking action="…"/>} child.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutPsaChatBlockSetRequest",
             exports = "makeChatBlockSetRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutPsaChatBlockSetRequest: smax("blocking", {action: CUSTOM_STRING(t)})
         var blockingNode = new NodeBuilder()
                 .description("blocking")
                 .attribute("action", blockingAction)

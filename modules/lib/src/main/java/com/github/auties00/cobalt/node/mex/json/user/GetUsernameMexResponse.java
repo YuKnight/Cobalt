@@ -19,11 +19,20 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The parsed response for this MEX query.
+ * Parsed response for the get-username query. Carries the username record bound to the authenticated account.
  */
+@WhatsAppWebModule(moduleName = "WAWebMexGetUsernameJob")
 public final class GetUsernameMexResponse implements MexOperation.Response.Json {
+    /**
+     * The username record returned by the relay.
+     */
     private final UsernameInfo usernameInfo;
 
+    /**
+     * Constructs a new response with the given username record.
+     *
+     * @param usernameInfo the username record returned by the relay
+     */
     private GetUsernameMexResponse(UsernameInfo usernameInfo) {
         this.usernameInfo = usernameInfo;
     }
@@ -31,12 +40,8 @@ public final class GetUsernameMexResponse implements MexOperation.Response.Json 
     /**
      * Parses the MEX response carried by an inbound IQ stanza.
      *
-     * @implNote WAWebMexGetUsernameJob.mexGetUsernameQueryJob: reads the
-     * {@code username_info} record with {@code username}, {@code state}
-     * and {@code pin}.
      * @param node the inbound IQ stanza carrying the {@code <result>} child
-     * @return the parsed response, or {@code Optional.empty()} if the
-     *         expected JSON shape is absent
+     * @return the parsed response, or {@link Optional#empty()} if the expected JSON shape is absent
      */
     @WhatsAppWebExport(moduleName = "WAWebMexGetUsernameJob", exports = "mexGetUsernameQueryJob",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -47,22 +52,41 @@ public final class GetUsernameMexResponse implements MexOperation.Response.Json 
     }
 
     /**
-     * Returns the {@code username_info} field.
+     * Returns the username record returned by the relay.
      *
-     * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the record, or empty if absent
      */
     public Optional<UsernameInfo> usernameInfo() {
         return Optional.ofNullable(usernameInfo);
     }
 
     /**
-     * A parsed {@code UsernameInfo} object.
+     * Username record returned by the relay. Carries the assigned username, its registration state and the recovery
+     * PIN hash.
      */
     public static final class UsernameInfo {
+        /**
+         * The username currently bound to the account.
+         */
         private final String username;
+
+        /**
+         * The registration state of the username (for example {@code pending} or {@code active}).
+         */
         private final String state;
+
+        /**
+         * The recovery PIN hash associated with the username.
+         */
         private final String pin;
 
+        /**
+         * Constructs a new username record.
+         *
+         * @param username the username currently bound to the account
+         * @param state the registration state of the username
+         * @param pin the recovery PIN hash
+         */
         private UsernameInfo(String username, String state, String pin) {
             this.username = username;
             this.state = state;
@@ -70,37 +94,37 @@ public final class GetUsernameMexResponse implements MexOperation.Response.Json 
         }
 
         /**
-         * Returns the {@code username} field.
+         * Returns the username currently bound to the account.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+         * @return an {@link Optional} containing the username, or empty if absent
          */
         public Optional<String> username() {
             return Optional.ofNullable(username);
         }
 
         /**
-         * Returns the {@code state} field.
+         * Returns the registration state of the username.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+         * @return an {@link Optional} containing the state, or empty if absent
          */
         public Optional<String> state() {
             return Optional.ofNullable(state);
         }
 
         /**
-         * Returns the {@code pin} field.
+         * Returns the recovery PIN hash.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+         * @return an {@link Optional} containing the PIN hash, or empty if absent
          */
         public Optional<String> pin() {
             return Optional.ofNullable(pin);
         }
 
         /**
-         * Parses a {@code UsernameInfo} from the given JSON object.
+         * Parses a username record from the given JSON object.
          *
          * @param obj the JSON object to parse
-         * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+         * @return an {@link Optional} containing the parsed record, or empty if {@code obj} is {@code null}
          */
         static Optional<UsernameInfo> of(JSONObject obj) {
             if (obj == null) {
@@ -114,10 +138,10 @@ public final class GetUsernameMexResponse implements MexOperation.Response.Json 
         }
 
         /**
-         * Parses a list of {@code UsernameInfo} from the given JSON array.
+         * Parses a list of username records from the given JSON array.
          *
          * @param arr the JSON array to parse
-         * @return the list of parsed results, empty if {@code arr} is {@code null}
+         * @return the list of parsed records, empty if {@code arr} is {@code null}
          */
         static List<UsernameInfo> ofArray(JSONArray arr) {
             if (arr == null) {
@@ -132,6 +156,12 @@ public final class GetUsernameMexResponse implements MexOperation.Response.Json 
         }
     }
 
+    /**
+     * Parses the response from the raw JSON payload bytes.
+     *
+     * @param json the raw JSON bytes from the {@code <result>} child
+     * @return an {@link Optional} containing the parsed response, or empty if the envelope is missing
+     */
     private static Optional<GetUsernameMexResponse> of(byte[] json) {
         var jsonObject = JSON.parseObject(json);
         if (jsonObject == null) {

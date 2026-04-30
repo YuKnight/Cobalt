@@ -16,7 +16,7 @@ import java.util.Optional;
  *
  * @implNote {@code WAWebGetPushServerSettingsJob.getPushServerSettings}
  *           short-circuits the parser when {@code <error/>} is
- *           absent and projects {@code child("settings").attrString("webserverkey")};
+ *           absent and projects {@code child("settings").attrString("webserverkey")}.
  *           Cobalt splits the failure path into typed
  *           {@code ClientError} / {@code ServerError} variants.
  */
@@ -27,10 +27,10 @@ public sealed interface IqGetPushServerSettingsResponse extends IqOperation.Resp
      * Tries each {@link IqGetPushServerSettingsResponse} variant in priority order and returns
      * the first that parses cleanly.
      *
-     * @param node    the inbound IQ stanza received from the relay;
-     *                never {@code null}
-     * @param request the original outbound stanza — used to validate
-     *                echoed identifiers; never {@code null}
+     * @param node    the inbound IQ stanza received from the relay.
+     *                Never {@code null}
+     * @param request the original outbound stanza. Used to validate
+     *                echoed identifiers. Never {@code null}
      * @return an {@link Optional} carrying the parsed variant, or
      *         {@link Optional#empty()} when no documented variant
      *         matched the stanza shape
@@ -53,7 +53,7 @@ public sealed interface IqGetPushServerSettingsResponse extends IqOperation.Resp
     }
 
     /**
-     * The {@code Success} reply variant — the relay returned the
+     * The {@code Success} reply variant. The relay returned the
      * server-side push key.
      *
      * <p>Carries the base64-encoded {@code webserverkey} attribute
@@ -76,7 +76,7 @@ public sealed interface IqGetPushServerSettingsResponse extends IqOperation.Resp
         /**
          * Constructs a new successful reply.
          *
-         * @param webServerKey the server-side push key; never
+         * @param webServerKey the server-side push key. Never
          *                     {@code null}
          * @throws NullPointerException if {@code webServerKey} is
          *                              {@code null}
@@ -88,7 +88,7 @@ public sealed interface IqGetPushServerSettingsResponse extends IqOperation.Resp
         /**
          * Returns the base64-encoded server-side push key.
          *
-         * @return the key string; never {@code null}
+         * @return the key string. Never {@code null}
          */
         public String webServerKey() {
             return webServerKey;
@@ -145,7 +145,7 @@ public sealed interface IqGetPushServerSettingsResponse extends IqOperation.Resp
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected the
+     * The {@code ClientError} reply variant. The relay rejected the
      * query as malformed or unauthorised.
      */
     @WhatsAppWebModule(moduleName = "WAWebGetPushServerSettingsJob")
@@ -164,7 +164,7 @@ public sealed interface IqGetPushServerSettingsResponse extends IqOperation.Resp
          * Constructs a new client-error reply.
          *
          * @param errorCode the numeric error code
-         * @param errorText the optional human-readable text; may be
+         * @param errorText the optional human-readable text. May be
          *                  {@code null}
          */
         public ClientError(int errorCode, String errorText) {
@@ -237,7 +237,7 @@ public sealed interface IqGetPushServerSettingsResponse extends IqOperation.Resp
     }
 
     /**
-     * The {@code ServerError} reply variant — the relay encountered a
+     * The {@code ServerError} reply variant. The relay encountered a
      * transient internal failure while processing the query.
      */
     @WhatsAppWebModule(moduleName = "WAWebGetPushServerSettingsJob")
@@ -256,7 +256,7 @@ public sealed interface IqGetPushServerSettingsResponse extends IqOperation.Resp
          * Constructs a new server-error reply.
          *
          * @param errorCode the numeric error code
-         * @param errorText the optional human-readable text; may be
+         * @param errorText the optional human-readable text. May be
          *                  {@code null}
          */
         public ServerError(int errorCode, String errorText) {

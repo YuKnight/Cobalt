@@ -15,13 +15,13 @@ import java.util.Optional;
  *
  * <p>The class mirrors {@link SmaxIqResultResponseMixin} but for the error
  * envelope: it validates the {@code iq} tag, the echoed {@code id}, the
- * echoed {@code from}/{@code to}, and asserts {@code type="error"}; it also
+ * echoed {@code from}/{@code to}, and asserts {@code type="error"}. It also
  * exposes a companion {@link #parseError(Node)} that extracts the
  * {@code <error code="…" text="…"/>} child carried by every error
  * envelope.
  *
  * @implNote {@code WASmaxInGroupsIQErrorResponseMixin.parseIQErrorResponseMixin}
- *           is the per-RPC analogue; Cobalt collapses every copy into the
+ *           is the per-RPC analogue. Cobalt collapses every copy into the
  *           single helper here. The {@code parseError} extraction is
  *           lifted out separately because {@code ClientError} variants
  *           combine the envelope check with a per-RPC client-error-code
@@ -32,7 +32,7 @@ import java.util.Optional;
 public final class SmaxIqErrorResponseMixin {
 
     /**
-     * Private constructor — the class is a static-only utility.
+     * Private constructor. The class is a static-only utility.
      */
     private SmaxIqErrorResponseMixin() {
         throw new AssertionError("SmaxIqErrorResponseMixin cannot be instantiated");
@@ -43,17 +43,17 @@ public final class SmaxIqErrorResponseMixin {
      * {@code <iq type="error">} echoing the request's {@code id} and
      * {@code to} attributes.
      *
-     * @param reply   the inbound stanza received from the relay; never
+     * @param reply   the inbound stanza received from the relay. Never
      *                {@code null}
-     * @param request the outbound stanza emitted by the caller — used to
+     * @param request the outbound stanza emitted by the caller. Used to
      *                cross-check the echoed {@code id} and {@code from}
-     *                attributes; never {@code null}
+     *                attributes. Never {@code null}
      * @return {@code true} when {@code reply} is an error envelope echoing
      *         {@code request}'s identifiers; {@code false} otherwise
      * @throws NullPointerException if either argument is {@code null}
      *
      * @implNote {@code WASmaxInGroupsIQErrorResponseMixin.parseIQErrorResponseMixin}
-     *           runs the same checks; Cobalt collapses the structured
+     *           runs the same checks. Cobalt collapses the structured
      *           projection to a boolean.
      */
     @WhatsAppWebExport(moduleName = "WASmaxInGroupsIQErrorResponseMixin",
@@ -89,7 +89,7 @@ public final class SmaxIqErrorResponseMixin {
      * {@code <error/>} child or when the child is malformed (missing
      * {@code code} attribute).
      *
-     * @param reply the inbound error stanza; never {@code null}
+     * @param reply the inbound error stanza. Never {@code null}
      * @return an {@link Optional} carrying the parsed envelope, or empty
      *         when the {@code <error/>} child is missing
      * @throws NullPointerException if {@code reply} is {@code null}
@@ -112,8 +112,8 @@ public final class SmaxIqErrorResponseMixin {
      * Container for the {@code code}/{@code text} pair carried by every
      * {@code <error/>} child of an error envelope.
      *
-     * @param code the numeric error code; always non-negative
-     * @param text the optional human-readable error text; may be
+     * @param code the numeric error code. Always non-negative
+     * @param text the optional human-readable error text. May be
      *             {@code null}
      */
     public record Envelope(int code, String text) {

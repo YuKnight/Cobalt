@@ -3,7 +3,9 @@ package com.github.auties00.cobalt.node.iq.biz;
 import java.util.Objects;
 
 /**
- * One {@code (id, symbol, description)} price tier triple.
+ * Typed {@code (id, symbol, description)} price-tier triple carried by
+ * the price-tier list responses fetched alongside business profile
+ * editing.
  */
 public final class IqEditBusinessProfilePriceTier {
     /**

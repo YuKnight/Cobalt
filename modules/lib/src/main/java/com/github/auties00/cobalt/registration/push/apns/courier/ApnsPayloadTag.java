@@ -3,7 +3,7 @@ package com.github.auties00.cobalt.registration.push.apns.courier;
 /**
  * One-byte type code that prefixes every APNS frame on the wire.
  * Names match the labels Apple's push daemon ({@code apsd}) uses
- * internally; values are the actual bytes observed on the v3
+ * internally. Values are the actual bytes observed on the v3
  * protocol.
  */
 public enum ApnsPayloadTag {
@@ -12,7 +12,7 @@ public enum ApnsPayloadTag {
      */
     CONNECT(0x07),
     /**
-     * Inbound: response to {@link #CONNECT}; carries the auth token.
+     * Inbound: response to {@link #CONNECT}. Carries the auth token.
      */
     READY(0x08),
     /**

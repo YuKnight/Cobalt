@@ -16,7 +16,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Theme-mode discriminator (V2 only) — projects the {@code <theme mode>}
+ * Theme-mode discriminator (V2 only). Projects the {@code <theme mode>}
  * attribute through {@code WASmaxInBotEnums.ENUM_DARK_LIGHT}.
  */
 @WhatsAppWebModule(moduleName = "WASmaxInBotEnums")

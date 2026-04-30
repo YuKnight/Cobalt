@@ -26,8 +26,8 @@ public sealed interface SmaxStatsSendBufferResponse extends SmaxOperation.Respon
     /**
      * Tries each {@link SmaxStatsSendBufferResponse} variant in priority order.
      *
-     * @param node    the inbound IQ stanza; never {@code null}
-     * @param request the original outbound stanza; never
+     * @param node    the inbound IQ stanza. Never {@code null}
+     * @param request the original outbound stanza. Never
      *                {@code null}
      * @return an {@link Optional} carrying the parsed variant
      * @throws NullPointerException if either argument is
@@ -50,7 +50,7 @@ public sealed interface SmaxStatsSendBufferResponse extends SmaxOperation.Respon
     }
 
     /**
-     * The {@code Success} reply variant — the relay accepted the
+     * The {@code Success} reply variant. The relay accepted the
      * batch.
      *
      * <p>Carries no payload beyond the envelope echo: the
@@ -106,7 +106,7 @@ public sealed interface SmaxStatsSendBufferResponse extends SmaxOperation.Respon
     }
 
     /**
-     * The {@code ErrorNoRetry} reply variant — a permanent rejection
+     * The {@code ErrorNoRetry} reply variant. A permanent rejection
      * that the local client must NOT retry.
      *
      * <p>Carries one of three documented {@code (code, text)} pairs:
@@ -119,7 +119,7 @@ public sealed interface SmaxStatsSendBufferResponse extends SmaxOperation.Respon
      *
      * @implNote {@code WASmaxInStatsSendBufferResponseErrorNoRetry.parseSendBufferResponseErrorNoRetry}
      *           projects the {@code <error/>} child through
-     *           {@code WASmaxInStatsSendBufferNoRetryError} — a
+     *           {@code WASmaxInStatsSendBufferNoRetryError} . a
      *           disjunction over {@code IQErrorBadRequest},
      *           {@code IQErrorNotAcceptable}, and
      *           {@code IQErrorFeatureNotImplemented}. Cobalt
@@ -134,13 +134,13 @@ public sealed interface SmaxStatsSendBufferResponse extends SmaxOperation.Respon
     @WhatsAppWebModule(moduleName = "WASmaxInStatsIQErrorFeatureNotImplementedMixin")
     final class ErrorNoRetry implements SmaxStatsSendBufferResponse {
         /**
-         * The numeric error code — one of {@code 400}, {@code 406},
+         * The numeric error code. One of {@code 400}, {@code 406},
          * or {@code 501}.
          */
         private final int errorCode;
 
         /**
-         * The error text — one of {@code "bad-request"},
+         * The error text. One of {@code "bad-request"},
          * {@code "not-acceptable"}, or
          * {@code "feature-not-implemented"}.
          */
@@ -163,11 +163,11 @@ public sealed interface SmaxStatsSendBufferResponse extends SmaxOperation.Respon
          * Constructs a new no-retry error reply.
          *
          * @param errorCode   the numeric error code
-         * @param errorText   the optional error text; may be
+         * @param errorText   the optional error text. May be
          *                    {@code null}
-         * @param fieldName   the optional field name; may be
+         * @param fieldName   the optional field name. May be
          *                    {@code null}
-         * @param fieldReason the optional field reason; may be
+         * @param fieldReason the optional field reason. May be
          *                    {@code null}
          */
         public ErrorNoRetry(int errorCode, String errorText, String fieldName, String fieldReason) {
@@ -242,7 +242,7 @@ public sealed interface SmaxStatsSendBufferResponse extends SmaxOperation.Respon
             if (code == 400 && "bad-request".equals(text)) {
                 // IQErrorBadRequestMixin
             } else if (code == 406 && "not-acceptable".equals(text)) {
-                // IQErrorNotAcceptableMixin — also carries optional <field name reason/>
+                // IQErrorNotAcceptableMixin. Also carries optional <field name reason/>
                 var errorChild = node.getChild("error").orElse(null);
                 if (errorChild != null) {
                     var fieldNode = errorChild.getChild("field").orElse(null);
@@ -257,7 +257,7 @@ public sealed interface SmaxStatsSendBufferResponse extends SmaxOperation.Respon
             } else if (code == 501 && "feature-not-implemented".equals(text)) {
                 // IQErrorFeatureNotImplementedMixin
             } else {
-                // Unknown code/text pair — not a documented variant.
+                // Unknown code/text pair. Not a documented variant.
                 return Optional.empty();
             }
             return Optional.of(new ErrorNoRetry(code, text, fieldName, fieldReason));
@@ -293,7 +293,7 @@ public sealed interface SmaxStatsSendBufferResponse extends SmaxOperation.Respon
     }
 
     /**
-     * The {@code ErrorRetry} reply variant — a transient
+     * The {@code ErrorRetry} reply variant. A transient
      * {@code 503 service-unavailable} rejection. The local client
      * must re-buffer the batch and retry on the next flush window.
      *
@@ -315,7 +315,7 @@ public sealed interface SmaxStatsSendBufferResponse extends SmaxOperation.Respon
         }
 
         /**
-         * Returns the numeric error code — always {@code 503}.
+         * Returns the numeric error code. Always {@code 503}.
          *
          * @return the code
          */
@@ -324,7 +324,7 @@ public sealed interface SmaxStatsSendBufferResponse extends SmaxOperation.Respon
         }
 
         /**
-         * Returns the error text — always
+         * Returns the error text. Always
          * {@code "service-unavailable"}.
          *
          * @return the text

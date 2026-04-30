@@ -17,16 +17,9 @@ import com.github.auties00.libsignal.protocol.SignalSenderKeyDistributionMessage
 import java.util.Objects;
 
 /**
- * A service for encrypting messages using the Signal Protocol.
- * <p>
- * This service handles both 1:1 messages using Signal sessions and group messages
- * using sender keys. It is the sending counterpart to
- * {@link MessageDecryption}.
- *
- * @implNote WAWebEncryptMsgProtobuf: provides {@code encryptMsgProtobuf} for 1:1 device
- * encryption and {@code encryptMsgSenderKey} for group sender key encryption.
- * In Cobalt, constructor-based DI replaces module-level imports for
- * WAWebSignal.Cipher and WAWebSignalProtocolStore.
+ * Encrypts outgoing messages using the Signal Protocol. Handles both 1:1
+ * messages over Signal sessions and group messages over sender keys, and is
+ * the sending counterpart to {@link MessageDecryption}.
  */
 @WhatsAppWebModule(moduleName = "WAWebEncryptMsgProtobuf")
 @WhatsAppWebModule(moduleName = "WAWebBackendJobsCommon")
@@ -35,74 +28,51 @@ import java.util.Objects;
 @WhatsAppWebModule(moduleName = "WAWebCryptoLibrary")
 public final class MessageEncryption {
     /**
-     * Logger for encryption diagnostics.
-     *
-     * @implNote ADAPTED: WAWebEncryptMsgProtobuf uses {@code WALogger.WARN} for error
-     * logging; Cobalt uses {@link System.Logger} instead.
+     * Holds the logger used for encryption diagnostics.
      */
     private static final System.Logger LOGGER = System.getLogger(MessageEncryption.class.getName());
 
     /**
-     * Current ciphertext version used for message encryption.
-     *
-     * @implNote WAWebBackendJobsCommon.CIPHERTEXT_VERSION: constant {@code m = 2},
-     * exported as {@code CIPHERTEXT_VERSION}.
+     * Holds the current ciphertext version written into outgoing {@code <enc>}
+     * stanzas.
      */
     @WhatsAppWebExport(moduleName = "WAWebBackendJobsCommon", exports = "CIPHERTEXT_VERSION",
             adaptation = WhatsAppAdaptation.DIRECT)
     public static final int CIPHERTEXT_VERSION = 2;
 
     /**
-     * The WhatsApp store for session and sender key lookups.
-     *
-     * @implNote ADAPTED: WAWebEncryptMsgProtobuf accesses
-     * WAWebSignalProtocolStore and WAWebSignalSessionApi implicitly via
-     * module imports; Cobalt uses constructor-based DI.
+     * Holds the store consulted for Signal session and sender-key lookups.
      */
     private final WhatsAppStore store;
 
     /**
-     * The Signal session cipher for per-device encryption.
-     *
-     * @implNote ADAPTED: WAWebEncryptMsgProtobuf delegates to
-     * WAWebSignal.Cipher which wraps WAWebCryptoLibrary.
+     * Holds the per-device Signal session cipher.
      */
     private final SignalSessionCipher sessionCipher;
 
     /**
-     * The Signal group cipher for sender-key encryption.
-     *
-     * @implNote ADAPTED: WAWebEncryptMsgProtobuf delegates to
-     * WAWebSignal.Cipher which wraps WAWebCryptoLibrary.
+     * Holds the sender-key group cipher.
      */
     private final SignalGroupCipher groupCipher;
 
     /**
-     * Minimum padding length in bytes.
-     *
-     * @implNote WACryptoPkcs7.writeRandomPadMax16: padding byte is
-     * {@code (randomByte & 0x0F) + 1}, giving minimum 1.
+     * Holds the minimum number of random padding bytes appended to a plaintext
+     * before encryption.
      */
     private static final int MIN_PADDING = 1;
 
     /**
-     * Maximum padding length in bytes.
-     *
-     * @implNote WACryptoPkcs7.writeRandomPadMax16: padding byte is
-     * {@code (randomByte & 0x0F) + 1}, giving maximum 16.
+     * Holds the maximum number of random padding bytes appended to a plaintext
+     * before encryption.
      */
     private static final int MAX_PADDING = 16;
 
     /**
-     * Creates a new message encryption service.
+     * Constructs an encryption service bound to the given dependencies.
      *
-     * @param store         the store for Signal protocol state
-     * @param sessionCipher the cipher for 1:1 encryption
-     * @param groupCipher   the cipher for sender key encryption
-     *
-     * @implNote ADAPTED: WAWebEncryptMsgProtobuf uses module-level imports
-     * for WAWebSignal.Cipher and WAWebSignalProtocolStore;
-     * Cobalt uses constructor-based DI instead.
+     * @param store         the store providing Signal protocol state
+     * @param sessionCipher the cipher used for 1:1 encryption
+     * @param groupCipher   the cipher used for sender-key encryption
      */
     @WhatsAppWebExport(moduleName = "WAWebEncryptMsgProtobuf", exports = {"encryptMsgProtobuf", "encryptMsgSenderKey"},
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -117,23 +87,16 @@ public final class MessageEncryption {
     }
 
     /**
-     * Encrypts a message for a specific device using Signal Protocol.
-     * <p>
-     * The plaintext is padded with 1-16 random bytes before encryption.
-     * Returns either a PreKeySignalMessage (pkmsg) for new sessions or
-     * a SignalMessage (msg) for established sessions.
+     * Encrypts the given plaintext for a specific recipient device. The
+     * plaintext is padded with one to sixteen random bytes before encryption,
+     * and the result is either a {@code PreKeySignalMessage} for new sessions
+     * or a {@code SignalMessage} for established ones.
      *
-     * @param recipientJid the recipient's device JID
-     * @param plaintext    the plaintext message bytes (already protobuf-encoded)
-     * @return the encrypted payload with its type
-     * @throws WhatsAppMessageException.Send if encryption fails
-     *
-     * @implNote WAWebEncryptMsgProtobuf.encryptMsgProtobuf: calls
-     * {@code WAWebSignal.Cipher.encryptSignalProto(address, encodeAndPad(msg), scope)}
-     * which returns {@code {type, ciphertext}}. In Cobalt, the caller handles protobuf
-     * encoding; this method handles only padding and encryption.
-     * WAM metrics ({@code postSuccessDirectE2eMessageSendMetric} /
-     * {@code postFailureDirectE2eMessageSendMetric}) are intentionally skipped.
+     * @param recipientJid the recipient device JID
+     * @param plaintext    the protobuf-encoded plaintext bytes
+     * @return the encrypted payload along with its type
+     * @throws NullPointerException                    if any argument is {@code null}
+     * @throws WhatsAppMessageException.Send.Unknown if encryption fails
      */
     @WhatsAppWebExport(moduleName = "WAWebEncryptMsgProtobuf", exports = "encryptMsgProtobuf",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -145,19 +108,11 @@ public final class MessageEncryption {
         Objects.requireNonNull(recipientJid, "recipientJid cannot be null");
         Objects.requireNonNull(plaintext, "plaintext cannot be null");
 
-        // ADAPTED: WAWebSendMsgCommonApi.encodeAndPad calls encodeProtobuf then
-        // writeRandomPadMax16; in Cobalt the caller encodes, we only pad here
         var paddedPlaintext = addPadding(plaintext);
-
-        // WAWebSignalCommonUtils.createSignalAddress: convert JID to Signal address
         var address = recipientJid.toSignalAddress();
 
         try {
-            // WAWebSignal.Cipher.encryptSignalProto -> WAWebCryptoLibrary.encryptSignalProto
             var ciphertextMessage = sessionCipher.encrypt(address, paddedPlaintext);
-
-            // WAWebEncryptMsgProtobuf: type is cast via CiphertextType.cast(type)
-            // Returns Pkmsg for PreKeySignalMessage, Msg for SignalMessage
             var encryptionType = MessageEncryptionType.fromSignalCiphertext(ciphertextMessage);
 
             LOGGER.log(System.Logger.Level.DEBUG,
@@ -170,14 +125,10 @@ public final class MessageEncryption {
                     recipientJid
             );
         } catch (Exception e) {
-            // WAWebEncryptMsgProtobuf: logs "encryption fail for {device}" and rejects
             LOGGER.log(System.Logger.Level.WARNING,
                     "encryptMsgProtobuf: encryption fail for {0}: {1}",
                     recipientJid, e.getMessage());
 
-            // ADAPTED: WAWebSignalSessionApi.maybeDeleteUnconvertedSession cleans up
-            // unconverted sessions only; Cobalt removes the full session since
-            // the unified store does not distinguish converted vs unconverted sessions
             try {
                 store.removeSession(address);
                 LOGGER.log(System.Logger.Level.DEBUG,
@@ -196,26 +147,16 @@ public final class MessageEncryption {
     }
 
     /**
-     * Encrypts a message for a group using Sender Key encryption.
-     * <p>
-     * Group messages are encrypted once with the sender's key. All group members
-     * who have received the SenderKeyDistributionMessage can decrypt.
+     * Encrypts the given plaintext for a group using sender-key encryption.
+     * The same ciphertext is delivered to every group member who already holds
+     * the corresponding {@code SenderKeyDistributionMessage}.
      *
      * @param groupJid  the group JID
-     * @param senderJid the sender's device JID (PN or LID based on addressing mode)
-     * @param plaintext the plaintext message bytes (already protobuf-encoded)
-     * @return the encrypted payload (always SKMSG type)
-     * @throws WhatsAppMessageException.Send if encryption fails
-     *
-     * @implNote WAWebEncryptMsgProtobuf.encryptMsgSenderKey: receives
-     * {@code (msg, groupJid, paddedContent, groupInfo)}, determines sender
-     * as LID or PN based on {@code isCagAddon || isLidAddressingMode}, then
-     * calls {@code WAWebSignal.Cipher.encryptSenderKeyMsgSignalProto(groupJid, senderJid, content)}.
-     * In Cobalt, the caller resolves the sender JID and handles protobuf encoding;
-     * this method handles only padding and encryption.
-     * In WA Web the return includes {@code senderKeyBytes}; in Cobalt, sender key
-     * bytes are obtained separately via {@link #getSenderKeyBytes(Jid, Jid)}.
-     * WAM metrics ({@code E2eMessageSendWamEvent}) are intentionally skipped.
+     * @param senderJid the sender device JID, PN or LID depending on addressing mode
+     * @param plaintext the protobuf-encoded plaintext bytes
+     * @return the SKMSG-typed encrypted payload
+     * @throws NullPointerException                    if any argument is {@code null}
+     * @throws WhatsAppMessageException.Send.Unknown if encryption fails
      */
     @WhatsAppWebExport(moduleName = "WAWebEncryptMsgProtobuf", exports = "encryptMsgSenderKey",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -228,16 +169,10 @@ public final class MessageEncryption {
         Objects.requireNonNull(senderJid, "senderJid cannot be null");
         Objects.requireNonNull(plaintext, "plaintext cannot be null");
 
-        // ADAPTED: WAWebSendGroupSkmsgJob calls encodeAndPad before encryptMsgSenderKey;
-        // in Cobalt the caller encodes, we pad here
         var paddedPlaintext = addPadding(plaintext);
-
-        // WAWebEncryptMsgProtobuf.encryptMsgSenderKey: sender JID is based on
-        // addressing mode (isCagAddon || isLidAddressingMode -> LID, else PN)
         var senderKeyName = SenderKeyNameFactory.create(groupJid, senderJid);
 
         try {
-            // WAWebSignal.Cipher.encryptSenderKeyMsgSignalProto -> WAWebCryptoLibrary.encryptSenderKeyMsgSignalProto
             var ciphertextMessage = groupCipher.encrypt(senderKeyName, paddedPlaintext);
 
             LOGGER.log(System.Logger.Level.DEBUG,
@@ -250,7 +185,6 @@ public final class MessageEncryption {
                     null
             );
         } catch (Exception e) {
-            // WAWebEncryptMsgProtobuf.encryptMsgSenderKey: logs and rejects on failure
             LOGGER.log(System.Logger.Level.WARNING,
                     "encryptMsgSenderKey: encryption fail for {0}: {1}",
                     groupJid, e.getMessage());
@@ -261,18 +195,13 @@ public final class MessageEncryption {
     }
 
     /**
-     * Adds PKCS#7 style padding to a plaintext message.
-     * The padding length is random between 1 and 16 bytes.
-     * All padding bytes contain the padding length value.
+     * Appends one to sixteen random padding bytes to the given plaintext.
+     * Every padding byte carries the padding length value, matching WA Web's
+     * {@code writeRandomPadMax16} layout.
      *
-     * @param plaintext the original plaintext bytes
+     * @param plaintext the unpadded plaintext bytes
      * @return the padded plaintext
-     *
-     * @implNote WACryptoPkcs7.writeRandomPadMax16: generates a random byte,
-     * masks with {@code 0x0F} (range 0-15), adds 1 (range 1-16), then writes
-     * that many copies of the padding length. Called from
-     * WAWebSignalCommonUtils.writeRandomPadMax16 and
-     * WAWebSendMsgCommonApi.encodeAndPad.
+     * @throws NullPointerException if {@code plaintext} is {@code null}
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "encodeAndPad",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -283,14 +212,11 @@ public final class MessageEncryption {
     private static byte[] addPadding(byte[] plaintext) {
         Objects.requireNonNull(plaintext, "plaintext cannot be null");
 
-        // Generate random padding length between 1 and 16
         var paddingLength = MIN_PADDING + (DataUtils.randomByteArray(1)[0] & 0x0F);
 
         var padded = new byte[plaintext.length + paddingLength];
         System.arraycopy(plaintext, 0, padded, 0, plaintext.length);
 
-        // PKCS#7 padding: fill ALL padding bytes with the padding length value
-        // Per WAWebSendMsgCommonApi.writeRandomPadMax16
         for (var i = plaintext.length; i < padded.length; i++) {
             padded[i] = (byte) paddingLength;
         }
@@ -299,19 +225,14 @@ public final class MessageEncryption {
     }
 
     /**
-     * Creates a sender key distribution message for a group.
-     * <p>
-     * This message must be sent to group members who don't have the sender's key.
-     * It contains the initial chain key and signing key for decryption.
+     * Creates a sender-key distribution message for the given group/sender
+     * pair. The distribution message must reach members that do not yet hold
+     * the sender's key before they can decrypt SKMSG payloads.
      *
      * @param groupJid  the group JID
-     * @param senderJid the sender's device JID
-     * @return the sender key distribution message
-     *
-     * @implNote WAWebSignalSessionApi.getGroupSenderKeyInfo: creates or retrieves
-     * the sender key session for the group/sender pair.
-     * WAWebGetGroupKeyDistributionMsg.getKeyDistributionMsg: builds
-     * the distribution message to send to other participants.
+     * @param senderJid the sender device JID
+     * @return the sender-key distribution message
+     * @throws NullPointerException if any argument is {@code null}
      */
     @WhatsAppWebExport(moduleName = "WAWebSignalSessionApi", exports = "getGroupSenderKeyInfo",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -324,17 +245,12 @@ public final class MessageEncryption {
     }
 
     /**
-     * Gets the raw sender key bytes for distribution.
+     * Returns the serialised sender-key distribution bytes for the given
+     * group/sender pair.
      *
      * @param groupJid  the group JID
-     * @param senderJid the sender's device JID
-     * @return the serialized sender key distribution message
-     *
-     * @implNote WAWebCryptoLibrary.encryptSenderKeyMsgSignalProto: returns
-     * {@code senderKeyBytes} alongside ciphertext.
-     * WAWebGetGroupKeyDistributionMsg: extracts
-     * {@code axolotlSenderKeyDistributionMessage} for ICDC construction.
-     * In Cobalt, sender key bytes are obtained separately from encryption.
+     * @param senderJid the sender device JID
+     * @return the serialised distribution bytes
      */
     @WhatsAppWebExport(moduleName = "WAWebGetGroupKeyDistributionMsg", exports = "getKeyDistributionMsg",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -344,16 +260,12 @@ public final class MessageEncryption {
     }
 
     /**
-     * Deletes the sender key for a group, forcing regeneration.
-     * <p>
-     * Key rotation is required when participants are removed from the group.
+     * Deletes the sender key for the given group, forcing it to be regenerated
+     * on the next send. This is required after participants are removed.
      *
      * @param groupJid  the group JID
-     * @param senderJid the sender's device JID
-     *
-     * @implNote WAWebSignalSessionApi.deleteGroupSenderKeyInfo: deletes
-     * the sender key session for the group/sender pair from the
-     * signal protocol store.
+     * @param senderJid the sender device JID
+     * @throws NullPointerException if any argument is {@code null}
      */
     @WhatsAppWebExport(moduleName = "WAWebSignalSessionApi", exports = "deleteGroupSenderKeyInfo",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -361,7 +273,6 @@ public final class MessageEncryption {
         Objects.requireNonNull(groupJid, "groupJid cannot be null");
         Objects.requireNonNull(senderJid, "senderJid cannot be null");
 
-        // WAWebSignal.Session.deleteGroupSenderKeyInfo(groupJid, senderJid)
         var senderKeyName = SenderKeyNameFactory.create(groupJid, senderJid);
         store.removeSenderKeys(senderKeyName);
 
@@ -371,13 +282,11 @@ public final class MessageEncryption {
     }
 
     /**
-     * Returns whether a Signal session exists with the specified device.
+     * Returns whether a Signal session already exists with the given device.
      *
-     * @param deviceJid the device JID to check
-     * @return {@code true} if a session exists
-     *
-     * @implNote WAWebSignalSessionApi.hasSignalSessions: checks
-     * the signal protocol store for an existing session with the device.
+     * @param deviceJid the device JID to query
+     * @return {@code true} when a session exists
+     * @throws NullPointerException if {@code deviceJid} is {@code null}
      */
     @WhatsAppWebExport(moduleName = "WAWebSignalSessionApi", exports = "hasSignalSessions",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -388,14 +297,12 @@ public final class MessageEncryption {
     }
 
     /**
-     * Returns whether a sender key exists for the specified group and sender.
+     * Returns whether a sender key already exists for the given group/sender pair.
      *
      * @param groupJid  the group JID
-     * @param senderJid the sender's device JID
-     * @return {@code true} if a sender key exists
-     *
-     * @implNote WAWebApiParticipantStore: tracks {@code hasSenderKey} status
-     * per participant. In Cobalt, the sender key store is queried directly.
+     * @param senderJid the sender device JID
+     * @return {@code true} when a sender key is present
+     * @throws NullPointerException if any argument is {@code null}
      */
     public boolean hasSenderKey(Jid groupJid, Jid senderJid) {
         Objects.requireNonNull(groupJid, "groupJid cannot be null");

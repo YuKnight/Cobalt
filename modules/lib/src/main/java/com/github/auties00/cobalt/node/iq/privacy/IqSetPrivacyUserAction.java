@@ -27,7 +27,7 @@ public enum IqSetPrivacyUserAction {
     /**
      * Constructs a user-action constant.
      *
-     * @param wire the wire string; never {@code null}
+     * @param wire the wire string. Never {@code null}
      */
     IqSetPrivacyUserAction(String wire) {
         this.wire = wire;
@@ -36,7 +36,7 @@ public enum IqSetPrivacyUserAction {
     /**
      * Returns the wire string.
      *
-     * @return the wire string; never {@code null}
+     * @return the wire string. Never {@code null}
      */
     public String wire() {
         return wire;

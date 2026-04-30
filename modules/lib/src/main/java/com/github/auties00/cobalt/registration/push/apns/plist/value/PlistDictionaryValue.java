@@ -8,12 +8,12 @@ import java.util.SequencedMap;
 
 /**
  * Plist dictionary node. Backed by a sequenced map so iteration
- * order matches the source order — important for tests and for the
+ * order matches the source order. Important for tests and for the
  * FairPlay signature, which is computed over the exact serialized
  * bytes.
  *
  * <p>The {@link #entries()} accessor returns an unmodifiable view of
- * the backing map; the field itself is stored as-is to avoid the
+ * the backing map. The field itself is stored as-is to avoid the
  * defensive wrap on every construction.
  *
  * @param entries the ordered entries
@@ -69,7 +69,7 @@ public record PlistDictionaryValue(SequencedMap<String, PlistValue> entries) imp
         private final LinkedHashMap<String, PlistValue> map = new LinkedHashMap<>();
 
         /**
-         * Hidden constructor — instances are obtained from
+         * Hidden constructor. Instances are obtained from
          * {@link PlistDictionaryValue#builder()}.
          */
         private Builder() {

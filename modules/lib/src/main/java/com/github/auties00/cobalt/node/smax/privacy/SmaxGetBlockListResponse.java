@@ -156,13 +156,10 @@ public sealed interface SmaxGetBlockListResponse extends SmaxOperation.Response
     }
 
     /**
-     * The {@code SuccessWithMatch} reply variant — the relay returned
+     * The {@code SuccessWithMatch} reply variant. The relay returned
      * a bare {@code <iq type="result">} envelope (no {@code <list/>}
      * child) signalling that the client's cached blocklist is up to
      * date.
-     *
-     * @implNote {@code WASmaxInBlocklistsGetBlockListResponseSuccessWithMatch.parseGetBlockListResponseSuccessWithMatch}
-     *           — projects only {@code {type: "result"}}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBlocklistsGetBlockListResponseSuccessWithMatch")
     final class SuccessWithMatch implements SmaxGetBlockListResponse {
@@ -215,14 +212,9 @@ public sealed interface SmaxGetBlockListResponse extends SmaxOperation.Response
     }
 
     /**
-     * The {@code SuccessWithMismatch} reply variant — the relay
+     * The {@code SuccessWithMismatch} reply variant. The relay
      * returned the full PN-addressed blocklist because the client's
      * cached digest does not match the server's current digest.
-     *
-     * @implNote {@code WASmaxInBlocklistsGetBlockListResponseSuccessWithMismatch.parseGetBlockListResponseSuccessWithMismatch}
-     *           projects {@code (listDhash, listAddressingMode, listItem)}.
-     *           {@code listAddressingMode} is the optional literal
-     *           {@code "pn"} marker.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBlocklistsGetBlockListResponseSuccessWithMismatch")
     final class SuccessWithMismatch implements SmaxGetBlockListResponse {
@@ -341,15 +333,9 @@ public sealed interface SmaxGetBlockListResponse extends SmaxOperation.Response
     }
 
     /**
-     * The {@code MigratedSuccessWithMismatch} reply variant — the
+     * The {@code MigratedSuccessWithMismatch} reply variant. The
      * relay returned the full LID-addressed blocklist after a
      * regular PN-to-LID migration.
-     *
-     * @implNote {@code WASmaxInBlocklistsGetBlockListResponseMigratedSuccessWithMismatch.parseGetBlockListResponseMigratedSuccessWithMismatch}
-     *           — same shape as {@link SuccessWithMismatch} but with
-     *           {@code addressing_mode="lid"} required (not optional)
-     *           and the inner {@code <item jid/>} children using LID
-     *           JIDs rather than PN JIDs.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBlocklistsGetBlockListResponseMigratedSuccessWithMismatch")
     final class MigratedSuccessWithMismatch implements SmaxGetBlockListResponse {
@@ -448,16 +434,10 @@ public sealed interface SmaxGetBlockListResponse extends SmaxOperation.Response
     }
 
     /**
-     * The {@code ForceMigratedSuccessWithMismatch} reply variant —
+     * The {@code ForceMigratedSuccessWithMismatch} reply variant.
      * issued when the relay force-migrates an out-of-date PN
      * blocklist to LID. The {@code <list/>} carries an additional
      * {@code dirty="true"} marker.
-     *
-     * @implNote {@code WASmaxInBlocklistsGetBlockListResponseForceMigratedSuccessWithMismatch.parseGetBlockListResponseForceMigratedSuccessWithMismatch}.
-     *           In contrast to the regular {@link MigratedSuccessWithMismatch},
-     *           the inner {@code <item jid/>} attribute is OPTIONAL
-     *           because the force-migration may not be able to map
-     *           every PN entry to a LID.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBlocklistsGetBlockListResponseForceMigratedSuccessWithMismatch")
     final class ForceMigratedSuccessWithMismatch implements SmaxGetBlockListResponse {
@@ -557,19 +537,11 @@ public sealed interface SmaxGetBlockListResponse extends SmaxOperation.Response
     }
 
     /**
-     * The {@code CAPISuccessWithMismatch} reply variant — issued by
+     * The {@code CAPISuccessWithMismatch} reply variant. Issued by
      * the Cloud-API server flavour rather than the regular relay.
      * Same wire shape as {@link MigratedSuccessWithMismatch} but with
-     * a different envelope source — distinguished only by relay-side
+     * a different envelope source. Distinguished only by relay-side
      * metadata that Cobalt does not currently track.
-     *
-     * @implNote {@code WASmaxInBlocklistsGetBlockListResponseCAPISuccessWithMismatch.parseGetBlockListResponseCAPISuccessWithMismatch}.
-     *           Wire-shape-equivalent to the regular migrated variant,
-     *           differing only in that the inner {@code <item jid/>}
-     *           attribute is optional. The fall-through ordering in
-     *           {@link SmaxGetBlockListResponse#of(Node, Node)} attempts the regular
-     *           migrated variant first and the CAPI variant
-     *           afterwards, matching WA Web's ordering exactly.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBlocklistsGetBlockListResponseCAPISuccessWithMismatch")
     final class CAPISuccessWithMismatch implements SmaxGetBlockListResponse {
@@ -667,7 +639,7 @@ public sealed interface SmaxGetBlockListResponse extends SmaxOperation.Response
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected the
+     * The {@code ClientError} reply variant. The relay rejected the
      * request as malformed.
      *
      * @implNote {@code WASmaxInBlocklistsGetBlockListResponseInvalidRequest.parseGetBlockListResponseInvalidRequest}
@@ -762,11 +734,8 @@ public sealed interface SmaxGetBlockListResponse extends SmaxOperation.Response
     }
 
     /**
-     * The {@code ServerError} reply variant — the relay encountered
+     * The {@code ServerError} reply variant. The relay encountered
      * a transient internal failure.
-     *
-     * @implNote {@code WASmaxInBlocklistsGetBlockListResponseInternalServerError.parseGetBlockListResponseInternalServerError}
-     *           — collapsed to the universal {@code (code, text)} pair.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBlocklistsGetBlockListResponseInternalServerError")
     final class ServerError implements SmaxGetBlockListResponse {

@@ -2156,7 +2156,6 @@ public final class FetchNewsletterEnforcementsMexResponse implements MexOperatio
             }
 
             var baseEnforcementData = BaseEnforcementData.of(obj.getJSONObject("base_enforcement_data")).orElse(null);
-            // WAWebMexFetchNewsletterEnforcementsJob.mexFetchNewsletterEnforcements
             // Reads country_codes as a list of raw ISO 2-letter strings; WA Web enriches via WAWebAsISOCountryCode/WAWebLocaleModules in UI code
             var countryCodesArr = obj.getJSONArray("country_codes");
             List<String> countryCodes;
@@ -2206,21 +2205,18 @@ public final class FetchNewsletterEnforcementsMexResponse implements MexOperatio
      *         empty if the envelope is missing expected fields
      */
     private static Optional<FetchNewsletterEnforcementsMexResponse> of(byte[] json) {
-        // WAWebMexFetchNewsletterEnforcementsJob.mexFetchNewsletterEnforcements
         // Parses the raw JSON payload, bailing out if fastjson2 returns null
         var jsonObject = JSON.parseObject(json);
         if (jsonObject == null) {
             return Optional.empty();
         }
 
-        // WAWebMexFetchNewsletterEnforcementsJob.mexFetchNewsletterEnforcements
         // Descends into the standard GraphQL "data" envelope
         var data = jsonObject.getJSONObject("data");
         if (data == null) {
             return Optional.empty();
         }
 
-        // WAWebMexFetchNewsletterEnforcementsJob.mexFetchNewsletterEnforcements
         // Extracts the operation-specific root keyed by xwa2_channel_enforcements
         var root = data.getJSONObject("xwa2_channel_enforcements");
         if (root == null) {

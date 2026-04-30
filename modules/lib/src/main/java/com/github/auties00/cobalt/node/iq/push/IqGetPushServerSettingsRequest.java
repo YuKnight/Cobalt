@@ -10,7 +10,7 @@ import com.github.auties00.cobalt.util.RandomIdUtils;
 
 /**
  * The outbound {@code <iq xmlns="urn:xmpp:whatsapp:push" type="get">}
- * stanza variant — wraps a single bare {@code <settings/>} payload.
+ * stanza variant. Wraps a single bare {@code <settings/>} payload.
  */
 @WhatsAppWebModule(moduleName = "WAWebGetPushServerSettingsJob")
 public final class IqGetPushServerSettingsRequest implements IqOperation.Request {

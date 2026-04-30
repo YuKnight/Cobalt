@@ -12,7 +12,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps the disjunctive
+ * The outbound stanza variant. Wraps the disjunctive
  * {@link SmaxAccountSetPaymentsTOSv3ConsumerVariant} children inside an
  * {@code <iq xmlns="urn:xmpp:whatsapp:account" type="set"
  * to="s.whatsapp.net"><accept_pay version="3"
@@ -70,17 +70,6 @@ public final class SmaxAccountSetPaymentsTOSv3Request implements SmaxOperation.R
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         the {@code <accept_pay/>} payload
-     *
-     * @implNote {@code WASmaxOutAccountSetPaymentsTOSv3Request.makeSetPaymentsTOSv3Request}
-     *           composes
-     *           {@code WASmaxOutAccountSetIQMixin}
-     *           ({@code xmlns="urn:xmpp:whatsapp:account"},
-     *           {@code to=S_WHATSAPP_NET}) and
-     *           {@code WASmaxOutAccountBaseIQSetRequestMixin}
-     *           ({@code id=generateId()}, {@code type="set"}) over
-     *           an {@code <accept_pay version="3" tos_version=INT
-     *           service="FBPAY"|"UPI"><additional_notice
-     *           notice=ENUM/></accept_pay>} child tree.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutAccountSetPaymentsTOSv3Request",

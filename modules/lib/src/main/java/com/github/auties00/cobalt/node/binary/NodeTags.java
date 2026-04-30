@@ -4,20 +4,16 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.node.Node;
 
 /**
- * Byte-tag constants used by WhatsApp's compact binary XML protocol.
+ * Defines the leading byte tags used by WhatsApp's compact binary stanza
+ * protocol.
  *
- * <p>The WhatsApp wire format uses a single leading byte to identify the
- * type of each value in the stanza tree: empty lists, dictionary tokens,
- * list sizes, JID shapes, hex/nibble-packed strings, or binary blobs of
- * various length widths. The constants defined here are the numeric tag
- * values referenced by {@link NodeEncoder} and {@link NodeDecoder} while
- * translating between {@link Node} trees and their serialised form.
+ * <p>The wire format places a single tag byte before every value to identify
+ * its shape: an empty list, a dictionary token, a sized list, a JID variant,
+ * a hex or nibble packed string, or a binary blob with an 8, 20, or 32 bit
+ * length prefix. {@link NodeEncoder} and {@link NodeDecoder} consult these
+ * constants while translating between {@link Node} trees and their serialised
+ * form.
  *
- * <p>This class is intentionally non-instantiable and consists solely of
- * {@code public static final} byte constants.
- *
- * @implNote WAWap: the JS module exposes these same byte values as
- *           module-level constants used by the encode/decode pipeline.
  * @see Node
  * @see NodeEncoder
  * @see NodeDecoder
@@ -25,130 +21,120 @@ import com.github.auties00.cobalt.node.Node;
 @WhatsAppWebModule(moduleName = "WAWap")
 public final class NodeTags {
     /**
-     * Prevents instantiation of this utility class.
+     * Prevents instantiation of this constants holder.
      *
-     * @throws UnsupportedOperationException always, as this class holds
-     *         only static constants
+     * @throws UnsupportedOperationException always
      */
     private NodeTags() {
         throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
     }
 
     /**
-     * Tag indicating an empty list structure with no elements.
+     * Marks an empty list or an absent value.
      */
     public static final byte LIST_EMPTY = 0;
 
     /**
-     * Tag for dictionary lookup in {@link NodeTokens#DICTIONARY_0_TOKENS}.
-     * Used for compact string representation by referencing predefined tokens.
+     * Selects {@link NodeTokens#DICTIONARY_0_TOKENS} for the next index byte.
      */
     public static final byte DICTIONARY_0 = (byte) 236;
 
     /**
-     * Tag for dictionary lookup in {@link NodeTokens#DICTIONARY_1_TOKENS}.
-     * Used for compact string representation by referencing predefined tokens.
+     * Selects {@link NodeTokens#DICTIONARY_1_TOKENS} for the next index byte.
      */
     public static final byte DICTIONARY_1 = (byte) 237;
 
     /**
-     * Tag for dictionary lookup in {@link NodeTokens#DICTIONARY_2_TOKENS}.
-     * Used for compact string representation by referencing predefined tokens.
+     * Selects {@link NodeTokens#DICTIONARY_2_TOKENS} for the next index byte.
      */
     public static final byte DICTIONARY_2 = (byte) 238;
 
     /**
-     * Tag for dictionary lookup in {@link NodeTokens#DICTIONARY_3_TOKENS}.
-     * Used for compact string representation by referencing predefined tokens.
+     * Selects {@link NodeTokens#DICTIONARY_3_TOKENS} for the next index byte.
      */
     public static final byte DICTIONARY_3 = (byte) 239;
 
     /**
-     * AD_JID domain type for the standard WhatsApp user domain ({@code s.whatsapp.net}).
+     * Domain code for the standard WhatsApp user server ({@code s.whatsapp.net}).
      */
     public static final int DOMAIN_WHATSAPP = 0;
 
     /**
-     * AD_JID domain type for the Linked Identity domain ({@code lid}).
+     * Domain code for the linked identity server ({@code lid}).
      */
     public static final int DOMAIN_LID = 1;
 
     /**
-     * AD_JID domain type for the business-hosted domain ({@code hosted}).
+     * Domain code for the business hosted server ({@code hosted}).
      */
     public static final int DOMAIN_HOSTED = 128;
 
     /**
-     * AD_JID domain type for the business-hosted LID domain ({@code hosted.lid}).
+     * Domain code for the business hosted linked identity server ({@code hosted.lid}).
      */
     public static final int DOMAIN_HOSTED_LID = 129;
 
     /**
-     * Tag indicating a cross-platform interoperability JID.
-     * Used for JIDs from external platforms communicating via interoperability protocols.
-     * Wire format: tag(245) + user(string) + device(uint16) + integrator(uint16) + domain(string).
+     * Marks a cross platform interoperability JID.
+     *
+     * @implNote The body is a user string, a 16 bit device id, a 16 bit
+     *           integrator id, and a domain string.
      */
     public static final byte JID_INTEROP = (byte) 245;
 
     /**
-     * Tag indicating a Facebook Messenger JID.
-     * Used for Messenger users participating in cross-platform conversations.
-     * Wire format: tag(246) + user(string) + device(uint16) + domain(string).
+     * Marks a Facebook Messenger JID.
+     *
+     * @implNote The body is a user string, a 16 bit device id, and a
+     *           domain string.
      */
     public static final byte JID_FB = (byte) 246;
 
     /**
-     * Tag indicating an advertisement JID with domain type.
-     * Used for multi-device WhatsApp accounts with domain type encoding.
-     * Wire format: tag(247) + domainType(uint8) + device(uint8) + user(string).
+     * Marks a multi device JID with explicit domain code.
+     *
+     * @implNote The body is an 8 bit domain code, an 8 bit device id, and
+     *           a user string.
      */
     public static final byte AD_JID = (byte) 247;
 
     /**
-     * Tag indicating a list structure with up to 255 elements (8-bit length).
-     * The next byte specifies the number of elements in the list.
+     * Marks a list whose length fits in 8 bits.
      */
     public static final byte LIST_8 = (byte) 248;
 
     /**
-     * Tag indicating a list structure with up to 65535 elements (16-bit length).
-     * The next two bytes specify the number of elements in the list.
+     * Marks a list whose length fits in 16 bits.
      */
     public static final byte LIST_16 = (byte) 249;
 
     /**
-     * Tag indicating a JID pair structure.
-     * Represents a WhatsApp JID consisting of user and server parts.
+     * Marks a JID built from a user component and a server component.
      */
     public static final byte JID_PAIR = (byte) 250;
 
     /**
-     * Tag indicating an 8-bit hexadecimal encoded value.
-     * The next byte specifies the length, followed by hexadecimal data.
+     * Marks a hex packed string with an 8 bit byte count.
      */
     public static final byte HEX_8 = (byte) 251;
 
     /**
-     * Tag indicating binary data with 8-bit length.
-     * The next 8 bits specify the length (0-255 bytes), followed by the binary data.
+     * Marks a binary blob whose length fits in 8 bits.
      */
     public static final byte BINARY_8 = (byte) 252;
 
     /**
-     * Tag indicating binary data with 20-bit length.
-     * The next 20 bits specify the length, followed by the binary data.
+     * Marks a binary blob whose length fits in 20 bits.
      */
     public static final byte BINARY_20 = (byte) 253;
 
     /**
-     * Tag indicating binary data with 32-bit length.
-     * The next 32 bits specify the length, followed by the binary data.
+     * Marks a binary blob whose length fits in 32 bits.
      */
     public static final byte BINARY_32 = (byte) 254;
 
     /**
-     * Tag indicating an 8-bit nibble-packed value.
-     * Used for compact encoding.
+     * Marks a nibble packed string with an 8 bit byte count.
      */
     public static final byte NIBBLE_8 = (byte) 255;
 }

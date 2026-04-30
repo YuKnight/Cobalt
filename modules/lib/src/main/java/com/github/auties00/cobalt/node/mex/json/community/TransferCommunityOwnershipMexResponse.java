@@ -18,12 +18,27 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The parsed response for this MEX mutation.
+ * Parsed response for the transfer-community-ownership mutation. Carries the affected community group identifier
+ * together with the LID migration state projected from {@code data.xwa2_group_update_users_role}.
  */
+@WhatsAppWebModule(moduleName = "WAWebMexTransferCommunityOwnershipJob")
 public final class TransferCommunityOwnershipMexResponse implements MexOperation.Response.Json {
+    /**
+     * The affected community group identifier.
+     */
     private final String groupId;
+
+    /**
+     * The LID migration state record reported alongside the mutation result.
+     */
     private final LidMigrationState lidMigrationState;
 
+    /**
+     * Constructs a new response with the given fields.
+     *
+     * @param groupId the affected community group identifier
+     * @param lidMigrationState the LID migration state record
+     */
     private TransferCommunityOwnershipMexResponse(String groupId, LidMigrationState lidMigrationState) {
         this.groupId = groupId;
         this.lidMigrationState = lidMigrationState;
@@ -32,12 +47,8 @@ public final class TransferCommunityOwnershipMexResponse implements MexOperation
     /**
      * Parses the MEX response carried by an inbound IQ stanza.
      *
-     * @implNote WAWebMexTransferCommunityOwnershipJob.mexTransferCommunityOwnershipJob:
-     * reads {@code data.xwa2_group_update_users_role.group_id} and the
-     * {@code lid_migration_state} sub-object.
      * @param node the inbound IQ stanza carrying the {@code <result>} child
-     * @return the parsed response, or {@code Optional.empty()} if the
-     *         expected JSON shape is absent
+     * @return the parsed response, or {@link Optional#empty()} if the expected JSON shape is absent
      */
     @WhatsAppWebExport(moduleName = "WAWebMexTransferCommunityOwnershipJob", exports = "mexTransferCommunityOwnershipJob",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -48,47 +59,56 @@ public final class TransferCommunityOwnershipMexResponse implements MexOperation
     }
 
     /**
-     * Returns the {@code group_id} field.
+     * Returns the affected community group identifier.
      *
-     * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the identifier, or empty if absent
      */
     public Optional<String> groupId() {
         return Optional.ofNullable(groupId);
     }
 
     /**
-     * Returns the {@code lid_migration_state} field.
+     * Returns the LID migration state record reported alongside the mutation result.
      *
-     * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the record, or empty if absent
      */
     public Optional<LidMigrationState> lidMigrationState() {
         return Optional.ofNullable(lidMigrationState);
     }
 
     /**
-     * A parsed {@code LidMigrationState} object.
+     * LID migration state record. Captures the addressing mode tag describing whether the group is in LID-addressed
+     * mode or has fallen back to the legacy phone-number addressing.
      */
     public static final class LidMigrationState {
+        /**
+         * The addressing mode tag for the affected group.
+         */
         private final String addressingMode;
 
+        /**
+         * Constructs a new record with the given addressing mode tag.
+         *
+         * @param addressingMode the addressing mode tag
+         */
         private LidMigrationState(String addressingMode) {
             this.addressingMode = addressingMode;
         }
 
         /**
-         * Returns the {@code addressing_mode} field.
+         * Returns the addressing mode tag for the affected group.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+         * @return an {@link Optional} containing the tag, or empty if absent
          */
         public Optional<String> addressingMode() {
             return Optional.ofNullable(addressingMode);
         }
 
         /**
-         * Parses a {@code LidMigrationState} from the given JSON object.
+         * Parses a LID migration state record from the given JSON object.
          *
          * @param obj the JSON object to parse
-         * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+         * @return an {@link Optional} containing the parsed record, or empty if {@code obj} is {@code null}
          */
         static Optional<LidMigrationState> of(JSONObject obj) {
             if (obj == null) {
@@ -100,10 +120,10 @@ public final class TransferCommunityOwnershipMexResponse implements MexOperation
         }
 
         /**
-         * Parses a list of {@code LidMigrationState} from the given JSON array.
+         * Parses a list of LID migration state records from the given JSON array.
          *
          * @param arr the JSON array to parse
-         * @return the list of parsed results, empty if {@code arr} is {@code null}
+         * @return the list of parsed records, empty if {@code arr} is {@code null}
          */
         static List<LidMigrationState> ofArray(JSONArray arr) {
             if (arr == null) {
@@ -118,6 +138,12 @@ public final class TransferCommunityOwnershipMexResponse implements MexOperation
         }
     }
 
+    /**
+     * Parses the response from the raw JSON payload bytes.
+     *
+     * @param json the raw JSON bytes from the {@code <result>} child
+     * @return an {@link Optional} containing the parsed response, or empty if the envelope is missing
+     */
     private static Optional<TransferCommunityOwnershipMexResponse> of(byte[] json) {
         var jsonObject = JSON.parseObject(json);
         if (jsonObject == null) {

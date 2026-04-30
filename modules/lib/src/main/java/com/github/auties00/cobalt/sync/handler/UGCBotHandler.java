@@ -83,7 +83,7 @@ public final class UGCBotHandler implements WebAppStateActionHandler {
      */
     @Override
     public String actionName() {
-        return UGCBotAction.ACTION_NAME; // WAWebProtobufSyncAction.pb: UGC_BOT:"ugc_bot"
+        return UGCBotAction.ACTION_NAME;
     }
 
     /**
@@ -99,7 +99,7 @@ public final class UGCBotHandler implements WebAppStateActionHandler {
      */
     @Override
     public SyncPatchType collectionName() {
-        return UGCBotAction.COLLECTION_NAME; // WAWebProtobufSyncAction.pb.getCollectionForAction: UGC_BOT -> REGULAR_HIGH
+        return UGCBotAction.COLLECTION_NAME;
     }
 
     /**
@@ -118,7 +118,7 @@ public final class UGCBotHandler implements WebAppStateActionHandler {
      */
     @Override
     public int version() {
-        return UGCBotAction.ACTION_VERSION; // NO_WA_BASIS: forward-looking default of 1
+        return UGCBotAction.ACTION_VERSION;
     }
 
     /**
@@ -138,7 +138,7 @@ public final class UGCBotHandler implements WebAppStateActionHandler {
      */
     @Override
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // NO_WA_BASIS: shared Cobalt success-check adapter
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -168,16 +168,16 @@ public final class UGCBotHandler implements WebAppStateActionHandler {
      */
     @Override
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        if (mutation.operation() != SyncdOperation.SET) { // NO_WA_BASIS: shared Cobalt convention - non-SET ops are unsupported
+        if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof UGCBotAction action) // NO_WA_BASIS: extract SyncActionValue$UGCBot
-                || action.definition().isEmpty()) { // NO_WA_BASIS: SyncActionValue$UGCBot.definition must be present
+        if (!(mutation.value().action().orElse(null) instanceof UGCBotAction action)
+                || action.definition().isEmpty()) {
             return MutationApplicationResult.malformed();
         }
 
-        client.store().setUgcBotDefinition(action.definition().get()); // NO_WA_BASIS: persist UGC bot definition bytes for downstream consumers
+        client.store().setUgcBotDefinition(action.definition().get());
         return MutationApplicationResult.success();
     }
 }

@@ -12,8 +12,8 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * The outbound {@code <iq xmlns="tos" type="set">} stanza variant —
- * wraps a {@code <request type="session_update">} child carrying one
+ * The outbound {@code <iq xmlns="tos" type="set">} stanza variant.
+ * Wraps a {@code <request type="session_update">} child carrying one
  * {@code <notice id="…"/>} per accepted notice id.
  */
 @WhatsAppWebModule(moduleName = "WAWebTosJob")
@@ -28,7 +28,7 @@ public final class IqUpdateTosRequest implements IqOperation.Request {
     /**
      * Constructs a new update-tos request.
      *
-     * @param noticeIds the list of notice ids being accepted; never
+     * @param noticeIds the list of notice ids being accepted. Never
      *                  {@code null}, may be empty
      * @throws NullPointerException if {@code noticeIds} is
      *                              {@code null}
@@ -41,7 +41,7 @@ public final class IqUpdateTosRequest implements IqOperation.Request {
     /**
      * Returns the unmodifiable list of notice ids being accepted.
      *
-     * @return the notice ids; never {@code null}
+     * @return the notice ids. Never {@code null}
      */
     public List<String> noticeIds() {
         return noticeIds;

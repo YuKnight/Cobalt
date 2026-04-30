@@ -23,7 +23,7 @@ import java.util.Optional;
 @WhatsAppWebModule(moduleName = "WASmaxOutPushConfigSetSetConfigOrSetClearMixinGroup")
 public final class SmaxPushConfigSetRequest implements SmaxOperation.Request {
     /**
-     * The exclusive payload variant — exactly one of
+     * The exclusive payload variant. Exactly one of
      * {@code config} / {@code clear} must be non-null.
      */
     private final SmaxPushConfigSetSetVariant variant;
@@ -31,7 +31,7 @@ public final class SmaxPushConfigSetRequest implements SmaxOperation.Request {
     /**
      * Constructs a new push-config request.
      *
-     * @param variant the payload variant; never {@code null}
+     * @param variant the payload variant. Never {@code null}
      * @throws NullPointerException if {@code variant} is
      *                              {@code null}
      */
@@ -42,7 +42,7 @@ public final class SmaxPushConfigSetRequest implements SmaxOperation.Request {
     /**
      * Returns the payload variant.
      *
-     * @return the variant; never {@code null}
+     * @return the variant. Never {@code null}
      */
     public SmaxPushConfigSetSetVariant variant() {
         return variant;
@@ -67,7 +67,6 @@ public final class SmaxPushConfigSetRequest implements SmaxOperation.Request {
     @WhatsAppWebExport(moduleName = "WASmaxOutPushConfigSetRequest",
             exports = "makeSetRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutPushConfigSetSetConfigOrSetClearMixinGroup: emits either
         // <config>...</config> or <clear platform?/>.
         return new NodeBuilder()
                 .description("iq")

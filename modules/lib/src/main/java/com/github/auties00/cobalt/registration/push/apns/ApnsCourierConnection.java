@@ -52,7 +52,7 @@ import java.util.function.Predicate;
  * <ul>
  *   <li>the <em>read pump</em>, started after a successful TLS
  *       handshake, which decodes every inbound frame and routes it
- *       through {@link #dispatchPacket};</li>
+ *       through {@link #dispatchPacket}.</li>
  *   <li>the <em>keep-alive thread</em>, started after the courier
  *       login succeeds, which writes a
  *       {@link ApnsPayloadTag#KEEP_ALIVE_SEND} every
@@ -61,13 +61,13 @@ import java.util.function.Predicate;
  *
  * <p>Both writers go through {@link #writeLock} so frames cannot
  * interleave on the wire. Outbound request/response correlation
- * lives in {@link #pending}; incoming
+ * lives in {@link #pending}. Incoming
  * {@link ApnsPayloadTag#NOTIFICATION}s are auto-acked and any
  * embedded {@code regcode} is handed to {@link #pushCode}.
  */
 final class ApnsCourierConnection {
     /**
-     * Logger shared with the rest of the APNS client — same logger
+     * Logger shared with the rest of the APNS client. Same logger
      * name {@code cobalt.apns} so consumers can configure verbosity
      * uniformly.
      */
@@ -76,7 +76,7 @@ final class ApnsCourierConnection {
     /**
      * Endpoint for the bag, the JSON-in-plist directory listing
      * Apple uses to advertise the active courier replicas. HTTP, not
-     * HTTPS — the file is unauthenticated.
+     * HTTPS. The file is unauthenticated.
      */
     private static final String BAG_URL = "http://init-p01st.push.apple.com/bag";
 
@@ -86,7 +86,7 @@ final class ApnsCourierConnection {
     private static final int APNS_PORT = 443;
 
     /**
-     * Keep-alive cadence; matches the value the native {@code apsd}
+     * Keep-alive cadence. Matches the value the native {@code apsd}
      * uses to keep middlebox NAT entries alive on cellular networks.
      */
     private static final long KEEP_ALIVE_INTERVAL_SECONDS = 5L;
@@ -108,9 +108,9 @@ final class ApnsCourierConnection {
      * socket. The APNS protocol authenticates the device with its
      * FairPlay-signed certificate in-band rather than via the TLS
      * PKI chain, and the courier endpoint is a moving target
-     * ({@code 1-courier...}–{@code 50-courier...}), so we cannot pin
+     * ({@code 1-courier...} to {@code 50-courier...}), so we cannot pin
      * a single certificate. Skipping host PKI verification here is
-     * the same trade-off Apple's own {@code apsd} makes; the protocol
+     * the same trade-off Apple's own {@code apsd} makes. The protocol
      * is still authenticated by the application-layer ALPN string
      * {@code apns-security-v3} and the FairPlay nonce signature on
      * {@link ApnsPayloadTag#CONNECT}.
@@ -135,7 +135,7 @@ final class ApnsCourierConnection {
     // ─────────────────────────────────────────────────────────────
     // APNS field ids. Field ids are scoped to the enclosing
     // {@link ApnsPayloadTag}, so the same numeric value can mean
-    // different things in different packets — see the references on
+    // different things in different packets. See the references on
     // each constant.
     // ─────────────────────────────────────────────────────────────
 
@@ -258,7 +258,7 @@ final class ApnsCourierConnection {
     private volatile SSLSocket socket;
 
     /**
-     * Cached output stream of {@link #socket}; cached so the write
+     * Cached output stream of {@link #socket}. Cached so the write
      * path does not hit the {@code SSLSocket.getOutputStream} guard
      * on every frame.
      */
@@ -295,7 +295,7 @@ final class ApnsCourierConnection {
 
     /**
      * Constructs a new courier connection bound to the given session
-     * and push-code sink. Does not open a socket — the caller must
+     * and push-code sink. Does not open a socket. The caller must
      * invoke {@link #start} after construction.
      *
      * @param session  the session that supplies the keypair, device
@@ -319,7 +319,7 @@ final class ApnsCourierConnection {
      * Fetches the courier bag, opens the TLS socket, runs the
      * {@code CONNECT}/{@code READY}/{@code STATE}/{@code FILTER}
      * handshake, then spawns the read pump and the keep-alive
-     * thread. Blocking until the handshake completes; throws on any
+     * thread. Blocking until the handshake completes. Throws on any
      * step that fails.
      *
      * @throws IOException on any HTTP, TLS, or protocol failure
@@ -417,7 +417,7 @@ final class ApnsCourierConnection {
 
     /**
      * Tears down the read pump, the keep-alive thread, and the TLS
-     * socket; fails every still-pending request with an
+     * socket. Fails every still-pending request with an
      * {@link IOException}. Idempotent.
      */
     void close() {
@@ -518,7 +518,7 @@ final class ApnsCourierConnection {
      * Routes one decoded packet. Notifications are auto-acked and
      * any embedded {@code regcode} is delivered to {@link #pushCode}.
      * After that, the packet is offered to every pending request in
-     * registration order; the first whose filter matches consumes it.
+     * registration order. The first whose filter matches consumes it.
      *
      * @param packet the just-decoded packet
      */
@@ -542,7 +542,7 @@ final class ApnsCourierConnection {
      * {@link ApnsPayloadTag#NOTIFICATION} and hands it to
      * {@link #pushCode}. Quietly ignores notifications without a
      * payload, with a non-JSON payload, or without a {@code regcode}
-     * field — those are not registration codes and are still acked
+     * field. Those are not registration codes and are still acked
      * for protocol correctness.
      *
      * @param packet the notification packet
@@ -618,7 +618,7 @@ final class ApnsCourierConnection {
      * Spawns the keep-alive virtual thread that emits a
      * {@link ApnsPayloadTag#KEEP_ALIVE_SEND} every
      * {@link #KEEP_ALIVE_INTERVAL_SECONDS} seconds. Quietly returns
-     * if the socket dies — the read pump will surface the underlying
+     * if the socket dies. The read pump will surface the underlying
      * error.
      */
     private void startKeepAlive() {
@@ -842,14 +842,14 @@ final class ApnsCourierConnection {
     private static final class Pending {
         /**
          * Predicate the read pump consults when routing each
-         * incoming frame; the first pending entry whose filter
+         * incoming frame. The first pending entry whose filter
          * matches consumes the packet.
          */
         final Predicate<ApnsPacket> filter;
 
         /**
          * Single-slot mailbox. Holds either an {@link ApnsPacket} (on
-         * delivery) or a {@link Throwable} (on failure / close); the
+         * delivery) or a {@link Throwable} (on failure / close). The
          * consumer disambiguates via {@code instanceof}.
          */
         final ArrayBlockingQueue<Object> slot = new ArrayBlockingQueue<>(1);
@@ -866,7 +866,7 @@ final class ApnsCourierConnection {
 
         /**
          * Delivers a successful response to the awaiting consumer.
-         * Non-blocking; subsequent calls are silently dropped.
+         * Non-blocking. Subsequent calls are silently dropped.
          *
          * @param packet the matched response packet
          */

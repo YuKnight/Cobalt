@@ -48,7 +48,7 @@ public sealed interface SmaxWaffleGetCertificateResponse extends SmaxOperation.R
 
     /**
      * Typed projection of one PEM child carried by the success reply
-     * — the encryption / signature / password PEM family share the
+     *. The encryption / signature / password PEM family share the
      * same {@code (ttl, keyId?, content-bytes)} shape.
      *
      * @param ttl     the TTL in seconds; always positive
@@ -96,7 +96,7 @@ public sealed interface SmaxWaffleGetCertificateResponse extends SmaxOperation.R
     }
 
     /**
-     * The {@code Success} reply variant — the relay returned the
+     * The {@code Success} reply variant. The relay returned the
      * requested PEM subset.
      *
      * @implNote {@code WASmaxInWaffleGetCertificateResponseSuccess.parseGetCertificateResponseSuccess}

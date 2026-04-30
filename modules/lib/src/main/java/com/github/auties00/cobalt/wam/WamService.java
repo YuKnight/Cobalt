@@ -69,46 +69,45 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.logging.Logger;
 
 /**
- * A service that collects, batches, and uploads WhatsApp Metrics (WAM)
- * telemetry events over the three transport channels.
+ * A service that collects, batches, and uploads WhatsApp Metrics
+ * (WAM) telemetry events over the three transport channels.
  *
  * <p>Events are committed via {@link #commit(WamEventSpec)} and held
- * in memory until the next periodic flush or an immediate flush for
- * {@link WamChannel#REALTIME} events. On flush, one or more byte
- * buffers are allocated for each channel with pending events, each
- * capped at {@link #MAX_BUFFER_SIZE} bytes.
+ * in memory until the next periodic flush, or until an immediate
+ * flush for {@link WamChannel#REALTIME} events. On flush, one or more
+ * byte buffers are allocated for each channel with pending events,
+ * each capped at {@link #MAX_BUFFER_SIZE} bytes.
  *
  * <p>Events committed before {@link #initialize()} is called are
  * queued in an init queue and replayed once initialization completes,
  * matching WhatsApp Web's {@code WAWebWamInitQueue} mechanism.
  *
  * <p>This service does not persist unsent buffers across sessions.
- * WhatsApp Web persists pending buffers to IndexedDB every 5 seconds
- * and restores them on page reload; this implementation treats all
- * in-flight data as ephemeral — buffers that have not been uploaded
+ * WhatsApp Web persists pending buffers to IndexedDB every five
+ * seconds and restores them on page reload. Cobalt treats all
+ * in-flight data as ephemeral, so buffers that have not been uploaded
  * when the service is closed are silently discarded.
  *
- * @apiNote This service emits {@code WamClientErrorsWamEvent} with
+ * @apiNote Emits {@code WamClientErrorsWamEvent} with
  * {@code wamClientBufferDropErrorCount = 1} when a buffer is dropped
- * because it exceeds {@link #MAX_UPLOAD_SIZE}, mirroring WA Web's
- * {@code _executePending} and {@code oe} (upload) self-metric paths.
- * This service does not emit {@code WamDroppedEventWamEvent} for
- * per-event validation failures: WA Web uses it to track events
- * rejected by {@code runPreCommitValidation} for operational
- * visibility; this implementation logs a warning instead.
+ * because it exceeds {@link #MAX_UPLOAD_SIZE}, mirroring WhatsApp
+ * Web's {@code _executePending} and {@code oe} (upload) self-metric
+ * paths. This service does not emit {@code WamDroppedEventWamEvent}
+ * for per-event validation failures. WhatsApp Web uses that event to
+ * track items rejected by {@code runPreCommitValidation} for
+ * operational visibility, while Cobalt logs a warning instead.
  *
- * @implNote Adapts the WA Web WAM telemetry pipeline: event commit comes
- *     from {@code WAWebWamCommonLogEvent}, buffer rotation and flush from
- *     {@code WAWebWam}, AB-prop sampling overrides from
- *     {@code WAWebEventSampling}, beacon sequence numbers from
- *     {@code WAWebWamBeaconing} and private-stats identifier rotation from
+ * @implNote Adapts the WhatsApp Web WAM telemetry pipeline. Buffer
+ *     rotation and flush come from {@code WAWebWam}, AB-prop
+ *     sampling overrides from {@code WAWebEventSampling}, beacon
+ *     sequence numbers from {@code WAWebWamBeaconing}, and
+ *     private-stats identifier rotation from
  *     {@code WAWebWamPrivateStats}.
  * @see WamEventSpec
  * @see WamGlobalEncoder
  * @see WamChannel
  */
 @WhatsAppWebModule(moduleName = "WAWebWam")
-@WhatsAppWebModule(moduleName = "WAWebWamCommonLogEvent")
 @WhatsAppWebModule(moduleName = "WAWebL10NCountryCodes")
 @WhatsAppWebModule(moduleName = "WAWebBrowserApi")
 @WhatsAppWebModule(moduleName = "WAWebWamMsgUtils")
@@ -121,38 +120,51 @@ public final class WamService {
             MethodHandles.byteArrayViewVarHandle(short[].class, ByteOrder.LITTLE_ENDIAN);
 
     /**
-     * Size of the WAM buffer header in bytes:
+     * Size of the WAM buffer header in bytes. Layout is
      * {@code "WAM"(3) + version(1) + streamId(1) + seqNum(2 LE) + channel(1)}.
      */
     private static final int HEADER_SIZE = 8;
 
+    /**
+     * Magic bytes that prefix every WAM buffer.
+     */
     private static final byte[] WAM_MAGIC = {'W', 'A', 'M'};
+
+    /**
+     * Protocol version written into the WAM buffer header.
+     */
     private static final int PROTOCOL_VERSION = 5;
+
+    /**
+     * Stream identifier written into the WAM buffer header. Always
+     * {@code 1} for the regular client stream.
+     */
     private static final int STREAM_ID = 1;
 
     /**
      * Interval in seconds between serialization checks. Matches the
-     * WhatsApp Web two-tier timing where events are serialized every 5
-     * seconds and the rotation/upload cycle runs every 120 seconds.
+     * WhatsApp Web two-tier timing where events are serialized every
+     * five seconds and the rotation and upload cycle runs every 120
+     * seconds.
      */
     private static final int SERIALIZE_INTERVAL_SECONDS = 5;
 
     /**
-     * Interval in seconds between rotation/upload cycles.
+     * Interval in seconds between rotation and upload cycles.
      */
     private static final int FLUSH_INTERVAL_SECONDS = 120;
 
     /**
-     * Maximum size of a single WAM buffer in bytes before it is rotated
-     * and a new buffer is started. Matches the JS constant
-     * {@code WAM_MAX_BUFFER_SIZE}.
+     * Maximum size of a single WAM buffer in bytes before it is
+     * rotated and a new buffer is started. Matches the JavaScript
+     * constant {@code WAM_MAX_BUFFER_SIZE}.
      */
     private static final int MAX_BUFFER_SIZE = 50_000;
 
     /**
      * Maximum size of a WAM buffer that may be uploaded. Buffers
-     * exceeding this size are dropped. Matches the JS constant
-     * {@code WAM_MAX_BUFFER_SIZE_FOR_UPLOAD}.
+     * exceeding this size are dropped. Matches the JavaScript
+     * constant {@code WAM_MAX_BUFFER_SIZE_FOR_UPLOAD}.
      */
     private static final int MAX_UPLOAD_SIZE = 64_000;
 
@@ -175,39 +187,37 @@ public final class WamService {
 
     /**
      * Maximum value for the uint16 sequence number before wrapping
-     * back to 1.
+     * back to {@code 1}.
      */
     private static final int MAX_SEQUENCE_NUMBER = 0xFFFF;
 
     /**
-     * Device classification value for DESKTOP, matching the JS enum
-     * {@code DEVICE_CLASSIFICATION.DESKTOP}.
+     * Device classification value for DESKTOP, matching the
+     * JavaScript enum {@code DEVICE_CLASSIFICATION.DESKTOP}.
      *
-     * @implNote Adapts {@code WAWebFalcoCanonicalDeviceClassification}
-     * which returns the string {@code "desktop"}; this numeric constant
-     * is the encoded form written into the Falco global
-     * {@code deviceClassification} (14507).
+     * @implNote Adapts
+     *     {@code WAWebFalcoCanonicalDeviceClassification}, which
+     *     returns the string {@code "desktop"}. This numeric constant
+     *     is the encoded form written into the Falco global
+     *     {@code deviceClassification} (14507).
      */
     @WhatsAppWebExport(moduleName = "WAWebFalcoCanonicalDeviceClassification", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private static final int DEVICE_CLASSIFICATION_DESKTOP = 4;
 
     /**
-     * App build type value for RELEASE, matching the JS enum
+     * App build type value for RELEASE, matching the JavaScript enum
      * {@code APP_BUILD_TYPE.RELEASE}.
-     *
-     * @apiNote WAWebWamEnumAppBuildType.APP_BUILD_TYPE: ALPHA, BETA,
-     * RELEASE values.
      */
     private static final int APP_BUILD_RELEASE = 4;
 
     /**
-     * Web client environment value for PROD, matching the JS enum
-     * {@code WEBC_ENV_CODE.PROD}.
+     * Web client environment value for PROD, matching the JavaScript
+     * enum {@code WEBC_ENV_CODE.PROD}.
      */
     private static final int WEBC_ENV_PROD = 0;
 
     /**
-     * Web platform value for WEB, matching the JS enum
+     * Web platform value for WEB, matching the JavaScript enum
      * {@code WEBC_WEB_PLATFORM_TYPE.WEB}.
      */
     private static final int PLATFORM_WEBCLIENT = 1;
@@ -218,22 +228,98 @@ public final class WamService {
      */
     private static final long CONNECTIVITY_WAIT_TIMEOUT_MS = 30_000;
 
+    /**
+     * The bound WhatsApp client used to dispatch IQ stanzas and
+     * inspect connectivity state.
+     */
     private final WhatsAppClient client;
+
+    /**
+     * AB props service used to read sampling configs and feature
+     * flags driving the WAM pipeline.
+     */
     private final ABPropsService abPropsService;
+
+    /**
+     * Pending events keyed by channel. Each value is a list of
+     * uncommitted events awaiting flush.
+     */
     private final ConcurrentMap<WamChannel, List<WamPendingEvent>> pending;
+
+    /**
+     * Per-channel sequence counter written into the buffer header.
+     * Counters wrap from {@link #MAX_SEQUENCE_NUMBER} back to
+     * {@code 1}.
+     */
     private final Map<WamChannel, AtomicInteger> sequenceNumbers;
+
+    /**
+     * Daily-sampled beaconing state, queried for every flushed event
+     * to determine whether a beacon sequence number must be emitted.
+     */
     private final WamBeaconing beaconing;
+
+    /**
+     * Rotating pseudonymous identifiers attached to private-channel
+     * events.
+     */
     private final WamPrivateStatsId privateStatsId;
+
+    /**
+     * Uploader for private-channel buffers, performing the
+     * blinded-token VOPRF round-trip and the multipart POST.
+     */
     private final WamPrivateStatsUploader privateStatsUploader;
+
+    /**
+     * Per-event-id sampling weight overrides loaded from AB props at
+     * initialization and updated at runtime.
+     */
     private final WamSamplingOverride samplingOverride;
+
+    /**
+     * Last-emitted session globals for each channel, used by
+     * {@link #encodeGlobals} to write only dirty globals on
+     * subsequent flushes.
+     */
     private final Map<WamChannel, Map<Integer, Object>> prevSessionGlobals;
+
+    /**
+     * Queue of pre-init commit actions, drained on the first call to
+     * {@link #initialize()}.
+     */
     private final ConcurrentLinkedQueue<Runnable> initQueue;
 
+    /**
+     * Initialization gate. Events committed before {@code true} are
+     * buffered into {@link #initQueue} and replayed on
+     * {@link #initialize()}.
+     */
     private volatile boolean initialized;
+
+    /**
+     * Scheduler driving the periodic serialize and flush passes.
+     * Replaced on every {@link #initialize()} and shut down by
+     * {@link #close()}.
+     */
     private ScheduledExecutorService scheduler;
 
+    /**
+     * Platform identifier written as global {@code 11}. Resolved from
+     * {@link com.github.auties00.cobalt.client.WhatsAppClientType} at
+     * initialization.
+     */
     private volatile long platform;
+
+    /**
+     * Stringified WhatsApp client version written as global
+     * {@code 17} ({@code appVersion}).
+     */
     private volatile String appVersion;
+
+    /**
+     * Device name reported as global {@code 13} ({@code deviceName}).
+     */
     private volatile String deviceName;
     /**
      * Approximate device memory class in megabytes, reported as the
@@ -253,15 +339,17 @@ public final class WamService {
             adaptation = WhatsAppAdaptation.ADAPTED
     )
     private volatile int memClass;
+
     /**
      * Number of logical CPUs reported as the WAM global with index
      * {@code 10317} ({@code numCpu}).
      *
-     * @implNote In WA Web this is {@code self.navigator.hardwareConcurrency},
-     *           short-circuiting to {@code 1} when gkx {@code 17565} (prod
-     *           low-end device) is set. Cobalt runs headless on the JVM and
-     *           uses {@link Runtime#availableProcessors()}; the
-     *           low-end-device override is not applicable.
+     * @implNote WhatsApp Web reads
+     *     {@code self.navigator.hardwareConcurrency}, short-circuiting
+     *     to {@code 1} when gkx {@code 17565} (prod low-end device)
+     *     is set. Cobalt runs headless on the JVM and uses
+     *     {@link Runtime#availableProcessors()}. The low-end-device
+     *     override does not apply.
      */
     @WhatsAppWebExport(
             moduleName = "WAWebBrowserApi",
@@ -269,16 +357,70 @@ public final class WamService {
             adaptation = WhatsAppAdaptation.ADAPTED
     )
     private volatile int numCpu;
+
+    /**
+     * Browser name reported as global {@code 779} ({@code browser}).
+     */
     private volatile String browser;
+
+    /**
+     * Browser version reported as global {@code 295}
+     * ({@code browserVersion}).
+     */
     private volatile String browserVersion;
+
+    /**
+     * OS version reported as global {@code 15} ({@code osVersion}).
+     */
     private volatile String osVersion;
+
+    /**
+     * Device version reported as global {@code 4505}
+     * ({@code deviceVersion}).
+     */
     private volatile String deviceVersion;
+
+    /**
+     * Per-session tab id reported as global {@code 3727}
+     * ({@code webcTabId}).
+     */
     private volatile String webcTabId;
+
+    /**
+     * Optional AB-experiment key reported as global {@code 4473}
+     * ({@code abKey2}). May be {@code null} when WAM AB-key reporting
+     * is disabled.
+     */
     private volatile String abKey2;
+
+    /**
+     * Web client revision reported as global {@code 18491}
+     * ({@code webcRevision}).
+     */
     private volatile int webcRevision;
+
+    /**
+     * Companion app version reported as global {@code 1005}
+     * ({@code webcPhoneAppVersion}).
+     */
     private volatile String companionAppVersion;
+
+    /**
+     * Country code reported on the private channel as global
+     * {@code 6833} ({@code psCountryCode}).
+     */
     private volatile String psCountryCode;
+
+    /**
+     * Service-improvement opt-out flag reported as global
+     * {@code 13293} ({@code serviceImprovementOptOut}).
+     */
     private volatile boolean serviceImprovementOptOut;
+
+    /**
+     * Push-phase string reported as global {@code 6605}
+     * ({@code webcWebArch}). Always {@code null} for Cobalt.
+     */
     private volatile String pushPhase;
 
     /**
@@ -335,9 +477,7 @@ public final class WamService {
         this.appVersion = version != null ? version.toString() : null;
         this.platform = store.clientType() == WhatsAppClientType.WEB ? 8L : 2L;
         this.deviceName = store.name();
-        // ADAPTED: WAWebBrowserApi.getMemClass - navigator.deviceMemory*1000 is headless-unavailable
         this.memClass = (int) (Runtime.getRuntime().maxMemory() / (1024 * 1024));
-        // ADAPTED: WAWebBrowserApi.getNumCpu - navigator.hardwareConcurrency is headless-unavailable
         this.numCpu = Runtime.getRuntime().availableProcessors();
         this.browser = "Chrome";
         this.browserVersion = appVersion;
@@ -355,7 +495,6 @@ public final class WamService {
         this.serviceImprovementOptOut = abPropsService.getBool(ABProp.SERVICE_IMPROVEMENT_OPT_OUT_FLAG);
         this.pushPhase = getPushPhase();
 
-        // Load WAM event sampling overrides from AB props
         var configs = abPropsService.samplingConfigs();
         if (!configs.isEmpty()) {
             samplingOverride.replaceAll(configs);
@@ -363,7 +502,6 @@ public final class WamService {
 
         this.initialized = true;
 
-        // Drain the init queue: replay events committed before initialization
         Runnable action;
         while ((action = initQueue.poll()) != null) {
             action.run();
@@ -373,11 +511,11 @@ public final class WamService {
         scheduler.scheduleWithFixedDelay(this::checkMidCycleUpload, SERIALIZE_INTERVAL_SECONDS, SERIALIZE_INTERVAL_SECONDS, TimeUnit.SECONDS);
         scheduler.scheduleWithFixedDelay(this::flush, FLUSH_INTERVAL_SECONDS, FLUSH_INTERVAL_SECONDS, TimeUnit.SECONDS);
 
-        // WAWebWamPrivateStats.initPrivateStats: emit a PsIdUpdateEvent
-        // with action CREATED for every rotation group that has no
-        // prior value in storage. Cobalt does not persist PS IDs
-        // across sessions, so every group is treated as freshly created
-        // on each initialization.
+        // Cobalt does not persist PS IDs across sessions, so every
+        // rotation group is treated as freshly created on each
+        // initialization, matching WAWebWamPrivateStats.initPrivateStats
+        // emitting a CREATED PsIdUpdateEvent for entries with no prior
+        // stored value.
         for (var info : privateStatsId.snapshotAll()) {
             commit(new PsIdUpdateEventBuilder()
                     .psIdAction(PsIdAction.CREATED)
@@ -561,25 +699,26 @@ public final class WamService {
     /**
      * Flushes all pending events across all channels.
      *
-     * <p>For each channel with pending events, one or more buffers are
-     * built and sent — each capped at {@link #MAX_BUFFER_SIZE} bytes.
-     * Buffers exceeding {@link #MAX_UPLOAD_SIZE} are dropped.
+     * <p>For each channel with pending events, one or more buffers
+     * are built and sent. Each buffer is capped at
+     * {@link #MAX_BUFFER_SIZE} bytes, and buffers exceeding
+     * {@link #MAX_UPLOAD_SIZE} are dropped.
      *
-     * <p>The pending list is atomically swapped to {@code null} so that
-     * new events committed during the flush are not lost.
+     * <p>The pending list is atomically swapped to {@code null} so
+     * that new events committed during the flush are not lost.
      *
-     * @implNote Adapts {@code WAWebWam.sendAllLogs}: the JS routine
-     *     reads pending buffers from {@code WAWebWamStorage} (IndexedDB)
-     *     for a single buffer-key, uploads each to either
+     * @implNote Adapts {@code WAWebWam.sendAllLogs}. The JavaScript
+     *     routine reads pending buffers from {@code WAWebWamStorage}
+     *     (IndexedDB) for a single buffer-key, uploads each to either
      *     {@code WAWebUploadStatsBackend} or
-     *     {@code WAWebUploadPrivateStatsBackend}, drops oversize buffers
-     *     emitting a {@code WamClientErrorsWamEvent} with
-     *     {@code wamClientBufferDropErrorCount = 1}, and on partial
-     *     success re-persists the failed payloads. Cobalt does not
-     *     persist pending buffers to disk, so this method is the direct
-     *     in-memory equivalent: {@code flushChannel} drains the pending
-     *     list and {@code buildAndSend} performs the equivalent oversize
-     *     drop and self-metric emission.
+     *     {@code WAWebUploadPrivateStatsBackend}, drops oversize
+     *     buffers while emitting a {@code WamClientErrorsWamEvent}
+     *     with {@code wamClientBufferDropErrorCount = 1}, and on
+     *     partial success re-persists the failed payloads. Cobalt
+     *     does not persist pending buffers to disk, so this method
+     *     is the direct in-memory equivalent. {@code flushChannel}
+     *     drains the pending list and {@code buildAndSend} performs
+     *     the equivalent oversize drop and self-metric emission.
      */
     @WhatsAppWebExport(moduleName = "WAWebWam", exports = "sendAllLogs", adaptation = WhatsAppAdaptation.ADAPTED)
     public void flush() {
@@ -593,12 +732,12 @@ public final class WamService {
     }
 
     /**
-     * Checks whether any non-realtime channel has accumulated more than
-     * {@link #MAX_BUFFER_SIZE} bytes of pending events and triggers an
-     * early flush if so.
+     * Checks whether any non-realtime channel has accumulated more
+     * than {@link #MAX_BUFFER_SIZE} bytes of pending events and
+     * triggers an early flush when it has.
      *
-     * <p>This implements the mid-cycle upload behaviour from WhatsApp
-     * Web's two-tier timing system, where a 5-second serialization
+     * <p>Implements the mid-cycle upload behaviour from WhatsApp
+     * Web's two-tier timing system, where a five-second serialization
      * timer checks for oversized buffers between the 120-second
      * rotation cycles.
      */
@@ -652,9 +791,6 @@ public final class WamService {
         }
 
         if (channel == WamChannel.PRIVATE) {
-            // WAWebWamPrivateStats internal rotate function: after
-            // regenerating a PS ID value, logs a PsIdUpdateEvent with
-            // action ROTATED for that entry.
             var rotated = privateStatsId.rotateAndReportChanges();
             for (var info : rotated) {
                 commit(new PsIdUpdateEventBuilder()
@@ -689,14 +825,14 @@ public final class WamService {
     }
 
     /**
-     * Flushes a list of events for the given channel, building one or
-     * more buffers capped at {@link #MAX_BUFFER_SIZE}.
+     * Flushes a list of events for the given channel, building one
+     * or more buffers capped at {@link #MAX_BUFFER_SIZE}.
      *
-     * <p>Buffer rotation uses a post-check: the event that pushes the
-     * buffer over the limit stays in the current buffer, and a new
-     * buffer is started for subsequent events. This matches WhatsApp
-     * Web's behaviour where a buffer may momentarily exceed the limit
-     * by one event.
+     * <p>Buffer rotation uses a post-check. The event that pushes
+     * the buffer over the limit stays in the current buffer, and a
+     * new buffer is started for subsequent events, matching WhatsApp
+     * Web's behaviour where a buffer may momentarily exceed the
+     * limit by one event.
      *
      * @param channel   the transport channel
      * @param events    the events to flush
@@ -751,10 +887,6 @@ public final class WamService {
     private void buildAndSend(WamChannel channel, List<WamPendingEvent> events, int[] weights, OptionalInt[] beacons, byte[] globalsBytes, int from, int to, int size) {
         if (size > MAX_UPLOAD_SIZE) {
             LOGGER.warning("Dropping WAM buffer of " + size + " bytes (exceeds upload limit)");
-            // WAWebWam.oe: when WAWebWamUtils.isWamBufferTooBigToUpload
-            // is true, the buffer is dropped and a WamClientErrorsWamEvent
-            // with wamClientBufferDropErrorCount = 1 is committed as a
-            // pipeline self-metric.
             commit(new WamClientErrorsEventBuilder()
                     .wamClientBufferDropErrorCount(1)
                     .build());
@@ -801,14 +933,15 @@ public final class WamService {
     }
 
     /**
-     * Encodes the session globals for the given channel, writing only
-     * globals that have changed since the last flush for this channel.
+     * Encodes the session globals for the given channel, writing
+     * only globals that have changed since the last flush for this
+     * channel.
      *
-     * <p>On first call for a channel, all globals are written. On
-     * subsequent calls, only dirty (changed) globals and null
-     * transitions are written. This matches WhatsApp Web's
-     * dirty-tracking approach where each {@code WamContext} maintains
-     * its own independent {@code prevGlobals}.
+     * <p>On the first call for a channel all globals are written.
+     * On subsequent calls only dirty globals and null transitions
+     * are written. Matches WhatsApp Web's dirty-tracking approach
+     * where each {@code WamContext} maintains its own independent
+     * {@code prevGlobals}.
      *
      * @param channel the transport channel
      * @return the encoded globals as a byte array
@@ -976,11 +1109,11 @@ public final class WamService {
 
     /**
      * Atomically swaps the pending list for the given channel with
-     * {@code null}, returning the old contents.
+     * {@code null} and returns the old contents.
      *
      * <p>Uses {@link ConcurrentHashMap#compute} to ensure that no
-     * concurrent {@link #commit} call can append to the returned list
-     * after the swap.
+     * concurrent {@link #commit} call can append to the returned
+     * list after the swap.
      *
      * @param channel the channel to drain
      * @return the drained events, never {@code null}
@@ -1103,10 +1236,6 @@ public final class WamService {
                 }
 
                 LOGGER.warning("WAM upload failed with error " + errorCode + ", dropping buffer");
-                // WAWebWam._executePending catch block: when upload fails
-                // permanently, a WamClientErrorsWamEvent with
-                // wamClientBufferDropErrorCount = 1 is committed to track
-                // the dropped buffer.
                 commit(new WamClientErrorsEventBuilder()
                         .wamClientBufferDropErrorCount(1)
                         .build());
@@ -1126,9 +1255,6 @@ public final class WamService {
                     }
                 } else {
                     LOGGER.warning("WAM upload failed after " + MAX_RETRIES + " retries: " + e.getMessage());
-                    // WAWebWam._executePending catch block: exhausted
-                    // retries count as a dropped buffer for pipeline
-                    // self-metrics.
                     commit(new WamClientErrorsEventBuilder()
                             .wamClientBufferDropErrorCount(1)
                             .build());
@@ -1281,14 +1407,13 @@ public final class WamService {
      */
     @WhatsAppWebExport(moduleName = "WAWebWam", exports = "getPushPhase", adaptation = WhatsAppAdaptation.ADAPTED)
     private static String getPushPhase() {
-        // WAWebWam.ie: alias map sandcastle->dev, trunkstable->C1; gkx 26256 -> jest-e2e.
-        // Cobalt has no PUSH_PHASE build constant nor jest-e2e harness.
         return null;
     }
 
     /**
-     * Stops the flush threads and performs a final flush of all pending
-     * events.
+     * Stops the flush threads and performs a final flush of all
+     * pending events. Once closed, the service must be re-initialized
+     * before further use.
      */
     public void close() {
         if (scheduler != null) {
@@ -1355,36 +1480,32 @@ public final class WamService {
         }
         var content = container.content();
         return switch (content) {
-            case ImageMessage ignored -> MediaType.PHOTO; // WAWebWamMsgUtils: case "image" -> MEDIA_TYPE.PHOTO
-            case VideoMessage video -> video.gifPlayback() // WAWebWamMsgUtils: case "video" -> e.isGif ? GIF : VIDEO
-                    ? MediaType.GIF
-                    : MediaType.VIDEO;
-            case AudioMessage audio -> audio.ptt() // WAWebWamMsgUtils: case "audio" -> AUDIO; case "ptt" -> PTT
-                    ? MediaType.PTT
-                    : MediaType.AUDIO;
-            case DocumentMessage ignored -> MediaType.DOCUMENT; // WAWebWamMsgUtils: case "document" -> DOCUMENT
-            case StickerMessage ignored -> MediaType.STICKER; // WAWebWamMsgUtils: case "sticker" -> STICKER
-            case StickerPackMessage ignored -> MediaType.STICKER_PACK; // WAWebWamMsgUtils: case "sticker-pack" -> STICKER_PACK
-            case ReactionMessage ignored -> MediaType.REACTION; // WAWebWamMsgUtils: case "reaction"/"reaction_enc" -> REACTION
-            case EncReactionMessage ignored -> MediaType.REACTION; // WAWebWamMsgUtils: case "reaction_enc" -> REACTION
-            case PollCreationMessage ignored -> MediaType.POLL_CREATE; // WAWebWamMsgUtils: case "poll_creation" -> POLL_CREATE
-            case PollUpdateMessage ignored -> MediaType.POLL_VOTE; // WAWebWamMsgUtils: case "poll_update"/"poll_vote" -> POLL_VOTE
-            case ContactMessage ignored -> MediaType.CONTACT; // WAWebWamMsgUtils: case "vcard" -> CONTACT
-            case ContactsArrayMessage ignored -> MediaType.CONTACT_ARRAY; // WAWebWamMsgUtils: case "multi_vcard" -> CONTACT_ARRAY
-            case LocationMessage ignored ->
-                    MediaType.LOCATION; // WAWebWamMsgUtils: case "location" (non-live) -> LOCATION
-            case LiveLocationMessage ignored -> MediaType.LIVE_LOCATION; // WAWebWamMsgUtils: case "location" when isLive -> LIVE_LOCATION
-            case ProductMessage ignored -> MediaType.PRODUCT_IMAGE; // WAWebWamMsgUtils: case "product" -> PRODUCT_IMAGE
-            case ListMessage ignored -> MediaType.LIST; // WAWebWamMsgUtils: case "list" (SINGLE_SELECT) -> LIST
-            case ListResponseMessage ignored -> MediaType.LIST_REPLY; // WAWebWamMsgUtils: case "list_response" -> LIST_REPLY
-            case OrderMessage ignored -> MediaType.ORDER; // WAWebWamMsgUtils: case "order" -> ORDER
-            case EventResponseMessage ignored -> MediaType.EVENT_RESPOND; // WAWebWamMsgUtils: case "event_response" -> EVENT_RESPOND
-            case EncEventResponseMessage ignored -> MediaType.EVENT_RESPOND; // WAWebWamMsgUtils: case "event_response" -> EVENT_RESPOND
-            case EventMessage ignored -> MediaType.EVENT_CREATE; // WAWebWamMsgUtils: case "event_creation" -> EVENT_CREATE
-            case AlbumMessage ignored -> MediaType.MEDIA_ALBUM; // WAWebWamMsgUtils: case "album" -> MEDIA_ALBUM
-            case PinInChatMessage ignored -> MediaType.PIN_IN_CHAT; // WAWebWamMsgUtils: case "pin_message" -> PIN_IN_CHAT
-            case ExtendedTextMessage ignored -> MediaType.TEXT; // WAWebWamMsgUtils: case "chat" -> default TEXT branch in m(e.matchedText)
-            case null, default -> MediaType.NONE; // WAWebWamMsgUtils: default -> MEDIA_TYPE.NONE
+            case ImageMessage ignored -> MediaType.PHOTO;
+            case VideoMessage video -> video.gifPlayback() ? MediaType.GIF : MediaType.VIDEO;
+            case AudioMessage audio -> audio.ptt() ? MediaType.PTT : MediaType.AUDIO;
+            case DocumentMessage ignored -> MediaType.DOCUMENT;
+            case StickerMessage ignored -> MediaType.STICKER;
+            case StickerPackMessage ignored -> MediaType.STICKER_PACK;
+            case ReactionMessage ignored -> MediaType.REACTION;
+            case EncReactionMessage ignored -> MediaType.REACTION;
+            case PollCreationMessage ignored -> MediaType.POLL_CREATE;
+            case PollUpdateMessage ignored -> MediaType.POLL_VOTE;
+            case ContactMessage ignored -> MediaType.CONTACT;
+            case ContactsArrayMessage ignored -> MediaType.CONTACT_ARRAY;
+            case LocationMessage ignored -> MediaType.LOCATION;
+            case LiveLocationMessage ignored -> MediaType.LIVE_LOCATION;
+            case ProductMessage ignored -> MediaType.PRODUCT_IMAGE;
+            case ListMessage ignored -> MediaType.LIST;
+            case ListResponseMessage ignored -> MediaType.LIST_REPLY;
+            case OrderMessage ignored -> MediaType.ORDER;
+            case EventResponseMessage ignored -> MediaType.EVENT_RESPOND;
+            case EncEventResponseMessage ignored -> MediaType.EVENT_RESPOND;
+            case EventMessage ignored -> MediaType.EVENT_CREATE;
+            case AlbumMessage ignored -> MediaType.MEDIA_ALBUM;
+            case PinInChatMessage ignored -> MediaType.PIN_IN_CHAT;
+            case ExtendedTextMessage ignored -> MediaType.TEXT;
+            // Cobalt-only fallthrough: collection/unknown maps to NONE.
+            case null, default -> MediaType.NONE;
         };
     }
 
@@ -1448,19 +1569,19 @@ public final class WamService {
         if (chatJid == null) {
             return MessageType.INDIVIDUAL;
         }
-        if (chatJid.isStatusBroadcastAccount()) { // WAWebMsgGetters.getIsStatus -> MESSAGE_TYPE.STATUS
+        if (chatJid.isStatusBroadcastAccount()) {
             return MessageType.STATUS;
         }
-        if (chatJid.hasGroupOrCommunityServer()) { // WAWebMsgGetters.getIsGroupMsg -> MESSAGE_TYPE.GROUP
+        if (chatJid.hasGroupOrCommunityServer()) {
             return MessageType.GROUP;
         }
-        if (chatJid.hasBroadcastServer()) { // WAWebWid.isBroadcast -> MESSAGE_TYPE.BROADCAST
+        if (chatJid.hasBroadcastServer()) {
             return MessageType.BROADCAST;
         }
-        if (chatJid.hasNewsletterServer()) { // WAWebWid.isNewsletter -> MESSAGE_TYPE.CHANNEL
+        if (chatJid.hasNewsletterServer()) {
             return MessageType.CHANNEL;
         }
-        return MessageType.INDIVIDUAL; // WAWebWamMsgUtils: default -> MESSAGE_TYPE.INDIVIDUAL
+        return MessageType.INDIVIDUAL;
     }
 
     /**
@@ -1498,13 +1619,9 @@ public final class WamService {
             return MessageType.INDIVIDUAL;
         }
         return switch (stanzaType) {
-            // WAWebWamMsgUtils.getMessageTypeFromMsgInfoType: "chat" -> INDIVIDUAL
             case CHAT, PEER_CHAT -> MessageType.INDIVIDUAL;
-            // WAWebWamMsgUtils.getMessageTypeFromMsgInfoType: "group" -> GROUP
             case GROUP -> MessageType.GROUP;
-            // WAWebWamMsgUtils.getMessageTypeFromMsgInfoType: "peer_broadcast"/"other_broadcast" -> BROADCAST
             case PEER_BROADCAST, OTHER_BROADCAST -> MessageType.BROADCAST;
-            // WAWebWamMsgUtils.getMessageTypeFromMsgInfoType: "direct_peer_status"/"other_status" -> STATUS
             case DIRECT_PEER_STATUS, OTHER_STATUS -> MessageType.STATUS;
         };
     }
@@ -1541,28 +1658,23 @@ public final class WamService {
         if (senderJid == null) {
             return null;
         }
-        // WAWebWamMsgUtils.getWamE2eSenderType: e instanceof Wid filter; Cobalt only accepts user/LID JIDs here
         if (!senderJid.hasUserServer() && !senderJid.hasLidServer()
                 && !senderJid.hasHostedServer() && !senderJid.hasHostedLidServer()) {
             return null;
         }
         var isMe = selfJid != null
                 && selfJid.toUserJid().equals(senderJid.toUserJid());
-        var isCompanion = senderJid.hasDevice(); // WAWebWid.isCompanion: device != 0
+        var isCompanion = senderJid.hasDevice();
         var isHosted = senderJid.hasHostedServer() || senderJid.hasHostedLidServer();
         if (isMe) {
             if (isCompanion) {
-                // WAWebWamMsgUtils.getWamE2eSenderType: MY + companion + hosted -> MY_HOSTED_COMPANION
                 return isHosted ? E2eDeviceType.MY_HOSTED_COMPANION : E2eDeviceType.MY_COMPANION;
             }
-            // WAWebWamMsgUtils.getWamE2eSenderType: MY + primary -> MY_PRIMARY
             return E2eDeviceType.MY_PRIMARY;
         }
         if (isCompanion) {
-            // WAWebWamMsgUtils.getWamE2eSenderType: OTHER + companion + hosted -> OTHER_HOSTED_COMPANION
             return isHosted ? E2eDeviceType.OTHER_HOSTED_COMPANION : E2eDeviceType.OTHER_COMPANION;
         }
-        // WAWebWamMsgUtils.getWamE2eSenderType: OTHER + primary -> OTHER_PRIMARY
         return E2eDeviceType.OTHER_PRIMARY;
     }
 
@@ -1598,17 +1710,13 @@ public final class WamService {
         }
         InteractiveMessageContent content = interactive.content().orElse(null);
         if (content == null) {
-            // WAWebWamMsgUtils.getInteractiveWamType: t == null -> MEDIA_TYPE.NONE
             return MediaType.NONE;
         }
         return switch (content) {
-            // WAWebWamMsgUtils.getInteractiveWamType: case SHOPS_STOREFRONT -> SHOP_STOREFRONT
             case InteractiveMessage.ShopMessage ignored -> MediaType.SHOP_STOREFRONT;
-            // WAWebWamMsgUtils.getInteractiveWamType: case CAROUSEL -> INTERACTIVE_CAROUSEL
             case InteractiveMessage.CarouselMessage ignored -> MediaType.INTERACTIVE_CAROUSEL;
-            // WAWebWamMsgUtils.getInteractiveWamType: case NATIVE_FLOW -> d(e)
             case InteractiveMessage.NativeFlowMessage native_ -> getInteractiveNativeFlowWamType(native_);
-            // Cobalt-only branch: collection messages have no WA Web counterpart in this mapper
+            // Cobalt-only branch: collection messages have no WhatsApp Web counterpart in this mapper.
             case InteractiveMessage.CollectionMessage ignored -> MediaType.NONE;
         };
     }
@@ -1639,7 +1747,7 @@ public final class WamService {
     private static MediaType getInteractiveNativeFlowWamType(InteractiveMessage.NativeFlowMessage nativeFlow) {
         for (var button : nativeFlow.buttons()) {
             var name = button.name().orElse(null);
-            // WAWebInteractiveMessagesNativeFlowName.CTA_FLOW -> "galaxy_message"
+            // WAWebInteractiveMessagesNativeFlowName.CTA_FLOW resolves to "galaxy_message".
             if ("galaxy_message".equals(name)) {
                 return MediaType.NONE;
             }
@@ -1680,11 +1788,9 @@ public final class WamService {
             return null;
         }
         if (chatJid.isBot()) {
-            // WAWebWamMsgUtils.getWamAgentEngagementType: e.id.remote.isBot() -> DIRECT_CHAT
             return AgentEngagementEnumType.DIRECT_CHAT;
         }
         if (isBotInvoked) {
-            // WAWebWamMsgUtils.getWamAgentEngagementType: getIsBotQuery || getIsMetaBotResponse -> INVOKED
             return AgentEngagementEnumType.INVOKED;
         }
         return null;
@@ -1723,18 +1829,14 @@ public final class WamService {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public BotType getWamBotType(Jid botJid, boolean is1pBizBot, boolean is3pBizBot) {
         if (botJid != null && botJid.isBot()) {
-            // WAWebWamMsgUtils.getWamBotType: e?.isBot() -> METABOT
             return BotType.METABOT;
         }
         if (is1pBizBot) {
-            // WAWebWamMsgUtils.getWamBotType: BizBotType.BIZ_1P / BizBotAutomatedType.PARTIAL_1P -> BOT_1P_BIZ
             return BotType.BOT_1P_BIZ;
         }
         if (is3pBizBot) {
-            // WAWebWamMsgUtils.getWamBotType: BizBotType.BIZ_3P / BizBotAutomatedType.FULL_3P -> BOT_3P_BIZ
             return BotType.BOT_3P_BIZ;
         }
-        // WAWebWamMsgUtils.getWamBotType: default -> UNKNOWN
         return BotType.UNKNOWN;
     }
 
@@ -1765,7 +1867,6 @@ public final class WamService {
         if (category == null || category.isEmpty()) {
             return null;
         }
-        // WAWebHandleMsgCommon.MSG_CATEGORY.peer -> INVISIBLE_MESSAGE_CATEGORY_TYPE.PEER
         if ("peer".equals(category)) {
             return InvisibleMessageCategoryType.PEER;
         }
@@ -1816,14 +1917,11 @@ public final class WamService {
             boolean participantIsLid
     ) {
         if (chatType == MessageType.GROUP) {
-            // WAWebWamMsgUtils.msgIsLid: t.isGroup() -> !!n
             return participantIsLid;
         }
         if (chatType == MessageType.STATUS) {
-            // WAWebWamMsgUtils.msgIsLid: t.isStatus() -> e.id.participant?.isLid() ?? false
             return keyParticipantJid != null && keyParticipantJid.hasLidServer();
         }
-        // WAWebWamMsgUtils.msgIsLid: default -> e.from.isLid() || e.to.isLid()
         var fromIsLid = fromJid != null && fromJid.hasLidServer();
         var toIsLid = toJid != null && toJid.hasLidServer();
         return fromIsLid || toIsLid;
@@ -1870,8 +1968,9 @@ public final class WamService {
             Map.entry("mpeg", DocumentType.VIDEO),
             Map.entry("rm", DocumentType.VIDEO),
             Map.entry("vob", DocumentType.VIDEO),
-            // WAWebProcessRawMediaLogging: ["wmv", AUDIO] is exactly what the WA Web table has;
-            // the classification is kept even though wmv is conventionally a video container.
+            // The WhatsApp Web table maps "wmv" to AUDIO. The classification
+            // is kept verbatim even though wmv is conventionally a video
+            // container.
             Map.entry("wmv", DocumentType.AUDIO),
             Map.entry("aif", DocumentType.AUDIO),
             Map.entry("cda", DocumentType.AUDIO),
@@ -1951,10 +2050,6 @@ public final class WamService {
     @WhatsAppWebExport(moduleName = "WAWebProcessRawMediaLogging", exports = "logSendDocumentEvent",
             adaptation = WhatsAppAdaptation.DIRECT)
     public void logSendDocumentEvent(String filename, long size) {
-        // WAWebProcessRawMediaLogging.logSendDocumentEvent:
-        //   a = e == null ? undefined : e.split(".").pop() ?? ""
-        //   i = s.has(a) ? a : ""
-        //   l = s.get(i) ?? DOCUMENT_TYPE.OTHER
         String extension;
         if (filename == null || filename.isEmpty()) {
             extension = "";
@@ -1966,11 +2061,8 @@ public final class WamService {
         var normalizedExt = DOCUMENT_EXT_TO_TYPE.containsKey(extension) ? extension : "";
         var documentType = DOCUMENT_EXT_TO_TYPE.getOrDefault(normalizedExt, DocumentType.OTHER);
         commit(new SendDocumentEventBuilder()
-                // WAWebProcessRawMediaLogging.logSendDocumentEvent: documentSize = t (raw byte count)
                 .documentSize((double) size)
-                // WAWebProcessRawMediaLogging.logSendDocumentEvent: documentType = l
                 .documentType(documentType)
-                // WAWebProcessRawMediaLogging.logSendDocumentEvent: documentExt = i
                 .documentExt(normalizedExt)
                 .build());
     }

@@ -15,7 +15,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Sealed disjunction over the optional contacts/replied filter — at
+ * Sealed disjunction over the optional contacts/replied filter, at
  * most one is applied per request.
  *
  * @implNote {@code WASmaxOutNewslettersContactsOrRepliedFilterMixinMixinGroup.mergeContactsOrRepliedFilterMixinMixinGroup}.

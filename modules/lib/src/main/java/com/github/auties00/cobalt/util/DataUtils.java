@@ -5,17 +5,12 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 
 /**
- * Utility methods for random byte/number generation, hex encoding and
+ * Utility methods for random byte and number generation, hex encoding, and
  * byte-array concatenation.
  *
  * <p>All random values are produced by a single {@link SecureRandom}
  * instance obtained via {@link SecureRandom#getInstanceStrong()} to ensure
  * cryptographic quality.
- *
- * @implNote Pure Cobalt utility class; no direct WhatsApp Web counterpart.
- *     The APIs it provides are the common toolkit used by callers that
- *     historically imported small helpers from several scattered WA Web
- *     modules (e.g. {@code WABase64}, {@code WACryptoRandom}).
  */
 public final class DataUtils {
     /**
@@ -33,9 +28,9 @@ public final class DataUtils {
      * Shared empty heap {@link ByteBuffer}, safe to use as a sentinel for
      * zero-length buffer payloads.
      *
-     * @implNote A zero-capacity buffer exposes no mutable state (position
-     *     and limit are fixed at {@code 0}), so a single shared instance is
-     *     safe to reuse across threads.
+     * @implNote A zero-capacity buffer exposes no mutable state because its
+     *     position and limit are both fixed at {@code 0}, so a single shared
+     *     instance is safe to reuse across threads.
      */
     public static final ByteBuffer EMPTY_BYTE_BUFFER = ByteBuffer.allocate(0);
 
@@ -63,12 +58,12 @@ public final class DataUtils {
     }
 
     /**
-     * Returns a random byte array whose length is sampled uniformly from
-     * {@code [minLength, maxLength)}.
+     * Returns a newly allocated random byte array whose length is sampled
+     * uniformly from {@code [minLength, maxLength)}.
      *
-     * @param minLength the minimum length inclusive
-     * @param maxLength the maximum length exclusive
-     * @return the newly-allocated random byte array
+     * @param minLength the minimum length, inclusive
+     * @param maxLength the maximum length, exclusive
+     * @return the random byte array
      * @throws IllegalArgumentException if {@code minLength} is negative or
      *                                  greater than {@code maxLength}
      */
@@ -91,7 +86,7 @@ public final class DataUtils {
      * Returns a random byte array of the given length.
      *
      * @param length the exact length
-     * @return the newly-allocated random byte array, or the shared empty
+     * @return the newly allocated random byte array, or the shared empty
      *         array when {@code length} is {@code 0}
      * @throws IllegalArgumentException if {@code length} is negative
      */
@@ -128,12 +123,12 @@ public final class DataUtils {
     }
 
     /**
-     * Concatenates the given byte arrays into a single newly-allocated
+     * Concatenates the given byte arrays into a single newly allocated
      * array, skipping {@code null} entries.
      *
      * @param entries the arrays to join, may be {@code null}
      * @return the concatenation, or the shared empty array if {@code entries}
-     *         is {@code null} or every entry is {@code null}/empty
+     *         is {@code null} or every entry is {@code null} or empty
      */
     public static byte[] concatByteArrays(byte[]... entries) {
         if(entries == null) {

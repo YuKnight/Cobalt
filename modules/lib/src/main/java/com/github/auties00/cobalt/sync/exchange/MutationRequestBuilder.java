@@ -59,10 +59,21 @@ import java.util.logging.Logger;
 @WhatsAppWebModule(moduleName = "WAWebSyncdRequestEncode")
 @WhatsAppWebModule(moduleName = "WAWebSyncdMMSUpload")
 public final class MutationRequestBuilder {
+    /**
+     * Logger for sync request building diagnostics.
+     */
     private static final Logger LOGGER = Logger.getLogger(MutationRequestBuilder.class.getName());
 
+    /**
+     * The WhatsApp client used for store access and for media uploads.
+     */
     private final WhatsAppClient whatsapp;
+
+    /**
+     * Source of A/B-tested configuration values that gate inline vs MMS uploads.
+     */
     private final ABPropsService abPropsService;
+
     /**
      * The WAM telemetry service used to commit media-upload events.
      */

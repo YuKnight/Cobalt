@@ -1,49 +1,22 @@
 package com.github.auties00.cobalt.exception;
 
 /**
- * Exception thrown when the client's own device list has become stale and needs refresh.
- * <p>
- * In WhatsApp's multi-device architecture, each device maintains a list of all devices
- * associated with the account. This list has a maximum staleness threshold, and when
- * exceeded, the client must refresh the list before continuing certain operations.
+ * Thrown when the cached list of devices linked to this account has
+ * become too stale to be used for routing messages.
  *
- * <h2>Device List Architecture</h2>
- * The device list system works as follows:
- * <ul>
- *   <li>Each device tracks when it last synchronized its device list</li>
- *   <li>The list includes all companion devices and the primary device</li>
- *   <li>A staleness threshold determines when the list needs refresh</li>
- *   <li>The list is used for message encryption routing decisions</li>
- * </ul>
+ * <p>Every device in a WhatsApp account keeps its own record of the
+ * full set of devices linked to that account, refreshed periodically
+ * from the server. The Advanced Device Verification job watches the
+ * age of that record and raises this exception when it has exceeded
+ * the staleness threshold the server is willing to accept. While the
+ * record is in this state, sending a message would risk targeting a
+ * device that is no longer authorized or omitting one that has just
+ * been added.
  *
- * <h2>When This Occurs</h2>
- * This exception is thrown during ADV (Authenticated Device Verification) checks when:
- * <ul>
- *   <li>The device list hasn't been updated for too long</li>
- *   <li>The staleness threshold has been exceeded</li>
- *   <li>A message would be sent to a potentially outdated device list</li>
- * </ul>
- *
- * <h2>Staleness Thresholds</h2>
- * WhatsApp uses different thresholds depending on context:
- * <ul>
- *   <li>Normal operations: ~7 days</li>
- *   <li>Security-sensitive operations: Shorter intervals</li>
- *   <li>Server may request immediate refresh in some cases</li>
- * </ul>
- *
- * <h2>Fatality</h2>
- * The fatality of this exception depends on the context:
- * <ul>
- *   <li><b>Fatal:</b> When the staleness indicates a serious sync issue requiring logout</li>
- *   <li><b>Non-fatal:</b> When a simple device list refresh can resolve the issue</li>
- * </ul>
- *
- * <h2>Recovery</h2>
- * <ul>
- *   <li><b>Non-fatal:</b> Refresh the device list from the server and retry</li>
- *   <li><b>Fatal:</b> Log out and re-authenticate to re-establish device relationships</li>
- * </ul>
+ * <p>The error is fatal in Cobalt: until the device list is refreshed
+ * the local view of the account cannot be trusted. The configurable
+ * error handler decides whether to refresh and reconnect or to log the
+ * device out.
  */
 public final class WhatsAppOwnDeviceListExpiredException extends WhatsAppException {
     /**
@@ -54,12 +27,11 @@ public final class WhatsAppOwnDeviceListExpiredException extends WhatsAppExcepti
     }
 
     /**
-     * Returns whether this exception represents a fatal error.
+     * Returns whether the failure invalidates the current session.
      *
-     * <p>The client's own device list has exceeded the server-enforced staleness
-     * threshold and cannot be used for message routing without a full refresh.
-     * Cobalt treats this condition as fatal and delegates the recovery policy
-     * (refresh list, reconnect, or log out) to the configurable error handler.
+     * <p>The local device list is required for correctly routing
+     * outgoing messages. While it is expired the session cannot be
+     * trusted and the failure is reported as fatal.
      *
      * @return {@code true}
      */

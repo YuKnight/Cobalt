@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.node.iq.biz;
 
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.JidServer;
 import com.github.auties00.cobalt.node.Node;
@@ -12,8 +13,14 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant.
+ * The outbound {@code <iq xmlns="w:biz" type="set">} stanza that mutates
+ * the current merchant's business profile. Each non-{@code null} field
+ * becomes one child of the {@code <business_profile/>} delta payload, so
+ * callers can patch any subset of address, geo coordinates, description,
+ * email, websites, categories, business hours, price tier or service
+ * areas in a single round-trip.
  */
+@WhatsAppWebModule(moduleName = "WAWebBusinessProfileJob")
 public final class IqEditBusinessProfileRequest implements IqOperation.Request {
     /**
      * The optional address line.

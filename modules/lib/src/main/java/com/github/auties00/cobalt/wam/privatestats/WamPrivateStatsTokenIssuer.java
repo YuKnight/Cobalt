@@ -2,6 +2,9 @@ package com.github.auties00.cobalt.wam.privatestats;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.exception.WhatsAppPrivateStatsTokenIssuerException;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.node.NodeBuilder;
 
 import java.security.MessageDigest;
@@ -10,44 +13,51 @@ import java.security.SecureRandom;
 import java.util.Objects;
 
 /**
- * Issues private-stats tokens by performing the {@code <sign_credential>}
- * IQ round-trip against {@code s.whatsapp.net}.
+ * Issues private-stats tokens by performing the
+ * {@code <sign_credential>} IQ round-trip against
+ * {@code s.whatsapp.net}.
  *
- * <p>The flow mirrors {@code privateStatsToken.issuePrivateStatsToken} from
- * the WA Web JavaScript runtime:
+ * <p>The flow mirrors
+ * {@code privateStatsToken.issuePrivateStatsToken} from the WhatsApp
+ * Web JavaScript runtime:
  *
  * <ol>
- *   <li>Generate a random 32-byte {@code token} (the secret nonce) and a
- *       random 32-byte {@code blindingFactor}.</li>
- *   <li>Compute {@code blindedToken =
- *       PrivateStatsTokenBlinder.blind(token, blindingFactor)}.</li>
- *   <li>Send the IQ {@code <iq xmlns="privatestats" type="get">
+ *   <li>Generate a random 32-byte {@code token} (the secret nonce)
+ *       and a random 32-byte {@code blindingFactor}.</li>
+ *   <li>Compute
+ *       {@code blindedToken =
+ *       WamPrivateStatsTokenBlinder.blind(token, blindingFactor)}.</li>
+ *   <li>Send the IQ
+ *       {@code <iq xmlns="privatestats" type="get">
  *       <sign_credential version="1">
- *         <blinded_credential>blindedToken</blinded_credential>
+ *       <blinded_credential>blindedToken</blinded_credential>
  *       </sign_credential></iq>}.</li>
- *   <li>Receive {@code <signed_credential>}, {@code <acs_public_key>}, and
- *       a {@code <dleq_proof>}.</li>
- *   <li>Compute {@code unblindedSignedToken =
- *       PrivateStatsTokenBlinder.unblind(signedCredential, blindingFactor,
- *       acsPublicKey)}.</li>
- *   <li>Derive the shared secret as {@code SHA-512(token ||
- *       unblindedSignedToken)}.</li>
- *   <li>Return {@link WamPrivateStatsToken} carrying the original {@code token} and
- *       the {@code sharedSecret}.</li>
+ *   <li>Receive {@code <signed_credential>},
+ *       {@code <acs_public_key>}, and a {@code <dleq_proof>}.</li>
+ *   <li>Compute
+ *       {@code unblindedSignedToken =
+ *       WamPrivateStatsTokenBlinder.unblind(signedCredential,
+ *       blindingFactor, acsPublicKey)}.</li>
+ *   <li>Derive the shared secret as
+ *       {@code SHA-512(token || unblindedSignedToken)}.</li>
+ *   <li>Return a {@link WamPrivateStatsToken} carrying the original
+ *       {@code token} and the {@code sharedSecret}.</li>
  * </ol>
  *
- * <p>The {@code <dleq_proof>} block is currently parsed but not verified.
- * In a complete VOPRF implementation it would prove that the server used
- * the same private key for {@code signedCredential = sk * blindedToken}
- * and {@code acsPublicKey = sk * B}; without verification a malicious
- * server could substitute an unrelated key pair. This is acceptable given
- * the trust model (the server is also the consumer of the upload), but a
- * future tightening may add the Chaum-Pedersen check.
+ * <p>The {@code <dleq_proof>} block is currently parsed but not
+ * verified. In a complete VOPRF implementation it would prove that
+ * the server used the same private key for
+ * {@code signedCredential = sk * blindedToken} and
+ * {@code acsPublicKey = sk * B}. Without verification a malicious
+ * server could substitute an unrelated key pair. This is acceptable
+ * given the trust model (the server is also the consumer of the
+ * upload), but a future tightening may add the Chaum-Pedersen check.
  *
- * @apiNote The IQ envelope and child-tag names were captured live from
- * snapshot {@code 1038176432} on 2026-04-27. Re-verify if the protocol
- * changes.
+ * @apiNote The IQ envelope and child-tag names were captured live
+ * from snapshot {@code 1038176432} on 2026-04-27. Re-verify if the
+ * protocol changes.
  */
+@WhatsAppWebModule(moduleName = "WAWebIssuePrivateStatsToken")
 public final class WamPrivateStatsTokenIssuer {
     /**
      * XMPP namespace for the private-stats token issuance IQ.
@@ -60,22 +70,24 @@ public final class WamPrivateStatsTokenIssuer {
     private static final String SERVER = "s.whatsapp.net";
 
     /**
-     * The client used to dispatch the IQ. Held as a field so callers do
-     * not have to thread it through every {@link #issue} invocation.
+     * The client used to dispatch the IQ. Held as a field so callers
+     * do not have to thread it through every {@link #issue}
+     * invocation.
      */
     private final WhatsAppClient client;
 
     /**
-     * Source of cryptographic randomness used to generate the token and
-     * blinding factor. {@link SecureRandom} backed by the JVM default
-     * provider.
+     * Source of cryptographic randomness used to generate the token
+     * and blinding factor. A {@link SecureRandom} backed by the JVM
+     * default provider.
      */
     private final SecureRandom random;
 
     /**
      * Constructs a new issuer bound to a WhatsApp client.
      *
-     * @param client the client used to dispatch the IQ; must not be {@code null}
+     * @param client the client used to dispatch the IQ, must not be
+     *               {@code null}
      * @throws NullPointerException if {@code client} is {@code null}
      */
     public WamPrivateStatsTokenIssuer(WhatsAppClient client) {
@@ -84,19 +96,24 @@ public final class WamPrivateStatsTokenIssuer {
     }
 
     /**
-     * Performs one issuance round-trip and returns the resulting token.
+     * Performs one issuance round-trip and returns the resulting
+     * token.
      *
-     * <p>Generates fresh randomness on every call. The returned token is
-     * single-use against a particular WAM upload buffer; callers must not
-     * cache and reuse it across uploads (reuse leaks the unblinded outputs
-     * of prior buffers).
+     * <p>Generates fresh randomness on every call. The returned
+     * token is single-use against a particular WAM upload buffer.
+     * Callers must not cache and reuse it across uploads, since
+     * reuse leaks the unblinded outputs of prior buffers.
      *
      * @return the freshly issued token
-     * @throws WhatsAppPrivateStatsTokenIssuerException if the server responds with
-     *                                          an error, the response is
-     *                                          malformed, or the unblinded
-     *                                          token fails to decode
+     * @throws WhatsAppPrivateStatsTokenIssuerException if the server
+     *         responds with an error, the response is malformed, or
+     *         the unblinded token fails to decode
      */
+    @WhatsAppWebExport(
+            moduleName = "WAWebIssuePrivateStatsToken",
+            exports = "getToken",
+            adaptation = WhatsAppAdaptation.ADAPTED
+    )
     public WamPrivateStatsToken issue() {
         var token = new byte[WamPrivateStatsToken.TOKEN_BYTES];
         random.nextBytes(token);

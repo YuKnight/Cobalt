@@ -68,7 +68,7 @@ public final class SmaxGroupsGroupsDirtyNotificationResponse implements SmaxOper
         if (!node.hasAttribute("type", "w:gp2")) {
             return Optional.empty();
         }
-        // attrDomainJid(from)=="g.us" — domain must equal the group server
+        // The from attribute domain must equal the group server
         var from = node.getAttributeAsJid("from").orElse(null);
         if (from == null || !"g.us".equals(from.server().toString())) {
             return Optional.empty();

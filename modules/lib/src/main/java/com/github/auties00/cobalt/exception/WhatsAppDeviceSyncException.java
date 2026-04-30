@@ -1,39 +1,37 @@
 package com.github.auties00.cobalt.exception;
 
 /**
- * Exception thrown when device synchronization (USync) fails.
+ * Thrown when a USync device-list query against the WhatsApp servers
+ * returns an error.
  *
- * <p>USync is the WhatsApp server-side mechanism used to retrieve and reconcile
- * device lists for a set of users. When the client needs to send a message to a
- * user it first queries USync to learn which devices belong to that user, so that
- * the message can be fanned out to every relevant Signal session.
-
- * <p>Per WhatsApp Web, USync can fail with two distinct classes of errors:
- * <ul>
- *   <li><b>Fatal ({@code error.all}):</b> Affects the entire sync request and prevents
- *       processing of every user in the batch.</li>
- *   <li><b>Non-fatal ({@code error.devices}):</b> Affects specific device queries but
- *       allows the rest of the batch to continue.</li>
- * </ul>
+ * <p>USync is the request Cobalt issues before sending a message in
+ * order to learn the set of devices that belong to each recipient. The
+ * server can reject the request as a whole (a batch-wide failure that
+ * blocks the entire send) or report a per-device issue inside an
+ * otherwise successful response (a partial failure that lets other
+ * recipients still be addressed). The {@code fatal} flag passed to the
+ * constructor mirrors that distinction and is reflected in
+ * {@link #isFatal()}.
  */
 public final class WhatsAppDeviceSyncException extends WhatsAppException {
     /**
-     * The error code returned by the USync server response.
+     * The numeric error code returned in the USync error stanza.
      */
     private final int errorCode;
 
     /**
-     * Whether this particular USync failure should be treated as fatal.
+     * Whether the USync server response marked this failure as
+     * batch-wide.
      */
     private final boolean fatal;
 
     /**
      * Constructs a new device sync exception.
      *
-     * @param errorCode the error code from the server
-     * @param errorText the error text/message from the server
-     * @param fatal     whether this is a fatal error (batch-wide) or a per-device
-     *                  failure that allows the rest of the batch to succeed
+     * @param errorCode the numeric error code returned by the server
+     * @param errorText the human-readable description returned by the server
+     * @param fatal     {@code true} when the failure affects the whole batch,
+     *                  {@code false} when only a subset of devices failed
      */
     public WhatsAppDeviceSyncException(int errorCode, String errorText, boolean fatal) {
         super("USync error " + errorCode + ": " + errorText);
@@ -42,10 +40,11 @@ public final class WhatsAppDeviceSyncException extends WhatsAppException {
     }
 
     /**
-     * Returns the error code from the server.
+     * Returns the numeric error code returned by the USync server.
      *
-     * <p>The code originates from the {@code code} attribute of the USync {@code error}
-     * node and can be used to distinguish between server-side failure modes.
+     * <p>The code is taken verbatim from the {@code code} attribute of
+     * the USync error stanza and can be used to disambiguate the
+     * server-side failure mode.
      *
      * @return the error code
      */
@@ -54,13 +53,13 @@ public final class WhatsAppDeviceSyncException extends WhatsAppException {
     }
 
     /**
-     * Returns whether this exception represents a fatal error.
+     * Returns whether the failure invalidates the current session.
      *
-     * <p>Fatal USync errors indicate the entire batch request failed and cannot be
-     * processed. Non-fatal errors indicate only a subset of the device queries failed
-     * and the remaining devices can still be used.
+     * <p>USync errors are reported as fatal when the entire batch was
+     * rejected and as non-fatal when only a subset of devices failed.
      *
-     * @return {@code true} if the USync response marked this as a batch-wide failure
+     * @return {@code true} for batch-wide rejections, {@code false}
+     *         when the rest of the response can still be used
      */
     @Override
     public boolean isFatal() {

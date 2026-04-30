@@ -30,8 +30,6 @@ import java.util.concurrent.TimeUnit;
 public final class MissingSyncKeyTimeoutScheduler {
     /**
      * Logger for this scheduler.
-     *
-     * @implNote WAWebSyncdStoreMissingKeys: WALogger.LOG/ERROR usage
      */
     private static final System.Logger LOGGER = System.getLogger(MissingSyncKeyTimeoutScheduler.class.getName());
 
@@ -40,19 +38,15 @@ public final class MissingSyncKeyTimeoutScheduler {
      *
      * @implNote WAWebTasksDefinitions: HOUR_SECONDS * 6
      */
-    private static final long RE_REQUEST_INTERVAL_HOURS = 6; // WAWebTasksDefinitions: HOUR_SECONDS * 6
+    private static final long RE_REQUEST_INTERVAL_HOURS = 6;
 
     /**
      * The WhatsApp client instance, used for fatal error handling.
-     *
-     * @implNote ADAPTED: Cobalt DI pattern (constructor injection)
      */
     private final WhatsAppClient client;
 
     /**
      * The WhatsApp store, used for querying missing sync keys and sync key state.
-     *
-     * @implNote ADAPTED: Cobalt DI pattern (constructor injection)
      */
     private final WhatsAppStore store;
 
@@ -73,7 +67,7 @@ public final class MissingSyncKeyTimeoutScheduler {
     /**
      * Single-threaded scheduler for all timeout and periodic tasks.
      *
-     * @implNote ADAPTED: Java ScheduledExecutorService replaces WA Web's setTimeout/setInterval
+     * @implNote Replaces WA Web's {@code setTimeout}/{@code setInterval}.
      */
     private final ScheduledExecutorService scheduler;
 

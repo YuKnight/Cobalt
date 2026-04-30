@@ -19,7 +19,7 @@ import java.util.Optional;
  * @implNote {@code WAWebUsync.usyncParser} projects the
  *           {@code <usync><result/><list/></usync>} structure
  *           into a {@code (perProtocolErrors, perProtocolRefresh,
- *           userResults)} triple; Cobalt mirrors the projection
+ *           userResults)} triple. Cobalt mirrors the projection
  *           on {@link IqUsyncResponse.Success}.
  */
 public sealed interface IqUsyncResponse extends IqOperation.Response
@@ -29,10 +29,10 @@ public sealed interface IqUsyncResponse extends IqOperation.Response
      * Tries each {@link IqUsyncResponse} variant in priority order and returns
      * the first that parses cleanly.
      *
-     * @param node    the inbound IQ stanza received from the relay;
-     *                never {@code null}
-     * @param request the original outbound stanza — used to validate
-     *                echoed identifiers; never {@code null}
+     * @param node    the inbound IQ stanza received from the relay.
+     *                Never {@code null}
+     * @param request the original outbound stanza. Used to validate
+     *                echoed identifiers. Never {@code null}
      * @return an {@link Optional} carrying the parsed variant, or
      *         {@link Optional#empty()} when no documented variant
      *         matched the stanza shape
@@ -55,7 +55,7 @@ public sealed interface IqUsyncResponse extends IqOperation.Response
     }
 
     /**
-     * The {@code Success} reply variant — the relay returned the
+     * The {@code Success} reply variant. The relay returned the
      * per-user attribute projections plus per-protocol envelope
      * status (errors and refresh hints).
      */
@@ -63,14 +63,14 @@ public sealed interface IqUsyncResponse extends IqOperation.Response
     final class Success implements IqUsyncResponse {
         /**
          * The list of per-protocol envelopes returned in the
-         * {@code <result/>} grandchild — one entry per protocol
+         * {@code <result/>} grandchild. One entry per protocol
          * that the relay was queried for.
          */
         private final List<ProtocolEnvelope> protocolEnvelopes;
 
         /**
          * The list of per-user results returned in the
-         * {@code <list/>} grandchild — one entry per user the
+         * {@code <list/>} grandchild. One entry per user the
          * relay successfully resolved (relay drops users with no
          * resolvable JID).
          */
@@ -79,9 +79,9 @@ public sealed interface IqUsyncResponse extends IqOperation.Response
         /**
          * Constructs a new successful reply.
          *
-         * @param protocolEnvelopes the per-protocol envelopes;
-         *                          never {@code null}
-         * @param userResults       the per-user results; never
+         * @param protocolEnvelopes the per-protocol envelopes.
+         *                          Never {@code null}
+         * @param userResults       the per-user results. Never
          *                          {@code null}
          * @throws NullPointerException if any reference argument
          *                              is {@code null}
@@ -96,7 +96,7 @@ public sealed interface IqUsyncResponse extends IqOperation.Response
         /**
          * Returns the unmodifiable list of per-protocol envelopes.
          *
-         * @return the envelopes; never {@code null}
+         * @return the envelopes. Never {@code null}
          */
         public List<ProtocolEnvelope> protocolEnvelopes() {
             return protocolEnvelopes;
@@ -105,7 +105,7 @@ public sealed interface IqUsyncResponse extends IqOperation.Response
         /**
          * Returns the unmodifiable list of per-user results.
          *
-         * @return the results; never {@code null}
+         * @return the results. Never {@code null}
          */
         public List<UserResult> userResults() {
             return userResults;
@@ -124,7 +124,7 @@ public sealed interface IqUsyncResponse extends IqOperation.Response
          * @implNote {@code WAWebUsync.usyncParser} projects
          *           {@code child("usync").{child("result"),
          *           child("list")}} into the per-protocol error
-         *           map and the per-user result list; Cobalt
+         *           map and the per-user result list. Cobalt
          *           preserves the structure with explicit
          *           {@link ProtocolEnvelope} and
          *           {@link UserResult} nested types.
@@ -186,14 +186,14 @@ public sealed interface IqUsyncResponse extends IqOperation.Response
 
     /**
      * Per-protocol envelope projected from one grandchild of the
-     * inbound {@code <result/>} child — carries either an
+     * inbound {@code <result/>} child. Carries either an
      * {@code <error/>} sub-envelope (per-protocol failure with
      * optional backoff hint) or a {@code refresh} attribute
      * (per-protocol cache TTL hint).
      *
      * @implNote {@code WAWebUsync.usyncParser} projects
      *           {@code maybeChild("error").{code, text, backoff}}
-     *           or {@code attrInt("refresh", 0)} per protocol;
+     *           or {@code attrInt("refresh", 0)} per protocol.
      *           Cobalt models both projections.
      */
     @WhatsAppWebModule(moduleName = "WAWebUsync")
@@ -235,7 +235,7 @@ public sealed interface IqUsyncResponse extends IqOperation.Response
         /**
          * Constructs a new envelope.
          *
-         * @param protocol     the protocol tag; never {@code null}
+         * @param protocol     the protocol tag. Never {@code null}
          * @param errorCode    the optional error code
          * @param errorText    the optional error text
          * @param errorBackoff the optional backoff hint in seconds
@@ -255,7 +255,7 @@ public sealed interface IqUsyncResponse extends IqOperation.Response
         /**
          * Returns the protocol tag.
          *
-         * @return the tag; never {@code null}
+         * @return the tag. Never {@code null}
          */
         public String protocol() {
             return protocol;
@@ -305,7 +305,7 @@ public sealed interface IqUsyncResponse extends IqOperation.Response
         /**
          * Parses an envelope from the given protocol grandchild.
          *
-         * @param protocolNode the protocol grandchild; never
+         * @param protocolNode the protocol grandchild. Never
          *                     {@code null}
          * @return the parsed envelope
          */
@@ -375,7 +375,7 @@ public sealed interface IqUsyncResponse extends IqOperation.Response
      * @implNote {@code WAWebUsync.m()} projects
      *           {@code attrDeviceJid("jid")} +
      *           {@code attrDeviceJid("pn_jid")} plus the
-     *           per-protocol payload subtrees; Cobalt keeps the
+     *           per-protocol payload subtrees. Cobalt keeps the
      *           payload subtrees as raw {@link Node} entries so
      *           the caller can route through whichever
      *           protocol-specific parser is appropriate.
@@ -403,8 +403,8 @@ public sealed interface IqUsyncResponse extends IqOperation.Response
          *
          * @param userJid          the optional user JID
          * @param pnJid            the optional phone JID
-         * @param protocolPayloads the per-protocol payload nodes;
-         *                         never {@code null}
+         * @param protocolPayloads the per-protocol payload nodes.
+         *                         Never {@code null}
          * @throws NullPointerException if {@code protocolPayloads}
          *                              is {@code null}
          */
@@ -437,7 +437,7 @@ public sealed interface IqUsyncResponse extends IqOperation.Response
          * Returns the unmodifiable list of per-protocol payload
          * nodes.
          *
-         * @return the payloads; never {@code null}
+         * @return the payloads. Never {@code null}
          */
         public List<Node> protocolPayloads() {
             return protocolPayloads;
@@ -471,7 +471,7 @@ public sealed interface IqUsyncResponse extends IqOperation.Response
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected
+     * The {@code ClientError} reply variant. The relay rejected
      * the entire usync as malformed or unauthorised.
      */
     @WhatsAppWebModule(moduleName = "WAWebUsync")
@@ -490,7 +490,7 @@ public sealed interface IqUsyncResponse extends IqOperation.Response
          * Constructs a new client-error reply.
          *
          * @param errorCode the numeric error code
-         * @param errorText the optional human-readable text; may be
+         * @param errorText the optional human-readable text. May be
          *                  {@code null}
          */
         public ClientError(int errorCode, String errorText) {
@@ -563,7 +563,7 @@ public sealed interface IqUsyncResponse extends IqOperation.Response
     }
 
     /**
-     * The {@code ServerError} reply variant — the relay encountered a
+     * The {@code ServerError} reply variant. The relay encountered a
      * transient internal failure while processing the usync.
      */
     @WhatsAppWebModule(moduleName = "WAWebUsync")
@@ -582,7 +582,7 @@ public sealed interface IqUsyncResponse extends IqOperation.Response
          * Constructs a new server-error reply.
          *
          * @param errorCode the numeric error code
-         * @param errorText the optional human-readable text; may be
+         * @param errorText the optional human-readable text. May be
          *                  {@code null}
          */
         public ServerError(int errorCode, String errorText) {

@@ -25,32 +25,22 @@ import java.util.Set;
  * presence state} and {@linkplain Contact#lastSeen() last-seen timestamp} in the
  * local store, then notifies registered listeners.
  *
- * @implNote WAWebHandlePresence.default and WAWebChangePresenceHandlerAction.default
  */
 @WhatsAppWebModule(moduleName = "WAWebHandlePresence")
 @WhatsAppWebModule(moduleName = "WAWebChangePresenceHandlerAction")
 public final class PresenceStreamHandler implements SocketStream.Handler {
     /**
-     * The logger for diagnostic messages related to presence handling.
-     *
-     * @implNote WAWebHandlePresence, WALogger.ERROR usage
+     * Logger for diagnostic messages related to presence handling.
      */
     private static final System.Logger LOGGER = System.getLogger(PresenceStreamHandler.class.getName());
 
     /**
-     * The set of {@code last} attribute values that indicate the contact has hidden
-     * their last-seen timestamp through privacy settings. When the {@code last}
-     * attribute matches one of these values, the last-seen timestamp is not updated
-     * and is instead cleared.
-     *
-     * @implNote WAWebHandlePresence, var c = ["deny", "none", "error"]
+     * The set of {@code last} attribute values that indicate the contact has hidden their last-seen timestamp through privacy settings. When the {@code last} attribute matches one of these values, the last-seen timestamp is not updated and is instead cleared.
      */
     private static final Set<String> HIDDEN_LAST_VALUES = Set.of("deny", "none", "error");
 
     /**
-     * The WhatsApp client instance used to access the store and notify listeners.
-     *
-     * @implNote WAWebHandlePresence, constructor DI replaces module-level store access
+     * The WhatsApp client used to access the store and notify listeners.
      */
     private final WhatsAppClient whatsapp;
 
@@ -58,7 +48,6 @@ public final class PresenceStreamHandler implements SocketStream.Handler {
      * Constructs a new presence stream handler with the given WhatsApp client.
      *
      * @param whatsapp the non-{@code null} WhatsApp client instance
-     * @implNote WAWebHandlePresence, module-level initialization
      */
     @WhatsAppWebExport(moduleName = "WAWebHandlePresence", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -82,13 +71,7 @@ public final class PresenceStreamHandler implements SocketStream.Handler {
      * </ol>
      *
      * @param node the non-{@code null} presence stanza node
-     * @implNote WAWebHandlePresence.default, async function m(t). The WA Web
-     *           handler additionally dispatches {@code GroupAvailable} and
-     *           {@code GroupUnavailable} parsed-presence variants to
-     *           {@code WAWebChangeGroupPresenceHandlerAction}; Cobalt does not
-     *           model group-presence counts (the server emits them only for
-     *           UI participant-count badges, which Cobalt's headless model
-     *           does not surface), so those branches are intentionally absent.
+     * @implNote WA Web's handler also dispatches GroupAvailable and GroupUnavailable variants to WAWebChangeGroupPresenceHandlerAction; Cobalt does not model group-presence counts (the server emits them only for UI participant-count badges) so those branches are absent.
      */
     @WhatsAppWebExport(moduleName = "WAWebHandlePresence", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -96,57 +79,35 @@ public final class PresenceStreamHandler implements SocketStream.Handler {
             adaptation = WhatsAppAdaptation.ADAPTED)
     @Override
     public void handle(Node node) {
-        // WAWebHandlePresence.default: var l = chatJidToChatWid(i.value.from)
         var from = node.getAttributeAsJid("from", null);
         if (from == null) {
             LOGGER.log(System.Logger.Level.DEBUG, "Ignoring presence stanza without from: {0}", node);
             return;
         }
 
-        // WAWebChangePresenceHandlerAction.default: if (!isMeAccount(a))
-        // isMeAccount checks both PN and LID user; Cobalt checks the PN user
-        // directly and resolves LID-based from JIDs via findPhoneByLid
         var meJid = whatsapp.store().jid().orElse(null);
         if (meJid != null && isSelfPresence(from, meJid)) {
-            return; // WAWebChangePresenceHandlerAction.default, skip self-presence
+            return;
         }
 
-        // ADAPTED: WAWebHandlePresence.default, LID/PN resolution
-        // WA Web checks isLidMigrated() and has two paths:
-        //   - Not migrated: convert LID to PN via getPhoneNumber
-        //   - Migrated: reject PN presence, resolve LID via getChatByAccountLid
-        // Cobalt treats isLidMigrated() as always true and resolves LIDs to PNs
-        // via findPhoneByLid, which is architecturally equivalent since Cobalt
-        // stores contacts by PN JID rather than using a PresenceCollection keyed by wid.
         var contact = getOrCreateContact(from);
         if (contact == null) {
             return;
         }
 
-        // WAWebHandlePresence.default: type: i.value.type || "available"
         var type = node.getAttributeAsString("type", "available");
         var status = "unavailable".equals(type) ? ContactStatus.UNAVAILABLE : ContactStatus.AVAILABLE;
-        contact.setLastKnownPresence(status); // WAWebChangePresenceHandlerAction.default, r.set(t)
+        contact.setLastKnownPresence(status);
 
-        // WAWebHandlePresence.default: t: i.value.type === "unavailable" ? d(i.value.last) : void 0
-        // Only set lastSeen when type is "unavailable" and d(last) returns a value.
-        // When type is "available", the t property in the WA Web update object is
-        // undefined, and the Backbone-style setter r.set({t: undefined}) leaves the
-        // existing t field untouched. Similarly, deny/none/error sentinel values
-        // produce undefined from d(last) and do not modify the lastSeen field.
+        // Only set lastSeen when type is "unavailable" and resolveLastSeen returns a value, mirroring WA Web's r.set({t: undefined}) which leaves the existing t field untouched.
         var lastValue = node.getAttributeAsString("last", null);
         var lastSeen = resolveLastSeen(lastValue, status);
         if (lastSeen != null) {
-            contact.setLastSeen(lastSeen); // WAWebPresenceModel.Chatstate, t field
+            contact.setLastSeen(lastSeen);
         }
-        // WAWebHandlePresence.default: deny: i.value.last === "deny" || void 0
-        // NO_WA_BASIS, Cobalt's Contact model has no dedicated deny flag;
-        // in WA Web the deny flag only affects the forceDisplay UI hint
-        // (forceDisplay = ... || (isUser && !chatstate.deny)), which has no
-        // equivalent in Cobalt's headless model. The last="deny" sentinel is
-        // already handled correctly by resolveLastSeen returning null.
-        whatsapp.store().addContact(contact); // ADAPTED: WAWebPresenceCollection store operations
-        notifyPresence(contact.toJid(), contact.toJid()); // ADAPTED: WAWebChangePresenceHandlerAction.default, non-group path
+        // WA Web's deny flag is a UI forceDisplay hint that Cobalt's headless model does not surface; the last="deny" sentinel is already handled by resolveLastSeen returning null.
+        whatsapp.store().addContact(contact);
+        notifyPresence(contact.toJid(), contact.toJid());
     }
 
     /**
@@ -167,25 +128,22 @@ public final class PresenceStreamHandler implements SocketStream.Handler {
      * @param lastValue the raw {@code last} attribute value from the stanza, or {@code null}
      * @param status    the resolved presence status
      * @return the last-seen instant, or {@code null} if not applicable
-     * @implNote WAWebHandlePresence, function d(e)
      */
     private Instant resolveLastSeen(String lastValue, ContactStatus status) {
-        // WAWebHandlePresence.default: t: i.value.type === "unavailable" ? d(i.value.last) : void 0
         if (status != ContactStatus.UNAVAILABLE) {
             return null;
         }
 
-        // WAWebHandlePresence, d(e): if (e != null) { if (!c.includes(e)) return castToUnixTime(Number(e)) } else return unixTime()
         if (lastValue == null) {
-            return Instant.now(); // WAWebHandlePresence, d(e): else return unixTime()
+            return Instant.now();
         }
 
         if (HIDDEN_LAST_VALUES.contains(lastValue)) {
-            return null; // WAWebHandlePresence, d(e): if (!c.includes(e)), deny/none/error return undefined
+            return null;
         }
 
         try {
-            return Instant.ofEpochSecond(Long.parseLong(lastValue)); // WAWebHandlePresence, d(e): castToUnixTime(Number(e))
+            return Instant.ofEpochSecond(Long.parseLong(lastValue));
         } catch (NumberFormatException exception) {
             LOGGER.log(System.Logger.Level.DEBUG,
                     "Ignoring malformed presence last value {0}", lastValue);
@@ -204,16 +162,13 @@ public final class PresenceStreamHandler implements SocketStream.Handler {
      * @param from  the JID from the presence stanza
      * @param meJid the current user's device JID
      * @return {@code true} if the presence is for the current user's own account
-     * @implNote WAWebUserPrefsMeUser.isMeAccount, function $(e)
      */
     private boolean isSelfPresence(Jid from, Jid meJid) {
         var fromUser = from.toUserJid();
         var meUser = meJid.toUserJid();
-        // WAWebUserPrefsMeUser.isMePnUser: checks PN user part match
         if (fromUser.user().equals(meUser.user())) {
             return true;
         }
-        // WAWebUserPrefsMeUser.isMeAccount: also checks LID match via getMaybeMeLidUser
         if (fromUser.hasLidServer()) {
             var phoneJid = whatsapp.store().findPhoneByLid(fromUser).orElse(null);
             return phoneJid != null && phoneJid.user().equals(meUser.user());
@@ -232,15 +187,12 @@ public final class PresenceStreamHandler implements SocketStream.Handler {
      *
      * @param jid the JID from the presence stanza
      * @return the resolved contact, or {@code null} if the JID cannot be resolved
-     * @implNote ADAPTED: WAWebHandlePresence.default, LID/PN resolution via
-     *           WAWebApiContact.getPhoneNumber and WAWebChatCollection.getChatByAccountLid
      */
     private Contact getOrCreateContact(Jid jid) {
         if (jid == null) {
-            return null; // NO_WA_BASIS, defensive null check
+            return null;
         }
 
-        // ADAPTED: WAWebHandlePresence.default, var p = getPhoneNumber(l); if (p == null) return; l = p
         var canonical = jid.toUserJid().hasLidServer()
                 ? whatsapp.store().findPhoneByLid(jid.toUserJid()).orElse(jid.toUserJid())
                 : jid.toUserJid();
@@ -258,9 +210,7 @@ public final class PresenceStreamHandler implements SocketStream.Handler {
      *
      * @param conversation the JID of the conversation where the presence changed
      * @param participant  the JID of the participant whose presence changed
-     * @implNote ADAPTED: WAWebChangePresenceHandlerAction.default, non-group
-     *           presence update triggers UI refresh via model observation; Cobalt
-     *           uses an explicit listener notification instead
+     * @implNote WA Web's non-group presence update triggers UI refresh via model observation; Cobalt uses an explicit listener notification.
      */
     private void notifyPresence(Jid conversation, Jid participant) {
         for (var listener : whatsapp.store().listeners()) {

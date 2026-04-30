@@ -8,29 +8,26 @@ import java.util.Optional;
 /**
  * Success result of {@code WAWebUsyncContact.contactParser}.
  *
- * <p>Carries the {@code type} attribute (the discovery answer:
- * {@code "in"} for registered, {@code "out"} for not registered,
- * {@code "none"} for unknown), the optional {@code username} attribute,
- * and the optional inline content (typically the canonical phone number
- * the relay echoes back).
- *
- * @implNote WAWebUsyncContact.contactParser: success branch returns
- *     {@code {type, username?, content?}}.
+ * <p>Carries the {@code type} attribute (the discovery answer, where
+ * {@code "in"} means registered, {@code "out"} means not registered, and
+ * {@code "none"} means unknown), the optional {@code username} attribute, and
+ * the optional inline content (typically the canonical phone number the relay
+ * echoes back).
  */
 @WhatsAppWebModule(moduleName = "WAWebUsyncContact")
 public final class ContactResult implements UsyncProtocolResponse {
     /**
-     * The {@code type} attribute on the {@code <contact>} response.
+     * Holds the {@code type} attribute on the {@code <contact>} response.
      */
     private final String type;
 
     /**
-     * The {@code username} attribute, or {@code null} if absent.
+     * Holds the {@code username} attribute, or {@code null} if absent.
      */
     private final String username;
 
     /**
-     * The inline text content of the {@code <contact>} child, or
+     * Holds the inline text content of the {@code <contact>} child, or
      * {@code null} if the response had no content.
      */
     private final String content;

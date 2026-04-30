@@ -5,8 +5,11 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * One {@code (businessJid, tag)} request entry — each entry materialises
- * a single {@code <profile jid tag/>} child of the outbound payload.
+ * Typed {@code (businessJid, tag)} entry carried inside an
+ * {@link IqQueryBusinessProfileRequest}. Each entry produces one
+ * {@code <profile jid tag/>} child of the outbound payload; supplying the
+ * tag lets the relay omit the full profile body when its cached version
+ * matches.
  */
 public final class IqQueryBusinessProfileRequestEntry {
     /**

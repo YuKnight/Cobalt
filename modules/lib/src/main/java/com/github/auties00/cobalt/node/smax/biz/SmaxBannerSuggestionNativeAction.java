@@ -14,7 +14,7 @@ import java.util.Optional;
 
 /**
  * Single {@code <native_action/>} entry from the
- * {@code native_actions_mixin} grandchild — describes a per-platform
+ * {@code native_actions_mixin} grandchild. Describes a per-platform
  * deep-link target.
  */
 @WhatsAppWebModule(moduleName = "WASmaxInBizCtwaActionNativeActionsMixinMixin")

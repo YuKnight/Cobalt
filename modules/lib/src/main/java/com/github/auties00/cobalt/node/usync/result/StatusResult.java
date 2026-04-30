@@ -7,23 +7,21 @@ import java.util.Optional;
 /**
  * Success result of {@code WAWebUsyncStatus.statusParser}.
  *
- * <p>Three states distinguishable by the {@link #status()} value:
- * <ul>
- *   <li>{@code Optional.of(text)} — the live status text,</li>
- *   <li>{@code Optional.of("")} — the relay returned a {@code code="401"}
- *       indicating the peer's privacy settings hide the status,</li>
- *   <li>{@code Optional.empty()} — the peer has no status set.</li>
- * </ul>
+ * <p>Three states are distinguishable by the {@link #status()} value.
+ * {@code Optional.of(text)} carries the live status text. {@code Optional.of("")}
+ * indicates the relay returned a {@code code="401"} marker because the peer's
+ * privacy settings hide the status. {@code Optional.empty()} indicates the
+ * peer has no status set.
  *
- * @implNote WAWebUsyncStatus.statusParser: returns one of
- *     {@code string | "" | null}; Cobalt collapses all three into an
- *     {@link Optional} with the empty-string discriminator preserved.
+ * @implNote The JS parser returns one of {@code string | "" | null}. Cobalt
+ *     collapses all three into an {@link Optional} with the empty-string
+ *     discriminator preserved.
  */
 @WhatsAppWebModule(moduleName = "WAWebUsyncStatus")
 public final class StatusResult implements UsyncProtocolResponse {
     /**
-     * The status string, or {@code null} when the peer has no status set.
-     * The empty string preserves the {@code code="401"} privacy-block
+     * Holds the status string, or {@code null} when the peer has no status
+     * set. The empty string preserves the {@code code="401"} privacy-block
      * marker.
      */
     private final String status;

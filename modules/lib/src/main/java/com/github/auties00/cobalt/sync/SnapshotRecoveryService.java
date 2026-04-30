@@ -72,16 +72,27 @@ import java.util.zip.GZIPInputStream;
 @WhatsAppWebModule(moduleName = "WAWebSendNonMessageDataRequest")
 public final class SnapshotRecoveryService {
     private static final Logger LOGGER = Logger.getLogger(SnapshotRecoveryService.class.getName());
-    private static final long RECOVERY_TIMEOUT_MS = 60_000; // WAWebRequestSyncdSnapshotRecovery: var p = 6e4
+    private static final long RECOVERY_TIMEOUT_MS = 60_000;
 
-    private final WhatsAppClient client; // ADAPTED: WAWebRequestSyncdSnapshotRecovery constructor DI
-    private final ABPropsService abPropsService; // ADAPTED: WAWebSyncdSnapshotRecoveryGatingUtils uses WAWebABProps directly
+    private final WhatsAppClient client;
+    private final ABPropsService abPropsService;
     /**
      * The WAM telemetry service used to commit recovery-request events.
      */
     private final WamService wamService;
-    private final Map<SyncPatchType, CompletableFuture<SyncdSnapshotRecovery>> pendingRecoveries; // ADAPTED: WAWebRequestSyncdSnapshotRecovery: this.recoveryPromise = new Map — holds the decoded snapshot to avoid double-decoding
-    private final Semaphore recoverySemaphore; // ADAPTED: WAWebRequestSyncdSnapshotRecovery: this.recoveryInflight (Resolvable)
+    /**
+     * Holds the decoded snapshot per collection to avoid double-decoding.
+     *
+     * @implNote Replaces WA Web's {@code this.recoveryPromise = new Map}, but stores the
+     *           pre-decoded {@link SyncdSnapshotRecovery} instead of a raw resolvable.
+     */
+    private final Map<SyncPatchType, CompletableFuture<SyncdSnapshotRecovery>> pendingRecoveries;
+    /**
+     * Serialises concurrent recovery requests across collections.
+     *
+     * @implNote Replaces WA Web's {@code this.recoveryInflight} resolvable.
+     */
+    private final Semaphore recoverySemaphore;
 
     /**
      * Creates a new snapshot recovery service.
@@ -93,11 +104,11 @@ public final class SnapshotRecoveryService {
      */
     @WhatsAppWebExport(moduleName = "WAWebRequestSyncdSnapshotRecovery", exports = "SyncdSnapshotRecoveryModule", adaptation = WhatsAppAdaptation.ADAPTED)
     public SnapshotRecoveryService(WhatsAppClient client, ABPropsService abPropsService, WamService wamService) {
-        this.client = client; // ADAPTED: WAWebRequestSyncdSnapshotRecovery constructor DI
-        this.abPropsService = abPropsService; // ADAPTED: WAWebSyncdSnapshotRecoveryGatingUtils uses WAWebABProps directly
+        this.client = client;
+        this.abPropsService = abPropsService;
         this.wamService = wamService;
-        this.pendingRecoveries = new ConcurrentHashMap<>(); // WAWebRequestSyncdSnapshotRecovery: this.recoveryPromise = new Map
-        this.recoverySemaphore = new Semaphore(1); // ADAPTED: WAWebRequestSyncdSnapshotRecovery: this.recoveryInflight = null
+        this.pendingRecoveries = new ConcurrentHashMap<>();
+        this.recoverySemaphore = new Semaphore(1);
     }
 
     /**

@@ -142,7 +142,6 @@ public final class LinkPreviewService {
      * @param chatJid the target chat JID
      * @param message the outgoing extended-text message; mutated in
      *                place
-     * @implNote WAWebLinkPreviewChatAction.getLinkPreview.
      */
     @WhatsAppWebExport(moduleName = "WAWebLinkPreviewChatAction", exports = "getLinkPreview",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -150,7 +149,6 @@ public final class LinkPreviewService {
         if (message == null) {
             return;
         }
-        // WAWebLinkPreviewChatAction: short-circuit on disableLinkPreviews
         if (client.store().disableLinkPreviews()) {
             return;
         }
@@ -158,26 +156,20 @@ public final class LinkPreviewService {
         if (text == null || text.isEmpty()) {
             return;
         }
-        // WALinkify.findLink(text, false): pick the first detected URL
         var match = Linkify.findLink(text, false).orElse(null);
         if (match == null) {
             return;
         }
-        // WAWebLinkPreviewChatAction inner gate: refuse previews for hosts
-        // flagged by SuspiciousLinks.findSuspiciousCharacters (homograph
-        // attacks). Strictly the JS pipeline only consults the gate after
-        // the deep-link branches; in practice the deep-link patterns are
-        // restricted to canonical WhatsApp domains that always pass the
-        // gate, so applying the check up-front is equivalent.
+        // The JS pipeline only consults the suspicious gate after the deep link branches.
+        // In practice deep link patterns are restricted to canonical WhatsApp domains
+        // that always pass the gate, so applying the check up front is equivalent.
         if (SuspiciousLinks.isSuspicious(client, chatJid, match)) {
             return;
         }
-        // WAWebCheckIfDomainIsPreviewable
         if (!DomainPreviewableGate.isPreviewable(client, chatJid, match.domain())) {
             return;
         }
         var newsletterChat = chatJid != null && chatJid.hasNewsletterServer();
-        // WAWebLinkPreviewCache: short-circuit on cache hit
         var cached = cache.get(match.href(), newsletterChat).orElse(null);
         if (cached != null) {
             if (!LinkPreviewCache.isNegative(cached)) {
@@ -185,13 +177,11 @@ public final class LinkPreviewService {
             }
             return;
         }
-        // WAWebApiParse.parseAPICmd: dispatch deep-link types first.
-        // Catalog / Product / GroupInvite return non-null when the resolution
-        // succeeds; in that case the deep-link branch wins and the rich fetch
-        // is skipped. PaymentLink threads through previewType + paymentDetails
-        // and continues into the rich fetch so the page title/description
-        // populate the card. Anything else goes straight to rich fetch
-        // (or the newsletter MEX for newsletter chats).
+        // Catalog, Product and GroupInvite return non-null when the resolution succeeds.
+        // In that case the deep link branch wins and the rich fetch is skipped.
+        // PaymentLink threads through previewType and paymentDetails and continues into
+        // the rich fetch so the page title and description populate the card. Anything
+        // else goes straight to rich fetch, or to the newsletter MEX for newsletter chats.
         var command = DeepLinkParser.parse(client, match.href());
         var previewType = ExtendedTextMessage.PreviewType.NONE;
         PaymentLinkDetails paymentDetails = null;
@@ -219,8 +209,8 @@ public final class LinkPreviewService {
                 }
             }
             case DeepLinkParser.DeepLink.PaymentLink payment -> {
-                // WAWebPaymentLinkUrlMetaData.getPaymentLinkUrlMetaData: shouldDetectInComposer
-                // is SMB-only; non-SMB clients see the URL but do not produce a payment card.
+                // shouldDetectInComposer is SMB only. Non SMB clients still see the URL but
+                // do not produce a payment card.
                 if (payment.shouldDetectInComposer()) {
                     previewType = ExtendedTextMessage.PreviewType.PAYMENT_LINKS;
                     paymentDetails = new PaymentLinkDetails(payment.psp());
@@ -271,8 +261,8 @@ public final class LinkPreviewService {
                                       ExtendedTextMessage message,
                                       ExtendedTextMessage.PreviewType baselinePreviewType,
                                       PaymentLinkDetails paymentDetails) {
-        // WAWebLinkPreviewChatAction: !getABPropConfigValue("web_link_preview_sync_enabled")
-        // || !PrimaryFeatures.linkPreview ⇒ genMinimalLinkPreview
+        // When web_link_preview_sync_enabled is off the rich fetch is skipped and the
+        // minimal fallback is attached, mirroring the JS genMinimalLinkPreview branch.
         if (!client.abPropsService().getBool(ABProp.WEB_LINK_PREVIEW_SYNC_ENABLED)) {
             attachMinimal(match, message, baselinePreviewType, paymentDetails);
             return true;
@@ -461,10 +451,9 @@ public final class LinkPreviewService {
             cache.put(url, newsletterChat, null);
             return;
         }
-        // WAWebNewsletterFetchLinkPreviewAction.fetchPlaintextLinkPreviewAction:
-        // newsletter previews are only cached when the HQ thumbnail is present
-        // (thumbnailHQ != null), so subsequent sends of the same URL re-query
-        // the server while the LQ-only result is still considered transient.
+        // Newsletter previews are only cached when the HQ thumbnail is present, so
+        // subsequent sends of the same URL re-query the server while a LQ only result
+        // is still considered transient.
         if (newsletterChat && message.thumbnailDirectPath().isEmpty()) {
             return;
         }

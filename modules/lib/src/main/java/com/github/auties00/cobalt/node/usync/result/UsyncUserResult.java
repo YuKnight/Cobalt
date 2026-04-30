@@ -12,38 +12,36 @@ import java.util.Optional;
 /**
  * Per-user result for one entry in a USync response.
  *
- * <p>Each {@code <user>} entry in the {@code <list>} reply carries the
- * peer's identifiers as attributes ({@code jid} and optionally
- * {@code pn_jid}) plus one child element per protocol the query asked
- * about. This class wraps both into a typed, immutable shape.
+ * <p>Each {@code <user>} entry in the {@code <list>} reply carries the peer's
+ * identifiers as attributes ({@code jid} and optionally {@code pn_jid}) plus
+ * one child element per protocol the query asked about. This class wraps both
+ * into a typed, immutable shape.
  *
- * <p>Per-protocol results are not exposed as a raw {@link Map}; callers
- * look up a specific protocol via
- * {@link #getProtocolResult(UsyncProtocol)} (typed) or
- * {@link #getProtocolResult(String)} (by wire name) and check membership
- * via {@link #hasProtocolResult(UsyncProtocol)}.
+ * <p>Per-protocol results are not exposed as a raw {@link Map}. Callers look
+ * up a specific protocol via {@link #getProtocolResult(UsyncProtocol)}
+ * (typed) or {@link #getProtocolResult(String)} (by wire name) and check
+ * membership via {@link #hasProtocolResult(UsyncProtocol)}.
  *
- * @implNote WAWebUsync.m: the JS function builds a flat object keyed by
- *     protocol name. Cobalt nests the protocols under a private map so
- *     the JID identifiers cannot collide with protocol names and the map
- *     never leaks to callers.
+ * @implNote The JS function builds a flat object keyed by protocol name.
+ *     Cobalt nests the protocols under a private map so the JID identifiers
+ *     cannot collide with protocol names and the map never leaks to callers.
  */
 @WhatsAppWebModule(moduleName = "WAWebUsync")
 public final class UsyncUserResult {
     /**
-     * The peer's canonical JID, or {@code null} when the relay omitted
+     * Holds the peer's canonical JID, or {@code null} when the relay omitted
      * the {@code jid} attribute.
      */
     private final Jid id;
 
     /**
-     * The peer's phone-number JID, or {@code null} when the relay
+     * Holds the peer's phone-number JID, or {@code null} when the relay
      * omitted the {@code pn_jid} attribute.
      */
     private final Jid phoneJid;
 
     /**
-     * Map from protocol name to the parsed result for this user.
+     * Maps protocol name to the parsed result for this user.
      */
     private final Map<String, UsyncProtocolResult> protocolResults;
 
@@ -53,8 +51,8 @@ public final class UsyncUserResult {
      *
      * @param id              the canonical JID, or {@code null}
      * @param phoneJid        the phone-number JID, or {@code null}
-     * @param protocolResults the per-protocol results; defaults to an
-     *                        empty map when {@code null}
+     * @param protocolResults the per-protocol results; defaults to an empty
+     *                        map when {@code null}
      */
     public UsyncUserResult(Jid id, Jid phoneJid, Map<String, UsyncProtocolResult> protocolResults) {
         this.id = id;
@@ -102,8 +100,8 @@ public final class UsyncUserResult {
     }
 
     /**
-     * Returns whether the relay returned a parse result for the
-     * specified protocol on this user entry.
+     * Returns whether the relay returned a parse result for the specified
+     * protocol on this user entry.
      *
      * @param protocol the protocol descriptor
      * @return {@code true} when present

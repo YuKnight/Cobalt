@@ -1,6 +1,8 @@
 package com.github.auties00.cobalt.info;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.device.pairing.ClientAppVersion;
 
 import java.io.IOException;
@@ -10,69 +12,72 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 
 /**
- * Resolves the current WhatsApp Web build version by scraping the
- * {@code web.whatsapp.com} landing page.
+ * Represents the build identity of a WhatsApp Web client and resolves it by
+ * scraping the {@code web.whatsapp.com} landing page.
  *
- * <p>WhatsApp Web ships the running build version as a JSON property named
+ * <p>WhatsApp Web ships its current build version as a JSON property named
  * {@code client_revision} inlined into the HTML delivered on the first page
- * load. This class fetches that page with a browser-like User-Agent, scans
+ * load. This class fetches that page with a browser like User-Agent, scans
  * the response for the {@code "client_revision":} marker and reads the
  * following integer, which it then folds into a fixed {@code 2.3000.X}
  * {@link ClientAppVersion}. The result is cached in a lazily initialised
- * volatile field protected by a double-checked lock so that a Cobalt process
+ * volatile field protected by a double checked lock so that a Cobalt process
  * performs at most one HTTP request for the web version regardless of how
- * many web/desktop clients it creates.
+ * many web or desktop clients it creates.
  *
- * <p>Desktop Windows and macOS clients reuse this class because they ship
- * the same JavaScript bundle as web.whatsapp.com and therefore have the same
- * {@code client_revision}.
+ * <p>The macOS desktop client reuses this class because it ships the same
+ * JavaScript bundle as {@code web.whatsapp.com} and therefore advertises
+ * the same {@code client_revision}. The Windows desktop client extends the
+ * web version with an additional store build component through
+ * {@link WhatsAppWindowsClientInfo}.
  *
- * @implNote WA Web's own source exposes the equivalent value through
- * {@code WAWebBuildConstants.VERSION_STR}, which is built at runtime from
- * {@code SiteData.client_revision}. Cobalt cannot read {@code SiteData}
- * directly because it is not running inside the web bundle, so it scrapes
- * the same underlying value from the HTML body.
+ * @implNote WhatsApp Web's own source exposes the equivalent value through
+ *           {@code WAWebBuildConstants.VERSION_STR}, which is built at runtime
+ *           from {@code SiteData.client_revision}. Cobalt cannot read
+ *           {@code SiteData} directly because it is not running inside the
+ *           web bundle, so it scrapes the same underlying value from the
+ *           HTML body.
  * @see WhatsAppClientInfo
  */
 @WhatsAppWebModule(moduleName = "WAWebBuildConstants")
 final class WhatsAppWebClientInfo implements WhatsAppClientInfo {
     /**
-     * Cached singleton instance of the resolved web client info.
+     * Holds the cached singleton instance of the resolved web client info.
      *
      * <p>Populated lazily on the first call to {@link #of()} and protected by
-     * {@link #webInfoLock} using the double-checked locking idiom.
+     * {@link #webInfoLock} using the double checked locking idiom.
      */
     private static volatile WhatsAppWebClientInfo webInfo;
 
     /**
-     * Monitor used to serialise initialisation of {@link #webInfo}.
+     * Holds the monitor used to serialise initialisation of {@link #webInfo}.
      */
     private static final Object webInfoLock = new Object();
 
     /**
-     * User-Agent string sent when fetching the web landing page.
+     * Holds the User-Agent string sent when fetching the web landing page.
      *
-     * <p>Using a realistic desktop Chrome User-Agent avoids serving a mobile
-     * redirect page that would not contain the {@code client_revision}
-     * marker.
+     * <p>A realistic desktop Chrome User-Agent is required so that the server
+     * does not respond with a mobile redirect page that would not contain
+     * the {@code client_revision} marker.
      */
     private static final String WEB_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36";
 
     /**
-     * Target URL whose HTML response embeds the {@code client_revision}
-     * field.
+     * Holds the target URL whose HTML response embeds the
+     * {@code client_revision} field.
      */
     private static final URI WEB_UPDATE_URL = URI.create("https://web.whatsapp.com");
 
     /**
-     * Character pattern used by {@link #queryWebInfo()} to locate the
-     * {@code "client_revision":} JSON property inside the streamed HTML
+     * Holds the character pattern used by {@link #queryWebInfo()} to locate
+     * the {@code "client_revision":} JSON property inside the streamed HTML
      * response without requiring full DOM parsing.
      */
     private static final char[] WEB_UPDATE_PATTERN = "\"client_revision\":".toCharArray();
 
     /**
-     * Resolved application version advertised by this info instance.
+     * Holds the resolved application version advertised by this info instance.
      */
     private final ClientAppVersion version;
 
@@ -90,11 +95,11 @@ final class WhatsAppWebClientInfo implements WhatsAppClientInfo {
      * call.
      *
      * <p>Subsequent invocations within the same JVM return the same instance.
-     * If the initial scrape failed with a runtime exception the failure is
-     * not cached: the next call will retry.
+     * If the initial scrape fails with a runtime exception the failure is not
+     * cached and the next call will retry.
      *
      * @return the resolved web client info
-     * @throws IllegalStateException if the scrape returns a non-200 response
+     * @throws IllegalStateException if the scrape returns a non 200 response
      *                               or if the {@code client_revision} marker
      *                               cannot be located in the response
      * @throws RuntimeException if the HTTP request fails with an I/O or
@@ -117,14 +122,15 @@ final class WhatsAppWebClientInfo implements WhatsAppClientInfo {
      *
      * <p>The response body is streamed byte by byte while a rolling pattern
      * match tracks progress through {@link #WEB_UPDATE_PATTERN}. When the
-     * pattern matches completely, the following ASCII digits are consumed
-     * and assembled into the tertiary version component; the primary and
-     * secondary components are fixed at {@code 2} and {@code 3000}
-     * respectively to match WhatsApp Web's versioning scheme.
+     * pattern matches completely, the trailing ASCII digits are consumed and
+     * assembled into the tertiary version component. The primary and
+     * secondary components are fixed at {@code 2} and {@code 3000} so the
+     * resulting version matches WhatsApp Web's versioning scheme.
      *
-     * @return a new {@code WhatsAppWebClientInfo} with the discovered version
-     * @throws IllegalStateException if the server returns a non-200 status or
-     *                               the marker is not found
+     * @return a new {@code WhatsAppWebClientInfo} carrying the discovered
+     *         version
+     * @throws IllegalStateException if the server returns a non 200 status or
+     *                               the marker is not found in the body
      * @throws RuntimeException if the HTTP exchange fails
      */
     private static WhatsAppWebClientInfo queryWebInfo() {
@@ -147,15 +153,11 @@ final class WhatsAppWebClientInfo implements WhatsAppClientInfo {
                 throw new IllegalStateException("Cannot query web version: status code " + response.statusCode());
             }
             try (var inputStream = response.body()) {
-                // Scans the streamed HTML byte by byte looking for the
-                // "client_revision": marker using a rolling pattern match
                 var patternIndex = 0;
                 int value;
                 while ((value = inputStream.read()) != -1) {
                     if (value == WEB_UPDATE_PATTERN[patternIndex]) {
                         if (++patternIndex == WEB_UPDATE_PATTERN.length) {
-                            // Consumes the trailing digits into an integer
-                            // that becomes the tertiary version component
                             var clientVersion = 0;
                             while ((value = inputStream.read()) != -1 && Character.isDigit(value)) {
                                 clientVersion *= 10;
@@ -185,6 +187,7 @@ final class WhatsAppWebClientInfo implements WhatsAppClientInfo {
      * @return the resolved version
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAWebBuildConstants", exports = "VERSION_STR", adaptation = WhatsAppAdaptation.ADAPTED)
     public ClientAppVersion version() {
         return version;
     }

@@ -30,7 +30,7 @@ public sealed interface SmaxGetAccountNonceResponse extends SmaxOperation.Respon
      *
      * @param node    the inbound IQ stanza received from the relay;
      *                never {@code null}
-     * @param request the original outbound stanza — used to validate
+     * @param request the original outbound stanza. Used to validate
      *                echoed identifiers; never {@code null}
      * @return an {@link Optional} carrying the parsed variant, or
      *         {@link Optional#empty()} when no documented variant
@@ -54,7 +54,7 @@ public sealed interface SmaxGetAccountNonceResponse extends SmaxOperation.Respon
     }
 
     /**
-     * The {@code Success} reply variant — the relay issued an
+     * The {@code Success} reply variant. The relay issued an
      * account-nonce.
      *
      * @implNote {@code WASmaxInBizLinkingGetAccountNonceResponseSuccess.parseGetAccountNonceResponseSuccess}
@@ -69,7 +69,7 @@ public sealed interface SmaxGetAccountNonceResponse extends SmaxOperation.Respon
     final class Success implements SmaxGetAccountNonceResponse {
         /**
          * The element-content of the {@code <nonce>} child of
-         * {@code <detail>} — the freshly-issued account-binding nonce.
+         * {@code <detail>}. The freshly-issued account-binding nonce.
          */
         private final String nonce;
 
@@ -185,7 +185,7 @@ public sealed interface SmaxGetAccountNonceResponse extends SmaxOperation.Respon
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected the
+     * The {@code ClientError} reply variant. The relay rejected the
      * request with a {@code 4xx} error code.
      *
      * @implNote {@code WASmaxInBizLinkingGetAccountNonceResponseError.parseGetAccountNonceResponseError}
@@ -283,7 +283,7 @@ public sealed interface SmaxGetAccountNonceResponse extends SmaxOperation.Respon
     }
 
     /**
-     * The {@code ServerError} reply variant — the relay encountered a
+     * The {@code ServerError} reply variant. The relay encountered a
      * transient internal failure ({@code 5xx}) while processing the
      * request.
      *

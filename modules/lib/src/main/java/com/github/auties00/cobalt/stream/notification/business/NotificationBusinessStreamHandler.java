@@ -89,10 +89,9 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
      * and sending an acknowledgement with optional side-list flag.
      *
      * @param node the notification stanza node
-     * @implNote WAWebHandleBusinessNotification.handleBusinessNotificationJob
      */
     private void handleBusinessNotification(Node node) {
-        var needsSideList = false; // WAWebHandleBusinessNotification: third parameter to ack function u()
+        var needsSideList = false;
         try {
             needsSideList = dispatch(node);
         } catch (Throwable throwable) {
@@ -113,7 +112,6 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
      * notification type.
      *
      * @param node the notification stanza node
-     * @implNote WAWebHandleDigitalCommerceSubscriptionNotification.handleDigitalCommerceSubscriptionNotificationJob
      */
     private void handleDigitalCommerceSubscription(Node node) {
         try {
@@ -135,28 +133,26 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
      * child is missing a JID (pruned update), a full bot initialization is triggered.
      *
      * @param node the notification stanza node
-     * @implNote WAWebHandleBotProfileNotification.handleBotProfileNotification
      */
     private void handleBotProfileUpdate(Node node) {
         try {
-            var pruned = false; // WAWebHandleBotProfileNotification: y flag for pruned updates
+            var pruned = false;
             for (var child : node.children()) {
                 if (!"update".equals(child.description())) {
-                    continue; // WAWebHandleBotProfileNotification: C.tag === p
-                }
-
-                var childType = child.getAttributeAsString("type", null);
-                if (!"bot_profile".equals(childType)) { // WAWebHandleBotProfileNotification: b.type.toString() === _
                     continue;
                 }
 
-                var botJid = child.getAttributeAsString("jid", null); // WAWebHandleBotProfileNotification: b.jid.toString()
+                var childType = child.getAttributeAsString("type", null);
+                if (!"bot_profile".equals(childType)) {
+                    continue;
+                }
+
+                var botJid = child.getAttributeAsString("jid", null);
                 if (botJid == null || botJid.isEmpty()) {
-                    pruned = true; // WAWebHandleBotProfileNotification: y = true; break
+                    pruned = true;
                     break;
                 }
 
-                // WAWebHandleBotProfileNotification: v(k, I) refreshes agent status and hatch identity
                 LOGGER.log(System.Logger.Level.DEBUG,
                         "Bot profile update for {0}, category={1}",
                         botJid,
@@ -164,7 +160,6 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
             }
 
             if (pruned) {
-                // WAWebHandleBotProfileNotification: initializeBots() for pruned updates
                 LOGGER.log(System.Logger.Level.DEBUG,
                         "Pruned bot profile update, full bot sync needed");
             }
@@ -192,7 +187,6 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
      *     {@code false} otherwise
      */
     private boolean dispatch(Node node) {
-        // WAWebHandleBusinessNotification: parser checks children in order
         if (node.hasChild("remove")) {
             return handleRemove(node.getRequiredChild("remove"));
         }
@@ -211,12 +205,11 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
         }
 
         if (node.hasChild("subscriptions")) {
-            handleSubscriptions(node); // WAWebHandleBusinessNotification: subscriptions case
+            handleSubscriptions(node);
             return false;
         }
 
         if (node.hasChild("ctwa_suggestion")) {
-            // WAWebHandleBusinessNotification: ctwa_suggestion case
             // WA Web gates this behind WAWebBizGatingUtils.adsActionBannersEnabled(),
             // parses via WAWebCTWAParseSuggestion.parseCTWASuggestion, then handles
             // via WAWebHandleCTWASuggestion.handleCTWASuggestion.
@@ -227,21 +220,20 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
         }
 
         if (node.hasChild("privacy")) {
-            handlePrivacy(node); // WAWebHandleBusinessNotification: privacy case
+            handlePrivacy(node);
             return false;
         }
 
         if (node.hasChild("wa_ad_account_nonce")) {
-            handleAdAccountNonce(node); // WAWebHandleBusinessNotification: wa_ad_account_nonce case
+            handleAdAccountNonce(node);
             return false;
         }
 
         if (node.hasChild("mm_campaign")) {
-            handleMarketingCampaign(node); // WAWebHandleBusinessNotification: mm_campaign case
+            handleMarketingCampaign(node);
             return false;
         }
 
-        // WAWebHandleBusinessNotification: default/unknown case
         LOGGER.log(System.Logger.Level.DEBUG,
                 "Received unknown business notification subtype");
         return false;
@@ -265,14 +257,10 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
      *     {@code false} otherwise
      */
     private boolean handleRemove(Node removeNode) {
-        // WAWebHandleBusinessNotification: parser checks l.hasAttr("jid")
         var jid = removeNode.getAttributeAsJid("jid").orElse(null);
         if (jid != null) {
-            // WAWebHandleBusinessNotification: type "remove_jid"
-            // WAWebHandleBusinessRemoval.handleBusinessRemovalNotificationContact
             var targetJid = jid.withoutData();
             if (isSelf(targetJid)) {
-                // ADAPTED: WAWebHandleBusinessRemoval.handleBusinessRemoval clears
                 // contact business fields and sends frontend events. Cobalt clears
                 // store fields directly.
                 whatsapp.store()
@@ -284,11 +272,9 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
                         .setBusinessCategory(null)
                         .setSyncedBusinessCertificate(false);
             }
-            return false; // WAWebHandleBusinessNotification: u(r.stanzaId, r.from, false)
+            return false;
         }
 
-        // WAWebHandleBusinessNotification: type "remove_hash"
-        // WAWebHandleBusinessRemoval.handleBusinessRemovalNotificationHash
         // ADAPTED: Hash-based contact lookup (WAWebApiContact.getContactRecordByHash)
         // is not available in Cobalt. We cannot resolve the contact, so we return true
         // (contact not found) to trigger the side-list ack for companion redistribution.
@@ -296,7 +282,7 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
         LOGGER.log(System.Logger.Level.DEBUG,
                 "Cannot handle hash-based business removal (hash={0}), requesting side-list redistribution",
                 hash);
-        return true; // WAWebHandleBusinessNotification: !false = true (hash not found case)
+        return true;
     }
 
     /**
@@ -318,11 +304,8 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
      *     {@code false} otherwise
      */
     private boolean handleVerifiedName(Node verifiedNameNode) {
-        // WAWebHandleBusinessNotification: parser checks l.hasAttr("jid")
         var jid = verifiedNameNode.getAttributeAsJid("jid").orElse(null);
         if (jid != null) {
-            // WAWebHandleBusinessNotification: type "verified_name_jid"
-            // WAWebHandleBusinessNameChange.handleVerifiedBusinessNameNotificationContact
             var targetJid = jid.withoutData();
             if (isSelf(targetJid)) {
                 // ADAPTED: WA Web retrieves verified name via IQ query (retrieveBusinessDetails)
@@ -337,17 +320,15 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
                 // Cobalt queries the business profile to refresh the contact.
                 whatsapp.queryBusinessProfile(targetJid);
             }
-            return false; // WAWebHandleBusinessNotification: u(r.stanzaId, r.from, false)
+            return false;
         }
 
-        // WAWebHandleBusinessNotification: type "verified_name_hash"
-        // WAWebHandleBusinessNameChange.handleVerifiedBusinessNameNotificationHash
         // ADAPTED: Hash-based contact lookup is not available in Cobalt.
         var hash = verifiedNameNode.getAttributeAsString("hash", null); // NO_WA_BASIS: defensive read
         LOGGER.log(System.Logger.Level.DEBUG,
                 "Cannot handle hash-based verified name change (hash={0}), requesting side-list redistribution",
                 hash);
-        return true; // WAWebHandleBusinessNotification: !false = true (hash not found case)
+        return true;
     }
 
     /**
@@ -371,11 +352,8 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
      *     {@code false} otherwise
      */
     private boolean handleProfile(Node node, Node profileNode) {
-        // WAWebHandleBusinessNotification: parser checks isStringNullOrEmpty(hash)
         var hash = profileNode.getAttributeAsString("hash", null);
         if (hash == null || hash.isEmpty()) {
-            // WAWebHandleBusinessNotification: type "profile"
-            // WAWebHandleBusinessProfile.handleBusinessProfile
             var targetJid = node.getAttributeAsJid("from")
                     .map(Jid::withoutData)
                     .orElse(null);
@@ -388,16 +366,14 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
                     whatsapp.store().setSyncedBusinessCertificate(true);
                 }
             }
-            return false; // WAWebHandleBusinessNotification: u(r.stanzaId, r.from, false)
+            return false;
         }
 
-        // WAWebHandleBusinessNotification: type "profile_hash"
-        // WAWebHandleBusinessProfile.handleBusinessProfileHash
         // ADAPTED: Hash-based contact lookup is not available in Cobalt.
         LOGGER.log(System.Logger.Level.DEBUG,
                 "Cannot handle hash-based business profile update (hash={0}), requesting side-list redistribution",
                 hash);
-        return true; // WAWebHandleBusinessNotification: !false = true (hash not found case)
+        return true;
     }
 
     /**
@@ -413,10 +389,7 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
      * @param catalogNode the {@code <product_catalog>} child node
      */
     private void handleProductCatalog(Node catalogNode) {
-        // WAWebHandleBusinessNotification: parser checks c.hasChild("product") then c.hasChild("collection")
         if (catalogNode.hasChild("product")) {
-            // WAWebHandleBusinessNotification: type "product"
-            // WAWebHandleBusinessProductCatalogNotification.handleProductNotification(productsIds)
             // WA Web collects product IDs via c.forEachChildWithTag("product", ...)
             var productIds = catalogNode.getChildren("product").stream()
                     .flatMap(product -> product.getChild("id").stream())
@@ -430,8 +403,6 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
                         "Received product catalog notification for {0} products", productIds.size());
             }
         } else if (catalogNode.hasChild("collection")) {
-            // WAWebHandleBusinessNotification: type "collection"
-            // WAWebHandleBusinessProductCatalogNotification.handleCollectionNotification(r)
             // WA Web collects collection IDs and review statuses via
             // c.forEachChildWithTag("collection", ...) with status_info parsing.
             var collectionCount = catalogNode.getChildren("collection").size();
@@ -486,11 +457,9 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
      * @param node the full notification stanza (not the subscriptions child)
      */
     private void handleSubscriptions(Node node) {
-        // WAWebParseSubscriptionNotification.parseSubscriptionsAndFeatureFlags:
         // feature_flags are a direct child of the notification, not of the subscriptions child
         var flags = new HashMap<>(whatsapp.store().businessFeatureFlags());
         node.getChild("feature_flags").ifPresent(featureFlagsNode -> {
-            // WAWebParseSubscriptionNotification: o.forEachChildWithTag("feature_flag", ...)
             featureFlagsNode.getChildren("feature_flag").forEach(featureFlag -> {
                 var name = featureFlag.getAttributeAsString("name", null);
                 var enabled = featureFlag.getAttributeAsString("enabled", null);
@@ -500,7 +469,6 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
             });
         });
 
-        // WAWebParseSubscriptionNotification: i.forEachChildWithTag("subscription", ...)
         var statuses = new HashMap<>(whatsapp.store().businessSubscriptionStatuses());
         var expirations = new HashMap<>(whatsapp.store().businessSubscriptionExpirations());
         var creationTimes = new HashMap<>(whatsapp.store().businessSubscriptionCreationTimes());
@@ -522,7 +490,6 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
             });
         });
 
-        // WAWebSubscriptions.applySubscriptionsAndFeatureFlags(subscriptions, featureFlags, "update")
         whatsapp.store().setBusinessFeatureFlags(flags);
         whatsapp.store().setBusinessSubscriptionStatuses(statuses);
         whatsapp.store().setBusinessSubscriptionExpirations(expirations);
@@ -552,7 +519,6 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
             return;
         }
 
-        // WAWebHandlePrivacySettingsNotification.handleSmbDataSharingSettingNotification
         // fires frontendFireAndForget("smbDataSharingSettingUpdate", {smbDataSharingSettingValue: value})
         // ADAPTED: Cobalt stores the value directly.
         var fromJid = node.getAttributeAsJid("from")
@@ -620,14 +586,12 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
             return;
         }
 
-        // WAWebHandleBusinessNotification: parser checks
-        // v.mmCampaignAdCreativeId != null && v.mmCampaignAdGroupId != null && v.mmCampaignAdId != null
         var adCreativeId = campaignNode.getAttributeAsString("adCreativeId", null);
         var adGroupId = campaignNode.getAttributeAsString("adGroupId", null);
         var adId = campaignNode.getAttributeAsString("adId", null);
         var status = campaignNode.getAttributeAsString("status", null);
         if (adCreativeId == null || adGroupId == null || adId == null) {
-            return; // WAWebHandleBusinessNotification: parser returns unknown type if IDs missing
+            return;
         }
 
         // ADAPTED: WA Web emits to marketingCampaignNotificationEmitter with
@@ -660,7 +624,6 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
             return;
         }
 
-        // WAWebHandleBusinessNotification: WAWap.wap("ack",
         //   {id: CUSTOM_STRING(stanzaId), to: from, class: "notification", type: "business"},
         //   [optional: WAWap.wap("user", {side_list: "out"})])
         var ackBuilder = new NodeBuilder()
@@ -671,7 +634,6 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
                 .attribute("type", "business");
 
         if (needsSideList) {
-            // WAWebHandleBusinessNotification: u(stanzaId, from, true) includes user child
             ackBuilder.content(
                     new NodeBuilder()
                             .description("user")
@@ -700,7 +662,6 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
             return;
         }
 
-        // WAWebHandleDigitalCommerceSubscriptionNotification: wap("ack",
         //   {id: CUSTOM_STRING(stanzaId), to: from, class: "notification", type: "digital_commerce_subscription"})
         whatsapp.sendNodeWithNoResponse(new NodeBuilder()
                 .description("ack")
@@ -729,7 +690,6 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
             return;
         }
 
-        // WAWebHandleBotProfileNotification: wap("ack",
         //   {id: CUSTOM_STRING(s), to: CUSTOM_STRING(u), class: "notification", type: CUSTOM_STRING(f)})
         whatsapp.sendNodeWithNoResponse(new NodeBuilder()
                 .description("ack")

@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.node.iq.biz;
 
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
@@ -14,8 +15,10 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Sealed family of inbound reply variants.
+ * Sealed family of inbound reply variants produced by the relay in
+ * response to an {@link IqQueryBusinessProfileRequest}.
  */
+@WhatsAppWebModule(moduleName = "WAWebQueryBusinessProfileJob")
 public sealed interface IqQueryBusinessProfileResponse extends IqOperation.Response
         permits IqQueryBusinessProfileResponse.Success, IqQueryBusinessProfileResponse.ClientError, IqQueryBusinessProfileResponse.ServerError {
 

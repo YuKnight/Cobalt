@@ -22,7 +22,7 @@ import java.util.Optional;
  *
  * @implNote {@code WASmaxPreKeysFetchKeyBundlesRPC.sendFetchKeyBundlesRPC}
  *           tries {@code Success} → {@code RequestError} →
- *           {@code ServerError} and throws on no-match; Cobalt returns
+ *           {@code ServerError} and throws on no-match. Cobalt returns
  *           {@link Optional#empty()} on no-match and renames
  *           {@code RequestError} to the consistent
  *           {@link SmaxPreKeysFetchKeyBundlesResponse.ClientError} naming used across SMAX RPCs.
@@ -36,8 +36,8 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
      *
      * @param node    the inbound IQ stanza received from the relay;
      *                never {@code null}
-     * @param request the original outbound stanza — used to validate
-     *                echoed identifiers; never {@code null}
+     * @param request the original outbound stanza. Used to validate
+     *                echoed identifiers. Never {@code null}
      * @return an {@link Optional} carrying the parsed variant, or
      *         {@link Optional#empty()} when no documented variant
      *         matched the stanza shape
@@ -60,7 +60,7 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
     }
 
     /**
-     * The {@code Success} reply variant — the relay produced a
+     * The {@code Success} reply variant. The relay produced a
      * {@code <list>} carrying one {@code <user>} entry per requested
      * user. Each entry is either a successful key-bundle projection
      * ({@link UserKeyBundle}) or a per-user error projection
@@ -91,7 +91,7 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
         /**
          * Constructs a successful reply.
          *
-         * @param users the per-user entries; never {@code null}
+         * @param users the per-user entries. Never {@code null}
          *              (defaults to empty)
          */
         public Success(List<UserEntry> users) {
@@ -101,7 +101,7 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
         /**
          * Returns the list of per-user entries.
          *
-         * @return an unmodifiable list of entries; never {@code null}
+         * @return an unmodifiable list of entries. Never {@code null}
          */
         public List<UserEntry> users() {
             return users;
@@ -162,7 +162,7 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
         }
 
         /**
-         * Sealed disjunction of the two per-user reply shapes — either a
+         * Sealed disjunction of the two per-user reply shapes. Either a
          * fully populated {@link UserKeyBundle} when the relay had the
          * bundle on hand, or a {@link UserError} when the bundle could
          * not be assembled (user blocked, registration mismatch, no
@@ -173,7 +173,7 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
             /**
              * Returns the per-user JID echoed by the relay.
              *
-             * @return the JID; never {@code null}
+             * @return the JID. Never {@code null}
              */
             Jid userJid();
 
@@ -181,7 +181,7 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
              * Tries to parse a {@link UserEntry} from the given
              * {@code <user/>} grandchild.
              *
-             * @param userNode the {@code <user/>} grandchild; never
+             * @param userNode the {@code <user/>} grandchild. Never
              *                 {@code null}
              * @return an {@link Optional} carrying the parsed entry, or
              *         empty when the grandchild matches neither the
@@ -201,7 +201,7 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
         }
 
         /**
-         * The successful per-user projection — carries the full Signal
+         * The successful per-user projection. Carries the full Signal
          * pre-key bundle plus optional device-identity attestation.
          *
          * @implNote {@code WASmaxInPreKeysFetchKeyBundlesUserSuccessMixin.parseFetchKeyBundlesUserSuccessMixin}
@@ -233,7 +233,7 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
             private final Long timestamp;
 
             /**
-             * The optional {@code is_cloud_api="true"} marker — set when
+             * The optional {@code is_cloud_api="true"} marker. Set when
              * the bundle belongs to a Cloud-API hosted account.
              */
             private final boolean cloudApi;
@@ -255,7 +255,7 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
             private final byte[] identityKey;
 
             /**
-             * The optional unsigned pre-key — null when the relay had
+             * The optional unsigned pre-key. Null when the relay had
              * no fresh pre-keys to surface.
              */
             private final PreKey preKey;
@@ -267,7 +267,7 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
             private final SignedPreKey signedPreKey;
 
             /**
-             * The optional device-identity attestation bytes — present
+             * The optional device-identity attestation bytes. Present
              * only when the request asked for {@code reason="identity"}.
              */
             private final byte[] deviceIdentity;
@@ -275,20 +275,20 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
             /**
              * Constructs a key-bundle projection.
              *
-             * @param userJid        the per-user JID; never {@code null}
-             * @param timestamp      the optional relay timestamp; may be
+             * @param userJid        the per-user JID. Never {@code null}
+             * @param timestamp      the optional relay timestamp. May be
              *                       {@code null}
              * @param cloudApi       whether the {@code is_cloud_api}
              *                       marker was set
-             * @param registrationId the 4-byte registration id; never
+             * @param registrationId the 4-byte registration id. Never
              *                       {@code null}
              * @param keyType        the optional 1-byte key-type marker;
              *                       may be {@code null}
-             * @param identityKey    the 32-byte identity key; never
+             * @param identityKey    the 32-byte identity key. Never
              *                       {@code null}
-             * @param preKey         the optional unsigned pre-key; may
+             * @param preKey         the optional unsigned pre-key. May
              *                       be {@code null}
-             * @param signedPreKey   the signed pre-key; never
+             * @param signedPreKey   the signed pre-key. Never
              *                       {@code null}
              * @param deviceIdentity the optional device-identity bytes;
              *                       may be {@code null}
@@ -318,7 +318,7 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
             /**
              * Returns the per-user JID echoed by the relay.
              *
-             * @return the JID; never {@code null}
+             * @return the JID. Never {@code null}
              */
             @Override
             public Jid userJid() {
@@ -348,7 +348,7 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
             /**
              * Returns the 4-byte registration id (raw bytes, big-endian).
              *
-             * @return the registration id; never {@code null}
+             * @return the registration id. Never {@code null}
              */
             public byte[] registrationId() {
                 return registrationId;
@@ -367,7 +367,7 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
             /**
              * Returns the 32-byte Signal identity public key.
              *
-             * @return the identity key; never {@code null}
+             * @return the identity key. Never {@code null}
              */
             public byte[] identityKey() {
                 return identityKey;
@@ -387,7 +387,7 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
              * Returns the signed pre-key (always present in a successful
              * bundle).
              *
-             * @return the signed pre-key; never {@code null}
+             * @return the signed pre-key. Never {@code null}
              */
             public SignedPreKey signedPreKey() {
                 return signedPreKey;
@@ -432,20 +432,18 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
                     timestamp = t.getAsLong();
                 }
                 var cloudApi = userNode.hasAttribute("is_cloud_api", "true");
-                // WASmaxInPreKeysRegistrationIDMixin: <registration> with 4 content bytes
                 var registrationBytes = userNode.getChild("registration")
                         .flatMap(Node::toContentBytes)
                         .orElse(null);
                 if (registrationBytes == null || registrationBytes.length != 4) {
                     return Optional.empty();
                 }
-                // WASmaxInPreKeysKeyTypeMixin: optional <type> with literal [5] bytes
                 byte[] keyTypeBytes = null;
                 var typeNode = userNode.getChild("type").orElse(null);
                 if (typeNode != null) {
                     var typeContent = typeNode.toContentBytes().orElse(null);
                     if (typeContent == null || !Arrays.equals(typeContent, new byte[]{5})) {
-                        // Optional whose content didn't match — let the
+                        // Optional whose content didn't match. Let the
                         // value remain absent (mirrors WA Web's optional
                         // semantics: failure to parse the optional sub-tree
                         // surfaces as a null-valued field).
@@ -454,14 +452,12 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
                         keyTypeBytes = typeContent;
                     }
                 }
-                // WASmaxInPreKeysIdentityKeyMixin: <identity> with 32 content bytes
                 var identityBytes = userNode.getChild("identity")
                         .flatMap(Node::toContentBytes)
                         .orElse(null);
                 if (identityBytes == null || identityBytes.length != 32) {
                     return Optional.empty();
                 }
-                // WASmaxInPreKeysPreKeyMixin: optional <key>(<id>, <value>)
                 PreKey preKeyValue = null;
                 var preKeyNode = userNode.getChild("key").orElse(null);
                 if (preKeyNode != null) {
@@ -472,7 +468,6 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
                         return Optional.empty();
                     }
                 }
-                // WASmaxInPreKeysSignedPreKeyMixin: required <skey>(<id>, <value>, <signature>)
                 var signedPreKeyNode = userNode.getChild("skey").orElse(null);
                 if (signedPreKeyNode == null) {
                     return Optional.empty();
@@ -481,7 +476,6 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
                 if (signedPreKeyValue == null) {
                     return Optional.empty();
                 }
-                // WASmaxInPreKeysDeviceIdentityMixin: optional <device-identity> with arbitrary bytes
                 var deviceIdentityBytes = userNode.getChild("device-identity")
                         .flatMap(Node::toContentBytes)
                         .orElse(null);
@@ -541,7 +535,7 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
             }
 
             /**
-             * The unsigned pre-key projection — pairs a 3-byte key id
+             * The unsigned pre-key projection. Pairs a 3-byte key id
              * with 32 bytes of public-key material.
              *
              * @implNote {@code WASmaxInPreKeysPreKeyMixin.parsePreKeyMixin}
@@ -568,8 +562,8 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
                 /**
                  * Constructs a pre-key projection.
                  *
-                 * @param keyId    the 3-byte key id; never {@code null}
-                 * @param keyValue the 32-byte key material; never
+                 * @param keyId    the 3-byte key id. Never {@code null}
+                 * @param keyValue the 32-byte key material. Never
                  *                 {@code null}
                  * @throws NullPointerException if any argument is
                  *                              {@code null}
@@ -582,7 +576,7 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
                 /**
                  * Returns the 3-byte pre-key identifier.
                  *
-                 * @return the key id bytes; never {@code null}
+                 * @return the key id bytes. Never {@code null}
                  */
                 public byte[] keyId() {
                     return keyId;
@@ -591,7 +585,7 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
                 /**
                  * Returns the 32-byte public-key material.
                  *
-                 * @return the key value bytes; never {@code null}
+                 * @return the key value bytes. Never {@code null}
                  */
                 public byte[] keyValue() {
                     return keyValue;
@@ -651,7 +645,7 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
             }
 
             /**
-             * The signed pre-key projection — pairs a 3-byte key id with
+             * The signed pre-key projection. Pairs a 3-byte key id with
              * 32 bytes of public-key material plus a 64-byte
              * signature.
              *
@@ -685,10 +679,10 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
                 /**
                  * Constructs a signed pre-key projection.
                  *
-                 * @param keyId     the 3-byte key id; never {@code null}
-                 * @param keyValue  the 32-byte key material; never
+                 * @param keyId     the 3-byte key id. Never {@code null}
+                 * @param keyValue  the 32-byte key material. Never
                  *                  {@code null}
-                 * @param signature the 64-byte signature; never
+                 * @param signature the 64-byte signature. Never
                  *                  {@code null}
                  * @throws NullPointerException if any argument is
                  *                              {@code null}
@@ -702,7 +696,7 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
                 /**
                  * Returns the 3-byte signed-pre-key identifier.
                  *
-                 * @return the key id bytes; never {@code null}
+                 * @return the key id bytes. Never {@code null}
                  */
                 public byte[] keyId() {
                     return keyId;
@@ -711,7 +705,7 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
                 /**
                  * Returns the 32-byte public-key material.
                  *
-                 * @return the key value bytes; never {@code null}
+                 * @return the key value bytes. Never {@code null}
                  */
                 public byte[] keyValue() {
                     return keyValue;
@@ -720,7 +714,7 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
                 /**
                  * Returns the 64-byte signature.
                  *
-                 * @return the signature bytes; never {@code null}
+                 * @return the signature bytes. Never {@code null}
                  */
                 public byte[] signature() {
                     return signature;
@@ -790,12 +784,12 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
         }
 
         /**
-         * The per-user error projection — surfaces a relay-side rejection
+         * The per-user error projection. Surfaces a relay-side rejection
          * for a single addressee while the rest of the {@code <list>}
          * may still carry successful bundles.
          *
          * @implNote {@code WASmaxInPreKeysFetchKeyBundlesUserErrorMixin.parseFetchKeyBundlesUserErrorMixin}
-         *           parses the literal {@code code="500"} variant; the
+         *           parses the literal {@code code="500"} variant. The
          *           companion
          *           {@code WASmaxInPreKeysFetchKeyBundlesUserErrorFallbackMixin.parseFetchKeyBundlesUserErrorFallbackMixin}
          *           accepts {@code code} in {@code [500, 599]}. Cobalt
@@ -824,9 +818,9 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
             /**
              * Constructs a per-user error projection.
              *
-             * @param userJid   the per-user JID; never {@code null}
+             * @param userJid   the per-user JID. Never {@code null}
              * @param errorCode the numeric error code
-             * @param errorText the human-readable text; never
+             * @param errorText the human-readable text. Never
              *                  {@code null}
              * @throws NullPointerException if {@code userJid} or
              *                              {@code errorText} is
@@ -841,7 +835,7 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
             /**
              * Returns the per-user JID echoed by the relay.
              *
-             * @return the JID; never {@code null}
+             * @return the JID. Never {@code null}
              */
             @Override
             public Jid userJid() {
@@ -860,7 +854,7 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
             /**
              * Returns the human-readable error text.
              *
-             * @return the error text; never {@code null}
+             * @return the error text. Never {@code null}
              */
             public String errorText() {
                 return errorText;
@@ -932,7 +926,7 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected the
+     * The {@code ClientError} reply variant. The relay rejected the
      * outer request as malformed, unauthorised, or referencing no valid
      * JIDs.
      *
@@ -960,7 +954,7 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
          * Constructs a new client-error reply.
          *
          * @param errorCode the numeric error code
-         * @param errorText the optional human-readable text; may be
+         * @param errorText the optional human-readable text. May be
          *                  {@code null}
          */
         public ClientError(int errorCode, String errorText) {
@@ -1031,7 +1025,7 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
     }
 
     /**
-     * The {@code ServerError} reply variant — the relay encountered a
+     * The {@code ServerError} reply variant. The relay encountered a
      * transient internal failure while processing the request.
      *
      * @implNote {@code WASmaxInPreKeysFetchKeyBundlesResponseServerError.parseFetchKeyBundlesResponseServerError}
@@ -1056,7 +1050,7 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
          * Constructs a new server-error reply.
          *
          * @param errorCode the numeric error code
-         * @param errorText the optional human-readable text; may be
+         * @param errorText the optional human-readable text. May be
          *                  {@code null}
          */
         public ServerError(int errorCode, String errorText) {

@@ -45,14 +45,9 @@ public sealed interface SmaxWaffleEncryptedPayloadRequestResponse extends SmaxOp
     }
 
     /**
-     * The {@code Success} reply variant — the relay returned the
+     * The {@code Success} reply variant. The relay returned the
      * encrypted Facebook-side response plus an optional
      * {@code wf_deleted} marker.
-     *
-     * @implNote {@code WASmaxInWaffleEncryptedPayloadRequestResponseSuccess.parseEncryptedPayloadRequestResponseSuccess}
-     *           projects the {@code <encryption_metadata/>} subtree
-     *           plus an optional
-     *           {@code <wf_deleted>true|false</wf_deleted>} child.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInWaffleEncryptedPayloadRequestResponseSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxInWaffleIQResultResponseMixin")

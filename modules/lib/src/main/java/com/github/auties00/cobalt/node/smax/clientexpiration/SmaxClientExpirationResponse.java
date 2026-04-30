@@ -10,7 +10,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Sealed family of inbound projections — the receive-only RPC has a
+ * Sealed family of inbound projections. The receive-only RPC has a
  * single {@link Inbound} permit.
  */
 public sealed interface SmaxClientExpirationResponse extends SmaxOperation.Response
@@ -19,7 +19,7 @@ public sealed interface SmaxClientExpirationResponse extends SmaxOperation.Respo
     /**
      * Tries to parse the inbound stanza.
      *
-     * @param node the inbound stanza; never {@code null}
+     * @param node the inbound stanza. Never {@code null}
      * @return an {@link Optional} carrying the parsed projection,
      *         or empty when the stanza shape does not match the
      *         documented schema
@@ -48,8 +48,8 @@ public sealed interface SmaxClientExpirationResponse extends SmaxOperation.Respo
     @WhatsAppWebModule(moduleName = "WASmaxInClientExpirationClientExpirationRequest")
     final class Inbound implements SmaxClientExpirationResponse {
         /**
-         * The {@code from} JID echoed on the {@code <ib>} envelope —
-         * always the literal {@code s.whatsapp.net} server JID.
+         * The {@code from} JID echoed on the {@code <ib>} envelope.
+         * Always the literal {@code s.whatsapp.net} server JID.
          */
         private final Jid from;
 
@@ -63,7 +63,7 @@ public sealed interface SmaxClientExpirationResponse extends SmaxOperation.Respo
         /**
          * Constructs a new inbound projection.
          *
-         * @param from               the {@code from} JID; never
+         * @param from               the {@code from} JID. Never
          *                           {@code null}
          * @param clientExpirationT  the optional cutoff timestamp;
          *                           may be {@code null}
@@ -78,7 +78,7 @@ public sealed interface SmaxClientExpirationResponse extends SmaxOperation.Respo
         /**
          * Returns the {@code from} JID.
          *
-         * @return the JID; never {@code null}
+         * @return the JID. Never {@code null}
          */
         public Jid from() {
             return from;
@@ -97,7 +97,7 @@ public sealed interface SmaxClientExpirationResponse extends SmaxOperation.Respo
          * Tries to parse an {@link Inbound} projection from the
          * given stanza.
          *
-         * @param node the inbound stanza; never {@code null}
+         * @param node the inbound stanza. Never {@code null}
          * @return an {@link Optional} carrying the parsed
          *         projection
          * @throws NullPointerException if {@code node} is

@@ -60,10 +60,8 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
 
     /**
      * Maximum number of retry attempts that will be honoured before refusing further retries.
-     *
-     * @implNote WAWebPostMessageHighRetryCountMetric.MAX_RETRY
      */
-    private static final int MAX_RETRY = 5; // WAWebPostMessageHighRetryCountMetric.MAX_RETRY
+    private static final int MAX_RETRY = 5;
 
     /**
      * The WhatsApp client instance providing access to the store and networking.
@@ -107,7 +105,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      * {@link ReceiptAck#CONTENT_GONE}, only an ack is sent without processing.
      *
      * @param node the incoming receipt stanza node
-     * @implNote WAWebHandleMsgReceipt.default
      */
     @Override
     public void handle(Node node) {
@@ -116,7 +113,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
             return;
         }
 
-        // WAWebCreateReceiptStanzaReceiveMetric.createReceiptStanzaReceiveMetric:
         // construct the ReceiptStanzaReceive metric with OVERALL stage and
         // default totalCount=1, and start its duration timer. Commit is deferred
         // until after parse/process, and only happens for non-offline receipts
@@ -132,7 +128,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
             return;
         }
 
-        // WAWebHandleMsgReceipt.default: CONTENT_GONE skips processing, only sends ack
         if (parsed instanceof SimpleReceipt simple && simple.ack() == ReceiptAck.CONTENT_GONE) {
             sendAck(node, parsed);
             commitReceiptMetric(receiptMetric, parsed);
@@ -180,17 +175,14 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      *           WAWebHandleMsgReceipt.b (commit gate)
      */
     private void commitReceiptMetric(ReceiptStanzaReceiveEventBuilder builder, ParsedReceipt parsed) {
-        // WAWebHandleMsgReceipt.b: commit only when the stanza-level offline
         // attribute was absent. Cobalt records that attribute via
         // ReceiptLike.offline() (true when the <receipt> carried offline="...").
         if (parsed.offline()) {
             return;
         }
 
-        // WAWebCreateReceiptStanzaReceiveMetric: e.messageType = s(from)
         builder.messageType(resolveMessageType(parsed.from()));
 
-        // WAWebCreateReceiptStanzaReceiveMetric: receiptStanzaType defaults to
         // ACK_STRING.DELIVERY ("delivery") when ackString is null; otherwise
         // it is the raw type string when (and only when) it matches a known
         // RECEIPT_TYPES_TO_ACK entry. Unknown type strings leave the field
@@ -203,7 +195,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
             builder.receiptStanzaType(ackString);
         }
 
-        // WAWebCreateReceiptStanzaReceiveMetric:
         // (receipts?.length) != null && (receiptStanzaTotalCount = receipts.length)
         // WA Web's parser only attaches a "receipts" array to aggregated-by-type
         // and aggregated-by-message receipts (each entry corresponds to one
@@ -220,8 +211,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
             }
         }
 
-        // WAWebCreateReceiptStanzaReceiveMetric: e.markReceiptStanzaDuration();
-        // e.commit()
         builder.stopReceiptStanzaDuration();
         wamService.commit(builder.build());
     }
@@ -247,23 +236,18 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
         if (from == null) {
             return MessageType.INDIVIDUAL;
         }
-        // WAWebCreateReceiptStanzaReceiveMetric.s: WAWebWid.isStatus -> STATUS
         if (from.isStatusBroadcastAccount()) {
             return MessageType.STATUS;
         }
-        // WAWebCreateReceiptStanzaReceiveMetric.s: WAWebWid.isGroup -> GROUP
         if (from.hasGroupOrCommunityServer()) {
             return MessageType.GROUP;
         }
-        // WAWebCreateReceiptStanzaReceiveMetric.s: WAWebWid.isBroadcast -> BROADCAST
         if (from.hasBroadcastServer()) {
             return MessageType.BROADCAST;
         }
-        // WAWebCreateReceiptStanzaReceiveMetric.s: WAWebWid.isNewsletter -> CHANNEL
         if (from.hasNewsletterServer()) {
             return MessageType.CHANNEL;
         }
-        // WAWebCreateReceiptStanzaReceiveMetric.s: fallback INDIVIDUAL
         return MessageType.INDIVIDUAL;
     }
 
@@ -278,13 +262,11 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      * @implNote WAWebHandleMsgReceipt.v (handleSimpleReceipt dispatch)
      */
     private void handleSimple(SimpleReceipt receipt) {
-        // WAWebHandleMsgReceipt.v: PEER ack is handled by WAWebHandleAckPeerSimpleReceipt
         // In Cobalt, peer message deletion is handled elsewhere
         if (receipt.ack() == ReceiptAck.PEER) {
-            return; // ADAPTED: WAWebHandleAckPeerSimpleReceipt.handleAckPeerSimpleReceipt
+            return;
         }
 
-        // WAWebHandleMsgReceipt.v: broadcast receipts from self are skipped
         if (receipt.from().hasBroadcastServer() && receipt.participant() != null) {
             var self = whatsapp.store().jid().orElse(null);
             if (self != null && sameUser(self, receipt.participant())) {
@@ -313,19 +295,16 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      * @implNote WAWebHandleMsgReceipt.S (handleAggregateReceipt)
      */
     private void handleAggregatedByType(AggregatedByTypeReceipt receipt) {
-        // WAWebHandleMsgReceipt.S: CONTENT_GONE receipts cannot be aggregated
         if (receipt.ack() == ReceiptAck.CONTENT_GONE) {
             LOGGER.log(System.Logger.Level.WARNING, "Reupload receipts cannot be aggregated");
             return;
         }
 
-        // WAWebHandleMsgReceipt.S: only group/broadcast supported for aggregated receipts
         if (!receipt.from().hasGroupOrCommunityServer() && !receipt.from().hasBroadcastServer()) {
             LOGGER.log(System.Logger.Level.WARNING, "Aggregated receipts only supported for group/broadcast");
             return;
         }
 
-        // WAWebHandleMsgReceiptUtils.deaggregateGroupedByTypeReceipt: each participant
         // becomes a simple receipt with the parent's ack/ackString
         for (var participantReceipt : receipt.receipts()) {
             var info = findMessage(receipt.from(), participantReceipt.participant(), receipt.externalId());
@@ -352,7 +331,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      * @implNote WAWebHandleMsgReceipt.R (handleAggregateByMessageReceipt)
      */
     private void handleAggregatedByMessage(AggregatedByMessageReceipt receipt) {
-        // WAWebHandleMsgReceiptUtils.deaggregateGroupedByMessageReceipt: each participant
         // uses its own ack/ackString from the per-user element
         for (var participantReceipt : receipt.receipts()) {
             var info = findMessage(receipt.from(), participantReceipt.participant(), receipt.externalId());
@@ -402,8 +380,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
                     node.getAttributeAsString("id", "<unknown>"),
                     exception.getMessage());
         } finally {
-            // WAWebHandleMessageRetryRequest.handleMessageRetryRequest: builds ack with
-            // class="receipt", type="retry"
             sendRetryAck(node);
         }
     }
@@ -422,11 +398,10 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
             exports = "handleRetryRequest",
             adaptation = WhatsAppAdaptation.ADAPTED)
     private void processRetryRequest(Node node) {
-        // WAWebHandleRetryRequest.R: VoIP retry variants are dispatched to the VoIP stack,
         // which Cobalt does not implement. Skip non-regular retry types.
         var type = node.getAttributeAsString("type", null);
         if ("enc_rekey_retry".equals(type) || "voip_1x1_retry".equals(type)) {
-            return; // ADAPTED: WAWebHandleRetryRequest — VoIP retry not supported in Cobalt
+            return;
         }
 
         var from = node.getAttributeAsJid("from").orElse(null);
@@ -434,18 +409,16 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
         var retryNode = node.getChild("retry").orElse(null);
         var originalId = retryNode != null ? retryNode.getAttributeAsString("id", null) : null;
 
-        // WAWebHandleRetryRequest.E (k function): check retry count against MAX_RETRY
         var retryCount = retryNode != null
                 ? retryNode.getAttributeAsInt("count").orElse(0)
                 : 0;
-        if (retryCount >= MAX_RETRY) { // WAWebPostMessageHighRetryCountMetric.MAX_RETRY
+        if (retryCount >= MAX_RETRY) {
             LOGGER.log(System.Logger.Level.DEBUG,
                     "Refusing retry attempt #{0}, exceeds max retry count {1}",
                     retryCount, MAX_RETRY);
             return;
         }
 
-        // WAWebHandleRetryRequest.E (k function): h = chat.isUser() ? t.from : t.participant
         // In the stanza layout, user/bot 1:1 retries have participant == null and the top-level
         // from is the requester device; group/broadcast retries carry the device in participant
         // and the group JID in from. Using "participant ?? from" mirrors the WA Web selection.
@@ -456,14 +429,11 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
             return;
         }
 
-        // WAWebHandleRetryRequest.E (k function): y = h.device || 0;
-        // if (!hasDevice(h, y)) { ...sendLogs(...); new MdRetryFromUnknownDeviceWamEvent({...}).commit(); return; }
         var deviceId = Math.max(requester.device(), 0);
         if (!isDeviceKnown(requester, deviceId)) {
             LOGGER.log(System.Logger.Level.DEBUG,
                     "handleRetryRequest: device {0} not found for {1}",
                     deviceId, requester.user());
-            // WAWebRetryRequestParser: offline = receipt.hasAttr("offline")
             var offline = node.hasAttribute("offline");
             emitRetryFromUnknownDevice(deviceId, offline);
             return;
@@ -577,7 +547,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
         }
 
         var keysNode = node.getChild("keys").orElse(null);
-        // WAWebRetryRequestParser: regId = e.child("registration").contentUint(4)
         // <registration> content is exactly 4 raw bytes parsed as a big-endian
         // unsigned integer, NOT an ASCII number string.
         var registrationId = node.getChild("registration")
@@ -589,12 +558,10 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
         }
 
         try {
-            // WAWebRetryRequestParser: identity = u.child("identity").contentBytes(32)
             var identityKey = keysNode.getChild("identity")
                     .flatMap(Node::toContentBytes)
                     .map(SignalIdentityPublicKey::ofDirect)
                     .orElse(null);
-            // WAWebRetryRequestParser: m = u.child("skey")
             var signedPreKey = keysNode.getChild("skey").orElse(null);
             if (identityKey == null || signedPreKey == null) {
                 return;
@@ -603,36 +570,29 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
             var builder = new SignalPreKeyBundleBuilder()
                     .registrationId(registrationId)
                     .deviceId(Math.max(remoteDevice.device(), 0))
-                    // WAWebRetryRequestParser: skey.id = m.child("id").contentUint(3)
                     .signedPreKeyId(signedPreKey.getChild("id")
                             .flatMap(Node::toContentBytes)
                             .map(bytes -> convertBytesToUint(bytes, 3))
                             .orElseThrow())
-                    // WAWebRetryRequestParser: skey.pubkey = m.child("value").contentBytes(32)
                     .signedPreKeyPublic(signedPreKey.getChild("value")
                             .flatMap(Node::toContentBytes)
                             .map(SignalIdentityPublicKey::ofDirect)
                             .orElseThrow())
-                    // WAWebRetryRequestParser: skey.signature = m.child("signature").contentBytes(64)
                     .signedPreKeySignature(signedPreKey.getChild("signature")
                             .flatMap(Node::toContentBytes)
                             .orElseThrow())
                     .identityKey(identityKey);
 
-            // WAWebRetryRequestParser: u.maybeChild("key") for bot retries, u.child("key")
-            // for regular retries. ADAPTED: Cobalt treats the one-time pre-key as optional in
             // both cases, since the session rebuild succeeds with skey alone if the server
             // omits the one-time prekey, and the bot/non-bot bifurcation only changes whether
             // the parser would throw — both branches still feed the same SignalPreKeyBundle.
             var preKey = keysNode.getChild("key").orElse(null);
             if (preKey != null) {
-                // WAWebRetryRequestParser: key.id = g.child("id").contentUint(3)
                 //                         (or f.child("id").contentUint(3) for bot retry)
                 var preKeyId = preKey.getChild("id")
                         .flatMap(Node::toContentBytes)
                         .map(bytes -> convertBytesToUint(bytes, 3))
                         .orElse(null);
-                // WAWebRetryRequestParser: key.pubkey = g.child("value").contentBytes(32)
                 var preKeyValue = preKey.getChild("value")
                         .flatMap(Node::toContentBytes)
                         .map(SignalIdentityPublicKey::ofDirect)
@@ -647,7 +607,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
             sessionCipher.process(remoteDevice.toSignalAddress(), builder.build());
             whatsapp.store().save();
         } catch (Throwable ignored) {
-            // ADAPTED: WAWebHandleRetryRequest — WA Web logs warning but continues
         }
     }
 
@@ -699,11 +658,9 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      *           decoupled from the device-service constructor parameter graph.
      */
     private boolean isDeviceKnown(Jid requester, int deviceId) {
-        // WAWebApiDeviceList.hasDevice: primary device always exists
         if (deviceId == DeviceConstants.PRIMARY_DEVICE_ID) {
             return true;
         }
-        // WAWebApiDeviceList.hasDevice: check cached device list for the user JID
         var deviceList = whatsapp.store().findDeviceList(requester.toUserJid()).orElse(null);
         if (deviceList == null || deviceList.deleted()) {
             return false;
@@ -727,11 +684,9 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      *           {@code new MdRetryFromUnknownDeviceWamEvent({offline, senderType}).commit()}
      */
     private void emitRetryFromUnknownDevice(int deviceId, boolean offline) {
-        // WAWebHandleRetryRequest.E: senderType = y === WAJids.DEFAULT_DEVICE_ID ? PRIMARY : COMPANION
         var senderType = deviceId == DeviceConstants.PRIMARY_DEVICE_ID
                 ? DeviceType.PRIMARY
                 : DeviceType.COMPANION;
-        // WAWebHandleRetryRequest.E: new MdRetryFromUnknownDeviceWamEvent({offline, senderType}).commit()
         wamService.commit(new MdRetryFromUnknownDeviceEventBuilder()
                 .offline(offline)
                 .senderType(senderType)
@@ -826,7 +781,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      *
      * @param node   the original receipt stanza node
      * @param parsed the parsed receipt, used to extract the participant for simple receipts
-     * @implNote WAWebReceiptAck.buildReceiptAck
      */
     private void sendAck(Node node, ParsedReceipt parsed) {
         var id = node.getAttributeAsString("id", null);
@@ -835,7 +789,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
             return;
         }
 
-        // WAWebReceiptAck.buildReceiptAck: participant is only set for simple receipts
         // and only when participant differs from from
         var participant = parsed instanceof SimpleReceipt simple ? simple.participant() : null;
         var ackString = parsed != null ? parsed.ackString() : node.getAttributeAsString("type", null);
@@ -887,7 +840,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      *
      * @param node the receipt stanza node
      * @return the parsed receipt, or {@code null} if essential attributes are missing
-     * @implNote WAWebHandleMsgReceiptParser.msgReceiptParser
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleMsgReceiptParser",
             exports = "msgReceiptParser", adaptation = WhatsAppAdaptation.ADAPTED)
@@ -898,18 +850,17 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
             return null;
         }
 
-        var offline = node.hasAttribute("offline"); // WAWebHandleMsgReceiptParser: offline field
+        var offline = node.hasAttribute("offline");
         var ackString = node.getAttributeAsString("type", null);
         var ack = ReceiptAck.fromType(ackString);
 
-        // WAWebHandleMsgReceiptParser: check for <error reason="lid" type="feature-incapable">
         // which overrides the ack to SENT (mapped to RECEIVED in Cobalt since SENT is not
         // a receipt-level concept)
         var errorNode = node.getChild("error").orElse(null);
         if (errorNode != null
                 && "lid".equals(errorNode.getAttributeAsString("reason", null))
                 && "feature-incapable".equals(errorNode.getAttributeAsString("type", null))) {
-            ack = ReceiptAck.RECEIVED; // WAWebHandleMsgReceiptParser: overrides to ACK.SENT (=1)
+            ack = ReceiptAck.RECEIVED;
         }
 
         var participantsNode = node.getChild("participants").orElse(null);
@@ -949,15 +900,12 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
     ) {
         var participant = node.getAttributeAsJid("participant").orElse(null);
 
-        // WAWebHandleMsgReceiptParser.p: parse participantPn from participant_pn attr
         var participantPn = node.getAttributeAsJid("participant_pn").orElse(null);
 
-        // WAWebHandleMsgReceiptParser.p: parse participantUsername from participant_username attr
         var participantUsername = node.getAttributeAsString("participant_username", null);
 
         var recipient = node.getAttributeAsJid("recipient").orElse(null);
 
-        // WAWebHandleMsgReceiptParser.p: parse isLidBot for bot participants
         var isLidBot = false;
         if (participant != null && participant.isBot() && node.hasAttribute("is_lid")) {
             isLidBot = "true".equals(node.getAttributeAsString("is_lid", null));
@@ -975,12 +923,10 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
             }
         }
 
-        // WAWebHandleMsgReceiptParser.p: for non-view receipts, stanzaId is appended
         if (!viewReceipt) {
             externalIds.add(id);
         }
 
-        // WAWebHandleMsgReceiptParser.p: parse <biz> child for business metadata
         BizInfo bizInfo = null;
         var bizNode = node.getChild("biz").orElse(null);
         if (bizNode != null) {
@@ -1046,7 +992,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
             if (participantJid == null) {
                 continue;
             }
-            // WAWebHandleMsgReceiptParser.d: parse participantPn and participantUsername
             var participantPn = userNode.getAttributeAsJid("participant_pn").orElse(null);
             var participantUsername = userNode.getAttributeAsString("participant_username", null);
             receipts.add(new ParticipantReceipt(
@@ -1097,7 +1042,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
                 continue;
             }
             var childAckString = userNode.getAttributeAsString("type", null);
-            // WAWebHandleMsgReceiptParser.m: parse participantPn and participantUsername
             var participantPn = userNode.getAttributeAsJid("participant_pn").orElse(null);
             var participantUsername = userNode.getAttributeAsString("participant_username", null);
             receipts.add(new ParticipantReceipt(
@@ -1177,7 +1121,7 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
             case READ -> MessageStatus.READ;
             case PLAYED -> MessageStatus.PLAYED;
             case CONTENT_GONE -> MessageStatus.ERROR;
-            case INACTIVE -> MessageStatus.ERROR; // WAWebAck.ACK.INACTIVE = -6
+            case INACTIVE -> MessageStatus.ERROR;
             default -> MessageStatus.DELIVERED;
         };
     }
@@ -1613,49 +1557,35 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      *   <li>{@code PEER} = ACK.PEER (5) — peer_msg</li>
      *   <li>{@code INACTIVE} = ACK.INACTIVE (-6) — inactive</li>
      * </ul>
-     *
-     * @implNote WAWebHandleMsgReceiptParser.RECEIPT_TYPES_TO_ACK, WAWebAck.ACK
      */
     private enum ReceiptAck {
         /**
          * Delivery-level acknowledgement (ACK.RECEIVED = 2).
-         *
-         * @implNote WAWebAck.ACK.RECEIVED
          */
         RECEIVED,
 
         /**
          * Read acknowledgement (ACK.READ = 3).
-         *
-         * @implNote WAWebAck.ACK.READ
          */
         READ,
 
         /**
          * Played acknowledgement for audio/video (ACK.PLAYED = 4).
-         *
-         * @implNote WAWebAck.ACK.PLAYED
          */
         PLAYED,
 
         /**
          * Content gone / server error (ACK.CONTENT_GONE = -3).
-         *
-         * @implNote WAWebAck.ACK.CONTENT_GONE
          */
         CONTENT_GONE,
 
         /**
          * Peer message acknowledgement (ACK.PEER = 5).
-         *
-         * @implNote WAWebAck.ACK.PEER
          */
         PEER,
 
         /**
          * Inactive acknowledgement (ACK.INACTIVE = -6).
-         *
-         * @implNote WAWebAck.ACK.INACTIVE
          */
         INACTIVE;
 
@@ -1673,7 +1603,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
          *
          * @param type the raw ack type string from the receipt stanza
          * @return the resolved ack level
-         * @implNote WAWebHandleMsgReceiptParser.RECEIPT_TYPES_TO_ACK
          */
         @WhatsAppWebExport(moduleName = "WAWebHandleMsgReceiptParser",
                 exports = "RECEIPT_TYPES_TO_ACK", adaptation = WhatsAppAdaptation.ADAPTED)

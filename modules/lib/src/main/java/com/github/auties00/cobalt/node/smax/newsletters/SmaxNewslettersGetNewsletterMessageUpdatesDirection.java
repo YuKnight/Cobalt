@@ -15,7 +15,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Sealed disjunction over the required pagination cursor — either
+ * Sealed disjunction over the required pagination cursor. Either
  * {@code before} or {@code after} a server-id.
  *
  * @implNote {@code WASmaxOutNewslettersMessageUpdatesBeforeOrAfterMixinMixinGroup.mergeMessageUpdatesBeforeOrAfterMixinMixinGroup}.
@@ -24,7 +24,7 @@ import java.util.Optional;
 public sealed interface SmaxNewslettersGetNewsletterMessageUpdatesDirection permits SmaxNewslettersGetNewsletterMessageUpdatesDirection.Before, SmaxNewslettersGetNewsletterMessageUpdatesDirection.After {
 
     /**
-     * The {@code before} cursor — fetch updates with server-ids
+     * The {@code before} cursor. Fetch updates with server-ids
      * strictly less than the given pivot.
      *
      * @implNote {@code WASmaxOutNewslettersMessageUpdatesBeforeMixinMixin.mergeMessageUpdatesBeforeMixinMixin}.
@@ -71,7 +71,7 @@ public sealed interface SmaxNewslettersGetNewsletterMessageUpdatesDirection perm
     }
 
     /**
-     * The {@code after} cursor — fetch updates with server-ids
+     * The {@code after} cursor. Fetch updates with server-ids
      * strictly greater than the given pivot.
      *
      * @implNote {@code WASmaxOutNewslettersMessageUpdatesAfterMixinMixin.mergeMessageUpdatesAfterMixinMixin}.

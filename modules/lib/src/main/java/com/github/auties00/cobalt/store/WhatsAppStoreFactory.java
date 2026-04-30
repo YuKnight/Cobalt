@@ -15,18 +15,12 @@ import java.util.UUID;
  * <p>Each factory encapsulates a specific storage strategy (fully in-memory
  * with protobuf file persistence, or a future persistent backend) and
  * exposes a uniform API to create a brand-new session store or to load an
- * existing one by UUID, by phone number, or by "most recently used"
+ * existing one by UUID, by phone number, or by most recently used
  * selection.
  *
  * <p>Concrete factories are obtained via the static factory methods on this
- * interface; callers should not depend on the concrete factory types
+ * interface. Callers should not depend on the concrete factory types
  * directly.
- *
- * @implNote Cobalt collapses WA Web's per-database factories
- * ({@code WAWebModelStorageInitialize}, {@code WAWebCollections},
- * {@code WAWebUserPrefsBase}, etc.) into a single store factory hierarchy
- * because {@link WhatsAppStore} itself merges all WA Web databases into one
- * in-memory aggregate.
  */
 public interface WhatsAppStoreFactory {
     /**

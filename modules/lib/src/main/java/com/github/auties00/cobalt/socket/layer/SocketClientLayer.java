@@ -7,96 +7,95 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 
 /**
- * A layer in the socket client stack that provides bidirectional byte I/O.
+ * One layer in the socket client stack, providing bidirectional byte
+ * I/O and a handful of transport-control hooks.
  *
- * <p>Layers are composed bottom-to-top: transport, optional tunnel, optional
- * TLS.  Each layer delegates to an inner layer for raw I/O and may add
- * its own framing, encryption, or tunnelling on top.
+ * <p>Layers are composed bottom-to-top: a transport layer at the head,
+ * then a tunnel layer for proxy support, then optional security layers
+ * for TLS, and finally an application layer (WebSocket and the
+ * WhatsApp datagram framer). Each layer delegates raw byte movement to
+ * the inner layer it wraps and adds its own framing, encryption or
+ * tunnelling on top.
  *
- * <p>In addition to the core I/O methods, layers expose transport-control
- * methods that propagate through the stack to the bottommost transport
- * layer.  These methods allow higher-level code (such as protocol
- * handshake logic) to manipulate the connection lifecycle without
- * needing direct access to the NIO channel or selector.
+ * <p>The transport-control hooks ({@link #finishConnect()},
+ * {@link #startHandshake(SocketClientLayerContext, long)},
+ * {@link #registerLayerContext(SocketClientLayerContext)}) propagate
+ * down the chain to the bottommost transport layer so higher-level
+ * code can drive connection lifecycle without holding a reference to
+ * the NIO channel or selector.
  *
- * @param <C> the type of layer context associated with this layer,
- *            used by the selector to return a properly typed
- *            {@link java.util.Optional}
+ * @param <C> the type of layer context this layer publishes; the
+ *            selector uses it to type its lookups
  */
 public interface SocketClientLayer<C extends SocketClientLayerContext> {
     /**
-     * Connects this layer to the specified address.
+     * Connects this layer (and every layer below it) to {@code address}.
      *
      * @param address  the remote endpoint
-     * @param listener the callback for events
-     * @throws IOException if the connection fails
+     * @param listener the callback that receives inbound events
+     * @throws IOException if any layer fails to connect
      */
     void connect(InetSocketAddress address, SocketClientLayerListener listener) throws IOException;
 
     /**
-     * Disconnects this layer and releases resources.
+     * Disconnects this layer and releases any resources it owns.
      */
     void disconnect();
 
     /**
-     * Returns whether this layer is connected.
+     * Returns whether this layer (transitively) is currently connected.
      *
      * @return {@code true} if connected
      */
     boolean isConnected();
 
     /**
-     * Sends one logical binary payload represented by the provided buffers.
+     * Sends one logical binary payload represented by the supplied
+     * buffers.
      *
-     * <p>Implementations may enqueue these buffers for asynchronous write and
-     * may transform their content in-place (for example framing, masking, or
-     * encryption). Callers should treat each supplied buffer as transferred
-     * ownership and avoid mutating it after this call.
+     * <p>Implementations may enqueue the buffers for asynchronous
+     * write and may transform their content in place (framing,
+     * masking, encryption). Callers must therefore treat each buffer
+     * as transferred and avoid mutating it after this call.
      *
      * @param buffers payload buffers in send order
+     * @throws IOException if the payload cannot be enqueued
      */
     void sendBinary(ByteBuffer... buffers) throws IOException;
 
     /**
-     * Reads binary bytes into {@code buffer}.
+     * Reads bytes into {@code buffer}.
      *
-     * <p>The destination buffer stays in write mode after the call; callers
-     * that need to read from it should invoke {@link ByteBuffer#flip()}
-     * explicitly.
+     * <p>The destination buffer stays in write mode after the call;
+     * callers must invoke {@link ByteBuffer#flip()} themselves before
+     * reading from it.
      *
      * @param buffer the destination buffer, in write mode
-     * @param fully  {@code true} to fill the buffer, {@code false} to return
-     *               after the first successful read
-     * @return bytes read, or {@code -1} on end-of-stream
+     * @param fully  {@code true} to keep reading until the buffer is
+     *               full, {@code false} to return after the first
+     *               successful read
+     * @return the number of bytes read, or {@code -1} on
+     *         end-of-stream
      * @throws IOException if reading fails
      */
     int readBinary(ByteBuffer buffer, boolean fully) throws IOException;
 
     /**
-     * Finishes the connection setup and transitions to asynchronous data
-     * flow.
+     * Finishes the connection setup and transitions to the
+     * post-handshake asynchronous data flow.
      *
-     * <p>This transitions the connection from synchronous handshake mode to
-     * the asynchronous post-handshake mode where the selector delivers data
-     * through layer contexts.  Starts the listener executor, marks the
-     * tunnel as established, and enables read interest.
-     *
-     * <p>Each wrapper layer delegates to its inner layer.  Only the
-     * bottommost transport layer implements this concretely.
+     * <p>Wrapper layers delegate to their inner layer; only the
+     * transport implements the actual selector transition.
      *
      * @throws IOException if the transition fails
      */
     void finishConnect() throws IOException;
 
     /**
-     * Finishes the connection setup, feeds leftover bytes into the
-     * pipeline, and drains any buffered TLS application data.
-     *
-     * <p>This is used after a synchronous protocol upgrade (such as a
-     * WebSocket handshake) where the HTTP response parser may have read
-     * bytes beyond the end of the response headers.  Those leftover bytes
-     * belong to the next protocol layer and must be fed into the selector
-     * pipeline before asynchronous processing begins.
+     * Variant of {@link #finishConnect()} that feeds leftover bytes
+     * (typically read past a synchronous protocol upgrade boundary,
+     * such as the WebSocket HTTP upgrade) into the pipeline before
+     * asynchronous processing begins.
      *
      * @param leftover the leftover bytes in read mode, or {@code null}
      * @throws IOException if the transition fails
@@ -104,24 +103,22 @@ public interface SocketClientLayer<C extends SocketClientLayerContext> {
     void finishConnect(ByteBuffer leftover) throws IOException;
 
     /**
-     * Initiates a TLS handshake and blocks until it completes.
+     * Initiates a TLS handshake on the inner transport and blocks the
+     * calling virtual thread until it completes.
      *
-     * <p>Registers the given TLS layer context with the selector pipeline
-     * and drives the handshake to completion.
-     *
-     * @param tlsContext the TLS layer context
+     * @param tlsContext the TLS layer context that drives the handshake
      * @param timeout    the handshake timeout in milliseconds
      * @throws IOException if the handshake fails or times out
      */
     void startHandshake(SocketClientLayerContext tlsContext, long timeout) throws IOException;
 
     /**
-     * Registers a layer context in the selector pipeline.
+     * Registers a layer context with the selector pipeline so the
+     * inbound read path can reach it.
      *
-     * <p>Layer contexts are the per-connection processing state for each
-     * protocol layer.  They are registered during stack construction so
-     * the selector can drive the inbound read path.  The concrete type
-     * of the context determines its position in the chain.
+     * <p>Contexts are registered during stack construction in the same
+     * order their layers are composed; the concrete context type
+     * determines its position in the chain.
      *
      * @param context the layer context to register
      * @throws IOException if registration fails

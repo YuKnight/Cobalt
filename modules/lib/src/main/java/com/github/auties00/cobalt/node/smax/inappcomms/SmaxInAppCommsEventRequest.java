@@ -13,7 +13,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps the {@code <event/>} payload
+ * The outbound stanza variant. Wraps the {@code <event/>} payload
  * in the canonical {@code <iq xmlns="w:comms" type="set"
  * to="s.whatsapp.net">} envelope.
  */
@@ -26,7 +26,7 @@ public final class SmaxInAppCommsEventRequest implements SmaxOperation.Request {
     private final String eventPromotionId;
 
     /**
-     * The event type — the discriminator that tells the analytics
+     * The event type. The discriminator that tells the analytics
      * pipeline what kind of interaction happened (impression, click,
      * dismiss, etc.).
      */
@@ -45,10 +45,10 @@ public final class SmaxInAppCommsEventRequest implements SmaxOperation.Request {
     /**
      * Constructs a request.
      *
-     * @param eventPromotionId  the promotion id; never {@code null}
-     * @param eventType         the event type; never {@code null}
+     * @param eventPromotionId  the promotion id. Never {@code null}
+     * @param eventType         the event type. Never {@code null}
      * @param eventTimestampSec the event timestamp in seconds
-     * @param eventLogdata      the event log payload; never
+     * @param eventLogdata      the event log payload. Never
      *                          {@code null}
      * @throws NullPointerException if any string argument is
      *                              {@code null}
@@ -64,7 +64,7 @@ public final class SmaxInAppCommsEventRequest implements SmaxOperation.Request {
     /**
      * Returns the promotion id.
      *
-     * @return the promotion id; never {@code null}
+     * @return the promotion id. Never {@code null}
      */
     public String eventPromotionId() {
         return eventPromotionId;
@@ -73,7 +73,7 @@ public final class SmaxInAppCommsEventRequest implements SmaxOperation.Request {
     /**
      * Returns the event type.
      *
-     * @return the event type; never {@code null}
+     * @return the event type. Never {@code null}
      */
     public String eventType() {
         return eventType;
@@ -91,7 +91,7 @@ public final class SmaxInAppCommsEventRequest implements SmaxOperation.Request {
     /**
      * Returns the event log payload.
      *
-     * @return the log payload; never {@code null}
+     * @return the log payload. Never {@code null}
      */
     public String eventLogdata() {
         return eventLogdata;
@@ -116,8 +116,6 @@ public final class SmaxInAppCommsEventRequest implements SmaxOperation.Request {
     @WhatsAppWebExport(moduleName = "WASmaxOutInAppCommsEventRequest",
             exports = "makeEventRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutInAppCommsEventRequest:
-        //   smax("event", {promotion_id, type, timestamp_sec, logdata})
         var eventNode = new NodeBuilder()
                 .description("event")
                 .attribute("promotion_id", eventPromotionId)
@@ -125,7 +123,6 @@ public final class SmaxInAppCommsEventRequest implements SmaxOperation.Request {
                 .attribute("timestamp_sec", eventTimestampSec)
                 .attribute("logdata", eventLogdata)
                 .build();
-        // smax("iq", {to: S_WHATSAPP_NET, xmlns: "w:comms", id: generateId(), type: "set"})
         return new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "w:comms")

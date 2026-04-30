@@ -49,7 +49,7 @@ public final class AiThreadRenameHandler implements WebAppStateActionHandler {
      *
      * @implNote ADAPTED: WAWebAiThreadRenameSync uses WALogger; Cobalt uses java.util.logging
      */
-    private static final Logger LOGGER = Logger.getLogger(AiThreadRenameHandler.class.getName()); // ADAPTED: WAWebAiThreadRenameSync — WALogger
+    private static final Logger LOGGER = Logger.getLogger(AiThreadRenameHandler.class.getName());
 
     /**
      * Singleton instance of this handler.
@@ -82,7 +82,7 @@ public final class AiThreadRenameHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebAiThreadRenameSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return AiThreadRenameAction.ACTION_NAME; // WAWebAiThreadRenameSync.getAction
+        return AiThreadRenameAction.ACTION_NAME;
     }
 
     /**
@@ -95,7 +95,7 @@ public final class AiThreadRenameHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebAiThreadRenameSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return AiThreadRenameAction.COLLECTION_NAME; // WAWebAiThreadRenameSync.collectionName = RegularLow
+        return AiThreadRenameAction.COLLECTION_NAME;
     }
 
     /**
@@ -107,7 +107,7 @@ public final class AiThreadRenameHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebAiThreadRenameSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return AiThreadRenameAction.ACTION_VERSION; // WAWebAiThreadRenameSync.getVersion
+        return AiThreadRenameAction.ACTION_VERSION;
     }
 
     /**
@@ -124,7 +124,7 @@ public final class AiThreadRenameHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebAiThreadRenameSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebAiThreadRenameSync.applyMutations
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -153,47 +153,39 @@ public final class AiThreadRenameHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebAiThreadRenameSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        try { // WAWebAiThreadRenameSync.applyMutations: try { ... } catch(e) { return {actionState: Failed} }
-            // WAWebAiThreadRenameSync.applyMutations: if (e.operation !== "set") return {actionState: Unsupported}
+        try {
             if (mutation.operation() != SyncdOperation.SET) {
                 return MutationApplicationResult.unsupported();
             }
 
-            // WAWebAiThreadRenameSync.applyMutations: var n = e.indexParts, s = n[1], u = n[2]
             var indexArray = JSON.parseArray(mutation.index());
             if (indexArray.size() < 3) {
-                return malformedActionIndex(); // WAWebAiThreadRenameSync.applyMutations -> this.malformedActionIndex()
+                return malformedActionIndex();
             }
 
-            var chatJidString = indexArray.getString(1); // WAWebAiThreadRenameSync.applyMutations: s = n[1]
-            var threadId = indexArray.getString(2); // WAWebAiThreadRenameSync.applyMutations: u = n[2]
-            // WAWebAiThreadRenameSync.applyMutations: if (!s || !u || !isWid(s) || !isStringNotNullAndNotWhitespaceOnly(u))
+            var chatJidString = indexArray.getString(1);
+            var threadId = indexArray.getString(2);
             //     return t.malformedActionIndex()
             if (chatJidString == null || chatJidString.isBlank()
                     || threadId == null || threadId.isBlank()) {
-                return malformedActionIndex(); // WAWebAiThreadRenameSync.applyMutations -> this.malformedActionIndex()
+                return malformedActionIndex();
             }
 
-            // WAWebAiThreadRenameSync.applyMutations: if (!t.validateSyncActionValue(a))
             //     return malformedActionValue(t.collectionName)
             if (!(mutation.value().action().orElse(null) instanceof AiThreadRenameAction action)) {
-                return malformedActionValue(); // WAWebAiThreadRenameSync.applyMutations -> WAWebSyncdIndexUtils.malformedActionValue
+                return malformedActionValue();
             }
 
-            var newTitle = action.newTitle().orElse(null); // WAWebAiThreadRenameSync.validateSyncActionValue: e.newTitle
-            // WAWebAiThreadRenameSync.validateSyncActionValue: isStringNotNullAndNotWhitespaceOnly(n)
+            var newTitle = action.newTitle().orElse(null);
             if (newTitle == null || newTitle.isBlank()) {
-                return malformedActionValue(); // WAWebAiThreadRenameSync.applyMutations -> malformedActionValue(collectionName)
+                return malformedActionValue();
             }
 
-            // WAWebAiThreadRenameSync.applyMutations: var c = createWid(s); if (!c.isBot()) return this.malformedActionIndex()
-            // WAWebWid.isBot covers both the dedicated bot server domain and reserved phone-number bot ranges,
             // so Cobalt must use Jid.isBot() (not Jid.hasBotServer()) to match semantics.
             var chatJid = Jid.of(chatJidString);
             if (!chatJid.isBot()) {
-                return malformedActionIndex(); // WAWebAiThreadRenameSync.applyMutations -> this.malformedActionIndex()
+                return malformedActionIndex();
             }
-            // WAWebAiThreadRenameSync.applyMutations: var d = asBotWidOrThrow(c) — throw path handled by outer try/catch -> Failed
             // ADAPTED: WAWebAiThreadRenameSync.applyMutations — WA Web checks
             // isBotEnabled() && isAiChatThreadsInfraEnabled() (AB prop-based gating).
             // Cobalt maps this to DeviceCapabilities.AiThread.SupportLevel check
@@ -204,7 +196,7 @@ public final class AiThreadRenameHandler implements WebAppStateActionHandler {
                     .filter(level -> level != DeviceCapabilities.AiThread.SupportLevel.NONE)
                     .isPresent();
             if (!aiThreadSupported) {
-                return MutationApplicationResult.unsupported(); // WAWebAiThreadRenameSync.applyMutations: Unsupported if gating fails
+                return MutationApplicationResult.unsupported();
             }
 
             // ADAPTED: WAWebAiThreadRenameSync.applyMutations — WA Web calls
@@ -213,7 +205,6 @@ public final class AiThreadRenameHandler implements WebAppStateActionHandler {
             var titles = new HashMap<>(client.store().aiThreadTitles());
             var key = chatJidString + "|" + threadId;
             if (!titles.containsKey(key)) {
-                // WAWebAiThreadRenameSync.applyMutations: return {actionState: Orphan, orphanModel: p.orphanModel}
                 return MutationApplicationResult.orphan(key, "Thread");
             }
 
@@ -224,11 +215,10 @@ public final class AiThreadRenameHandler implements WebAppStateActionHandler {
             // Cobalt's flat aiThreadTitles store map only tracks the title string.
             titles.put(key, newTitle);
             client.store().setAiThreadTitles(titles);
-            return MutationApplicationResult.success(); // WAWebAiThreadRenameSync.$AiThreadRenameSync$p_1: {actionState: Success}
+            return MutationApplicationResult.success();
         } catch (Exception e) {
-            // WAWebAiThreadRenameSync.applyMutations: catch(e) { return {actionState: Failed} }
-            LOGGER.warning("AI thread rename mutation failed: " + e.getMessage()); // ADAPTED: WAWebAiThreadRenameSync — log instead of silent catch
-            return MutationApplicationResult.failed(); // WAWebAiThreadRenameSync.applyMutations: {actionState: SyncActionState.Failed}
+            LOGGER.warning("AI thread rename mutation failed: " + e.getMessage());
+            return MutationApplicationResult.failed();
         }
     }
 
@@ -252,22 +242,22 @@ public final class AiThreadRenameHandler implements WebAppStateActionHandler {
      */
     @WhatsAppWebExport(moduleName = "WAWebAiThreadRenameSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncPendingMutation getAiThreadRenameMutation(Jid chatJid, String threadId, String newTitle) {
-        var timestamp = Instant.now(); // WAWebSyncdActionUtils.buildPendingMutation: timestamp: unixTime()
-        var action = new AiThreadRenameActionBuilder() // WAWebAiThreadRenameSync: {aiThreadRenameAction: {newTitle: ...}}
-                .newTitle(newTitle) // WAWebAiThreadRenameSync.validateSyncActionValue: e.newTitle
+        var timestamp = Instant.now();
+        var action = new AiThreadRenameActionBuilder()
+                .newTitle(newTitle)
                 .build();
-        var value = new SyncActionValueBuilder() // WAWebSyncdActionUtils.buildPendingMutation
+        var value = new SyncActionValueBuilder()
                 .timestamp(timestamp)
-                .aiThreadRenameAction(action) // WAWebAiThreadRenameSync: {aiThreadRenameAction: ...}
+                .aiThreadRenameAction(action)
                 .build();
         var index = JSON.toJSONString(List.of(AiThreadRenameAction.ACTION_NAME, chatJid.toString(), threadId)); // ["ai_thread_rename", chatJid, threadId]
         var mutation = new DecryptedMutation.Trusted(
                 index,
                 value,
-                SyncdOperation.SET, // WAWebAiThreadRenameSync: SET-only
+                SyncdOperation.SET,
                 timestamp,
-                AiThreadRenameAction.ACTION_VERSION // WAWebAiThreadRenameSync.getVersion: 7
+                AiThreadRenameAction.ACTION_VERSION
         );
-        return new SyncPendingMutation(mutation, 0); // WAWebSyncdActionUtils.buildPendingMutation
+        return new SyncPendingMutation(mutation, 0);
     }
 }

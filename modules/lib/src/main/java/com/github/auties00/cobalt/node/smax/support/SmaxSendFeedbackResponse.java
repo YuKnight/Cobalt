@@ -56,7 +56,7 @@ public sealed interface SmaxSendFeedbackResponse extends SmaxOperation.Response
     }
 
     /**
-     * The {@code Success} reply variant — the relay accepted the
+     * The {@code Success} reply variant. The relay accepted the
      * feedback and emitted the {@code <result status="Success"/>}
      * acknowledgement.
      *
@@ -68,7 +68,7 @@ public sealed interface SmaxSendFeedbackResponse extends SmaxOperation.Response
     @WhatsAppWebModule(moduleName = "WASmaxInSupportMessageFeedbackSendFeedbackResponseSuccess")
     final class Success implements SmaxSendFeedbackResponse {
         /**
-         * The acknowledgement {@code status} string — always the
+         * The acknowledgement {@code status} string, always the
          * literal {@code "Success"}.
          */
         private final String resultStatus;
@@ -149,7 +149,7 @@ public sealed interface SmaxSendFeedbackResponse extends SmaxOperation.Response
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected
+     * The {@code ClientError} reply variant. The relay rejected
      * the feedback as malformed ({@code 400}) or rate-limited
      * ({@code 429}).
      */
@@ -241,7 +241,7 @@ public sealed interface SmaxSendFeedbackResponse extends SmaxOperation.Response
     }
 
     /**
-     * The {@code ServerError} reply variant — the relay
+     * The {@code ServerError} reply variant. The relay
      * encountered a transient internal failure ({@code 500}).
      */
     @WhatsAppWebModule(moduleName = "WASmaxInSupportMessageFeedbackSendFeedbackResponseError")

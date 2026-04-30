@@ -100,7 +100,6 @@ public final class SmaxGroupsRevokeRequestCodeRequest implements SmaxOperation.R
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsRevokeRequestCodeRequest",
             exports = "makeRevokeRequestCodeRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutGroupsRevokeRequestCodeRequest: smax("participant", {jid: USER_JID(t)})
         var participantNodes = new ArrayList<Node>(participants.size());
         for (var participantJid : participants) {
             var participantNode = new NodeBuilder()
@@ -109,14 +108,10 @@ public final class SmaxGroupsRevokeRequestCodeRequest implements SmaxOperation.R
                     .build();
             participantNodes.add(participantNode);
         }
-        // WASmaxOutGroupsRevokeRequestCodeRequest: smax("revoke", null,
-        //   REPEATED_CHILD(participant, 1, 1000))
         var revokeNode = new NodeBuilder()
                 .description("revoke")
                 .content(participantNodes)
                 .build();
-        // WASmaxOutGroupsBaseSetGroupMixin: smax("iq", {to: GROUP_JID(t), xmlns: "w:g2"})
-        // WASmaxOutGroupsBaseIQSetRequestMixin: smax("iq", {id: generateId(), type: "set"})
         return new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "w:g2")

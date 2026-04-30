@@ -13,11 +13,11 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Sealed family of inbound reply variants — only the {@code Success}
+ * Sealed family of inbound reply variants. Only the {@code Success}
  * shape is documented for this RPC.
  *
  * @implNote {@code WASmaxReceiptPublishViewRPC.sendPublishViewRPC}
- *           tries {@code Success} only; on no-match the WA Web
+ *           tries {@code Success} only. On no-match the WA Web
  *           parser throws and the Cobalt {@link SmaxReceiptPublishViewResponse#of(Node, Node)}
  *           returns {@link Optional#empty()}.
  */
@@ -27,9 +27,9 @@ public sealed interface SmaxReceiptPublishViewResponse extends SmaxOperation.Res
     /**
      * Tries the single {@link Success} variant.
      *
-     * @param node    the inbound ack stanza; never {@code null}
-     * @param request the original outbound stanza — used to validate
-     *                echoed identifiers; never {@code null}
+     * @param node    the inbound ack stanza. Never {@code null}
+     * @param request the original outbound stanza. Used to validate
+     *                echoed identifiers. Never {@code null}
      * @return an {@link Optional} carrying the parsed variant, or
      *         empty when the stanza does not match the documented
      *         shape
@@ -44,7 +44,7 @@ public sealed interface SmaxReceiptPublishViewResponse extends SmaxOperation.Res
     }
 
     /**
-     * The {@code Success} reply variant — the relay produced an
+     * The {@code Success} reply variant. The relay produced an
      * {@code <ack class="receipt" type=ECHO from=ECHO id=ECHO/>}
      * envelope, optionally carrying the timestamp and read-receipts
      * echo plus a deprecated edit marker.
@@ -68,13 +68,13 @@ public sealed interface SmaxReceiptPublishViewResponse extends SmaxOperation.Res
         private final Long timestamp;
 
         /**
-         * The optional {@code readreceipts} echo — one of
+         * The optional {@code readreceipts} echo. One of
          * {@code "all"} / {@code "none"}.
          */
         private final String readReceipts;
 
         /**
-         * The optional deprecated {@code edit} marker — one of
+         * The optional deprecated {@code edit} marker. One of
          * {@code "0"} / {@code "1"} / {@code "7"}.
          */
         private final String deprecatedEdit;
@@ -82,9 +82,9 @@ public sealed interface SmaxReceiptPublishViewResponse extends SmaxOperation.Res
         /**
          * Constructs a new success reply.
          *
-         * @param timestamp      the optional timestamp; may be
+         * @param timestamp      the optional timestamp. May be
          *                       {@code null}
-         * @param readReceipts   the optional read-receipts echo; may
+         * @param readReceipts   the optional read-receipts echo. May
          *                       be {@code null}
          * @param deprecatedEdit the optional deprecated edit marker;
          *                       may be {@code null}

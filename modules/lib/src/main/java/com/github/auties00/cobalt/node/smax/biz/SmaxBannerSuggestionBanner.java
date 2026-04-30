@@ -13,7 +13,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The {@code <banner/>} grandchild projection — bundles
+ * The {@code <banner/>} grandchild projection. Bundles
  * {@link SmaxBannerSuggestionConfig}, {@link SmaxBannerSuggestionContent}, {@link SmaxBannerSuggestionAction} and
  * {@link SmaxBannerSuggestionNativeAction} sub-trees.
  */

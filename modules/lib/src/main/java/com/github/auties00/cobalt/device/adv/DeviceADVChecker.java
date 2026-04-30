@@ -54,20 +54,12 @@ import java.util.concurrent.TimeUnit;
 @WhatsAppWebModule(moduleName = "WAWebAdvDeviceInfoCheckJob")
 public final class DeviceADVChecker implements AutoCloseable {
     /**
-     * Logger for ADV device info check diagnostics.
+     * Logger for ADV check diagnostics.
      */
     private static final System.Logger LOGGER = System.getLogger(DeviceADVChecker.class.getName());
 
     /**
-     * Interval between ADV checks.
-     *
-     * <p>Corresponds to the 24-hour recurring schedule in WA Web's recursive
-     * {@code setTimeout} pattern, where each callback re-invokes
-     * {@code scheduleAdvDeviceInfoCheck} after recording the current timestamp.
-     *
-     * @implNote ADAPTED: WAWebAdvDeviceInfoCheckJob.scheduleAdvDeviceInfoCheck:
-     * WA Web uses {@code DAY_SECONDS} as the base interval for recursive
-     * scheduling; Cobalt uses {@code scheduleWithFixedDelay} with 24 hours.
+     * Recurrence interval for the ADV check, mirroring WA Web's 24-hour cadence.
      */
     @WhatsAppWebExport(moduleName = "WAWebAdvDeviceInfoCheckJob",
             exports = "scheduleAdvDeviceInfoCheck",
@@ -75,28 +67,18 @@ public final class DeviceADVChecker implements AutoCloseable {
     private static final Duration CHECK_INTERVAL = Duration.ofHours(24);
 
     /**
-     * The WhatsApp client for accessing the store and error handling.
-     *
-     * @implNote ADAPTED: WAWebAdvDeviceInfoCheckJob: WA Web accesses stores and
-     * services via module-level imports; Cobalt uses constructor-injected client.
+     * The WhatsApp client used for store access and failure reporting.
      */
     private final WhatsAppClient client;
 
     /**
-     * The device service for ADV check time tracking and pending sync operations.
-     *
-     * @implNote ADAPTED: WAWebAdvDeviceInfoCheckJob: WA Web uses
-     * {@code WAWebLastADVCheckTimeApi} and {@code WAWebApiPendingDeviceSync}
-     * as separate modules; Cobalt consolidates into {@link DeviceService}.
+     * The device service consulted for the last-check time and for queueing
+     * pending syncs.
      */
     private final DeviceService deviceService;
 
     /**
-     * The AB props service for reading expiration thresholds.
-     *
-     * @implNote ADAPTED: WAWebAdvDeviceInfoCheckJob.AdvToSystemBridgeImpl:
-     * WA Web uses {@code WAWebABProps.getABPropConfigValue}; Cobalt uses
-     * constructor-injected {@link ABPropsService}.
+     * The AB props service used to read expiration thresholds.
      */
     private final ABPropsService abPropsService;
 
@@ -106,24 +88,18 @@ public final class DeviceADVChecker implements AutoCloseable {
     private final WamService wamService;
 
     /**
-     * The scheduled executor for periodic ADV checks, or {@code null} if not started.
-     *
-     * @implNote ADAPTED: WAWebAdvDeviceInfoCheckJob.scheduleAdvDeviceInfoCheck:
-     * WA Web uses a module-level timeout variable {@code g} with recursive
-     * {@code setTimeout}; Cobalt uses a {@link ScheduledExecutorService}.
+     * The scheduled executor running the periodic check, or {@code null} when the
+     * scheduler is stopped.
      */
     private volatile ScheduledExecutorService scheduler;
 
     /**
-     * Creates a new ADV check scheduler.
+     * Constructs a new ADV check scheduler.
      *
-     * @implNote ADAPTED: WAWebAdvDeviceInfoCheckJob: WA Web creates a singleton
-     * runner lazily in {@code runAdvDeviceInfoCheck} using {@code new p(new _)};
-     * Cobalt receives dependencies via constructor injection.
-     * @param client        the WhatsApp client
-     * @param deviceService the device service for sync operations
-     * @param abPropsService the AB props service for thresholds
-     * @param wamService    the WAM telemetry service for committing ADV check events
+     * @param client         the WhatsApp client
+     * @param deviceService  the device service
+     * @param abPropsService the AB props service
+     * @param wamService     the WAM telemetry service
      */
     @WhatsAppWebExport(moduleName = "WAWebAdvDeviceInfoCheckJob",
             exports = "runAdvDeviceInfoCheck",
@@ -160,7 +136,6 @@ public final class DeviceADVChecker implements AutoCloseable {
                             .factory();
                     scheduler = Executors.newSingleThreadScheduledExecutor(factory);
 
-                    // WAWebAdvDeviceInfoCheckJob.scheduleAdvDeviceInfoCheck: compute initial delay
                     var initialDelay = computeInitialDelay();
                     LOGGER.log(Level.DEBUG, "ADV check scheduler starting with initial delay of {0} seconds",
                             initialDelay.toSeconds());
@@ -192,15 +167,14 @@ public final class DeviceADVChecker implements AutoCloseable {
     private Duration computeInitialDelay() {
         var lastCheck = deviceService.lastAdvCheckTime();
         if (lastCheck.isEmpty()) {
-            // WAWebAdvDeviceInfoCheckJob.scheduleAdvDeviceInfoCheck: no previous check - run immediately
-            // The actual job will be skipped in performCheck() when lastCheck is empty
+            // No previous check, so run immediately. The actual job is skipped in
+            // performCheck for the first run.
             return Duration.ZERO;
         }
 
         var now = Instant.now();
         var timeSinceLastCheck = Duration.between(lastCheck.get(), now);
 
-        // WAWebAdvDeviceInfoCheckJob.scheduleAdvDeviceInfoCheck: Math.max(DAY_SECONDS-(e-t), 0)
         if (timeSinceLastCheck.compareTo(CHECK_INTERVAL) >= 0) {
             return Duration.ZERO;
         }
@@ -230,16 +204,13 @@ public final class DeviceADVChecker implements AutoCloseable {
     private void performCheck() {
         var lastCheck = deviceService.lastAdvCheckTime();
         if (lastCheck.isEmpty()) {
-            // WAWebAdvDeviceInfoCheckJob.scheduleAdvDeviceInfoCheck: first run just records timestamp
-            // In WA Web, when lastCheck is null the action is a no-op (Promise.resolve()),
-            // and the timestamp is recorded after the action completes.
+            // The first run only records the timestamp, mirroring WA Web's no-op
+            // Promise.resolve() path.
             deviceService.updateAdvCheckTime();
             return;
         }
 
         try {
-            // WAWebAdvDeviceInfoCheckJob.AdvToSystemBridgeImpl.getUsersForExpiration:
-            // get expiry thresholds from AB props
             var expiryDays = abPropsService.getInt(ABProp.NUM_DAYS_KEY_INDEX_LIST_EXPIRATION);
             var warningDays = abPropsService.getInt(ABProp.NUM_DAYS_BEFORE_DEVICE_EXPIRY_CHECK);
             var expiryThreshold = Duration.ofDays(expiryDays);
@@ -259,43 +230,26 @@ public final class DeviceADVChecker implements AutoCloseable {
                     myUserJid
             );
 
-            // WAWebAdvDeviceInfoCheckJob.AdvToSystemBridgeImpl.sendADVStoredTimestampExpiredEvents:
-            // WA Web fires this right after removeCompanions (even in the self-expired
-            // logout branch, because both statements execute synchronously before the
-            // socketLogout promise resolves). Mirror that ordering by emitting before
-            // the logout early return so telemetry is not lost.
+            // The expired-timestamp WAM events fire before the self-expired logout so
+            // telemetry is not lost on the logout path.
             sendAdvStoredTimestampExpiredEvents(result.expiredLists(), now, expiryThreshold);
 
-            // WAWebAdvDeviceInfoCheckJob.AdvToSystemBridgeImpl.removeCompanions:
-            // if own device list expired AND AB prop is true, trigger logout and
-            // return resolved Promise (skip clearDeviceRecord for ALL entries)
             if (result.selfExpired() && shouldLogoutOnSelfExpired()) {
                 LOGGER.log(Level.WARNING, "Own device list expired, triggering logout");
                 client.handleFailure(new WhatsAppOwnDeviceListExpiredException());
                 return;
             }
 
-            // WAWebAdvDeviceInfoCheckJob.AdvToSystemBridgeImpl.removeCompanions:
-            // when not logging out, calls clearDeviceRecord(userJid, devices) for
-            // each expired entry via Promise.all
             for (var expiredList : result.expiredLists()) {
                 clearExpiredDeviceRecord(expiredList);
             }
 
-            // WAWebAdvDeviceInfoCheckJob.AdvToSystemBridgeImpl.sendOrQueueDeviceUsyncQuery:
-            // adds all users (expired + close-to-expiration) to pending device sync
-            // and triggers doPendingDeviceSync. canRemoveUserDevices always returns
-            // false so no filtering occurs.
             if (!result.jidsNeedingSync().isEmpty()) {
                 scheduleProactiveSync(result.jidsNeedingSync());
             }
         } catch (Exception e) {
-            // WAWebAdvDeviceInfoCheckJob.scheduleAdvDeviceInfoCheck: try{yield a()}catch(e){ERROR(...)}
             client.handleFailure(new WhatsAppAdvCheckException(e));
         } finally {
-            // WAWebAdvDeviceInfoCheckJob.scheduleAdvDeviceInfoCheck: timestamp recording
-            // runs after the try/catch in WA Web (not in a finally), but Cobalt uses
-            // finally for robustness. Semantically equivalent.
             deviceService.updateAdvCheckTime();
         }
     }
@@ -338,25 +292,17 @@ public final class DeviceADVChecker implements AutoCloseable {
         var jidsNeedingSync = new ArrayList<Jid>();
 
         for (var deviceList : deviceLists) {
-            // WAWebAdvDeviceInfoCheckJob.AdvToSystemBridgeImpl.getUsersForExpiration:
-            // n.deleted || v(n) -> skip
             if (deviceList.deleted() || isPrimaryOnly(deviceList)) {
                 continue;
             }
 
-            // WAWebAdvDeviceInfoCheckJob.AdvToSystemBridgeImpl.getUsersForExpiration:
-            // S(e, a, n, r) -> expired; R(e, warningThreshold, n) -> close to expiration
             if (DeviceExpectedTsUtils.isDeviceListStale(deviceList, now, expiryThreshold, lastCheck)) {
                 expiredLists.add(deviceList);
                 if (deviceList.userJid().equals(myUserJid)) {
                     selfExpired = true;
                 }
-                // WAWebAdvDeviceInfoCheckJob: expired users are added to the sync list
-                // alongside close-to-expiration users
                 jidsNeedingSync.add(deviceList.userJid());
             } else if (DeviceExpectedTsUtils.isDeviceListCloseToExpiration(deviceList, now, warningThreshold)) {
-                // WAWebAdvDeviceInfoCheckJob.AdvToSystemBridgeImpl.getUsersForExpiration:
-                // R(e, a - warningDays*DAY_SECONDS, n) -> add to usersCloseToExpiration
                 jidsNeedingSync.add(deviceList.userJid());
             }
         }
@@ -411,24 +357,16 @@ public final class DeviceADVChecker implements AutoCloseable {
     private void clearExpiredDeviceRecord(DeviceList deviceList) {
         var userJid = deviceList.userJid();
 
-        // WAWebIdentityUpdateDeviceTableApi.clearDeviceRecord: clean up Signal sessions
-        // for all non-primary devices: deleteRemoteInfo + deleteDeviceSenderKey
         deviceList.devices()
                 .stream()
                 .filter(device -> !device.isPrimary())
                 .map(device -> device.toDeviceJid(userJid.user(), userJid.server()))
                 .forEach(client.store()::cleanupSignalSessions);
 
-        // WAWebIdentityUpdateDeviceTableApi.clearDeviceRecord ->
-        // WAWebAdvUpdateParticipantApi.updateGroupParticipantsInTransaction:
-        // when devices are removed, mark sender keys for rotation in all groups
-        // containing this user
         client.store().markKeyRotation(userJid);
 
-        // WAWebIdentityUpdateDeviceTableApi.clearDeviceRecord: create {id:..., deleted:true}
-        // Note: removeCompanions calls clearDeviceRecord(wid, devices) without account
-        // type parameters, so _(undefined, undefined) returns null and
-        // deletedChangedToHost is never set in this path.
+        // removeCompanions calls clearDeviceRecord without account type parameters,
+        // so deletedChangedToHost is never set in this path.
         var deletedList = new DeviceListBuilder()
                 .userJid(userJid)
                 .deleted(true)
@@ -469,15 +407,10 @@ public final class DeviceADVChecker implements AutoCloseable {
             return;
         }
         for (var expiredList : expiredLists) {
-            // WAWebAdvDeviceInfoCheckJob.sendADVStoredTimestampExpiredEvents:
-            // r = now - (t.timestamp + expiryDays*DAY_SECONDS)
             var overshoot = Duration.between(expiredList.timestamp().plus(expiryThreshold), now);
             if (overshoot.isNegative()) {
-                // WAWebAdvDeviceInfoCheckJob.sendADVStoredTimestampExpiredEvents: if(!(r<0))
                 continue;
             }
-            // WAWebAdvDeviceInfoCheckJob.sendADVStoredTimestampExpiredEvents:
-            // a = Math.round(r / HOUR_SECONDS)
             var hours = Math.toIntExact(Math.round(overshoot.toSeconds() / 3600.0));
             wamService.commit(new AdvStoredTimestampExpiredEventBuilder()
                     .advExpireTimeInHours(hours)

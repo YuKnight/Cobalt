@@ -14,7 +14,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps the empty silent-nonce request
+ * The outbound stanza variant. Wraps the empty silent-nonce request
  * payload in the canonical
  * {@code <iq xmlns="fb:thrift_iq" type="get" to="s.whatsapp.net">}
  * envelope.
@@ -25,7 +25,7 @@ import java.util.Optional;
 public final class SmaxRequestSilentNonceRequest implements SmaxOperation.Request {
     /**
      * The optional {@code from} attribute echoed onto the outbound IQ
-     * via the {@code HackBaseIQGetRequestMixin} — the active user JID
+     * via the {@code HackBaseIQGetRequestMixin}. The active user JID
      * is the only legal value; {@code null} omits the attribute.
      */
     private final Jid fromUserJid;
@@ -74,9 +74,6 @@ public final class SmaxRequestSilentNonceRequest implements SmaxOperation.Reques
     @WhatsAppWebExport(moduleName = "WASmaxOutBizAccessTokenRequestSilentNonceRequest",
             exports = "makeRequestSilentNonceRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutBizAccessTokenHackBaseIQGetRequestMixin: smax("iq", {from: OPTIONAL(USER_JID, t), to: S_WHATSAPP_NET})
-        // WASmaxOutBizAccessTokenBaseIQGetRequestMixin: smax("iq", {id: generateId(), type: "get"})
-        // WASmaxOutBizAccessTokenRequestSilentNonceRequest: smax("iq", {xmlns: "fb:thrift_iq"})
         var builder = new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "fb:thrift_iq")

@@ -18,14 +18,14 @@ import java.time.Instant;
  * format.
  *
  * <p>Pass one walks the tree and computes the precise UTF-8 byte
- * count; pass two fills a single {@code byte[]} of that exact size
- * — no {@code StringBuilder} growth, no intermediate {@code String}
+ * count. Pass two fills a single {@code byte[]} of that exact size
+ *. No {@code StringBuilder} growth, no intermediate {@code String}
  * conversion, no {@code CharsetEncoder} pass. All XML element tags
  * and entity replacements are pre-encoded as {@code byte[]}
  * constants.
  *
  * <p>Callers normally route through the
- * {@code Plist} facade; this class is the implementation.
+ * {@code Plist} facade. This class is the implementation.
  */
 public final class PlistXmlWriter {
     /**
@@ -95,7 +95,7 @@ public final class PlistXmlWriter {
             "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/".getBytes(StandardCharsets.US_ASCII);
 
     /**
-     * Hidden constructor — the class is a stateless namespace.
+     * Hidden constructor. The class is a stateless namespace.
      */
     private PlistXmlWriter() {
     }
@@ -139,7 +139,7 @@ public final class PlistXmlWriter {
     }
 
     /**
-     * Returns the byte count for a dictionary node — open tag,
+     * Returns the byte count for a dictionary node. Open tag,
      * indented {@code <key>} / value pairs separated by newlines,
      * close tag.
      *
@@ -176,7 +176,7 @@ public final class PlistXmlWriter {
     }
 
     /**
-     * Recursive byte-emitter; dispatches on the sealed
+     * Recursive byte-emitter. Dispatches on the sealed
      * {@link PlistValue} hierarchy and writes directly into
      * {@code out} starting at {@code pos}.
      *
@@ -400,7 +400,7 @@ public final class PlistXmlWriter {
     }
 
     /**
-     * Writes the Base64 encoding of {@code src[srcOffset .. srcOffset
+     * Writes the Base64 encoding of {@code src[srcOffset .. SrcOffset
      * + srcLength)} directly into {@code out} starting at
      * {@code pos}, with no intermediate copy of the source slice.
      *

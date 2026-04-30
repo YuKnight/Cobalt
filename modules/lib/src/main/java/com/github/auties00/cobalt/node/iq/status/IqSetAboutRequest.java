@@ -9,7 +9,7 @@ import com.github.auties00.cobalt.node.iq.IqOperation;
 import java.util.Objects;
 
 /**
- * The outbound stanza variant — wraps the new about-text payload
+ * The outbound stanza variant. Wraps the new about-text payload
  * in the canonical {@code <iq xmlns="status" type="set"><status>...
  * </status></iq>} envelope.
  */
@@ -24,7 +24,7 @@ public final class IqSetAboutRequest implements IqOperation.Request {
     /**
      * Constructs a new request.
      *
-     * @param about the new about text; never {@code null}
+     * @param about the new about text. Never {@code null}
      * @throws NullPointerException if {@code about} is {@code null}
      */
     public IqSetAboutRequest(String about) {
@@ -34,7 +34,7 @@ public final class IqSetAboutRequest implements IqOperation.Request {
     /**
      * Returns the new about text.
      *
-     * @return the about-text string; never {@code null}
+     * @return the about-text string. Never {@code null}
      */
     public String about() {
         return about;

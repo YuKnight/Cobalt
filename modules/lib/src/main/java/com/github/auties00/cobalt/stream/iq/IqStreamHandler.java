@@ -46,8 +46,6 @@ import java.util.concurrent.TimeUnit;
  *   <li>{@code urn:xmpp:ping}, responds with an IQ result</li>
  *   <li>{@code md}, dispatches to pair-device or pair-success handlers</li>
  * </ul>
- *
- * @implNote WAWebHandleStanzaCommon.handleIq, WAWebHandlePairDevice.default, WAWebHandlePairSuccess.default
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleStanzaCommon")
 @WhatsAppWebModule(moduleName = "WAWebHandlePairDevice")
@@ -118,8 +116,6 @@ public final class IqStreamHandler implements SocketStream.Handler {
      * the {@code pair-device} stanza is acknowledged without scheduling
      * QR ref rotation and the {@code companion_hello} flow is started
      * instead.
-     *
-     * @implNote WAWebAltDeviceLinkingApi
      */
     private final CompanionPairingService deviceLinkingService;
 
@@ -184,29 +180,28 @@ public final class IqStreamHandler implements SocketStream.Handler {
      * the pair-device or pair-success handler based on the first child's tag.
      *
      * @param node the incoming IQ stanza
-     * @implNote WAWebHandleStanzaCommon.handleIq
      */
     @Override
     public void handle(Node node) {
-        var xmlns = node.getAttributeAsString("xmlns", null); // WAWebHandleStanzaCommon.handleIq: var t = e.attrs; if (t.xmlns === "urn:xmpp:ping")
+        var xmlns = node.getAttributeAsString("xmlns", null);
         if ("urn:xmpp:ping".equals(xmlns)) {
-            handlePing(node); // WAWebHandleStanzaCommon.handleIq: return o("WAWap").wap("iq", {type: "result", to: t.from})
+            handlePing(node);
             return;
         }
 
-        if (!"md".equals(xmlns)) { // WAWebHandleStanzaCommon.handleIq: if (t.xmlns === "md") { ... } else throw
-            return; // ADAPTED: WAWebHandleStanzaCommon.handleIq throws; Cobalt silently returns
+        if (!"md".equals(xmlns)) {
+            return;
         }
 
-        var child = node.getChild().orElse(null); // WAWebHandleStanzaCommon.handleIq: if (!Array.isArray(n) || !n.length) return; var a = n[0].tag
+        var child = node.getChild().orElse(null);
         if (child == null) {
             LOGGER.log(System.Logger.Level.DEBUG, "Ignoring md iq without child: {0}", node);
             return;
         }
 
-        switch (child.description()) { // WAWebHandleStanzaCommon.handleIq: switch (a)
-            case "pair-device" -> handlePairDevice(node); // WAWebHandleStanzaCommon.handleIq: return r("WAWebHandlePairDevice")(e), passes full IQ
-            case "pair-success" -> handlePairSuccess(node); // WAWebHandleStanzaCommon.handleIq: return r("WAWebHandlePairSuccess")(e), passes full IQ
+        switch (child.description()) {
+            case "pair-device" -> handlePairDevice(node);
+            case "pair-success" -> handlePairSuccess(node);
             default -> LOGGER.log(System.Logger.Level.DEBUG,
                     "Ignoring unsupported md iq child {0}", child.description());
         }
@@ -219,16 +214,16 @@ public final class IqStreamHandler implements SocketStream.Handler {
      * @implNote WAWebHandleStanzaCommon.handleIq (ping branch): return o("WAWap").wap("iq", {type: "result", to: t.from})
      */
     private void handlePing(Node node) {
-        var from = node.getAttributeAsJid("from").orElse(null); // WAWebHandleStanzaCommon.handleIq: t.from
+        var from = node.getAttributeAsJid("from").orElse(null);
         if (from == null) {
             LOGGER.log(System.Logger.Level.DEBUG, "Ignoring ping iq without from attribute"); // NO_WA_BASIS: defensive null check
             return;
         }
 
-        var response = new NodeBuilder() // WAWebHandleStanzaCommon.handleIq: o("WAWap").wap("iq", {type: "result", to: t.from})
+        var response = new NodeBuilder()
                 .description("iq")
-                .attribute("type", "result") // WAWebHandleStanzaCommon.handleIq: type: "result"
-                .attribute("to", from) // WAWebHandleStanzaCommon.handleIq: to: t.from
+                .attribute("type", "result")
+                .attribute("to", from)
                 .attribute("id", node.getAttributeAsString("id", null)) // ADAPTED: XMPP convention carries id for correlation
                 .build();
         whatsapp.sendNodeWithNoResponse(response); // ADAPTED: WA Web returns node which flows through WAComms.castStanza
@@ -240,19 +235,18 @@ public final class IqStreamHandler implements SocketStream.Handler {
      * an IQ result acknowledgment.
      *
      * @param iqNode the full IQ stanza containing the pair-device child
-     * @implNote WAWebHandlePairDevice.default
      */
     private void handlePairDevice(Node iqNode) {
-        var pairDevice = iqNode.getChild("pair-device").orElse(null); // WAWebHandlePairDevice: receiveSetToCompanionRPC extracts pair-device child
+        var pairDevice = iqNode.getChild("pair-device").orElse(null);
         if (pairDevice == null) {
             LOGGER.log(System.Logger.Level.WARNING, "Received md iq without pair-device child"); // NO_WA_BASIS: defensive check
             return;
         }
 
-        whatsapp.store().setAdvSecretKey(DataUtils.randomByteArray(32)); // WAWebHandlePairDevice.g: yield o("WAWebAdvSignatureApi").generateADVSecretKey()
-        sendPairDeviceAck(iqNode); // WAWebHandlePairDevice._: u(), makeSetToCompanionResponseClientResponse
+        whatsapp.store().setAdvSecretKey(DataUtils.randomByteArray(32));
+        sendPairDeviceAck(iqNode);
 
-        if (deviceLinkingService.isEnabled()) { // WAWebAltDeviceLinkingApi.startAltLinkingFlow: issued client-side when pairing type is ALT_DEVICE_LINKING
+        if (deviceLinkingService.isEnabled()) {
             try {
                 deviceLinkingService.start();
             } catch (Throwable throwable) {
@@ -261,13 +255,13 @@ public final class IqStreamHandler implements SocketStream.Handler {
             return;
         }
 
-        var refs = extractPairRefs(pairDevice); // WAWebHandlePairDevice._: c.pairDeviceRef.map(function(e) { ... readString(t.size()) })
+        var refs = extractPairRefs(pairDevice);
         if (refs.isEmpty()) {
             LOGGER.log(System.Logger.Level.WARNING, "Received pair-device iq without any usable refs"); // NO_WA_BASIS: defensive check
             return;
         }
 
-        scheduleVerificationValues(refs); // WAWebHandlePairDevice.g: f(d), schedules timer rotation
+        scheduleVerificationValues(refs);
     }
 
     /**
@@ -281,18 +275,18 @@ public final class IqStreamHandler implements SocketStream.Handler {
      * @implNote WASmaxOutMdSetToCompanionResponseClientResponse.makeSetToCompanionResponseClientResponse
      */
     private void sendPairDeviceAck(Node iqNode) {
-        var id = iqNode.getAttributeAsString("id", null); // WASmaxOutMdSetToCompanionResponseClientResponse: attrFromReference(attrStanzaId, e, ["id"])
-        var from = iqNode.getAttributeAsJid("from").orElse(null); // WASmaxOutMdSetToCompanionResponseClientResponse: attrFromReference(attrDomainJid, e, ["from"])
+        var id = iqNode.getAttributeAsString("id", null);
+        var from = iqNode.getAttributeAsJid("from").orElse(null);
         if (id == null || from == null) {
             LOGGER.log(System.Logger.Level.DEBUG, "Cannot send pair-device ack: missing id or from"); // NO_WA_BASIS: defensive check
             return;
         }
 
-        var response = new NodeBuilder() // WASmaxOutMdSetToCompanionResponseClientResponse: smax("iq", {id: STANZA_ID(t.value), to: DOMAIN_JID(n.value), type: "result"})
+        var response = new NodeBuilder()
                 .description("iq")
-                .attribute("id", id) // WASmaxOutMdSetToCompanionResponseClientResponse: id: STANZA_ID(t.value)
-                .attribute("to", Jid.userServer()) // WASmaxOutMdSetToCompanionResponseClientResponse: to: DOMAIN_JID(n.value), domain JID is s.whatsapp.net
-                .attribute("type", "result") // WASmaxOutMdSetToCompanionResponseClientResponse: type: "result"
+                .attribute("id", id)
+                .attribute("to", Jid.userServer())
+                .attribute("type", "result")
                 .build();
         whatsapp.sendNodeWithNoResponse(response); // ADAPTED: WA Web returns node through WAComms.castStanza
     }
@@ -313,8 +307,8 @@ public final class IqStreamHandler implements SocketStream.Handler {
         var refs = new LinkedHashSet<String>(); // ADAPTED: WA Web uses array from SMAX parse
         decodeContentAsString(pairDevice).ifPresent(refs::add); // NO_WA_BASIS: defensive extraction from node itself
 
-        for (var child : pairDevice.children()) { // WASmaxInMdSetToCompanionRequest: mapChildrenWithTag(r.value, "ref", 6, 6, e)
-            decodeContentAsString(child).ifPresent(refs::add); // WASmaxInMdSetToCompanionRequest.e: contentBytes(e) -> elementValue
+        for (var child : pairDevice.children()) {
+            decodeContentAsString(child).ifPresent(refs::add);
 
             findStringAttribute(child, "ref", "value", "code") // NO_WA_BASIS: defensive attribute extraction
                     .ifPresent(refs::add);
@@ -349,11 +343,11 @@ public final class IqStreamHandler implements SocketStream.Handler {
      */
     private void scheduleVerificationValues(LinkedHashSet<String> refs) {
         synchronized (rotationLock) {
-            cancelRotationLocked(); // WAWebHandlePairDevice.g: m || (m = new ShiftTimer(...)) reuses single instance
+            cancelRotationLocked();
         }
 
         var queue = new ArrayDeque<>(refs);
-        runRotationTick(queue); // WAWebHandlePairDevice.g: m.forceRunNow(), first tick runs immediately
+        runRotationTick(queue);
     }
 
     /**
@@ -375,26 +369,26 @@ public final class IqStreamHandler implements SocketStream.Handler {
         synchronized (rotationLock) {
             cancelRotationLocked(); // ADAPTED: WAShiftTimer reschedules via onOrAfter; we reschedule by cancelling + scheduling a new task
 
-            if (whatsapp.store().registered()) { // WAWebHandlePairDevice: if (WAWebUserPrefsMultiDevice.isRegistered()) m && m.cancel(), m = null
+            if (whatsapp.store().registered()) {
                 return;
             }
 
-            if (queue.isEmpty()) { // WAWebHandlePairDevice: else if (!d || !d.length) m && m.cancel(), m = null, triggerSetSocketState(UNPAIRED_IDLE)
+            if (queue.isEmpty()) {
                 return; // ADAPTED: UNPAIRED_IDLE event is a WA Web backend event bus signal with no Cobalt analogue
             }
 
-            rotationDelay = queue.size() == 6 ? QR_ROTATION_MS : REFRESH_ROTATION_MS; // WAWebHandlePairDevice: var e = d.length === 6 ? u : c
-            next = queue.pollFirst(); // WAWebHandlePairDevice: var t = d.shift()
+            rotationDelay = queue.size() == 6 ? QR_ROTATION_MS : REFRESH_ROTATION_MS;
+            next = queue.pollFirst();
         }
 
-        publishVerificationValue(next); // WAWebHandlePairDevice: Conn.set({ref: t, refTTL: e}), triggerSetSocketState(UNPAIRED)
+        publishVerificationValue(next);
 
         synchronized (rotationLock) {
-            if (queue.isEmpty()) { // WAWebHandlePairDevice: on next tick (!d || !d.length) branch cancels; we skip scheduling to avoid a trailing no-op tick
+            if (queue.isEmpty()) {
                 return;
             }
 
-            rotationTask = rotationExecutor.schedule( // WAWebHandlePairDevice: m && m.onOrAfter(e)
+            rotationTask = rotationExecutor.schedule(
                     () -> runRotationTick(queue),
                     rotationDelay,
                     TimeUnit.MILLISECONDS);
@@ -437,7 +431,7 @@ public final class IqStreamHandler implements SocketStream.Handler {
      */
     private String buildQrPayload(String ref) {
         var store = whatsapp.store();
-        var advSecret = store.advSecretKey().orElseGet(() -> { // WAWebHandlePairDevice.g: yield generateADVSecretKey(), already generated
+        var advSecret = store.advSecretKey().orElseGet(() -> {
             var generated = DataUtils.randomByteArray(32); // NO_WA_BASIS: fallback generation
             store.setAdvSecretKey(generated);
             return generated;
@@ -475,22 +469,21 @@ public final class IqStreamHandler implements SocketStream.Handler {
      * @implNote WAWebHandlePairSuccess.default (h/y function)
      */
     private void handlePairSuccess(Node iqNode) {
-        if (whatsapp.store().registered()) { // WAWebHandlePairSuccess.y: if (!(g || WAWebUserPrefsMultiDevice.isRegistered())) { ... }
+        if (whatsapp.store().registered()) {
             LOGGER.log(System.Logger.Level.DEBUG, "Ignoring pair-success iq: store already registered");
             return;
         }
 
         synchronized (rotationLock) {
-            cancelRotationLocked(); // ADAPTED: WAWebHandlePairDevice.g timer checks isRegistered() and cancels; we cancel eagerly once pair-success arrives
+            cancelRotationLocked();
         }
 
-        // WAWebHandlePairSuccess.y: var a = WATimeUtils.unixTimeWithoutClockSkewCorrection() captured
         // at entry and threaded into initDeviceLinkEvent / commitDeviceLinkEvent as the
         // `regStartTime` baseline. Cobalt captures it here so the mdDurationS/mdTimestampS
         // deltas on the MdLinkDeviceCompanionEvent commits below are consistent across stages.
         var regStartSeconds = Instant.now().getEpochSecond();
 
-        var pairSuccess = iqNode.getChild("pair-success").orElse(null); // WAWebHandlePairSuccess: receiveSetRegRPC extracts pair-success child
+        var pairSuccess = iqNode.getChild("pair-success").orElse(null);
         if (pairSuccess == null) {
             LOGGER.log(System.Logger.Level.WARNING, "Received md iq without pair-success child"); // NO_WA_BASIS: defensive check
             return;
@@ -498,8 +491,8 @@ public final class IqStreamHandler implements SocketStream.Handler {
 
         var store = whatsapp.store();
 
-        resolvePairedJid(pairSuccess, false).ifPresent(jid -> { // WAWebHandlePairSuccess: setMe(deviceJidToDeviceWid(y))
-            store.setJid(jid); // WAWebHandlePairSuccess: setMe(deviceJidToDeviceWid(y))
+        resolvePairedJid(pairSuccess, false).ifPresent(jid -> {
+            store.setJid(jid);
             if (store.phoneNumber().isEmpty()) { // ADAPTED: WA Web does not set phone number from JID
                 try {
                     store.setPhoneNumber(Long.parseLong(jid.user()));
@@ -507,13 +500,12 @@ public final class IqStreamHandler implements SocketStream.Handler {
                 }
             }
         });
-        resolvePairedJid(pairSuccess, true).ifPresent(store::setLid); // WAWebHandlePairSuccess: b != null && setMeLid(deviceJidToDeviceWid(b))
+        resolvePairedJid(pairSuccess, true).ifPresent(store::setLid);
 
-        var validatedIdentity = deviceService.extractAndValidateLocalSignedDeviceIdentity(pairSuccess) // WAWebHandlePairSuccess: decode HMAC, verify, generate device signature
+        var validatedIdentity = deviceService.extractAndValidateLocalSignedDeviceIdentity(pairSuccess)
                 .orElse(null);
 
         if (validatedIdentity == null) {
-            // WAWebHandlePairSuccess.y: if HMAC fails, m() returns without committing a link
             // event; if verifyDeviceIdentityAccountSignature fails, commitDeviceLinkEvent(401)
             // fires. Cobalt's DeviceService.extractAndValidateLocalSignedDeviceIdentity
             // collapses both failures into an empty Optional (the underlying
@@ -525,8 +517,6 @@ public final class IqStreamHandler implements SocketStream.Handler {
             return;
         }
 
-        // WAWebHandlePairSuccess.y: var w = yield initDeviceLinkEvent(P, M.identityKeyPair.pubKey, a);
-        // yield setDeviceLinkPairStage(PAIR_SUCCESS_RECEIVED).
         // P is the accountSignatureKey from the decoded SignedDeviceIdentity (available once
         // validation passes); M.identityKeyPair.pubKey is the local companion identity key.
         // The reporter hashes both into mdSessionId and emits the PAIR_SUCCESS_RECEIVED stage.
@@ -537,25 +527,21 @@ public final class IqStreamHandler implements SocketStream.Handler {
         emitMdLinkDeviceCompanionStage(MdLinkDeviceCompanionStage.PAIR_SUCCESS_RECEIVED, null, mdSessionId, regStartSeconds);
 
         try {
-            // WAWebHandlePairSuccess: yield waSignalStore.putIdentity(createSignalAddress(asUserWidOrThrow(deviceJidToDeviceWid(y))).toString(), bufferToStr(toSignalCurvePubKey(P)))
             // Persist the accountSignatureKey as the local user's signal identity (device 0) so
             // subsequent ADV validations resolve the primary identity from the local store.
             store.jid().ifPresent(localJid -> deviceService.persistLocalDeviceIdentityFromPairSuccess(
                     localJid, validatedIdentity.accountSignatureKey().orElse(null)));
-            store.setSignedDeviceIdentity(validatedIdentity); // WAWebHandlePairSuccess: setADVSignedIdentity($)
-            sendPairSuccessResponse(iqNode, validatedIdentity); // WAWebHandlePairSuccess: return q = d({deviceIdentityElementValue: W, deviceIdentityKeyIndex: B})
+            store.setSignedDeviceIdentity(validatedIdentity);
+            sendPairSuccessResponse(iqNode, validatedIdentity);
 
-            // WAWebHandlePairSuccess.y: yield setDeviceLinkPairStage(PAIR_DEVICE_SIGN_SENT).
             // Emitted after the signed identity response has been sent back to the server;
             // WA Web performs the commit immediately after assembling q and before the next
             // yield, so we mirror that ordering by committing right after sendPairSuccessResponse.
             emitMdLinkDeviceCompanionStage(MdLinkDeviceCompanionStage.PAIR_DEVICE_SIGN_SENT, null, mdSessionId, regStartSeconds);
 
-            extractPairingProps(pairSuccess) // WAWebHandlePairSuccess: if (_ != null) yield C(_)
+            extractPairingProps(pairSuccess)
                     .ifPresent(props -> {
-                        snapshotRecoveryService.updatePrimaryDeviceSupportsSyncdRecovery(props.isSyncdSnapshotRecoveryEnabled()); // WAWebHandlePairSuccess.C/b: updatePrimaryDeviceSupportsSyncdRecovery(i === true)
-                        // WAWebHandlePairSuccess.C/b: n === true && (
-                        //   yield Lid1X1MigrationUtils.setIsLidMigrated(true, LidMigrationSource.HISTORY, a),
+                        snapshotRecoveryService.updatePrimaryDeviceSupportsSyncdRecovery(props.isSyncdSnapshotRecoveryEnabled());
                         //   new Lid11MigrationLifecycleWamEvent({
                         //     migrationStage: COMPANION_MIGRATED_ON_NEW_PAIRING,
                         //     webClientDidPairingStanzaIndicated1x1MigrationThisSession: true,
@@ -572,12 +558,11 @@ public final class IqStreamHandler implements SocketStream.Handler {
                                     .build());
                         }
                     });
-            store.setPairingTimestamp(Instant.ofEpochSecond(regStartSeconds)); // WAWebHandlePairSuccess: setPairingTimestamp(a)
-            store.setRegistered(true); // WAWebHandlePairSuccess: marks the local companion as registered
+            store.setPairingTimestamp(Instant.ofEpochSecond(regStartSeconds));
+            store.setRegistered(true);
             store.setOnline(true); // ADAPTED: Cobalt sets online flag
             safeSave("pair-success"); // ADAPTED: Cobalt persists store
         } catch (RuntimeException exception) {
-            // WAWebHandlePairSuccess.y catch branch: yield commitDeviceLinkEvent(-1) before
             // logging out via socketLogout(LogoutReason.UnknownCompanion). Cobalt does not
             // swallow the underlying exception — it is rethrown after the WAM emission so
             // upstream error handling (client.handleFailure / socket teardown) still runs.
@@ -612,7 +597,7 @@ public final class IqStreamHandler implements SocketStream.Handler {
         try {
             var digest = MessageDigest.getInstance("SHA-256");
             digest.update(accountSignatureKey);
-            digest.update((byte) 0x5f); // WAWebWamDeviceLinkReporter.v: n.write(95)
+            digest.update((byte) 0x5f);
             digest.update(localIdentityKey);
             return Base64.getEncoder().encodeToString(digest.digest());
         } catch (NoSuchAlgorithmException exception) {
@@ -661,14 +646,14 @@ public final class IqStreamHandler implements SocketStream.Handler {
         try {
             var nowSeconds = Instant.now().getEpochSecond();
             var builder = new MdLinkDeviceCompanionEventBuilder()
-                    .mdTimestampS((int) regStartSeconds) // WAWebWamDeviceLinkReporter.R: mdTimestampS: r.regStartTime
-                    .mdDurationS((int) (nowSeconds - regStartSeconds)) // WAWebWamDeviceLinkReporter.R: mdDurationS: unixTimeWithoutClockSkewCorrection() - r.regStartTime
-                    .mdLinkDeviceCompanionErrorCode(errorCode != null ? errorCode : 0) // WAWebWamDeviceLinkReporter.R: mdLinkDeviceCompanionErrorCode: t == null ? 0 : t
-                    .mdLinkDeviceCompanionStage(stage); // WAWebWamDeviceLinkReporter.R: mdLinkDeviceCompanionStage: i (u, the last stored stage)
+                    .mdTimestampS((int) regStartSeconds)
+                    .mdDurationS((int) (nowSeconds - regStartSeconds))
+                    .mdLinkDeviceCompanionErrorCode(errorCode != null ? errorCode : 0)
+                    .mdLinkDeviceCompanionStage(stage);
             if (mdSessionId != null) {
-                builder.mdSessionId(mdSessionId); // WAWebWamDeviceLinkReporter.R: mdSessionId: r.sessionId
+                builder.mdSessionId(mdSessionId);
             }
-            wamService.commit(builder.build()); // WAWebWamDeviceLinkReporter.R: l.commitAndWaitForFlush(true)
+            wamService.commit(builder.build());
         } catch (RuntimeException wamException) {
             // Telemetry emission must never disrupt the pairing flow: log and swallow.
             LOGGER.log(System.Logger.Level.WARNING, "Cannot commit MdLinkDeviceCompanion event: {0}", wamException.getMessage());
@@ -691,13 +676,12 @@ public final class IqStreamHandler implements SocketStream.Handler {
      *           WASmaxOutMdSetRegResponseClientResponse.makeSetRegResponseClientResponse
      */
     private void sendPairSuccessResponse(Node iqNode, ADVSignedDeviceIdentity validatedIdentity) {
-        var id = iqNode.getAttributeAsString("id", null); // WASmaxOutMdSetRegResponseClientResponse: attrFromReference(attrStanzaId, t, ["id"])
+        var id = iqNode.getAttributeAsString("id", null);
         if (id == null) {
             LOGGER.log(System.Logger.Level.DEBUG, "Cannot send pair-success response: missing id"); // NO_WA_BASIS: defensive check
             return;
         }
 
-        // WAWebHandlePairSuccess: var O = decodeProtobuf(ADVDeviceIdentitySpec, $.details); var B = O.keyIndex
         var details = validatedIdentity.details().orElse(null);
         if (details == null) {
             LOGGER.log(System.Logger.Level.WARNING, "Cannot send pair-success response: missing details in validated identity"); // NO_WA_BASIS: defensive check
@@ -706,42 +690,40 @@ public final class IqStreamHandler implements SocketStream.Handler {
 
         int keyIndex;
         try {
-            var innerIdentity = ADVDeviceIdentitySpec.decode(details); // WAWebHandlePairSuccess: decodeProtobuf(ADVDeviceIdentitySpec, $.details)
-            keyIndex = innerIdentity.keyIndex().orElseThrow(() -> // WAWebHandlePairSuccess: B != null || s(0, 56297)
+            var innerIdentity = ADVDeviceIdentitySpec.decode(details);
+            keyIndex = innerIdentity.keyIndex().orElseThrow(() ->
                     new NullPointerException("keyIndex cannot be null"));
         } catch (Exception exception) {
             LOGGER.log(System.Logger.Level.WARNING, "Cannot send pair-success response: failed to decode inner device identity: {0}", exception.getMessage()); // NO_WA_BASIS: defensive check
             return;
         }
 
-        // WAWebHandlePairSuccess: $.accountSignatureKey = void 0
         var identityForResponse = new ADVSignedDeviceIdentityBuilder()
                 .details(details)
-                .accountSignature(validatedIdentity.accountSignature().orElse(null)) // WAWebHandlePairSuccess: keeps accountSignature
-                .deviceSignature(validatedIdentity.deviceSignature().orElse(null)) // WAWebHandlePairSuccess: keeps deviceSignature (generated earlier)
+                .accountSignature(validatedIdentity.accountSignature().orElse(null))
+                .deviceSignature(validatedIdentity.deviceSignature().orElse(null))
                 // accountSignatureKey intentionally omitted, WAWebHandlePairSuccess: $.accountSignatureKey = void 0
                 .build();
 
-        var encodedIdentity = ADVSignedDeviceIdentitySpec.encode(identityForResponse); // WAWebHandlePairSuccess: encodeProtobuf(ADVSignedDeviceIdentitySpec, $).readByteArrayView()
+        var encodedIdentity = ADVSignedDeviceIdentitySpec.encode(identityForResponse);
 
-        // WASmaxOutMdRegularCompanionSetRegResponseBundleMixin: smax("pair-device-sign", null, smax("device-identity", {"key-index": INT(a)}, i))
         var deviceIdentityNode = new NodeBuilder()
                 .description("device-identity")
-                .attribute("key-index", keyIndex) // WASmaxOutMdRegularCompanionSetRegResponseBundleMixin: "key-index": INT(a)
-                .content(encodedIdentity) // WASmaxOutMdRegularCompanionSetRegResponseBundleMixin: content is deviceIdentityElementValue
+                .attribute("key-index", keyIndex)
+                .content(encodedIdentity)
                 .build();
 
-        var pairDeviceSignNode = new NodeBuilder() // WASmaxOutMdRegularCompanionSetRegResponseBundleMixin: smax("pair-device-sign", null, ...)
+        var pairDeviceSignNode = new NodeBuilder()
                 .description("pair-device-sign")
                 .content(deviceIdentityNode)
                 .build();
 
-        var response = new NodeBuilder() // WASmaxOutMdSetRegResponseClientResponse: smax("iq", {id: STANZA_ID(n.value), to: S_WHATSAPP_NET, type: "result"})
+        var response = new NodeBuilder()
                 .description("iq")
-                .attribute("id", id) // WASmaxOutMdSetRegResponseClientResponse: id: STANZA_ID(n.value)
-                .attribute("to", Jid.userServer()) // WASmaxOutMdSetRegResponseClientResponse: to: S_WHATSAPP_NET
-                .attribute("type", "result") // WASmaxOutMdSetRegResponseClientResponse: type: "result"
-                .content(pairDeviceSignNode) // WASmaxOutMdRegularCompanionSetRegResponseBundleMixin: mergeStanzas appends smax$any children
+                .attribute("id", id)
+                .attribute("to", Jid.userServer())
+                .attribute("type", "result")
+                .content(pairDeviceSignNode)
                 .build();
 
         whatsapp.sendNodeWithNoResponse(response); // ADAPTED: WA Web returns node through WAComms.castStanza
@@ -790,7 +772,7 @@ public final class IqStreamHandler implements SocketStream.Handler {
             }
 
             try {
-                return Optional.of(ClientPairingPropsSpec.decode(bytes)); // WAWebHandlePairSuccess.C/b: decodeProtobuf(ClientPairingPropsSpec, e.elementValue)
+                return Optional.of(ClientPairingPropsSpec.decode(bytes));
             } catch (Throwable ignored) {
             }
         }

@@ -10,12 +10,9 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The {@code SmaxClientNotificationComposing} state-type — the user is currently typing
+ * The {@code SmaxClientNotificationComposing} state-type. The user is currently typing
  * (or recording an audio note when {@link #hasComposingMediaAudio()}
  * is {@code true}).
- *
- * @implNote {@code WASmaxOutChatstateComposingMixin.mergeComposingMixin}
- *           emits {@code smax("composing", {media:OPTIONAL_LITERAL("audio")})}.
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutChatstateComposingMixin")
 public final class SmaxClientNotificationComposing implements SmaxClientNotificationStateType {

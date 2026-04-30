@@ -65,13 +65,13 @@ public final class SyncdIndexUtils {
      *
      * @implNote WASyncdConst.MUTATION_NAME_INDEX
      */
-    public static final int MUTATION_NAME_INDEX = 0; // WASyncdConst.MUTATION_NAME_INDEX = f = 0
+    public static final int MUTATION_NAME_INDEX = 0;
     /**
      * Logger for sync index utilities.
      *
      * @implNote ADAPTED: WAWebSyncdIndexUtils uses WALogger; Cobalt uses java.util.logging
      */
-    private static final Logger LOGGER = Logger.getLogger(SyncdIndexUtils.class.getName()); // ADAPTED: WAWebSyncdIndexUtils — WALogger
+    private static final Logger LOGGER = Logger.getLogger(SyncdIndexUtils.class.getName());
 
     /**
      * Private constructor to prevent instantiation of this utility class.
@@ -106,11 +106,10 @@ public final class SyncdIndexUtils {
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdActionUtils", exports = "buildIndex", adaptation = WhatsAppAdaptation.DIRECT)
     public static String buildIndex(String actionName, String... indexArgs) {
-        // WAWebSyncdActionUtils.buildIndex (function u): return JSON.stringify([e].concat(t))
         var parts = new Object[indexArgs.length + 1];
-        parts[0] = actionName; // WAWebSyncdActionUtils.u: [e]
-        System.arraycopy(indexArgs, 0, parts, 1, indexArgs.length); // WAWebSyncdActionUtils.u: .concat(t)
-        return JSON.toJSONString(Arrays.asList(parts)); // WAWebSyncdActionUtils.u: JSON.stringify(...)
+        parts[0] = actionName;
+        System.arraycopy(indexArgs, 0, parts, 1, indexArgs.length);
+        return JSON.toJSONString(Arrays.asList(parts));
     }
 
     /**
@@ -132,17 +131,16 @@ public final class SyncdIndexUtils {
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdActionUtils", exports = "parseIndex", adaptation = WhatsAppAdaptation.DIRECT)
     public static JSONArray parseIndex(String collectionName, String index) {
-        // WAWebSyncdActionUtils.parseIndex (function c)
         try {
-            var parsed = JSON.parseArray(index); // WAWebSyncdActionUtils.c: var r = JSON.parse(n)
-            if (parsed == null || parsed.size() < 1) { // WAWebSyncdActionUtils.c: if (r.length < 1)
-                LOGGER.warning(() -> "[syncd] invalid empty index for collection " + collectionName); // WAWebSyncdActionUtils.c: WALogger.WARN
-                return null; // WAWebSyncdActionUtils.c: return null
+            var parsed = JSON.parseArray(index);
+            if (parsed == null || parsed.size() < 1) {
+                LOGGER.warning(() -> "[syncd] invalid empty index for collection " + collectionName);
+                return null;
             }
             return parsed;
-        } catch (Throwable throwable) { // WAWebSyncdActionUtils.c: catch (e)
-            LOGGER.warning(() -> "[syncd] invalid index for collection " + collectionName); // WAWebSyncdActionUtils.c: WALogger.WARN
-            return null; // WAWebSyncdActionUtils.c: return null
+        } catch (Throwable throwable) {
+            LOGGER.warning(() -> "[syncd] invalid index for collection " + collectionName);
+            return null;
         }
     }
 
@@ -164,12 +162,11 @@ public final class SyncdIndexUtils {
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdActionUtils", exports = "getMutationNameFromIndex", adaptation = WhatsAppAdaptation.DIRECT)
     public static String getMutationNameFromIndex(String collectionName, String index) {
-        // WAWebSyncdActionUtils.getMutationNameFromIndex (function d): var n = c(e, t); return n == null ? void 0 : n[MUTATION_NAME_INDEX]
-        var parsed = parseIndex(collectionName, index); // WAWebSyncdActionUtils.d: var n = c(e, t)
-        if (parsed == null) { // WAWebSyncdActionUtils.d: n == null ? void 0
+        var parsed = parseIndex(collectionName, index);
+        if (parsed == null) {
             return null;
         }
-        return parsed.getString(MUTATION_NAME_INDEX); // WAWebSyncdActionUtils.d: n[o("WASyncdConst").MUTATION_NAME_INDEX]
+        return parsed.getString(MUTATION_NAME_INDEX);
     }
 
     /**
@@ -194,17 +191,16 @@ public final class SyncdIndexUtils {
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdActionUtils", exports = "buildMessageKey", adaptation = WhatsAppAdaptation.DIRECT)
     public static List<String> buildMessageKey(Jid remoteJid, String id, boolean fromMe, Jid participant) {
-        // WAWebSyncdActionUtils.buildMessageKey (function p):
         // return [o, n, t?"1":"0", r!=null && !t ? r : "0"]
-        var fromMeStr = fromMe ? "1" : "0"; // WAWebSyncdActionUtils.p: t?"1":"0"
-        var participantStr = participant != null && !fromMe // WAWebSyncdActionUtils.p: r!=null && !t
-                ? participant.toString() // WAWebSyncdActionUtils.p: r
-                : "0"; // WAWebSyncdActionUtils.p: "0"
+        var fromMeStr = fromMe ? "1" : "0";
+        var participantStr = participant != null && !fromMe
+                ? participant.toString()
+                : "0";
         return List.of(
-                remoteJid.toString(), // WAWebSyncdActionUtils.p: o (remoteJid)
-                id, // WAWebSyncdActionUtils.p: n (id)
-                fromMeStr, // WAWebSyncdActionUtils.p: t?"1":"0"
-                participantStr // WAWebSyncdActionUtils.p: r!=null && !t ? r : "0"
+                remoteJid.toString(),
+                id,
+                fromMeStr,
+                participantStr
         );
     }
 
@@ -229,9 +225,8 @@ public final class SyncdIndexUtils {
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdUtils", exports = "constructMsgKeySegments", adaptation = WhatsAppAdaptation.DIRECT)
     public static List<String> constructMsgKeySegments(ChatMessageInfo info) {
-        // WAWebSyncdUtils.constructMsgKeySegments (function e): return l(e.id)
         Objects.requireNonNull(info, "info cannot be null");
-        return constructMsgKeySegmentsFromMsgKey(info.key()); // WAWebSyncdUtils.e: l(e.id)
+        return constructMsgKeySegmentsFromMsgKey(info.key());
     }
 
     /**
@@ -264,19 +259,18 @@ public final class SyncdIndexUtils {
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdUtils", exports = "constructMsgKeySegmentsFromMsgKey", adaptation = WhatsAppAdaptation.DIRECT)
     public static List<String> constructMsgKeySegmentsFromMsgKey(MessageKey key) {
-        // WAWebSyncdUtils.constructMsgKeySegmentsFromMsgKey (function l):
         // var t = s(e); return [e.remote.toString({legacy:!0}), e.id, e.fromMe?"1":"0", t]
         Objects.requireNonNull(key, "key cannot be null");
-        var remoteJid = key.parentJid() // WAWebSyncdUtils.l: e.remote
+        var remoteJid = key.parentJid()
                 .orElseThrow(() -> new IllegalArgumentException("key must carry a parentJid"));
-        var id = key.id() // WAWebSyncdUtils.l: e.id
+        var id = key.id()
                 .orElseThrow(() -> new IllegalArgumentException("key must carry an id"));
-        var participantSegment = extractParticipantForSync(key); // WAWebSyncdUtils.l: var t = s(e)
+        var participantSegment = extractParticipantForSync(key);
         return List.of(
-                toLegacyJidString(remoteJid), // WAWebSyncdUtils.l: e.remote.toString({legacy:!0})
-                id, // WAWebSyncdUtils.l: e.id
-                key.fromMe() ? "1" : "0", // WAWebSyncdUtils.l: e.fromMe?"1":"0"
-                participantSegment // WAWebSyncdUtils.l: t
+                toLegacyJidString(remoteJid),
+                id,
+                key.fromMe() ? "1" : "0",
+                participantSegment
         );
     }
 
@@ -314,22 +308,21 @@ public final class SyncdIndexUtils {
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdUtils", exports = "extractParticipantForSync", adaptation = WhatsAppAdaptation.ADAPTED)
     public static String extractParticipantForSync(MessageKey key) {
-        // WAWebSyncdUtils.extractParticipantForSync (function s):
         // var t = "0"; return e.participant && !e.remote.isUser() && !e.fromMe
         //               && (t = e.participant.toString({legacy:!0})), t
         Objects.requireNonNull(key, "key cannot be null");
-        var remoteJid = key.parentJid() // WAWebSyncdUtils.s: e.remote
+        var remoteJid = key.parentJid()
                 .orElseThrow(() -> new IllegalArgumentException("key must carry a parentJid"));
         // ADAPTED: Cobalt's MessageKey.senderJid() falls back to parentJid when the
         // raw sender field is null, so we read the raw field via a short-circuit
         // predicate that mirrors WA Web's `e.participant` truthiness check.
-        var rawParticipant = rawSenderJid(key); // WAWebSyncdUtils.s: e.participant
-        if (rawParticipant != null // WAWebSyncdUtils.s: e.participant &&
-                && !isUserJid(remoteJid) // WAWebSyncdUtils.s: !e.remote.isUser()
-                && !key.fromMe()) { // WAWebSyncdUtils.s: !e.fromMe
-            return toLegacyJidString(rawParticipant); // WAWebSyncdUtils.s: e.participant.toString({legacy:!0})
+        var rawParticipant = rawSenderJid(key);
+        if (rawParticipant != null
+                && !isUserJid(remoteJid)
+                && !key.fromMe()) {
+            return toLegacyJidString(rawParticipant);
         }
-        return "0"; // WAWebSyncdUtils.s: t = "0"
+        return "0";
     }
 
     /**
@@ -393,13 +386,12 @@ public final class SyncdIndexUtils {
      */
     @WhatsAppWebExport(moduleName = "WAWebWid", exports = "toString", adaptation = WhatsAppAdaptation.ADAPTED)
     private static String toLegacyJidString(Jid jid) {
-        // WAWebWid.toString({legacy:!0}): r = t.legacy && this.server === "c.us" ? "s.whatsapp.net" : this.server
         // Only the c.us server remap branch is reachable without formatFull/forLog;
         // for any other server the {legacy:true} argument is a no-op and the
         // default `_serialized` value is returned.
         Objects.requireNonNull(jid, "jid cannot be null");
-        if (!jid.server().equals(JidServer.legacyUser())) { // WAWebWid.toString: this.server === "c.us" gate
-            return jid.toString(); // WAWebWid.toString: return this._serialized
+        if (!jid.server().equals(JidServer.legacyUser())) {
+            return jid.toString();
         }
         // Legacy user server remap: swap the @c.us suffix for @s.whatsapp.net.
         // Jid.toString already produces a well-formed user[_agent][:device]@server
@@ -439,17 +431,16 @@ public final class SyncdIndexUtils {
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdIndexUtils", exports = "msgKeyToDbIdWithoutFromMeParticipant", adaptation = WhatsAppAdaptation.ADAPTED)
     static String msgKeyToDbIdWithoutFromMeParticipant(MessageKey key) {
-        // WAWebSyncdIndexUtils.msgKeyToDbIdWithoutFromMeParticipant (function d)
-        var serialized = serializeMessageKey(key); // WAWebSyncdIndexUtils.d: var t = e.toString()
-        var remoteJid = key.parentJid().orElse(null); // WAWebSyncdIndexUtils.d: e.remote
-        if (!key.fromMe() || remoteJid == null || isUserJid(remoteJid)) { // WAWebSyncdIndexUtils.d: if (!e.fromMe || e.remote.isUser()) return t
+        var serialized = serializeMessageKey(key);
+        var remoteJid = key.parentJid().orElse(null);
+        if (!key.fromMe() || remoteJid == null || isUserJid(remoteJid)) {
             return serialized;
         }
-        var lastUnderscore = serialized.lastIndexOf('_'); // WAWebSyncdIndexUtils.d: var n = t.lastIndexOf("_")
+        var lastUnderscore = serialized.lastIndexOf('_');
         if (lastUnderscore < 0) {
             return serialized; // ADAPTED: defensive null check — WA Web assumes underscore always exists
         }
-        return serialized.substring(0, lastUnderscore); // WAWebSyncdIndexUtils.d: return t.substring(0, n)
+        return serialized.substring(0, lastUnderscore);
     }
 
     /**
@@ -481,41 +472,39 @@ public final class SyncdIndexUtils {
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdIndexUtils", exports = "syncKeyToMsgKey", adaptation = WhatsAppAdaptation.ADAPTED)
     static Optional<MessageKey> syncKeyToMsgKey(WhatsAppStore store, String remote, String id, String fromMe, String participant) {
-        // WAWebSyncdIndexUtils.syncKeyToMsgKey (function m)
-        if (remote == null || remote.isEmpty()) { // WAWebSyncdIndexUtils.m: if (!r("WAWebWid").isWid(t)) return ... null
-            LOGGER.warning("syncKeyToMsgKey: invalid remote value"); // WAWebSyncdIndexUtils.m: WALogger.WARN
+        if (remote == null || remote.isEmpty()) {
+            LOGGER.warning("syncKeyToMsgKey: invalid remote value");
             return Optional.empty();
         }
 
         Jid remoteJid;
         try {
-            remoteJid = Jid.of(remote); // WAWebSyncdIndexUtils.m: var u = o("WAWebWidFactory").createWid(t)
+            remoteJid = Jid.of(remote);
         } catch (Exception e) {
-            LOGGER.warning("syncKeyToMsgKey: invalid remote value: " + remote); // WAWebSyncdIndexUtils.m: WALogger.WARN
+            LOGGER.warning("syncKeyToMsgKey: invalid remote value: " + remote);
             return Optional.empty();
         }
 
-        Jid participantJid = null; // WAWebSyncdIndexUtils.m: var l = void 0
-        var isUser = isUserJid(remoteJid); // WAWebSyncdIndexUtils.m: u.isUser()
-        var isNewsletter = remoteJid.hasNewsletterServer(); // WAWebSyncdIndexUtils.m: u.isNewsletter()
-        if (!isUser && !isNewsletter) { // WAWebSyncdIndexUtils.m: if (!u.isUser() && !u.isNewsletter())
-            if ("1".equals(fromMe)) { // WAWebSyncdIndexUtils.m: a === "1" ? l = o("WAWebUserPrefsMeUser").getMePnUserOrThrow_DO_NOT_USE()
-                participantJid = store.jid().orElse(null); // WAWebSyncdIndexUtils.m: getMePnUserOrThrow_DO_NOT_USE()
-            } else { // WAWebSyncdIndexUtils.m: a === "0" && !r("WAWebWid").isWid(i) check
-                if (participant == null || participant.isEmpty()) { // WAWebSyncdIndexUtils.m: if (a === "0" && !r("WAWebWid").isWid(i))
-                    LOGGER.warning("syncKeyToMsgKey: invalid participant value"); // WAWebSyncdIndexUtils.m: WALogger.WARN
+        Jid participantJid = null;
+        var isUser = isUserJid(remoteJid);
+        var isNewsletter = remoteJid.hasNewsletterServer();
+        if (!isUser && !isNewsletter) {
+            if ("1".equals(fromMe)) {
+                participantJid = store.jid().orElse(null);
+            } else {
+                if (participant == null || participant.isEmpty()) {
+                    LOGGER.warning("syncKeyToMsgKey: invalid participant value");
                     return Optional.empty();
                 }
                 try {
-                    participantJid = Jid.of(participant); // WAWebSyncdIndexUtils.m: l = o("WAWebWidFactory").createWid(i)
+                    participantJid = Jid.of(participant);
                 } catch (Exception e) {
-                    LOGGER.warning("syncKeyToMsgKey: invalid participant value: " + participant); // WAWebSyncdIndexUtils.m: WALogger.WARN
+                    LOGGER.warning("syncKeyToMsgKey: invalid participant value: " + participant);
                     return Optional.empty();
                 }
             }
         }
 
-        // WAWebSyncdIndexUtils.m: return new(r("WAWebMsgKey"))({fromMe: a === "1", remote: u, id: n, participant: l})
         var key = new MessageKeyBuilder()
                 .fromMe("1".equals(fromMe))
                 .parentJid(remoteJid)
@@ -540,21 +529,20 @@ public final class SyncdIndexUtils {
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdIndexUtils", exports = "getMsgKeyFromStarActionIndex", adaptation = WhatsAppAdaptation.ADAPTED)
     static Optional<MessageKey> getMsgKeyFromStarActionIndex(WhatsAppStore store, String index) {
-        // WAWebSyncdIndexUtils.getMsgKeyFromStarActionIndex (function p)
-        var parsed = JSON.parseArray(index); // WAWebSyncdIndexUtils.p: var t = JSON.parse(e)
-        if (parsed == null || parsed.size() < 5) { // WAWebSyncdIndexUtils.p: if (t.length < 5) throw ...  (ADAPTED: defensive null check vs. WA Web's JS-runtime throw)
-            LOGGER.warning("[sync-action] star action index malformed, cannot create MsgKey"); // WAWebSyncdIndexUtils.p: r("err")("[sync-action] star action index malformed...")
-            return Optional.empty(); // ADAPTED: WAWebSyncdIndexUtils.p throws; Cobalt returns empty
+        var parsed = JSON.parseArray(index);
+        if (parsed == null || parsed.size() < 5) {
+            LOGGER.warning("[sync-action] star action index malformed, cannot create MsgKey");
+            return Optional.empty();
         }
-        var result = syncKeyToMsgKey( // WAWebSyncdIndexUtils.p: var n = m(t[1], t[2], t[3], t[4])
+        var result = syncKeyToMsgKey(
                 store,
                 parsed.getString(1),
                 parsed.getString(2),
                 parsed.getString(3),
                 parsed.getString(4)
         );
-        if (result.isEmpty()) { // WAWebSyncdIndexUtils.p: if (!n) throw ...
-            LOGGER.warning("[sync-action] star index malformed, MsgKey failed"); // WAWebSyncdIndexUtils.p: WALogger.WARN
+        if (result.isEmpty()) {
+            LOGGER.warning("[sync-action] star index malformed, MsgKey failed");
         }
         return result;
     }
@@ -576,10 +564,8 @@ public final class SyncdIndexUtils {
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdIndexUtils", exports = "malformedActionIndex", adaptation = WhatsAppAdaptation.ADAPTED)
     static MutationApplicationResult malformedActionIndex(String collectionName, String actionName) {
-        // WAWebSyncdIndexUtils.malformedActionIndex (function _)
-        // WAWebSyncdIndexUtils._: o("WAWebSyncdMetrics").uploadMdCriticalEventMetric(...) — WAM telemetry skipped
-        LOGGER.fine(() -> "malformedActionIndex: collection=" + collectionName + ", action=" + actionName); // ADAPTED: WAWebSyncdIndexUtils._ — WAM metric replaced with fine log
-        return MutationApplicationResult.malformed(); // WAWebSyncdIndexUtils._: {actionState: o("WASyncdConst").SyncActionState.Malformed}
+        LOGGER.fine(() -> "malformedActionIndex: collection=" + collectionName + ", action=" + actionName);
+        return MutationApplicationResult.malformed();
     }
 
     /**
@@ -595,9 +581,7 @@ public final class SyncdIndexUtils {
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdIndexUtils", exports = "malformedActionValue", adaptation = WhatsAppAdaptation.DIRECT)
     static MutationApplicationResult malformedActionValue(String collectionName) {
-        // WAWebSyncdIndexUtils.malformedActionValue (function f)
-        // WAWebSyncdIndexUtils.f: return {actionState: o("WASyncdConst").SyncActionState.Malformed}
-        return MutationApplicationResult.malformed(); // WAWebSyncdIndexUtils.f
+        return MutationApplicationResult.malformed();
     }
 
     /**
@@ -622,20 +606,18 @@ public final class SyncdIndexUtils {
      * @return the WA Web-compatible serialized string
      */
     static String serializeMessageKey(MessageKey key) {
-        // WAWebMsgKey constructor: this._serialized = E.join("_")
         // where E = [this.fromMe, this.remote, this.id, ...optional self, ...optional participant]
         var sb = new StringBuilder();
-        sb.append(key.fromMe()); // WAWebMsgKey: this.fromMe
+        sb.append(key.fromMe());
         sb.append('_');
         var remoteJid = key.parentJid().orElse(null);
-        sb.append(remoteJid != null ? remoteJid.toString() : ""); // WAWebMsgKey: this.remote
+        sb.append(remoteJid != null ? remoteJid.toString() : "");
         sb.append('_');
-        sb.append(key.id().orElse("")); // WAWebMsgKey: this.id
-        // WAWebMsgKey: participant is only set for group/broadcast keys (not user/newsletter)
+        sb.append(key.id().orElse(""));
         // Cobalt's senderJid() has fallback to parentJid, so we must only append it
         // when the remote is NOT a user and NOT a newsletter (matching WA Web behavior)
         if (remoteJid != null && !isUserJid(remoteJid) && !remoteJid.hasNewsletterServer()) { // ADAPTED: detect participant presence via remote type
-            key.senderJid().ifPresent(sender -> { // WAWebMsgKey: this.participant
+            key.senderJid().ifPresent(sender -> {
                 sb.append('_');
                 sb.append(sender);
             });
@@ -656,7 +638,6 @@ public final class SyncdIndexUtils {
      * @return {@code true} if the JID belongs to a user-category server
      */
     private static boolean isUserJid(Jid jid) {
-        // WAWebWid.prototype.isUser: this.server === "c.us" || this.server === "lid" || this.server === "bot" || this.server === "hosted" || this.server === "hosted.lid"
         return jid.hasUserServer()        // c.us / s.whatsapp.net
                 || jid.hasLidServer()     // lid
                 || jid.hasBotServer()     // bot

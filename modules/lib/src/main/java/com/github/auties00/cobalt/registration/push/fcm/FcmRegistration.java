@@ -2,12 +2,7 @@ package com.github.auties00.cobalt.registration.push.fcm;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
-import com.github.auties00.cobalt.client.registration.fcm.checkin.FcmCheckinRequestBuildBuilder;
-import com.github.auties00.cobalt.client.registration.fcm.checkin.FcmCheckinRequestBuilder;
-import com.github.auties00.cobalt.client.registration.fcm.checkin.FcmCheckinRequestCheckinBuilder;
-import com.github.auties00.cobalt.client.registration.fcm.checkin.FcmCheckinRequestEventBuilder;
-import com.github.auties00.cobalt.client.registration.fcm.checkin.FcmCheckinRequestSpec;
-import com.github.auties00.cobalt.client.registration.fcm.checkin.FcmCheckinResponseSpec;
+import com.github.auties00.cobalt.registration.push.fcm.checkin.*;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -39,16 +34,16 @@ import java.util.zip.GZIPOutputStream;
  * <p>The handshake is the standard sequence a real Android client
  * performs the first time it boots a Firebase-backed app:
  * <ol>
- *   <li>{@code POST android.clients.google.com/checkin} — gzipped
- *       AndroidCheckin protobuf, returns
+ *   <li>{@code POST android.clients.google.com/checkin} sends a gzipped
+ *       AndroidCheckin protobuf and returns
  *       {@code (androidId, securityToken)} used as the MCS login
  *       credentials.</li>
  *   <li>{@code POST firebaseinstallations.googleapis.com/.../installations}
- *       — only run when {@link FcmConfig#useFis()} is {@code true};
- *       returns a {@code fid} + FIS auth token used as headers on the
+ *       runs only when {@link FcmConfig#useFis()} is {@code true} and
+ *       returns a {@code fid} plus FIS auth token used as headers on the
  *       next call.</li>
- *   <li>{@code POST android.clients.google.com/c2dm/register3} —
- *       returns the FCM push token surfaced via
+ *   <li>{@code POST android.clients.google.com/c2dm/register3} returns
+ *       the FCM push token surfaced via
  *       {@link FcmClient#getPushToken()}.</li>
  * </ol>
  *
@@ -60,7 +55,7 @@ import java.util.zip.GZIPOutputStream;
  */
 final class FcmRegistration {
     /**
-     * Logger shared with the rest of the FCM client — same logger
+     * Logger shared with the rest of the FCM client. Same logger
      * name {@code cobalt.fcm} so consumers can configure verbosity
      * uniformly.
      */
@@ -104,7 +99,7 @@ final class FcmRegistration {
     private static final int FID_TRUNCATED_LENGTH = 22;
 
     /**
-     * Underlying HTTP client; built once with the configured proxy
+     * Underlying HTTP client. Built once with the configured proxy
      * and reused across every step.
      */
     private final HttpClient http;
@@ -441,7 +436,7 @@ final class FcmRegistration {
     }
 
     /**
-     * Tries to gunzip {@code data}; falls back to the input verbatim
+     * Tries to gunzip {@code data}. Falls back to the input verbatim
      * when the bytes are not a valid gzip stream. The checkin server
      * may reply with either form depending on the
      * {@code Accept-Encoding} negotiation.

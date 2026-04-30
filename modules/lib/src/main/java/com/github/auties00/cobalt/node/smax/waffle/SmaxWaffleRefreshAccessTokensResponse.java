@@ -45,13 +45,8 @@ public sealed interface SmaxWaffleRefreshAccessTokensResponse extends SmaxOperat
     }
 
     /**
-     * The {@code Success} reply variant — the relay returned a fresh
+     * The {@code Success} reply variant. The relay returned a fresh
      * encryption-metadata subtree carrying the rotated tokens.
-     *
-     * @implNote {@code WASmaxInWaffleRefreshAccessTokensResponseSuccess.parseRefreshAccessTokensResponseSuccess}
-     *           projects the {@code <encryption_metadata/>} subtree
-     *           via the shared
-     *           {@link SmaxWaffleRsaEncryptionMetadata#of(Node)}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInWaffleRefreshAccessTokensResponseSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxInWaffleIQResultResponseMixin")

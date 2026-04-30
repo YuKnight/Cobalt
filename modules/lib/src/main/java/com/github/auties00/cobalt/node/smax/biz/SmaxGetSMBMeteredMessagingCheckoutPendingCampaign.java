@@ -18,7 +18,7 @@ import java.util.OptionalInt;
 
 /**
  * Single {@code <campaign/>} grandchild of the outbound
- * {@code <pending_campaigns>} block — describes a previously-reserved
+ * {@code <pending_campaigns>} block. Describes a previously-reserved
  * send whose impact must be accounted for in the new quote.
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutSmbMeteredMessagingAccountGetSMBMeteredMessagingCheckoutRequest")

@@ -64,8 +64,6 @@ final class NotificationLinkingStreamHandler implements SocketStream.Handler {
 
     /**
      * Set of notification type attribute values routed to this handler by the dispatcher.
-     *
-     * @implNote WAWebCommsHandleLoggedInStanza.handleLoggedInStanza
      */
     private static final Set<String> SUPPORTED_TYPES = Set.of(
             "link_code_companion_reg",
@@ -79,40 +77,30 @@ final class NotificationLinkingStreamHandler implements SocketStream.Handler {
 
     /**
      * WA Web notification_metadata event integer for {@code ACCOUNT_LINKED}.
-     *
-     * @implNote WAWebAccountLinkingConstants.AccountLinkingNotificationEvent.ACCOUNT_LINKED
      */
     @WhatsAppWebExport(moduleName = "WAWebAccountLinkingConstants", exports = "AccountLinkingNotificationEvent", adaptation = WhatsAppAdaptation.ADAPTED)
     private static final int WAFFLE_EVENT_ACCOUNT_LINKED = 1;
 
     /**
      * WA Web notification_metadata event integer for {@code ACCOUNT_UNLINKED}.
-     *
-     * @implNote WAWebAccountLinkingConstants.AccountLinkingNotificationEvent.ACCOUNT_UNLINKED
      */
     @WhatsAppWebExport(moduleName = "WAWebAccountLinkingConstants", exports = "AccountLinkingNotificationEvent", adaptation = WhatsAppAdaptation.ADAPTED)
     private static final int WAFFLE_EVENT_ACCOUNT_UNLINKED = 2;
 
     /**
      * WA Web notification_metadata event integer for {@code STATE_DELETED}.
-     *
-     * @implNote WAWebAccountLinkingConstants.AccountLinkingNotificationEvent.STATE_DELETED
      */
     @WhatsAppWebExport(moduleName = "WAWebAccountLinkingConstants", exports = "AccountLinkingNotificationEvent", adaptation = WhatsAppAdaptation.ADAPTED)
     private static final int WAFFLE_EVENT_STATE_DELETED = 4;
 
     /**
      * WA Web notification_metadata event integer for {@code STATE_SUSPENDED}.
-     *
-     * @implNote WAWebAccountLinkingConstants.AccountLinkingNotificationEvent.STATE_SUSPENDED
      */
     @WhatsAppWebExport(moduleName = "WAWebAccountLinkingConstants", exports = "AccountLinkingNotificationEvent", adaptation = WhatsAppAdaptation.ADAPTED)
     private static final int WAFFLE_EVENT_STATE_SUSPENDED = 5;
 
     /**
      * WA Web notification_metadata event integer for {@code CLIENT_RESYNC}.
-     *
-     * @implNote WAWebAccountLinkingConstants.AccountLinkingNotificationEvent.CLIENT_RESYNC
      */
     @WhatsAppWebExport(moduleName = "WAWebAccountLinkingConstants", exports = "AccountLinkingNotificationEvent", adaptation = WhatsAppAdaptation.ADAPTED)
     private static final int WAFFLE_EVENT_CLIENT_RESYNC = 6;
@@ -128,8 +116,6 @@ final class NotificationLinkingStreamHandler implements SocketStream.Handler {
      * Shared alt-device-linking service that drives the companion side
      * of the pairing-code handshake. Handles both
      * {@code primary_hello} and {@code refresh_code} stages.
-     *
-     * @implNote WAWebAltDeviceLinkingApi
      */
     private final CompanionPairingService deviceLinkingService;
 
@@ -161,7 +147,6 @@ final class NotificationLinkingStreamHandler implements SocketStream.Handler {
      * the notification {@code type} attribute.
      *
      * @param node the notification stanza node, must not be {@code null}
-     * @implNote WAWebCommsHandleLoggedInStanza.handleLoggedInStanza
      */
     @Override
     public void handle(Node node) {
@@ -216,8 +201,8 @@ final class NotificationLinkingStreamHandler implements SocketStream.Handler {
      *     WASmaxInMdRefreshCodeNotifyCompanionRequest.parseRefreshCodeNotifyCompanionRequest
      */
     private void handleLinkCodeRefresh(Node node) {
-        if (node.hasAttribute("type", "companion_reg_refresh")) { // WAWebHandleCompanionReqRefreshNotification
-            whatsapp.store().setAdvSecretKey(DataUtils.randomByteArray(32)); // WAWebAdvSignatureApi.generateADVSecretKey, ADAPTED: WA Web stores base64, Cobalt stores raw bytes
+        if (node.hasAttribute("type", "companion_reg_refresh")) {
+            whatsapp.store().setAdvSecretKey(DataUtils.randomByteArray(32));
             return;
         }
 
@@ -225,43 +210,43 @@ final class NotificationLinkingStreamHandler implements SocketStream.Handler {
             return;
         }
 
-        var child = node.getChild("link_code_companion_reg").orElse(null); // WAWebAltDeviceLinkingHandleNotification.u: var t = e.content; if (!Array.isArray(t) || !t.length) ...
+        var child = node.getChild("link_code_companion_reg").orElse(null);
         if (child == null) {
             return;
         }
 
-        var stage = child.getAttributeAsString("stage", null); // WAWebAltDeviceLinkingHandleNotification.u: var n = t[0].attrs; n.stage
+        var stage = child.getAttributeAsString("stage", null);
         if (stage == null) {
             return;
         }
 
-        var ref = child.getChild("link_code_pairing_ref") // WASmaxInMdRefreshCodeNotifyCompanionRequest, WASmaxInMdPrimaryHelloNotifyCompanionRequest: linkCodeCompanionRegLinkCodePairingRefElementValue
+        var ref = child.getChild("link_code_pairing_ref")
                 .flatMap(Node::toContentBytes)
                 .orElse(null);
 
         switch (stage) {
-            case "primary_hello" -> { // WAWebAltDeviceLinkingHandleNotification.c: parsePrimaryHelloNotifyCompanionRequest
-                var wrappedPrimaryEphemeralPub = child.getChild("link_code_pairing_wrapped_primary_ephemeral_pub") // WASmaxInMdPrimaryHelloNotifyCompanionRequest: linkCodeCompanionRegLinkCodePairingWrappedPrimaryEphemeralPubElementValue
+            case "primary_hello" -> {
+                var wrappedPrimaryEphemeralPub = child.getChild("link_code_pairing_wrapped_primary_ephemeral_pub")
                         .flatMap(Node::toContentBytes)
                         .orElse(null);
-                var primaryIdentityPublic = child.getChild("primary_identity_pub") // WASmaxInMdPrimaryHelloNotifyCompanionRequest: linkCodeCompanionRegPrimaryIdentityPubElementValue
+                var primaryIdentityPublic = child.getChild("primary_identity_pub")
                         .flatMap(Node::toContentBytes)
                         .orElse(null);
                 if (wrappedPrimaryEphemeralPub == null || primaryIdentityPublic == null || ref == null) {
                     LOGGER.log(System.Logger.Level.WARNING,
-                            "Rejecting primary_hello notification missing required fields"); // WAWebAltDeviceLinkingHandleNotification.c: "alt pairing: could not parse primary hello"
+                            "Rejecting primary_hello notification missing required fields");
                     return;
                 }
                 try {
                     deviceLinkingService.handlePrimaryHello(wrappedPrimaryEphemeralPub, primaryIdentityPublic, ref);
                 } catch (Throwable throwable) {
                     LOGGER.log(System.Logger.Level.WARNING,
-                            "Cannot complete alt-device-linking handshake: {0}", throwable.getMessage()); // WAWebAltDeviceLinkingHandleNotification.c: primary_hello_error marker
+                            "Cannot complete alt-device-linking handshake: {0}", throwable.getMessage());
                 }
             }
-            case "refresh_code" -> deviceLinkingService.handleRefreshCode(ref); // WAWebAltDeviceLinkingHandleNotification.d: refreshAltLinkingCode / forceManualRefresh
+            case "refresh_code" -> deviceLinkingService.handleRefreshCode(ref);
             default -> LOGGER.log(System.Logger.Level.DEBUG,
-                    "Ignoring link_code_companion_reg notification with stage {0}", stage); // WAWebAltDeviceLinkingHandleNotification.u: else makeDeliverResponseBadStanza({ackError:487}, e)
+                    "Ignoring link_code_companion_reg notification with stage {0}", stage);
         }
     }
 
@@ -275,10 +260,8 @@ final class NotificationLinkingStreamHandler implements SocketStream.Handler {
      * {@code client_resync} attribute is {@code "true"}.
      *
      * @param node the notification stanza node
-     * @implNote WAWebAccountLinkingNotificationHandler.handleAccountLinkingNotification
      */
     private void handleWaffle(Node node) {
-        // WAWebAccountLinkingNotificationHandler: parse notification_metadata child
         var metadata = node.getChild("notification_metadata").orElse(null);
         if (metadata == null) {
             LOGGER.log(System.Logger.Level.DEBUG,
@@ -287,30 +270,22 @@ final class NotificationLinkingStreamHandler implements SocketStream.Handler {
             return;
         }
 
-        // WAWebSmaxInWaffleWFNotificationRequest: event attr is int 1-7
         var event = metadata.getAttributeAsInt("event", -1);
-        // WAWebSmaxInWaffleWFNotificationRequest: client_resync attr is optional string "true"/"false"
         var clientResync = "true".equals(metadata.getAttributeAsString("client_resync", null));
 
-        // WAWebAccountLinkingNotificationHandler: switch on AccountLinkingNotificationEvent
         switch (event) {
             case WAFFLE_EVENT_STATE_SUSPENDED ->
-                    // WAWebAccountLinkingHandler.handlePausedState
                     whatsapp.store().setWaffleAccountLinkState(WaffleAccountLinkStateAction.AccountLinkState.PAUSED);
             case WAFFLE_EVENT_STATE_DELETED ->
-                    // WAWebAccountLinkingHandler.handleUnlinkedState
                     whatsapp.store().setWaffleAccountLinkState(WaffleAccountLinkStateAction.AccountLinkState.UNLINKED);
             case WAFFLE_EVENT_CLIENT_RESYNC ->
-                    // WAWebAccountLinkingHandler.handleResyncState
                     whatsapp.store().setWaffleAccountLinkState(WaffleAccountLinkStateAction.AccountLinkState.ACTIVE);
             case WAFFLE_EVENT_ACCOUNT_UNLINKED -> {
-                // WAWebAccountLinkingNotificationHandler: only resync if client_resync === "true"
                 if (clientResync) {
                     whatsapp.store().setWaffleAccountLinkState(WaffleAccountLinkStateAction.AccountLinkState.ACTIVE);
                 }
             }
             case WAFFLE_EVENT_ACCOUNT_LINKED -> {
-                // WAWebAccountLinkingNotificationHandler: only resync if client_resync === "true"
                 if (clientResync) {
                     whatsapp.store().setWaffleAccountLinkState(WaffleAccountLinkStateAction.AccountLinkState.ACTIVE);
                 }
@@ -331,32 +306,23 @@ final class NotificationLinkingStreamHandler implements SocketStream.Handler {
      * attribute equals {@code "automation"} before disabling detected outcomes.
      *
      * @param node the notification stanza node
-     * @implNote WAWebHandleHostedNotification.handleHostedNotification
      */
     private void handleHosted(Node node) {
-        // WAWebHandleHostedNotification: try onboarding_status child first
         var onboardingStatus = node.getChild("onboarding_status").orElse(null);
         if (onboardingStatus != null) {
-            // WASmaxInCoexistenceOnboardingStatusNotificationRequest: check status and product_surface
             var status = onboardingStatus.getAttributeAsString("status", null);
             var productSurface = onboardingStatus.getAttributeAsString("product_surface", null);
-            // WAWebHandleHostedNotification: only act if status === "completed" and productSurface === "automation"
             if ("completed".equals(status) && "automation".equals(productSurface)) {
-                // WAWebCTWADetectedOutcomeOnboardingStatusNotification.handleCTWADetectedOutcomeOnboardingStatusNotification(true)
                 whatsapp.store().setHostedAutomationOnboarded(true);
                 whatsapp.store().setDetectedOutcomesEnabled(true);
             }
             return;
         }
 
-        // WAWebHandleHostedNotification: try offboarding child
         var offboarding = node.getChild("offboarding").orElse(null);
         if (offboarding != null) {
-            // WASmaxInCoexistenceOffboardingNotificationRequest: check product_surface
             var productSurface = offboarding.getAttributeAsString("product_surface", null);
-            // WAWebHandleHostedNotification: only act if productSurface === "automation"
             if ("automation".equals(productSurface)) {
-                // WAWebCTWADetectedOutcomeOnboardingStatusNotification.handleCTWADetectedOutcomeOnboardingStatusNotification(false)
                 whatsapp.store().setHostedAutomationOnboarded(false);
                 whatsapp.store().setDetectedOutcomesEnabled(false);
             }
@@ -380,7 +346,6 @@ final class NotificationLinkingStreamHandler implements SocketStream.Handler {
      * @implNote ADAPTED: WAWebHandleGrowthNotification.default
      */
     private void handleGrowth(Node node) {
-        // WAWebHandleGrowthNotification: extract invite > receiver > user JID
         var receiver = node.getChild("invite")
                 .flatMap(invite -> invite.getChild("receiver"))
                 .flatMap(receiverNode -> receiverNode.getAttributeAsJid("user"))
@@ -390,12 +355,10 @@ final class NotificationLinkingStreamHandler implements SocketStream.Handler {
             return;
         }
 
-        // ADAPTED: WAWebHandleGrowthNotification - Cobalt creates contact/chat directly
         var existed = whatsapp.store().findContactByJid(receiver).isPresent();
         var contact = whatsapp.store()
                 .findContactByJid(receiver)
                 .orElseGet(() -> whatsapp.store().addNewContact(receiver));
-        // WAWebHandleGrowthNotification: gates the ChatMessageCounts emission on whether the chat
         // did not previously exist (i.e. findLocal returns null before createChat).
         var chatCreated = whatsapp.store().findChatByJid(receiver).isEmpty();
         whatsapp.store()
@@ -416,7 +379,6 @@ final class NotificationLinkingStreamHandler implements SocketStream.Handler {
             fireListeners(listener -> listener.onNewContact(whatsapp, contact));
         }
 
-        // WAWebHandleGrowthNotification: new ChatMessageCountsWamEvent({isInviteCreatedThread:true}).commit()
         // emitted after the fresh invite chat is created.
         if (chatCreated) {
             wamService.commit(new ChatMessageCountsEventBuilder()
@@ -455,13 +417,11 @@ final class NotificationLinkingStreamHandler implements SocketStream.Handler {
      *     WAWebHandleWaChat.default
      */
     private void handlePsa(Node node) {
-        // WAWebCommsHandleLoggedInStanza.handleLoggedInStanza: if (from === PSA_JID) dispatch on first child tag
         var from = node.getAttributeAsJid("from").orElse(null);
         if (from != null && from.equals(Jid.announcementsAccount())) {
             var firstChild = node.getChild().orElse(null);
             var firstChildTag = firstChild == null ? null : firstChild.description();
             if ("surfaces".equals(firstChildTag)) {
-                // WAWebHandleQPSurfacesNotification.handleQPSurfacesNotification: updateQPSurfacesFromNotification
                 // NO_WA_BASIS: Cobalt has no local quick-promotion infrastructure; skip with log.
                 LOGGER.log(System.Logger.Level.DEBUG,
                         "Ignoring QP surfaces psa notification: {0}",
@@ -469,7 +429,6 @@ final class NotificationLinkingStreamHandler implements SocketStream.Handler {
                 return;
             }
             if ("reset_smb_last_qp_prefetch_timestamp".equals(firstChildTag)) {
-                // WAWebHandleQPPrefetchTimestampNotification.handleQPPrefetchTimestampNotification:
                 //     qpGraphQLEnabledSMB() && fireAndForget("fetchQuickPromotionsNow")
                 // NO_WA_BASIS: Cobalt has no local quick-promotion infrastructure; skip with log.
                 LOGGER.log(System.Logger.Level.DEBUG,
@@ -477,8 +436,6 @@ final class NotificationLinkingStreamHandler implements SocketStream.Handler {
                         node.getAttributeAsString("id", "<missing>"));
                 return;
             }
-            // WAWebCommsHandleLoggedInStanza: if (enable_client_chat_psa AB prop) WAWebHandleWaChat(e) else WAWebHandlePsa(e)
-            // WAWebHandleWaChat parses a chat message from PSA_JID and pushes it through processDecryptedMessageProto.
             // NO_WA_BASIS: Cobalt has no in-app PSA campaign / wa_chat message pipeline; skip with log.
             LOGGER.log(System.Logger.Level.DEBUG,
                     "Ignoring wa_chat/psa notification from PSA_JID: {0}",
@@ -486,7 +443,6 @@ final class NotificationLinkingStreamHandler implements SocketStream.Handler {
             return;
         }
 
-        // WAWebHandlePsa: parses campaign metadata but only returns ack, no behavioral action
         LOGGER.log(System.Logger.Level.DEBUG,
                 "Ignoring psa notification: {0}",
                 firstChildDescription(node));
@@ -504,16 +460,13 @@ final class NotificationLinkingStreamHandler implements SocketStream.Handler {
      * instead.
      *
      * @param node the notification stanza node
-     * @implNote WAWebHandleNewsletterNotification.default
      */
     private void handleNewsletter(Node node) {
-        // WAWebHandleNewsletterNotification: validate from is newsletter JID
         var newsletterJid = node.getAttributeAsJid("from").orElse(null);
         if (newsletterJid == null || !newsletterJid.hasNewsletterServer()) {
             return;
         }
 
-        // WAWebHandleNewsletterNotification: only live_updates is supported
         if (node.hasChild("live_updates")) {
             // ADAPTED: Cobalt refreshes metadata then queries messages
             try {
@@ -525,7 +478,6 @@ final class NotificationLinkingStreamHandler implements SocketStream.Handler {
                         throwable.getMessage());
             }
 
-            // WAWebNewsletterHandleLiveUpdatesNotification.handleNewsletterLiveUpdatesNotification
             try {
                 whatsapp.queryNewsletterMessages(newsletterJid, 20);
             } catch (Throwable throwable) {
@@ -624,7 +576,7 @@ final class NotificationLinkingStreamHandler implements SocketStream.Handler {
         whatsapp.sendNodeWithNoResponse(new NodeBuilder()
                 .description("ack")
                 .attribute("id", stanzaId)
-                .attribute("class", "notification") // WAWebHandleCompanionReqRefreshNotification, WAWebHandlePsa, WAWebHandleGrowthNotification: hardcoded "notification"
+                .attribute("class", "notification")
                 .attribute("to", stanzaFrom)
                 .attribute("type", node.getAttributeAsString("type", null)) // Each WA Web handler hardcodes its own type; since this handler dispatches multiple types, we read dynamically
                 .build());

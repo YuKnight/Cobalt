@@ -1,14 +1,15 @@
 package com.github.auties00.cobalt.exception;
 
 /**
- * Non-fatal exception used for server-driven runtime conditions that should
- * still flow through the central error handler without forcing a disconnect.
+ * Thrown for server-driven runtime conditions that do not fit any of
+ * the more specific exception types and that should be observed
+ * through the configurable error handler without forcing a disconnect.
  *
- * <p>This exception is raised when the server sends a transient or informational
- * error that does not correspond to one of the specialized exception domains
- * ({@link WhatsAppSessionException}, {@link WhatsAppStreamException},
- * {@link WhatsAppMessageException}, and so on). The configurable error handler
- * decides what to do: typically the event is logged and the client keeps running.
+ * <p>The WhatsApp servers occasionally deliver informational or
+ * transient error stanzas that do not map cleanly to a session, stream,
+ * message, or media failure. Surfacing them as this exception lets the
+ * configurable error handler log the event or run custom telemetry
+ * while the session keeps running.
  */
 public final class WhatsAppServerRuntimeException extends WhatsAppException {
     /**
@@ -32,10 +33,10 @@ public final class WhatsAppServerRuntimeException extends WhatsAppException {
     }
 
     /**
-     * Returns whether this exception represents a fatal error.
+     * Returns whether the failure invalidates the current session.
      *
-     * <p>Server runtime exceptions are non-fatal; they are raised to let the error
-     * handler observe the server-driven condition while keeping the session active.
+     * <p>Server runtime exceptions are observational and never tear the
+     * session down on their own.
      *
      * @return {@code false}
      */

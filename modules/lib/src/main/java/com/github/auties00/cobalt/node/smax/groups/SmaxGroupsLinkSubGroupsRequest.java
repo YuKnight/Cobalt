@@ -105,7 +105,6 @@ public final class SmaxGroupsLinkSubGroupsRequest implements SmaxOperation.Reque
             }
             groupNodes.add(groupBuilder.build());
         }
-        // WASmaxOutGroupsLinkSubGroupsRequest: <link link_type="sub_group">REPEATED_CHILD(group)</link>
         var linkNode = new NodeBuilder()
                 .description("link")
                 .attribute("link_type", "sub_group")
@@ -115,7 +114,6 @@ public final class SmaxGroupsLinkSubGroupsRequest implements SmaxOperation.Reque
                 .description("links")
                 .content(linkNode)
                 .build();
-        // WASmaxOutGroupsBaseSetGroupMixin + WASmaxOutGroupsBaseIQSetRequestMixin
         return new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "w:g2")

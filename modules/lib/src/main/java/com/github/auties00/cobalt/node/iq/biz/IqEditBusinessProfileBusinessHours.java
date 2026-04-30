@@ -5,8 +5,10 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The full business-hours payload — optional timezone plus the list of
- * day-of-week rows, optional note text.
+ * Typed business-hours payload carried as the {@code <business_hours/>}
+ * child of an {@link IqEditBusinessProfileRequest}. Wraps the optional
+ * IANA timezone, the optional schedule note, and the per-day-of-week
+ * configuration rows.
  */
 public final class IqEditBusinessProfileBusinessHours {
     /**

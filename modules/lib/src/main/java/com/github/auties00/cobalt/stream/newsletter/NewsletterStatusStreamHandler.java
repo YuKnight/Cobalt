@@ -38,35 +38,24 @@ import java.time.Instant;
  *   <li>{@code <reaction>}: child node for reaction/reaction-revoke</li>
  * </ul>
  *
- * @implNote WAWebHandleNewsletterStatus.default
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleNewsletterStatus")
 @WhatsAppWebModule(moduleName = "WAWebNewsletterStatusUtils")
 public final class NewsletterStatusStreamHandler implements SocketStream.Handler {
     /**
      * Logger for diagnostic messages during newsletter status processing.
-     *
-     * @implNote ADAPTED: WAWebHandleNewsletterStatus uses WALogger with tagged
-     * template literals; Cobalt uses {@code System.Logger} instead.
      */
     private static final System.Logger LOGGER = System.getLogger(NewsletterStatusStreamHandler.class.getName());
 
     /**
-     * The WhatsApp client instance providing access to the store and
-     * listener notification.
-     *
-     * @implNote ADAPTED: WAWebHandleNewsletterStatus accesses stores and
-     * services via module-level imports; Cobalt uses constructor-based DI.
+     * The WhatsApp client providing access to the store and listener notification.
      */
     private final WhatsAppClient whatsapp;
 
     /**
-     * Constructs a new newsletter status stream handler with the required
-     * client dependency.
+     * Constructs a new newsletter status stream handler with the required client dependency.
      *
      * @param whatsapp the WhatsApp client instance, must not be {@code null}
-     * @implNote ADAPTED: WAWebHandleNewsletterStatus.default uses module-level
-     * imports for all dependencies; Cobalt uses constructor-based DI.
      */
     public NewsletterStatusStreamHandler(WhatsAppClient whatsapp) {
         this.whatsapp = whatsapp;
@@ -89,62 +78,31 @@ public final class NewsletterStatusStreamHandler implements SocketStream.Handler
      * </ul>
      *
      * @param node the raw {@code <status>} stanza node
-     * @implNote WAWebHandleNewsletterStatus.default: parses the stanza via
-     * WASmaxStatusDeliverIncomingNewsletterStatusRPC.receiveIncomingNewsletterStatusRPC,
-     * which delegates to WASmaxInStatusDeliverIncomingNewsletterStatusRequest
-     * and WASmaxInStatusDeliverFromNewsletterMixin for attribute extraction.
-     * The content type is determined by
-     * WASmaxInStatusDeliverNewsletterStatusContentTypeMixins which checks
-     * for StatusNewsletterRevoke, StatusNewsletterText, StatusNewsletterMedia,
-     * StatusNewsletterReaction, and StatusNewsletterReactionRevoke in that
-     * order.  Reactions and reaction-revokes are returned immediately with
-     * a success response and no message processing.
      */
     @Override
     public void handle(Node node) {
-        // WASmaxInStatusDeliverFromNewsletterMixin: attrNewsletterJid(e, "from")
         var from = node.getAttributeAsJid("from", null);
         if (from == null || !from.hasNewsletterServer()) {
             return;
         }
 
-        // WASmaxInStatusDeliverIncomingNewsletterStatusRequest: attrStanzaId(e, "id")
-        // The id is required by the RPC parser; Cobalt defensively guards
-        // against missing ids (WA Web would throw during parsing).
         var id = node.getAttributeAsString("id", null);
         if (id == null) {
             return;
         }
 
-        // WASmaxInStatusDeliverNewsletterStatusContentTypeMixins:
-        // Reactions have a <reaction> child -> skip immediately
-        // WAWebHandleNewsletterStatus.default: case "StatusNewsletterReaction":
-        // case "StatusNewsletterReactionRevoke": return d;
         if (node.hasChild("reaction")) {
             return;
         }
 
-        // WASmaxInStatusDeliverStatusAdminRevokeMixin: literal(attrString, e, "edit", "8")
-        // WAWebHandleNewsletterStatus.default: case "StatusNewsletterRevoke" ->
-        // mapStatusRevokeToMsgData (WAWebNewsletterStatusUtils.u):
-        //   new MsgKey({remote: t, fromMe: isSender, id: newId_DEPRECATED()})
-        //   type: MSG_TYPE.PROTOCOL, kind: MsgKind.ProtocolRevoke,
-        //   subtype: "admin_revoke", viewMode: NEWSLETTER_TOMBSTONE,
-        //   protocolMessageKey: new MsgKey({remote: t, fromMe: isSender, id: e.id})
         var edit = node.getAttributeAsString("edit", null);
         if ("8".equals(edit)) {
-            // ADAPTED: Cobalt's newsletter model currently handles revoke
-            // tombstones at a higher layer (listener-level revoke notification).
-            // The handler logs and skips rather than materializing a synthetic
-            // PROTOCOL/ProtocolRevoke message with viewMode=NEWSLETTER_TOMBSTONE.
+            // Cobalt handles revoke tombstones at a higher layer through listener-level revoke notifications, so it skips materialising a synthetic PROTOCOL/ProtocolRevoke message here.
             LOGGER.log(System.Logger.Level.DEBUG,
                     "Skipping newsletter status revoke for {0} from {1}", id, from);
             return;
         }
 
-        // WASmaxInStatusDeliverStatusNewsletterTextMixin / StatusNewsletterMediaMixin:
-        // flattenedChildWithTag(e, "plaintext") -> parseNewsletterPlaintextPayloadMixin
-        // -> contentBytesRange(e, 1, 1048576)
         var plaintext = node.getChild("plaintext")
                 .flatMap(Node::toContentBytes)
                 .orElse(null);
@@ -154,31 +112,21 @@ public final class NewsletterStatusStreamHandler implements SocketStream.Handler
             return;
         }
 
-        // WAWebNewsletterStatusUtils.mapStatusStanzaToMsgData:
-        // decodeProtobuf(MessageSpec, n) decodes the plaintext payload
         var message = decodeMessage(id, plaintext);
         if (message == null) {
             return;
         }
 
-        // WASmaxInStatusDeliverFromNewsletterMixin: attrIntRange(e, "server_id", 99, 2147476647)
         var serverId = node.getAttributeAsInt("server_id", 0);
-        // WASmaxInStatusDeliverFromNewsletterMixin: attrIntRange(e, "t", 1577865600, 4102473600)
         var timestamp = resolveTimestamp(node);
-        // WASmaxInStatusDeliverFromNewsletterMixin: optionalLiteral(attrString, e, "is_sender", "true")
         var isSender = "true".equals(node.getAttributeAsString("is_sender", null));
 
-        // WAWebNewsletterStatusUtils.mapStatusStanzaToMsgData -> d(e, t):
-        // new MsgKey({remote: t, fromMe: n, id: e.id})
-        // Note: no senderJid/participant is set for newsletter status keys
         var key = new MessageKeyBuilder()
                 .id(id)
                 .parentJid(from)
                 .fromMe(isSender)
                 .build();
 
-        // WAWebNewsletterStatusUtils.mapStatusStanzaToMsgData:
-        // constructs message data with ack: ACK.SENT, serverId, isNewMsg
         var info = new NewsletterMessageInfoBuilder()
                 .key(key)
                 .serverId(serverId)
@@ -187,10 +135,6 @@ public final class NewsletterStatusStreamHandler implements SocketStream.Handler
                 .status(MessageStatus.DELIVERED)
                 .build();
 
-        // ADAPTED: WAWebHandleNewsletterStatus.default calls
-        // handleSingleMsg({chatId: m, newMsg: t, handleSingleMsgOrigin: "addStatusMessages"})
-        // which stores the message through the standard pipeline.
-        // Cobalt directly stores to the newsletter and notifies listeners.
         storeMessage(from, info);
         notifyNewMessage(info);
     }

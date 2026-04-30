@@ -10,7 +10,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps the {@code to} (peer JID),
+ * The outbound stanza variant. Wraps the {@code to} (peer JID),
  * optional {@code name} (display hint), and optional
  * {@code context} (parent group JID) into a
  * {@code <presence type="subscribe"/>} envelope.
@@ -30,7 +30,7 @@ public final class SmaxSubscribeRequest implements SmaxOperation.Request {
     private final String presenceName;
 
     /**
-     * The optional parent group JID — supplied when the
+     * The optional parent group JID. Supplied when the
      * subscription targets a participant of an open group chat,
      * letting the relay scope the push to that group's frame only.
      */
@@ -39,11 +39,11 @@ public final class SmaxSubscribeRequest implements SmaxOperation.Request {
     /**
      * Constructs a new subscription request.
      *
-     * @param presenceTo      the peer to subscribe to; never
+     * @param presenceTo      the peer to subscribe to. Never
      *                        {@code null}
-     * @param presenceName    the optional display-name hint; may be
+     * @param presenceName    the optional display-name hint. May be
      *                        {@code null}
-     * @param presenceContext the optional parent group JID; may be
+     * @param presenceContext the optional parent group JID. May be
      *                        {@code null}
      * @throws NullPointerException if {@code presenceTo} is
      *                              {@code null}
@@ -57,7 +57,7 @@ public final class SmaxSubscribeRequest implements SmaxOperation.Request {
     /**
      * Returns the peer JID being subscribed to.
      *
-     * @return the peer JID; never {@code null}
+     * @return the peer JID. Never {@code null}
      */
     public Jid presenceTo() {
         return presenceTo;

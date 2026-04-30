@@ -59,7 +59,6 @@ final class PaymentLinkResolver {
      *               and determine SMB status
      * @param url    the URL to inspect
      * @return the matched metadata, or empty
-     * @implNote WAWebPaymentLinkUrlMetaData.getPaymentLinkUrlMetaData.
      */
     @WhatsAppWebExport(moduleName = "WAWebPaymentLinkUrlMetaData", exports = "getPaymentLinkUrlMetaData",
             adaptation = WhatsAppAdaptation.DIRECT)

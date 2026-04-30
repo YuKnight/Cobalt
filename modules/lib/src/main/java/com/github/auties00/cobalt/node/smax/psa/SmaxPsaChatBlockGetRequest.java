@@ -13,7 +13,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps the {@code <query><blocking_status/></query>}
+ * The outbound stanza variant. Wraps the {@code <query><blocking_status/></query>}
  * payload in the canonical {@code <iq xmlns="w:comms:chat" type="get"
  * to="s.whatsapp.net">} envelope.
  */
@@ -21,7 +21,7 @@ import java.util.Optional;
 @WhatsAppWebModule(moduleName = "WASmaxOutPsaBaseIQGetRequestMixin")
 public final class SmaxPsaChatBlockGetRequest implements SmaxOperation.Request {
     /**
-     * Constructs a new request — no parameters.
+     * Constructs a new request. No parameters.
      */
     public SmaxPsaChatBlockGetRequest() {
     }
@@ -31,23 +31,14 @@ public final class SmaxPsaChatBlockGetRequest implements SmaxOperation.Request {
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <query><blocking_status/></query>} payload
-     *
-     * @implNote {@code WASmaxOutPsaChatBlockGetRequest.makeChatBlockGetRequest}
-     *           composes {@code WASmaxOutPsaBaseIQGetRequestMixin}
-     *           ({@code id=generateId()}, {@code type="get"}) over a
-     *           bare {@code <iq xmlns="w:comms:chat" to="s.whatsapp.net">}
-     *           with a single {@code <query><blocking_status/></query>}
-     *           child.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutPsaChatBlockGetRequest",
             exports = "makeChatBlockGetRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutPsaChatBlockGetRequest: smax("blocking_status", null)
         var blockingStatusNode = new NodeBuilder()
                 .description("blocking_status")
                 .build();
-        // WASmaxOutPsaChatBlockGetRequest: smax("query", null, blocking_status)
         var queryNode = new NodeBuilder()
                 .description("query")
                 .content(blockingStatusNode)

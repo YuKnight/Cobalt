@@ -12,7 +12,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Sealed family of inbound reply variants — only {@code Success} is
+ * Sealed family of inbound reply variants. Only {@code Success} is
  * documented by WA Web for this RPC.
  *
  * @implNote {@code WASmaxPassiveModePassiveIQRPC.sendPassiveIQRPC} tries
@@ -29,8 +29,8 @@ public sealed interface SmaxPassiveModePassiveIQResponse extends SmaxOperation.R
      *
      * @param node    the inbound IQ stanza received from the relay;
      *                never {@code null}
-     * @param request the original outbound stanza — used to validate
-     *                echoed identifiers; never {@code null}
+     * @param request the original outbound stanza. Used to validate
+     *                echoed identifiers. Never {@code null}
      * @return an {@link Optional} carrying the parsed variant, or
      *         {@link Optional#empty()} on no-match
      * @throws NullPointerException if either argument is {@code null}
@@ -44,7 +44,7 @@ public sealed interface SmaxPassiveModePassiveIQResponse extends SmaxOperation.R
     }
 
     /**
-     * The {@code Success} reply variant — the relay accepted the
+     * The {@code Success} reply variant. The relay accepted the
      * active→passive transition and echoed back the
      * {@code <iq type="result" from="s.whatsapp.net">} envelope.
      *
@@ -71,7 +71,7 @@ public sealed interface SmaxPassiveModePassiveIQResponse extends SmaxOperation.R
         /**
          * Constructs a successful reply.
          *
-         * @param from the echoed {@code from} JID; never {@code null}
+         * @param from the echoed {@code from} JID. Never {@code null}
          * @throws NullPointerException if {@code from} is {@code null}
          */
         public Success(Jid from) {
@@ -81,7 +81,7 @@ public sealed interface SmaxPassiveModePassiveIQResponse extends SmaxOperation.R
         /**
          * Returns the {@code from} JID echoed by the relay.
          *
-         * @return the JID; never {@code null}
+         * @return the JID. Never {@code null}
          */
         public Jid from() {
             return from;

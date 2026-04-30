@@ -26,7 +26,7 @@ import java.util.Optional;
 @WhatsAppWebModule(moduleName = "WASmaxOutSpamBizReportMixin")
 public final class SmaxStatusReportRequest implements SmaxOperation.Request {
     /**
-     * The status owner / target JID — routed into the
+     * The status owner / target JID, routed into the
      * {@code <spam_list jid>} attribute.
      */
     private final Jid spamListJid;
@@ -52,7 +52,7 @@ public final class SmaxStatusReportRequest implements SmaxOperation.Request {
     private final String messageId;
 
     /**
-     * The optional recipient JID — when supplied, routed into the
+     * The optional recipient JID. When supplied, routed into the
      * {@code <message to>} attribute via
      * {@code WASmaxOutSpamMessageRecipientMixin}.
      */
@@ -79,7 +79,7 @@ public final class SmaxStatusReportRequest implements SmaxOperation.Request {
     private final Node frxChild;
 
     /**
-     * The optional pre-built message child — when set, the request
+     * The optional pre-built message child. When set, the request
      * embeds it verbatim instead of synthesising the
      * {@code <message>} envelope from the scalar fields.
      */
@@ -239,7 +239,6 @@ public final class SmaxStatusReportRequest implements SmaxOperation.Request {
     @WhatsAppWebExport(moduleName = "WASmaxOutSpamStatusReportRequest",
             exports = "makeStatusReportRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutSpamMessageMixin: smax("message", {from, t, id, …})
         // WASmaxOutSpamMessageRecipientMixin (optional): smax("message", {to})
         Node messageNode;
         if (messageChild != null) {
@@ -255,9 +254,7 @@ public final class SmaxStatusReportRequest implements SmaxOperation.Request {
             }
             messageNode = messageBuilder.build();
         }
-        // WASmaxOutSpamBaseReportMixin: smax("spam_list", {spam_flow})
         // WASmaxOutSpamIsKnownChatMixin (optional): smax("spam_list", {is_known_chat})
-        // WASmaxOutSpamStatusReportRequest: smax("spam_list", {jid}, <message/>)
         var spamListBuilder = new NodeBuilder()
                 .description("spam_list")
                 .attribute("jid", spamListJid)
@@ -272,8 +269,6 @@ public final class SmaxStatusReportRequest implements SmaxOperation.Request {
         if (bizReportChild != null) {
             spamListBuilder.content(bizReportChild);
         }
-        // WASmaxOutSpamBaseIQSetRequestMixin: smax("iq", {id: generateId(), type: "set"})
-        // WASmaxOutSpamBaseReportMixin: smax("iq", {to: S_WHATSAPP_NET, xmlns: "spam"})
         var iqBuilder = new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "spam")
@@ -325,7 +320,7 @@ public final class SmaxStatusReportRequest implements SmaxOperation.Request {
     }
 
     /**
-     * Builder for {@link SmaxStatusReportRequest} — the canonical entry point for
+     * Builder for {@link SmaxStatusReportRequest}. The canonical entry point for
      * assembling a status spam report.
      */
     public static final class Builder {
@@ -510,7 +505,7 @@ public final class SmaxStatusReportRequest implements SmaxOperation.Request {
         }
 
         /**
-         * Sets the optional pre-built message child — embeds the
+         * Sets the optional pre-built message child, embeds the
          * supplied node verbatim instead of synthesising the
          * {@code <message>} envelope from the scalar fields.
          *

@@ -51,9 +51,6 @@ public sealed interface SmaxLinkQueryResponse extends SmaxOperation.Response
      * @param request the original outbound request
      * @return {@code true} when the envelope matches; {@code false}
      *         otherwise
-     *
-     * @implNote {@code WASmaxInVoipCallAckBaseMixin.parseCallAckBaseMixin}
-     *           — see {@link SmaxLinkCreateResponse} for the rationale.
      */
     private static boolean validateAckEnvelope(Node node, Node request) {
         if (!node.hasDescription("ack")) {
@@ -77,16 +74,8 @@ public sealed interface SmaxLinkQueryResponse extends SmaxOperation.Response
     }
 
     /**
-     * The {@code Success} reply variant — the relay resolved the
+     * The {@code Success} reply variant. The relay resolved the
      * supplied token and returned the call link's full metadata.
-     *
-     * @implNote {@code WASmaxInVoipLinkQueryResponseLinkQueryAck.parseLinkQueryResponseLinkQueryAck}
-     *           parses the {@code <link_query>} child and projects
-     *           {@code (linkCreator, linkCreatorPn, linkCreatorUsername,
-     *           action, token, media, hasEvent, waitingRoom)}. The
-     *           inner {@code <waiting_room/>} child is itself optional
-     *           and surfaces an {@code (isAdmin, enabled)} pair when
-     *           present.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInVoipLinkQueryResponseLinkQueryAck")
     @WhatsAppWebModule(moduleName = "WASmaxInVoipLinkQueryResponseLinkQueryAckLinkQueryWaitingRoom")
@@ -97,7 +86,7 @@ public sealed interface SmaxLinkQueryResponse extends SmaxOperation.Response
         private final Jid linkQueryLinkCreator;
 
         /**
-         * The optional creator phone-number JID — supplied when the
+         * The optional creator phone-number JID. Supplied when the
          * relay knows both the LID and PN identifiers for the
          * creator.
          */
@@ -351,8 +340,6 @@ public sealed interface SmaxLinkQueryResponse extends SmaxOperation.Response
          * Descriptor for the inner {@code <waiting_room
          * is_admin enabled/>} child carried by some
          * {@code Success} replies.
-         *
-         * @implNote {@code WASmaxInVoipLinkQueryResponseLinkQueryAckLinkQueryWaitingRoom.parseLinkQueryResponseLinkQueryAckLinkQueryWaitingRoom}.
          */
         public static final class WaitingRoom {
             /**
@@ -445,7 +432,7 @@ public sealed interface SmaxLinkQueryResponse extends SmaxOperation.Response
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected the
+     * The {@code ClientError} reply variant. The relay rejected the
      * query because the supplied token is invalid, expired, revoked,
      * or refers to a link the caller is not authorised to view.
      *

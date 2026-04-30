@@ -103,7 +103,7 @@ public final class StatusPrivacyHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebStatusPrivacySettingSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return StatusPrivacyAction.ACTION_NAME; // WAWebStatusPrivacySettingSync.getAction
+        return StatusPrivacyAction.ACTION_NAME;
     }
 
     /**
@@ -115,7 +115,7 @@ public final class StatusPrivacyHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebStatusPrivacySettingSync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return StatusPrivacyAction.COLLECTION_NAME; // WAWebStatusPrivacySettingSync constructor: e.collectionName = RegularHigh
+        return StatusPrivacyAction.COLLECTION_NAME;
     }
 
     /**
@@ -127,7 +127,7 @@ public final class StatusPrivacyHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebStatusPrivacySettingSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return StatusPrivacyAction.ACTION_VERSION; // WAWebStatusPrivacySettingSync.getVersion: return 7
+        return StatusPrivacyAction.ACTION_VERSION;
     }
 
     /**
@@ -184,25 +184,23 @@ public final class StatusPrivacyHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebStatusPrivacySettingSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public List<MutationApplicationResult> applyMutationBatchResults(WhatsAppClient client, WamService wamService, List<DecryptedMutation.Trusted> mutations) {
-        if (mutations.size() != 1) { // WAWebStatusPrivacySettingSync.applyMutations: if (t.length !== 1)
-            // WAWebStatusPrivacySettingSync.applyMutations: WALogger.ERROR("[syncd] unexpected mutation count %s for status privacy sync", t.length) — telemetry skipped
-            var malformed = new ArrayList<MutationApplicationResult>(mutations.size()); // WAWebStatusPrivacySettingSync.applyMutations: return t.map(function() { return {actionState: Malformed} })
-            for (var i = 0; i < mutations.size(); i++) { // WAWebStatusPrivacySettingSync.applyMutations: t.map
-                malformed.add(MutationApplicationResult.malformed()); // WAWebStatusPrivacySettingSync.applyMutations: {actionState: SyncActionState.Malformed}
+        if (mutations.size() != 1) {
+            var malformed = new ArrayList<MutationApplicationResult>(mutations.size());
+            for (var i = 0; i < mutations.size(); i++) {
+                malformed.add(MutationApplicationResult.malformed());
             }
             return malformed;
         }
 
-        var last = mutations.get(mutations.size() - 1); // WAWebStatusPrivacySettingSync.applyMutations: var a = t[t.length - 1]
-        if (last.operation() != SyncdOperation.SET) { // WAWebStatusPrivacySettingSync.applyMutations: if (a.operation === "set") { ... } return [{actionState: Unsupported}]
-            return List.of(MutationApplicationResult.unsupported()); // WAWebStatusPrivacySettingSync.applyMutations: return [{actionState: SyncActionState.Unsupported}]
+        var last = mutations.get(mutations.size() - 1);
+        if (last.operation() != SyncdOperation.SET) {
+            return List.of(MutationApplicationResult.unsupported());
         }
 
-        try { // WAWebStatusPrivacySettingSync.applyMutations: try { ... } catch (e) { ... }
-            return List.of(applySetMutation(client, last)); // WAWebStatusPrivacySettingSync.applyMutations: return [{actionState: Success}] / [malformedActionValue(...)]
-        } catch (RuntimeException e) { // WAWebStatusPrivacySettingSync.applyMutations: catch (e) { WALogger.ERROR("[syncd] status privacy IDB write failed %s", e); return t.map(function() { return {actionState: Failed} }) }
-            // WAWebStatusPrivacySettingSync.applyMutations: WALogger.ERROR("[syncd] status privacy IDB write failed %s", e) — telemetry skipped
-            return List.of(MutationApplicationResult.failed()); // WAWebStatusPrivacySettingSync.applyMutations: t.map(function() { return {actionState: SyncActionState.Failed} })
+        try {
+            return List.of(applySetMutation(client, last));
+        } catch (RuntimeException e) {
+            return List.of(MutationApplicationResult.failed());
         }
     }
 
@@ -244,14 +242,14 @@ public final class StatusPrivacyHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebStatusPrivacySettingSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        if (mutation.operation() != SyncdOperation.SET) { // WAWebStatusPrivacySettingSync.applyMutations: if (a.operation === "set") { ... } return [{actionState: Unsupported}]
-            return MutationApplicationResult.unsupported(); // WAWebStatusPrivacySettingSync.applyMutations: return [{actionState: SyncActionState.Unsupported}]
+        if (mutation.operation() != SyncdOperation.SET) {
+            return MutationApplicationResult.unsupported();
         }
 
-        try { // WAWebStatusPrivacySettingSync.applyMutations: try { ... } catch (e) { ... }
+        try {
             return applySetMutation(client, mutation);
-        } catch (RuntimeException e) { // WAWebStatusPrivacySettingSync.applyMutations: catch (e) { WALogger.ERROR(...); return t.map(...Failed) }
-            return MutationApplicationResult.failed(); // WAWebStatusPrivacySettingSync.applyMutations: {actionState: SyncActionState.Failed}
+        } catch (RuntimeException e) {
+            return MutationApplicationResult.failed();
         }
     }
 
@@ -272,71 +270,52 @@ public final class StatusPrivacyHandler implements WebAppStateActionHandler {
      */
     @WhatsAppWebExport(moduleName = "WAWebStatusPrivacySettingSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     private MutationApplicationResult applySetMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        if (!(mutation.value().action().orElse(null) instanceof StatusPrivacyAction action)) { // WAWebStatusPrivacySettingSync.applyMutations: var i = a.value, l = i.statusPrivacy; if (!l) return [malformedActionValue(this.collectionName)]
-            return malformedActionValue(); // WAWebStatusPrivacySettingSync.applyMutations: return [WAWebSyncdIndexUtils.malformedActionValue(this.collectionName)]
+        if (!(mutation.value().action().orElse(null) instanceof StatusPrivacyAction action)) {
+            return malformedActionValue();
         }
 
-        var mode = action.mode().orElse(null); // WAWebStatusPrivacySettingSync.applyMutations: var c = l.mode
-        if (mode == null) { // WAWebStatusPrivacySettingSync.applyMutations: if (c == null)
-            return malformedActionValue(); // WAWebStatusPrivacySettingSync.applyMutations: return [WAWebSyncdIndexUtils.malformedActionValue(this.collectionName)]
+        var mode = action.mode().orElse(null);
+        if (mode == null) {
+            return malformedActionValue();
         }
 
-        // WAWebStatusPrivacySettingSync.applyMutations: var d = l.shareToFB, m = l.shareToIG — receiver branch gated by crosspostSettingsSyncReceiverEnabled.
         // Cobalt's StatusPrivacyAction model does not carry shareToFB/shareToIG; the crossposting receiver branch is intentionally omitted (see report).
-        // WAWebStatusPrivacySettingSync.applyMutations: var p = l.userJid
-        var userJid = action.userJid(); // WAWebStatusPrivacySettingSync.applyMutations: l.userJid
+        var userJid = action.userJid();
 
-        // WAWebStatusPrivacySettingSync.applyMutations: var _ = [], f, g = [], h = []
-        // WAWebStatusPrivacySettingSync.applyMutations: e: { ... }
         PrivacySettingEntry entry = null;
-        switch (mode) { // WAWebStatusPrivacySettingSync.applyMutations: dispatch on c
-            case CONTACTS -> { // WAWebStatusPrivacySettingSync.applyMutations: if (c === StatusDistributionMode.CONTACTS)
-                // WAWebStatusPrivacySettingSync.applyMutations: f = StatusPrivacySettingType.Contact
-                // WAWebStatusPrivacySettingSync.applyMutations: _ = calculateStatusPrivacyUpdateEntries({setting: f}) — writes STATUS_PRIVACY_SETTING="contact" only
+        switch (mode) {
+            case CONTACTS -> {
                 entry = new PrivacySettingEntryBuilder()
                         .type(PrivacySettingType.STATUS) // ADAPTED: WAWebUserPrefsKeys.BACKEND_ONLY_KEYS.STATUS_PRIVACY_SETTING -> Cobalt PrivacySettingEntry.type
                         .value(PrivacySettingValue.CONTACTS) // ADAPTED: StatusPrivacySettingType.Contact ("contact") -> PrivacySettingValue.CONTACTS
                         .excluded(List.of()) // ADAPTED: no allowList/denyList written by WA Web for the Contact setting
                         .build();
             }
-            case ALLOW_LIST -> { // WAWebStatusPrivacySettingSync.applyMutations: if (c === StatusDistributionMode.ALLOW_LIST)
-                // WAWebStatusPrivacySettingSync.applyMutations: f = StatusPrivacySettingType.AllowList
-                // WAWebStatusPrivacySettingSync.applyMutations: g = p.map(WAWebWidFactory.createWid).filter(function(e) { return e.isUser() })
-                var allowList = filterUserJids(userJid); // WAWebStatusPrivacySettingSync.applyMutations: g = p.map(createWid).filter(e => e.isUser())
-                // WAWebStatusPrivacySettingSync.applyMutations: _ = calculateStatusPrivacyUpdateEntries({setting: f, allowList: g})
+            case ALLOW_LIST -> {
+                var allowList = filterUserJids(userJid);
                 entry = new PrivacySettingEntryBuilder()
                         .type(PrivacySettingType.STATUS) // ADAPTED: STATUS_PRIVACY_SETTING -> PrivacySettingEntry.type
                         .value(PrivacySettingValue.CONTACTS_ONLY) // ADAPTED: StatusPrivacySettingType.AllowList ("allow-list") -> PrivacySettingValue.CONTACTS_ONLY ("contact_whitelist")
                         .excluded(allowList) // ADAPTED: STATUS_ALLOW_LIST -> PrivacySettingEntry.excluded (Cobalt overloads excluded for both allow and deny lists)
                         .build();
             }
-            case DENY_LIST -> { // WAWebStatusPrivacySettingSync.applyMutations: if (c === StatusDistributionMode.DENY_LIST)
-                // WAWebStatusPrivacySettingSync.applyMutations: f = StatusPrivacySettingType.DenyList
-                // WAWebStatusPrivacySettingSync.applyMutations: h = p.map(createWid).filter(e => e.isUser())
-                var denyList = filterUserJids(userJid); // WAWebStatusPrivacySettingSync.applyMutations: h = p.map(createWid).filter(e => e.isUser())
-                // WAWebStatusPrivacySettingSync.applyMutations: _ = calculateStatusPrivacyUpdateEntries({setting: f, denyList: h})
+            case DENY_LIST -> {
+                var denyList = filterUserJids(userJid);
                 entry = new PrivacySettingEntryBuilder()
                         .type(PrivacySettingType.STATUS) // ADAPTED: STATUS_PRIVACY_SETTING -> PrivacySettingEntry.type
                         .value(PrivacySettingValue.CONTACTS_EXCEPT) // ADAPTED: StatusPrivacySettingType.DenyList ("deny-list") -> PrivacySettingValue.CONTACTS_EXCEPT ("contact_blacklist")
                         .excluded(denyList) // ADAPTED: STATUS_DENY_LIST -> PrivacySettingEntry.excluded
                         .build();
             }
-            case CLOSE_FRIENDS, CUSTOM_LIST -> { // WAWebStatusPrivacySettingSync.applyMutations: if (c === CLOSE_FRIENDS || c === CUSTOM_LIST) break e
-                // WAWebStatusPrivacySettingSync.applyMutations: no entries written, _ stays []; entry remains null and no store mutation occurs
-                // WAWebStatusPrivacySettingSync.applyMutations: WA Web returns Success after the empty entry list yields a no-op promise
+            case CLOSE_FRIENDS, CUSTOM_LIST -> {
             }
         }
 
-        // WAWebStatusPrivacySettingSync.applyMutations: var y = [];
-        // WAWebStatusPrivacySettingSync.applyMutations: if (crosspostSettingsSyncReceiverEnabled()) { var C = []; ... y.push(...) }
         // Crossposting receiver branch intentionally omitted: shareToFB/shareToIG fields are not in Cobalt's StatusPrivacyAction protobuf model.
-        // WAWebStatusPrivacySettingSync.applyMutations: _.length > 0 && y.push(userPrefsIdb.bulkSetItemsToIndexedDB(_).then(...))
-        if (entry != null) { // WAWebStatusPrivacySettingSync.applyMutations: _.length > 0 (entry list non-empty)
+        if (entry != null) {
             client.store().addPrivacySetting(entry); // ADAPTED: bulkSetItemsToIndexedDB -> WhatsAppStore.addPrivacySetting (Cobalt collapses STATUS_PRIVACY_SETTING/STATUS_ALLOW_LIST/STATUS_DENY_LIST into one PrivacySettingEntry)
-            // WAWebStatusPrivacySettingSync.applyMutations: BackendEventBus.triggerUpdateStatusPrivacySettings({setting: f, allowList: g, denyList: h}) — UI event bus, intentionally omitted in Cobalt
         }
-        // WAWebStatusPrivacySettingSync.applyMutations: yield Promise.all(y) — virtual-thread blocking calls already complete above
-        return MutationApplicationResult.success(); // WAWebStatusPrivacySettingSync.applyMutations: return [{actionState: SyncActionState.Success}]
+        return MutationApplicationResult.success();
     }
 
     /**
@@ -359,15 +338,15 @@ public final class StatusPrivacyHandler implements WebAppStateActionHandler {
      */
     @WhatsAppWebExport(moduleName = "WAWebWid", exports = "isUser", adaptation = WhatsAppAdaptation.ADAPTED)
     private static List<Jid> filterUserJids(List<Jid> jids) {
-        if (jids == null || jids.isEmpty()) { // WAWebWidFactory.createWid: jids may be empty
+        if (jids == null || jids.isEmpty()) {
             return List.of();
         }
-        var filtered = new ArrayList<Jid>(jids.size()); // WAWebStatusPrivacySettingSync.applyMutations: g/h = p.map(createWid).filter(...)
-        for (var jid : jids) { // WAWebStatusPrivacySettingSync.applyMutations: p.map(createWid).filter
+        var filtered = new ArrayList<Jid>(jids.size());
+        for (var jid : jids) {
             if (jid == null) { // ADAPTED: defensive null check; WA Web's createWid throws on null
                 continue;
             }
-            if (isUserWid(jid)) { // WAWebWid.Wid.prototype.isUser
+            if (isUserWid(jid)) {
                 filtered.add(jid);
             }
         }
@@ -386,13 +365,13 @@ public final class StatusPrivacyHandler implements WebAppStateActionHandler {
      */
     @WhatsAppWebExport(moduleName = "WAWebWid", exports = "isUser", adaptation = WhatsAppAdaptation.DIRECT)
     private static boolean isUserWid(Jid jid) {
-        var type = jid.server().type(); // WAWebWid.Wid.prototype.isUser: this.server
-        return type == JidServer.Type.USER // WAWebWid.Wid.prototype.isUser: includes "s.whatsapp.net" via WA_USER_JID_SUFFIX in static t.isUser
-                || type == JidServer.Type.LEGACY_USER // WAWebWid.Wid.prototype.isUser: this.server === "c.us"
-                || type == JidServer.Type.LID // WAWebWid.Wid.prototype.isUser: this.server === "lid"
-                || type == JidServer.Type.BOT // WAWebWid.Wid.prototype.isUser: this.server === "bot"
-                || type == JidServer.Type.HOSTED // WAWebWid.Wid.prototype.isUser: this.server === "hosted"
-                || type == JidServer.Type.HOSTED_LID; // WAWebWid.Wid.prototype.isUser: this.server === "hosted.lid"
+        var type = jid.server().type();
+        return type == JidServer.Type.USER
+                || type == JidServer.Type.LEGACY_USER
+                || type == JidServer.Type.LID
+                || type == JidServer.Type.BOT
+                || type == JidServer.Type.HOSTED
+                || type == JidServer.Type.HOSTED_LID;
     }
 
     /**
@@ -431,24 +410,23 @@ public final class StatusPrivacyHandler implements WebAppStateActionHandler {
      */
     @WhatsAppWebExport(moduleName = "WAWebStatusPrivacySettingSync", exports = "getStatusPrivacySettingMutation", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncPendingMutation getMutation(Instant timestamp, StatusPrivacyAction.StatusDistributionMode mode, List<Jid> userJids) {
-        var statusPrivacy = new StatusPrivacyActionBuilder() // WAWebStatusPrivacySettingSync.getStatusPrivacySettingMutation: {statusPrivacy: {mode: e, userJid: n, ...}}
-                .mode(mode) // WAWebStatusPrivacySettingSync.getStatusPrivacySettingMutation: mode: e
-                .userJid(userJids == null ? List.of() : userJids) // WAWebStatusPrivacySettingSync.getStatusPrivacySettingMutation: userJid: n
-                .customLists(List.of()) // WAWebStatusPrivacySettingSync.getStatusPrivacySettingMutation: customLists: [] (always emitted)
-                // WAWebStatusPrivacySettingSync.getStatusPrivacySettingMutation: shareToFB/shareToIG (gated by crosspostSettingsSyncSenderEnabled) — Cobalt has no AB-prop gating layer
+        var statusPrivacy = new StatusPrivacyActionBuilder()
+                .mode(mode)
+                .userJid(userJids == null ? List.of() : userJids)
+                .customLists(List.of())
                 .build();
-        var value = new SyncActionValueBuilder() // WAWebSyncdActionUtils.buildPendingMutation: encodeProtobuf(SyncActionValueSpec, {...l, timestamp: i})
-                .timestamp(timestamp) // WAWebSyncdActionUtils.buildPendingMutation: timestamp: t
-                .statusPrivacy(statusPrivacy) // WAWebStatusPrivacySettingSync.getStatusPrivacySettingMutation: value: {statusPrivacy: ...}
+        var value = new SyncActionValueBuilder()
+                .timestamp(timestamp)
+                .statusPrivacy(statusPrivacy)
                 .build();
-        var index = JSON.toJSONString(List.of(actionName())); // WAWebSyncdActionUtils.buildPendingMutation: index = JSON.stringify([action].concat(indexArgs)) where indexArgs = []
-        var trusted = new DecryptedMutation.Trusted( // WAWebSyncdActionUtils.buildPendingMutation: return { collection, index, binarySyncAction, version, operation, timestamp, action }
-                index, // WAWebSyncdActionUtils.buildPendingMutation: index
-                value, // WAWebSyncdActionUtils.buildPendingMutation: binarySyncAction
-                SyncdOperation.SET, // WAWebStatusPrivacySettingSync.getStatusPrivacySettingMutation: operation: SyncdMutation$SyncdOperation.SET
-                timestamp, // WAWebSyncdActionUtils.buildPendingMutation: timestamp
-                version() // WAWebSyncdActionUtils.buildPendingMutation: version: this.getVersion()
+        var index = JSON.toJSONString(List.of(actionName()));
+        var trusted = new DecryptedMutation.Trusted(
+                index,
+                value,
+                SyncdOperation.SET,
+                timestamp,
+                version()
         );
-        return new SyncPendingMutation(trusted, 0); // WAWebSyncdActionUtils.buildPendingMutation
+        return new SyncPendingMutation(trusted, 0);
     }
 }

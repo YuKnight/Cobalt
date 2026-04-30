@@ -24,23 +24,13 @@ import java.util.OptionalLong;
  * Fetches the full newsletter directory list filtered by country or category.
  *
  * <p>This query powers the explore tab of the newsletter directory, returning paginated channels that match the supplied filter arguments such as country or category.
- *
- * @implNote WAWebMexFetchNewsletterDirectoryListJob: adapts the {@code mexFetchNewsletterDirectoryList} GraphQL query,
- * which in WA Web is invoked via {@code WAWebMexClient.fetchQuery} and
- * whose response is unwrapped by the same module. Cobalt models the request
- * and response as sibling variants of a sealed interface rather than a
- * free-standing async function.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexFetchNewsletterDirectoryListJob")
 public final class FetchNewsletterDirectoryListMexRequest implements MexOperation.Request.Json {
     /**
      * The numeric GraphQL query identifier assigned by the WhatsApp relay
      * to the {@code FetchNewsletterDirectoryList} compiled query.
-     *
-     * @implNote WAWebMexFetchNewsletterDirectoryListJobQuery.graphql: corresponds to the compiled
-     * document id {@code params.id} registered for the
-     * {@code WAWebMexFetchNewsletterDirectoryListJobQuery} compiled query.
-     */
+     *     */
     public static final String QUERY_ID = "26125047313831973";
 
     /**
@@ -48,17 +38,6 @@ public final class FetchNewsletterDirectoryListMexRequest implements MexOperatio
      * {@code MexPerfTracker} when dispatching this query, mirroring the
      * {@code params.name} value of the compiled mexFetchNewsletterDirectoryList
      * operation.
-     *
-     * <p>The constant is exposed through {@link #name()} so
-     * call sites can reach the same telemetry tag WA Web emits without
-     * duplicating the literal at every dispatch site.
-     *
-     * @implNote WAWebMexFetchNewsletterDirectoryListJob: WA Web invokes the operation through
-     * {@code WAWebMexClient.fetchQuery} which forwards to
-     * {@code WAWebMexNativeClient}; the native client passes the
-     * {@code params.name} of the compiled GraphQL artifact to
-     * {@code MexPerfTracker.setOperationName}. Cobalt mirrors that
-     * scalar verbatim as {@code "mexFetchNewsletterDirectoryList"}.
      */
     public static final String OPERATION_NAME = "mexFetchNewsletterDirectoryList";
     private final NewsletterDirectoryListView view;
@@ -84,10 +63,7 @@ public final class FetchNewsletterDirectoryListMexRequest implements MexOperatio
      * @param fetchStatusMetadata whether to include
      *                            {@code status_metadata} in the response, set
      *                            from
-     *                            {@code WAWebNewsletterGatingUtils.isNewsletterStatusReceiverEnabled()}
-     * @implNote WAWebMexFetchNewsletterDirectoryListJob.mexFetchNewsletterDirectoryList:
-     * mirrors the inline destructure {@code var t=e.categories,n=e.countryCodes,r=e.cursorToken,a=e.limit,i=e.view}.
-     */
+     *                            {@code WAWebNewsletterGatingUtils.isNewsletterStatusReceiverEnabled()}     */
     public FetchNewsletterDirectoryListMexRequest(NewsletterDirectoryListView view,
                    List<String> countryCodes,
                    List<String> categories,
@@ -106,12 +82,7 @@ public final class FetchNewsletterDirectoryListMexRequest implements MexOperatio
      * Returns the compiled GraphQL query identifier projected from
      * {@link #QUERY_ID}.
      *
-     * @implNote WAWebMexFetchNewsletterDirectoryListJob: WA Web reads the {@code params.id}
-     *           field of the compiled artifact and forwards it to
-     *           {@code MexPerfTracker.setQueryId}; Cobalt projects
-     *           the same scalar through this accessor.
-     * @return the constant {@link #QUERY_ID}; never
-     *         {@code null}
+     * @return the constant {@link #QUERY_ID}, never {@code null}
      */
     @Override
     public String id() {
@@ -122,14 +93,7 @@ public final class FetchNewsletterDirectoryListMexRequest implements MexOperatio
      * Returns the GraphQL operation name projected from
      * {@link #OPERATION_NAME}.
      *
-     * @implNote WAWebMexFetchNewsletterDirectoryListJob: WA Web's
-     *           {@code WAWebMexNativeClient.fetchQuery} reads
-     *           {@code params.name} from the compiled GraphQL
-     *           artifact and forwards it to
-     *           {@code MexPerfTracker.setOperationName}; Cobalt
-     *           projects the same scalar through this accessor.
-     * @return the constant {@link #OPERATION_NAME};
-     *         never {@code null}
+     * @return the constant {@link #OPERATION_NAME}, never {@code null}
      */
     @Override
     public String name() {
@@ -140,11 +104,6 @@ public final class FetchNewsletterDirectoryListMexRequest implements MexOperatio
      * Builds the IQ stanza that dispatches this operation to the
      * WhatsApp relay.
      *
-     * @implNote WAWebMexFetchNewsletterDirectoryListJob.mexFetchNewsletterDirectoryList: WA Web constructs the
-     * {@code variables} object inline and delegates to
-     * {@code WAWebMexClient.fetchQuery}. Cobalt writes the JSON directly
-     * via {@code fastjson2.JSONWriter} and wraps it through
-     * {@link Json#createMexNode(String, String)}.
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         serialised GraphQL variables
      */
@@ -152,32 +111,22 @@ public final class FetchNewsletterDirectoryListMexRequest implements MexOperatio
             adaptation = WhatsAppAdaptation.ADAPTED)
     @Override
     public NodeBuilder toNode() {
-        // WAWebMexFetchNewsletterDirectoryListJob.mexFetchNewsletterDirectoryList
-        // Opens a UTF-8 JSON writer that will serialise the GraphQL variables envelope
         try (var writer = JSONWriter.ofUTF8()) {
-            // WAWebMexFetchNewsletterDirectoryListJob.mexFetchNewsletterDirectoryList
-            // Begins the outer envelope and the nested "variables" object consumed by WAWebMexClient.fetchQuery
             writer.startObject();
             writer.writeName("variables");
             writer.writeColon();
             writer.startObject();
 
-            // WAWebMexFetchNewsletterDirectoryListJob.mexFetchNewsletterDirectoryList
-            // var l={input:{view:u(i),filters:{country_codes:n,categories:t.map(...)},limit:a,start_cursor:r}, ...}
             writer.writeName("input");
             writer.writeColon();
             writer.startObject();
 
-            // WAWebMexFetchNewsletterDirectoryListJob.mexFetchNewsletterDirectoryList
-            // input.view = u(i) -> uppercase enum string
             if (view != null) {
                 writer.writeName("view");
                 writer.writeColon();
                 writer.writeString(view.value());
             }
 
-            // WAWebMexFetchNewsletterDirectoryListJob.mexFetchNewsletterDirectoryList
-            // input.filters = {country_codes:n, categories:t.map(getCategoryValueFromEnum)}
             writer.writeName("filters");
             writer.writeColon();
             writer.startObject();
@@ -189,15 +138,11 @@ public final class FetchNewsletterDirectoryListMexRequest implements MexOperatio
             writeStringArray(writer, categories);
             writer.endObject();
 
-            // WAWebMexFetchNewsletterDirectoryListJob.mexFetchNewsletterDirectoryList
-            // input.limit = a
             if (limit != null) {
                 writer.writeName("limit");
                 writer.writeColon();
                 writer.writeInt64(limit);
             }
-            // WAWebMexFetchNewsletterDirectoryListJob.mexFetchNewsletterDirectoryList
-            // input.start_cursor = r
             if (cursorToken != null) {
                 writer.writeName("start_cursor");
                 writer.writeColon();
@@ -206,8 +151,6 @@ public final class FetchNewsletterDirectoryListMexRequest implements MexOperatio
 
             writer.endObject();
 
-            // WAWebMexFetchNewsletterDirectoryListJob.mexFetchNewsletterDirectoryList
-            // fetch_status_metadata: o("WAWebNewsletterGatingUtils").isNewsletterStatusReceiverEnabled()
             writer.writeName("fetch_status_metadata");
             writer.writeColon();
             writer.writeBool(fetchStatusMetadata);
@@ -215,8 +158,6 @@ public final class FetchNewsletterDirectoryListMexRequest implements MexOperatio
             writer.endObject();
             writer.endObject();
 
-            // ADAPTED: WAWebMexFetchNewsletterDirectoryListJob.mexFetchNewsletterDirectoryList
-            // Flushes the JSON buffer into a StringWriter and wraps it in the shared MEX IQ envelope
             try (var output = new StringWriter()) {
                 writer.flushTo(output);
                 return Json.createMexNode(QUERY_ID, output.toString());

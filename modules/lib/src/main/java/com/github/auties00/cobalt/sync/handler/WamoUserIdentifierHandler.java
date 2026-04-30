@@ -115,7 +115,7 @@ public final class WamoUserIdentifierHandler implements WebAppStateActionHandler
      */
     @Override
     public String actionName() {
-        return WamoUserIdentifierAction.ACTION_NAME; // NO_WA_BASIS: WAWebProtobufSyncAction.pb only declares the protobuf field wamoUserIdentifierAction at index 52
+        return WamoUserIdentifierAction.ACTION_NAME;
     }
 
     /**
@@ -149,7 +149,7 @@ public final class WamoUserIdentifierHandler implements WebAppStateActionHandler
      */
     @Override
     public int version() {
-        return WamoUserIdentifierAction.ACTION_VERSION; // NO_WA_BASIS: WA Web has no wamo user identifier version constant; defaults to 1
+        return WamoUserIdentifierAction.ACTION_VERSION;
     }
 
     /**
@@ -221,17 +221,17 @@ public final class WamoUserIdentifierHandler implements WebAppStateActionHandler
      */
     @Override
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        if (mutation.operation() != SyncdOperation.SET) { // NO_WA_BASIS: only SET makes sense for a single-string identifier-style action
+        if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof WamoUserIdentifierAction action) // NO_WA_BASIS: payload type guard
+        if (!(mutation.value().action().orElse(null) instanceof WamoUserIdentifierAction action)
                 || action.identifier().isEmpty() // NO_WA_BASIS: identifier is the only field on the protobuf and is required for any meaningful update
-                || action.identifier().get().isBlank()) { // NO_WA_BASIS: blank/whitespace-only identifier carries no meaningful update
+                || action.identifier().get().isBlank()) {
             return MutationApplicationResult.malformed();
         }
 
-        client.store().setWamoUserIdentifier(action.identifier().get()); // NO_WA_BASIS: persist the identifier on the flattened Cobalt store
+        client.store().setWamoUserIdentifier(action.identifier().get());
         return MutationApplicationResult.success();
     }
 }

@@ -1,26 +1,32 @@
 package com.github.auties00.cobalt.wam.privatestats.ed25519;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
 /**
- * Hashes an arbitrary byte string to a point on the Ed25519 prime-order
- * subgroup, using the {@code WACryptoEd25519.hashToPoint} composition: a
- * SHA-512 of the message, an Elligator-2 map onto the Curve25519
- * Montgomery form, a birational lift to the twisted-Edwards form, and a
- * cofactor multiplication by {@code 8} to land in the prime-order subgroup.
+ * Hashes an arbitrary byte string to a point on the Ed25519
+ * prime-order subgroup, using the
+ * {@code WACryptoEd25519.hashToPoint} composition: a SHA-512 of the
+ * message, an Elligator-2 map onto the Curve25519 Montgomery form, a
+ * birational lift to the twisted-Edwards form, and a cofactor
+ * multiplication by {@code 8} to land in the prime-order subgroup.
  *
- * <p>This is <em>not</em> a standard hash-to-curve construction (it predates
- * RFC 9380); it is WA's own composition, used solely by
- * {@code WAWamPrivateStatsToken.blindToken}. The validation strategy for
- * this class therefore relies on KAT vectors captured from the live WA Web
- * JS bundle rather than an independent specification.
+ * <p>This is <em>not</em> a standard hash-to-curve construction. It
+ * predates RFC 9380 and is WhatsApp's own composition, used solely
+ * by {@code privateStatsToken.blindToken}. The validation strategy
+ * for this class therefore relies on KAT vectors captured from the
+ * live WhatsApp Web JavaScript bundle rather than an independent
+ * specification.
  *
- * @implNote Mirrors {@code WACryptoEd25519.hashToPoint} together with its
- * private helpers {@code E}, {@code k}, {@code D}, {@code x}, {@code $},
- * {@code W}, {@code V}, {@code A}, {@code F}, {@code O}, {@code M},
- * {@code P}, {@code N} and {@code B}.
+ * @implNote Mirrors {@code WACryptoEd25519.hashToPoint} together
+ *     with its private helpers {@code E}, {@code k}, {@code D},
+ *     {@code x}, {@code $}, {@code W}, {@code V}, {@code A},
+ *     {@code F}, {@code O}, {@code M}, {@code P}, {@code N}, and
+ *     {@code B}.
  */
+@WhatsAppWebModule(moduleName = "WACryptoEd25519")
 public final class Ed25519HashToPoint {
     /**
      * Canonical 32-byte little-endian encoding of the field element

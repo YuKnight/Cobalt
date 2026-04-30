@@ -15,7 +15,7 @@ import java.util.OptionalInt;
 
 /**
  * Documented {@code should_show_privacy_interstitial_to_new_users}
- * enum carried by the {@code <meta_verified/>} child — boolean
+ * enum carried by the {@code <meta_verified/>} child. Boolean
  * surfaced as the literal {@code "true"}/{@code "false"} pair.
  *
  * @implNote Mirrors {@code WASmaxInBizMarketingMessageEnums.ENUM_FALSE_TRUE}.

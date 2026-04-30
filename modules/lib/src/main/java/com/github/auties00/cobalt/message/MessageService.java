@@ -21,66 +21,42 @@ import com.github.auties00.libsignal.groups.SignalGroupCipher;
 import java.util.Objects;
 
 /**
- * Facade that exposes a single entry point for both outgoing and incoming
- * message traffic on top of Cobalt's split send/receive subsystems.
+ * Facade exposing a single entry point for both outgoing and incoming message
+ * traffic on top of Cobalt's split send and receive subsystems.
  *
- * <p>Internally the service wires a {@link MessageSendingService} and a
- * {@link MessageReceivingService} that share the same Signal ciphers and
- * {@link WhatsAppClient} instance; each call delegates to the appropriate
- * subsystem. Callers who need finer-grained control can still instantiate the
- * sending and receiving services directly, but the facade is the recommended
- * integration surface and mirrors the coarse send / handle split that WA Web
- * exposes at the top of its messaging stack.
+ * <p>The facade owns no state. All caches, queues, and counters live on the
+ * underlying {@link MessageSendingService} and {@link MessageReceivingService},
+ * which share the supplied Signal ciphers and {@link WhatsAppClient}.
  *
- * <p>The facade does not own any state of its own: all caches, queues, and
- * counters live on the underlying services. Stopping the facade therefore
- * reduces to clearing any transient caches on the receive side via
- * {@link #clearPendingMessages()}.
- *
- * @apiNote WA Web ships two entry points with equivalent responsibilities:
+ * @apiNote WA Web exposes two equivalent entry points:
  * {@code WAWebSendMsgJob.encryptAndSendMsg} drives outbound fanout and
  * {@code WAWebCommsHandleMessagingStanza.handleMessagingStanza} drives inbound
- * dispatch. Cobalt collapses them into a single service so the high-level API
- * is easier to consume.
+ * dispatch. Cobalt collapses them into a single service.
  */
 public final class MessageService {
     /**
-     * The sending service that owns outbound fanout, device fetch, and stanza
+     * Sending pipeline that owns outbound fanout, device fetch, and stanza
      * emission.
-     *
-     * @implNote ADAPTED: the responsibilities held by
-     * {@code WAWebSendMsgJob.encryptAndSendMsg} and friends in WA Web.
      */
     private final MessageSendingService sendingService;
 
     /**
-     * The receiving service that owns inbound stanza parsing, Signal
-     * decryption, and message info construction.
-     *
-     * @implNote ADAPTED: the responsibilities held by
-     * {@code WAWebCommsHandleMessagingStanza.handleMessagingStanza} and the
-     * downstream {@code WAWebMsgProcessing} modules in WA Web.
+     * Receiving pipeline that owns inbound stanza parsing, Signal decryption,
+     * and message info construction.
      */
     private final MessageReceivingService receivingService;
 
     /**
-     * Assembles the send and receive pipelines from the supplied
-     * collaborators.
+     * Assembles the send and receive pipelines from the supplied collaborators.
      *
-     * <p>The caller is responsible for providing a Signal session cipher and
-     * a Signal group cipher that are both backed by the same
-     * {@link WhatsAppClient#store() store}; otherwise the send and receive
-     * sides will disagree about session state.
-     *
-     * @param client         the WhatsApp client used to send and register
-     *                       stanza handlers
-     * @param sessionCipher  the Signal session cipher used for one-to-one
-     *                       encryption
+     * @implSpec The session and group ciphers must be backed by the same
+     * {@link WhatsAppClient#store() store} as the client, otherwise the send
+     * and receive sides will disagree about session state.
+     * @param client         the WhatsApp client used to send and register stanza handlers
+     * @param sessionCipher  the Signal session cipher used for one-to-one encryption
      * @param groupCipher    the Signal group cipher used for sender-key fanout
-     * @param deviceService  the device service used to resolve per-user
-     *                       device lists before fanout
-     * @param abPropsService the AB props service used to gate optional
-     *                       protocol behaviour
+     * @param deviceService  the device service used to resolve per-user device lists before fanout
+     * @param abPropsService the AB props service used to gate optional protocol behaviour
      * @param wamService     the WAM telemetry service forwarded to the sending pipeline
      * @throws NullPointerException if any argument is {@code null}
      */
@@ -107,13 +83,10 @@ public final class MessageService {
     }
 
     /**
-     * Sends a fresh message to the given chat, handling all preparation,
-     * device fanout, and ack tracking.
+     * Sends a fresh message to the given chat.
      *
-     * <p>This overload accepts a raw {@link MessageContainer}; the sending
-     * service is responsible for allocating a message id, resolving the
-     * sender/recipient device lists, encrypting, and waiting for the server
-     * acknowledgment.
+     * <p>Allocates a message id, resolves the sender and recipient device
+     * lists, encrypts, and waits for the server acknowledgment.
      *
      * @param chatJid   the recipient chat JID
      * @param container the raw message payload
@@ -122,7 +95,6 @@ public final class MessageService {
      * @see MessageSendingService#send(Jid, MessageContainer)
      */
     public AckResult send(Jid chatJid, MessageContainer container) {
-        // Delegates to the sending service that owns the outbound pipeline
         return sendingService.send(chatJid, container);
     }
 
@@ -130,38 +102,34 @@ public final class MessageService {
      * Sends a pre-populated message that the caller has already decorated with
      * a key, timestamp, and any extension metadata.
      *
-     * <p>Use this overload when the message has been prepared by the caller
-     * (for example when rehydrating a draft or re-transmitting after a
-     * nack): the sending service will not mutate the incoming
+     * @apiNote Use this overload when the message has been prepared by the
+     * caller (for example when rehydrating a draft or re-transmitting after a
+     * nack). The sending service does not mutate the supplied
      * {@link MessageInfo}.
-     *
      * @param messageInfo the fully-prepared outgoing message, either a
-     *                    {@link ChatMessageInfo} or a
-     *                    {@link NewsletterMessageInfo}
+     *                    {@link ChatMessageInfo} or a {@link NewsletterMessageInfo}
      * @return the server ack result
      * @throws NullPointerException if {@code messageInfo} is {@code null}
      * @see MessageSendingService#send(MessageInfo)
      */
     public AckResult send(MessageInfo messageInfo) {
-        // Delegates to the sending service for already-prepared outgoing messages
         return sendingService.send(messageInfo);
     }
 
     /**
      * Sends a peer protocol message to one of the user's own devices.
      *
-     * <p>Peer messages never reach other users: they carry app-state sync
+     * <p>Peer messages never reach other users. They carry app-state sync
      * payloads, key shares, and fatal-exception notifications between the
      * linked devices of the current account.
      *
-     * @param targetDevice the target device JID (typically the primary device)
+     * @param targetDevice the target device JID, typically the primary device
      * @param messageInfo  the peer protocol message
      * @return the server ack result
      * @throws NullPointerException if any argument is {@code null}
      * @see MessageSendingService#sendPeer(Jid, ChatMessageInfo)
      */
     public AckResult sendPeer(Jid targetDevice, ChatMessageInfo messageInfo) {
-        // Delegates to the sending service for peer (self-device) messages
         return sendingService.sendPeer(targetDevice, messageInfo);
     }
 
@@ -169,12 +137,11 @@ public final class MessageService {
      * Processes an inbound {@code <message>} stanza and returns a typed
      * {@link MessageInfo} suitable for application-level consumption.
      *
-     * <p>Newsletter messages are returned as
-     * {@link NewsletterMessageInfo}. All other messages go through the Signal
-     * decryption pipeline and are returned as {@link ChatMessageInfo}.
-     * Fanout placeholders for messages that the server could not deliver
-     * produce a {@code null} return value so the caller can distinguish them
-     * from real messages.
+     * <p>Newsletter messages are returned as {@link NewsletterMessageInfo}.
+     * Every other message goes through the Signal decryption pipeline and is
+     * returned as {@link ChatMessageInfo}. Fanout placeholders for messages
+     * that the server could not deliver produce a {@code null} return so the
+     * caller can distinguish them from real messages.
      *
      * @param node the raw inbound {@code <message>} node
      * @return the processed message info, or {@code null} for unavailable
@@ -184,7 +151,6 @@ public final class MessageService {
      * @see MessageReceivingService#process(Node)
      */
     public MessageInfo process(Node node) {
-        // Delegates to the receiving service for inbound stanza decoding
         return receivingService.process(node);
     }
 
@@ -192,14 +158,12 @@ public final class MessageService {
      * Clears the pending-message deduplication cache held by the receiving
      * service.
      *
-     * <p>Should be invoked when the offline delivery phase completes so that
-     * stanzas replayed in a new session are not mistakenly treated as
+     * @apiNote Should be invoked when the offline delivery phase completes so
+     * that stanzas replayed in a new session are not mistakenly treated as
      * duplicates of the pre-reconnect traffic.
-     *
      * @see MessageReceivingService#clearPendingMessages()
      */
     public void clearPendingMessages() {
-        // Resets the receiving-side dedup cache when offline delivery ends
         receivingService.clearPendingMessages();
     }
 }

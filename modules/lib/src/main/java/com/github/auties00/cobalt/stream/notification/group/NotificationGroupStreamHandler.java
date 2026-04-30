@@ -78,7 +78,6 @@ public final class NotificationGroupStreamHandler implements SocketStream.Handle
      * {@code type="w:gp2"} and delegates to {@link #handleNotification}.
      *
      * @param node the incoming stanza node
-     * @implNote WAWebHandleGroupNotification.handleGroupNotification
      */
     @Override
     public void handle(Node node) {
@@ -112,13 +111,11 @@ public final class NotificationGroupStreamHandler implements SocketStream.Handle
      * @implNote WAWebHandleGroupNotification.handleGroupNotification (function D)
      */
     private void handleNotification(Node node) {
-        // WAWebHandleGroupNotification.D: parse "from" as group JID
         var groupJid = node.getAttributeAsJid("from").orElse(null);
         if (groupJid == null || !groupJid.hasGroupOrCommunityServer()) {
             return;
         }
 
-        // WAWebHandleGroupNotification.D: check for groups_dirty first child
         if (node.hasChild("groups_dirty")) {
             refreshGroup(groupJid);
             return;
@@ -137,7 +134,6 @@ public final class NotificationGroupStreamHandler implements SocketStream.Handle
         var relatedGroups = new LinkedHashSet<Jid>();
         relatedGroups.add(groupJid);
 
-        // WAWebHandleGroupNotification: T.parse iterates over children
         for (var action : node.children()) {
             handleAction(node, chat, groupJid, action, relatedGroups);
         }
@@ -165,87 +161,53 @@ public final class NotificationGroupStreamHandler implements SocketStream.Handle
         collectRelatedGroups(action, relatedGroups);
 
         switch (action.description()) {
-            // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.CREATE = "create"
             case "create" -> applyCreate(notification, chat, groupJid, action);
-            // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.ADD = "add"
             case "add" -> applyParticipants(groupJid, action, GroupParticipantMutation.ADD);
-            // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.REMOVE = "remove"
             case "remove" -> applyParticipants(groupJid, action, GroupParticipantMutation.REMOVE);
-            // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.PROMOTE = "promote"
-            // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.LINKED_GROUP_PROMOTE = "linked_group_promote"
             case "promote", "linked_group_promote" -> applyParticipants(groupJid, action, GroupParticipantMutation.PROMOTE);
-            // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.DEMOTE = "demote"
-            // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.LINKED_GROUP_DEMOTE = "linked_group_demote"
             case "demote", "linked_group_demote" -> applyParticipants(groupJid, action, GroupParticipantMutation.DEMOTE);
-            // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.MODIFY = "modify"
             case "modify" -> applyParticipants(groupJid, action, GroupParticipantMutation.MODIFY);
-            // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.SUBJECT = "subject"
             case "subject" -> applySubject(notification, chat, groupJid, action);
-            // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.DESC = "description"
             case "description" -> applyDescription(notification, chat, groupJid, action);
-            // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.LOCKED = "locked"
             case "locked" -> applyRestrict(groupJid, true);
-            // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.UNLOCKED = "unlocked"
             case "unlocked" -> applyRestrict(groupJid, false);
-            // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.ANNOUNCE = "announcement"
             case "announcement" -> applyAnnounce(groupJid, true);
-            // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.NOT_ANNOUNCE = "not_announcement"
             case "not_announcement" -> applyAnnounce(groupJid, false);
-            // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.NO_FREQUENTLY_FORWARDED
             case "no_frequently_forwarded" -> applyNoFrequentlyForwarded(groupJid, true);
-            // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.FREQUENTLY_FORWARDED_OK
             case "frequently_forwarded_ok" -> applyNoFrequentlyForwarded(groupJid, false);
-            // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.EPHEMERAL = "ephemeral"
             case "ephemeral" -> applyEphemeral(notification, chat, groupJid, action);
-            // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.NOT_EPHEMERAL = "not_ephemeral"
             case "not_ephemeral" -> clearEphemeral(chat, groupJid);
-            // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.GROWTH_LOCKED = "growth_locked"
             case "growth_locked" -> applyGrowthLock(groupJid, action);
-            // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.GROWTH_UNLOCKED = "growth_unlocked"
             case "growth_unlocked" -> clearGrowthLock(groupJid);
-            // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.LINK = "link"
             case "link" -> applyLink(groupJid, action);
-            // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.UNLINK = "unlink"
             case "unlink" -> applyUnlink(groupJid, action);
-            // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.MEMBERSHIP_APPROVAL_MODE
             case "membership_approval_mode" -> applyMembershipApproval(action, groupJid);
-            // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.ALLOW_ADMIN_REPORTS
             case "allow_admin_reports" -> applyReportToAdmin(groupJid, true);
-            // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.NOT_ALLOW_ADMIN_REPORTS
             case "not_allow_admin_reports" -> applyReportToAdmin(groupJid, false);
-            // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.ALLOW_NON_ADMIN_SUB_GROUP_CREATION
             case "allow_non_admin_sub_group_creation" -> applyNonAdminSubgroupCreation(groupJid, true);
-            // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.NOT_ALLOW_NON_ADMIN_SUB_GROUP_CREATION
             case "not_allow_non_admin_sub_group_creation" -> applyNonAdminSubgroupCreation(groupJid, false);
-            // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.MEMBER_ADD_MODE = "member_add_mode"
             case "member_add_mode" -> applyMemberAddMode(groupJid, action);
-            // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.AUTO_ADD_DISABLED = "auto_add_disabled"
             case "auto_add_disabled" -> applyGeneralChatAutoAddDisabled(groupJid, true);
-            // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.GROUP_SAFETY_CHECK
             case "group_safety_check" -> applyGroupSafetyCheck(groupJid, true);
-            // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.SUSPENDED = "suspended"
             case "suspended" -> applySuspended(chat, groupJid, true);
-            // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.UNSUSPENDED = "unsuspended"
             case "unsuspended" -> applySuspended(chat, groupJid, false);
-            // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.DELETE = "delete"
             case "delete" -> {
-                // WAWebHandleGroupNotificationAction.handleAction: updateDBForGroupAction
                 whatsapp.store().removeChatMetadata(groupJid);
                 chat.setTerminated(true);
             }
             // Actions that WA Web parses but whose side-effects are
             // handled via system message generation and DB updates that
             // Cobalt covers through the post-loop metadata refresh.
-            case "invite",                           // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.INVITE
-                 "revoke",                           // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.REVOKE_INVITE = "revoke"
-                 "membership_approval_request",      // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.MEMBERSHIP_APPROVAL_REQUEST
-                 "reports",                          // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.REPORTS
-                 "created_membership_requests",      // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.CREATED_MEMBERSHIP_REQUESTS
-                 "revoked_membership_requests",      // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.REVOKED_MEMBERSHIP_REQUESTS
-                 "created_sub_group_suggestion",     // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.CREATED_SUBGROUP_SUGGESTION
-                 "revoked_sub_group_suggestions",    // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.REVOKED_SUB_GROUP_SUGGESTIONS
-                 "change_number",                    // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.CHANGE_NUMBER
-                 "missing_participant_identification" // WAWebHandleGroupNotificationConst.GROUP_NOTIFICATION_TAG.MISSING_PARTICIPANT_IDENTIFICATION
+            case "invite",
+                 "revoke",
+                 "membership_approval_request",
+                 "reports",
+                 "created_membership_requests",
+                 "revoked_membership_requests",
+                 "created_sub_group_suggestion",
+                 "revoked_sub_group_suggestions",
+                 "change_number",
+                 "missing_participant_identification"
                  -> LOGGER.log(System.Logger.Level.DEBUG,
                     "Handling w:gp2 action {0} conservatively via metadata refresh",
                     action.description());
@@ -272,7 +234,6 @@ public final class NotificationGroupStreamHandler implements SocketStream.Handle
      */
     private void applyCreate(Node notification, Chat chat, Jid groupJid, Node action) {
         var groupNode = action.getChild("group").orElse(action);
-        // WAWebHandleGroupCreation.handleGroupCreation: when the notification
         // author is null or is not the current PN user, the recipient was
         // added to a group they did not create, so a GroupJoinC telemetry
         // event is committed. The property list is empty (WA Web definition:
@@ -282,113 +243,85 @@ public final class NotificationGroupStreamHandler implements SocketStream.Handle
         if (notificationAuthor == null
                 || mePnUser == null
                 || !notificationAuthor.toUserJid().equals(mePnUser.toUserJid())) {
-            wamService.commit(new GroupJoinCEventBuilder().build()); // WAWebHandleGroupCreation: new GroupJoinCWamEvent().commit()
+            wamService.commit(new GroupJoinCEventBuilder().build());
         }
 
-        // WAWebHandleGroupNotification.I: subject
         var subject = groupNode.getAttributeAsString("subject", null);
         if (subject != null) {
             chat.setName(subject);
         }
 
-        // WAWebHandleGroupNotification.I: creation, owner
         var creation = groupNode.getAttributeAsLong("creation", (Long) null);
         chat.setCreatedAt(creation == null ? null : Instant.ofEpochSecond(creation));
         chat.setCreatedBy(groupNode.getAttributeAsString("creator", null));
-        // WAWebHandleGroupNotification.I: desc via g(d) -> description > body
         chat.setDescription(resolveCreateDescriptionBody(groupNode));
-        // WAWebHandleGroupNotification.I: support
         chat.setSupport(groupNode.hasChild("support"));
-        // WAWebHandleGroupNotification.I: defaultSubgroup
         chat.setDefaultSubgroup(groupNode.hasChild("default_sub_group"));
         chat.setArchived(false);
         chat.setSuspended(groupNode.hasChild("suspended"));
         chat.setTerminated(false);
 
-        // WAWebHandleGroupNotification.I: ephemeral settings via h(d)
         applyEphemeral(notification, chat, groupJid, groupNode);
 
         var metadata = currentMetadata(groupJid);
         if (metadata != null) {
-            // WAWebHandleGroupNotification.I: participants via y(e, d, "create")
             metadata.clearParticipants();
             metadata.addAllParticipants(parseParticipants(groupNode, GroupParticipantMutation.ADD));
 
-            // WAWebHandleGroupNotification.I: subject
             setSubject(metadata, subject);
 
-            // WAWebHandleGroupNotification.I: descId, desc from g(d)
             var createDescBody = resolveCreateDescriptionBody(groupNode);
             var createDescId = resolveCreateDescriptionId(groupNode);
             setDescription(metadata, createDescBody, createDescId,
                     resolveInstant(groupNode, "t"),
                     groupNode.getAttributeAsJid("participant").orElse(null));
 
-            // WAWebHandleGroupNotification.I: restrict = locked child
             applyRestrict(metadata, groupNode.hasChild("locked"));
-            // WAWebHandleGroupNotification.I: announce = announcement child
             applyAnnounce(metadata, groupNode.hasChild("announcement"));
-            // WAWebHandleGroupNotification.I: noFrequentlyForwarded
             applyNoFrequentlyForwarded(metadata, groupNode.hasChild("no_frequently_forwarded"));
 
-            // WAWebHandleGroupNotification.I: membershipApprovalMode
             var approvalState = groupNode.getChild("membership_approval_mode")
                     .flatMap(mam -> mam.getChild("group_join"))
                     .flatMap(gj -> gj.getAttributeAsString("state"))
                     .orElse(null);
             applyMembershipApproval(metadata, "on".equals(approvalState));
 
-            // WAWebHandleGroupNotification.I: memberAddMode
             var memberAddModeStr = groupNode.getChild("member_add_mode")
                     .flatMap(Node::toContentString)
                     .orElse(null);
             applyMemberAddMode(metadata, "admin_add".equals(memberAddModeStr));
 
-            // WAWebHandleGroupNotification.T: memberLinkMode (parsed from <member_link_mode> content)
             var memberLinkModeContent = groupNode.getChild("member_link_mode")
                     .flatMap(Node::toContentString)
                     .orElse(null);
             applyMemberLinkMode(metadata, memberLinkModeContent);
 
-            // WAWebHandleGroupNotification.T: limitSharingEnabled child (opus gating ignored server-side)
             applyLimitSharingEnabled(metadata, groupNode.hasChild("limit_sharing_enabled"));
 
-            // WAWebHandleGroupNotification.T: generalChatAutoAddDisabled read from the
             // notification <create> action node, not from the nested <group> element
             applyGeneralChatAutoAddDisabled(metadata, action.hasChild("auto_add_disabled"));
 
-            // WAWebHandleGroupNotification.T: isParentGroup, isParentGroupClosed
             if (metadata instanceof GroupMetadata groupMetadata) {
-                // WAWebHandleGroupNotification.T: support
                 groupMetadata.setSupport(groupNode.hasChild("support"));
-                // WAWebHandleGroupNotification.T: defaultSubgroup
                 groupMetadata.setDefaultSubgroup(groupNode.hasChild("default_sub_group"));
-                // WAWebHandleGroupNotification.T: generalSubgroup
                 groupMetadata.setGeneralSubgroup(groupNode.hasChild("general_chat"));
-                // WAWebHandleGroupNotification.T: hiddenSubgroup
                 groupMetadata.setHiddenSubgroup(groupNode.hasChild("hidden_group"));
-                // WAWebHandleGroupNotification.T: groupSafetyCheck
                 groupMetadata.setGroupSafetyCheck(groupNode.hasChild("group_safety_check"));
-                // WAWebHandleGroupNotification.T: hasCapi
                 groupMetadata.setHasCapi(groupNode.hasChild("capi"));
-                // WAWebHandleGroupNotification.T: size
                 var size = groupNode.getAttributeAsInt("size", (Integer) null);
                 if (size != null) {
                     groupMetadata.setSize(size);
                 }
 
-                // WAWebHandleGroupNotification.T: linkedParent via extractLinkedParent
                 groupNode.getChild("linked_parent")
                         .flatMap(lp -> lp.getAttributeAsJid("jid"))
                         .ifPresent(groupMetadata::setParentCommunityJid);
 
-                // WAWebHandleGroupNotification.T: groupAdder = participant
                 var groupAdder = notification.getAttributeAsJid("participant").orElse(null);
                 if (groupAdder != null) {
                     groupMetadata.setGroupAdder(groupAdder.toUserJid());
                 }
             } else if (metadata instanceof CommunityMetadata communityMetadata) {
-                // WAWebHandleGroupNotification.T: isParentGroup = parent child
                 // communities have these flags in the create stanza
                 communityMetadata.setSupport(groupNode.hasChild("support"));
                 communityMetadata.setDefaultSubgroup(groupNode.hasChild("default_sub_group"));
@@ -401,11 +334,9 @@ public final class NotificationGroupStreamHandler implements SocketStream.Handle
                     communityMetadata.setSize(size);
                 }
 
-                // WAWebHandleGroupNotification.T: allowNonAdminSubGroupCreation (community-only)
                 communityMetadata.setAllowNonAdminSubGroupCreation(
                         groupNode.hasChild("allow_non_admin_sub_group_creation"));
 
-                // WAWebHandleGroupNotification.T: isParentGroupClosed derived from
                 // <parent default_membership_approval_mode="request_required">
                 var parentClosed = groupNode.getChild("parent")
                         .flatMap(parent -> parent.getAttributeAsString("default_membership_approval_mode"))
@@ -490,7 +421,6 @@ public final class NotificationGroupStreamHandler implements SocketStream.Handle
      * @implNote WAWebHandleGroupNotification: SUBJECT case in parser T
      */
     private void applySubject(Node notification, Chat chat, Jid groupJid, Node action) {
-        // WAWebHandleGroupNotification: subject from attrString("subject")
         var subject = action.getAttributeAsString("subject", null);
         if (subject == null) {
             return;
@@ -500,7 +430,6 @@ public final class NotificationGroupStreamHandler implements SocketStream.Handle
         var metadata = currentMetadata(groupJid);
         if (metadata != null) {
             setSubject(metadata, subject);
-            // WAWebHandleGroupNotification: s_o and s_t attributes
             setSubjectTimestamp(metadata, resolveInstant(action, "s_t", "t"), action.getAttributeAsJid("s_o").orElse(notification.getAttributeAsJid("participant").orElse(null)));
         }
     }
@@ -519,9 +448,7 @@ public final class NotificationGroupStreamHandler implements SocketStream.Handle
      */
     private void applyDescription(Node notification, Chat chat, Jid groupJid, Node action) {
         var deleted = action.hasChild("delete");
-        // WAWebHandleGroupNotification: desc = body content, null if deleted
         var description = deleted ? null : resolveDescriptionBody(action);
-        // WAWebHandleGroupNotification: descId is always extracted (even on delete)
         var descriptionId = resolveDescriptionId(action);
         var timestamp = resolveInstant(action, "t");
         if (timestamp == null) {
@@ -639,14 +566,11 @@ public final class NotificationGroupStreamHandler implements SocketStream.Handle
      * @implNote WAWebHandleGroupNotification: EPHEMERAL case, h() function
      */
     private void applyEphemeral(Node notification, Chat chat, Jid groupJid, Node action) {
-        // WAWebHandleGroupNotification.h: checks for ephemeral child or direct attr
         var ephemeralNode = action.getChild("ephemeral").orElse(null);
         Node expirationSource;
         if (ephemeralNode != null) {
-            // WAWebHandleGroupNotification.h: ephemeral child inside group node (create flow)
             expirationSource = ephemeralNode;
         } else {
-            // WAWebHandleGroupNotification: direct ephemeral action node
             expirationSource = action;
         }
 
@@ -699,7 +623,6 @@ public final class NotificationGroupStreamHandler implements SocketStream.Handle
      */
     private void applyGrowthLock(Jid groupJid, Node action) {
         var metadata = currentMetadata(groupJid);
-        // WAWebHandleGroupNotification: expiration = attrInt, type = attrString
         var expiration = resolveInstant(action, "expiration");
         var type = action.getAttributeAsString("type", null);
         if (metadata instanceof GroupMetadata groupMetadata) {
@@ -739,7 +662,6 @@ public final class NotificationGroupStreamHandler implements SocketStream.Handle
      * @implNote WAWebHandleGroupNotification: LINK case
      */
     private void applyLink(Jid groupJid, Node action) {
-        // WAWebHandleGroupNotification: link_type attribute
         var linkType = action.getAttributeAsString("link_type", null);
         var metadata = currentMetadata(groupJid);
         if (metadata instanceof GroupMetadata groupMetadata && "parent_group".equals(linkType)) {
@@ -760,7 +682,6 @@ public final class NotificationGroupStreamHandler implements SocketStream.Handle
      * @implNote WAWebHandleGroupNotification: UNLINK case
      */
     private void applyUnlink(Jid groupJid, Node action) {
-        // WAWebHandleGroupNotification: unlink_type attribute
         var unlinkType = action.getAttributeAsString("unlink_type", null);
         var metadata = currentMetadata(groupJid);
         if (metadata instanceof GroupMetadata groupMetadata && "parent_group".equals(unlinkType)) {
@@ -777,7 +698,6 @@ public final class NotificationGroupStreamHandler implements SocketStream.Handle
      * @implNote WAWebHandleGroupNotification: MEMBERSHIP_APPROVAL_MODE case
      */
     private void applyMembershipApproval(Node action, Jid groupJid) {
-        // WAWebHandleGroupNotification: group_join > state == "on"
         var state = action.getChild("group_join")
                 .flatMap(child -> child.getAttributeAsString("state"))
                 .orElse(null);
@@ -847,7 +767,6 @@ public final class NotificationGroupStreamHandler implements SocketStream.Handle
      * @implNote WAWebHandleGroupNotification: MEMBER_ADD_MODE case
      */
     private void applyMemberAddMode(Jid groupJid, Node action) {
-        // WAWebHandleGroupNotification: MemberAddMode.cast(a.contentString())
         var adminOnly = "admin_add".equals(action.toContentString().orElse(null));
         var metadata = currentMetadata(groupJid);
         if (metadata != null) {
@@ -970,7 +889,6 @@ public final class NotificationGroupStreamHandler implements SocketStream.Handle
                 continue;
             }
 
-            // WAWebHandleGroupNotification.y: role from "type" attr with
             // GROUP_PARTICIPANT_TYPES mapping
             var role = switch (mutation) {
                 case PROMOTE -> GroupPartipantRole.ADMIN;
@@ -1249,13 +1167,12 @@ public final class NotificationGroupStreamHandler implements SocketStream.Handle
             return;
         }
 
-        // WAWebHandleGroupNotification.x: ack with class=notification, type=w:gp2
         whatsapp.sendNodeWithNoResponse(new NodeBuilder()
                 .description("ack")
                 .attribute("id", stanzaId)
-                .attribute("class", "notification") // WAWebHandleGroupNotification.x: hardcoded
+                .attribute("class", "notification")
                 .attribute("to", stanzaFrom)
-                .attribute("type", "w:gp2") // WAWebHandleGroupNotification.x: hardcoded
+                .attribute("type", "w:gp2")
                 .attribute("participant", node.getAttributeAsJid("participant", null))
                 .build());
     }

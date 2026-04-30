@@ -136,35 +136,24 @@ public final class NotificationStreamHandler implements SocketStream.Handler {
             adaptation = WhatsAppAdaptation.ADAPTED
     )
     public void handle(Node node) {
-        // WAWebCommsHandleLoggedInStanza.handleLoggedInStanza: var n=e.attrs; switch(n.type)
         var type = node.getAttributeAsString("type", null);
         if (type == null) {
             return;
         }
 
         switch (type) {
-            // Account family: WA Web cases "account_sync", "contacts", "disappearing_mode", "picture", "privacy_token", "status"
             case "account_sync", "contacts", "disappearing_mode", "picture", "privacy_token", "status" ->
                     accountHandler.handle(node);
-            // Business family: WA Web cases "business", "digital_commerce_subscription", "fb:update", "mex", "pay"
             case "business", "digital_commerce_subscription", "fb:update", "mex", "pay" ->
                     businessHandler.handle(node);
-            // Device family: WA Web cases "companion_reg_refresh", "devices", "encrypt", "hosted",
-            // "link_code_companion_reg", "mediaretry", "newsletter", "psa", "registration", "server",
-            // "server_sync", "w:growth", "waffle"
             case "companion_reg_refresh", "devices", "encrypt", "hosted", "link_code_companion_reg",
                     "mediaretry", "newsletter", "psa", "registration", "server", "server_sync",
                     "w:growth", "waffle" ->
                     deviceHandler.handle(node);
-            // ADAPTED: WAWebCommsHandleLoggedInStanza.handleLoggedInStanza does not route "w:gp2"
-            // through this top-level switch; WA Web dispatches group notifications via a separate path.
-            // Cobalt consolidates all <notification> routing here for symmetry.
+            // WA Web dispatches w:gp2 via a separate path; Cobalt consolidates all notification routing here for symmetry.
             case "w:gp2" ->
                     groupHandler.handle(node);
-            // WAWebCommsHandleLoggedInStanza.handleLoggedInStanza: unmatched notification types fall
-            // through to `return g(e)` which logs DEV_XMPP and NACKs with UnrecognizedStanza.
-            // Cobalt silently ignores unknown types here because unrecognised-stanza NACK policy is
-            // applied centrally by the socket stream's error model, not per-dispatcher.
+            // Unknown notification types are silently discarded; the unrecognised-stanza NACK policy is applied centrally by the socket stream's error model.
             default -> {
             }
         }

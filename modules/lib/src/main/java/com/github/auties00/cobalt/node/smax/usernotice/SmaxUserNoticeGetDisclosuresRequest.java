@@ -15,7 +15,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps the
+ * The outbound stanza variant. Wraps the
  * {@code <get_user_disclosures t="…"/>} payload in the canonical
  * {@code <iq xmlns="tos" type="get" to="s.whatsapp.net">} envelope.
  */
@@ -64,12 +64,10 @@ public final class SmaxUserNoticeGetDisclosuresRequest implements SmaxOperation.
     @WhatsAppWebExport(moduleName = "WASmaxOutUserNoticeGetDisclosuresRequest",
             exports = "makeGetDisclosuresRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutUserNoticeGetDisclosuresRequest: smax("get_user_disclosures", {t: INT(t)})
         var getUserDisclosuresNode = new NodeBuilder()
                 .description("get_user_disclosures")
                 .attribute("t", getUserDisclosuresT)
                 .build();
-        // smax("iq", {to: S_WHATSAPP_NET, xmlns: "tos", id: generateId(), type: "get"})
         return new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "tos")

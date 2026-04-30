@@ -21,7 +21,7 @@ import java.util.SequencedCollection;
  *           ...)} and projects each collection into a record-style object
  *           with {@code name}, {@code state}, {@code version},
  *           {@code patches}, and {@code snapshot} fields. Cobalt mirrors
- *           the projection verbatim — the binary {@code patches}
+ *           the projection verbatim. The binary {@code patches}
  *           payloads are exposed as raw {@code byte[]} entries since the
  *           syncd subsystem owns the
  *           {@code WAWebSyncdDecode.decodeSyncdPatch} pipeline.
@@ -45,7 +45,7 @@ public final class IqSyncdServerSyncResponseCollection {
 
     /**
      * The list of encoded patch payloads when the relay returned a
-     * {@code <patches/>} child; never {@code null}, possibly empty.
+     * {@code <patches/>} child. Never {@code null}, possibly empty.
      */
     private final List<byte[]> patches;
 
@@ -60,10 +60,10 @@ public final class IqSyncdServerSyncResponseCollection {
     /**
      * Constructs a new inbound collection projection.
      *
-     * @param name     the collection name; never {@code null}
-     * @param state    the wire-derived state; never {@code null}
+     * @param name     the collection name. Never {@code null}
+     * @param state    the wire-derived state. Never {@code null}
      * @param version  the relay-issued version, or {@code null}
-     * @param patches  the encoded patch payloads; {@code null} is
+     * @param patches  the encoded patch payloads. {@code null} is
      *                 treated as an empty list
      * @param snapshot the encoded snapshot payload, or {@code null}
      * @throws NullPointerException if {@code name} or {@code state}
@@ -84,7 +84,7 @@ public final class IqSyncdServerSyncResponseCollection {
     /**
      * Returns the collection name.
      *
-     * @return the name; never {@code null}
+     * @return the name. Never {@code null}
      */
     public String name() {
         return name;
@@ -93,7 +93,7 @@ public final class IqSyncdServerSyncResponseCollection {
     /**
      * Returns the wire-derived collection state.
      *
-     * @return the state; never {@code null}
+     * @return the state. Never {@code null}
      */
     public IqSyncdServerSyncCollectionState state() {
         return state;
@@ -112,7 +112,7 @@ public final class IqSyncdServerSyncResponseCollection {
     /**
      * Returns the list of encoded patch payloads.
      *
-     * @return an unmodifiable view of the patches; never {@code null},
+     * @return an unmodifiable view of the patches. Never {@code null},
      *         possibly empty
      */
     public SequencedCollection<byte[]> patches() {

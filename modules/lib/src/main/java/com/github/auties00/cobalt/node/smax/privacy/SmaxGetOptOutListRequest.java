@@ -26,7 +26,7 @@ public final class SmaxGetOptOutListRequest implements SmaxOperation.Request {
     private final String itemDhash;
 
     /**
-     * The optional category filter — used to narrow the query to a
+     * The optional category filter. Used to narrow the query to a
      * subset of opt-out entries.
      */
     private final String iqCategory;
@@ -66,16 +66,11 @@ public final class SmaxGetOptOutListRequest implements SmaxOperation.Request {
      * Builds the outbound IQ stanza.
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope
-     *
-     * @implNote {@code WASmaxOutBlocklistsGetOptOutListRequest.makeGetOptOutListRequest}
-     *           composes {@code <iq to="s.whatsapp.net" xmlns="optoutlist"
-     *           type="get" category? id="…"><item dhash/></iq>}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutBlocklistsGetOptOutListRequest",
             exports = "makeGetOptOutListRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutBlocklistsGetOptOutListRequest: smax("iq", {to: S_WHATSAPP_NET, xmlns: "optoutlist", type: "get", category?, id: generateId()})
         var iqBuilder = new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "optoutlist")
@@ -85,7 +80,6 @@ public final class SmaxGetOptOutListRequest implements SmaxOperation.Request {
             iqBuilder.attribute("category", iqCategory);
         }
         if (itemDhash != null) {
-            // WASmaxOutBlocklistsGetOptOutListRequest: smax("item", {dhash})
             var itemNode = new NodeBuilder()
                     .description("item")
                     .attribute("dhash", itemDhash)

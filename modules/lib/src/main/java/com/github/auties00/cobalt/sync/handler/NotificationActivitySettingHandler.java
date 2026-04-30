@@ -99,7 +99,7 @@ public final class NotificationActivitySettingHandler implements WebAppStateActi
      */
     @Override
     public String actionName() {
-        return NotificationActivitySettingAction.ACTION_NAME; // WAWebProtobufSyncAction.pb -> NOTIFICATION_ACTIVITY_SETTING_ACTION:"notificationActivitySetting"
+        return NotificationActivitySettingAction.ACTION_NAME;
     }
 
     /**
@@ -116,7 +116,7 @@ public final class NotificationActivitySettingHandler implements WebAppStateActi
      */
     @Override
     public SyncPatchType collectionName() {
-        return SyncPatchType.REGULAR; // WAWebProtobufSyncAction.pb -> getMutationProps$CollectionName: NOTIFICATION_ACTIVITY_SETTING_ACTION -> REGULAR
+        return SyncPatchType.REGULAR;
     }
 
     /**
@@ -136,7 +136,7 @@ public final class NotificationActivitySettingHandler implements WebAppStateActi
      */
     @Override
     public int version() {
-        return NotificationActivitySettingAction.ACTION_VERSION; // NO_WA_BASIS: forward-looking default
+        return NotificationActivitySettingAction.ACTION_VERSION;
     }
 
     /**
@@ -248,14 +248,14 @@ public final class NotificationActivitySettingHandler implements WebAppStateActi
     public SyncPendingMutation getNotificationActivityMutation(Instant timestamp, NotificationActivitySettingAction.NotificationActivitySetting setting) {
         Objects.requireNonNull(timestamp, "timestamp cannot be null");
         Objects.requireNonNull(setting, "setting cannot be null");
-        var action = new NotificationActivitySettingActionBuilder() // NO_WA_BASIS: wrap the enum into the protobuf payload
+        var action = new NotificationActivitySettingActionBuilder()
                 .notificationActivitySetting(setting)
                 .build();
         var value = new SyncActionValueBuilder()
                 .timestamp(timestamp)
                 .notificationActivitySettingAction(action)
                 .build();
-        var index = JSON.toJSONString(List.of(actionName())); // NO_WA_BASIS: JSON.stringify([action]) with empty indexArgs
+        var index = JSON.toJSONString(List.of(actionName()));
         var pending = new DecryptedMutation.Trusted(
                 index,
                 value,

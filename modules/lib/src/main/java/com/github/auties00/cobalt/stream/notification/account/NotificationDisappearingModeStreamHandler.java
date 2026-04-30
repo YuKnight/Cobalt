@@ -19,21 +19,16 @@ import java.time.Instant;
  * timestamp guard to prevent stale updates from overwriting newer ones), and sends
  * an acknowledgement stanza back to the server.
  *
- * @implNote WAWebHandleDisappearingModeNotification.handleDisappearingModeNotificationJob
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleDisappearingModeNotification")
 final class NotificationDisappearingModeStreamHandler implements SocketStream.Handler {
     /**
-     * The logger used to record diagnostic messages for this handler.
-     *
-     * @implNote WAWebHandleDisappearingModeNotification (WALogger usage)
+     * Logger for diagnostic messages from this handler.
      */
     private static final System.Logger LOGGER = System.getLogger(NotificationDisappearingModeStreamHandler.class.getName());
 
     /**
-     * The WhatsApp client instance providing access to the store and socket operations.
-     *
-     * @implNote WAWebHandleDisappearingModeNotification (module-level dependency)
+     * The WhatsApp client providing access to the store and socket operations.
      */
     private final WhatsAppClient whatsapp;
 
@@ -41,7 +36,6 @@ final class NotificationDisappearingModeStreamHandler implements SocketStream.Ha
      * Constructs a new handler with the specified WhatsApp client.
      *
      * @param whatsapp the non-{@code null} WhatsApp client instance
-     * @implNote WAWebHandleDisappearingModeNotification (module initialization)
      */
     NotificationDisappearingModeStreamHandler(WhatsAppClient whatsapp) {
         this.whatsapp = whatsapp;
@@ -61,25 +55,19 @@ final class NotificationDisappearingModeStreamHandler implements SocketStream.Ha
      * notifications from overwriting newer settings.
      *
      * @param node the non-{@code null} notification stanza node
-     * @implNote WAWebHandleDisappearingModeNotification.handleDisappearingModeNotificationJob
      */
     @Override
     public void handle(Node node) {
-        // WAWebHandleDisappearingModeNotification.d: update then ack, sequentially in the async worker
         handleDisappearingModeNotification(node);
         sendNotificationAck(node);
     }
 
     /**
-     * Performs the core disappearing-mode update logic by parsing the notification,
-     * looking up the chat, applying the timestamp guard, and updating the ephemeral
-     * settings.
+     * Performs the core disappearing-mode update logic by parsing the notification, looking up the chat, applying the timestamp guard, and updating the ephemeral settings.
      *
      * @param node the non-{@code null} notification stanza node
-     * @implNote WAWebHandleDisappearingModeNotification (function d / c)
      */
     private void handleDisappearingModeNotification(Node node) {
-        // WAWebHandleDisappearingModeNotification parser
         var from = node.getAttributeAsJid("from")
                 .map(jid -> jid.toUserJid())
                 .orElse(null);
@@ -88,30 +76,25 @@ final class NotificationDisappearingModeStreamHandler implements SocketStream.Ha
             return;
         }
 
-        // WAWebHandleDisappearingModeNotification parser: attrInt("duration", 0)
         var duration = disappearingMode.getAttributeAsInt("duration", 0);
-        // WAWebHandleDisappearingModeNotification parser: attrTime("t")
         var rawTimestamp = disappearingMode.getAttributeAsLong("t", (Long) null);
         var settingTimestamp = rawTimestamp != null ? Instant.ofEpochSecond(rawTimestamp) : null;
 
-        // ADAPTED: WAWebUpdateDisappearingModeForContact.updateDisappearingModeForContact
-        // WA Web looks up a contact record; Cobalt uses chat-level ephemeral fields
+        // WA Web looks up a contact record; Cobalt uses chat-level ephemeral fields.
         var chat = whatsapp.store()
                 .findChatByJid(from)
                 .orElse(null);
         if (chat == null) {
-            // WAWebUpdateDisappearingModeForContact: if (s) { ... } - silently exits if contact not found
             return;
         }
 
-        // WAWebUpdateDisappearingModeForContact: timestamp guard
-        // Only update if existing timestamp is null and new != 0, or existing < new
-        var existingTimestamp = chat.ephemeralSettingTimestamp().orElse(null); // WAWebUpdateDisappearingModeForContact
+        // Timestamp guard: only update when the existing timestamp is null and the new one is non-zero, or when the existing timestamp is strictly older than the new one.
+        var existingTimestamp = chat.ephemeralSettingTimestamp().orElse(null);
         var newTimestampSeconds = rawTimestamp != null ? rawTimestamp : 0L;
         if (existingTimestamp == null && newTimestampSeconds != 0
                 || existingTimestamp != null && settingTimestamp != null && existingTimestamp.isBefore(settingTimestamp)) {
-            chat.setEphemeralExpiration(ChatEphemeralTimer.of(duration)); // WAWebUpdateDisappearingModeForContact
-            chat.setEphemeralSettingTimestamp(settingTimestamp); // WAWebUpdateDisappearingModeForContact
+            chat.setEphemeralExpiration(ChatEphemeralTimer.of(duration));
+            chat.setEphemeralSettingTimestamp(settingTimestamp);
         }
     }
 
@@ -123,10 +106,8 @@ final class NotificationDisappearingModeStreamHandler implements SocketStream.Ha
      * {@code "notification"}, and a {@code type} of {@code "disappearing_mode"}.
      *
      * @param node the non-{@code null} notification stanza node to acknowledge
-     * @implNote WAWebHandleDisappearingModeNotification (function d - WAWap.wap("ack", ...))
      */
     private void sendNotificationAck(Node node) {
-        // WAWebHandleDisappearingModeNotification: wap("ack", { id, to, class, type })
         var stanzaId = node.getAttributeAsString("id", null);
         var stanzaFrom = node.getAttributeAsJid("from", null);
         if (stanzaId == null || stanzaFrom == null) {

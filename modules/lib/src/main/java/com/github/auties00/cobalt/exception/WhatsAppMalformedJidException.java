@@ -3,45 +3,19 @@ package com.github.auties00.cobalt.exception;
 import com.github.auties00.cobalt.model.jid.Jid;
 
 /**
- * Exception thrown when a JID (Jabber Identifier) cannot be parsed or is malformed.
- * <p>
- * JIDs are the unique identifiers used in WhatsApp to identify users, groups, broadcasts,
- * and other entities. This exception is thrown when a string cannot be parsed into a valid
- * JID structure.
+ * Thrown when a string cannot be parsed as a WhatsApp JID.
  *
- * <h2>JID Format</h2>
- * A valid WhatsApp JID typically follows the format:
- * <pre>user@server</pre>
- * Where:
- * <ul>
- *   <li><b>user:</b> The local part identifying the entity (phone number, group ID, etc.)</li>
- *   <li><b>server:</b> The server suffix indicating the entity type</li>
- * </ul>
+ * <p>JIDs are the addresses WhatsApp uses to identify users, groups,
+ * status broadcasts, newsletters, and similar entities. They follow a
+ * {@code user@server} shape where the server suffix selects the entity
+ * kind (for example {@code s.whatsapp.net} for a contact,
+ * {@code g.us} for a group, {@code newsletter} for a newsletter). When
+ * the input is missing the separator, has an empty component, contains
+ * forbidden characters, or names an unknown server suffix, this
+ * exception is raised.
  *
- * <h2>Server Types</h2>
- * Common server suffixes include:
- * <ul>
- *   <li>{@code s.whatsapp.net} - User accounts (phone number based)</li>
- *   <li>{@code g.us} - Group chats</li>
- *   <li>{@code broadcast} - Broadcast lists</li>
- *   <li>{@code status@broadcast} - Status updates</li>
- *   <li>{@code lid} - LID-based identifiers (privacy-enhanced IDs)</li>
- *   <li>{@code c.us} - Business catalogs</li>
- *   <li>{@code newsletter} - Newsletter/channel identifiers</li>
- * </ul>
- *
- * <h2>Possible Causes</h2>
- * <ul>
- *   <li><b>Invalid format:</b> Missing '@' separator or incorrect structure</li>
- *   <li><b>Empty components:</b> Empty user or server parts</li>
- *   <li><b>Invalid characters:</b> Characters not allowed in JID format</li>
- *   <li><b>Unknown server:</b> Unrecognized server suffix</li>
- *   <li><b>Numeric overflow:</b> Phone numbers that exceed numeric range</li>
- * </ul>
- *
- * <h2>Fatality</h2>
- * Malformed JID exceptions are non-fatal. The error affects only the specific JID
- * being parsed and does not impact the client session.
+ * <p>Parsing failures are non-fatal: only the offending value is
+ * rejected and the rest of the session is unaffected.
  *
  * @see Jid
  */
@@ -57,10 +31,10 @@ public final class WhatsAppMalformedJidException extends WhatsAppException {
     }
 
     /**
-     * Returns whether this exception represents a fatal error.
-     * <p>
-     * Malformed JID exceptions are non-fatal as they only affect the specific
-     * JID being parsed and don't impact the overall client session.
+     * Returns whether the failure invalidates the current session.
+     *
+     * <p>A JID that fails to parse only invalidates the specific
+     * operation that produced it, not the active session.
      *
      * @return {@code false}
      */

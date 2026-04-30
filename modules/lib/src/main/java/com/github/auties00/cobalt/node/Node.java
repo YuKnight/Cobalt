@@ -16,31 +16,49 @@ import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
 /**
- * Represents a node in WhatsApp's XMPP-like stanza tree.
+ * Represents a node in a WhatsApp stanza tree.
  *
  * <p>Every message exchanged with the WhatsApp server is a tree of nodes
- * serialised through WhatsApp's compact binary XML protocol. A node has a
- * tag (the {@code description}), an ordered map of attributes, and an
- * optional content (plain text, a JID, a binary blob, or a list of child
- * nodes). This interface is the Cobalt counterpart of WhatsApp Web's
- * {@code WapNode} / {@code XmlNode} classes and offers read-side access
- * to every constituent part along with conversion helpers that callers use
- * to read attributes and content in the type they expect.
+ * serialised through a compact binary XML protocol. A node carries a tag
+ * name (the {@code description}), an ordered map of attributes, and an
+ * optional content slot that holds either plain text, a single
+ * {@link Jid}, a binary blob, or a list of child nodes. Nodes are
+ * immutable: the read side methods exposed by this interface are the only
+ * way to inspect a node, while {@link NodeBuilder} is the entry point for
+ * producing one.
  *
- * <p>The concrete variants permitted by the sealed hierarchy are:
+ * <p>Five concrete variants populate the sealed hierarchy:
  * <ul>
- *   <li>{@link EmptyNode} for nodes without content.</li>
- *   <li>{@link TextNode} for nodes whose content is a UTF-8 string.</li>
- *   <li>{@link JidNode} for nodes whose content is a single JID.</li>
- *   <li>{@link BytesNode} for nodes whose content is a binary blob.</li>
- *   <li>{@link ContainerNode} for nodes that contain child nodes.</li>
+ *   <li>{@link EmptyNode} for nodes without content</li>
+ *   <li>{@link TextNode} for nodes whose content is a UTF-8 string</li>
+ *   <li>{@link JidNode} for nodes whose content is a single JID</li>
+ *   <li>{@link BytesNode} for nodes whose content is a binary blob</li>
+ *   <li>{@link ContainerNode} for nodes whose content is a list of child
+ *       nodes</li>
  * </ul>
  *
- * @implNote WAWap.WapNode: the canonical JS node class used by the
- *           encode/decode pipeline. WAXmlNode.XmlNode: the richer
- *           debug-oriented XML representation that WA Web uses for
- *           logging and structured pattern matching.
+ * <p>Reading attributes and content uses convenience helpers that return
+ * the value parsed in a specific shape. Each helper has three flavours:
+ * {@code getXxx} returns an {@link Optional} wrapper, {@code getXxx(key,
+ * default)} returns the value or a fallback, and {@code getRequiredXxx}
+ * throws when the value is absent. Stream variants ({@code streamXxx})
+ * yield zero or one element so they fit naturally into pipelines.
+ *
+ * <p>Example reading attributes from an inbound stanza:
+ * <pre>{@code
+ * String id = node.getRequiredAttributeAsString("id");
+ * Jid from = node.getAttributeAsJid("from").orElse(null);
+ * boolean retry = node.getAttributeAsBool("retry", false);
+ * }</pre>
+ *
+ * <p>Example walking children:
+ * <pre>{@code
+ * Node body = node.getRequiredChild("body");
+ * List<Node> participants = node.streamChildren("participant").toList();
+ * }</pre>
+ *
  * @see NodeBuilder
+ * @see NodeAttribute
  * @see NodeEncoder
  * @see NodeDecoder
  */
@@ -49,35 +67,35 @@ import java.util.stream.Stream;
 public sealed interface Node {
     /**
      * Returns the description (tag name) of this node.
-     * The description typically identifies the type or purpose of the node in the protocol.
      *
-     * @return the node's description as a string
+     * @return the non null tag name
      */
     String description();
 
     /**
-     * Checks if this node's description matches the specified description.
+     * Returns whether this node's description equals the supplied value.
      *
      * @param description the description to compare against
-     * @return {@code true} if the descriptions match, {@code false} otherwise
+     * @return {@code true} when the descriptions match
      */
     default boolean hasDescription(String description) {
         return Objects.equals(description(), description);
     }
 
     /**
-     * Returns the attributes of this node as an unmodifiable sequenced map.
-     * Attributes provide metadata about the node, similar to XML attributes.
+     * Returns the attributes attached to this node, in insertion order.
      *
-     * @return a sequenced map of attribute names to attribute values
+     * @return an unmodifiable sequenced map of attribute names to values
      */
     SequencedMap<String, NodeAttribute> attributes();
 
     /**
-     * Retrieves an optional attribute by key.
+     * Returns the attribute associated with the supplied key.
      *
      * @param key the attribute key to look up
-     * @return an {@link Optional} containing the attribute if present, or empty if not found
+     * @return an {@link Optional} that holds the matching attribute, or
+     *         empty when absent
+     * @throws NullPointerException if {@code key} is {@code null}
      */
     default Optional<NodeAttribute> getAttribute(String key) {
         Objects.requireNonNull(key, "key cannot be null");
@@ -85,11 +103,11 @@ public sealed interface Node {
     }
 
     /**
-     * Returns the value of the given attribute as a string.
+     * Returns the value of the supplied attribute as a string.
      *
      * @param key the attribute key
-     * @return an {@link Optional} holding the string value, or empty if
-     *         the attribute is absent
+     * @return an {@link Optional} that holds the string value, or empty
+     *         when the attribute is absent
      */
     default Optional<String> getAttributeAsString(String key) {
         return getAttribute(key)
@@ -97,11 +115,11 @@ public sealed interface Node {
     }
 
     /**
-     * Returns the value of the given attribute parsed as a boolean.
+     * Returns the value of the supplied attribute parsed as a boolean.
      *
      * @param key the attribute key
-     * @return an {@link Optional} holding the parsed boolean, or empty if
-     *         the attribute is absent
+     * @return an {@link Optional} that holds the parsed boolean, or empty
+     *         when the attribute is absent
      */
     default Optional<Boolean> getAttributeAsBool(String key) {
         return getAttribute(key)
@@ -110,12 +128,13 @@ public sealed interface Node {
     }
 
     /**
-     * Returns the value of the given attribute as a string, falling back
-     * to the supplied default if the attribute is absent.
+     * Returns the value of the supplied attribute as a string, falling
+     * back to {@code defaultValue} when absent.
      *
      * @param key          the attribute key
-     * @param defaultValue the value to return when the attribute is absent
-     * @return the attribute value or the default
+     * @param defaultValue the fallback returned when the attribute is
+     *                     absent
+     * @return the attribute value or the fallback
      */
     default String getAttributeAsString(String key, String defaultValue) {
         return getAttributeAsString(key)
@@ -123,12 +142,13 @@ public sealed interface Node {
     }
 
     /**
-     * Returns the value of the given attribute parsed as a boolean,
-     * falling back to the supplied default if the attribute is absent.
+     * Returns the value of the supplied attribute parsed as a boolean,
+     * falling back to {@code defaultValue} when absent.
      *
      * @param key          the attribute key
-     * @param defaultValue the value to return when the attribute is absent
-     * @return the parsed boolean or the default
+     * @param defaultValue the fallback returned when the attribute is
+     *                     absent
+     * @return the parsed boolean or the fallback
      */
     default boolean getAttributeAsBool(String key, boolean defaultValue) {
         return getAttributeAsBool(key)
@@ -136,10 +156,10 @@ public sealed interface Node {
     }
 
     /**
-     * Returns the value of the given attribute as a byte array.
+     * Returns the value of the supplied attribute as a byte array.
      *
      * @param key the attribute key
-     * @return an {@link Optional} holding the byte array, or empty if
+     * @return an {@link Optional} that holds the byte array, or empty when
      *         the attribute is absent
      */
     default Optional<byte[]> getAttributeAsBytes(String key) {
@@ -148,12 +168,13 @@ public sealed interface Node {
     }
 
     /**
-     * Returns the value of the given attribute as a byte array, falling
-     * back to the supplied default if the attribute is absent.
+     * Returns the value of the supplied attribute as a byte array, falling
+     * back to {@code defaultValue} when absent.
      *
      * @param key          the attribute key
-     * @param defaultValue the value to return when the attribute is absent
-     * @return the byte array or the default
+     * @param defaultValue the fallback returned when the attribute is
+     *                     absent
+     * @return the byte array or the fallback
      */
     default byte[] getAttributeAsBytes(String key, byte[] defaultValue) {
         return getAttribute(key)
@@ -162,11 +183,11 @@ public sealed interface Node {
     }
 
     /**
-     * Returns the value of the given attribute parsed as a {@link Jid}.
+     * Returns the value of the supplied attribute parsed as a {@link Jid}.
      *
      * @param key the attribute key
-     * @return an {@link Optional} holding the JID, or empty if the
-     *         attribute is absent or not a valid JID
+     * @return an {@link Optional} that holds the parsed JID, or empty when
+     *         the attribute is absent or unparseable
      */
     default Optional<Jid> getAttributeAsJid(String key) {
         return getAttribute(key)
@@ -174,14 +195,13 @@ public sealed interface Node {
     }
 
     /**
-     * Returns the value of the given attribute parsed as a {@link Jid},
-     * falling back to the supplied default if the attribute is absent or
-     * not a valid JID.
+     * Returns the value of the supplied attribute parsed as a {@link Jid},
+     * falling back to {@code defaultValue} when absent or unparseable.
      *
      * @param key          the attribute key
-     * @param defaultValue the value to return when the attribute is absent
-     *                     or not parseable
-     * @return the JID or the default
+     * @param defaultValue the fallback returned when the attribute is
+     *                     absent or unparseable
+     * @return the parsed JID or the fallback
      */
     default Jid getAttributeAsJid(String key, Jid defaultValue) {
         return getAttribute(key)
@@ -190,11 +210,11 @@ public sealed interface Node {
     }
 
     /**
-     * Returns the value of the given attribute parsed as a {@code long}.
+     * Returns the value of the supplied attribute parsed as a {@code long}.
      *
      * @param key the attribute key
-     * @return an {@link OptionalLong} holding the parsed value, or empty
-     *         if the attribute is absent or not a valid long
+     * @return an {@link OptionalLong} that holds the parsed value, or
+     *         empty when the attribute is absent or unparseable
      */
     default OptionalLong getAttributeAsLong(String key) {
         var result = getAttribute(key);
@@ -202,14 +222,13 @@ public sealed interface Node {
     }
 
     /**
-     * Returns the value of the given attribute parsed as a {@code long},
-     * falling back to the supplied default if the attribute is absent or
-     * not parseable.
+     * Returns the value of the supplied attribute parsed as a {@code long},
+     * falling back to {@code defaultValue} when absent or unparseable.
      *
      * @param key          the attribute key
-     * @param defaultValue the value to return when the attribute is absent
-     *                     or not parseable
-     * @return the parsed long or the default
+     * @param defaultValue the fallback returned when the attribute is
+     *                     absent or unparseable
+     * @return the parsed long or the fallback
      */
     default long getAttributeAsLong(String key, long defaultValue) {
         var result = getAttribute(key);
@@ -217,14 +236,13 @@ public sealed interface Node {
     }
 
     /**
-     * Returns the value of the given attribute parsed as a boxed
-     * {@link Long}, falling back to the supplied default (which may be
-     * {@code null}) if the attribute is absent or not parseable.
+     * Returns the value of the supplied attribute parsed as a boxed
+     * {@link Long}, falling back to {@code defaultValue} when absent or
+     * unparseable.
      *
      * @param key          the attribute key
-     * @param defaultValue the value to return when the attribute is absent
-     *                     or not parseable, may be {@code null}
-     * @return the parsed {@link Long}, or the default
+     * @param defaultValue the fallback, which may be {@code null}
+     * @return the parsed {@link Long} or the fallback
      */
     default Long getAttributeAsLong(String key, Long defaultValue) {
         var result = getAttribute(key);
@@ -241,11 +259,11 @@ public sealed interface Node {
     }
 
     /**
-     * Returns the value of the given attribute parsed as an {@code int}.
+     * Returns the value of the supplied attribute parsed as an {@code int}.
      *
      * @param key the attribute key
-     * @return an {@link OptionalInt} holding the parsed value, or empty
-     *         if the attribute is absent or not a valid int
+     * @return an {@link OptionalInt} that holds the parsed value, or empty
+     *         when the attribute is absent or unparseable
      */
     default OptionalInt getAttributeAsInt(String key) {
         var result = getAttribute(key);
@@ -253,14 +271,13 @@ public sealed interface Node {
     }
 
     /**
-     * Returns the value of the given attribute parsed as an {@code int},
-     * falling back to the supplied default if the attribute is absent or
-     * not parseable.
+     * Returns the value of the supplied attribute parsed as an {@code int},
+     * falling back to {@code defaultValue} when absent or unparseable.
      *
      * @param key          the attribute key
-     * @param defaultValue the value to return when the attribute is absent
-     *                     or not parseable
-     * @return the parsed int or the default
+     * @param defaultValue the fallback returned when the attribute is
+     *                     absent or unparseable
+     * @return the parsed int or the fallback
      */
     default int getAttributeAsInt(String key, int defaultValue) {
         var result = getAttribute(key);
@@ -268,14 +285,13 @@ public sealed interface Node {
     }
 
     /**
-     * Returns the value of the given attribute parsed as a boxed
-     * {@link Integer}, falling back to the supplied default (which may
-     * be {@code null}) if the attribute is absent or not parseable.
+     * Returns the value of the supplied attribute parsed as a boxed
+     * {@link Integer}, falling back to {@code defaultValue} when absent or
+     * unparseable.
      *
      * @param key          the attribute key
-     * @param defaultValue the value to return when the attribute is absent
-     *                     or not parseable, may be {@code null}
-     * @return the parsed {@link Integer}, or the default
+     * @param defaultValue the fallback, which may be {@code null}
+     * @return the parsed {@link Integer} or the fallback
      */
     default Integer getAttributeAsInt(String key, Integer defaultValue) {
         var result = getAttribute(key);
@@ -292,11 +308,11 @@ public sealed interface Node {
     }
 
     /**
-     * Returns the value of the given attribute parsed as a {@code double}.
+     * Returns the value of the supplied attribute parsed as a {@code double}.
      *
      * @param key the attribute key
-     * @return an {@link OptionalDouble} holding the parsed value, or empty
-     *         if the attribute is absent or not a valid double
+     * @return an {@link OptionalDouble} that holds the parsed value, or
+     *         empty when the attribute is absent or unparseable
      */
     default OptionalDouble getAttributeAsDouble(String key) {
         var result = getAttribute(key);
@@ -304,14 +320,13 @@ public sealed interface Node {
     }
 
     /**
-     * Returns the value of the given attribute parsed as a {@code double},
-     * falling back to the supplied default if the attribute is absent or
-     * not parseable.
+     * Returns the value of the supplied attribute parsed as a {@code double},
+     * falling back to {@code defaultValue} when absent or unparseable.
      *
      * @param key          the attribute key
-     * @param defaultValue the value to return when the attribute is absent
-     *                     or not parseable
-     * @return the parsed double or the default
+     * @param defaultValue the fallback returned when the attribute is
+     *                     absent or unparseable
+     * @return the parsed double or the fallback
      */
     default double getAttributeAsDouble(String key, double defaultValue) {
         var result = getAttribute(key);
@@ -319,14 +334,13 @@ public sealed interface Node {
     }
 
     /**
-     * Returns the value of the given attribute parsed as a boxed
-     * {@link Double}, falling back to the supplied default (which may
-     * be {@code null}) if the attribute is absent or not parseable.
+     * Returns the value of the supplied attribute parsed as a boxed
+     * {@link Double}, falling back to {@code defaultValue} when absent or
+     * unparseable.
      *
      * @param key          the attribute key
-     * @param defaultValue the value to return when the attribute is absent
-     *                     or not parseable, may be {@code null}
-     * @return the parsed {@link Double}, or the default
+     * @param defaultValue the fallback, which may be {@code null}
+     * @return the parsed {@link Double} or the fallback
      */
     default Double getAttributeAsDouble(String key, Double defaultValue) {
         var result = getAttribute(key);
@@ -343,10 +357,12 @@ public sealed interface Node {
     }
 
     /**
-     * Retrieves an optional attribute by key.
+     * Returns a single element stream that yields the matching attribute,
+     * or an empty stream when absent.
      *
-     * @param key the attribute key to look up
-     * @return an {@link Optional} containing the attribute if present, or empty if not found
+     * @param key the attribute key
+     * @return a {@link Stream} that yields the attribute or nothing
+     * @throws NullPointerException if {@code key} is {@code null}
      */
     default Stream<NodeAttribute> streamAttribute(String key) {
         Objects.requireNonNull(key, "key cannot be null");
@@ -354,11 +370,11 @@ public sealed interface Node {
     }
 
     /**
-     * Returns a single-element stream with the attribute's string value,
-     * or an empty stream if the attribute is absent.
+     * Returns a single element stream that yields the attribute as a
+     * string, or an empty stream when absent.
      *
      * @param key the attribute key
-     * @return a {@link Stream} yielding the string value or nothing
+     * @return a {@link Stream} that yields the string value or nothing
      */
     default Stream<String> streamAttributeAsString(String key) {
         return streamAttribute(key)
@@ -366,11 +382,11 @@ public sealed interface Node {
     }
 
     /**
-     * Returns a single-element stream with the attribute's parsed boolean
-     * value, or an empty stream if the attribute is absent.
+     * Returns a single element stream that yields the attribute parsed as
+     * a boolean, or an empty stream when absent.
      *
      * @param key the attribute key
-     * @return a {@link Stream} yielding the boolean value or nothing
+     * @return a {@link Stream} that yields the boolean value or nothing
      */
     default Stream<Boolean> streamAttributeAsBool(String key) {
         return streamAttribute(key)
@@ -379,11 +395,11 @@ public sealed interface Node {
     }
 
     /**
-     * Returns a single-element stream with the attribute's byte-array
-     * value, or an empty stream if the attribute is absent.
+     * Returns a single element stream that yields the attribute as a byte
+     * array, or an empty stream when absent.
      *
      * @param key the attribute key
-     * @return a {@link Stream} yielding the byte array or nothing
+     * @return a {@link Stream} that yields the byte array or nothing
      */
     default Stream<byte[]> streamAttributeAsBytes(String key) {
         return streamAttribute(key)
@@ -391,12 +407,12 @@ public sealed interface Node {
     }
 
     /**
-     * Returns a single-element stream with the attribute parsed as a
-     * {@link Jid}, or an empty stream if the attribute is absent or
-     * cannot be parsed.
+     * Returns a single element stream that yields the attribute parsed as
+     * a {@link Jid}, or an empty stream when absent or unparseable.
      *
-     * @param key the attribute key, must not be {@code null}
-     * @return a {@link Stream} yielding the parsed JID or nothing
+     * @param key the attribute key
+     * @return a {@link Stream} that yields the JID or nothing
+     * @throws NullPointerException if {@code key} is {@code null}
      */
     default Stream<Jid> streamAttributeAsJid(String key) {
         Objects.requireNonNull(key, "key cannot be null");
@@ -407,12 +423,12 @@ public sealed interface Node {
     }
 
     /**
-     * Returns a single-element stream with the attribute parsed as a
-     * {@code long}, or an empty stream if the attribute is absent or
-     * cannot be parsed.
+     * Returns a single element stream that yields the attribute parsed as
+     * a {@code long}, or an empty stream when absent or unparseable.
      *
-     * @param key the attribute key, must not be {@code null}
-     * @return a {@link LongStream} yielding the parsed long or nothing
+     * @param key the attribute key
+     * @return a {@link LongStream} that yields the long value or nothing
+     * @throws NullPointerException if {@code key} is {@code null}
      */
     default LongStream streamAttributeAsLong(String key) {
         Objects.requireNonNull(key, "key cannot be null");
@@ -423,12 +439,12 @@ public sealed interface Node {
     }
 
     /**
-     * Returns a single-element stream with the attribute parsed as an
-     * {@code int}, or an empty stream if the attribute is absent or
-     * cannot be parsed.
+     * Returns a single element stream that yields the attribute parsed as
+     * an {@code int}, or an empty stream when absent or unparseable.
      *
-     * @param key the attribute key, must not be {@code null}
-     * @return an {@link IntStream} yielding the parsed int or nothing
+     * @param key the attribute key
+     * @return an {@link IntStream} that yields the int value or nothing
+     * @throws NullPointerException if {@code key} is {@code null}
      */
     default IntStream streamAttributeAsInt(String key) {
         Objects.requireNonNull(key, "key cannot be null");
@@ -439,12 +455,13 @@ public sealed interface Node {
     }
 
     /**
-     * Returns a single-element stream with the attribute parsed as a
-     * {@code double}, or an empty stream if the attribute is absent or
-     * cannot be parsed.
+     * Returns a single element stream that yields the attribute parsed as
+     * a {@code double}, or an empty stream when absent or unparseable.
      *
-     * @param key the attribute key, must not be {@code null}
-     * @return a {@link DoubleStream} yielding the parsed double or nothing
+     * @param key the attribute key
+     * @return a {@link DoubleStream} that yields the double value or
+     *         nothing
+     * @throws NullPointerException if {@code key} is {@code null}
      */
     default DoubleStream streamAttributeAsDouble(String key) {
         Objects.requireNonNull(key, "key cannot be null");
@@ -455,11 +472,12 @@ public sealed interface Node {
     }
 
     /**
-     * Retrieves a required attribute by key.
+     * Returns the attribute associated with the supplied key, throwing
+     * when absent.
      *
-     * @param key the attribute key to look up
-     * @return the attribute value
-     * @throws NoSuchElementException if the attribute is not present
+     * @param key the attribute key
+     * @return the matching attribute
+     * @throws NoSuchElementException if the attribute is absent
      */
     default NodeAttribute getRequiredAttribute(String key) {
         var result = attributes().get(key);
@@ -471,11 +489,12 @@ public sealed interface Node {
     }
 
     /**
-     * Returns the required attribute as a string.
+     * Returns the value of the supplied attribute as a string, throwing
+     * when absent.
      *
      * @param key the attribute key
      * @return the string value
-     * @throws NoSuchElementException if the attribute is not present
+     * @throws NoSuchElementException if the attribute is absent
      */
     default String getRequiredAttributeAsString(String key) {
         return getRequiredAttribute(key)
@@ -483,11 +502,12 @@ public sealed interface Node {
     }
 
     /**
-     * Returns the required attribute parsed as a boolean.
+     * Returns the value of the supplied attribute parsed as a boolean,
+     * throwing when absent.
      *
      * @param key the attribute key
-     * @return the parsed boolean value
-     * @throws NoSuchElementException if the attribute is not present
+     * @return the parsed boolean
+     * @throws NoSuchElementException if the attribute is absent
      */
     default boolean getRequiredAttributeAsBool(String key) {
         var result = getRequiredAttribute(key)
@@ -496,11 +516,12 @@ public sealed interface Node {
     }
 
     /**
-     * Returns the required attribute as a byte array.
+     * Returns the value of the supplied attribute as a byte array,
+     * throwing when absent.
      *
      * @param key the attribute key
-     * @return the byte-array value
-     * @throws NoSuchElementException if the attribute is not present
+     * @return the byte array
+     * @throws NoSuchElementException if the attribute is absent
      */
     default byte[] getRequiredAttributeAsBytes(String key) {
         return getRequiredAttribute(key)
@@ -508,12 +529,14 @@ public sealed interface Node {
     }
 
     /**
-     * Returns the required attribute parsed as a {@link Jid}.
+     * Returns the value of the supplied attribute parsed as a {@link Jid},
+     * throwing when absent or unparseable.
      *
      * @param key the attribute key
      * @return the parsed JID
-     * @throws NoSuchElementException if the attribute is not present
-     * @throws IllegalArgumentException if the attribute is not a valid JID
+     * @throws NoSuchElementException   if the attribute is absent
+     * @throws IllegalArgumentException if the attribute does not parse to
+     *                                  a valid JID
      */
     default Jid getRequiredAttributeAsJid(String key) {
         var requiredAttribute = getRequiredAttribute(key);
@@ -523,12 +546,14 @@ public sealed interface Node {
     }
 
     /**
-     * Returns the required attribute parsed as a {@code long}.
+     * Returns the value of the supplied attribute parsed as a {@code long},
+     * throwing when absent or unparseable.
      *
      * @param key the attribute key
      * @return the parsed long
-     * @throws NoSuchElementException if the attribute is not present
-     * @throws IllegalArgumentException if the attribute is not a valid long
+     * @throws NoSuchElementException   if the attribute is absent
+     * @throws IllegalArgumentException if the attribute does not parse to
+     *                                  a valid long
      */
     default long getRequiredAttributeAsLong(String key) {
         var requiredAttribute = getRequiredAttribute(key);
@@ -538,12 +563,14 @@ public sealed interface Node {
     }
 
     /**
-     * Returns the required attribute parsed as an {@code int}.
+     * Returns the value of the supplied attribute parsed as an {@code int},
+     * throwing when absent or unparseable.
      *
      * @param key the attribute key
      * @return the parsed int
-     * @throws NoSuchElementException if the attribute is not present
-     * @throws IllegalArgumentException if the attribute is not a valid int
+     * @throws NoSuchElementException   if the attribute is absent
+     * @throws IllegalArgumentException if the attribute does not parse to
+     *                                  a valid int
      */
     default int getRequiredAttributeAsInt(String key) {
         var requiredAttribute = getRequiredAttribute(key);
@@ -553,13 +580,14 @@ public sealed interface Node {
     }
 
     /**
-     * Returns the required attribute parsed as a {@code double}.
+     * Returns the value of the supplied attribute parsed as a {@code double},
+     * throwing when absent or unparseable.
      *
      * @param key the attribute key
      * @return the parsed double
-     * @throws NoSuchElementException if the attribute is not present
-     * @throws IllegalArgumentException if the attribute is not a valid
-     *         double
+     * @throws NoSuchElementException   if the attribute is absent
+     * @throws IllegalArgumentException if the attribute does not parse to
+     *                                  a valid double
      */
     default double getRequiredAttributeAsDouble(String key) {
         var requiredAttribute = getRequiredAttribute(key);
@@ -569,10 +597,12 @@ public sealed interface Node {
     }
 
     /**
-     * Returns whether this node has an attribute with the given key.
+     * Returns whether this node carries an attribute with the supplied
+     * key.
      *
-     * @param key the attribute key, must not be {@code null}
-     * @return {@code true} if the attribute is present
+     * @param key the attribute key
+     * @return {@code true} when the attribute is present
+     * @throws NullPointerException if {@code key} is {@code null}
      */
     default boolean hasAttribute(String key) {
         Objects.requireNonNull(key, "key cannot be null");
@@ -580,13 +610,13 @@ public sealed interface Node {
     }
 
     /**
-     * Returns whether this node has an attribute with the given key and
-     * exact string value.
+     * Returns whether this node carries an attribute with the supplied key
+     * whose string value equals {@code value}.
      *
-     * @param key   the attribute key, must not be {@code null}
+     * @param key   the attribute key
      * @param value the expected string value
-     * @return {@code true} if the attribute is present and equal to
-     *         {@code value}
+     * @return {@code true} when the attribute exists and matches
+     * @throws NullPointerException if {@code key} is {@code null}
      */
     default boolean hasAttribute(String key, String value) {
         Objects.requireNonNull(key, "key cannot be null");
@@ -596,13 +626,13 @@ public sealed interface Node {
     }
 
     /**
-     * Returns whether this node has an attribute with the given key and
-     * byte-array value.
+     * Returns whether this node carries an attribute with the supplied key
+     * whose byte value equals {@code value}.
      *
-     * @param key   the attribute key, must not be {@code null}
-     * @param value the expected byte-array value
-     * @return {@code true} if the attribute is present and its bytes
-     *         equal {@code value}
+     * @param key   the attribute key
+     * @param value the expected byte array value
+     * @return {@code true} when the attribute exists and matches
+     * @throws NullPointerException if {@code key} is {@code null}
      */
     default boolean hasAttribute(String key, byte[] value) {
         Objects.requireNonNull(key, "key cannot be null");
@@ -612,13 +642,13 @@ public sealed interface Node {
     }
 
     /**
-     * Returns whether this node has an attribute with the given key that
-     * equals the supplied {@link Jid}.
+     * Returns whether this node carries an attribute with the supplied key
+     * that parses to the supplied {@link Jid}.
      *
-     * @param key   the attribute key, must not be {@code null}
-     * @param value the expected JID value
-     * @return {@code true} if the attribute is present and parses to
-     *         {@code value}
+     * @param key   the attribute key
+     * @param value the expected JID
+     * @return {@code true} when the attribute exists and matches
+     * @throws NullPointerException if {@code key} is {@code null}
      */
     default boolean hasAttribute(String key, Jid value) {
         Objects.requireNonNull(key, "key cannot be null");
@@ -633,13 +663,13 @@ public sealed interface Node {
     }
 
     /**
-     * Returns whether this node has an attribute with the given key that
-     * parses to the supplied {@code long}.
+     * Returns whether this node carries an attribute with the supplied key
+     * that parses to the supplied {@code long}.
      *
-     * @param key   the attribute key, must not be {@code null}
+     * @param key   the attribute key
      * @param value the expected long value
-     * @return {@code true} if the attribute is present and parses to
-     *         {@code value}
+     * @return {@code true} when the attribute exists and matches
+     * @throws NullPointerException if {@code key} is {@code null}
      */
     default boolean hasAttribute(String key, long value) {
         Objects.requireNonNull(key, "key cannot be null");
@@ -654,13 +684,13 @@ public sealed interface Node {
     }
 
     /**
-     * Returns whether this node has an attribute with the given key that
-     * parses to the supplied {@code int}.
+     * Returns whether this node carries an attribute with the supplied key
+     * that parses to the supplied {@code int}.
      *
-     * @param key   the attribute key, must not be {@code null}
+     * @param key   the attribute key
      * @param value the expected int value
-     * @return {@code true} if the attribute is present and parses to
-     *         {@code value}
+     * @return {@code true} when the attribute exists and matches
+     * @throws NullPointerException if {@code key} is {@code null}
      */
     default boolean hasAttribute(String key, int value) {
         Objects.requireNonNull(key, "key cannot be null");
@@ -675,13 +705,13 @@ public sealed interface Node {
     }
 
     /**
-     * Returns whether this node has an attribute with the given key that
-     * parses to the supplied {@code double}.
+     * Returns whether this node carries an attribute with the supplied key
+     * that parses to the supplied {@code double}.
      *
-     * @param key   the attribute key, must not be {@code null}
+     * @param key   the attribute key
      * @param value the expected double value
-     * @return {@code true} if the attribute is present and parses to
-     *         {@code value}
+     * @return {@code true} when the attribute exists and matches
+     * @throws NullPointerException if {@code key} is {@code null}
      */
     default boolean hasAttribute(String key, double value) {
         Objects.requireNonNull(key, "key cannot be null");
@@ -696,13 +726,13 @@ public sealed interface Node {
     }
 
     /**
-     * Returns whether this node has an attribute with the given key that
-     * parses to the supplied {@code boolean}.
+     * Returns whether this node carries an attribute with the supplied key
+     * that parses to the supplied {@code boolean}.
      *
-     * @param key   the attribute key, must not be {@code null}
+     * @param key   the attribute key
      * @param value the expected boolean value
-     * @return {@code true} if the attribute is present and parses to
-     *         {@code value}
+     * @return {@code true} when the attribute exists and matches
+     * @throws NullPointerException if {@code key} is {@code null}
      */
     default boolean hasAttribute(String key, boolean value) {
         Objects.requireNonNull(key, "key cannot be null");
@@ -716,68 +746,67 @@ public sealed interface Node {
     }
 
     /**
-     * Checks whether this node has children.
-     * Empty nodes return {@code false}, while all other node types return {@code true}.
+     * Returns whether this node carries any content slot.
      *
-     * @return {@code true} if the node has children, {@code false} otherwise
+     * @return {@code false} for {@link EmptyNode}, {@code true} for every
+     *         other variant
      */
     boolean hasContent();
 
     /**
-     * Returns whether this node's content equals the given text.
+     * Returns whether this node's content equals the supplied text.
      *
      * @param content the expected text content
-     * @return {@code true} if the node has text content equal to
+     * @return {@code true} when the node carries text content equal to
      *         {@code content}
      */
     boolean hasContent(String content);
 
     /**
-     * Returns whether this node's content equals the given JID.
+     * Returns whether this node's content equals the supplied JID.
      *
      * @param content the expected JID content
-     * @return {@code true} if the node has JID content equal to
+     * @return {@code true} when the node carries JID content equal to
      *         {@code content}
      */
     boolean hasContent(Jid content);
 
     /**
-     * Returns whether this node's content equals the given byte array.
+     * Returns whether this node's content equals the supplied byte array.
      *
-     * @param content the expected byte-array content
-     * @return {@code true} if the node has binary content equal to
+     * @param content the expected binary content
+     * @return {@code true} when the node carries binary content equal to
      *         {@code content}
      */
     boolean hasContent(byte[] content);
+
     /**
-     * Calculates the size of the node based on its attributes and whether it contains children.
-     * The size is computed as:
-     * <ul>
-     *   <li>one unit for the description</li>
-     *   <li>two units for each attribute (key and value)</li>
-     *   <li>one unit if the node contains children/li>
-     * </ul>
+     * Returns the encoded size of this node measured in token slots.
      *
-     * @return the calculated size of the node
+     * <p>The count is one for the description, two for every attribute
+     * (key plus value), and one when a content slot is populated.
+     *
+     * @return the number of token slots required by the node
      */
     default int size() {
-        return 1 // Description
-               + (attributes().size() * 2) // Attributes
-               + (hasContent() ? 1 : 0); // Content
+        return 1
+               + (attributes().size() * 2)
+               + (hasContent() ? 1 : 0);
     }
 
     /**
-     * Converts the content of this node to a buffer, if possible.
+     * Returns the content of this node as a byte array, when applicable.
      *
-     * @return an {@code Optional} containing the content a buffer if possible, otherwise an empty {@code Optional}
+     * @return an {@link Optional} that holds the content as bytes, or
+     *         empty when the variant has no convertible content
      */
     Optional<byte[]> toContentBytes();
 
     /**
-     * Returns a single-element stream with the node's content as a byte
-     * array, or an empty stream if the conversion is not possible.
+     * Returns a single element stream that yields the content as a byte
+     * array, or an empty stream when no conversion is possible.
      *
-     * @return a {@link Stream} yielding the byte-array content or nothing
+     * @return a {@link Stream} that yields the byte array or nothing
      */
     default Stream<byte[]> streamContentBytes() {
         return toContentBytes()
@@ -785,18 +814,20 @@ public sealed interface Node {
     }
 
     /**
-     * Converts the content of this node to an InputStream, if possible.
+     * Returns the content of this node as an {@link InputStream}, when
+     * applicable.
      *
-     * @return an {@code Optional} containing the content an InputStream if possible, otherwise an empty {@code Optional}
+     * @return an {@link Optional} that holds the content as a stream, or
+     *         empty when the variant has no convertible content
      */
     Optional<InputStream> toContentStream();
 
     /**
-     * Returns a single-element stream with the node's content as an
-     * {@link InputStream}, or an empty stream if the conversion is not
+     * Returns a single element stream that yields the content as an
+     * {@link InputStream}, or an empty stream when no conversion is
      * possible.
      *
-     * @return a {@link Stream} yielding the {@link InputStream} or nothing
+     * @return a {@link Stream} that yields the input stream or nothing
      */
     default Stream<InputStream> streamContentStream() {
         return toContentStream()
@@ -804,17 +835,18 @@ public sealed interface Node {
     }
 
     /**
-     * Converts the content of this node to a string, if possible.
+     * Returns the content of this node as a string, when applicable.
      *
-     * @return an {@code Optional} containing the content as a string if possible, otherwise an empty {@code Optional}
+     * @return an {@link Optional} that holds the content as text, or
+     *         empty when the variant has no convertible content
      */
     Optional<String> toContentString();
 
     /**
-     * Returns a single-element stream with the node's content as a
-     * string, or an empty stream if the conversion is not possible.
+     * Returns a single element stream that yields the content as a string,
+     * or an empty stream when no conversion is possible.
      *
-     * @return a {@link Stream} yielding the string or nothing
+     * @return a {@link Stream} that yields the string or nothing
      */
     default Stream<String> streamContentString() {
         return toContentString()
@@ -822,10 +854,11 @@ public sealed interface Node {
     }
 
     /**
-     * Returns the content of this node parsed as a boolean.
+     * Returns the content of this node parsed as a boolean, when
+     * applicable.
      *
-     * @return an {@link Optional} holding the parsed boolean, or empty if
-     *         the content cannot be converted to a string
+     * @return an {@link Optional} that holds the parsed boolean, or empty
+     *         when no conversion is possible
      */
     default Optional<Boolean> toContentBool() {
         return toContentString()
@@ -833,11 +866,10 @@ public sealed interface Node {
     }
 
     /**
-     * Returns a single-element stream with the node's content as a
-     * parsed boolean, or an empty stream if the conversion is not
-     * possible.
+     * Returns a single element stream that yields the content parsed as a
+     * boolean, or an empty stream when no conversion is possible.
      *
-     * @return a {@link Stream} yielding the parsed boolean or nothing
+     * @return a {@link Stream} that yields the parsed boolean or nothing
      */
     default Stream<Boolean> streamContentBool() {
         return toContentBool()
@@ -845,10 +877,11 @@ public sealed interface Node {
     }
 
     /**
-     * Returns the content of this node parsed as an {@link Integer}.
+     * Returns the content of this node parsed as an {@link Integer}, when
+     * applicable.
      *
-     * @return an {@link Optional} holding the parsed int, or empty if
-     *         the content is not a valid int
+     * @return an {@link Optional} that holds the parsed int, or empty when
+     *         the content does not represent a valid int
      */
     default Optional<Integer> toContentInt() {
         return toContentString().map(str -> {
@@ -861,10 +894,10 @@ public sealed interface Node {
     }
 
     /**
-     * Returns a single-element stream with the node's content as an
-     * {@link Integer}, or an empty stream if parsing fails.
+     * Returns a single element stream that yields the content parsed as
+     * an {@link Integer}, or an empty stream when parsing fails.
      *
-     * @return a {@link Stream} yielding the parsed int or nothing
+     * @return a {@link Stream} that yields the parsed int or nothing
      */
     default Stream<Integer> streamContentInt() {
         return toContentInt()
@@ -872,10 +905,11 @@ public sealed interface Node {
     }
 
     /**
-     * Returns the content of this node parsed as a {@link Long}.
+     * Returns the content of this node parsed as a {@link Long}, when
+     * applicable.
      *
-     * @return an {@link Optional} holding the parsed long, or empty if
-     *         the content is not a valid long
+     * @return an {@link Optional} that holds the parsed long, or empty
+     *         when the content does not represent a valid long
      */
     default Optional<Long> toContentLong() {
         return toContentString().map(str -> {
@@ -888,10 +922,10 @@ public sealed interface Node {
     }
 
     /**
-     * Returns a single-element stream with the node's content as a
-     * {@link Long}, or an empty stream if parsing fails.
+     * Returns a single element stream that yields the content parsed as a
+     * {@link Long}, or an empty stream when parsing fails.
      *
-     * @return a {@link Stream} yielding the parsed long or nothing
+     * @return a {@link Stream} that yields the parsed long or nothing
      */
     default Stream<Long> streamContentLong() {
         return toContentLong()
@@ -899,17 +933,18 @@ public sealed interface Node {
     }
 
     /**
-     * Converts the content of this node to a jid, if possible.
+     * Returns the content of this node as a {@link Jid}, when applicable.
      *
-     * @return an {@code Optional} containing the content as a jid if possible, otherwise an empty {@code Optional}
+     * @return an {@link Optional} that holds the JID, or empty when the
+     *         content does not parse to a valid JID
      */
     Optional<Jid> toContentJid();
 
     /**
-     * Returns a single-element stream with the node's content as a
-     * {@link Jid}, or an empty stream if parsing fails.
+     * Returns a single element stream that yields the content as a
+     * {@link Jid}, or an empty stream when parsing fails.
      *
-     * @return a {@link Stream} yielding the JID or nothing
+     * @return a {@link Stream} that yields the JID or nothing
      */
     default Stream<Jid> streamContentJid() {
         return toContentJid()
@@ -917,16 +952,16 @@ public sealed interface Node {
     }
 
     /**
-     * Retrieves the child nodes contained in this container node, if any.
+     * Returns the children of this node in declaration order.
      *
-     * @return a sequenced collection of child nodes contained in this container node
+     * @return a sequenced collection of child nodes, possibly empty
      */
     SequencedCollection<Node> children();
 
     /**
      * Returns the children of this node as a {@link Stream}.
      *
-     * @return a non-null stream over the child nodes
+     * @return a non null stream over the children
      */
     default Stream<Node> streamChildren() {
         return children()
@@ -934,10 +969,10 @@ public sealed interface Node {
     }
 
     /**
-     * Retrieves the first child Node in this container, if present.
+     * Returns the first child of this node, when present.
      *
-     * @return an {@code Optional} containing the first child Node if it exists,
-     *         otherwise an empty {@code Optional}.
+     * @return an {@link Optional} that holds the first child, or empty
+     *         when the node has none
      */
     default Optional<Node> getChild() {
         var children = children();
@@ -947,10 +982,10 @@ public sealed interface Node {
     }
 
     /**
-     * Retrieves the first child Node in this container, if present.
+     * Returns a single element stream that yields the first child, or an
+     * empty stream when the node has none.
      *
-     * @return a {@code Stream} containing the first child Node if it exists,
-     *         otherwise an empty {@code Stream}.
+     * @return a {@link Stream} that yields the first child or nothing
      */
     default Stream<Node> streamChild() {
         var children = children();
@@ -960,13 +995,12 @@ public sealed interface Node {
     }
 
     /**
-     * Finds a child node by its description within the current container node.
-     * If no child node with the specified description exists, an empty {@code Optional} is returned.
+     * Returns the first child whose description matches {@code description}.
      *
-     * @param description the description of the child node to find; cannot be null
-     * @return an {@code Optional} containing the child node if one is found
-     *         with the specified description, otherwise an empty {@code Optional}
-     * @throws NullPointerException if the given description is null
+     * @param description the description to match
+     * @return an {@link Optional} that holds the matching child, or empty
+     *         when none matches
+     * @throws NullPointerException if {@code description} is {@code null}
      */
     default Optional<Node> getChild(String description) {
         Objects.requireNonNull(description, "description cannot be null");
@@ -975,13 +1009,17 @@ public sealed interface Node {
     }
 
     /**
-     * Finds the first child node whose description matches one of the provided descriptions.
-     * The descriptions are checked in the same order they are provided.
+     * Returns the first child whose description matches any of the
+     * supplied descriptions.
      *
-     * @param descriptions the descriptions of the child nodes to find; cannot be null
-     * @return an {@link Optional} containing the first matching child node if one is found,
-     *         otherwise an empty {@code Optional}
-     * @throws NullPointerException if the descriptions array or one of its values is null
+     * <p>The descriptions are tested in the supplied order; the first
+     * match wins.
+     *
+     * @param descriptions the descriptions to match
+     * @return an {@link Optional} that holds the first match, or empty
+     *         when none matches
+     * @throws NullPointerException if {@code descriptions} or any element
+     *                              is {@code null}
      */
     default Optional<Node> getChild(String... descriptions) {
         Objects.requireNonNull(descriptions, "descriptions cannot be null");
@@ -997,13 +1035,13 @@ public sealed interface Node {
     }
 
     /**
-     * Finds a child node by its description within the current container node.
-     * If no child node with the specified description exists, {@code defaultValue} is returned
+     * Returns the first child whose description matches {@code description},
+     * or {@code defaultValue} when none matches.
      *
-     * @param description the description of the child node to find; cannot be null
-     * @param defaultValue the default value to return if no node with the provided description exists
-     * @return the child node with the provided description, if found, otherwise {@code defaultValue}
-     * @throws NullPointerException if the given description is null
+     * @param description  the description to match
+     * @param defaultValue the fallback returned when no child matches
+     * @return the matching child or the fallback
+     * @throws NullPointerException if {@code description} is {@code null}
      */
     default Node getChild(String description, Node defaultValue) {
         return getChild(description)
@@ -1011,13 +1049,13 @@ public sealed interface Node {
     }
 
     /**
-     * Finds a child node by its description within the current container node.
-     * If no child node with the specified description exists, an {@code IllegalArgumentException} is thrown.
+     * Returns the first child whose description matches {@code description},
+     * throwing when none matches.
      *
-     * @param description the description of the child node to find; cannot be null
-     * @return the first child node with the specified description
-     * @throws NullPointerException if the given description is null
-     * @throws IllegalArgumentException if no child node with the specified description exists
+     * @param description the description to match
+     * @return the first matching child
+     * @throws NullPointerException     if {@code description} is {@code null}
+     * @throws IllegalArgumentException if no child matches
      */
     default Node getRequiredChild(String description) {
         Objects.requireNonNull(description, "description cannot be null");
@@ -1027,13 +1065,17 @@ public sealed interface Node {
     }
 
     /**
-     * Finds the first child node whose description matches one of the provided descriptions.
-     * The descriptions are checked in the same order they are provided.
+     * Returns the first child whose description matches any of the
+     * supplied descriptions, throwing when none matches.
      *
-     * @param descriptions the descriptions of the child nodes to find; cannot be null
-     * @return the first matching child node
-     * @throws NullPointerException if the descriptions array or one of its values is null
-     * @throws IllegalArgumentException if no child node with any of the specified descriptions exists
+     * <p>The descriptions are tested in the supplied order; the first
+     * match wins.
+     *
+     * @param descriptions the descriptions to match
+     * @return the first matching child
+     * @throws NullPointerException     if {@code descriptions} or any
+     *                                  element is {@code null}
+     * @throws IllegalArgumentException if no child matches
      */
     default Node getRequiredChild(String... descriptions) {
         return getChild(descriptions)
@@ -1043,13 +1085,13 @@ public sealed interface Node {
     }
 
     /**
-     * Finds a child node by its description within the current container node.
-     * If no child node with the specified description exists, an empty {@code Stream} is returned.
+     * Returns a single element stream that yields the first child whose
+     * description matches {@code description}, or an empty stream when
+     * none matches.
      *
-     * @param description the description of the child node to find; cannot be null
-     * @return a {@code Stream} containing the child node if one is found
-     *         with the specified description, otherwise an empty {@code Stream}
-     * @throws NullPointerException if the given description is null
+     * @param description the description to match
+     * @return a {@link Stream} that yields the matching child or nothing
+     * @throws NullPointerException if {@code description} is {@code null}
      */
     default Stream<Node> streamChild(String description) {
         Objects.requireNonNull(description, "description cannot be null");
@@ -1059,13 +1101,14 @@ public sealed interface Node {
     }
 
     /**
-     * Finds the first child node whose description matches one of the provided descriptions.
-     * The descriptions are checked in the same order they are provided.
+     * Returns a single element stream that yields the first child whose
+     * description matches any of the supplied descriptions, or an empty
+     * stream when none matches.
      *
-     * @param descriptions the descriptions of the child nodes to find; cannot be null
-     * @return a {@code Stream} containing the first matching child node if one is found,
-     *         otherwise an empty {@code Stream}
-     * @throws NullPointerException if the descriptions array or one of its values is null
+     * @param descriptions the descriptions to match
+     * @return a {@link Stream} that yields the matching child or nothing
+     * @throws NullPointerException if {@code descriptions} or any element
+     *                              is {@code null}
      */
     default Stream<Node> streamChild(String... descriptions) {
         return getChild(descriptions)
@@ -1073,12 +1116,12 @@ public sealed interface Node {
     }
 
     /**
-     * Finds all children nodes by their descriptions within the current container node.
-     * If no child node with the specified description exists, an empty {@code SequencedCollection} is returned.
+     * Returns every child whose description matches {@code description},
+     * preserving declaration order.
      *
-     * @param description the description of the children nodes to find; cannot be null
-     * @return a {@code SequencedCollection} containing the children nodes
-     * @throws NullPointerException if the given description is null
+     * @param description the description to match
+     * @return a sequenced collection of matching children, possibly empty
+     * @throws NullPointerException if {@code description} is {@code null}
      */
     default SequencedCollection<Node> getChildren(String description) {
         Objects.requireNonNull(description, "description cannot be null");
@@ -1089,12 +1132,13 @@ public sealed interface Node {
     }
 
     /**
-     * Finds all children nodes whose descriptions match any of the provided descriptions.
-     * The returned collection preserves the original child order.
+     * Returns every child whose description matches any of the supplied
+     * descriptions, preserving declaration order.
      *
-     * @param descriptions the descriptions of the child nodes to find; cannot be null
-     * @return a {@code SequencedCollection} containing the matching children nodes
-     * @throws NullPointerException if the descriptions array or one of its values is null
+     * @param descriptions the descriptions to match
+     * @return a sequenced collection of matching children, possibly empty
+     * @throws NullPointerException if {@code descriptions} or any element
+     *                              is {@code null}
      */
     default SequencedCollection<Node> getChildren(String... descriptions) {
         return streamChildren(descriptions)
@@ -1102,12 +1146,12 @@ public sealed interface Node {
     }
 
     /**
-     * Finds all children nodes by their descriptions within the current container node.
-     * If no child node with the specified description exists, an empty {@code Stream} is returned.
+     * Returns a stream of every child whose description matches
+     * {@code description}, preserving declaration order.
      *
-     * @param description the description of the children nodes to find; cannot be null
-     * @return an {@code Stream} containing the children nodes
-     * @throws NullPointerException if the given description is null
+     * @param description the description to match
+     * @return a {@link Stream} over the matching children
+     * @throws NullPointerException if {@code description} is {@code null}
      */
     default Stream<Node> streamChildren(String description) {
         Objects.requireNonNull(description, "description cannot be null");
@@ -1117,12 +1161,13 @@ public sealed interface Node {
     }
 
     /**
-     * Finds all children nodes whose descriptions match any of the provided descriptions.
-     * The returned stream preserves the original child order.
+     * Returns a stream of every child whose description matches any of the
+     * supplied descriptions, preserving declaration order.
      *
-     * @param descriptions the descriptions of the child nodes to find; cannot be null
-     * @return a {@code Stream} containing the matching children nodes
-     * @throws NullPointerException if the descriptions array or one of its values is null
+     * @param descriptions the descriptions to match
+     * @return a {@link Stream} over the matching children
+     * @throws NullPointerException if {@code descriptions} or any element
+     *                              is {@code null}
      */
     default Stream<Node> streamChildren(String... descriptions) {
         var descriptionSet = new LinkedHashSet<String>();
@@ -1137,10 +1182,12 @@ public sealed interface Node {
     }
 
     /**
-     * Checks whether this node has a child node with the specified description.
+     * Returns whether this node has at least one child whose description
+     * matches {@code description}.
      *
-     * @param description the description of the child node to check for; cannot be null
-     * @return {@code true} if a child node with the specified description exists, {@code false} otherwise
+     * @param description the description to match
+     * @return {@code true} when at least one child matches
+     * @throws NullPointerException if {@code description} is {@code null}
      */
     default boolean hasChild(String description) {
         Objects.requireNonNull(description, "description cannot be null");
@@ -1150,28 +1197,31 @@ public sealed interface Node {
     }
 
     /**
-     * Checks whether this node has a child whose description matches any of the provided descriptions.
+     * Returns whether this node has at least one child whose description
+     * matches any of the supplied descriptions.
      *
-     * @param descriptions the descriptions of the child nodes to check for; cannot be null
-     * @return {@code true} if any matching child node exists, {@code false} otherwise
-     * @throws NullPointerException if the descriptions array or one of its values is null
+     * @param descriptions the descriptions to match
+     * @return {@code true} when at least one child matches
+     * @throws NullPointerException if {@code descriptions} or any element
+     *                              is {@code null}
      */
     default boolean hasChild(String... descriptions) {
         return getChild(descriptions).isPresent();
     }
 
     /**
-     * A node variant that has no content, only a tag and attributes.
+     * Node variant that carries no content slot.
      *
-     * <p>Used for stanzas that convey their meaning entirely through the
-     * tag name and attributes, such as simple presence or ack stanzas.
+     * <p>Used for stanzas whose meaning is conveyed entirely by the tag
+     * name and attributes, such as simple presence updates or
+     * acknowledgements.
      *
-     * @param description the node's tag name
-     * @param attributes  the node's attribute map
+     * @param description the tag name
+     * @param attributes  the attribute map
      */
     record EmptyNode(String description, SequencedMap<String, NodeAttribute> attributes) implements Node {
         /**
-         * Constructs an empty node, rejecting null arguments.
+         * Builds an empty node, rejecting {@code null} arguments.
          *
          * @throws NullPointerException if any argument is {@code null}
          */
@@ -1189,6 +1239,7 @@ public sealed interface Node {
         public boolean hasContent() {
             return false;
         }
+
         @Override
         public boolean hasContent(String content) {
             return false;
@@ -1208,6 +1259,7 @@ public sealed interface Node {
         public boolean hasContent(byte[] content) {
             return false;
         }
+
         @Override
         public Optional<Jid> toContentJid() {
             return Optional.empty();
@@ -1237,7 +1289,7 @@ public sealed interface Node {
                 case null, default -> false;
             };
         }
-        
+
         @Override
         public int hashCode() {
             return Objects.hash(description, attributes);
@@ -1261,18 +1313,19 @@ public sealed interface Node {
     }
 
     /**
-     * A node variant whose content is a UTF-8 string.
+     * Node variant whose content is a UTF-8 string.
      *
      * <p>Used for stanzas whose payload is textual data such as a status
-     * message, a JID serialised as text, or an informational blurb.
+     * blurb, an identifier serialised as text, or a free form message
+     * body.
      *
-     * @param description the node's tag name
-     * @param attributes  the node's attribute map
-     * @param content     the text content
+     * @param description the tag name
+     * @param attributes  the attribute map
+     * @param content     the textual payload
      */
     record TextNode(String description, SequencedMap<String, NodeAttribute> attributes, String content) implements Node {
         /**
-         * Constructs a text node, rejecting null arguments.
+         * Builds a text node, rejecting {@code null} arguments.
          *
          * @throws NullPointerException if any argument is {@code null}
          */
@@ -1306,6 +1359,7 @@ public sealed interface Node {
         public boolean hasContent(byte[] content) {
             return content != null && Objects.equals(this.content, new String(content));
         }
+
         @Override
         public Optional<byte[]> toContentBytes() {
             return Optional.of(content.getBytes());
@@ -1339,17 +1393,17 @@ public sealed interface Node {
         @Override
         public boolean equals(Object o) {
             return switch (o) {
-                case EmptyNode(var thatDescription, var thatAttributes) -> Objects.equals(description, thatDescription) 
-                        && Objects.equals(attributes, thatAttributes) 
+                case EmptyNode(var thatDescription, var thatAttributes) -> Objects.equals(description, thatDescription)
+                        && Objects.equals(attributes, thatAttributes)
                         && content.isEmpty();
-                case TextNode(var thatDescription, var thatAttributes, var thatContent) -> Objects.equals(description, thatDescription) 
-                        && Objects.equals(attributes, thatAttributes) 
+                case TextNode(var thatDescription, var thatAttributes, var thatContent) -> Objects.equals(description, thatDescription)
+                        && Objects.equals(attributes, thatAttributes)
                         && hasContent(thatContent);
-                case JidNode(var thatDescription, var thatAttributes, var thatContent) -> Objects.equals(description, thatDescription) 
-                        && Objects.equals(attributes, thatAttributes) 
+                case JidNode(var thatDescription, var thatAttributes, var thatContent) -> Objects.equals(description, thatDescription)
+                        && Objects.equals(attributes, thatAttributes)
                         && hasContent(thatContent);
-                case BytesNode(var thatDescription, var thatAttributes, var thatContent) -> Objects.equals(description, thatDescription) 
-                        && Objects.equals(attributes, thatAttributes) 
+                case BytesNode(var thatDescription, var thatAttributes, var thatContent) -> Objects.equals(description, thatDescription)
+                        && Objects.equals(attributes, thatAttributes)
                         && hasContent(thatContent);
                 case null, default -> false;
             };
@@ -1359,6 +1413,7 @@ public sealed interface Node {
         public int hashCode() {
             return Objects.hash(description, attributes, content);
         }
+
         @Override
         public String toString() {
             var result = new StringBuilder();
@@ -1382,19 +1437,19 @@ public sealed interface Node {
     }
 
     /**
-     * A node variant whose content is a single {@link Jid}.
+     * Node variant whose content is a single {@link Jid}.
      *
-     * <p>Used for stanzas whose payload identifies a user, group, or
-     * device. The JID is serialised on the wire using one of the WAWap
-     * JID shapes rather than as plain text.
+     * <p>Used for stanzas whose payload addresses a user, group, or
+     * device. The JID is serialised on the wire under one of the
+     * supported JID shapes rather than as plain text.
      *
-     * @param description the node's tag name
-     * @param attributes  the node's attribute map
-     * @param content     the JID content
+     * @param description the tag name
+     * @param attributes  the attribute map
+     * @param content     the JID payload
      */
     record JidNode(String description, SequencedMap<String, NodeAttribute> attributes, Jid content) implements Node {
         /**
-         * Constructs a JID node, rejecting null arguments.
+         * Builds a JID node, rejecting {@code null} arguments.
          *
          * @throws NullPointerException if any argument is {@code null}
          */
@@ -1428,6 +1483,7 @@ public sealed interface Node {
         public boolean hasContent(byte[] content) {
             return content != null && Objects.equals(this.content.toString(), new String(content));
         }
+
         @Override
         public Optional<String> toContentString() {
             return Optional.of(content.toString());
@@ -1456,14 +1512,14 @@ public sealed interface Node {
         @Override
         public boolean equals(Object o) {
             return switch (o) {
-                case TextNode(var thatDescription, var thatAttributes, var thatContent) -> Objects.equals(description, thatDescription) 
-                        && Objects.equals(attributes, thatAttributes) 
+                case TextNode(var thatDescription, var thatAttributes, var thatContent) -> Objects.equals(description, thatDescription)
+                        && Objects.equals(attributes, thatAttributes)
                         && hasContent(thatContent);
-                case JidNode(var thatDescription, var thatAttributes, var thatContent) -> Objects.equals(description, thatDescription) 
-                        && Objects.equals(attributes, thatAttributes) 
+                case JidNode(var thatDescription, var thatAttributes, var thatContent) -> Objects.equals(description, thatDescription)
+                        && Objects.equals(attributes, thatAttributes)
                         && hasContent(thatContent);
-                case BytesNode(var thatDescription, var thatAttributes, var thatContent) -> Objects.equals(description, thatDescription) 
-                        && Objects.equals(attributes, thatAttributes) 
+                case BytesNode(var thatDescription, var thatAttributes, var thatContent) -> Objects.equals(description, thatDescription)
+                        && Objects.equals(attributes, thatAttributes)
                         && hasContent(thatContent);
                 case null, default -> false;
             };
@@ -1497,18 +1553,18 @@ public sealed interface Node {
     }
 
     /**
-     * A node variant whose content is a binary blob.
+     * Node variant whose content is an opaque binary blob.
      *
-     * <p>Used for stanzas that carry raw bytes such as encrypted payloads
-     * (Signal ciphertext), media thumbnails, or any other opaque data.
+     * <p>Used for stanzas that carry raw bytes such as Signal ciphertext,
+     * media thumbnails, or any other already encoded payload.
      *
-     * @param description the node's tag name
-     * @param attributes  the node's attribute map
-     * @param content     the binary content
+     * @param description the tag name
+     * @param attributes  the attribute map
+     * @param content     the binary payload
      */
     record BytesNode(String description, SequencedMap<String, NodeAttribute> attributes, byte[] content) implements Node {
         /**
-         * Constructs a bytes node, rejecting null arguments.
+         * Builds a bytes node, rejecting {@code null} arguments.
          *
          * @throws NullPointerException if any argument is {@code null}
          */
@@ -1568,6 +1624,7 @@ public sealed interface Node {
         public boolean hasContent(byte[] content) {
             return Arrays.equals(this.content, content);
         }
+
         @Override
         public SequencedCollection<Node> children() {
             return List.of();
@@ -1576,14 +1633,14 @@ public sealed interface Node {
         @Override
         public boolean equals(Object o) {
             return switch (o) {
-                case TextNode(var thatDescription, var thatAttributes, var thatContent) -> Objects.equals(description, thatDescription) 
-                        && Objects.equals(attributes, thatAttributes) 
+                case TextNode(var thatDescription, var thatAttributes, var thatContent) -> Objects.equals(description, thatDescription)
+                        && Objects.equals(attributes, thatAttributes)
                         && hasContent(thatContent);
-                case JidNode(var thatDescription, var thatAttributes, var thatContent) -> Objects.equals(description, thatDescription) 
-                        && Objects.equals(attributes, thatAttributes) 
+                case JidNode(var thatDescription, var thatAttributes, var thatContent) -> Objects.equals(description, thatDescription)
+                        && Objects.equals(attributes, thatAttributes)
                         && hasContent(thatContent);
-                case BytesNode(var thatDescription, var thatAttributes, var thatContent) -> Objects.equals(description, thatDescription) 
-                        && Objects.equals(attributes, thatAttributes) 
+                case BytesNode(var thatDescription, var thatAttributes, var thatContent) -> Objects.equals(description, thatDescription)
+                        && Objects.equals(attributes, thatAttributes)
                         && hasContent(thatContent);
                 case null, default -> false;
             };
@@ -1593,6 +1650,7 @@ public sealed interface Node {
         public int hashCode() {
             return Objects.hash(description, attributes, Arrays.hashCode(content));
         }
+
         @Override
         public String toString() {
             var result = new StringBuilder();
@@ -1621,19 +1679,19 @@ public sealed interface Node {
     }
 
     /**
-     * A node variant whose content is a sequence of child nodes.
+     * Node variant whose content is a sequence of child nodes.
      *
      * <p>This is the recursive case of the stanza tree: a container node
-     * groups a set of children under a common tag, matching the XML
-     * element-with-children shape used across the WhatsApp protocol.
+     * groups a list of children under a common tag, matching the XML
+     * element with children shape used across the WhatsApp protocol.
      *
-     * @param description the node's tag name
-     * @param attributes  the node's attribute map
-     * @param children    the child nodes in the order they appear
+     * @param description the tag name
+     * @param attributes  the attribute map
+     * @param children    the child nodes in declaration order
      */
     record ContainerNode(String description, SequencedMap<String, NodeAttribute> attributes, SequencedCollection<Node> children) implements Node {
         /**
-         * Constructs a container node, rejecting null arguments.
+         * Builds a container node, rejecting {@code null} arguments.
          *
          * @throws NullPointerException if any argument is {@code null}
          */
@@ -1672,6 +1730,7 @@ public sealed interface Node {
         public boolean hasContent(String content) {
             return false;
         }
+
         @Override
         public Optional<byte[]> toContentBytes() {
             return Optional.empty();

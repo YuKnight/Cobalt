@@ -133,15 +133,6 @@ public final class SmaxWaffleGenerateWAEntACUserRequest implements SmaxOperation
      * Builds the outbound IQ stanza.
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope
-     *
-     * @implNote {@code WASmaxOutWaffleGenerateWAEntACUserRequest.makeGenerateWAEntACUserRequest}
-     *           composes
-     *           {@code WASmaxOutWaffleBaseIQGetRequestMixin}
-     *           ({@code id=generateId()}, {@code type="get"}) over the
-     *           {@code <encryption_metadata/>}/{@code <timestamp/>}/{@code <disclosure id version lg lc/>}
-     *           triple inside an
-     *           {@code <iq xmlns="waffle" smax_id="37"
-     *           to=S_WHATSAPP_NET>} envelope.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutWaffleGenerateWAEntACUserRequest",

@@ -1,9 +1,11 @@
 package com.github.auties00.cobalt.wam.privatestats;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+
 import java.util.Objects;
 
 /**
- * Outcome of one upload attempt.
+ * Outcome of one private-stats buffer upload attempt.
  *
  * @param result           the categorised result code, mirroring
  *                         {@code WAWebWamEnumPsBufferUploadResult}
@@ -11,9 +13,11 @@ import java.util.Objects;
  *                         endpoint, or {@code -1} when the request
  *                         could not be sent
  */
+@WhatsAppWebModule(moduleName = "WAWebUploadPrivateStatsBackend")
+@WhatsAppWebModule(moduleName = "WAWebWamEnumPsBufferUploadResult")
 public record WamPrivateStatsUploadResult(Type result, int httpResponseCode) {
     /**
-     * Compact constructor that null-checks the result code.
+     * Validates the {@code result} component for null.
      *
      * @throws NullPointerException if {@code result} is {@code null}
      */
@@ -22,8 +26,9 @@ public record WamPrivateStatsUploadResult(Type result, int httpResponseCode) {
     }
 
     /**
-     * Categorised upload outcomes mirroring the {@code result} strings
-     * passed to the WA Web {@code PsBufferUploadWamEvent}.
+     * Categorised upload outcomes mirroring the {@code result}
+     * strings passed to the WhatsApp Web
+     * {@code PsBufferUploadWamEvent}.
      */
     public enum Type {
         /**

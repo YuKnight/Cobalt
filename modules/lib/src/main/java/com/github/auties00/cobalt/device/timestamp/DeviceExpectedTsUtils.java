@@ -10,37 +10,28 @@ import java.time.Instant;
 import java.util.Objects;
 
 /**
- * Utility methods that implement WhatsApp's "expected timestamp" staleness logic for
+ * Utility methods that implement WhatsApp's expected-timestamp staleness logic for
  * device lists.
  *
- * <p>A device list that the server rejects with a matching dhash is not necessarily
- * up-to-date: the server may know that a newer list exists but choose not to send it,
- * instead indicating the "expected" next timestamp. Cobalt (like WA Web) tracks three
- * timestamps per device record to reason about this: the expected timestamp, when it
- * was last updated, and which ADV job run observed it. These helpers produce new
- * values of those fields and decide when a record should be refreshed, cleared, or
- * treated as expired.
+ * <p>A device list whose dhash matches the server's is not necessarily up-to-date:
+ * the server may know a newer list exists but choose not to send it, instead
+ * indicating the expected next timestamp. Cobalt mirrors WA Web by tracking three
+ * timestamps per device record (the expected timestamp, when it was last updated,
+ * and which ADV job run observed it) and using them to refresh, clear, or expire
+ * records.
  *
- * <p>Consumed by {@link com.github.auties00.cobalt.device.DeviceService} during every
- * USync response handling path and by
- * {@link com.github.auties00.cobalt.device.adv.DeviceADVChecker} during periodic
- * device list expiration checks.
- *
- * @implNote WAWebAdvExpectedTsApi: provides the original implementation for
- * expectedTs, expectedTsLastDeviceJobTs, and expectedTsUpdateTs tracking.
- * WAWebAdvDeviceInfoCheckJob: provides staleness and expiration check logic.
+ * <p>Consumed by {@link com.github.auties00.cobalt.device.DeviceService} during
+ * USync response handling and by
+ * {@link com.github.auties00.cobalt.device.adv.DeviceADVChecker} during the
+ * periodic expiration check.
  */
 @WhatsAppWebModule(moduleName = "WAWebAdvExpectedTsApi")
 @WhatsAppWebModule(moduleName = "WAWebAdvDeviceInfoCheckJob")
 public final class DeviceExpectedTsUtils {
 
     /**
-     * Threshold for expected timestamp staleness checks in the ADV scheduler.
-     * Corresponds to {@code 25 * HOUR_SECONDS} in WA Web.
-     *
-     * @implNote WAWebAdvDeviceInfoCheckJob: uses {@code 25 * HOUR_SECONDS} as the
-     * threshold constant {@code m} for determining whether expectedTsUpdateTs
-     * indicates a stale device list.
+     * Staleness threshold (25 hours) used by the ADV scheduler when comparing the
+     * expected-timestamp update instant.
      */
     @WhatsAppWebExport(moduleName = "WAWebAdvDeviceInfoCheckJob",
             exports = "runAdvDeviceInfoCheck",
@@ -48,9 +39,9 @@ public final class DeviceExpectedTsUtils {
     private static final Duration EXPECTED_TIMESTAMP_UPDATE_THRESHOLD = Duration.ofHours(25);
 
     /**
-     * Prevents instantiation of this utility class.
+     * Prevents instantiation.
      *
-     * @throws UnsupportedOperationException always, to enforce the utility-class idiom
+     * @throws UnsupportedOperationException always
      */
     private DeviceExpectedTsUtils() {
         throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
@@ -85,15 +76,12 @@ public final class DeviceExpectedTsUtils {
 
         var cachedExpectedTimestamp = cachedList.expectedTimestamp();
 
-        // WAWebAdvExpectedTsApi.shouldClearExpectedTs condition 1:
-        // Clear when server timestamp >= cached expectedTs (server has caught up)
+        // The server has caught up, so the expectation is no longer interesting.
         if (!incomingTimestamp.isBefore(cachedExpectedTimestamp)) {
             return true;
         }
 
-        // WAWebAdvExpectedTsApi.shouldClearExpectedTs condition 2:
-        // Clear when incoming expectedTs matches cached AND the last ADV job check
-        // occurred after the cached job timestamp (staleness detected across job runs)
+        // The expectation is unchanged but a fresh ADV job ran after the cached one.
         if (incomingExpectedTimestamp == null || !incomingExpectedTimestamp.equals(cachedExpectedTimestamp) || lastADVCheckTime == null) {
             return false;
         }
@@ -149,8 +137,6 @@ public final class DeviceExpectedTsUtils {
             DeviceList cachedList,
             Instant lastADVCheckTime
     ) {
-        // WAWebAdvExpectedTsApi.computeExpectedTsForDeviceRecord: var r=t==null?void 0:t.timestamp
-        // Returns empty result if cachedList is null OR cachedList.timestamp is null
         if (cachedList == null) {
             return new ExpectedTimestampResult(null, null, null);
         }
@@ -163,8 +149,7 @@ public final class DeviceExpectedTsUtils {
         Instant currentExpectedTimestampLastDeviceJobTimestamp = null;
         Instant currentExpectedTimestampUpdateTimestamp = null;
 
-        // WAWebAdvExpectedTsApi.computeExpectedTsForDeviceRecord:
-        // Only extract existing values from non-deleted records
+        // Existing values are only carried forward from non-deleted records.
         if (!cachedList.deleted()) {
             currentExpectedTimestamp = cachedList.expectedTimestamp();
             currentExpectedTimestampLastDeviceJobTimestamp = cachedList.expectedTimestampLastDeviceJobTimestamp();
@@ -216,21 +201,16 @@ public final class DeviceExpectedTsUtils {
                 currentExpectedTimestampUpdateTimestamp
         );
 
-        // WAWebAdvExpectedTsApi.computeNewExpectedTs:
-        // If current timestamp is already >= incoming, no update needed
         if (!currentTimestamp.isBefore(incomingTimestamp)) {
             return result;
         }
 
-        // WAWebAdvExpectedTsApi.computeNewExpectedTs:
-        // If current expectedTs is already >= incoming, no update needed
         if (currentExpectedTimestamp != null && !currentExpectedTimestamp.isBefore(incomingTimestamp)) {
             return result;
         }
 
-        // WAWebAdvExpectedTsApi.computeNewExpectedTs:
-        // Update expectedTsUpdateTs only when setting a new expectedTs target
-        // (i.e., when there's no existing expectedTs or current has caught up to it)
+        // The update instant is refreshed only when a new expectation target is set,
+        // not when the existing one is reaffirmed.
         var newExpectedTimestampUpdateTimestamp = currentExpectedTimestampUpdateTimestamp;
         if (currentExpectedTimestamp == null || !currentTimestamp.isBefore(currentExpectedTimestamp)) {
             newExpectedTimestampUpdateTimestamp = Instant.now();
@@ -265,26 +245,20 @@ public final class DeviceExpectedTsUtils {
     ) {
         var timestamp = deviceList.timestamp();
 
-        // WAWebAdvDeviceInfoCheckJob.S: e-n.timestamp>=t
-        // Device list is stale if timestamp exceeds the expiry threshold
         if (Duration.between(timestamp, currentTime).compareTo(expiryThreshold) >= 0) {
             return true;
         }
 
-        // WAWebAdvDeviceInfoCheckJob.S: n.expectedTsUpdateTs!=null
         var expectedTimestampUpdateTimestamp = deviceList.expectedTimestampUpdateTimestamp();
         if (expectedTimestampUpdateTimestamp == null) {
             return false;
         }
 
-        // WAWebAdvDeviceInfoCheckJob.S: e-n.expectedTsUpdateTs>=m (m=25*HOUR_SECONDS)
         var elapsedSinceUpdate = Duration.between(expectedTimestampUpdateTimestamp, currentTime);
         if (elapsedSinceUpdate.compareTo(EXPECTED_TIMESTAMP_UPDATE_THRESHOLD) < 0) {
             return false;
         }
 
-        // WAWebAdvDeviceInfoCheckJob.S: n.expectedTsLastDeviceJobTs!==r
-        // Uses !== (strict inequality) in JS, which means both-null returns false
         var expectedTimestampLastDeviceJobTimestamp = deviceList.expectedTimestampLastDeviceJobTimestamp();
         return !Objects.equals(expectedTimestampLastDeviceJobTimestamp, lastADVCheckTime);
     }
@@ -312,12 +286,10 @@ public final class DeviceExpectedTsUtils {
     ) {
         var timestamp = deviceList.timestamp();
 
-        // WAWebAdvDeviceInfoCheckJob.R: e-n.timestamp>=t
         if (Duration.between(timestamp, currentTime).compareTo(warningThreshold) >= 0) {
             return true;
         }
 
-        // WAWebAdvDeviceInfoCheckJob.R: n.expectedTs!=null?n.expectedTs>n.timestamp:!1
         var expectedTimestamp = deviceList.expectedTimestamp();
         return expectedTimestamp != null && expectedTimestamp.isAfter(timestamp);
     }

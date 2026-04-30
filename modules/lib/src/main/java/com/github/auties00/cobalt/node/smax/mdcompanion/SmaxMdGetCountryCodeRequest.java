@@ -13,7 +13,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps the bare
+ * The outbound stanza variant. Wraps the bare
  * {@code <link_code_companion_reg stage="get_country_code"/>} payload
  * in the canonical {@code <iq xmlns="md" type="get" to="s.whatsapp.net">}
  * envelope.

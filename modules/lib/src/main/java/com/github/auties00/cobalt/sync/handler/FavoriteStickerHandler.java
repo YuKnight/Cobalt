@@ -69,7 +69,7 @@ public final class FavoriteStickerHandler implements WebAppStateActionHandler {
      *
      * @implNote WAWebMiscGatingUtils.isFavoriteStickersEnabled — primary feature key
      */
-    private static final String FAVORITE_STICKER_FEATURE = "favorite_sticker"; // WAWebMiscGatingUtils.isFavoriteStickersEnabled: primaryFeatureEnabled("favorite_sticker")
+    private static final String FAVORITE_STICKER_FEATURE = "favorite_sticker";
 
     /**
      * The singleton instance of {@code FavoriteStickerHandler}.
@@ -101,7 +101,7 @@ public final class FavoriteStickerHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebStickersFavoriteSyncAction", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return StickerAction.ACTION_NAME; // WAWebStickersFavoriteSyncAction.getAction
+        return StickerAction.ACTION_NAME;
     }
 
     /**
@@ -114,18 +114,16 @@ public final class FavoriteStickerHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebStickersFavoriteSyncAction", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return StickerAction.COLLECTION_NAME; // WAWebStickersFavoriteSyncAction constructor: this.collectionName = RegularLow
+        return StickerAction.COLLECTION_NAME;
     }
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote WAWebStickersFavoriteSyncAction.getVersion — returns the literal {@code 7}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebStickersFavoriteSyncAction", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return StickerAction.ACTION_VERSION; // WAWebStickersFavoriteSyncAction.getVersion: return 7
+        return StickerAction.ACTION_VERSION;
     }
 
     /**
@@ -187,43 +185,41 @@ public final class FavoriteStickerHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebStickersFavoriteSyncAction", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        if (mutation.operation() != SyncdOperation.SET) { // WAWebStickersFavoriteSyncAction.applyMutations: if (e.operation !== "set") return a++, {actionState: Unsupported}
-            return MutationApplicationResult.unsupported(); // WAWebStickersFavoriteSyncAction.applyMutations: a++, {actionState: SyncActionState.Unsupported}
+        if (mutation.operation() != SyncdOperation.SET) {
+            return MutationApplicationResult.unsupported();
         }
 
-        try { // WAWebStickersFavoriteSyncAction.applyMutations: try { ... } catch (e) { return {actionState: Failed} }
-            var indexArray = JSON.parseArray(mutation.index()); // WAWebStickersFavoriteSyncAction.applyMutations: var t = e.indexParts
-            var stickerHash = indexArray.getString(1); // WAWebStickersFavoriteSyncAction.applyMutations: var u = t[1]
-            if (stickerHash == null || stickerHash.isEmpty()) { // WAWebStickersFavoriteSyncAction.applyMutations: if (!u)
-                return malformedActionIndex(); // WAWebStickersFavoriteSyncAction.applyMutations: return r.malformedActionIndex()
+        try {
+            var indexArray = JSON.parseArray(mutation.index());
+            var stickerHash = indexArray.getString(1);
+            if (stickerHash == null || stickerHash.isEmpty()) {
+                return malformedActionIndex();
             }
 
-            if (!(mutation.value().action().orElse(null) instanceof StickerAction action)) { // WAWebStickersFavoriteSyncAction.applyMutations: var c = s.stickerAction; if (c == null)
-                return malformedActionValue(); // WAWebStickersFavoriteSyncAction.applyMutations: i++, WAWebSyncdIndexUtils.malformedActionValue(r.collectionName)
+            if (!(mutation.value().action().orElse(null) instanceof StickerAction action)) {
+                return malformedActionValue();
             }
-            // WAWebStickersFavoriteSyncAction.applyMutations: destructured fields from c — deviceIdHint, directPath, fileEncSha256, height, isFavorite, mediaKey, mimetype, width
             // ADAPTED: WAWebStickersFavoriteSyncAction.applyMutations — WA Web checks if (g == null) on the protobuf isFavorite flag and returns malformedActionValue.
             // Cobalt's StickerAction.isFavorite() accessor coalesces a null protobuf field to false per the project's "no Optional<Boolean>" rule, so the malformed-on-null check is intentionally not replicated here.
-            if (!client.store().primaryFeatures().contains(FAVORITE_STICKER_FEATURE)) { // WAWebStickersFavoriteSyncAction.applyMutations: if (!WAWebMiscGatingUtils.isFavoriteStickersEnabled())
-                return MutationApplicationResult.orphan(stickerHash, "FavoriteSticker"); // WAWebStickersFavoriteSyncAction.applyMutations: l++, {actionState: Orphan, orphanModel: {modelId: u, modelType: SyncModelType.FavoriteSticker}}
+            if (!client.store().primaryFeatures().contains(FAVORITE_STICKER_FEATURE)) {
+                return MutationApplicationResult.orphan(stickerHash, "FavoriteSticker");
             }
 
-            if (action.isFavorite()) { // WAWebStickersFavoriteSyncAction.applyMutations: if (g)
-                if (client.store().findFavouriteSticker(stickerHash).isPresent()) { // WAWebStickersFavoriteSyncAction.applyMutations: if (FavoriteStickerCollection.get(u))
-                    return MutationApplicationResult.success(); // WAWebStickersFavoriteSyncAction.applyMutations: m++, {actionState: Success}
+            if (action.isFavorite()) {
+                if (client.store().findFavouriteSticker(stickerHash).isPresent()) {
+                    return MutationApplicationResult.success();
                 }
-                // WAWebStickersFavoriteSyncAction.applyMutations: var b = new StickerModel({id: u, directPath: p, filehash: u, encFilehash: _ ? encodeB64(_) : "", mediaKey: h != null ? encodeB64(h) : "", mediaKeyTimestamp: n, width: C, height: f, mimetype: y})
-                var sticker = action.toSticker(); // WAWebStickersFavoriteSyncAction.applyMutations: new StickerModel({...})
-                sticker.setTimestamp(mutation.timestamp().getEpochSecond()); // WAWebStickersFavoriteSyncAction.applyMutations: mediaKeyTimestamp: n (and FavoriteStickerModel.timestamp: t)
-                client.store().addFavouriteSticker(stickerHash, sticker); // WAWebStickersFavoriteSyncAction.applyMutations: yield FavoriteStickerCollection.addOrUpdateStickers([b], n, d)
-            } else { // WAWebStickersFavoriteSyncAction.applyMutations: else (g is false)
+                var sticker = action.toSticker();
+                sticker.setTimestamp(mutation.timestamp().getEpochSecond());
+                client.store().addFavouriteSticker(stickerHash, sticker);
+            } else {
                 // ADAPTED: WAWebStickersFavoriteSyncAction.applyMutations — WA Web reads the entry first (var v = FavoriteStickerCollection.get(u)) and short-circuits with Success when absent, otherwise calls removeAndSave(u). Cobalt's removeFavouriteSticker is idempotent (returns Optional), so the explicit pre-check would be redundant; the observable outcome is identical.
-                client.store().removeFavouriteSticker(stickerHash); // WAWebStickersFavoriteSyncAction.applyMutations: FavoriteStickerCollection.removeAndSave(u)
+                client.store().removeFavouriteSticker(stickerHash);
             }
 
-            return MutationApplicationResult.success(); // WAWebStickersFavoriteSyncAction.applyMutations: return {actionState: Success}
-        } catch (Exception e) { // WAWebStickersFavoriteSyncAction.applyMutations: catch (e) { return {actionState: Failed} }
-            return MutationApplicationResult.failed(); // WAWebStickersFavoriteSyncAction.applyMutations: {actionState: SyncActionState.Failed}
+            return MutationApplicationResult.success();
+        } catch (Exception e) {
+            return MutationApplicationResult.failed();
         }
     }
 
@@ -255,22 +251,22 @@ public final class FavoriteStickerHandler implements WebAppStateActionHandler {
      */
     @WhatsAppWebExport(moduleName = "WAWebStickersFavoriteSyncAction", exports = "generateFavoriteSyncMutation", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncPendingMutation getFavoriteStickerMutation(String stickerHash, boolean favorite) {
-        var action = new StickerActionBuilder() // WAWebStickersFavoriteSyncAction: {stickerAction: {isFavorite: a}}
-                .isFavorite(favorite) // WAWebStickersFavoriteSyncAction.applyMutations: isFavorite field
+        var action = new StickerActionBuilder()
+                .isFavorite(favorite)
                 .build();
-        var timestamp = Instant.now(); // WAWebSyncdActionUtils.buildPendingMutation: timestamp: unixTime()
-        var value = new SyncActionValueBuilder() // WAWebSyncdActionUtils.buildPendingMutation: encodeProtobuf(SyncActionValueSpec, ...)
-                .timestamp(timestamp) // WAWebSyncdActionUtils.buildPendingMutation: timestamp: i
-                .stickerAction(action) // WAWebStickersFavoriteSyncAction: {stickerAction: ...}
+        var timestamp = Instant.now();
+        var value = new SyncActionValueBuilder()
+                .timestamp(timestamp)
+                .stickerAction(action)
                 .build();
-        var index = JSON.toJSONString(List.of(StickerAction.ACTION_NAME, stickerHash)); // WAWebSyncdActionUtils.buildPendingMutation: index = JSON.stringify([action].concat(indexArgs))
+        var index = JSON.toJSONString(List.of(StickerAction.ACTION_NAME, stickerHash));
         var mutation = new DecryptedMutation.Trusted(
                 index,
                 value,
-                SyncdOperation.SET, // WAWebStickersFavoriteSyncAction: operation: SyncdMutation$SyncdOperation.SET
+                SyncdOperation.SET,
                 timestamp,
-                StickerAction.ACTION_VERSION // WAWebStickersFavoriteSyncAction.getVersion: 7
+                StickerAction.ACTION_VERSION
         );
-        return new SyncPendingMutation(mutation, 0); // WAWebSyncdActionUtils.buildPendingMutation
+        return new SyncPendingMutation(mutation, 0);
     }
 }

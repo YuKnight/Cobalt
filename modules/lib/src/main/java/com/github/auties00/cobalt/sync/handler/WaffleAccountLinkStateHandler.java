@@ -81,7 +81,7 @@ public final class WaffleAccountLinkStateHandler implements WebAppStateActionHan
     @Override
     @WhatsAppWebExport(moduleName = "WAWebWaffleAccountLinkStateSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return WaffleAccountLinkStateAction.ACTION_NAME; // WAWebWaffleAccountLinkStateSync.getAction
+        return WaffleAccountLinkStateAction.ACTION_NAME;
     }
 
     /**
@@ -94,18 +94,16 @@ public final class WaffleAccountLinkStateHandler implements WebAppStateActionHan
     @Override
     @WhatsAppWebExport(moduleName = "WAWebWaffleAccountLinkStateSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return WaffleAccountLinkStateAction.COLLECTION_NAME; // WAWebWaffleAccountLinkStateSync constructor: this.collectionName = RegularHigh
+        return WaffleAccountLinkStateAction.COLLECTION_NAME;
     }
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote WAWebWaffleAccountLinkStateSync.getVersion — returns the literal {@code 1}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebWaffleAccountLinkStateSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return WaffleAccountLinkStateAction.ACTION_VERSION; // WAWebWaffleAccountLinkStateSync.getVersion: return 1
+        return WaffleAccountLinkStateAction.ACTION_VERSION;
     }
 
     /**
@@ -158,48 +156,42 @@ public final class WaffleAccountLinkStateHandler implements WebAppStateActionHan
     @Override
     @WhatsAppWebExport(moduleName = "WAWebWaffleAccountLinkStateSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public List<MutationApplicationResult> applyMutationBatchResults(WhatsAppClient client, WamService wamService, List<DecryptedMutation.Trusted> mutations) {
-        var accountLinkingEnabled = client.abPropsService().getBool(ABProp.WEB_WAFFLE); // WAWebWaffleAccountLinkStateSync.applyMutations: WAWebAccountLinkingGatingUtils.accountLinkingEnabled() -> getABPropConfigValue("web_waffle")
-        DecryptedMutation.Trusted latest = null; // WAWebWaffleAccountLinkStateSync.applyMutations: var a
-        var results = new ArrayList<MutationApplicationResult>(mutations.size()); // WAWebWaffleAccountLinkStateSync.applyMutations: var u = t.map(...)
-        for (var mutation : mutations) { // WAWebWaffleAccountLinkStateSync.applyMutations: t.map(function(e) {...})
-            if (!accountLinkingEnabled) { // WAWebWaffleAccountLinkStateSync.applyMutations: accountLinkingEnabled() ? (...) : {actionState: Unsupported}
-                results.add(MutationApplicationResult.unsupported()); // WAWebWaffleAccountLinkStateSync.applyMutations: {actionState: Unsupported}
+        var accountLinkingEnabled = client.abPropsService().getBool(ABProp.WEB_WAFFLE);
+        DecryptedMutation.Trusted latest = null;
+        var results = new ArrayList<MutationApplicationResult>(mutations.size());
+        for (var mutation : mutations) {
+            if (!accountLinkingEnabled) {
+                results.add(MutationApplicationResult.unsupported());
                 continue;
             }
 
-            if (mutation.operation() != SyncdOperation.SET) { // WAWebWaffleAccountLinkStateSync.applyMutations: e.operation !== "set"
-                results.add(MutationApplicationResult.unsupported()); // WAWebWaffleAccountLinkStateSync.applyMutations: i++, {actionState: Unsupported}
+            if (mutation.operation() != SyncdOperation.SET) {
+                results.add(MutationApplicationResult.unsupported());
                 continue;
             }
 
-            // WAWebWaffleAccountLinkStateSync.applyMutations: ((t = e.value.waffleAccountLinkStateAction) == null ? void 0 : t.linkState) == null
             if (!(mutation.value().action().orElse(null) instanceof WaffleAccountLinkStateAction action)
                     || action.linkState().isEmpty()) {
-                results.add(malformedActionValue()); // WAWebWaffleAccountLinkStateSync.applyMutations: l++, WAWebSyncdIndexUtils.malformedActionValue(n.collectionName)
+                results.add(malformedActionValue());
                 continue;
             }
 
-            if (latest == null || mutation.timestamp().compareTo(latest.timestamp()) > 0) { // WAWebWaffleAccountLinkStateSync.applyMutations: a == null || e.timestamp > a.timestamp
-                latest = mutation; // WAWebWaffleAccountLinkStateSync.applyMutations: a = e
+            if (latest == null || mutation.timestamp().compareTo(latest.timestamp()) > 0) {
+                latest = mutation;
             }
-            results.add(MutationApplicationResult.success()); // WAWebWaffleAccountLinkStateSync.applyMutations: {actionState: Success}
+            results.add(MutationApplicationResult.success());
         }
-        // WAWebWaffleAccountLinkStateSync.applyMutations: WALogger.WARN("waffleaccountlinkstate sync: i operations not supported") and WARN("waffleaccountlinkstate sync: l malformed mutations"), skipped, telemetry/logging
-        if (latest != null) { // WAWebWaffleAccountLinkStateSync.applyMutations: if (a != null)
-            // WAWebWaffleAccountLinkStateSync.applyMutations: var m = mapToAccountLinkState(NULL_THROWS(a.value.waffleAccountLinkStateAction.linkState))
+        if (latest != null) {
             var action = (WaffleAccountLinkStateAction) latest.value().action().orElseThrow();
             var linkState = action.linkState().orElseThrow();
-            // WAWebWaffleAccountLinkStateSync.applyMutations: var p = Number(NULL_THROWS(a.value.timestamp)), a.value.timestamp == mutation.timestamp() in Cobalt
-            // WAWebWaffleAccountLinkStateSync.applyMutations: yield this.storeLinkState(m, p) -> u.createOrUpdateAccountLinkingState({accountLinkKey, linkState, linkTimestamp})
             client.store().setWaffleAccountLinkState(linkState); // ADAPTED: WAWebAccountLinkingDBOperations_DO_NOT_USE_DIRECTLY.createOrUpdateAccountLinkingState — Cobalt flattens the account-linking record into store fields
             client.store().setWaffleAccountLinkStateTimestamp(latest.timestamp()); // ADAPTED: createOrUpdateAccountLinkingState linkTimestamp field
-            // WAWebWaffleAccountLinkStateSync.applyMutations: m === AccountLinkState.Active && (yield requestNonceFromPrimary())
             if (linkState == WaffleAccountLinkStateAction.AccountLinkState.ACTIVE) {
-                requestNonceFromPrimary(client, wamService); // WAWebAccountLinkingNonceFetchAPI.requestNonceFromPrimary
+                requestNonceFromPrimary(client, wamService);
             }
         }
 
-        return results; // WAWebWaffleAccountLinkStateSync.applyMutations: return u
+        return results;
     }
 
     /**
@@ -223,29 +215,26 @@ public final class WaffleAccountLinkStateHandler implements WebAppStateActionHan
     @Override
     @WhatsAppWebExport(moduleName = "WAWebWaffleAccountLinkStateSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        if (!client.abPropsService().getBool(ABProp.WEB_WAFFLE)) { // WAWebWaffleAccountLinkStateSync.applyMutations: WAWebAccountLinkingGatingUtils.accountLinkingEnabled() == false branch
-            return MutationApplicationResult.unsupported(); // WAWebWaffleAccountLinkStateSync.applyMutations: {actionState: Unsupported}
+        if (!client.abPropsService().getBool(ABProp.WEB_WAFFLE)) {
+            return MutationApplicationResult.unsupported();
         }
 
-        if (mutation.operation() != SyncdOperation.SET) { // WAWebWaffleAccountLinkStateSync.applyMutations: e.operation !== "set"
-            return MutationApplicationResult.unsupported(); // WAWebWaffleAccountLinkStateSync.applyMutations: {actionState: Unsupported}
+        if (mutation.operation() != SyncdOperation.SET) {
+            return MutationApplicationResult.unsupported();
         }
 
-        // WAWebWaffleAccountLinkStateSync.applyMutations: (e.value.waffleAccountLinkStateAction?.linkState) == null
         if (!(mutation.value().action().orElse(null) instanceof WaffleAccountLinkStateAction action)
                 || action.linkState().isEmpty()) {
-            return malformedActionValue(); // WAWebWaffleAccountLinkStateSync.applyMutations: WAWebSyncdIndexUtils.malformedActionValue(n.collectionName)
+            return malformedActionValue();
         }
 
-        var linkState = action.linkState().orElseThrow(); // WAWebWaffleAccountLinkStateSync.applyMutations: NULL_THROWS(a.value.waffleAccountLinkStateAction.linkState)
-        // WAWebWaffleAccountLinkStateSync.applyMutations: yield this.storeLinkState(m, p) -> u.createOrUpdateAccountLinkingState({accountLinkKey, linkState, linkTimestamp})
+        var linkState = action.linkState().orElseThrow();
         client.store().setWaffleAccountLinkState(linkState); // ADAPTED: WAWebAccountLinkingDBOperations_DO_NOT_USE_DIRECTLY.createOrUpdateAccountLinkingState — Cobalt flattens the account-linking record into store fields
         client.store().setWaffleAccountLinkStateTimestamp(mutation.timestamp()); // ADAPTED: createOrUpdateAccountLinkingState linkTimestamp field
-        // WAWebWaffleAccountLinkStateSync.applyMutations: m === AccountLinkState.Active && (yield requestNonceFromPrimary())
         if (linkState == WaffleAccountLinkStateAction.AccountLinkState.ACTIVE) {
-            requestNonceFromPrimary(client, wamService); // WAWebAccountLinkingNonceFetchAPI.requestNonceFromPrimary
+            requestNonceFromPrimary(client, wamService);
         }
-        return MutationApplicationResult.success(); // WAWebWaffleAccountLinkStateSync.applyMutations: {actionState: Success}
+        return MutationApplicationResult.success();
     }
 
     /**
@@ -278,27 +267,25 @@ public final class WaffleAccountLinkStateHandler implements WebAppStateActionHan
             return; // ADAPTED: defensive guard against missing own JID; WA Web throws via getMePnUserOrThrow_DO_NOT_USE
         }
 
-        var request = new PeerDataOperationRequestMessageBuilder() // WAWebSendNonMessageDataRequest.L: var n = {peerDataOperationRequestType: e, requestUrlPreview: [], requestStickerReupload: [], placeholderMessageResendRequest: []}
-                .peerDataOperationRequestType(PeerDataOperationRequestType.WAFFLE_LINKING_NONCE_FETCH) // WAWebSendNonMessageDataRequest.L: case Message$PeerDataOperationRequestType.WAFFLE_LINKING_NONCE_FETCH: break (no extra fields)
+        var request = new PeerDataOperationRequestMessageBuilder()
+                .peerDataOperationRequestType(PeerDataOperationRequestType.WAFFLE_LINKING_NONCE_FETCH)
                 .build();
         var protocol = new ProtocolMessageBuilder() // ADAPTED: WAWebSendNonMessageDataRequest wraps in protocol msg via send pipeline
-                .type(ProtocolMessage.Type.PEER_DATA_OPERATION_REQUEST_MESSAGE) // WAWebSendNonMessageDataRequest.k: type: "protocol", subtype: "peer_data_operation_request_message"
-                .peerDataOperationRequestMessage(request) // WAWebSendNonMessageDataRequest.k: peerDataOperationRequestMessage: e
+                .type(ProtocolMessage.Type.PEER_DATA_OPERATION_REQUEST_MESSAGE)
+                .peerDataOperationRequestMessage(request)
                 .build();
         var container = new MessageContainerBuilder() // ADAPTED: WAWebSendNonMessageDataRequest wraps in message container via send pipeline
                 .protocolMessage(protocol)
                 .build();
-        // WAWebNonMessageDataRequestLoggingUtils.logNonMessagePeerDataRequest: emitted for every
         // fanout message in WAWebSendNonMessageDataRequest.sendPeerDataOperationRequest. For
         // WAFFLE_LINKING_NONCE_FETCH WAWebNonMessageDataRequestLoggingUtils.d returns 1,
-        // WAWebNonMessageDataRequestLoggingUtils.m maps to PEER_DATA_REQUEST_TYPE.WAFFLE_LINKING_NONCE_FETCH,
         // and peerDataRequestSessionId is the outbound peer message key id (t.id.id).
-        var sessionId = MessageIdGenerator.generate(MessageIdVersion.V2, me); // WAWebSendNonMessageDataRequest.D: yield WAWebMsgKey.newId()
+        var sessionId = MessageIdGenerator.generate(MessageIdVersion.V2, me);
         wamService.commit(new NonMessagePeerDataRequestEventBuilder()
                 .peerDataRequestCount(1)
                 .peerDataRequestType(PeerDataRequestType.WAFFLE_LINKING_NONCE_FETCH)
                 .peerDataRequestSessionId(sessionId)
                 .build());
-        client.sendMessage(me.withDevice(0), container); // WAWebSendNonMessageDataRequest.k non-fanout path: createDeviceWidFromUserAndDevice(getMeDevicePnOrThrow().user, getMeDevicePnOrThrow().server, 0); WAWebSendAppStateSyncMsgJob.encryptAndSendKeyMsg
+        client.sendMessage(me.withDevice(0), container);
     }
 }

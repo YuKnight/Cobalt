@@ -5,16 +5,13 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 /**
  * Success result of {@code WAWebUsyncPicture.pictureParser}.
  *
- * <p>Carries the profile-picture id; can be passed to the media service
- * to download the actual JPEG payload.
- *
- * @implNote WAWebUsyncPicture.pictureParser: success branch returns
- *     {@code {id: e.attrInt("id")}}.
+ * <p>Carries the profile-picture id and can be passed to the media service to
+ * download the actual JPEG payload.
  */
 @WhatsAppWebModule(moduleName = "WAWebUsyncPicture")
 public final class PictureResult implements UsyncProtocolResponse {
     /**
-     * The profile-picture id.
+     * Holds the profile-picture id.
      */
     private final int id;
 

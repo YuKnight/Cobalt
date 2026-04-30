@@ -69,7 +69,6 @@ public final class GroupInvitePreviewResolver {
      *                   {@code link_preview_wait_time}
      * @return the preview details and inline thumbnail, or empty when
      *         the lookup failed
-     * @implNote WAWebLinkPreviewGroupUtils.getGroupInviteLinkPreview.
      */
     @WhatsAppWebExport(moduleName = "WAWebLinkPreviewGroupUtils", exports = "getGroupInviteLinkPreview",
             adaptation = WhatsAppAdaptation.ADAPTED)

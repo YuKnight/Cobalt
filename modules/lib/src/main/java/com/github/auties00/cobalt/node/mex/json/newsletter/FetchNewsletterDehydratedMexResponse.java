@@ -21,11 +21,7 @@ import java.util.Optional;
 import java.util.OptionalLong;
 
 /**
- * The response variant of {@link FetchNewsletterDehydratedMexResponse} that exposes the data
- * returned by the server after a successful query.
- *
- * @implNote WAWebMexFetchNewsletterDehydratedJob: adapts the JSON root returned by the GraphQL
- * query into a Java value object.
+ * Response variant for {@link FetchNewsletterDehydratedMexRequest} carrying the parsed server reply.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexFetchNewsletterDehydratedJob")
 public final class FetchNewsletterDehydratedMexResponse implements MexOperation.Response.Json {
@@ -42,9 +38,6 @@ public final class FetchNewsletterDehydratedMexResponse implements MexOperation.
     /**
      * Parses a MEX response from the given IQ response node.
      *
-     * @implNote WAWebMexFetchNewsletterDehydratedJob.mexGetNewsletterDehydrated: WA Web relies on the
-     * GraphQL client to unwrap the response. Cobalt performs the
-     * unwrapping manually from the IQ {@code <result>} child.
      * @param node the IQ response node received from the relay
      * @return an {@link Optional} containing the parsed response, or
      *         empty if the node is missing a result payload
@@ -101,7 +94,7 @@ public final class FetchNewsletterDehydratedMexResponse implements MexOperation.
         /**
          * Returns the {@code subscribers_count} field.
          *
-         * @return an {@link OptionalLong} containing the value, or empty if absent
+     * @return an {@link OptionalLong} containing the value, or empty if absent
          */
         public OptionalLong subscribersCount() {
             return subscribersCount != null ? OptionalLong.of(subscribersCount) : OptionalLong.empty();
@@ -110,7 +103,7 @@ public final class FetchNewsletterDehydratedMexResponse implements MexOperation.
         /**
          * Returns the {@code verification} field.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
          */
         public Optional<String> verification() {
             return Optional.ofNullable(verification);
@@ -119,7 +112,7 @@ public final class FetchNewsletterDehydratedMexResponse implements MexOperation.
         /**
          * Returns the {@code settings} field.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
          */
         public Optional<Settings> settings() {
             return Optional.ofNullable(settings);
@@ -128,7 +121,7 @@ public final class FetchNewsletterDehydratedMexResponse implements MexOperation.
         /**
          * Returns the {@code wamo_sub} field.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
          */
         public Optional<WamoSub> wamoSub() {
             return Optional.ofNullable(wamoSub);
@@ -147,7 +140,7 @@ public final class FetchNewsletterDehydratedMexResponse implements MexOperation.
             /**
              * Returns the {@code reaction_codes} field.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
              */
             public Optional<ReactionCodes> reactionCodes() {
                 return Optional.ofNullable(reactionCodes);
@@ -166,7 +159,7 @@ public final class FetchNewsletterDehydratedMexResponse implements MexOperation.
                 /**
                  * Returns the {@code value} field.
                  *
-                 * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
                  */
                 public Optional<String> value() {
                     return Optional.ofNullable(value);
@@ -175,7 +168,7 @@ public final class FetchNewsletterDehydratedMexResponse implements MexOperation.
                 /**
                  * Parses a {@code ReactionCodes} from the given JSON object.
                  *
-                 * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
                  * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
                  */
                 static Optional<ReactionCodes> of(JSONObject obj) {
@@ -190,7 +183,7 @@ public final class FetchNewsletterDehydratedMexResponse implements MexOperation.
                 /**
                  * Parses a list of {@code ReactionCodes} from the given JSON array.
                  *
-                 * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
                  * @return the list of parsed results, empty if {@code arr} is {@code null}
                  */
                 static List<ReactionCodes> ofArray(JSONArray arr) {
@@ -209,7 +202,7 @@ public final class FetchNewsletterDehydratedMexResponse implements MexOperation.
             /**
              * Parses a {@code Settings} from the given JSON object.
              *
-             * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
              * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
              */
             static Optional<Settings> of(JSONObject obj) {
@@ -224,7 +217,7 @@ public final class FetchNewsletterDehydratedMexResponse implements MexOperation.
             /**
              * Parses a list of {@code Settings} from the given JSON array.
              *
-             * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
              * @return the list of parsed results, empty if {@code arr} is {@code null}
              */
             static List<Settings> ofArray(JSONArray arr) {
@@ -253,7 +246,7 @@ public final class FetchNewsletterDehydratedMexResponse implements MexOperation.
             /**
              * Returns the {@code plan_id} field.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
              */
             public Optional<String> planId() {
                 return Optional.ofNullable(planId);
@@ -262,7 +255,7 @@ public final class FetchNewsletterDehydratedMexResponse implements MexOperation.
             /**
              * Parses a {@code WamoSub} from the given JSON object.
              *
-             * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
              * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
              */
             static Optional<WamoSub> of(JSONObject obj) {
@@ -277,7 +270,7 @@ public final class FetchNewsletterDehydratedMexResponse implements MexOperation.
             /**
              * Parses a list of {@code WamoSub} from the given JSON array.
              *
-             * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
              * @return the list of parsed results, empty if {@code arr} is {@code null}
              */
             static List<WamoSub> ofArray(JSONArray arr) {
@@ -296,7 +289,7 @@ public final class FetchNewsletterDehydratedMexResponse implements MexOperation.
         /**
          * Parses a {@code ThreadMetadata} from the given JSON object.
          *
-         * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
          * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
          */
         static Optional<ThreadMetadata> of(JSONObject obj) {
@@ -314,7 +307,7 @@ public final class FetchNewsletterDehydratedMexResponse implements MexOperation.
         /**
          * Parses a list of {@code ThreadMetadata} from the given JSON array.
          *
-         * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
          * @return the list of parsed results, empty if {@code arr} is {@code null}
          */
         static List<ThreadMetadata> ofArray(JSONArray arr) {
@@ -343,7 +336,7 @@ public final class FetchNewsletterDehydratedMexResponse implements MexOperation.
         /**
          * Returns the {@code wamo_sub_status} field.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
          */
         public Optional<String> wamoSubStatus() {
             return Optional.ofNullable(wamoSubStatus);
@@ -352,7 +345,7 @@ public final class FetchNewsletterDehydratedMexResponse implements MexOperation.
         /**
          * Parses a {@code ViewerMetadata} from the given JSON object.
          *
-         * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
          * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
          */
         static Optional<ViewerMetadata> of(JSONObject obj) {
@@ -367,7 +360,7 @@ public final class FetchNewsletterDehydratedMexResponse implements MexOperation.
         /**
          * Parses a list of {@code ViewerMetadata} from the given JSON array.
          *
-         * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
          * @return the list of parsed results, empty if {@code arr} is {@code null}
          */
         static List<ViewerMetadata> ofArray(JSONArray arr) {
@@ -387,30 +380,21 @@ public final class FetchNewsletterDehydratedMexResponse implements MexOperation.
      * Parses a {@link FetchNewsletterDehydratedMexResponse} from the raw JSON bytes of the
      * {@code <result>} child.
      *
-     * @implNote WAWebMexFetchNewsletterDehydratedJob.mexGetNewsletterDehydrated: mirrors the implicit
-     * unwrapping that WA Web performs on the GraphQL response,
-     * extracting the {@code xwa2_newsletter} root.
      * @param json the UTF-8 encoded JSON payload
      * @return an {@link Optional} containing the parsed response, or
      *         empty if the envelope is missing expected fields
      */
     private static Optional<FetchNewsletterDehydratedMexResponse> of(byte[] json) {
-        // WAWebMexFetchNewsletterDehydratedJob.mexGetNewsletterDehydrated
-        // Parses the raw JSON payload, bailing out if fastjson2 returns null
         var jsonObject = JSON.parseObject(json);
         if (jsonObject == null) {
             return Optional.empty();
         }
 
-        // WAWebMexFetchNewsletterDehydratedJob.mexGetNewsletterDehydrated
-        // Descends into the standard GraphQL "data" envelope
         var data = jsonObject.getJSONObject("data");
         if (data == null) {
             return Optional.empty();
         }
 
-        // WAWebMexFetchNewsletterDehydratedJob.mexGetNewsletterDehydrated
-        // Extracts the operation-specific root keyed by xwa2_newsletter
         var root = data.getJSONObject("xwa2_newsletter");
         if (root == null) {
             return Optional.empty();

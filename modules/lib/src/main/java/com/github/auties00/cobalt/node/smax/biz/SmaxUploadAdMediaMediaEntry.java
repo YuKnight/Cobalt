@@ -15,7 +15,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Single {@code (id, type)} media entry — used by both the outbound
+ * Single {@code (id, type)} media entry. Used by both the outbound
  * primary {@code <media/>} child and the 0..10 outbound/inbound
  * {@code <media_list/>} children.
  */

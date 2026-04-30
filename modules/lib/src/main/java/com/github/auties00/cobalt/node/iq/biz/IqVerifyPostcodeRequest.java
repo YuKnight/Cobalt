@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.node.iq.biz;
 
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidServer;
@@ -9,8 +10,12 @@ import com.github.auties00.cobalt.node.iq.IqOperation;
 import java.util.Objects;
 
 /**
- * The outbound stanza variant.
+ * The outbound {@code <iq xmlns="w:biz:catalog" type="get">} stanza that
+ * checks whether a buyer-supplied postcode falls inside a merchant's
+ * service area. The postcode itself ships as an opaque blob produced by
+ * the buyer-side direct-connection encryption flow.
  */
+@WhatsAppWebModule(moduleName = "WAWebVerifyPostcodeJob")
 public final class IqVerifyPostcodeRequest implements IqOperation.Request {
     /**
      * The business JID whose service-area should be checked. Routed

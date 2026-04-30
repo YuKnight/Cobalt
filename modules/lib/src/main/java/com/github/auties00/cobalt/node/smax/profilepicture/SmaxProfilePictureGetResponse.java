@@ -16,13 +16,8 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Sealed family of inbound reply variants — five success shapes
+ * Sealed family of inbound reply variants. Five success shapes
  * plus one error shape.
- *
- * @implNote {@code WASmaxProfilePictureGetRPC.sendGetRPC} tries
- *           {@code SuccessPictureURL} → {@code SuccessAvatarURLs}
- *           → {@code SuccessPictureBlob} → {@code SuccessNoData}
- *           → {@code Error}.
  */
 public sealed interface SmaxProfilePictureGetResponse extends SmaxOperation.Response
         permits SmaxProfilePictureGetResponse.SuccessPictureURL, SmaxProfilePictureGetResponse.SuccessAvatarURLs,
@@ -63,13 +58,8 @@ public sealed interface SmaxProfilePictureGetResponse extends SmaxOperation.Resp
     }
 
     /**
-     * The {@code SuccessPictureURL} reply variant — the relay
+     * The {@code SuccessPictureURL} reply variant. The relay
      * returns a CDN-hosted picture URL plus content hash.
-     *
-     * @implNote {@code WASmaxInProfilePictureGetResponseSuccessPictureURL.parseGetResponseSuccessPictureURL}
-     *           validates the IQ-result envelope, extracts the
-     *           {@code <picture id type url direct_path hash?
-     *           has_staging?/>} child and projects each attribute.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInProfilePictureGetResponseSuccessPictureURL")
     @WhatsAppWebModule(moduleName = "WASmaxInProfilePictureIQResultResponseMixin")
@@ -82,7 +72,7 @@ public sealed interface SmaxProfilePictureGetResponse extends SmaxOperation.Resp
         private final String pictureId;
 
         /**
-         * The picture type — one of {@code "image"} /
+         * The picture type. One of {@code "image"} /
          * {@code "preview"}.
          */
         private final String pictureType;
@@ -104,7 +94,7 @@ public sealed interface SmaxProfilePictureGetResponse extends SmaxOperation.Resp
         private final String pictureHash;
 
         /**
-         * The optional {@code has_staging} marker — one of
+         * The optional {@code has_staging} marker. One of
          * {@code "false"} / {@code "true"}.
          */
         private final String pictureHasStaging;
@@ -266,19 +256,14 @@ public sealed interface SmaxProfilePictureGetResponse extends SmaxOperation.Resp
     }
 
     /**
-     * The {@code SuccessAvatarURLs} reply variant — the entity
+     * The {@code SuccessAvatarURLs} reply variant. The entity
      * uses an avatar; the relay returns between {@code 1} and
      * {@code 4} avatar URLs (one per pose-id).
-     *
-     * @implNote {@code WASmaxInProfilePictureGetResponseSuccessAvatarURLs.parseGetResponseSuccessAvatarURLs}
-     *           validates the IQ-result envelope and projects the
-     *           {@code <avatar url pose_id hash?/>} children
-     *           ({@code 1..4} entries).
      */
     @WhatsAppWebModule(moduleName = "WASmaxInProfilePictureGetResponseSuccessAvatarURLs")
     final class SuccessAvatarURLs implements SmaxProfilePictureGetResponse {
         /**
-         * The list of avatar entries — between {@code 1} and
+         * The list of avatar entries. Between {@code 1} and
          * {@code 4} entries.
          */
         private final List<AvatarUrl> avatars;
@@ -470,15 +455,9 @@ public sealed interface SmaxProfilePictureGetResponse extends SmaxOperation.Resp
     }
 
     /**
-     * The {@code SuccessPictureBlob} reply variant — the picture
+     * The {@code SuccessPictureBlob} reply variant. The picture
      * is small enough to be inlined as raw bytes content of the
      * {@code <picture>} child.
-     *
-     * @implNote {@code WASmaxInProfilePictureGetResponseSuccessPictureBlob.parseGetResponseSuccessPictureBlob}
-     *           validates the IQ-result envelope and extracts the
-     *           {@code <picture id type has_staging?>{bytes}</picture>}
-     *           projection (the content bytes carry the full
-     *           binary picture payload).
      */
     @WhatsAppWebModule(moduleName = "WASmaxInProfilePictureGetResponseSuccessPictureBlob")
     final class SuccessPictureBlob implements SmaxProfilePictureGetResponse {
@@ -488,7 +467,7 @@ public sealed interface SmaxProfilePictureGetResponse extends SmaxOperation.Resp
         private final String pictureId;
 
         /**
-         * The picture type — one of {@code "image"} /
+         * The picture type. One of {@code "image"} /
          * {@code "preview"}.
          */
         private final String pictureType;
@@ -630,12 +609,12 @@ public sealed interface SmaxProfilePictureGetResponse extends SmaxOperation.Resp
     }
 
     /**
-     * The {@code SuccessNoData} reply variant — the entity has no
+     * The {@code SuccessNoData} reply variant. The entity has no
      * picture / avatar set; the relay returns a bare result IQ
      * envelope with no payload children.
      *
      * @implNote {@code WASmaxInProfilePictureGetResponseSuccessNoData.parseGetResponseSuccessNoData}
-     *           is just the IQ-result envelope check — Cobalt
+     *           is just the IQ-result envelope check. Cobalt
      *           additionally verifies the absence of the
      *           {@code <picture>} and {@code <avatar>} children to
      *           avoid false positives against the four
@@ -663,7 +642,7 @@ public sealed interface SmaxProfilePictureGetResponse extends SmaxOperation.Resp
             if (!SmaxIqResultResponseMixin.validate(node, request)) {
                 return Optional.empty();
             }
-            // Disambiguate from the picture-bearing success variants — those
+            // Disambiguate from the picture-bearing success variants. Those
             // are tried first by the dispatcher but, when this static factory
             // is invoked directly, we want to ensure no false positive.
             if (node.getChild("picture").isPresent()) {
@@ -695,7 +674,7 @@ public sealed interface SmaxProfilePictureGetResponse extends SmaxOperation.Resp
     }
 
     /**
-     * The {@code Error} reply variant — one of seven documented
+     * The {@code Error} reply variant. One of seven documented
      * IQ-error sub-mixins.
      *
      * <p>Carries one of the following {@code (code, text)} pairs:
@@ -713,7 +692,7 @@ public sealed interface SmaxProfilePictureGetResponse extends SmaxOperation.Resp
      *           validates the IQ-error envelope and projects the
      *           {@code <error/>} child through
      *           {@code WASmaxInProfilePictureProfilePictureGetErrors}
-     *           — a disjunction over the seven sub-mixins above.
+     *          . A disjunction over the seven sub-mixins above.
      *           Cobalt collapses all seven into the single
      *           {@code (errorCode, errorText)} pair below.
      */

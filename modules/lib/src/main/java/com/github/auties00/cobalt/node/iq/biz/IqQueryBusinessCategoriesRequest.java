@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.node.iq.biz;
 
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.JidServer;
 import com.github.auties00.cobalt.node.NodeBuilder;
@@ -8,8 +9,11 @@ import com.github.auties00.cobalt.node.iq.IqOperation;
 import java.util.Objects;
 
 /**
- * The outbound stanza variant.
+ * The outbound {@code <iq xmlns="fb:thrift_iq" type="get">} stanza that
+ * runs a {@code profile_typeahead} {@code catkit} query for business
+ * categories. Powers the category picker shown in the SMB profile editor.
  */
+@WhatsAppWebModule(moduleName = "WAWebQueryBusinessCategoriesJob")
 public final class IqQueryBusinessCategoriesRequest implements IqOperation.Request {
     /**
      * The free-text typeahead query (may be empty).

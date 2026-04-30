@@ -47,14 +47,14 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
      * @implNote WAWebContactSync — module-level singleton {@code v = new b()}
      */
     @WhatsAppWebExport(moduleName = "WAWebContactSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public static final ContactActionHandler INSTANCE = new ContactActionHandler(); // WAWebContactSync: var v = new b(); l.default = v
+    public static final ContactActionHandler INSTANCE = new ContactActionHandler();
 
     /**
      * Logger for diagnostic messages emitted during contact sync processing.
      *
      * @implNote ADAPTED: WAWebContactSync uses WALogger; Cobalt uses java.util.logging
      */
-    private static final Logger LOGGER = Logger.getLogger(ContactActionHandler.class.getName()); // ADAPTED: WAWebContactSync — WALogger
+    private static final Logger LOGGER = Logger.getLogger(ContactActionHandler.class.getName());
 
     /**
      * Compiled pattern matching any Unicode whitespace character.
@@ -66,7 +66,7 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
      * @implNote ADAPTED: WAWebContactShortName.getShortName — JS regex {@code /\s/} mapped
      *           to Java's {@code \s} pattern
      */
-    private static final Pattern WHITESPACE_PATTERN = Pattern.compile("\\s"); // ADAPTED: WAWebContactShortName.getShortName — JS split(/\s/)
+    private static final Pattern WHITESPACE_PATTERN = Pattern.compile("\\s");
 
     /**
      * Private constructor preventing external instantiation.
@@ -89,7 +89,7 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebContactSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return ContactAction.ACTION_NAME; // WAWebContactSync.getAction
+        return ContactAction.ACTION_NAME;
     }
 
     /**
@@ -102,7 +102,7 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebContactSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return ContactAction.COLLECTION_NAME; // WAWebContactSync.collectionName
+        return ContactAction.COLLECTION_NAME;
     }
 
     /**
@@ -114,7 +114,7 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebContactSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return ContactAction.ACTION_VERSION; // WAWebContactSync.getVersion
+        return ContactAction.ACTION_VERSION;
     }
 
     /**
@@ -129,7 +129,7 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebContactSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebContactSync.applyMutations
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -159,43 +159,42 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebContactSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        var indexArray = JSON.parseArray(mutation.index()); // WAWebContactSync.applyMutations: var n = t.indexParts
-        var contactJidString = indexArray.getString(1); // WAWebContactSync.applyMutations: var a = n[1]
-        if (contactJidString == null || contactJidString.isEmpty()) { // WAWebContactSync.applyMutations: if (r("isStringNullOrEmpty")(a))
-            return malformedActionIndex(); // WAWebContactSync.applyMutations: return l.malformedActionIndex()
+        var indexArray = JSON.parseArray(mutation.index());
+        var contactJidString = indexArray.getString(1);
+        if (contactJidString == null || contactJidString.isEmpty()) {
+            return malformedActionIndex();
         }
 
-        var contactJid = Jid.of(contactJidString); // WAWebContactSync.applyMutations: var i = o("WAWebWidFactory").createUserWidOrThrow(a)
-        var usernameEnabled = client.abPropsService() // WAWebContactSync.applyMutations: var h = o("WAWebUsernameGatingUtils").usernameContactSyncdEnabled()
+        var contactJid = Jid.of(contactJidString);
+        var usernameEnabled = client.abPropsService()
                 .getBool(ABProp.USERNAME_CONTACT_SYNCD_SUPPORT_ENABLE);
 
         switch (mutation.operation()) {
-            case SET -> { // WAWebContactSync.applyMutations: if (t.operation === "set")
-                if (!(mutation.value().action().orElse(null) instanceof ContactAction action)) { // WAWebContactSync.applyMutations: var u = t.value.contactAction; if (!u)
-                    return malformedActionValue(); // WAWebContactSync.applyMutations: return ... malformedActionValue(l.collectionName)
+            case SET -> {
+                if (!(mutation.value().action().orElse(null) instanceof ContactAction action)) {
+                    return malformedActionValue();
                 }
 
-                if (contactJid.hasLidServer()) { // WAWebContactSync.applyMutations: if (i.isLid())
-                    return MutationApplicationResult.skipped(); // WAWebContactSync.applyMutations: return {actionState: Skipped}
+                if (contactJid.hasLidServer()) {
+                    return MutationApplicationResult.skipped();
                 }
 
-                var contact = client.store() // WAWebContactSync.applyMutations: y.push(f) then createOrMergeAddressBookContacts(y)
+                var contact = client.store()
                         .findContactByJid(contactJid)
                         .orElseGet(() -> client.store().addNewContact(contactJid));
-                var fullName = action.fullName().orElse(""); // WAWebContactSync.applyMutations: var d = u.fullName; f.name = d != null ? d : ""
+                var fullName = action.fullName().orElse("");
                 contact.setFullName(fullName);
-                var shortName = action.firstName() // WAWebContactSync.applyMutations: var s = c != null ? c : o("WAWebContactShortName").getShortName(d); f.shortName = s != null ? s : ""
+                var shortName = action.firstName()
                         .orElseGet(() -> deriveShortName(fullName));
                 contact.setShortName(shortName);
 
-                if (usernameEnabled) { // WAWebContactSync.applyMutations: h && !r("isStringNullOrEmpty")(_)
-                    action.username() // WAWebContactSync.applyMutations: var _ = u.username
-                            .filter(u -> !u.isEmpty()) // WAWebContactSync.applyMutations: !r("isStringNullOrEmpty")(_)
-                            .map(u -> u.startsWith("@") ? u.substring(1) : u) // WAWebContactSync.applyMutations: _.startsWith("@") ? _.slice(1) : _
-                            .ifPresent(contact::setUsername); // WAWebContactSync.applyMutations: f.username = ...
+                if (usernameEnabled) {
+                    action.username()
+                            .filter(u -> !u.isEmpty())
+                            .map(u -> u.startsWith("@") ? u.substring(1) : u)
+                            .ifPresent(contact::setUsername);
                 }
 
-                // WAWebContactSync.applyMutations:
                 //   var g = m != null ? asUserLidOrThrow(createUserWidOrThrow(m, "lid")) : null;
                 //   S.set(i, g != null ? g : WAWebLidMigrationUtils.toLid(i));
                 //   if (i.isRegularUserPn() && g) v.push({lid: C, pn: i});
@@ -203,25 +202,23 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
                 // ADAPTED: Cobalt's store is keyed by canonical JID, so the dual-key map S is not mirrored.
                 // The createLidPnMappings call is gated on `contactJid.hasUserServer() && lidJid != null`,
                 // matching WA Web's `isRegularUserPn() && g` condition.
-                action.lidJid().ifPresent(lid -> { // WAWebContactSync.applyMutations: var m = u.lidJid
-                    contact.setLid(lid); // WAWebContactSync.applyMutations: S.set(i, g); later ContactCollection.add for LID record
-                    if (contactJid.hasUserServer()) { // WAWebContactSync.applyMutations: if (i.isRegularUserPn() && g)
-                        client.store().registerLidMapping(contactJid, lid); // WAWebContactSync.applyMutations: createLidPnMappings({mappings: v, ...})
+                action.lidJid().ifPresent(lid -> {
+                    contact.setLid(lid);
+                    if (contactJid.hasUserServer()) {
+                        client.store().registerLidMapping(contactJid, lid);
                     }
                 });
 
-                // WAWebContactSync.applyMutations: o("WAWebSyncContactsJob").syncNewContact(i)
                 // SKIPPED: debounced background contact sync refresh; not mirrored in Cobalt.
-                retryOrphanStatusMutes(client, wamService, contactJidString); // WAWebContactSync.applyMutations: o("WAWebSyncdOrphan").checkOrphanUserStatusMutes(y.map(...))
+                retryOrphanStatusMutes(client, wamService, contactJidString);
 
-                return MutationApplicationResult.success(); // WAWebContactSync.applyMutations: {actionState: Success}
+                return MutationApplicationResult.success();
             }
-            case REMOVE -> { // WAWebContactSync.applyMutations: t.operation === "remove"
-                if (contactJid.hasLidServer() || contactJid.hasBotServer()) { // WAWebContactSync.applyMutations: i.isLid() || i.isBot() ? Skipped
-                    return MutationApplicationResult.skipped(); // WAWebContactSync.applyMutations: {actionState: Skipped}
+            case REMOVE -> {
+                if (contactJid.hasLidServer() || contactJid.hasBotServer()) {
+                    return MutationApplicationResult.skipped();
                 }
 
-                // WAWebContactSync.applyMutations:
                 //   b.push(i)                                                                 // per-mutation: queue removal
                 //   var I = []; if (h) { D = bulkGet(T); D.forEach((e,t) => { (e==null || e.isUsernameContact!==true) && I.push(b[t]) }) } else I = b;
                 //   if (I.length>0) { yield setNotAddressBookContacts(x); ... }
@@ -230,19 +227,19 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
                 // check. When username contacts gating is enabled, contacts marked
                 // isUsernameContact (addedByUsername) are skipped; otherwise the contact's
                 // address-book fields are cleared (setNotMyContact).
-                var contact = client.store().findContactByJid(contactJid); // WAWebContactSync.applyMutations: ContactCollection.get(e)
-                if (contact.isPresent()) { // WAWebContactSync.applyMutations: t && t.setNotMyContact()
-                    if (usernameEnabled && contact.get().isAddedByUsername()) { // WAWebContactSync.applyMutations: h && D[t].isUsernameContact === true -> skip I.push
-                        return MutationApplicationResult.success(); // WAWebContactSync.applyMutations: {actionState: Success}
+                var contact = client.store().findContactByJid(contactJid);
+                if (contact.isPresent()) {
+                    if (usernameEnabled && contact.get().isAddedByUsername()) {
+                        return MutationApplicationResult.success();
                     }
-                    contact.get().setFullName(null); // WAWebContactSync.applyMutations: setNotMyContact clears contact fields
-                    contact.get().setShortName(null); // WAWebContactSync.applyMutations: setNotMyContact clears contact fields
-                    contact.get().setUsername(null); // WAWebContactSync.applyMutations: setNotMyContact clears contact fields
+                    contact.get().setFullName(null);
+                    contact.get().setShortName(null);
+                    contact.get().setUsername(null);
                 }
-                return MutationApplicationResult.success(); // WAWebContactSync.applyMutations: {actionState: Success}
+                return MutationApplicationResult.success();
             }
-            default -> { // WAWebContactSync.applyMutations: else { E++ ... Unsupported }
-                return MutationApplicationResult.unsupported(); // WAWebContactSync.applyMutations: {actionState: Unsupported}
+            default -> {
+                return MutationApplicationResult.unsupported();
             }
         }
     }
@@ -280,34 +277,33 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
             Boolean syncToAddressbook,
             String username
     ) {
-        var timestamp = Instant.now(); // WAWebContactSync.getContactSyncMutation: var u = o("WATimeUtils").unixTimeMs()
-        var action = new ContactActionBuilder() // WAWebContactSync.getContactSyncMutation: var c = {contactAction: {fullName: ..., firstName: ..., ...}}
-                .fullName(fullName) // WAWebContactSync.getContactSyncMutation: fullName: r != null ? r : void 0
-                .firstName(firstName) // WAWebContactSync.getContactSyncMutation: firstName: n != null ? n : void 0
-                .lidJid(lid) // WAWebContactSync.getContactSyncMutation: lidJid: i ? i.toString() : void 0
-                .saveOnPrimaryAddressbook(syncToAddressbook) // WAWebContactSync.getContactSyncMutation: saveOnPrimaryAddressbook: l != null ? l : void 0
-                .username(username) // WAWebContactSync.getContactSyncMutation: username: s
+        var timestamp = Instant.now();
+        var action = new ContactActionBuilder()
+                .fullName(fullName)
+                .firstName(firstName)
+                .lidJid(lid)
+                .saveOnPrimaryAddressbook(syncToAddressbook)
+                .username(username)
                 .build();
-        var value = new SyncActionValueBuilder() // WAWebSyncdActionUtils.buildPendingMutation: encodeProtobuf(SyncActionValueSpec, {...l, timestamp: i})
-                .timestamp(timestamp) // WAWebSyncdActionUtils.buildPendingMutation: timestamp: u
-                .contactAction(action) // WAWebContactSync.getContactSyncMutation: value: c (contains contactAction)
+        var value = new SyncActionValueBuilder()
+                .timestamp(timestamp)
+                .contactAction(action)
                 .build();
-        var operation = isDelete // WAWebContactSync.getContactSyncMutation: operation: a ? REMOVE : SET
+        var operation = isDelete
                 ? SyncdOperation.REMOVE
                 : SyncdOperation.SET;
-        // WAWebSyncdActionUtils.buildPendingMutation: index = JSON.stringify([action].concat(indexArgs))
         // where indexArgs = [e.toString({legacy: true})] in WA Web.
         // ADAPTED: Cobalt uses Jid.toString() canonical form; WA Web's legacy form is not mirrored
         // because Cobalt normalizes JIDs to a single canonical representation.
         var index = JSON.toJSONString(List.of(actionName(), contactJid.toString()));
-        var mutation = new DecryptedMutation.Trusted( // WAWebSyncdActionUtils.buildPendingMutation: return { collection, index, ... }
+        var mutation = new DecryptedMutation.Trusted(
                 index,
                 value,
                 operation,
                 timestamp,
                 version()
         );
-        return new SyncPendingMutation(mutation, 0); // WAWebSyncdActionUtils.buildPendingMutation
+        return new SyncPendingMutation(mutation, 0);
     }
 
     /**
@@ -331,15 +327,14 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
      */
     @WhatsAppWebExport(moduleName = "WAWebContactSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private void retryOrphanStatusMutes(WhatsAppClient client, WamService wamService, String contactJidString) {
-        // WAWebContactSync.applyMutations: o("WAWebSyncdOrphan").checkOrphanUserStatusMutes(y.map(function(e) { return e.id }))
         try {
-            var entries = client.store().findOrphanMutationsByModel(UserStatusMuteAction.COLLECTION_NAME, contactJidString); // WAWebSyncdOrphan.checkOrphanUserStatusMutes -> getSyncActionsByModelInfosInTransaction
+            var entries = client.store().findOrphanMutationsByModel(UserStatusMuteAction.COLLECTION_NAME, contactJidString);
             if (entries.isEmpty()) {
                 return;
             }
 
             var applied = new ArrayList<OrphanMutationEntry>(); // NO_WA_BASIS — Cobalt orphan retry bookkeeping
-            for (var entry : entries) { // WAWebSyncdOrphan.checkOrphanUserStatusMutes -> applyIndividualMutations
+            for (var entry : entries) {
                 var orphanMutation = new DecryptedMutation.Trusted(
                         entry.index(),
                         entry.value(),
@@ -347,17 +342,16 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
                         entry.timestamp(),
                         entry.actionVersion()
                 );
-                var result = UserStatusMuteHandler.INSTANCE.applyMutationResult(client, wamService, orphanMutation); // WAWebSyncdOrphan -> WAWebSyncdCollectionHandler.applyIndividualMutations
+                var result = UserStatusMuteHandler.INSTANCE.applyMutationResult(client, wamService, orphanMutation);
                 if (result.actionState() == SyncActionState.SUCCESS) {
                     applied.add(entry);
                 }
             }
 
             if (!applied.isEmpty()) {
-                client.store().removeOrphanMutations(UserStatusMuteAction.COLLECTION_NAME, applied); // WAWebSyncdOrphan — cleanup applied orphans
+                client.store().removeOrphanMutations(UserStatusMuteAction.COLLECTION_NAME, applied);
             }
         } catch (Exception e) {
-            // WAWebContactSync.applyMutations: .catch(function() { o("WALogger").ERROR(...).sendLogs(...) })
             LOGGER.warning("[syncd] contact: orphan status mutes check failed: " + e.getMessage()); // ADAPTED: WAWebContactSync.applyMutations — WALogger.ERROR replaced with j.u.l WARNING
         }
     }
@@ -382,18 +376,18 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
      */
     @WhatsAppWebExport(moduleName = "WAWebContactShortName", exports = "getShortName", adaptation = WhatsAppAdaptation.ADAPTED)
     static String deriveShortName(String fullName) {
-        if (fullName == null || fullName.isEmpty()) { // WAWebContactShortName.getShortName: if (t == null) return null
+        if (fullName == null || fullName.isEmpty()) {
             return ""; // ADAPTED: WA Web returns null, but caller coalesces to ""
         }
-        var tokens = WHITESPACE_PATTERN.split(fullName, 2); // WAWebContactShortName.getShortName: var n = t.split(/\s/)
-        var firstToken = tokens[0]; // WAWebContactShortName.getShortName: var a = n[0]
-        if (firstToken.isEmpty()) { // WAWebContactShortName.getShortName: asMaybeNonEmptyString(a) returns null for empty
+        var tokens = WHITESPACE_PATTERN.split(fullName, 2);
+        var firstToken = tokens[0];
+        if (firstToken.isEmpty()) {
             return ""; // ADAPTED: WA Web returns null, but caller coalesces to ""
         }
-        if (!containsLetter(firstToken)) { // WAWebContactShortName.getShortName: r("WAWebAlphaRegex").exec(a)
-            return ""; // WAWebContactShortName.getShortName: WALogger.LOG(...), null -> coalesced to ""
+        if (!containsLetter(firstToken)) {
+            return "";
         }
-        return firstToken; // WAWebContactShortName.getShortName: o("WAWebNonEmptyString").asMaybeNonEmptyString(a)
+        return firstToken;
     }
 
     /**
@@ -412,7 +406,6 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
      */
     @WhatsAppWebExport(moduleName = "WAWebAlphaRegex", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private static boolean containsLetter(String s) {
-        // WAWebAlphaRegex: regex character class for Unicode letters — exec() checks if any char matches
-        return s.codePoints().anyMatch(Character::isLetter); // ADAPTED: WAWebAlphaRegex.exec(a) — regex match mapped to codePoint scan
+        return s.codePoints().anyMatch(Character::isLetter);
     }
 }

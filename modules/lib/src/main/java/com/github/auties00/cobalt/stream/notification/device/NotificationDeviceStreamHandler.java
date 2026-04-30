@@ -40,25 +40,17 @@ public final class NotificationDeviceStreamHandler implements SocketStream.Handl
 
     /**
      * Logger for device notification operations.
-     *
-     * @implNote WAWebHandleDeviceNotification: uses WALogger for WARN/ERROR logging.
      */
     private static final System.Logger LOGGER =
             System.getLogger(NotificationDeviceStreamHandler.class.getName());
 
     /**
      * The WhatsApp client used for sending ack stanzas and accessing the store.
-     *
-     * @implNote WAWebHandleDeviceNotification: uses WAWap, WAWebCommsWapMd, WAWebDBCreateLidPnMappings
-     * via module-level imports.
      */
     private final WhatsAppClient whatsapp;
 
     /**
-     * The device service used for handling add/remove notifications and syncing device lists.
-     *
-     * @implNote WAWebHandleDeviceNotification: delegates to WAWebAdvHandlerApi.handleADVDeviceNotification
-     * and WAWebSyncDeviceAdvDeviceListJob.syncDeviceListJob.
+     * The device service used for handling add and remove notifications and for syncing device lists.
      */
     private final DeviceService deviceService;
 
@@ -67,9 +59,6 @@ public final class NotificationDeviceStreamHandler implements SocketStream.Handl
      *
      * @param whatsapp      the WhatsApp client
      * @param deviceService the device service for device list operations
-     * @implNote WAWebHandleDeviceNotification: module-level dependencies include WAWebAdvHandlerApi,
-     * WAWebApiContact, WAWebApiPendingDeviceSync, WAWebDBCreateLidPnMappings, WAWebOfflineHandler,
-     * WAWebSyncDeviceAdvDeviceListJob, etc.
      */
     public NotificationDeviceStreamHandler(WhatsAppClient whatsapp, DeviceService deviceService) {
         this.whatsapp = whatsapp;
@@ -86,87 +75,66 @@ public final class NotificationDeviceStreamHandler implements SocketStream.Handl
      * processed when available. An ack stanza is always sent to the server.
      *
      * @param node the incoming notification stanza node
-     * @implNote WAWebHandleDeviceNotification.handleDevicesNotification: parses stanza via
-     * WADeprecatedWapParser, builds ack with USER_JID(from), registers lid-pn mappings via
-     * WAWebDBCreateLidPnMappings.createLidPnMappings, then dispatches each wid entry to
-     * WAWebAdvHandlerApi.handleADVDeviceNotification (add/remove) or
-     * WAWebSyncDeviceAdvDeviceListJob.syncDeviceListJob (update).
      */
     @Override
     public void handle(Node node) {
-        // WAWebHandleDeviceNotification.h: assertTag("notification"), assertAttr("type", "devices")
         if (!node.hasDescription("notification") || !node.hasAttribute("type", "devices")) {
             return;
         }
 
-        // WAWebHandleDeviceNotification.h: extract user from "from" attribute
-        // WAWebJidToWid.deviceJidToUserWid: converts device JID to user-level JID
         var userJid = node.getAttributeAsJid("from")
                 .map(Jid::toUserJid)
                 .orElse(null);
         if (userJid == null) {
             LOGGER.log(System.Logger.Level.WARNING,
-                    "Skipping devices notification without from attribute"); // WAWebHandleDeviceNotification.h: parse error
+                    "Skipping devices notification without from attribute");
             return;
         }
 
-        // WAWebHandleDeviceNotification.h: extract lidUser from "lid" attribute
-        // WAWebJidToWid.lidDeviceJidToUserLid: converts lid device JID to user LID
         var lidUser = node.getAttributeAsJid("lid")
                 .map(Jid::toUserJid)
                 .orElse(null);
 
-        // WAWebHandleDeviceNotification.h: determine action type from child node
         var actionNode = node.getChild("remove")
                 .or(() -> node.getChild("add"))
                 .or(() -> node.getChild("update"))
                 .orElse(null);
         if (actionNode == null) {
             LOGGER.log(System.Logger.Level.WARNING,
-                    "[devices] notif missing \"remove\" or \"add\" node"); // WAWebHandleDeviceNotification.h: parse error
+                    "[devices] notif missing \"remove\" or \"add\" node");
             return;
         }
-        var actionType = actionNode.description(); // WAWebHandleDeviceNotification.h: r (type)
+        var actionType = actionNode.description();
 
-        // WAWebHandleDeviceNotification.h: extract hash for update type
         var hash = actionType.equals("update")
                 ? actionNode.getAttributeAsString("hash", null)
                 : null;
 
-        // WAWebHandleDeviceNotification.C: build list of wids to process
-        // l = {wid: a.user, ...}
-        // s = a.user.isLid() ? toPn(a.user) : a.lidUser
-        var secondaryJid = userJid.hasLidServer() // WAWebHandleDeviceNotification.C: a.user.isLid()
-                ? whatsapp.store().getPhoneNumberByLid(userJid).orElse(null) // WAWebLidMigrationUtils.toPn
+        var secondaryJid = userJid.hasLidServer()
+                ? whatsapp.store().getPhoneNumberByLid(userJid).orElse(null)
                 : lidUser;
 
-        // WAWebHandleDeviceNotification.C: register LID-PN mappings
-        // b = []; if (a.lidUser != null && a.user != null) b.push({lid: a.lidUser, pn: a.user})
-        // userJid is guaranteed non-null above; the WA Web a.user != null arm is thus always true here.
-        if (lidUser != null) { // WAWebHandleDeviceNotification.C: a.lidUser != null
-            whatsapp.store().registerLidMapping(userJid, lidUser); // WAWebDBCreateLidPnMappings.createLidPnMappings({lid: a.lidUser, pn: a.user})
+        if (lidUser != null) {
+            whatsapp.store().registerLidMapping(userJid, lidUser);
         }
 
-        // WAWebHandleDeviceNotification.C: build entries [l, y].filter(Boolean)
         var entries = new ArrayList<Jid>();
-        entries.add(userJid); // WAWebHandleDeviceNotification.C: l = {wid: a.user, ...}
+        entries.add(userJid);
         if (secondaryJid != null) {
-            entries.add(secondaryJid); // WAWebHandleDeviceNotification.C: y = {wid: s, ...}
+            entries.add(secondaryJid);
         }
 
-        // WAWebHandleDeviceNotification.C: process each entry
         for (var entryJid : entries) {
             try {
-                processDeviceEntry(entryJid, actionType, actionNode, hash); // WAWebHandleDeviceNotification.C: Promise.all(C.map(...))
+                processDeviceEntry(entryJid, actionType, actionNode, hash);
             } catch (Throwable throwable) {
                 LOGGER.log(System.Logger.Level.WARNING,
                         "handleDevicesNotification - {0} error: {1}",
-                        actionType, throwable.getMessage()); // WAWebHandleDeviceNotification.C: catch(e) WARN
+                        actionType, throwable.getMessage());
             }
         }
 
-        // WAWebHandleDeviceNotification.C: return ack stanza i
-        sendNotificationAck(node, userJid); // WAWebHandleDeviceNotification.C: return i (ack)
+        sendNotificationAck(node, userJid);
     }
 
     /**
@@ -179,38 +147,27 @@ public final class NotificationDeviceStreamHandler implements SocketStream.Handl
      * @param actionType the action type ("add", "remove", or "update")
      * @param actionNode the action child node from the notification stanza
      * @param hash       the hash attribute value for update notifications, or {@code null}
-     * @implNote WAWebHandleDeviceNotification.C: inner async function that dispatches based on
-     * a.type. For add/remove: calls WAWebAdvHandlerApi.handleADVDeviceNotification({wid, devices, type}).
-     * For update: calls WAWebApiContact.getContactRecordByHash(hash) then
-     * WAWebSyncDeviceAdvDeviceListJob.syncDeviceListJob([wid], "notification", null).
+     * @implNote Cobalt does not maintain a contact-by-hash index. WA Web's update branch resolves the opaque side-contact hash to a wid through getContactRecordByHash; Cobalt syncs the device list for the entry JID directly because the entry JID already identifies the user.
      */
     private void processDeviceEntry(Jid entryJid, String actionType, Node actionNode, String hash) {
         switch (actionType) {
-            case "add", "remove" -> { // WAWebHandleDeviceNotification.C: if (a.type === g.add) / if (a.type === g.remove)
+            case "add", "remove" -> {
                 deviceService.handleDeviceNotification(
                         normalizeDeviceActionNode(actionNode),
                         actionType,
                         entryJid
-                ); // WAWebAdvHandlerApi.handleADVDeviceNotification({wid, devices, type})
+                );
             }
-            case "update" -> { // WAWebHandleDeviceNotification.C: if (a.type === g.update)
-                // ADAPTED: WAWebHandleDeviceNotification.C performs
-                //   var s = yield getContactRecordByHash(nullthrows(n))
-                //   if (s == null) v++ else syncDeviceListJob([createWid(s.id)], "notification", null)
-                // Cobalt does not maintain a contact-by-hash index, so we sync the device list
-                // for the entry JID directly. The WA Web indirection exists because the server
-                // sends an opaque side-contact hash that must be resolved to a wid; when the
-                // notification is addressed to a specific user/lid, the entry JID already
-                // identifies that user and is equivalent to the hash lookup result.
+            case "update" -> {
                 if (hash == null) {
                     LOGGER.log(System.Logger.Level.WARNING,
-                            "[devices] update notification missing hash for {0}", entryJid); // ADAPTED: nullthrows(n) in WA Web would throw
+                            "[devices] update notification missing hash for {0}", entryJid);
                     return;
                 }
-                deviceService.getDeviceLists(List.of(entryJid), "notification", null, false); // WAWebSyncDeviceAdvDeviceListJob.syncDeviceListJob([wid], "notification", null)
+                deviceService.getDeviceLists(List.of(entryJid), "notification", null, false);
             }
             default -> LOGGER.log(System.Logger.Level.WARNING,
-                    "handleDevicesNotification - unknown notification type: {0}", actionType); // WAWebHandleDeviceNotification.C: S++
+                    "handleDevicesNotification - unknown notification type: {0}", actionType);
         }
     }
 
@@ -227,7 +184,7 @@ public final class NotificationDeviceStreamHandler implements SocketStream.Handl
      * key-index-list as separate fields. DeviceService.handleDeviceNotification expects them as
      * child nodes of the action node, so this method adapts the stanza structure.
      */
-    private Node normalizeDeviceActionNode(Node actionNode) { // ADAPTED: WAWebHandleDeviceNotification.h
+    private Node normalizeDeviceActionNode(Node actionNode) {
         if (actionNode.getChild("device-list").isPresent()
                 || actionNode.getChild("key-index-list").isEmpty()) {
             return actionNode;
@@ -261,17 +218,14 @@ public final class NotificationDeviceStreamHandler implements SocketStream.Handl
      *
      * @param node    the original notification stanza node
      * @param userJid the user-level JID extracted from the {@code from} attribute
-     * @implNote WAWebHandleDeviceNotification.C: builds ack as
-     * wap("ack", {to: USER_JID(a.user), id: CUSTOM_STRING(a.stanzaId), class: "notification"}).
-     * Note: WA Web's ack only has to, id, and class, no type or participant attributes.
+     * @implNote The ack only carries to, id, and class. There is no type or participant attribute.
      */
-    private void sendNotificationAck(Node node, Jid userJid) { // WAWebHandleDeviceNotification.C
+    private void sendNotificationAck(Node node, Jid userJid) {
         var stanzaId = node.getAttributeAsString("id", null);
         if (stanzaId == null) {
             return;
         }
 
-        // WAWebHandleDeviceNotification.C: wap("ack", {to: USER_JID(a.user), id: CUSTOM_STRING(a.stanzaId), class: "notification"})
         whatsapp.sendNodeWithNoResponse(new NodeBuilder()
                 .description("ack")
                 .attribute("id", stanzaId)

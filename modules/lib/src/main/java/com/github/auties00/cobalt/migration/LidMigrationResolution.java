@@ -7,27 +7,21 @@ import com.github.auties00.cobalt.model.jid.Jid;
  * Represents the decision taken for a single chat thread during the LID
  * migration sweep.
  *
- * <p>When the LID migration runs over the local chat store, each chat is
- * classified into one of three mutually exclusive outcomes:
- * <ul>
- *     <li>{@link Migrate} - the chat is rewritten to use LID addressing,</li>
- *     <li>{@link Keep} - the chat is left untouched because it is either
- *         already on LID, an unsupported type (group, newsletter, broadcast,
- *         bot), or has a duplicate LID thread that will absorb it,</li>
- *     <li>{@link Delete} - the chat is removed because no LID mapping is
- *         known and the chat is judged safe to delete.</li>
- * </ul>
+ * <p>Every chat in the local store is classified into exactly one of three
+ * mutually exclusive outcomes. {@link Migrate} rewrites the chat to use LID
+ * addressing, {@link Keep} leaves it untouched (because it is already on
+ * LID, because its type does not participate in 1:1 migration, or because a
+ * duplicate LID thread will absorb it), and {@link Delete} removes it
+ * (because no LID can be resolved and the chat passes the deletability
+ * heuristics).
  *
- * <p>This type mirrors the return shape of WA Web's
- * {@code getResolvedThreadAccountLid} helper and is consumed by the
- * executor phase of {@link LidMigrationService}.
- *
- * @implNote WAWebLid1X1ThreadAccountMigrations.getResolvedThreadAccountLid:
- *           maps the JS return shapes to Cobalt types. {@code {threadLid}}
- *           becomes {@link Migrate}; an already-LID or non-regular JID
- *           becomes {@link Keep}; {@code {deleteChat: true}} becomes
- *           {@link Delete}; the {@code {logoutReason}} shape causes a
- *           {@code WhatsAppLidMigrationException} to be thrown instead.
+ * <p>This type mirrors the discriminated return shape of WhatsApp Web's
+ * {@code getResolvedThreadAccountLid} helper. The {@code {threadLid}}
+ * variant becomes {@link Migrate}, the already-LID and ignore variants
+ * become {@link Keep}, the {@code {deleteChat: true}} variant becomes
+ * {@link Delete}, and the {@code {logoutReason}} variant is converted into
+ * a {@code WhatsAppLidMigrationException} thrown by
+ * {@link LidMigrationService}.
  */
 @WhatsAppWebModule(moduleName = "WAWebLid1X1ThreadAccountMigrations")
 public sealed interface LidMigrationResolution
@@ -35,48 +29,51 @@ public sealed interface LidMigrationResolution
                 LidMigrationResolution.Keep,
                 LidMigrationResolution.Delete{
     /**
-     * Returns the original JID of the chat thread before any migration
-     * rewrite is applied.
+     * Returns the JID the chat had before any migration rewrite was
+     * applied.
      *
-     * @return the original JID, never {@code null}
+     * @return the original JID of the chat
      */
     Jid originalJid();
 
     /**
-     * Resolution indicating the thread should be migrated to LID addressing.
+     * Resolution that re-keys a chat to LID addressing.
      *
-     * <p>When executed, the chat is re-keyed to {@code targetLid} and its
-     * phone-number JID is preserved as metadata for backwards compatibility.
+     * <p>When executed by the migration service the chat is moved to
+     * {@code targetLid} and its original phone-number JID is preserved as
+     * metadata so historical references continue to resolve.
      *
-     * @param originalJid the original phone number JID of the chat
-     * @param targetLid   the LID the chat should be re-keyed to
+     * @param originalJid the phone-number JID the chat previously used
+     * @param targetLid   the LID the chat is rewritten to
      */
     record Migrate(Jid originalJid, Jid targetLid) implements LidMigrationResolution {
 
     }
 
     /**
-     * Resolution indicating the thread should be kept as-is.
+     * Resolution that leaves a chat untouched.
      *
-     * <p>Keep is emitted for chats that either already use LID addressing,
-     * are of a type not covered by 1:1 migration, or whose duplicate LID
-     * thread will absorb them during the sweep.
+     * <p>Emitted when the chat already uses LID addressing, when the chat
+     * type is not part of 1:1 migration (group, community, newsletter,
+     * broadcast, bot), or when a duplicate LID thread will absorb the
+     * chat during the sweep.
      *
-     * @param originalJid the original JID (may be PN or LID)
-     * @param reason      the reason the chat is being kept unchanged
+     * @param originalJid the JID currently held by the chat
+     * @param reason      the reason the chat is being kept as is
      */
     record Keep(Jid originalJid, KeepReason reason) implements LidMigrationResolution {
 
     }
 
     /**
-     * Resolution indicating the thread should be deleted.
+     * Resolution that removes a chat from the store.
      *
-     * <p>Delete is emitted when no LID mapping is available for a 1:1 chat
-     * and the chat passes the deletability heuristics (no ephemeral/locked/
-     * archived/muted state, only safe system messages, etc.).
+     * <p>Emitted only when no LID mapping can be resolved for a 1:1 chat
+     * and the chat passes the deletability heuristics that classify it as
+     * safe to drop (no ephemeral or locked or archived or muted state, and
+     * only safe stub messages or call-log entries).
      *
-     * @param originalJid the original phone number JID of the chat
+     * @param originalJid the phone-number JID of the chat being removed
      * @param reason      the reason the chat is being deleted
      */
     record Delete(Jid originalJid, DeleteReason reason) implements LidMigrationResolution {
@@ -84,62 +81,69 @@ public sealed interface LidMigrationResolution
     }
 
     /**
-     * Enumerates the reasons a chat may be kept unchanged during LID
+     * Enumerates the reasons a chat is left untouched during LID
      * migration.
      */
     enum KeepReason {
         /**
-         * Thread is already using LID addressing.
+         * The chat already uses LID addressing.
          */
         ALREADY_LID,
 
         /**
-         * Thread is a group or community (not subject to LID migration).
+         * The chat is a group or community and does not participate in
+         * 1:1 migration.
          */
         GROUP_OR_COMMUNITY,
 
         /**
-         * Thread is a newsletter (not subject to LID migration).
+         * The chat is a newsletter and does not participate in 1:1
+         * migration.
          */
         NEWSLETTER,
 
         /**
-         * Thread is a broadcast list (not subject to LID migration).
+         * The chat is a regular broadcast list and does not participate
+         * in 1:1 migration.
          */
         BROADCAST,
 
         /**
-         * Thread is the status broadcast (not subject to LID migration).
+         * The chat is the dedicated status broadcast and does not
+         * participate in 1:1 migration.
          */
         STATUS_BROADCAST,
 
         /**
-         * Thread belongs to a bot account.
+         * The chat belongs to a bot account.
          */
         BOT,
 
         /**
-         * Thread has a duplicate LID thread that will be merged.
+         * The chat has a duplicate LID thread that will be merged into
+         * it during the sweep.
          */
         DUPLICATE_WILL_MERGE
     }
 
     /**
-     * Enumerates the reasons a chat may be deleted during LID migration.
+     * Enumerates the reasons a chat is removed during LID migration.
      */
     enum DeleteReason {
         /**
-         * No LID mapping found in primary device's cache.
+         * No LID mapping was found in the primary device's cache or in
+         * the local store.
          */
         NO_LID_MAPPING,
 
         /**
-         * Contact has not completed LID migration on their end.
+         * The contact has not yet completed LID migration on their end.
          */
         CONTACT_NOT_MIGRATED,
 
         /**
-         * Split thread detected - would result in duplicate after migration.
+         * A split thread was detected that would result in a duplicate
+         * after migration.
          */
         SPLIT_THREAD_MISMATCH
     }

@@ -9,7 +9,7 @@ import it.auties.protobuf.model.ProtobufType;
  * {@link ApnsConfig} plus the device-bound credentials accumulated
  * across the activation pipeline. Two of these credentials persist for
  * roughly three years (the keypair and the {@code deviceCertificate}
- * Apple signs against it); the third ({@code authToken}) is only
+ * Apple signs against it). The third ({@code authToken}) is only
  * meaningful while a courier connection is alive.
  *
  * <p>This is the only class the caller needs to round-trip via
@@ -60,7 +60,7 @@ public final class ApnsSession {
     }
 
     /**
-     * Creates an empty session bound to {@code config} — every
+     * Creates an empty session bound to {@code config}. Every
      * credential field is zero-length. Used by
      * {@link ApnsClient#authenticate} on first run.
      *

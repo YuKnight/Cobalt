@@ -8,7 +8,7 @@ import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.node.iq.IqOperation;
 
 /**
- * The outbound stanza variant — wraps a bare {@code <privacy/>} child in
+ * The outbound stanza variant. Wraps a bare {@code <privacy/>} child in
  * the canonical {@code <iq xmlns="privacy" type="get">} envelope.
  *
  * <p>Legacy-IQ RPC: fetches the user's full set of privacy settings
@@ -18,7 +18,7 @@ import com.github.auties00.cobalt.node.iq.IqOperation;
  *
  * @implNote {@code WAWebQueryPrivacySettingsJob.getPrivacy} optionally routes
  *           through MEX when the {@code mex_get_privacy_settings_mode} A/B
- *           flag is enabled; Cobalt models only the legacy XML path here.
+ *           flag is enabled. Cobalt models only the legacy XML path here.
  *           The MEX path is a separate module
  *           ({@code WAWebMexGetPrivacySetting}).
  */

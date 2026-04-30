@@ -17,55 +17,183 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
 /**
- * A SOCKS tunnel layer for proxied socket connections.
+ * Tunnel layer that establishes a TCP tunnel through a SOCKS proxy.
  *
  * <p>Supports SOCKS4 (local DNS, IPv4 only), SOCKS4a (remote DNS via
- * sentinel IP), SOCKS5 with local DNS resolution (RFC 1928), and SOCKS5h
- * with remote DNS resolution.  SOCKS5 authentication is handled via
- * RFC 1929 username/password sub-negotiation.
+ * sentinel IP), SOCKS5 with local DNS resolution (RFC 1928) and
+ * SOCKS5h with remote DNS resolution. SOCKS5 authentication is
+ * handled via the RFC 1929 username and password sub-negotiation.
  *
- * <p>This layer only performs the SOCKS handshake.  It does <b>not</b>
- * call {@code markReady()} — that is the responsibility of the caller
- * (typically a tunnel security layer or the layer stack assembly code).
+ * <p>The layer only performs the SOCKS handshake; the tunnel security
+ * layer above is responsible for marking the connection ready.
  *
- * @apiNote This layer directly depends on
- * {@link WhatsAppProxy.Socks} for proxy configuration.  This
- * coupling is intentional for this project.  If the socket stack is
- * extracted as a standalone library, a generic proxy configuration
- * interface should be introduced to replace the direct dependency.
+ * @apiNote The layer directly depends on
+ *     {@link WhatsAppProxy.Socks} for proxy configuration; if the
+ *     socket stack is ever extracted as a standalone library a
+ *     generic proxy configuration interface should be introduced.
  */
 public final class SocksSocketClientTunnelLayer implements SocketClientTunnelLayer {
+    /**
+     * SOCKS protocol version 4 byte.
+     */
     private static final byte SOCKS_VERSION_4 = 0x04;
+
+    /**
+     * SOCKS protocol version 5 byte.
+     */
     private static final byte SOCKS_VERSION_5 = 0x05;
+
+    /**
+     * SOCKS {@code CONNECT} command byte.
+     */
     private static final byte CMD_CONNECT = 0x01;
+
+    /**
+     * Method byte indicating "no authentication required".
+     */
     private static final byte METHOD_NO_AUTH = 0x00;
+
+    /**
+     * Marker indicating that the proxy refused every offered method.
+     */
     private static final int METHOD_NO_ACCEPTABLE = 0xFF;
+
+    /**
+     * SOCKS5 address type byte for IPv4.
+     */
     private static final byte ADDR_TYPE_IPV4 = 0x01;
+
+    /**
+     * SOCKS5 address type byte for a domain name.
+     */
     private static final byte ADDR_TYPE_DOMAIN = 0x03;
+
+    /**
+     * SOCKS5 address type byte for IPv6.
+     */
     private static final byte ADDR_TYPE_IPV6 = 0x04;
+
+    /**
+     * RFC 1929 sub-negotiation version 1.
+     */
     private static final byte AUTH_VERSION_1 = 0x01;
+
+    /**
+     * RFC 1929 success byte.
+     */
     private static final byte AUTH_SUCCESS = 0x00;
+
+    /**
+     * SOCKS5 reply: success.
+     */
     private static final byte SOCKS5_REPLY_SUCCESS = 0x00;
+
+    /**
+     * SOCKS5 reply: general server failure.
+     */
     private static final int SOCKS5_REPLY_GENERAL_FAILURE = 0x01;
+
+    /**
+     * SOCKS5 reply: connection not allowed by ruleset.
+     */
     private static final int SOCKS5_REPLY_CONNECTION_NOT_ALLOWED = 0x02;
+
+    /**
+     * SOCKS5 reply: network unreachable.
+     */
     private static final int SOCKS5_REPLY_NETWORK_UNREACHABLE = 0x03;
+
+    /**
+     * SOCKS5 reply: host unreachable.
+     */
     private static final int SOCKS5_REPLY_HOST_UNREACHABLE = 0x04;
+
+    /**
+     * SOCKS5 reply: connection refused.
+     */
     private static final int SOCKS5_REPLY_CONNECTION_REFUSED = 0x05;
+
+    /**
+     * SOCKS5 reply: TTL expired.
+     */
     private static final int SOCKS5_REPLY_TTL_EXPIRED = 0x06;
+
+    /**
+     * SOCKS5 reply: command not supported.
+     */
     private static final int SOCKS5_REPLY_COMMAND_NOT_SUPPORTED = 0x07;
+
+    /**
+     * SOCKS5 reply: address type not supported.
+     */
     private static final int SOCKS5_REPLY_ADDRESS_TYPE_UNSUPPORTED = 0x08;
+
+    /**
+     * SOCKS5 reserved byte that always carries a zero value on the
+     * wire.
+     */
     private static final byte SOCKS5_RESERVED = 0x00;
+
+    /**
+     * SOCKS4 reply version byte.
+     */
     private static final int SOCKS4_REPLY_VERSION = 0x00;
+
+    /**
+     * SOCKS4 status code: request granted.
+     */
     private static final int SOCKS4_REQUEST_GRANTED = 0x5A;
+
+    /**
+     * SOCKS4 status code: request rejected or failed.
+     */
     private static final int SOCKS4_REQUEST_REJECTED = 0x5B;
+
+    /**
+     * SOCKS4 status code: identd unreachable.
+     */
     private static final int SOCKS4_REQUEST_NO_IDENTD = 0x5C;
+
+    /**
+     * SOCKS4 status code: identd reported a different user id.
+     */
     private static final int SOCKS4_REQUEST_IDENTD_MISMATCH = 0x5D;
+
+    /**
+     * Null byte used to terminate SOCKS4 user-id and domain fields.
+     */
     private static final byte SOCKS4_NULL_TERMINATOR = 0x00;
+
+    /**
+     * Empty user id substituted when SOCKS4 authentication is absent.
+     */
     private static final byte[] SOCKS4_EMPTY_USER_ID = DataUtils.EMPTY_BYTE_ARRAY;
+
+    /**
+     * Sentinel IP {@code 0.0.0.1} that signals to a SOCKS4a proxy
+     * that the destination is supplied as a domain name instead of an
+     * IPv4 address.
+     */
     private static final byte[] SOCKS4A_SENTINEL_IP = {0x00, 0x00, 0x00, 0x01};
+
+    /**
+     * Length of an IPv4 address in bytes.
+     */
     private static final int IPV4_ADDR_LENGTH = 4;
+
+    /**
+     * Length of an IPv6 address in bytes.
+     */
     private static final int IPV6_ADDR_LENGTH = 16;
+
+    /**
+     * Length of the SOCKS port field in bytes.
+     */
     private static final int PORT_LENGTH = 2;
+
+    /**
+     * Maximum domain length permitted by SOCKS5.
+     */
     private static final int MAX_DOMAIN_LENGTH = 255;
 
     /**
@@ -100,18 +228,17 @@ public final class SocksSocketClientTunnelLayer implements SocketClientTunnelLay
     }
 
     /**
-     * Connects through the SOCKS proxy to the specified target endpoint.
+     * Connects through the SOCKS proxy to {@code address}.
      *
-     * <p>Opens a connection to the proxy server via the inner layer and
-     * performs the appropriate SOCKS handshake (4, 4a, 5, or 5h) based
-     * on the proxy configuration.
-     *
-     * <p>After this method returns successfully, the tunnel is established
-     * but the connection is not yet marked ready for application data.
-     * The caller is responsible for calling {@code markReady()}.
+     * <p>Opens the inner connection to the proxy and runs the SOCKS
+     * variant matching the configuration (4, 4a, 5 or 5h). On return
+     * the tunnel is established but not yet marked ready; the
+     * surrounding tunnel security layer is responsible for the ready
+     * transition.
      *
      * @param address  the target endpoint for the tunnel
-     * @param listener the callback for events (not used during handshake)
+     * @param listener the callback for events (unused during the
+     *                 handshake)
      * @throws IOException if the connection or handshake fails
      */
     @Override
@@ -388,7 +515,7 @@ public final class SocksSocketClientTunnelLayer implements SocketClientTunnelLay
         innerLayer.readBinary(addrInfo, true);
         addrInfo.flip();
 
-        addrInfo.get(); // reserved
+        addrInfo.get(); // discard the reserved byte
 
         var addrType = addrInfo.get();
         int remainingBytes;

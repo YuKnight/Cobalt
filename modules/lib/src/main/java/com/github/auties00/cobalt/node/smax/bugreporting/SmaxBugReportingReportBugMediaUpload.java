@@ -21,7 +21,7 @@ import java.util.Optional;
  * {@link SmaxBugReportingReportBugRequest}.
  *
  * @implNote {@code WASmaxOutBugReportingReportBugRequest.makeReportBugRequestMedia}
- *           emits the stanza shape; Cobalt models the
+ *           emits the stanza shape. Cobalt models the
  *           {@code (iv, cipherKey, type?, fileName?, bytes)} tuple
  *           as a value-class field bundle.
  */
@@ -58,13 +58,13 @@ public final class SmaxBugReportingReportBugMediaUpload {
     /**
      * Constructs a new media upload entry.
      *
-     * @param mediaIv             the IV; never {@code null}
-     * @param mediaCipherKey      the cipher key; never {@code null}
-     * @param mediaType           the optional MIME type; may be
+     * @param mediaIv             the IV. Never {@code null}
+     * @param mediaCipherKey      the cipher key. Never {@code null}
+     * @param mediaType           the optional MIME type. May be
      *                            {@code null}
-     * @param mediaFileName       the optional file name; may be
+     * @param mediaFileName       the optional file name. May be
      *                            {@code null}
-     * @param mediaElementValue   the encrypted blob; never
+     * @param mediaElementValue   the encrypted blob. Never
      *                            {@code null}
      * @throws NullPointerException if any required argument is
      *                              {@code null}
@@ -81,7 +81,7 @@ public final class SmaxBugReportingReportBugMediaUpload {
     /**
      * Returns the IV.
      *
-     * @return the IV; never {@code null}
+     * @return the IV. Never {@code null}
      */
     public String mediaIv() {
         return mediaIv;
@@ -90,7 +90,7 @@ public final class SmaxBugReportingReportBugMediaUpload {
     /**
      * Returns the cipher key.
      *
-     * @return the key; never {@code null}
+     * @return the key. Never {@code null}
      */
     public String mediaCipherKey() {
         return mediaCipherKey;
@@ -117,7 +117,7 @@ public final class SmaxBugReportingReportBugMediaUpload {
     /**
      * Returns the encrypted blob.
      *
-     * @return the bytes; never {@code null}
+     * @return the bytes. Never {@code null}
      */
     public byte[] mediaElementValue() {
         return mediaElementValue;

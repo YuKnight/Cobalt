@@ -3,7 +3,9 @@ package com.github.auties00.cobalt.node.iq.biz;
 import java.util.Objects;
 
 /**
- * One website slot — the relay supports up to two.
+ * Typed website slot carried inside the {@code website} children of an
+ * {@link IqEditBusinessProfileRequest}. The relay accepts at most two
+ * slots; an empty URL clears the slot.
  */
 public final class IqEditBusinessProfileWebsite {
     /**

@@ -13,7 +13,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The optional {@code <action/>} projection — banner deep-link
+ * The optional {@code <action/>} projection. Banner deep-link
  * triple.
  */
 @WhatsAppWebModule(moduleName = "WASmaxInBizCtwaActionBannerSuggestionRequest")

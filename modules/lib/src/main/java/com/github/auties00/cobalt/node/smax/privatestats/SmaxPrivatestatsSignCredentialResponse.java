@@ -26,8 +26,8 @@ public sealed interface SmaxPrivatestatsSignCredentialResponse extends SmaxOpera
     /**
      * Tries each {@link SmaxPrivatestatsSignCredentialResponse} variant in priority order.
      *
-     * @param node    the inbound IQ stanza; never {@code null}
-     * @param request the original outbound stanza; never
+     * @param node    the inbound IQ stanza. Never {@code null}
+     * @param request the original outbound stanza. Never
      *                {@code null}
      * @return an {@link Optional} carrying the parsed variant
      * @throws NullPointerException if either argument is
@@ -51,7 +51,7 @@ public sealed interface SmaxPrivatestatsSignCredentialResponse extends SmaxOpera
     }
 
     /**
-     * The {@code Success} reply variant — the relay signed the
+     * The {@code Success} reply variant. The relay signed the
      * blinded credential and returned the signature, the ACS public
      * key, and the DLEQ proof bytes.
      *
@@ -103,12 +103,12 @@ public sealed interface SmaxPrivatestatsSignCredentialResponse extends SmaxOpera
          *
          * @param signCredentialT             the timestamp
          * @param signedCredentialElementValue the signed credential
-         *                                    bytes; never
-         *                                    {@code null}; exactly
+         *                                    bytes. Never
+         *                                    {@code null}. Exactly
          *                                    {@code 32} bytes
          * @param acsPublicKeyElementValue    the ACS public key
-         *                                    bytes; never
-         *                                    {@code null}; exactly
+         *                                    bytes. Never
+         *                                    {@code null}. Exactly
          *                                    {@code 32} bytes
          * @param dleqProofCElementValue      the DLEQ proof
          *                                    {@code c} bytes;
@@ -156,7 +156,7 @@ public sealed interface SmaxPrivatestatsSignCredentialResponse extends SmaxOpera
         /**
          * Returns the signed credential bytes.
          *
-         * @return the bytes; never {@code null}
+         * @return the bytes. Never {@code null}
          */
         public byte[] signedCredentialElementValue() {
             return signedCredentialElementValue;
@@ -165,7 +165,7 @@ public sealed interface SmaxPrivatestatsSignCredentialResponse extends SmaxOpera
         /**
          * Returns the ACS public key bytes.
          *
-         * @return the bytes; never {@code null}
+         * @return the bytes. Never {@code null}
          */
         public byte[] acsPublicKeyElementValue() {
             return acsPublicKeyElementValue;
@@ -174,7 +174,7 @@ public sealed interface SmaxPrivatestatsSignCredentialResponse extends SmaxOpera
         /**
          * Returns the DLEQ proof {@code c} component.
          *
-         * @return the bytes; never {@code null}
+         * @return the bytes. Never {@code null}
          */
         public byte[] dleqProofCElementValue() {
             return dleqProofCElementValue;
@@ -183,7 +183,7 @@ public sealed interface SmaxPrivatestatsSignCredentialResponse extends SmaxOpera
         /**
          * Returns the DLEQ proof {@code s} component.
          *
-         * @return the bytes; never {@code null}
+         * @return the bytes. Never {@code null}
          */
         public byte[] dleqProofSElementValue() {
             return dleqProofSElementValue;
@@ -192,7 +192,7 @@ public sealed interface SmaxPrivatestatsSignCredentialResponse extends SmaxOpera
         /**
          * Returns the project-name echo.
          *
-         * @return the project name; never {@code null}
+         * @return the project name. Never {@code null}
          */
         public String projectNameElementValue() {
             return projectNameElementValue;
@@ -299,7 +299,7 @@ public sealed interface SmaxPrivatestatsSignCredentialResponse extends SmaxOpera
     }
 
     /**
-     * The {@code ErrorNoRetry} reply variant — a permanent
+     * The {@code ErrorNoRetry} reply variant. A permanent
      * rejection that the local client must NOT retry.
      *
      * <p>Carries one of three documented {@code (code, text)} pairs:
@@ -309,8 +309,8 @@ public sealed interface SmaxPrivatestatsSignCredentialResponse extends SmaxOpera
      *
      * @implNote {@code WASmaxInPrivatestatsSignCredentialResponseErrorNoRetry.parseSignCredentialResponseErrorNoRetry}
      *           projects the {@code <error/>} child through
-     *           {@code WASmaxInPrivatestatsSignCredentialNoRetryError}
-     *           — a disjunction over {@code IQErrorBadRequest},
+     *           {@code WASmaxInPrivatestatsSignCredentialNoRetryError},
+     *           a disjunction over {@code IQErrorBadRequest},
      *           {@code IQErrorFeatureNotImplemented}, and
      *           {@code IQErrorServiceUnavailable}.
      */
@@ -321,13 +321,13 @@ public sealed interface SmaxPrivatestatsSignCredentialResponse extends SmaxOpera
     @WhatsAppWebModule(moduleName = "WASmaxInPrivatestatsIQErrorServiceUnavailableMixin")
     final class ErrorNoRetry implements SmaxPrivatestatsSignCredentialResponse {
         /**
-         * The numeric error code — one of {@code 400}, {@code 501},
+         * The numeric error code. One of {@code 400}, {@code 501},
          * or {@code 503}.
          */
         private final int errorCode;
 
         /**
-         * The error text — one of {@code "bad-request"},
+         * The error text. One of {@code "bad-request"},
          * {@code "feature-not-implemented"}, or
          * {@code "service-unavailable"}.
          */
@@ -337,7 +337,7 @@ public sealed interface SmaxPrivatestatsSignCredentialResponse extends SmaxOpera
          * Constructs a new no-retry error reply.
          *
          * @param errorCode the numeric error code
-         * @param errorText the optional error text; may be
+         * @param errorText the optional error text. May be
          *                  {@code null}
          */
         public ErrorNoRetry(int errorCode, String errorText) {
@@ -420,7 +420,7 @@ public sealed interface SmaxPrivatestatsSignCredentialResponse extends SmaxOpera
     }
 
     /**
-     * The {@code ErrorRetry} reply variant — a transient
+     * The {@code ErrorRetry} reply variant. A transient
      * {@code 500 internal-server-error} rejection. The local client
      * may retry on the next flush window.
      *
@@ -443,7 +443,7 @@ public sealed interface SmaxPrivatestatsSignCredentialResponse extends SmaxOpera
         }
 
         /**
-         * Returns the numeric error code — always {@code 500}.
+         * Returns the numeric error code. Always {@code 500}.
          *
          * @return the code
          */
@@ -452,7 +452,7 @@ public sealed interface SmaxPrivatestatsSignCredentialResponse extends SmaxOpera
         }
 
         /**
-         * Returns the error text — always
+         * Returns the error text. Always
          * {@code "internal-server-error"}.
          *
          * @return the text

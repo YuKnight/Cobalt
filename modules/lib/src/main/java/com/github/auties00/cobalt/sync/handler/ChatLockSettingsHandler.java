@@ -40,7 +40,7 @@ public final class ChatLockSettingsHandler implements WebAppStateActionHandler {
      *
      * @implNote ADAPTED: WAWebChatLockSettingsSync uses WALogger; Cobalt uses java.util.logging
      */
-    private static final Logger LOGGER = Logger.getLogger(ChatLockSettingsHandler.class.getName()); // ADAPTED: WAWebChatLockSettingsSync - WALogger
+    private static final Logger LOGGER = Logger.getLogger(ChatLockSettingsHandler.class.getName());
 
     /**
      * The singleton instance of {@code ChatLockSettingsHandler}.
@@ -65,7 +65,6 @@ public final class ChatLockSettingsHandler implements WebAppStateActionHandler {
      */
     @WhatsAppWebExport(moduleName = "WAWebChatLockSettingsSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private ChatLockSettingsHandler() {
-        // WAWebChatLockSettingsSync constructor
     }
 
     /**
@@ -77,7 +76,7 @@ public final class ChatLockSettingsHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebChatLockSettingsSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return ChatLockSettings.ACTION_NAME; // WAWebChatLockSettingsSync.getAction -> "setting_chatLock"
+        return ChatLockSettings.ACTION_NAME;
     }
 
     /**
@@ -89,18 +88,16 @@ public final class ChatLockSettingsHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebChatLockSettingsSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return ChatLockSettings.COLLECTION_NAME; // WAWebChatLockSettingsSync.collectionName = RegularLow
+        return ChatLockSettings.COLLECTION_NAME;
     }
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote WAWebChatLockSettingsSync.getVersion - returns {@code 7}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebChatLockSettingsSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return ChatLockSettings.ACTION_VERSION; // WAWebChatLockSettingsSync.getVersion -> 7
+        return ChatLockSettings.ACTION_VERSION;
     }
 
     /**
@@ -119,7 +116,7 @@ public final class ChatLockSettingsHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebChatLockSettingsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebChatLockSettingsSync.applyMutations -> SyncActionState.Success
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -151,23 +148,23 @@ public final class ChatLockSettingsHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebChatLockSettingsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        if (mutation.operation() != SyncdOperation.SET) { // WAWebChatLockSettingsSync.applyMutations: if (e.operation !== "set")
-            return MutationApplicationResult.unsupported(); // WAWebChatLockSettingsSync.applyMutations: {actionState: SyncActionState.Unsupported}
+        if (mutation.operation() != SyncdOperation.SET) {
+            return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof ChatLockSettings settings)) { // WAWebChatLockSettingsSync.applyMutations: var t = e.value.chatLockSettings; if (t == null)
-            return malformedActionValue(); // WAWebChatLockSettingsSync.applyMutations: malformedActionValue(n.collectionName)
+        if (!(mutation.value().action().orElse(null) instanceof ChatLockSettings settings)) {
+            return malformedActionValue();
         }
 
         // ADAPTED: WAWebChatLockSettingsSync.applyMutations: var s = t.hideLockedChats; if (s == null) return malformed
         // Cobalt's hideLockedChats() coalesces null to false per nullable Boolean convention;
         // the null-vs-false distinction is not observable through the public accessor.
-        if (!isSecretCodeValid(settings)) { // WAWebChatLockSettingsSync.applyMutations: secretCode validation block
-            return malformedActionValue(); // WAWebChatLockSettingsSync.applyMutations: malformedActionValue(n.collectionName)
+        if (!isSecretCodeValid(settings)) {
+            return malformedActionValue();
         }
 
-        client.store().setChatLockSettings(settings); // WAWebChatLockSettingsSync.applyMutations: getChatLockSettings().updateAndSave(r)
-        return MutationApplicationResult.success(); // WAWebChatLockSettingsSync.applyMutations: {actionState: SyncActionState.Success}
+        client.store().setChatLockSettings(settings);
+        return MutationApplicationResult.success();
     }
 
     /**
@@ -197,23 +194,22 @@ public final class ChatLockSettingsHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebChatLockSettingsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.DIRECT)
     public List<MutationApplicationResult> applyMutationBatchResults(WhatsAppClient client, WamService wamService, List<DecryptedMutation.Trusted> mutations) {
-        ChatLockSettings pending = null; // WAWebChatLockSettingsSync.applyMutations: var r
-        var results = new ArrayList<MutationApplicationResult>(mutations.size()); // WAWebChatLockSettingsSync.applyMutations: t.map(function(e) {...})
-        for (var mutation : mutations) { // WAWebChatLockSettingsSync.applyMutations: t.map(function(e) {...})
-            if (mutation.operation() != SyncdOperation.SET) { // WAWebChatLockSettingsSync.applyMutations: if (e.operation !== "set")
-                results.add(MutationApplicationResult.unsupported()); // WAWebChatLockSettingsSync.applyMutations: {actionState: SyncActionState.Unsupported}
+        ChatLockSettings pending = null;
+        var results = new ArrayList<MutationApplicationResult>(mutations.size());
+        for (var mutation : mutations) {
+            if (mutation.operation() != SyncdOperation.SET) {
+                results.add(MutationApplicationResult.unsupported());
                 continue;
             }
 
-            if (!(mutation.value().action().orElse(null) instanceof ChatLockSettings settings)) { // WAWebChatLockSettingsSync.applyMutations: var t = e.value.chatLockSettings; if (t == null)
-                results.add(malformedActionValue()); // WAWebChatLockSettingsSync.applyMutations: malformedActionValue(n.collectionName)
+            if (!(mutation.value().action().orElse(null) instanceof ChatLockSettings settings)) {
+                results.add(malformedActionValue());
                 continue;
             }
 
             // ADAPTED: WAWebChatLockSettingsSync.applyMutations: var s = t.hideLockedChats; if (s == null) return malformed
             // Cobalt's hideLockedChats() coalesces null to false per nullable Boolean convention;
             // the null-vs-false distinction is not observable through the public accessor.
-            // WAWebChatLockSettingsSync.applyMutations: r = {hideLockedChats: s, secretCode: null}
             // This assignment happens BEFORE the secretCode check in WA (JS comma expression),
             // so even malformed-secretCode mutations leave r populated with a sanitized value.
             pending = new ChatLockSettingsBuilder()
@@ -221,20 +217,19 @@ public final class ChatLockSettingsHandler implements WebAppStateActionHandler {
                     .secretCode(null)
                     .build();
 
-            if (!isSecretCodeValid(settings)) { // WAWebChatLockSettingsSync.applyMutations: secretCode validation
-                results.add(malformedActionValue()); // WAWebChatLockSettingsSync.applyMutations: malformedActionValue(n.collectionName)
+            if (!isSecretCodeValid(settings)) {
+                results.add(malformedActionValue());
                 continue;
             }
 
-            // WAWebChatLockSettingsSync.applyMutations: r.secretCode = {iterations:..., encoding:c, salt:..., transformer:m, data:d}
             pending.setSecretCode(settings.secretCode().orElse(null));
-            results.add(MutationApplicationResult.success()); // WAWebChatLockSettingsSync.applyMutations: {actionState: SyncActionState.Success}
+            results.add(MutationApplicationResult.success());
         }
 
-        if (pending != null) { // WAWebChatLockSettingsSync.applyMutations: if (r != null) updateAndSave(r)
-            client.store().setChatLockSettings(pending); // WAWebChatLockSettingsSync.applyMutations: getChatLockSettings().updateAndSave(r)
+        if (pending != null) {
+            client.store().setChatLockSettings(pending);
         } else {
-            LOGGER.warning("ChatLockSettingsSync: mutations parse failed"); // WAWebChatLockSettingsSync.applyMutations: WALogger.WARN("ChatLockSettingsSync: mutations parse failed")
+            LOGGER.warning("ChatLockSettingsSync: mutations parse failed");
         }
 
         return results;
@@ -266,59 +261,52 @@ public final class ChatLockSettingsHandler implements WebAppStateActionHandler {
      *         {@code false} if malformed
      */
     private boolean isSecretCodeValid(ChatLockSettings settings) {
-        var secretCode = settings.secretCode(); // WAWebChatLockSettingsSync.applyMutations: var u = t.secretCode
-        if (secretCode.isEmpty()) { // WAWebChatLockSettingsSync.applyMutations: if (u != null) {...} - null secretCode is valid
+        var secretCode = settings.secretCode();
+        if (secretCode.isEmpty()) {
             return true;
         }
 
         var password = secretCode.get();
 
-        // WAWebChatLockSettingsSync.applyMutations: var c = u.encoding, d = u.transformedData, m = u.transformer, p = u.transformerArg
-        var encoding = password.encoding(); // WAWebChatLockSettingsSync.applyMutations: var c = u.encoding
-        var transformedData = password.transformedData(); // WAWebChatLockSettingsSync.applyMutations: var d = u.transformedData
-        var transformer = password.transformer(); // WAWebChatLockSettingsSync.applyMutations: var m = u.transformer
-        var transformerArgs = password.transformerArg(); // WAWebChatLockSettingsSync.applyMutations: var p = u.transformerArg
+        var encoding = password.encoding();
+        var transformedData = password.transformedData();
+        var transformer = password.transformer();
+        var transformerArgs = password.transformerArg();
 
-        // WAWebChatLockSettingsSync.applyMutations: if (p == null || m == null || d == null || c == null) return malformedActionValue
         if (transformerArgs.isEmpty() || transformer.isEmpty() || transformedData.isEmpty() || encoding.isEmpty()) {
             return false;
         }
 
-        // WAWebChatLockSettingsSync.applyMutations: if (m !== PBKDF2_HMAC_SHA512) return malformedActionValue
         if (transformer.get() != UserPassword.Transformer.PBKDF2_HMAC_SHA512) {
             return false;
         }
 
-        // WAWebChatLockSettingsSync.applyMutations: var _ = p.reduce(function(e, t) {
         //   return t.value == null || (t.key === "iterations" ? e.iterations = t.value.asUnsignedInteger
         //                              : t.key === "salt" && (e.salt = t.value.asBlob)), e
         // }, {})
-        var hasIterations = false; // WAWebChatLockSettingsSync.applyMutations: _.iterations
-        var hasSalt = false; // WAWebChatLockSettingsSync.applyMutations: _.salt
-        for (var arg : transformerArgs) { // WAWebChatLockSettingsSync.applyMutations: p.reduce
-            var value = arg.value().orElse(null); // WAWebChatLockSettingsSync.applyMutations: t.value
-            if (value == null) { // WAWebChatLockSettingsSync.applyMutations: if (t.value == null) continue (via return e)
+        var hasIterations = false;
+        var hasSalt = false;
+        for (var arg : transformerArgs) {
+            var value = arg.value().orElse(null);
+            if (value == null) {
                 continue;
             }
-            var key = arg.key().orElse(null); // WAWebChatLockSettingsSync.applyMutations: t.key
-            if ("iterations".equals(key)) { // WAWebChatLockSettingsSync.applyMutations: t.key === "iterations"
-                // WAWebChatLockSettingsSync.applyMutations: e.iterations = t.value.asUnsignedInteger
+            var key = arg.key().orElse(null);
+            if ("iterations".equals(key)) {
                 // WA Web reads Value.asUnsignedInteger directly; Cobalt uses the oneof accessor
                 // and checks the variant type to match the same semantics
-                if (value.value().orElse(null) instanceof UserPassword.TransformerArg.ValueSpec.AsUnsignedInteger ui // ADAPTED: WAWebChatLockSettingsSync.applyMutations
+                if (value.value().orElse(null) instanceof UserPassword.TransformerArg.ValueSpec.AsUnsignedInteger ui
                         && ui.asUnsignedInteger() != null) {
                     hasIterations = true;
                 }
-            } else if ("salt".equals(key)) { // WAWebChatLockSettingsSync.applyMutations: t.key === "salt"
-                // WAWebChatLockSettingsSync.applyMutations: e.salt = t.value.asBlob
-                if (value.value().orElse(null) instanceof UserPassword.TransformerArg.ValueSpec.AsBlob blob // ADAPTED: WAWebChatLockSettingsSync.applyMutations
+            } else if ("salt".equals(key)) {
+                if (value.value().orElse(null) instanceof UserPassword.TransformerArg.ValueSpec.AsBlob blob
                         && blob.asBlob() != null) {
                     hasSalt = true;
                 }
             }
         }
 
-        // WAWebChatLockSettingsSync.applyMutations: if (_.iterations == null || _.salt == null) return malformedActionValue
         return hasIterations && hasSalt;
     }
 }

@@ -13,20 +13,20 @@ import java.util.Optional;
  * <p>Carries the peer's full device list and, when present, their signed
  * key-index-list metadata.
  *
- * @implNote WAWebUsyncDevice.deviceParser: success branch returns
- *     {@code {deviceList, keyIndex}}. Cobalt models the per-device shape
- *     as a static nested class and the optional key-index shape similarly.
+ * @implNote The JS parser returns {@code {deviceList, keyIndex}}. Cobalt
+ *     models the per-device shape as a static nested class and the optional
+ *     key-index shape similarly.
  */
 @WhatsAppWebModule(moduleName = "WAWebUsyncDevice")
 public final class DeviceResult implements UsyncProtocolResponse {
     /**
-     * The list of devices linked to the peer; never {@code null}.
+     * Holds the list of devices linked to the peer. Never {@code null}.
      */
     private final List<Device> devices;
 
     /**
-     * The peer's signed key-index-list metadata, or {@code null} if the
-     * relay did not return a {@code <key-index-list>} child.
+     * Holds the peer's signed key-index-list metadata, or {@code null} if
+     * the relay did not return a {@code <key-index-list>} child.
      */
     private final KeyIndex keyIndex;
 
@@ -62,26 +62,23 @@ public final class DeviceResult implements UsyncProtocolResponse {
 
     /**
      * One device in the peer's device list.
-     *
-     * @implNote WAWebUsyncDevice.deviceParser: per-device shape
-     *     {@code {id, keyIndex?, isHosted?}}.
      */
     @WhatsAppWebModule(moduleName = "WAWebUsyncDevice")
     public static final class Device {
         /**
-         * The device id (small integer).
+         * Holds the device id (small integer).
          */
         private final int id;
 
         /**
-         * The device's signed key index, or {@code null} if the relay
+         * Holds the device's signed key index, or {@code null} if the relay
          * omitted the attribute.
          */
         private final Integer keyIndex;
 
         /**
-         * Whether the device is a hosted device. {@code false} when the
-         * attribute is absent.
+         * Tracks whether the device is a hosted device. {@code false} when
+         * the attribute is absent.
          */
         private final boolean hosted;
 
@@ -128,25 +125,23 @@ public final class DeviceResult implements UsyncProtocolResponse {
 
     /**
      * The peer's signed key-index-list metadata.
-     *
-     * @implNote WAWebUsyncDevice.deviceParser: key-index shape
-     *     {@code {ts, signedKeyIndexBytes, expectedTs?}}.
      */
     @WhatsAppWebModule(moduleName = "WAWebUsyncDevice")
     public static final class KeyIndex {
         /**
-         * The timestamp the index was signed at; never {@code null}.
+         * Holds the timestamp the index was signed at. Never {@code null}.
          */
         private final Instant timestamp;
 
         /**
-         * The raw signed protobuf bytes, or {@code null} when the
+         * Holds the raw signed protobuf bytes, or {@code null} when the
          * {@code <key-index-list>} element had no inline content.
          */
         private final byte[] signedBytes;
 
         /**
-         * The {@code expected_ts} attribute, or {@code null} when absent.
+         * Holds the {@code expected_ts} attribute, or {@code null} when
+         * absent.
          */
         private final Instant expectedTimestamp;
 

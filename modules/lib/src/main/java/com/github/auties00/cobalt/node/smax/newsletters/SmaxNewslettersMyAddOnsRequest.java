@@ -16,7 +16,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps the {@code <my_addons/>} payload
+ * The outbound stanza variant. Wraps the {@code <my_addons/>} payload
  * in the canonical
  * {@code <iq xmlns="newsletter" type="get" to="s.whatsapp.net">}
  * envelope.
@@ -87,16 +87,12 @@ public final class SmaxNewslettersMyAddOnsRequest implements SmaxOperation.Reque
     @WhatsAppWebExport(moduleName = "WASmaxOutNewslettersMyAddOnsRequest",
             exports = "makeMyAddOnsRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutNewslettersMyAddOnsRequest:
-        //   smax("my_addons", {limit: INT(t), jid: OPTIONAL(JID, n)})
         var myAddOnsBuilder = new NodeBuilder()
                 .description("my_addons")
                 .attribute("limit", limit);
         if (newsletterJid != null) {
             myAddOnsBuilder.attribute("jid", newsletterJid);
         }
-        // WASmaxOutNewslettersSelfIQGetRequestMixin: smax("iq", {to: S_WHATSAPP_NET, xmlns: "newsletter"})
-        // WASmaxOutNewslettersBaseIQGetRequestMixin: smax("iq", {id: generateId(), type: "get"})
         return new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "newsletter")

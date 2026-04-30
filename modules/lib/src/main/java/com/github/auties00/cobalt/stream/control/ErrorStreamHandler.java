@@ -90,27 +90,18 @@ public final class ErrorStreamHandler implements SocketStream.Handler {
     @Override
     @WhatsAppWebExport(moduleName = "WABackendHandleError", exports = "handleError", adaptation = WhatsAppAdaptation.ADAPTED)
     public void handle(Node node) {
-        // WABackendHandleError.errorParser: var t = e.attrInt("code")
         var code = node.getAttributeAsInt("code", (Integer) null);
         if (code == null) {
-            // ADAPTED: WA Web's WAParsableWapNode.attrInt would throw XmppParsingFailure here,
-            // which the WADeprecatedWapParser wrapper catches and returns as {error: e}; Cobalt
-            // logs and returns instead so that a malformed error stanza never propagates.
+            // Cobalt logs and returns so that a malformed error stanza never propagates; WA Web's parser would throw XmppParsingFailure.
             LOGGER.log(System.Logger.Level.WARNING, "Received error stanza without code: {0}", node);
             return;
         }
 
-        // WABackendHandleError.errorParser: switch (t) { case c.SMAX_INVALID: return p(); ... }
         if (code == SMAX_INVALID_CODE) {
-            // WABackendHandleError.p: WALogger.ERROR(`Invalid stanza sent (smax-invalid)`)
-            //                         .sendLogs("smax-invalid") , telemetry, skipped
             LOGGER.log(System.Logger.Level.ERROR, "Invalid stanza sent (smax-invalid)");
             return;
         }
 
-        // WABackendHandleError.errorParser: default: return _(t)
-        // WABackendHandleError._: WALogger.ERROR(`Unknown error code: ${e}`, e)
-        //                         .sendLogs("unknown-error-code") , telemetry, skipped
         LOGGER.log(System.Logger.Level.ERROR, "Unknown error code: {0}", code);
     }
 }

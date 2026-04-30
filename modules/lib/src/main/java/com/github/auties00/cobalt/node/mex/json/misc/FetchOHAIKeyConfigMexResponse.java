@@ -14,26 +14,29 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The parsed response for the {@link FetchOHAIKeyConfigMexRequest} MEX
- * query, exposing the OHAI key configuration list returned by the relay.
+ * Parsed response of the {@link FetchOHAIKeyConfigMexRequest} query, exposing
+ * the OHAI key configuration list returned by the relay.
  *
- * <p>WA Web reduces the raw {@code ohai_configs} array down to the entry
- * with the earliest {@code expiration_date} and projects only the fields
- * needed by {@code WAWebOHAIClient.fetchOHAI}. Cobalt is a library and
- * preserves the raw configuration list so callers can pick the active
- * entry themselves; the field projection inside each entry is identical
- * to the WA Web shape.
- *
- * @implNote WAWebFetchOHAIKeyConfigJob: adapts the JSON root returned by
- * the GraphQL query into a Java value object. WA Web reads
- * {@code data.xwa2_ohai_configurations.ohai_configs} and reduces the
- * array to the entry with the earliest {@code expiration_date}; Cobalt
- * exposes the full list via {@link #ohaiConfigs()}.
+ * <p>WA Web reduces the raw {@code ohai_configs} array down to the entry with
+ * the earliest {@code expiration_date} and projects only the fields needed by
+ * {@code WAWebOHAIClient.fetchOHAI}. Cobalt is a library and preserves the
+ * raw configuration list so callers can pick the active entry themselves. The
+ * field projection inside each entry is identical to the WA Web shape.
  */
 @WhatsAppWebModule(moduleName = "WAWebFetchOHAIKeyConfigJob")
 public final class FetchOHAIKeyConfigMexResponse implements MexOperation.Response.Json {
+    /**
+     * The unfiltered list of OHAI key configurations projected from
+     * {@code data.xwa2_ohai_configurations.ohai_configs}.
+     */
     private final List<OhaiConfig> ohaiConfigs;
 
+    /**
+     * Constructs a response wrapping the parsed list of OHAI key
+     * configurations.
+     *
+     * @param ohaiConfigs the unfiltered list of configurations
+     */
     private FetchOHAIKeyConfigMexResponse(List<OhaiConfig> ohaiConfigs) {
         this.ohaiConfigs = ohaiConfigs;
     }
@@ -41,10 +44,6 @@ public final class FetchOHAIKeyConfigMexResponse implements MexOperation.Respons
     /**
      * Parses a MEX response from the given IQ response node.
      *
-     * @implNote WAWebFetchOHAIKeyConfigJob.mexFetchOHAIKeyConfig: WA Web
-     * relies on the GraphQL client to unwrap the response. Cobalt
-     * performs the unwrapping manually from the IQ {@code <result>}
-     * child.
      * @param node the IQ response node received from the relay
      * @return an {@link Optional} containing the parsed response, or empty
      *         if the node is missing a result payload
@@ -58,24 +57,19 @@ public final class FetchOHAIKeyConfigMexResponse implements MexOperation.Respons
     }
 
     /**
-     * Returns the {@code ohai_configs} field carrying the unfiltered list
-     * of OHAI key configurations advertised by the relay.
+     * Returns the unfiltered list of OHAI key configurations advertised by
+     * the relay.
      *
-     * @return the list of configurations, empty if the relay returned no
-     *         entries
+     * @return the list of configurations, empty if the relay returned no entries
      */
     public List<OhaiConfig> ohaiConfigs() {
         return ohaiConfigs;
     }
 
     /**
-     * Parses a {@link FetchOHAIKeyConfigMexResponse} from the raw JSON
-     * bytes of the {@code <result>} child.
+     * Parses a {@link FetchOHAIKeyConfigMexResponse} from the raw JSON bytes
+     * of the {@code <result>} child.
      *
-     * @implNote WAWebFetchOHAIKeyConfigJob.mexFetchOHAIKeyConfig: mirrors
-     * the implicit unwrapping that WA Web performs on the GraphQL
-     * response, descending into
-     * {@code data.xwa2_ohai_configurations.ohai_configs}.
      * @param json the UTF-8 encoded JSON payload
      * @return an {@link Optional} containing the parsed response, or empty
      *         if the envelope is missing expected fields
@@ -110,14 +104,48 @@ public final class FetchOHAIKeyConfigMexResponse implements MexOperation.Respons
      * {@code public_key} as required (THROW-on-null) scalar fields.
      */
     public static final class OhaiConfig {
+        /**
+         * The {@code aead_id} scalar identifying the AEAD cipher suite.
+         */
         private final String aeadId;
+        /**
+         * The {@code expiration_date} scalar (Unix epoch second).
+         */
         private final String expirationDate;
+        /**
+         * The {@code kdf_id} scalar identifying the HPKE KDF.
+         */
         private final String kdfId;
+        /**
+         * The {@code kem_id} scalar identifying the HPKE KEM.
+         */
         private final String kemId;
+        /**
+         * The {@code key_id} scalar carrying the server-assigned identifier.
+         */
         private final String keyId;
+        /**
+         * The {@code last_updated_time} scalar (Unix epoch second).
+         */
         private final String lastUpdatedTime;
+        /**
+         * The {@code public_key} scalar carrying the OHAI public key bytes
+         * encoded as a hexadecimal string.
+         */
         private final String publicKey;
 
+        /**
+         * Constructs an OHAI key configuration entry from the parsed scalar
+         * fields of the {@code XWA2OHAIConfig} fragment.
+         *
+         * @param aeadId          the {@code aead_id} scalar
+         * @param expirationDate  the {@code expiration_date} scalar
+         * @param kdfId           the {@code kdf_id} scalar
+         * @param kemId           the {@code kem_id} scalar
+         * @param keyId           the {@code key_id} scalar
+         * @param lastUpdatedTime the {@code last_updated_time} scalar
+         * @param publicKey       the {@code public_key} scalar
+         */
         private OhaiConfig(String aeadId, String expirationDate, String kdfId, String kemId,
                            String keyId, String lastUpdatedTime, String publicKey) {
             this.aeadId = aeadId;

@@ -16,7 +16,7 @@ import java.util.Optional;
 /**
  * Documented {@code state} enum carried by the
  * {@code <whatsapp_as_page_button>} grandchild of
- * {@code <fb_page/>} — opt-in toggle for the
+ * {@code <fb_page/>}. Opt-in toggle for the
  * "WhatsApp as page button" overlay.
  *
  * @implNote Mirrors {@code WASmaxInBizLinkingEnums.ENUM_OFF_ON}.

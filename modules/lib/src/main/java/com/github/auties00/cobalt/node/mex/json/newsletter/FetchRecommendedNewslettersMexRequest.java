@@ -23,22 +23,12 @@ import java.util.OptionalLong;
  * Fetches a list of newsletters recommended to the authenticated user.
  *
  * <p>The recommendation engine returns channels that the WhatsApp backend estimates are relevant to the user based on follow history, directory browsing and regional signals.
- *
- * @implNote WAWebMexFetchRecommendedNewslettersJob: adapts the {@code mexFetchRecommendedNewsletters} GraphQL query,
- * which in WA Web is invoked via {@code WAWebMexClient.fetchQuery} and
- * whose response is unwrapped by the same module. Cobalt models the request
- * and response as sibling variants of a sealed interface rather than a
- * free-standing async function.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexFetchRecommendedNewslettersJob")
 public final class FetchRecommendedNewslettersMexRequest implements MexOperation.Request.Json {
     /**
      * The numeric GraphQL query identifier assigned by the WhatsApp relay
      * to the {@code FetchRecommendedNewsletters} compiled query.
-     *
-     * @implNote WAWebMexFetchRecommendedNewslettersJobQuery.graphql: corresponds to the
-     * {@code params.id} field of the compiled GraphQL document
-     * ({@code id:"25806748772361516"}) bundled in the WA Web client.
      */
     public static final String QUERY_ID = "25806748772361516";
 
@@ -47,17 +37,6 @@ public final class FetchRecommendedNewslettersMexRequest implements MexOperation
      * {@code MexPerfTracker} when dispatching this query, mirroring the
      * {@code params.name} value of the compiled mexFetchRecommendedNewsletters
      * operation.
-     *
-     * <p>The constant is exposed through {@link #name()} so
-     * call sites can reach the same telemetry tag WA Web emits without
-     * duplicating the literal at every dispatch site.
-     *
-     * @implNote WAWebMexFetchRecommendedNewslettersJob: WA Web invokes the operation through
-     * {@code WAWebMexClient.fetchQuery} which forwards to
-     * {@code WAWebMexNativeClient}; the native client passes the
-     * {@code params.name} of the compiled GraphQL artifact to
-     * {@code MexPerfTracker.setOperationName}. Cobalt mirrors that
-     * scalar verbatim as {@code "mexFetchRecommendedNewsletters"}.
      */
     public static final String OPERATION_NAME = "mexFetchRecommendedNewsletters";
     private final Long limit;
@@ -90,12 +69,7 @@ public final class FetchRecommendedNewslettersMexRequest implements MexOperation
      * Returns the compiled GraphQL query identifier projected from
      * {@link #QUERY_ID}.
      *
-     * @implNote WAWebMexFetchRecommendedNewslettersJob: WA Web reads the {@code params.id}
-     *           field of the compiled artifact and forwards it to
-     *           {@code MexPerfTracker.setQueryId}; Cobalt projects
-     *           the same scalar through this accessor.
-     * @return the constant {@link #QUERY_ID}; never
-     *         {@code null}
+     * @return the constant {@link #QUERY_ID}, never {@code null}
      */
     @Override
     public String id() {
@@ -106,14 +80,7 @@ public final class FetchRecommendedNewslettersMexRequest implements MexOperation
      * Returns the GraphQL operation name projected from
      * {@link #OPERATION_NAME}.
      *
-     * @implNote WAWebMexFetchRecommendedNewslettersJob: WA Web's
-     *           {@code WAWebMexNativeClient.fetchQuery} reads
-     *           {@code params.name} from the compiled GraphQL
-     *           artifact and forwards it to
-     *           {@code MexPerfTracker.setOperationName}; Cobalt
-     *           projects the same scalar through this accessor.
-     * @return the constant {@link #OPERATION_NAME};
-     *         never {@code null}
+     * @return the constant {@link #OPERATION_NAME}, never {@code null}
      */
     @Override
     public String name() {
@@ -124,12 +91,6 @@ public final class FetchRecommendedNewslettersMexRequest implements MexOperation
      * Builds the IQ stanza that dispatches this operation to the
      * WhatsApp relay.
      *
-     * @implNote WAWebMexFetchRecommendedNewslettersJob.mexFetchRecommendedNewsletters: WA Web constructs the
-     * {@code variables} object inline as
-     * {@code {input:{limit:t,country_codes:r}, fetch_status_metadata: <bool>}}
-     * and delegates to {@code WAWebMexClient.fetchQuery}. Cobalt writes
-     * the JSON directly via {@code fastjson2.JSONWriter} and wraps it
-     * through {@link Json#createMexNode(String, String)}.
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         serialised GraphQL variables
      */
@@ -137,18 +98,12 @@ public final class FetchRecommendedNewslettersMexRequest implements MexOperation
             adaptation = WhatsAppAdaptation.ADAPTED)
     @Override
     public NodeBuilder toNode() {
-        // WAWebMexFetchRecommendedNewslettersJob.mexFetchRecommendedNewsletters
-        // Opens a UTF-8 JSON writer that will serialise the GraphQL variables envelope
         try (var writer = JSONWriter.ofUTF8()) {
-            // WAWebMexFetchRecommendedNewslettersJob.mexFetchRecommendedNewsletters
-            // Begins the outer envelope and the nested "variables" object consumed by WAWebMexClient.fetchQuery
             writer.startObject();
             writer.writeName("variables");
             writer.writeColon();
             writer.startObject();
 
-            // WAWebMexFetchRecommendedNewslettersJob.mexFetchRecommendedNewsletters
-            // Emits {input:{limit:t, country_codes:r}}; the inner object is emitted even when both children are null
             // to mirror the JS object literal shape.
             writer.writeName("input");
             writer.writeColon();
@@ -172,8 +127,6 @@ public final class FetchRecommendedNewslettersMexRequest implements MexOperation
             }
             writer.endObject();
 
-            // WAWebMexFetchRecommendedNewslettersJob.mexFetchRecommendedNewsletters
-            // Emits the sibling {fetch_status_metadata: <bool>} field, mirroring the JS variables literal
             writer.writeName("fetch_status_metadata");
             writer.writeColon();
             writer.writeBool(fetchStatusMetadata);
@@ -181,8 +134,6 @@ public final class FetchRecommendedNewslettersMexRequest implements MexOperation
             writer.endObject();
             writer.endObject();
 
-            // ADAPTED: WAWebMexFetchRecommendedNewslettersJob.mexFetchRecommendedNewsletters
-            // Flushes the JSON buffer into a StringWriter and wraps it in the shared MEX IQ envelope
             try (var output = new StringWriter()) {
                 writer.flushTo(output);
                 return Json.createMexNode(QUERY_ID, output.toString());

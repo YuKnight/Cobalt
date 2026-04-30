@@ -15,7 +15,7 @@ import java.util.Optional;
  * response to a {@link IqDeleteTosRequest}.
  *
  * @implNote {@code WAWebTosJob.deleteTosState} routes through a no-op
- *           parser; Cobalt projects the three IQ shapes for caller
+ *           parser. Cobalt projects the three IQ shapes for caller
  *           visibility.
  */
 public sealed interface IqDeleteTosResponse extends IqOperation.Response
@@ -25,10 +25,10 @@ public sealed interface IqDeleteTosResponse extends IqOperation.Response
      * Tries each {@link IqDeleteTosResponse} variant in priority order and returns
      * the first that parses cleanly.
      *
-     * @param node    the inbound IQ stanza received from the relay;
-     *                never {@code null}
-     * @param request the original outbound stanza — used to validate
-     *                echoed identifiers; never {@code null}
+     * @param node    the inbound IQ stanza received from the relay.
+     *                Never {@code null}
+     * @param request the original outbound stanza. Used to validate
+     *                echoed identifiers. Never {@code null}
      * @return an {@link Optional} carrying the parsed variant, or
      *         {@link Optional#empty()} when no documented variant
      *         matched the stanza shape
@@ -51,7 +51,7 @@ public sealed interface IqDeleteTosResponse extends IqOperation.Response
     }
 
     /**
-     * The {@code Success} reply variant — the relay accepted the
+     * The {@code Success} reply variant. The relay accepted the
      * deletion. Carries no payload beyond the envelope echo.
      */
     @WhatsAppWebModule(moduleName = "WAWebTosJob")
@@ -101,7 +101,7 @@ public sealed interface IqDeleteTosResponse extends IqOperation.Response
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected the
+     * The {@code ClientError} reply variant. The relay rejected the
      * deletion as malformed, unauthorised, or referencing an unknown
      * notice id.
      */
@@ -121,7 +121,7 @@ public sealed interface IqDeleteTosResponse extends IqOperation.Response
          * Constructs a new client-error reply.
          *
          * @param errorCode the numeric error code
-         * @param errorText the optional human-readable text; may be
+         * @param errorText the optional human-readable text. May be
          *                  {@code null}
          */
         public ClientError(int errorCode, String errorText) {
@@ -194,7 +194,7 @@ public sealed interface IqDeleteTosResponse extends IqOperation.Response
     }
 
     /**
-     * The {@code ServerError} reply variant — the relay encountered a
+     * The {@code ServerError} reply variant. The relay encountered a
      * transient internal failure while processing the deletion.
      */
     @WhatsAppWebModule(moduleName = "WAWebTosJob")
@@ -213,7 +213,7 @@ public sealed interface IqDeleteTosResponse extends IqOperation.Response
          * Constructs a new server-error reply.
          *
          * @param errorCode the numeric error code
-         * @param errorText the optional human-readable text; may be
+         * @param errorText the optional human-readable text. May be
          *                  {@code null}
          */
         public ServerError(int errorCode, String errorText) {

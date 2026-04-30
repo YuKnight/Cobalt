@@ -19,7 +19,7 @@ import java.util.Optional;
  *
  * @implNote {@code WAWebQueryPrivacySettingsJob.getPrivacy} parses the
  *           result via {@code privacyParser} and throws
- *           {@code ServerStatusCodeError} on failure; Cobalt routes the
+ *           {@code ServerStatusCodeError} on failure. Cobalt routes the
  *           {@code 4xx} / {@code 5xx} split through
  *           {@link IqQueryPrivacySettingsResponse.ClientError} and
  *           {@link IqQueryPrivacySettingsResponse.ServerError}.
@@ -34,8 +34,8 @@ public sealed interface IqQueryPrivacySettingsResponse extends IqOperation.Respo
      * Tries each {@link IqQueryPrivacySettingsResponse} variant in
      * priority order and returns the first that parses cleanly.
      *
-     * @param node    the inbound IQ stanza; never {@code null}
-     * @param request the original outbound stanza; never {@code null}
+     * @param node    the inbound IQ stanza. Never {@code null}
+     * @param request the original outbound stanza. Never {@code null}
      * @return an {@link Optional} carrying the parsed variant, or empty
      *         when no documented variant matched
      * @throws NullPointerException if either argument is {@code null}
@@ -57,12 +57,12 @@ public sealed interface IqQueryPrivacySettingsResponse extends IqOperation.Respo
     }
 
     /**
-     * The {@code Success} reply variant — the relay returned a
+     * The {@code Success} reply variant. The relay returned a
      * {@code <privacy>} envelope listing every privacy category and its
      * current value.
      *
      * @implNote {@code WAWebQueryPrivacySettingsJob.privacyParser}
-     *           projects the per-category settings as a flat record;
+     *           projects the per-category settings as a flat record.
      *           Cobalt projects them as a
      *           {@link IqQueryPrivacySettingsCategoryName} →
      *           {@link IqQueryPrivacySettingsVisibility} map, dropping
@@ -72,7 +72,7 @@ public sealed interface IqQueryPrivacySettingsResponse extends IqOperation.Respo
     @WhatsAppWebModule(moduleName = "WAWebQueryPrivacySettingsJob")
     final class Success implements IqQueryPrivacySettingsResponse {
         /**
-         * The parsed per-category settings — never {@code null}; may be
+         * The parsed per-category settings. Never {@code null}. May be
          * empty when the relay returned no {@code <category/>} children.
          */
         private final Map<IqQueryPrivacySettingsCategoryName, IqQueryPrivacySettingsVisibility> categories;
@@ -80,7 +80,7 @@ public sealed interface IqQueryPrivacySettingsResponse extends IqOperation.Respo
         /**
          * Constructs a {@code Success} reply.
          *
-         * @param categories the per-category settings; never
+         * @param categories the per-category settings. Never
          *                   {@code null}
          * @throws NullPointerException if {@code categories} is
          *                              {@code null}
@@ -93,7 +93,7 @@ public sealed interface IqQueryPrivacySettingsResponse extends IqOperation.Respo
         /**
          * Returns the parsed per-category settings.
          *
-         * @return an unmodifiable map keyed by category; never
+         * @return an unmodifiable map keyed by category. Never
          *         {@code null}
          */
         public Map<IqQueryPrivacySettingsCategoryName, IqQueryPrivacySettingsVisibility> categories() {
@@ -163,7 +163,7 @@ public sealed interface IqQueryPrivacySettingsResponse extends IqOperation.Respo
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected the
+     * The {@code ClientError} reply variant. The relay rejected the
      * request with a {@code 4xx} error code.
      */
     @WhatsAppWebModule(moduleName = "WAWebQueryPrivacySettingsJob")
@@ -182,7 +182,7 @@ public sealed interface IqQueryPrivacySettingsResponse extends IqOperation.Respo
          * Constructs a client-error reply.
          *
          * @param errorCode the numeric error code
-         * @param errorText the optional text; may be {@code null}
+         * @param errorText the optional text. May be {@code null}
          */
         public ClientError(int errorCode, String errorText) {
             this.errorCode = errorCode;
@@ -251,7 +251,7 @@ public sealed interface IqQueryPrivacySettingsResponse extends IqOperation.Respo
     }
 
     /**
-     * The {@code ServerError} reply variant — the relay encountered a
+     * The {@code ServerError} reply variant. The relay encountered a
      * transient internal failure ({@code 5xx} error code).
      */
     @WhatsAppWebModule(moduleName = "WAWebQueryPrivacySettingsJob")
@@ -270,7 +270,7 @@ public sealed interface IqQueryPrivacySettingsResponse extends IqOperation.Respo
          * Constructs a server-error reply.
          *
          * @param errorCode the numeric error code
-         * @param errorText the optional text; may be {@code null}
+         * @param errorText the optional text. May be {@code null}
          */
         public ServerError(int errorCode, String errorText) {
             this.errorCode = errorCode;

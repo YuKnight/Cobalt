@@ -4,12 +4,11 @@ import java.nio.ByteBuffer;
 import java.util.Objects;
 
 /**
- * An encoded WebSocket frame consisting of a header and payload.
+ * Materialised WebSocket frame split into a header buffer and a
+ * payload buffer.
  *
- * @implNote No WhatsApp Web counterpart: WA Web relies on the browser's
- *     native {@code WebSocket} object to produce on-the-wire frames.
- *     Cobalt materialises the header and payload buffers explicitly so
- *     the layered selector can hand them to a gather-write call.
+ * <p>The two buffers are kept separate so the selector can hand them
+ * to a gather-write call without an intermediate copy.
  */
 public final class WebSocketEncodedFrame {
     /**

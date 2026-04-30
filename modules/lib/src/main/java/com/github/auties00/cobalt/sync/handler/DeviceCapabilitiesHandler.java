@@ -76,7 +76,7 @@ public final class DeviceCapabilitiesHandler implements WebAppStateActionHandler
      *           the primary device of the account.
      */
     @WhatsAppWebExport(moduleName = "WAWebDeviceCapabilitiesSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
-    private static final int PRIMARY_DEVICE = 0; // WAWebDeviceCapabilitiesSync: c = "0"
+    private static final int PRIMARY_DEVICE = 0;
 
     /**
      * Index of the JID element inside the mutation's {@code indexParts}
@@ -87,7 +87,7 @@ public final class DeviceCapabilitiesHandler implements WebAppStateActionHandler
      *           the target device JID in legacy format.
      */
     @WhatsAppWebExport(moduleName = "WAWebDeviceCapabilitiesSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
-    private static final int JID_INDEX = 1; // WAWebDeviceCapabilitiesSync: d = 1
+    private static final int JID_INDEX = 1;
 
     /**
      * Singleton instance of this handler.
@@ -113,7 +113,6 @@ public final class DeviceCapabilitiesHandler implements WebAppStateActionHandler
      */
     @WhatsAppWebExport(moduleName = "WAWebDeviceCapabilitiesSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private DeviceCapabilitiesHandler() {
-        // WAWebDeviceCapabilitiesSync constructor: this.collectionName = RegularLow
     }
 
     /**
@@ -127,7 +126,7 @@ public final class DeviceCapabilitiesHandler implements WebAppStateActionHandler
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDeviceCapabilitiesSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return DeviceCapabilities.ACTION_NAME; // WAWebDeviceCapabilitiesSync.getAction
+        return DeviceCapabilities.ACTION_NAME;
     }
 
     /**
@@ -140,7 +139,7 @@ public final class DeviceCapabilitiesHandler implements WebAppStateActionHandler
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDeviceCapabilitiesSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return DeviceCapabilities.COLLECTION_NAME; // WAWebDeviceCapabilitiesSync: this.collectionName = RegularLow
+        return DeviceCapabilities.COLLECTION_NAME;
     }
 
     /**
@@ -153,7 +152,7 @@ public final class DeviceCapabilitiesHandler implements WebAppStateActionHandler
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDeviceCapabilitiesSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return DeviceCapabilities.ACTION_VERSION; // WAWebDeviceCapabilitiesSync.getVersion: return 7
+        return DeviceCapabilities.ACTION_VERSION;
     }
 
     /**
@@ -214,23 +213,20 @@ public final class DeviceCapabilitiesHandler implements WebAppStateActionHandler
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDeviceCapabilitiesSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        if (mutation.operation() != SyncdOperation.SET) { // WAWebDeviceCapabilitiesSync.applyMutations: if (e.operation === "set")
-            return MutationApplicationResult.success(); // WAWebDeviceCapabilitiesSync.applyMutations: return {actionState: Success}
+        if (mutation.operation() != SyncdOperation.SET) {
+            return MutationApplicationResult.success();
         }
 
-        // WAWebDeviceCapabilitiesSync.applyMutations: var i = e.indexParts[d]
         var indexArray = JSON.parseArray(mutation.index());
         var deviceJidString = indexArray.size() > JID_INDEX ? indexArray.getString(JID_INDEX) : null;
-        // WAWebDeviceCapabilitiesSync.applyMutations: var a = e.value?.deviceCapabilities
         // ADAPTED: WA Web accesses the field directly on the decoded protobuf value; Cobalt
         // resolves the polymorphic SyncAction and narrows it via instanceof.
         var capabilities = mutation.value().action().orElse(null) instanceof DeviceCapabilities entry
                 ? entry
                 : null;
-        // WAWebDeviceCapabilitiesSync.applyMutations: if (a != null) ... and implicit null
         // check on indexParts[d] before m(i)
         if (capabilities == null || deviceJidString == null || deviceJidString.isBlank()) {
-            return MutationApplicationResult.success(); // WAWebDeviceCapabilitiesSync.applyMutations: fall through to return Success
+            return MutationApplicationResult.success();
         }
 
         // ADAPTED: NO_WA_BASIS - Cobalt tracks a per-JID map so repeated primary mutations with
@@ -242,12 +238,10 @@ public final class DeviceCapabilitiesHandler implements WebAppStateActionHandler
             return MutationApplicationResult.success();
         }
 
-        // WAWebDeviceCapabilitiesSync.applyMutations: var l = i != null ? m(i) : null; if (l === c)
         // where m() extracts the substring between ':' and '@' from the legacy JID string.
         // Jid.of(...).device() returns the same integer decoded from the ":<device>@" section.
         var deviceJid = Jid.of(deviceJidString);
-        if (deviceJid.device() == PRIMARY_DEVICE) { // WAWebDeviceCapabilitiesSync.applyMutations: if (l === c)
-            // WAWebDeviceCapabilitiesSync.applyMutations:
+        if (deviceJid.device() == PRIMARY_DEVICE) {
             //   u = mapProtobufToAllDeviceCapabilities(a);
             //   mergeDeviceCapabilitiesToStorage(u, "primary");
             // ADAPTED: WA Web flattens the payload into {chatLockSupportLevel, aiThread.supportLevel}
@@ -258,7 +252,6 @@ public final class DeviceCapabilitiesHandler implements WebAppStateActionHandler
             // userHasAvatar flag to the store during sync; WA Web reads it on demand.
             capabilities.userHasAvatar()
                     .ifPresent(avatar -> client.store().setHasAvatar(avatar.userHasAvatar()));
-            // WAWebDeviceCapabilitiesSync.applyMutations: e.value.deviceCapabilities.lidMigration.chatDbMigrationTimestamp != null
             // Forwards the timestamp to the LidMigrationService so it can progress the local
             // migration state machine, and emits the companion-received-device-capability WAM
             // event when the timestamp is present and the account is not yet LID-migrated,
@@ -267,7 +260,6 @@ public final class DeviceCapabilitiesHandler implements WebAppStateActionHandler
                     .flatMap(DeviceCapabilities.LIDMigration::chatDbMigrationTimestamp)
                     .ifPresent(timestamp -> {
                         client.lidMigrationService().observeChatDbMigrationTimestamp(timestamp);
-                        // WAWebDeviceCapabilitiesSync.applyMutations:
                         //   chatDbMigrationTimestamp != null && !Lid1X1MigrationUtils.isLidMigrated()
                         //     && new Lid11MigrationLifecycleWamEvent({
                         //          migrationStage: COMPANION_RECEIVED_DEVICE_CAPABILITY,
@@ -291,6 +283,6 @@ public final class DeviceCapabilitiesHandler implements WebAppStateActionHandler
             //     campaignSyncEnabled);
             //   - WALogger.LOG("[DeviceCapabilitiesSync] primary caps updated Nx", counter).
         }
-        return MutationApplicationResult.success(); // WAWebDeviceCapabilitiesSync.applyMutations: return {actionState: Success}
+        return MutationApplicationResult.success();
     }
 }

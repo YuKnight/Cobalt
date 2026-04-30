@@ -157,11 +157,9 @@ public final class DeviceUSyncQueryBuilder {
             exports = "USyncUsernameProtocol",
             adaptation = WhatsAppAdaptation.ADAPTED)
     private static NodeBuilder buildEntry(Collection<Jid> userJids, String context, Map<Jid, DeviceListHashInfo> hashInfos, boolean includeUsernameProtocol) {
-        // WAWap.generateId(): generates session ID in WhatsApp format
         var sessionId = RandomIdUtils.newId();
 
-        // WAWebAdvSyncDeviceListApi: filters out PSA (Public Service Announcements) account
-        // e.id.user!=="0" && a.withUser(...)
+        // The PSA (Public Service Announcement) account is filtered out, matching WA Web.
         var userNodes = userJids.stream()
                 .filter(jid -> !jid.toUserJid().equals(Jid.announcementsAccount()))
                 .map(jid -> buildUserNode(jid, hashInfos))
@@ -172,15 +170,11 @@ public final class DeviceUSyncQueryBuilder {
                 .content(userNodes)
                 .build();
 
-        // WAWebUsyncDevice.USyncDeviceProtocol: defines devices protocol with version
         var devicesNode = new NodeBuilder()
                 .description("devices")
                 .attribute("version", "2")
                 .build();
 
-        // WAWebUsyncUsername.USyncUsernameProtocol.getQueryElement: WAWap.wap("username", null)
-        // yields an empty <username/> element. getUserElement always returns null so no per-user
-        // <username> child is emitted.
         Node queryNode;
         if (includeUsernameProtocol) {
             var usernameNode = new NodeBuilder()
@@ -197,9 +191,8 @@ public final class DeviceUSyncQueryBuilder {
                     .build();
         }
 
-        // WAWebUsync.USyncQuery.$3: WAWap.wap("usync", {sid, index:"0", last:"true",
-        // mode, context}) — attribute insertion order matches the JS object literal
-        // exactly so that the encoded WAP byte stream is identical to live traffic.
+        // Attribute insertion order matches the WA Web JS object literal so the encoded
+        // WAP byte stream is identical to live traffic.
         var usyncNode = new NodeBuilder()
                 .description("usync")
                 .attribute("sid", sessionId)
@@ -210,9 +203,7 @@ public final class DeviceUSyncQueryBuilder {
                 .content(queryNode, listNode)
                 .build();
 
-        // WAWebUsync.USyncQuery.$3: WAWap.wap("iq", {to: S_WHATSAPP_NET, xmlns: "usync",
-        // type: "get", id: generateId()}) — attribute order mirrors JS source. The id
-        // attribute is appended by the transport layer at send time.
+        // The id attribute is appended by the transport layer at send time.
         return new NodeBuilder()
                 .description("iq")
                 .attribute("to", JidServer.user())
@@ -237,7 +228,6 @@ public final class DeviceUSyncQueryBuilder {
             exports = "USyncDeviceProtocol",
             adaptation = WhatsAppAdaptation.DIRECT)
     private static Node buildUserDevicesElement(DeviceListHashInfo hashInfo) {
-        // WAWebUsyncDevice.USyncDeviceProtocol.getUserElement
         if (hashInfo == null) {
             return null;
         }
@@ -246,7 +236,6 @@ public final class DeviceUSyncQueryBuilder {
         var ts = hashInfo.timestamp();
         var expectedTs = hashInfo.expectedTimestamp().orElse(null);
 
-        // WAWebUsyncDevice.USyncDeviceProtocol.getUserElement: return null if all are null
         if (hash == null && ts == null && expectedTs == null) {
             return null;
         }
@@ -286,8 +275,6 @@ public final class DeviceUSyncQueryBuilder {
                 .description("user")
                 .attribute("jid", userJid);
 
-        // WAWebUsyncDevice.USyncDeviceProtocol.getUserElement: adds devices child element
-        // with device_hash, ts, and expected_ts for delta updates
         if (hashInfos != null) {
             var devicesElement = buildUserDevicesElement(hashInfos.get(userJid));
             if (devicesElement != null) {

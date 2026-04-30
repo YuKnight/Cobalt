@@ -49,20 +49,20 @@ public final class FcmCheckinRequest {
     String timeZone;
 
     /**
-     * Checkin version — the native Android client sends {@code 3}.
+     * Checkin version. The native Android client sends {@code 3}.
      */
     @ProtobufProperty(index = 14, type = ProtobufType.INT32)
     int version;
 
     /**
-     * Numeric flags Cobalt sets to {@code 0}; carried so the wire body
+     * Numeric flags Cobalt sets to {@code 0}. Carried so the wire body
      * matches what the server expects.
      */
     @ProtobufProperty(index = 20, type = ProtobufType.INT64)
     long fragment;
 
     /**
-     * Numeric flag Cobalt sets to {@code 0}; same rationale as
+     * Numeric flag Cobalt sets to {@code 0}. Same rationale as
      * {@link #fragment}.
      */
     @ProtobufProperty(index = 22, type = ProtobufType.INT64)
@@ -98,7 +98,7 @@ public final class FcmCheckinRequest {
         long lastCheckinMs;
 
         /**
-         * One synthetic {@code event_log_start} entry; the server expects
+         * One synthetic {@code event_log_start} entry. The server expects
          * at least one event to be present.
          */
         @ProtobufProperty(index = 3, type = ProtobufType.MESSAGE)

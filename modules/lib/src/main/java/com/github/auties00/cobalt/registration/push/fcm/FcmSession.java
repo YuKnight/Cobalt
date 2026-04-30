@@ -63,7 +63,7 @@ public final class FcmSession {
 
     /**
      * FIS refresh token returned alongside {@link #fid}. Currently
-     * stored but not consumed — the client just re-runs the install
+     * stored but not consumed. The client just re-runs the install
      * flow when {@link #fisAuthToken} expires.
      */
     @ProtobufProperty(index = 6, type = ProtobufType.STRING)
@@ -111,7 +111,7 @@ public final class FcmSession {
     }
 
     /**
-     * Creates an empty session bound to {@code config} — every
+     * Creates an empty session bound to {@code config}. Every
      * credential field is zero/empty. Used by
      * {@link FcmClient#newSession(FcmConfig)}.
      */

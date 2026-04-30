@@ -72,7 +72,7 @@ public final class UserStatusMuteHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUserStatusMuteSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return UserStatusMuteAction.ACTION_NAME; // WAWebUserStatusMuteSync.getAction
+        return UserStatusMuteAction.ACTION_NAME;
     }
 
     /**
@@ -85,7 +85,7 @@ public final class UserStatusMuteHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUserStatusMuteSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return UserStatusMuteAction.COLLECTION_NAME; // WAWebUserStatusMuteSync.collectionName
+        return UserStatusMuteAction.COLLECTION_NAME;
     }
 
     /**
@@ -97,7 +97,7 @@ public final class UserStatusMuteHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUserStatusMuteSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return UserStatusMuteAction.ACTION_VERSION; // WAWebUserStatusMuteSync.getVersion
+        return UserStatusMuteAction.ACTION_VERSION;
     }
 
     /**
@@ -113,7 +113,7 @@ public final class UserStatusMuteHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUserStatusMuteSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebUserStatusMuteSync.applyMutations
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -153,28 +153,28 @@ public final class UserStatusMuteHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUserStatusMuteSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        if (mutation.operation() != SyncdOperation.SET) { // WAWebUserStatusMuteSync.applyMutations: if (e.operation === "set") ... else { _++; return {actionState: Unsupported} }
-            return MutationApplicationResult.unsupported(); // WAWebUserStatusMuteSync.applyMutations: {actionState: Unsupported}
+        if (mutation.operation() != SyncdOperation.SET) {
+            return MutationApplicationResult.unsupported();
         }
 
         // MISMATCH (ORDER): WA Web checks the index (indexParts[1] is a wid) BEFORE the value. Cobalt currently
         // checks the value first, so a mutation with both a bad index and a missing muted field ends up tagged
         // {@code MALFORMED_VALUE} in Cobalt vs {@code MALFORMED_INDEX} in WA Web. Reordered below to match WA Web.
-        var indexArray = JSON.parseArray(mutation.index()); // WAWebUserStatusMuteSync.applyMutations: var n = e.indexParts
-        var widString = indexArray.getString(1); // WAWebUserStatusMuteSync.applyMutations: var u = n[1]
-        if (widString == null || widString.isEmpty()) { // WAWebUserStatusMuteSync.applyMutations: if (!u || !WAWebWid.isWid(u)) return a.malformedActionIndex()
-            return malformedActionIndex(); // WAWebUserStatusMuteSync.applyMutations: return a.malformedActionIndex()
+        var indexArray = JSON.parseArray(mutation.index());
+        var widString = indexArray.getString(1);
+        if (widString == null || widString.isEmpty()) {
+            return malformedActionIndex();
         }
 
         Jid wid;
         try {
-            wid = Jid.of(widString); // WAWebUserStatusMuteSync.applyMutations: WAWebWid.isWid(u) — validates wid string
+            wid = Jid.of(widString);
         } catch (RuntimeException e) {
-            return malformedActionIndex(); // WAWebUserStatusMuteSync.applyMutations: !WAWebWid.isWid(u) -> malformedActionIndex
+            return malformedActionIndex();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof UserStatusMuteAction action)) { // WAWebUserStatusMuteSync.applyMutations: var c = (t = s.userStatusMuteAction) == null ? void 0 : t.muted; if (c === void 0) return malformedActionValue(a.collectionName)
-            return malformedActionValue(); // WAWebUserStatusMuteSync.applyMutations: return WAWebSyncdIndexUtils.malformedActionValue(a.collectionName)
+        if (!(mutation.value().action().orElse(null) instanceof UserStatusMuteAction action)) {
+            return malformedActionValue();
         }
 
         // MISMATCH (COALESCE): WA Web specifically tests {@code c === void 0} where {@code c = userStatusMuteAction.muted}.
@@ -185,26 +185,24 @@ public final class UserStatusMuteHandler implements WebAppStateActionHandler {
         // (see {@code feedback_nullable_bool_accessors.md}) intentionally accepts this divergence.
         // ADAPTED: WAWebUserStatusMuteSync.applyMutations — malformed-counter + first-three WARN log telemetry
         // is intentionally omitted (matches the project-wide policy of dropping WAM/WALogger paths).
-        if (wid.hasServer(JidServer.groupOrCommunity())) { // WAWebUserStatusMuteSync.applyMutations: WAWebWid.isGroup(u)
-            var groupMetadata = client.store().findChatMetadata(wid).orElse(null); // WAWebUserStatusMuteSync.applyMutations: i.has(u) — c() builds set from getGroupMetadataTable().bulkGet(a)
-            if (!(groupMetadata instanceof GroupMetadata group)) { // WAWebUserStatusMuteSync.applyMutations: !i.has(u) -> Orphan
-                return MutationApplicationResult.orphan(widString, "UserStatusMute"); // WAWebUserStatusMuteSync.applyMutations: {actionState: Orphan, orphanModel: {modelId: u, modelType: SyncModelType.UserStatusMute}}
+        if (wid.hasServer(JidServer.groupOrCommunity())) {
+            var groupMetadata = client.store().findChatMetadata(wid).orElse(null);
+            if (!(groupMetadata instanceof GroupMetadata group)) {
+                return MutationApplicationResult.orphan(widString, "UserStatusMute");
             }
-            group.setStatusMuted(action.muted()); // WAWebUserStatusMuteSync.applyMutations: d.push({id: u, statusMute: c}) -> later getGroupMetadataTable().bulkMergeOnly(d)
-            // WAWebUserStatusMuteSync.applyMutations: frontendFireAndForget("updateContactsStatusMute", {groupStatusMuteUpdates: d, ...})
+            group.setStatusMuted(action.muted());
             // ADAPTED: Cobalt does not have frontend event dispatching; the store update is sufficient
-            return MutationApplicationResult.success(); // WAWebUserStatusMuteSync.applyMutations: {actionState: SyncActionState.Success}
+            return MutationApplicationResult.success();
         }
 
-        var contact = client.store().findContactByJid(wid); // WAWebUserStatusMuteSync.applyMutations: i.has(u) — c() builds set from WAWebLidAwareContactsDB.bulkGet(n)
-        if (contact.isEmpty()) { // WAWebUserStatusMuteSync.applyMutations: !i.has(u) -> Orphan
-            return MutationApplicationResult.orphan(widString, "UserStatusMute"); // WAWebUserStatusMuteSync.applyMutations: {actionState: Orphan, orphanModel: {modelId: u, modelType: SyncModelType.UserStatusMute}}
+        var contact = client.store().findContactByJid(wid);
+        if (contact.isEmpty()) {
+            return MutationApplicationResult.orphan(widString, "UserStatusMute");
         }
 
-        contact.get().setStatusMuted(action.muted()); // WAWebUserStatusMuteSync.applyMutations: l.push({id: u, statusMute: c}) -> later getContactTable().bulkCreateOrMerge(l)
-        // WAWebUserStatusMuteSync.applyMutations: frontendFireAndForget("updateContactsStatusMute", {userStatusMuteUpdates: l, ...})
+        contact.get().setStatusMuted(action.muted());
         // ADAPTED: Cobalt does not have frontend event dispatching; the store update is sufficient
-        return MutationApplicationResult.success(); // WAWebUserStatusMuteSync.applyMutations: {actionState: SyncActionState.Success}
+        return MutationApplicationResult.success();
     }
 
     /**
@@ -227,21 +225,21 @@ public final class UserStatusMuteHandler implements WebAppStateActionHandler {
      */
     @WhatsAppWebExport(moduleName = "WAWebUserStatusMuteSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPendingMutation getMutationForStatusMute(Jid wid, boolean muted, Instant timestamp) {
-        var action = new UserStatusMuteActionBuilder() // WAWebUserStatusMuteSync.getMutationForStatusMute: var r = {userStatusMuteAction: {muted: t}}
-                .muted(muted) // WAWebUserStatusMuteSync.getMutationForStatusMute: muted: t
+        var action = new UserStatusMuteActionBuilder()
+                .muted(muted)
                 .build();
-        var value = new SyncActionValueBuilder() // WAWebSyncdActionUtils.buildPendingMutation: encodeProtobuf(SyncActionValueSpec, {...l, timestamp: i})
-                .timestamp(timestamp) // WAWebSyncdActionUtils.buildPendingMutation: timestamp: n
-                .userStatusMuteAction(action) // WAWebUserStatusMuteSync.getMutationForStatusMute: value: {userStatusMuteAction: ...}
+        var value = new SyncActionValueBuilder()
+                .timestamp(timestamp)
+                .userStatusMuteAction(action)
                 .build();
-        var index = JSON.toJSONString(List.of(actionName(), wid.toString())); // WAWebSyncdActionUtils.buildPendingMutation: index = JSON.stringify([action].concat(indexArgs)) where indexArgs = [e.toString({legacy: true})]
-        var mutation = new DecryptedMutation.Trusted( // WAWebSyncdActionUtils.buildPendingMutation: return { collection, index, ... }
+        var index = JSON.toJSONString(List.of(actionName(), wid.toString()));
+        var mutation = new DecryptedMutation.Trusted(
                 index,
                 value,
-                SyncdOperation.SET, // WAWebUserStatusMuteSync.getMutationForStatusMute: operation: SyncdMutation$SyncdOperation.SET
+                SyncdOperation.SET,
                 timestamp,
                 version()
         );
-        return new SyncPendingMutation(mutation, 0); // WAWebSyncdActionUtils.buildPendingMutation
+        return new SyncPendingMutation(mutation, 0);
     }
 }

@@ -13,7 +13,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound ack stanza — emitted by the companion back through
+ * The outbound ack stanza. Emitted by the companion back through
  * the socket pipeline after consuming the {@link SmaxMdSetToCompanionResponse} stanza.
  *
  * @implNote {@code WASmaxOutMdSetToCompanionResponseClientResponse.makeSetToCompanionResponseClientResponse}

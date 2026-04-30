@@ -27,8 +27,8 @@ public sealed interface SmaxPushConfigSetResponse extends SmaxOperation.Response
     /**
      * Tries each {@link SmaxPushConfigSetResponse} variant in priority order.
      *
-     * @param node    the inbound IQ stanza; never {@code null}
-     * @param request the original outbound stanza; never
+     * @param node    the inbound IQ stanza. Never {@code null}
+     * @param request the original outbound stanza. Never
      *                {@code null}
      * @return an {@link Optional} carrying the parsed variant
      * @throws NullPointerException if either argument is
@@ -51,7 +51,7 @@ public sealed interface SmaxPushConfigSetResponse extends SmaxOperation.Response
     }
 
     /**
-     * The {@code Success} reply variant — the relay accepted the
+     * The {@code Success} reply variant. The relay accepted the
      * push-config change.
      *
      * <p>Carries no payload beyond the envelope echo.
@@ -106,7 +106,7 @@ public sealed interface SmaxPushConfigSetResponse extends SmaxOperation.Response
     }
 
     /**
-     * The {@code InternalServerError} reply variant —
+     * The {@code InternalServerError} reply variant carrying
      * {@code (500, "internal-server-error")}.
      *
      * @implNote {@code WASmaxInPushConfigSetResponseInternalServerError.parseSetResponseInternalServerError}
@@ -127,7 +127,7 @@ public sealed interface SmaxPushConfigSetResponse extends SmaxOperation.Response
         }
 
         /**
-         * Returns the numeric error code — always {@code 500}.
+         * Returns the numeric error code. Always {@code 500}.
          *
          * @return the code
          */
@@ -136,7 +136,7 @@ public sealed interface SmaxPushConfigSetResponse extends SmaxOperation.Response
         }
 
         /**
-         * Returns the error text — always
+         * Returns the error text. Always
          * {@code "internal-server-error"}.
          *
          * @return the text
@@ -186,7 +186,7 @@ public sealed interface SmaxPushConfigSetResponse extends SmaxOperation.Response
     }
 
     /**
-     * The {@code Conflict} reply variant — {@code (409, "conflict")}
+     * The {@code Conflict} reply variant. {@code (409, "conflict")}
      * thrown when the requested registration collides with an
      * existing one (e.g., multiple devices vying for the same push
      * token).
@@ -209,7 +209,7 @@ public sealed interface SmaxPushConfigSetResponse extends SmaxOperation.Response
         }
 
         /**
-         * Returns the numeric error code — always {@code 409}.
+         * Returns the numeric error code. Always {@code 409}.
          *
          * @return the code
          */
@@ -218,7 +218,7 @@ public sealed interface SmaxPushConfigSetResponse extends SmaxOperation.Response
         }
 
         /**
-         * Returns the error text — always {@code "conflict"}.
+         * Returns the error text. Always {@code "conflict"}.
          *
          * @return the text
          */

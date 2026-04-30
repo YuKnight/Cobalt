@@ -10,31 +10,24 @@ import java.nio.ByteBuffer;
 /**
  * TCP implementation of {@link SocketClientTransportLayerContext}.
  *
- * <p>The context only owns the 16 KiB inbound buffer and its chain link
- * to the next layer.  Per-connection state (pending writes, connection
- * lock, connected flag) lives on the selector's {@code AttachmentData}.
+ * <p>Owns only the 16 KiB inbound buffer and the link to the next
+ * layer; per-connection state (pending writes, connection lock,
+ * connected flag) lives on the selector's {@code AttachmentData}.
  */
 final class TcpSocketClientTransportLayerContext implements SocketClientTransportLayerContext {
     /**
-     * The buffer into which raw bytes are read from the channel.
-     *
-     * <p>This is the very first buffer in the inbound processing chain.
-     * The selector reads channel data into this buffer and then
-     * {@link #processInbound(int)} propagates the data to the next layer.
+     * Direct buffer that the selector fills with raw channel bytes.
      */
     private final ByteBuffer inboundBuffer = ByteBuffer.allocateDirect(16384);
 
     /**
-     * The next layer context in the inbound processing chain.
-     *
-     * <p>Set by {@link #setNextLayer(SocketClientLayerContext)} when the
-     * chain is extended.  May be {@code null} during early connection
-     * setup before any upper layer has been registered.
+     * Next layer in the inbound chain; {@code null} until an upper
+     * layer registers itself during connection setup.
      */
     private volatile SocketClientLayerContext nextLayer;
 
     /**
-     * Creates a transport layer context for a new connection.
+     * Creates a transport context for a new connection.
      */
     TcpSocketClientTransportLayerContext() {
     }

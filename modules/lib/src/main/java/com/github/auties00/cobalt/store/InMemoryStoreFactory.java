@@ -13,15 +13,15 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * {@link WhatsAppStoreFactory} implementation that keeps the entire session
- * state in memory and persists it to protobuf files on disk.
+ * Factory implementation that keeps the entire session state in memory and
+ * persists it to protobuf files on disk.
  *
  * <p>Each session lives in its own directory named after the session UUID
  * (or phone number) under the configured root directory. The root
- * {@code store.proto} file holds the session-level state; individual chats
- * and newsletters are stored as separate {@code chat_*.proto} and
- * {@code newsletter_*.proto} files so that per-entity serialisation can
- * avoid rewriting the entire store on every change.
+ * {@code store.proto} file holds the session-level state, while individual
+ * chats and newsletters are stored as separate {@code chat_*.proto} and
+ * {@code newsletter_*.proto} files so that per-entity writes do not require
+ * rewriting the entire store on every change.
  */
 final class InMemoryStoreFactory implements WhatsAppStoreFactory {
     /**

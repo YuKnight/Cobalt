@@ -12,29 +12,21 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Sealed disjunction over the publish-payload addressing modes —
+ * Sealed disjunction over the publish-payload addressing modes.
  * either a "client + server id" reference (publishing a
  * question-response, reaction, reaction-revoke, or poll-vote tied to
  * a previously-published message identified by its server-id) or a
  * "client id only" reference (publishing a brand-new message,
  * carrying optional msg-meta-origin and sender content-type media
  * RCAT children).
- *
- * @implNote {@code WASmaxOutMessagePublishClientNewsletterAndServerOrNewsletterIDMixinGroup.mergeClientNewsletterAndServerOrNewsletterIDMixinGroup}.
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutMessagePublishClientNewsletterAndServerOrNewsletterIDMixinGroup")
 public sealed interface SmaxMessagePublishNewsletterPayload permits SmaxMessagePublishNewsletterPayload.WithServerId, SmaxMessagePublishNewsletterPayload.WithClientIdOnly {
 
     /**
-     * The "client id + server id" payload — used for publishing a
+     * The "client id + server id" payload. Used for publishing a
      * question-response / reaction / reaction-revoke / poll-vote
      * that references a previously-published message.
-     *
-     * @implNote {@code WASmaxOutMessagePublishNewsletterClientAndServerIDMixin.mergeNewsletterClientAndServerIDMixin}
-     *           composes
-     *           {@code WASmaxOutMessagePublishNewsletterQuestionResponsePublishOrReactionOrReactionRevokeOrPollVoteMixinGroup}
-     *           over a {@code <message id=STANZA_ID(t)
-     *           server_id=INT(n)>...</message>} envelope.
      */
     @WhatsAppWebModule(moduleName = "WASmaxOutMessagePublishNewsletterClientAndServerIDMixin")
     @WhatsAppWebModule(moduleName = "WASmaxOutMessagePublishNewsletterQuestionResponsePublishOrReactionOrReactionRevokeOrPollVoteMixinGroup")
@@ -50,7 +42,7 @@ public sealed interface SmaxMessagePublishNewsletterPayload permits SmaxMessageP
         private final long messageServerId;
 
         /**
-         * The inner content payload as a fully-built {@link Node} —
+         * The inner content payload as a fully-built {@link Node}.
          * one of the disjunctive
          * {@code WASmaxOutMessagePublishNewsletterQuestionResponsePublish},
          * {@code WASmaxOutMessagePublishNewsletterReaction},
@@ -137,19 +129,10 @@ public sealed interface SmaxMessagePublishNewsletterPayload permits SmaxMessageP
     }
 
     /**
-     * The "client id only" payload — used for publishing a brand-new
+     * The "client id only" payload. Used for publishing a brand-new
      * message, optionally carrying msg-meta-origin and sender
      * content-type-media RCAT children alongside the inner client-id
      * content.
-     *
-     * @implNote {@code WASmaxOutMessagePublishNewsletterClientIDMixin.mergeNewsletterClientIDMixin}
-     *           composes
-     *           {@code WASmaxOutMessagePublishNewsletterClientIdContent}
-     *           over an optional
-     *           {@code WASmaxOutMessagePublishMsgMetaOriginMixin} and
-     *           {@code WASmaxOutMessagePublishSenderContentTypeMediaRCATMixin}
-     *           overlay against a {@code <message id=STANZA_ID(t)>}
-     *           envelope.
      */
     @WhatsAppWebModule(moduleName = "WASmaxOutMessagePublishNewsletterClientIDMixin")
     @WhatsAppWebModule(moduleName = "WASmaxOutMessagePublishNewsletterClientIdContent")

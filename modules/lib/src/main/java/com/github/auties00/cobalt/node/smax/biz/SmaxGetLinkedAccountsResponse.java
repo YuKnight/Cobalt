@@ -33,7 +33,7 @@ public sealed interface SmaxGetLinkedAccountsResponse extends SmaxOperation.Resp
      *
      * @param node    the inbound IQ stanza received from the relay;
      *                never {@code null}
-     * @param request the original outbound stanza — used to validate
+     * @param request the original outbound stanza. Used to validate
      *                echoed identifiers; never {@code null}
      * @return an {@link Optional} carrying the parsed variant, or
      *         {@link Optional#empty()} when no documented variant
@@ -61,7 +61,7 @@ public sealed interface SmaxGetLinkedAccountsResponse extends SmaxOperation.Resp
     }
 
     /**
-     * The {@code Success} reply variant — carries up to four optional
+     * The {@code Success} reply variant. Carries up to four optional
      * typed projections of the linked external identities.
      *
      * @implNote {@code WASmaxInBizLinkingGetLinkedAccountsResponseSuccess.parseGetLinkedAccountsResponseSuccess}
@@ -250,7 +250,7 @@ public sealed interface SmaxGetLinkedAccountsResponse extends SmaxOperation.Resp
         }
 
         /**
-         * The {@code <fb_page/>} child projection — the linked
+         * The {@code <fb_page/>} child projection. The linked
          * Facebook-page identity plus its display-name, ad-status,
          * profile-sync, profile-picture, "show on profile" and
          * "WhatsApp as page button" sub-states.
@@ -548,7 +548,7 @@ public sealed interface SmaxGetLinkedAccountsResponse extends SmaxOperation.Resp
         }
 
         /**
-         * The {@code <fb_biz/>} child projection — the linked
+         * The {@code <fb_biz/>} child projection. The linked
          * Facebook-business identity plus its catalog sub-state.
          */
         @WhatsAppWebModule(moduleName = "WASmaxInBizLinkingFBBizResponseMixin")
@@ -681,7 +681,7 @@ public sealed interface SmaxGetLinkedAccountsResponse extends SmaxOperation.Resp
             }
 
             /**
-             * The {@code <catalog/>} grandchild projection — the
+             * The {@code <catalog/>} grandchild projection. The
              * linked Facebook-business catalog identifier and
              * sync-state toggle.
              */
@@ -779,7 +779,7 @@ public sealed interface SmaxGetLinkedAccountsResponse extends SmaxOperation.Resp
         }
 
         /**
-         * The {@code <ig_professional/>} child projection — the
+         * The {@code <ig_professional/>} child projection. The
          * linked Instagram-professional identity plus
          * profile-picture, display-name and show-on-profile
          * sub-states.
@@ -991,7 +991,7 @@ public sealed interface SmaxGetLinkedAccountsResponse extends SmaxOperation.Resp
         }
 
         /**
-         * The {@code <whatsapp_ad_identity/>} child projection — the
+         * The {@code <whatsapp_ad_identity/>} child projection. The
          * linked WhatsApp ad-account identifier plus its ad-status.
          */
         @WhatsAppWebModule(moduleName = "WASmaxInBizLinkingWhatsAppAdIdentityResponseMixin")
@@ -1092,7 +1092,7 @@ public sealed interface SmaxGetLinkedAccountsResponse extends SmaxOperation.Resp
     }
 
     /**
-     * The {@code Forbidden} reply variant — the relay rejected the
+     * The {@code Forbidden} reply variant. The relay rejected the
      * request because the calling business is not authorised to
      * enumerate linked accounts (for example because the SMB linking
      * feature has not been enabled on the relay side).
@@ -1198,7 +1198,7 @@ public sealed interface SmaxGetLinkedAccountsResponse extends SmaxOperation.Resp
     }
 
     /**
-     * The {@code ClientError} reply variant — any other documented
+     * The {@code ClientError} reply variant. Any other documented
      * {@code 4xx} error code that did not match {@link Forbidden}.
      *
      * @implNote {@code WASmaxInBizLinkingGetLinkedAccountsResponseError.parseGetLinkedAccountsResponseError}
@@ -1302,7 +1302,7 @@ public sealed interface SmaxGetLinkedAccountsResponse extends SmaxOperation.Resp
     }
 
     /**
-     * The {@code ServerError} reply variant — the relay encountered a
+     * The {@code ServerError} reply variant. The relay encountered a
      * transient internal failure ({@code 5xx}).
      *
      * @implNote Sourced from the {@code 5xx} arms of

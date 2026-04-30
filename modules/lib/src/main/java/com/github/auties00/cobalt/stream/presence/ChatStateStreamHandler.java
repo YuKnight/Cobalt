@@ -28,8 +28,6 @@ import com.github.auties00.cobalt.stream.SocketStream;
  * into a single {@link #handle(Node)} method that branches on the presence of the
  * {@code participant} attribute.
  *
- * @implNote WAWebHandleChatState, WACreateHandleChatState.createHandleChatState,
- *           WAWebChangePresenceHandlerAction.default
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleChatState")
 @WhatsAppWebModule(moduleName = "WACreateHandleChatState")
@@ -37,17 +35,12 @@ import com.github.auties00.cobalt.stream.SocketStream;
 @WhatsAppWebModule(moduleName = "WAWebChangePresenceHandlerAction")
 public final class ChatStateStreamHandler implements SocketStream.Handler {
     /**
-     * The logger for diagnostic messages related to chatstate handling.
-     *
-     * @implNote WAWebHandleChatState, WALogger usage in error paths
+     * Logger for diagnostic messages related to chatstate handling.
      */
     private static final System.Logger LOGGER = System.getLogger(ChatStateStreamHandler.class.getName());
 
     /**
-     * The WhatsApp client instance used to access the store and notify listeners.
-     *
-     * @implNote WAWebHandleChatState, constructor DI replaces module-level imports of
-     *           WAWebPresenceCollection, WAWebChatCollection, and WAWebApiContact
+     * The WhatsApp client used to access the store and notify listeners.
      */
     private final WhatsAppClient whatsapp;
 
@@ -55,9 +48,6 @@ public final class ChatStateStreamHandler implements SocketStream.Handler {
      * Constructs a new chatstate stream handler with the given WhatsApp client.
      *
      * @param whatsapp the non-{@code null} WhatsApp client instance
-     * @implNote WACreateHandleChatState.createHandleChatState, module-level handler
-     *           creation; the factory receives individualMessage and groupMessage
-     *           handlers and returns a unified function
      */
     public ChatStateStreamHandler(WhatsAppClient whatsapp) {
         this.whatsapp = whatsapp;
@@ -84,36 +74,27 @@ public final class ChatStateStreamHandler implements SocketStream.Handler {
      * parsing inline using the stanza's XML structure directly.
      *
      * @param node the non-{@code null} chatstate stanza node
-     * @implNote WACreateHandleChatState.createHandleChatState, the returned function
-     *           that routes to handleIndividualChatState or handleGroupChatState
      */
     @Override
     @WhatsAppWebExport(moduleName = "WACreateHandleChatState", exports = "createHandleChatState",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public void handle(Node node) {
-        // WACreateHandleChatState: stateSource determines FromUser vs FromGroup
-        // WASmaxInChatstateFromUserMixin: from attr is a user JID
-        // WASmaxInChatstateFromGroupMixin: from attr is a group JID, participant attr is a user JID
         var from = node.getAttributeAsJid("from", null);
         if (from == null) {
             LOGGER.log(System.Logger.Level.DEBUG, "Ignoring chatstate stanza without from: {0}", node);
             return;
         }
 
-        // WACreateHandleChatState: stateSource.name === "FromGroup" has participant
         var participant = node.getAttributeAsJid("participant", null);
 
-        // WACreateHandleChatState: parseChatStatus(stateTypes)
         var state = resolveState(node);
         if (state == null) {
             return;
         }
 
         if (participant != null) {
-            // WAWebHandleChatState.handleGroupChatState
             handleGroupChatState(from, participant, state);
         } else {
-            // WAWebHandleChatState.handleIndividualChatState
             handleIndividualChatState(from, state);
         }
     }
@@ -135,30 +116,23 @@ public final class ChatStateStreamHandler implements SocketStream.Handler {
      *
      * @param from  the JID of the sender (user JID)
      * @param state the resolved composing state
-     * @implNote WAWebHandleChatState.handleIndividualChatState
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleChatState", exports = "handleIndividualChatState",
             adaptation = WhatsAppAdaptation.ADAPTED)
     private void handleIndividualChatState(Jid from, ContactStatus state) {
-        // WAWebChangePresenceHandlerAction.default: if (!isMeAccount(a))
-        // Skip self-chatstates for individual chats
         var meJid = whatsapp.store().jid().orElse(null);
         if (meJid != null && isSelf(from, meJid)) {
-            return; // WAWebChangePresenceHandlerAction.default, skip self-chatstate
+            return;
         }
 
-        // WAWebHandleChatState.handleIndividualChatState: var a = userJidToUserWid(jid)
-        // ADAPTED: LID migration logic (isLidMigrated check, toUserLid, getChatRecordByAccountLid)
-        // collapsed into findPhoneByLid since Cobalt stores contacts by PN
         var contact = getOrCreateContact(from);
         if (contact == null) {
             return;
         }
 
-        // WAWebChangePresenceHandlerAction.default -> m(presence, {id, type})
         contact.setLastKnownPresence(state);
-        whatsapp.store().addContact(contact); // ADAPTED: WAWebPresenceCollection.set operations
-        notifyPresence(contact.toJid(), contact.toJid()); // WAWebChangePresenceHandlerAction, non-group path
+        whatsapp.store().addContact(contact);
+        notifyPresence(contact.toJid(), contact.toJid());
     }
 
     /**
@@ -184,23 +158,18 @@ public final class ChatStateStreamHandler implements SocketStream.Handler {
      * @param from        the JID of the group
      * @param participant the JID of the group participant who is composing
      * @param state       the resolved composing state
-     * @implNote WAWebHandleChatState.handleGroupChatState,
-     *           WAWebChangePresenceHandlerAction.default, group path in m(e, t)
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleChatState", exports = "handleGroupChatState",
             adaptation = WhatsAppAdaptation.ADAPTED)
     private void handleGroupChatState(Jid from, Jid participant, ContactStatus state) {
-        // WAWebHandleChatState.handleGroupChatState: var i = chatJidToChatWid(jid), var l = userJidToUserWid(participant)
-        // WAWebChangePresenceHandlerAction.default -> m(presence, {id: i, type: status, participant: l})
         var contact = getOrCreateContact(participant);
         if (contact == null) {
             return;
         }
 
-        // WAWebChangePresenceHandlerAction.m: group path sets chatstate on participant sub-entry
         contact.setLastKnownPresence(state);
-        whatsapp.store().addContact(contact); // ADAPTED: WAWebPresenceCollection chatstate set
-        notifyPresence(from, contact.toJid()); // WAWebChangePresenceHandlerAction, group path: id=group, participant=user
+        whatsapp.store().addContact(contact);
+        notifyPresence(from, contact.toJid());
     }
 
     /**
@@ -224,19 +193,13 @@ public final class ChatStateStreamHandler implements SocketStream.Handler {
      * </ul>
      *
      * @param node the chatstate stanza node
-     * @return the resolved {@link ContactStatus}, or {@code null} if the child element
-     *         is missing or unsupported
-     * @implNote WASmaxInChatstateStateTypes.parseStateTypes,
-     *           WASmaxInChatstateComposingMixin.parseComposingMixin,
-     *           WASmaxInChatstatePausedMixin.parsePausedMixin,
-     *           WAHandleChatStateProtocol.parseChatStatus
+     * @return the resolved {@link ContactStatus}, or {@code null} if the child element is missing or unsupported
      */
     @WhatsAppWebExport(moduleName = "WAHandleChatStateProtocol", exports = "parseChatStatus",
             adaptation = WhatsAppAdaptation.ADAPTED)
     @WhatsAppWebExport(moduleName = "WASmaxInChatstateStateTypes", exports = "parseStateTypes",
             adaptation = WhatsAppAdaptation.ADAPTED)
     private ContactStatus resolveState(Node node) {
-        // WASmaxInChatstateStateTypes: tries parseComposingMixin, then parsePausedMixin
         var child = node.getChild().orElse(null);
         if (child == null) {
             LOGGER.log(System.Logger.Level.DEBUG, "Ignoring empty chatstate stanza: {0}", node);
@@ -244,15 +207,10 @@ public final class ChatStateStreamHandler implements SocketStream.Handler {
         }
 
         return switch (child.description()) {
-            // WASmaxInChatstateComposingMixin: flattenedChildWithTag(e, "composing")
-            // WAHandleChatStateProtocol.parseChatStatus: composingMedia === "audio" ? "recording_audio" : "typing"
             case "composing" -> "audio".equals(child.getAttributeAsString("media", null))
                     ? ContactStatus.RECORDING
                     : ContactStatus.COMPOSING;
-            // WASmaxInChatstatePausedMixin: flattenedChildWithTag(e, "paused")
-            // WAHandleChatStateProtocol.parseChatStatus: "Paused" -> "idle"
-            // ADAPTED: WAWebChangePresenceHandlerAction.m converts "idle" to
-            // e.isOnline ? "available" : "unavailable"; Cobalt defaults to AVAILABLE
+            // WA Web converts "idle" via e.isOnline to either "available" or "unavailable"; Cobalt defaults to AVAILABLE because no per-contact PresenceCollection tracks isOnline.
             case "paused" -> ContactStatus.AVAILABLE;
             default -> {
                 LOGGER.log(System.Logger.Level.DEBUG,
@@ -274,16 +232,13 @@ public final class ChatStateStreamHandler implements SocketStream.Handler {
      * @param from  the JID from the chatstate stanza
      * @param meJid the current user's device JID
      * @return {@code true} if the chatstate is for the current user's own account
-     * @implNote WAWebUserPrefsMeUser.isMeAccount, function $(e)
      */
     private boolean isSelf(Jid from, Jid meJid) {
         var fromUser = from.toUserJid();
         var meUser = meJid.toUserJid();
-        // WAWebUserPrefsMeUser.isMePnUser: checks PN user part match
         if (fromUser.user().equals(meUser.user())) {
             return true;
         }
-        // WAWebUserPrefsMeUser.isMeAccount: also checks LID match via getMaybeMeLidUser
         if (fromUser.hasLidServer()) {
             var phoneJid = whatsapp.store().findPhoneByLid(fromUser).orElse(null);
             return phoneJid != null && phoneJid.user().equals(meUser.user());
@@ -304,17 +259,13 @@ public final class ChatStateStreamHandler implements SocketStream.Handler {
      *
      * @param jid the JID from the chatstate stanza
      * @return the resolved contact, or {@code null} if the JID cannot be resolved
-     * @implNote ADAPTED: WAWebHandleChatState.handleIndividualChatState, LID migration
-     *           logic via WAWebLid1X1MigrationGating.isLidMigrated,
-     *           WAWebLidMigrationUtils.toUserLid, WAWebApiChat.getChatRecordByAccountLid;
-     *           Cobalt collapses all LID resolution into findPhoneByLid
+     * @implNote Cobalt collapses WA Web's LID migration logic (isLidMigrated, toUserLid, getChatRecordByAccountLid) into a single findPhoneByLid lookup because Cobalt stores contacts by PN.
      */
     private Contact getOrCreateContact(Jid jid) {
         if (jid == null) {
-            return null; // NO_WA_BASIS, defensive null check
+            return null;
         }
 
-        // ADAPTED: WAWebHandleChatState, userJidToUserWid + LID migration resolution
         var canonical = jid.toUserJid().hasLidServer()
                 ? whatsapp.store().findPhoneByLid(jid.toUserJid()).orElse(jid.toUserJid())
                 : jid.toUserJid();
@@ -330,12 +281,9 @@ public final class ChatStateStreamHandler implements SocketStream.Handler {
      * <p>Each listener is invoked on a separate virtual thread to avoid blocking
      * the handler.
      *
-     * @param conversation the JID of the conversation where the presence changed
-     *                     (same as participant for 1:1 chats, group JID for groups)
+     * @param conversation the JID of the conversation where the presence changed (same as participant for 1:1 chats, group JID for groups)
      * @param participant  the JID of the participant whose presence changed
-     * @implNote ADAPTED: WAWebChangePresenceHandlerAction.default, in WA Web, presence
-     *           changes propagate through model observation on the PresenceCollection;
-     *           Cobalt uses explicit listener notification instead
+     * @implNote WA Web propagates presence through PresenceCollection model observation; Cobalt uses explicit listener notification.
      */
     private void notifyPresence(Jid conversation, Jid participant) {
         for (var listener : whatsapp.store().listeners()) {

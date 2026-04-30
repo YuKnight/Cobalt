@@ -18,7 +18,7 @@ import java.util.Optional;
  *
  * @implNote {@code WAWebTosJob.queryTosState}'s
  *           {@code WAWebBackendErrors.ServerStatusCodeError} throw
- *           collapses both client and server error envelopes; Cobalt
+ *           collapses both client and server error envelopes. Cobalt
  *           splits them into typed {@code ClientError} /
  *           {@code ServerError} variants.
  */
@@ -62,10 +62,10 @@ public sealed interface IqQueryTosResponse extends IqOperation.Response
      * Tries each {@link IqQueryTosResponse} variant in priority order and returns
      * the first that parses cleanly.
      *
-     * @param node    the inbound IQ stanza received from the relay;
-     *                never {@code null}
-     * @param request the original outbound stanza — used to validate
-     *                echoed identifiers; never {@code null}
+     * @param node    the inbound IQ stanza received from the relay.
+     *                Never {@code null}
+     * @param request the original outbound stanza. Used to validate
+     *                echoed identifiers. Never {@code null}
      * @return an {@link Optional} carrying the parsed variant, or
      *         {@link Optional#empty()} when no documented variant
      *         matched the stanza shape
@@ -88,7 +88,7 @@ public sealed interface IqQueryTosResponse extends IqOperation.Response
     }
 
     /**
-     * The {@code Success} reply variant — the relay returned the
+     * The {@code Success} reply variant. The relay returned the
      * current notice state for every requested id.
      *
      * <p>Carries the clamped {@code refresh} interval and the list of
@@ -96,8 +96,8 @@ public sealed interface IqQueryTosResponse extends IqOperation.Response
      *
      * @implNote {@code WAWebTosJob.tosNotices} parser:
      *           {@code child("tos").attrInt("refresh")} clamped to
-     *           {@code [7200, 259200]} (else {@code 86400}); each
-     *           {@code <notice id state/>} parsed via
+     *           {@code [7200, 259200]} (else {@code 86400}). Each
+     *           {@code <notice id state/>} is parsed via
      *           {@code maybeAttrString("state") !== "false"}.
      */
     @WhatsAppWebModule(moduleName = "WAWebTosJob")
@@ -119,8 +119,8 @@ public sealed interface IqQueryTosResponse extends IqOperation.Response
          * Constructs a new successful reply.
          *
          * @param refreshIntervalSeconds the clamped refresh interval
-         * @param notices                the list of notice states;
-         *                               never {@code null}
+         * @param notices                the list of notice states.
+         *                               Never {@code null}
          * @throws NullPointerException if {@code notices} is
          *                              {@code null}
          */
@@ -142,7 +142,7 @@ public sealed interface IqQueryTosResponse extends IqOperation.Response
         /**
          * Returns the unmodifiable list of per-notice state entries.
          *
-         * @return the notice states; never {@code null}
+         * @return the notice states. Never {@code null}
          */
         public List<NoticeState> notices() {
             return notices;
@@ -222,7 +222,7 @@ public sealed interface IqQueryTosResponse extends IqOperation.Response
          * @implNote {@code WAWebTosJob.tosNotices}: each notice carries
          *           an {@code id} (verbatim) and an interpreted
          *           {@code state} flag (any value other than
-         *           {@code "false"} maps to {@code true}; missing
+         *           {@code "false"} maps to {@code true}. Missing
          *           attribute defaults to {@code true}).
          */
         @WhatsAppWebModule(moduleName = "WAWebTosJob")
@@ -234,7 +234,7 @@ public sealed interface IqQueryTosResponse extends IqOperation.Response
             private final String id;
 
             /**
-             * The accepted-state flag — {@code true} when the user has
+             * The accepted-state flag. {@code true} when the user has
              * accepted the notice (or when the relay omits the
              * {@code state} attribute), {@code false} only when the
              * relay explicitly returns {@code state="false"}.
@@ -244,7 +244,7 @@ public sealed interface IqQueryTosResponse extends IqOperation.Response
             /**
              * Constructs a new notice state entry.
              *
-             * @param id       the notice id; never {@code null}
+             * @param id       the notice id. Never {@code null}
              * @param accepted the accepted-state flag
              * @throws NullPointerException if {@code id} is
              *                              {@code null}
@@ -257,7 +257,7 @@ public sealed interface IqQueryTosResponse extends IqOperation.Response
             /**
              * Returns the notice id.
              *
-             * @return the id; never {@code null}
+             * @return the id. Never {@code null}
              */
             public String id() {
                 return id;
@@ -300,12 +300,12 @@ public sealed interface IqQueryTosResponse extends IqOperation.Response
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected the
+     * The {@code ClientError} reply variant. The relay rejected the
      * query as malformed or unauthorised.
      *
      * @implNote {@code WAWebTosJob.queryTosState} throws
      *           {@code ServerStatusCodeError(code, text)} on any
-     *           non-result; Cobalt narrows to codes {@code [400, 500)}.
+     *           non-result. Cobalt narrows to codes {@code [400, 500)}.
      */
     @WhatsAppWebModule(moduleName = "WAWebTosJob")
     final class ClientError implements IqQueryTosResponse {
@@ -323,7 +323,7 @@ public sealed interface IqQueryTosResponse extends IqOperation.Response
          * Constructs a new client-error reply.
          *
          * @param errorCode the numeric error code
-         * @param errorText the optional human-readable text; may be
+         * @param errorText the optional human-readable text. May be
          *                  {@code null}
          */
         public ClientError(int errorCode, String errorText) {
@@ -396,11 +396,11 @@ public sealed interface IqQueryTosResponse extends IqOperation.Response
     }
 
     /**
-     * The {@code ServerError} reply variant — the relay encountered a
+     * The {@code ServerError} reply variant. The relay encountered a
      * transient internal failure while processing the query.
      *
      * @implNote {@code WAWebTosJob.queryTosState} folds server failures
-     *           into the same {@code ServerStatusCodeError} throw;
+     *           into the same {@code ServerStatusCodeError} throw.
      *           Cobalt narrows to codes {@code >= 500}.
      */
     @WhatsAppWebModule(moduleName = "WAWebTosJob")
@@ -419,7 +419,7 @@ public sealed interface IqQueryTosResponse extends IqOperation.Response
          * Constructs a new server-error reply.
          *
          * @param errorCode the numeric error code
-         * @param errorText the optional human-readable text; may be
+         * @param errorText the optional human-readable text. May be
          *                  {@code null}
          */
         public ServerError(int errorCode, String errorText) {

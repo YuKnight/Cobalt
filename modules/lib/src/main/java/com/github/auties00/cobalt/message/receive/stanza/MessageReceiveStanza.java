@@ -12,573 +12,400 @@ import java.util.Optional;
 import java.util.OptionalInt;
 
 /**
- * Holds the fully parsed structural representation of an incoming
- * {@code <message>} stanza before the payload is decrypted.
+ * Holds the fully parsed structural representation of an incoming {@code <message>}
+ * stanza before the payload is decrypted.
  *
- * <p>Captures every metadata field extracted from the raw XML node:
- * the message identifier and timestamp; the addressing information
- * (including the LID/PN migration fields); the encrypted payloads; the
- * bot, business, and payment metadata; the reporting tokens; broadcast
- * participant lists; and every {@code <meta>} attribute. Decryption
- * and downstream processing operate on this structured form rather
- * than re-scanning the raw node.
+ * <p>Captures every metadata field extracted from the raw XML node: identifier and
+ * timestamp, addressing information (including the LID/PN migration fields), the
+ * encrypted payloads, the bot/business/payment metadata, the reporting tokens, the
+ * broadcast participant lists, and every {@code <meta>} attribute. Decryption and
+ * downstream processing operate on this structured form rather than re-scanning the
+ * raw node.
  *
- * <p>WA Web produces equivalent data in separate {@code msgInfo},
+ * @implNote WA Web produces equivalent data in separate {@code msgInfo},
  * {@code msgMeta}, {@code encs}, {@code deviceIdentity}, {@code bizInfo},
- * {@code hsmInfo}, {@code paymentInfo}, {@code rcat}, {@code msgBotInfo},
- * and {@code reportingTokenInfo} objects; Cobalt merges them into a
- * single cohesive container so callers receive one value per stanza.
- *
- * @apiNote WAWebHandleMsgParser.incomingMsgParser: the primary parser
- * for incoming message stanzas in WA Web.
+ * {@code hsmInfo}, {@code paymentInfo}, {@code rcat}, {@code msgBotInfo}, and
+ * {@code reportingTokenInfo} objects. Cobalt merges them into a single cohesive
+ * container.
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleMsgParser")
 @WhatsAppWebModule(moduleName = "WAWebHandleMsgCommon")
 public final class MessageReceiveStanza {
     /**
-     * The {@code edit} attribute value representing the absence of
-     * an edit.
-     *
-     * @implNote WAWebHandleMsgCommon.EDIT_ATTR.NONE.
+     * {@code edit} attribute value representing the absence of an edit.
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleMsgCommon", exports = "EDIT_ATTR",
             adaptation = WhatsAppAdaptation.DIRECT)
     public static final int EDIT_NONE = 0;
 
     /**
-     * The {@code edit} attribute value indicating a message edit.
-     *
-     * @implNote WAWebHandleMsgCommon.EDIT_ATTR.MESSAGE.
+     * {@code edit} attribute value indicating a message edit.
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleMsgCommon", exports = "EDIT_ATTR",
             adaptation = WhatsAppAdaptation.DIRECT)
     public static final int EDIT_MESSAGE = 1;
 
     /**
-     * The {@code edit} attribute value indicating a pin-in-chat
-     * operation.
-     *
-     * @implNote WAWebHandleMsgCommon.EDIT_ATTR.PIN.
+     * {@code edit} attribute value indicating a pin-in-chat operation.
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleMsgCommon", exports = "EDIT_ATTR",
             adaptation = WhatsAppAdaptation.DIRECT)
     public static final int EDIT_PIN = 2;
 
     /**
-     * The {@code edit} attribute value indicating the sender revoked
-     * the message.
-     *
-     * @implNote WAWebHandleMsgCommon.EDIT_ATTR.SENDER_REVOKE.
+     * {@code edit} attribute value indicating that the sender revoked the message.
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleMsgCommon", exports = "EDIT_ATTR",
             adaptation = WhatsAppAdaptation.DIRECT)
     public static final int EDIT_SENDER_REVOKE = 7;
 
     /**
-     * The {@code edit} attribute value indicating an admin revoked the
-     * message.
-     *
-     * @implNote WAWebHandleMsgCommon.EDIT_ATTR.ADMIN_REVOKE.
+     * {@code edit} attribute value indicating that an admin revoked the message.
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleMsgCommon", exports = "EDIT_ATTR",
             adaptation = WhatsAppAdaptation.DIRECT)
     public static final int EDIT_ADMIN_REVOKE = 8;
 
     /**
-     * The {@code context_source} value identifying the stanza as
-     * originating from a channel invitation.
-     *
-     * @implNote WAWebHandleMsgCommon.CONTEXT_SOURCE.
+     * {@code context_source} value identifying a stanza originating from a channel
+     * invitation.
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleMsgCommon", exports = "CONTEXT_SOURCE",
             adaptation = WhatsAppAdaptation.DIRECT)
     public static final String CONTEXT_SOURCE_CHANNELS_INVITATION = "channels_invitation";
 
     /**
-     * The stanza's {@code id} attribute.
-     *
-     * @implNote WAWebHandleMsgParser: {@code e.attrString("id")}.
+     * Stanza's {@code id} attribute.
      */
     private final String id;
 
     /**
-     * The message timestamp parsed from the {@code t} attribute.
-     *
-     * @implNote WAWebHandleMsgParser: {@code e.attrTime("t")}.
+     * Message timestamp parsed from the {@code t} attribute.
      */
     private final Instant timestamp;
 
     /**
-     * The chat JID derived from the {@code from} attribute.
-     *
-     * <p>For 1:1 messages this equals the sender; for groups,
-     * broadcasts, and status feeds this identifies the
+     * Chat JID derived from the {@code from} attribute. For 1:1 messages this equals
+     * the sender; for groups, broadcasts, and status feeds this identifies the
      * group/broadcast/status chat.
-     *
-     * @implNote WAWebHandleMsgParser:
-     * {@code jidWithTypeToWid(e.attrJidWithType("from"))}.
      */
     private final Jid chatJid;
 
     /**
-     * The actual sender's device JID.
-     *
-     * <p>For 1:1 messages equals {@link #chatJid}; for
-     * groups/broadcasts this is the {@code participant} attribute.
-     *
-     * @implNote WAWebHandleMsgParser: {@code from.isGroup()||from.isBroadcast() ? participant : from}.
+     * Actual sender's device JID. For 1:1 messages this equals {@link #chatJid}; for
+     * groups and broadcasts it is the {@code participant} attribute.
      */
     private final Jid senderJid;
 
     /**
-     * The {@code participant} attribute present on group, broadcast,
-     * and status messages. Identifies the sender's device within the
-     * group.
-     *
-     * @implNote WAWebHandleMsgParser: {@code e.attrDeviceJid("participant")}.
+     * {@code participant} attribute present on group, broadcast, and status messages,
+     * identifying the sender's device within the group.
      */
     private final Jid participant;
 
     /**
-     * The classified message type derived from the addressing.
-     *
-     * @implNote WAWebHandleMsgParser function C(): determines CHAT,
-     * GROUP, PEER_BROADCAST, OTHER_BROADCAST, DIRECT_PEER_STATUS, or
-     * OTHER_STATUS based on the {@code from} JID type and participant
-     * presence.
+     * Classified message type derived from the addressing.
      */
     private final MessageType messageType;
 
     /**
-     * The {@code edit} attribute, defaulting to {@link #EDIT_NONE}.
-     *
-     * @implNote WAWebHandleMsgParser: {@code e.maybeAttrInt("edit") ?? EDIT_ATTR.NONE}.
+     * {@code edit} attribute, defaulting to {@link #EDIT_NONE}.
      */
     private final int editAttribute;
 
     /**
-     * The sender's push name from the {@code notify} attribute.
-     *
-     * @implNote WAWebHandleMsgParser: {@code e.maybeAttrString("notify")}.
+     * Sender's push name from the {@code notify} attribute.
      */
     private final String pushName;
 
     /**
-     * The message category. The only defined value is {@code "peer"}
-     * for peer protocol messages.
-     *
-     * @implNote WAWebHandleMsgCommon.MSG_CATEGORY.
+     * Message category. The only defined value is {@code "peer"} for peer protocol
+     * messages.
      */
     private final String category;
 
     /**
-     * The {@code offline} attribute value, present on messages
-     * delivered while the client was offline.
-     *
-     * @implNote WAWebHandleMsgParser: {@code e.maybeAttrString("offline")}.
+     * {@code offline} attribute value, present on messages delivered while the client
+     * was offline.
      */
     private final String offline;
 
     /**
-     * The addressing mode for group messages: either {@code "pn"}
-     * (phone number) or {@code "lid"}.
-     *
-     * @implNote WAWebHandleMsgCommon.STANZA_MSG_ADDRESSING_MODE.
+     * Addressing mode for group messages: either {@code "pn"} (phone number) or
+     * {@code "lid"}.
      */
     private final String addressingMode;
 
     /**
-     * Whether the stanza has an {@code <hsm>} child indicating a highly
-     * structured message (business template).
-     *
-     * @implNote WAWebHandleMsgParser: {@code e.hasChild("hsm")}.
+     * Whether the stanza has an {@code <hsm>} child indicating a highly structured
+     * message (business template).
      */
     private final boolean isHsm;
 
     /**
-     * The optional {@code count} attribute.
-     *
-     * @implNote WAWebHandleMsgParser: {@code e.maybeAttrInt("count")}.
+     * Optional {@code count} attribute.
      */
     private final Integer count;
 
     /**
-     * The sender's phone number JID from the {@code sender_pn}
-     * attribute. Used on LID-addressed groups to carry the PN mapping.
-     *
-     * @implNote WAWebHandleMsgParser: {@code e.attrUserJid("sender_pn")}.
+     * Sender's phone number JID from the {@code sender_pn} attribute. Used on
+     * LID-addressed groups to carry the PN mapping.
      */
     private final Jid senderPn;
 
     /**
-     * The sender's LID from the {@code sender_lid} attribute.
-     *
-     * @implNote WAWebHandleMsgParser: {@code e.attrUserJid("sender_lid")}.
+     * Sender's LID from the {@code sender_lid} attribute.
      */
     private final Jid senderLid;
 
     /**
-     * The recipient's phone number from the {@code recipient_pn}
-     * attribute, present on peer messages.
-     *
-     * @implNote WAWebHandleMsgParser: {@code e.attrUserJid("recipient_pn")}.
+     * Recipient's phone number from the {@code recipient_pn} attribute, present on
+     * peer messages.
      */
     private final Jid recipientPn;
 
     /**
-     * The recipient's LID from the {@code recipient_lid} attribute.
-     *
-     * @implNote WAWebHandleMsgParser: {@code e.attrLidUserJid("recipient_lid")}.
+     * Recipient's LID from the {@code recipient_lid} attribute.
      */
     private final Jid recipientLid;
 
     /**
-     * The peer recipient's phone number from the
-     * {@code peer_recipient_pn} attribute, used on peer broadcast
-     * messages.
-     *
-     * @implNote WAWebHandleMsgParser: {@code e.attrUserJid("peer_recipient_pn")}.
+     * Peer recipient's phone number from the {@code peer_recipient_pn} attribute,
+     * used on peer broadcast messages.
      */
     private final Jid peerRecipientPn;
 
     /**
-     * The peer recipient's LID from the {@code peer_recipient_lid}
-     * attribute.
-     *
-     * @implNote WAWebHandleMsgParser: {@code e.attrLidUserJid("peer_recipient_lid")}.
+     * Peer recipient's LID from the {@code peer_recipient_lid} attribute.
      */
     private final Jid peerRecipientLid;
 
     /**
-     * The peer recipient's username from the
-     * {@code peer_recipient_username} attribute.
-     *
-     * @implNote WAWebHandleMsgParser: {@code e.maybeAttrString("peer_recipient_username")}.
+     * Peer recipient's username from the {@code peer_recipient_username} attribute.
      */
     private final String peerRecipientUsername;
 
     /**
-     * The most recent LID known for the recipient from the
-     * {@code recipient_latest_lid} attribute.
-     *
-     * @implNote WAWebHandleMsgParser: {@code e.attrLidUserJid("recipient_latest_lid")}.
+     * Most recent LID known for the recipient from the {@code recipient_latest_lid}
+     * attribute.
      */
     private final Jid recipientLatestLid;
 
     /**
-     * The recipient's username from the {@code recipient_username}
-     * attribute.
-     *
-     * @implNote WAWebHandleMsgParser: {@code e.maybeAttrString("recipient_username")}.
+     * Recipient's username from the {@code recipient_username} attribute.
      */
     private final String recipientUsername;
 
     /**
-     * The group participant's phone number from the
-     * {@code participant_pn} attribute.
-     *
-     * @implNote WAWebHandleMsgParser: {@code e.attrUserJid("participant_pn")}.
+     * Group participant's phone number from the {@code participant_pn} attribute.
      */
     private final Jid participantPn;
 
     /**
-     * The group participant's LID from the {@code participant_lid}
-     * attribute.
-     *
-     * @implNote WAWebHandleMsgParser: {@code e.attrLidUserJid("participant_lid")}.
+     * Group participant's LID from the {@code participant_lid} attribute.
      */
     private final Jid participantLid;
 
     /**
-     * The group participant's username from the
-     * {@code participant_username} attribute.
-     *
-     * @implNote WAWebHandleMsgParser: {@code e.maybeAttrString("participant_username")}.
+     * Group participant's username from the {@code participant_username} attribute.
      */
     private final String participantUsername;
 
     /**
-     * The sender's username from the {@code username} attribute.
-     *
-     * @implNote WAWebHandleMsgParser: {@code e.maybeAttrString("username")}.
+     * Sender's username from the {@code username} attribute.
      */
     private final String username;
 
     /**
-     * The sender's display name from the {@code display_name}
-     * attribute.
-     *
-     * @implNote WAWebHandleMsgParser: {@code e.maybeAttrString("display_name")}.
+     * Sender's display name from the {@code display_name} attribute.
      */
     private final String displayName;
 
     /**
-     * The stanza's {@code type} attribute. Defined values are
-     * {@code "text"}, {@code "media"}, {@code "medianotify"},
-     * {@code "pay"}, {@code "poll"}, {@code "reaction"}, and
-     * {@code "event"}.
-     *
-     * @implNote WAWebHandleMsgCommon.STANZA_MSG_TYPES.
+     * Stanza's {@code type} attribute. Defined values are {@code "text"},
+     * {@code "media"}, {@code "medianotify"}, {@code "pay"}, {@code "poll"},
+     * {@code "reaction"}, and {@code "event"}.
      */
     private final String stanzaType;
 
     /**
-     * Whether the stanza has an {@code <unavailable>} child indicating
-     * the payload is absent (fanout placeholder).
-     *
-     * @implNote WAWebHandleMsgParser function b(): {@code e.hasChild("unavailable")}.
+     * Whether the stanza has an {@code <unavailable>} child indicating the payload is
+     * absent (fanout placeholder).
      */
     private final boolean unavailable;
 
     /**
-     * Whether the {@code <unavailable>} child carries {@code hosted="true"},
-     * meaning a hosted-device fanout placeholder.
-     *
-     * @implNote WAWebHandleMsgParser: {@code unavailable.maybeAttrString("hosted") === "true"}.
+     * Whether the {@code <unavailable>} child carries {@code hosted="true"}, meaning
+     * a hosted-device fanout placeholder.
      */
     private final boolean hostedUnavailable;
 
     /**
-     * Whether the {@code <unavailable>} child carries
-     * {@code type="view_once"}, meaning a view-once fanout placeholder.
-     *
-     * @implNote WAWebHandleMsgParser: {@code unavailable.maybeAttrString("type") === "view_once"}.
+     * Whether the {@code <unavailable>} child carries {@code type="view_once"},
+     * meaning a view-once fanout placeholder.
      */
     private final boolean viewOnceUnavailable;
 
     /**
-     * The {@code polltype} attribute from the {@code <meta>} node.
-     * Defined values are {@code "creation"}, {@code "quiz_creation"},
-     * {@code "vote"}, {@code "result_snapshot"}, and {@code "edit"}.
-     *
-     * @implNote WAWebHandleMsgCommon.POLL_TYPES.
+     * {@code polltype} attribute from the {@code <meta>} node. Defined values are
+     * {@code "creation"}, {@code "quiz_creation"}, {@code "vote"},
+     * {@code "result_snapshot"}, and {@code "edit"}.
      */
     private final String pollType;
 
     /**
-     * The {@code event_type} attribute from the {@code <meta>} node.
-     * Defined values are {@code "creation"}, {@code "response"}, and
-     * {@code "edit"}. Populated only when the stanza type is
-     * {@code "event"}.
-     *
-     * @implNote WAWebHandleMsgCommon.EVENT_TYPES.
+     * {@code event_type} attribute from the {@code <meta>} node. Defined values are
+     * {@code "creation"}, {@code "response"}, and {@code "edit"}. Populated only when
+     * the stanza type is {@code "event"}.
      */
     private final String eventType;
 
     /**
-     * The {@code origin} attribute from the {@code <meta>} node. The
-     * only defined value is {@code "ctwa"} (click-to-WhatsApp ads).
-     *
-     * @implNote WAWebHandleMsgCommon.STANZA_MSG_ORIGIN.
+     * {@code origin} attribute from the {@code <meta>} node. The only defined value
+     * is {@code "ctwa"} (click-to-WhatsApp ads).
      */
     private final String origin;
 
     /**
      * Whether the stanza has a {@code <url_number>} child.
-     *
-     * @implNote WAWebHandleMsgParser: {@code e.hasChild("url_number")}.
      */
     private final boolean urlNumber;
 
     /**
      * Whether the stanza has a {@code <url_text>} child.
-     *
-     * @implNote WAWebHandleMsgParser: {@code e.hasChild("url_text")}.
      */
     private final boolean urlText;
 
     /**
      * Whether the {@code <meta>} node has {@code status_mentioned="true"}.
-     *
-     * @implNote WAWebHandleMsgParser: {@code meta.maybeAttrString("status_mentioned") === "true"}.
      */
     private final boolean statusMentioned;
 
     /**
-     * The {@code appdata} attribute from the {@code <meta>} node.
-     * Defined values are {@code "default"}, {@code "member_tag"},
-     * and {@code "group_history"}.
-     *
-     * @implNote WAWebHandleMsgCommon.APPDATA.
+     * {@code appdata} attribute from the {@code <meta>} node. Defined values are
+     * {@code "default"}, {@code "member_tag"}, and {@code "group_history"}.
      */
     private final String appdata;
 
     /**
-     * The {@code biz_source} attribute from the {@code <meta>} node.
-     *
-     * @implNote WAWebHandleMsgCommon.BIZ_SOURCE_ATTR.
+     * {@code biz_source} attribute from the {@code <meta>} node.
      */
     private final String bizSource;
 
     /**
-     * The {@code thread_msg_id} attribute from the {@code <meta>} node,
-     * identifying the parent message of a comment thread.
-     *
-     * @implNote WAWebHandleMsgParser: {@code meta.attrString("thread_msg_id")}.
+     * {@code thread_msg_id} attribute from the {@code <meta>} node, identifying the
+     * parent message of a comment thread.
      */
     private final String threadMsgId;
 
     /**
-     * The {@code thread_msg_sender_jid} attribute from the
-     * {@code <meta>} node.
-     *
-     * @implNote WAWebHandleMsgParser: {@code meta.attrJidWithType("thread_msg_sender_jid")}.
+     * {@code thread_msg_sender_jid} attribute from the {@code <meta>} node.
      */
     private final Jid threadMsgSenderJid;
 
     /**
-     * The {@code target_id} attribute from the {@code <meta>} node,
-     * referencing the parent message for addon messages (reactions,
-     * poll votes, etc.).
-     *
-     * @implNote WAWebHandleMsgParser: {@code meta.attrString("target_id")}.
+     * {@code target_id} attribute from the {@code <meta>} node, referencing the
+     * parent message for addon messages (reactions, poll votes, etc.).
      */
     private final String targetId;
 
     /**
-     * The {@code target_sender_jid} attribute from the {@code <meta>}
-     * node.
-     *
-     * @implNote WAWebHandleMsgParser: {@code meta.attrJidWithType("target_sender_jid")}.
+     * {@code target_sender_jid} attribute from the {@code <meta>} node.
      */
     private final Jid targetSenderJid;
 
     /**
-     * The {@code target_chat_jid} attribute from the {@code <meta>}
-     * node.
-     *
-     * @implNote WAWebHandleMsgParser: {@code meta.attrJidWithType("target_chat_jid")}.
+     * {@code target_chat_jid} attribute from the {@code <meta>} node.
      */
     private final Jid targetChatJid;
 
     /**
-     * The {@code target_chat_jid_lid} attribute from the {@code <meta>}
-     * node.
-     *
-     * @implNote WAWebHandleMsgParser: {@code meta.attrJidWithType("target_chat_jid_lid")}.
+     * {@code target_chat_jid_lid} attribute from the {@code <meta>} node.
      */
     private final Jid targetChatJidLid;
 
     /**
      * Whether the {@code <meta>} node has {@code capi="true"}.
-     *
-     * @implNote WAWebHandleMsgParser: {@code meta.attrString("capi") === "true"}.
      */
     private final boolean capi;
 
     /**
-     * The {@code context_source} attribute from the {@code <meta>}
-     * node. The known value is {@code "channels_invitation"}.
-     *
-     * @implNote WAWebHandleMsgCommon.CONTEXT_SOURCE.
+     * {@code context_source} attribute from the {@code <meta>} node. The known value
+     * is {@code "channels_invitation"}.
      */
     private final String contextSource;
 
     /**
-     * The sender's country code parsed from the {@code <meta>} node's
+     * Sender's country code parsed from the {@code <meta>} node's
      * {@code sender_country_code} attribute.
-     *
-     * @implNote WAWebHandleMsgParser function T(): parses and validates
-     * the ISO country code.
      */
     private final String senderCountryCode;
 
     /**
-     * The list of encrypted payloads parsed from {@code <enc>} child
-     * nodes.
-     *
-     * @implNote WAWebHandleMsgParser: maps each {@code <enc>} child to
-     * an object with e2eType, encMediaType, ciphertext, retryCount,
-     * and hideFail.
+     * List of encrypted payloads parsed from {@code <enc>} child nodes.
      */
     private final List<MessageReceiveEncryptedPayload> encs;
 
     /**
-     * The device identity bytes from the {@code <device-identity>}
-     * child, used for ADV validation of companion devices.
-     *
-     * @implNote WAWebHandleMsgParser: {@code deviceIdentityNode.contentBytes()}.
+     * Device identity bytes from the {@code <device-identity>} child, used for ADV
+     * validation of companion devices.
      */
     private final byte[] deviceIdentity;
 
     /**
-     * The parsed bot info from the {@code <bot>} child.
-     *
-     * @implNote WAWebHandleMsgParser function b().
+     * Parsed bot info from the {@code <bot>} child.
      */
     private final MessageReceiveBotInfo botInfo;
 
     /**
-     * The parsed business info from stanza attributes and the
-     * {@code <biz>} child.
-     *
-     * @implNote WAWebHandleMsgParser function v().
+     * Parsed business info from stanza attributes and the {@code <biz>} child.
      */
     private final MessageReceiveBizInfo bizInfo;
 
     /**
-     * The parsed reporting token info from the {@code <reporting>}
-     * child.
-     *
-     * @implNote WAWebHandleMsgParser function k().
+     * Parsed reporting token info from the {@code <reporting>} child.
      */
     private final MessageReceiveReportingInfo reportingInfo;
 
     /**
-     * The list of broadcast contact list participants from the
-     * {@code <participants>} child. Populated for PEER_BROADCAST and
-     * DIRECT_PEER_STATUS messages.
-     *
-     * @implNote WAWebHandleMsgParser function y(): maps each
-     * {@code <to>} child.
+     * List of broadcast contact list participants from the {@code <participants>}
+     * child. Populated for PEER_BROADCAST and DIRECT_PEER_STATUS messages.
      */
     private final List<MessageReceiveBroadcastParticipant> bclParticipants;
 
     /**
-     * The parsed payment info from the {@code <pay>} and
-     * {@code <transaction>} children.
-     *
-     * @implNote WAWebHandleMsgParser function R().
+     * Parsed payment info from the {@code <pay>} and {@code <transaction>} children.
      */
     private final MessageReceivePaymentInfo paymentInfo;
 
     /**
-     * The content bytes of the {@code <rcat>} child node, used for
-     * content binding verification.
-     *
-     * @implNote WAWebHandleMsgParser: {@code rcat.contentBytes()}.
+     * Content bytes of the {@code <rcat>} child node, used for content binding
+     * verification.
      */
     private final byte[] rcat;
 
     /**
-     * The stanza-level {@code eph_setting} attribute, present on
-     * OTHER_BROADCAST messages for ephemeral message settings.
-     *
-     * @implNote WAWebHandleMsgParser: {@code e.maybeAttrString("eph_setting")}.
+     * Stanza-level {@code eph_setting} attribute, present on OTHER_BROADCAST messages
+     * for ephemeral message settings.
      */
     private final String ephSetting;
 
     /**
-     * The {@code tag} attribute from the {@code <hsm>} child node.
-     *
-     * @implNote WAWebHandleMsgParser function R(): {@code hsm.maybeAttrString("tag")}.
+     * {@code tag} attribute from the {@code <hsm>} child node.
      */
     private final String hsmTag;
 
     /**
-     * The {@code category} attribute from the {@code <hsm>} child node.
-     *
-     * @implNote WAWebHandleMsgParser function R(): {@code hsm.maybeAttrString("category")}.
+     * {@code category} attribute from the {@code <hsm>} child node.
      */
     private final String hsmCategory;
 
     /**
      * Constructs a new parsed stanza record.
      *
-     * <p>This constructor is public and accepts every parsed field.
-     * It is intended to be called by {@link MessageReceiveStanzaParser}
-     * after completing its extraction pass; callers outside the parser
-     * rarely need to invoke it directly.
+     * <p>Intended to be called by {@link MessageReceiveStanzaParser} after completing
+     * its extraction pass; callers outside the parser rarely need to invoke it
+     * directly.
      *
      * @param id                    the stanza identifier
      * @param timestamp             the message timestamp
@@ -639,11 +466,7 @@ public final class MessageReceiveStanza {
      * @param rcat                  the rcat content bytes, or {@code null}
      * @param hsmTag                the HSM tag, or {@code null}
      * @param hsmCategory           the HSM category, or {@code null}
-     *
      * @throws NullPointerException if any non-nullable argument is {@code null}
-     *
-     * @implNote WAWebHandleMsgParser.incomingMsgParser: constructs the
-     * composite parsed result object.
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleMsgParser", exports = "incomingMsgParser",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -777,7 +600,7 @@ public final class MessageReceiveStanza {
     public String id() { return id; }
 
     /**
-     * Returns the message timestamp parsed from the {@code t} attribute.
+     * Returns the message timestamp.
      *
      * @return the message timestamp
      */
@@ -980,32 +803,28 @@ public final class MessageReceiveStanza {
     public boolean isHostedUnavailable() { return hostedUnavailable; }
 
     /**
-     * Returns whether the unavailable placeholder is for a view-once
-     * message.
+     * Returns whether the unavailable placeholder is for a view-once message.
      *
      * @return {@code true} if view-once
      */
     public boolean isViewOnceUnavailable() { return viewOnceUnavailable; }
 
     /**
-     * Returns the optional {@code polltype} attribute from the
-     * {@code <meta>} node.
+     * Returns the optional {@code polltype} attribute from the {@code <meta>} node.
      *
      * @return an {@link Optional} wrapping the poll type
      */
     public Optional<String> pollType() { return Optional.ofNullable(pollType); }
 
     /**
-     * Returns the optional {@code event_type} attribute from the
-     * {@code <meta>} node.
+     * Returns the optional {@code event_type} attribute from the {@code <meta>} node.
      *
      * @return an {@link Optional} wrapping the event type
      */
     public Optional<String> eventType() { return Optional.ofNullable(eventType); }
 
     /**
-     * Returns the optional {@code origin} attribute from the
-     * {@code <meta>} node.
+     * Returns the optional {@code origin} attribute from the {@code <meta>} node.
      *
      * @return an {@link Optional} wrapping the origin
      */
@@ -1033,16 +852,14 @@ public final class MessageReceiveStanza {
     public boolean statusMentioned() { return statusMentioned; }
 
     /**
-     * Returns the optional {@code appdata} attribute from the
-     * {@code <meta>} node.
+     * Returns the optional {@code appdata} attribute from the {@code <meta>} node.
      *
      * @return an {@link Optional} wrapping the appdata value
      */
     public Optional<String> appdata() { return Optional.ofNullable(appdata); }
 
     /**
-     * Returns the optional {@code biz_source} attribute from the
-     * {@code <meta>} node.
+     * Returns the optional {@code biz_source} attribute from the {@code <meta>} node.
      *
      * @return an {@link Optional} wrapping the biz source
      */
@@ -1112,24 +929,21 @@ public final class MessageReceiveStanza {
     public Optional<String> senderCountryCode() { return Optional.ofNullable(senderCountryCode); }
 
     /**
-     * Returns the list of encrypted payloads parsed from {@code <enc>}
-     * children.
+     * Returns the list of encrypted payloads parsed from {@code <enc>} children.
      *
      * @return the encrypted payloads list
      */
     public List<MessageReceiveEncryptedPayload> encs() { return encs; }
 
     /**
-     * Returns the optional device identity bytes used for ADV
-     * validation.
+     * Returns the optional device identity bytes used for ADV validation.
      *
      * @return an {@link Optional} wrapping the device identity bytes
      */
     public Optional<byte[]> deviceIdentity() { return Optional.ofNullable(deviceIdentity); }
 
     /**
-     * Returns the optional parsed bot info from the {@code <bot>}
-     * child.
+     * Returns the optional parsed bot info from the {@code <bot>} child.
      *
      * @return an {@link Optional} wrapping the bot info
      */
@@ -1192,18 +1006,13 @@ public final class MessageReceiveStanza {
     public Optional<String> hsmCategory() { return Optional.ofNullable(hsmCategory); }
 
     /**
-     * Returns the retry count from the first encrypted payload, when
-     * non-zero, used to determine the retry receipt count.
+     * Returns the retry count from the first encrypted payload, when non-zero, used
+     * to determine the retry receipt count.
      *
-     * @return an {@link OptionalInt} wrapping the retry count, empty
-     *         when no retries were recorded
-     *
-     * @implNote WAWebHandleMsg: uses {@code encs[0].retryCount} to
-     * determine retry receipt count.
+     * @return an {@link OptionalInt} wrapping the retry count, empty when no retries
+     *         were recorded
      */
     public OptionalInt retryCount() {
-        // WAWebHandleMsg
-        // Extracts the first enc's retry count and returns empty when no retries are recorded
         if (encs.isEmpty()) {
             return OptionalInt.empty();
         }
@@ -1212,90 +1021,59 @@ public final class MessageReceiveStanza {
     }
 
     /**
-     * Returns whether any encrypted payload has
-     * {@code decrypt-fail="hide"}, used by the dedup layer to decide
-     * whether to suppress placeholders on decryption failure.
+     * Returns whether any encrypted payload has {@code decrypt-fail="hide"}, used by
+     * the dedup layer to decide whether to suppress placeholders on decryption
+     * failure.
      *
      * @return {@code true} if any payload hides failures
-     *
-     * @implNote WAWebHandleMsg function v(): checks
-     * {@code encs.some(e => e.hideFail)} to determine dedup eligibility.
      */
     public boolean hasHideFailPayload() {
-        // WAWebHandleMsg function v()
-        // Returns true when any encrypted payload is flagged to hide decryption failures
         return encs.stream().anyMatch(MessageReceiveEncryptedPayload::hideFail);
     }
 
     /**
-     * Returns whether the message was received while the client was
-     * offline.
+     * Returns whether the message was received while the client was offline.
      *
      * @return {@code true} if the {@code offline} attribute was set
-     *
-     * @implNote WAWebHandleMsg: {@code msgInfo.offline != null}.
      */
     public boolean isOffline() {
-        // WAWebHandleMsg
-        // Returns true when the offline attribute was present on the stanza
         return offline != null;
     }
 
     /**
-     * Returns whether this is a peer message (category is
-     * {@code "peer"}).
+     * Returns whether this is a peer message (category is {@code "peer"}).
      *
      * @return {@code true} if the category is {@code "peer"}
-     *
-     * @implNote WAWebHandleMsgCommon.MSG_CATEGORY.peer.
      */
     public boolean isPeer() {
-        // WAWebHandleMsgCommon.MSG_CATEGORY
-        // Compares the category attribute to the peer constant
         return "peer".equals(category);
     }
 
     /**
-     * Returns whether every encrypted payload uses direct (non-SKMSG)
-     * encryption.
+     * Returns whether every encrypted payload uses direct (non-SKMSG) encryption.
      *
      * @return {@code true} if no SKMSG payload is present
-     *
-     * @implNote WAWebHandleMsgParser: {@code isDirect = encs.every(e => e.e2eType !== Skmsg)}.
      */
     public boolean isDirect() {
-        // WAWebHandleMsgParser
-        // Returns true when no enc payload is a sender-key group message
         return encs.stream().noneMatch(enc ->
                 enc.e2eType().isSenderKeyMessage());
     }
 
     /**
-     * Returns whether the sender is a companion device (device id
-     * not zero).
+     * Returns whether the sender is a companion device (device id is not zero).
      *
      * @return {@code true} if the sender is a companion device
-     *
-     * @implNote WAWebMsgProcessingDecryptApi: validates ADV only when
-     * {@code author.device != null && author.device !== 0}.
      */
     public boolean isCompanionDevice() {
-        // WAWebMsgProcessingDecryptApi
-        // Returns true when the sender's device id indicates a companion rather than the primary device
         return senderJid.device() != 0;
     }
 
     /**
-     * Returns whether any encrypted payload carries a non-zero retry
-     * count.
+     * Returns whether any encrypted payload carries a non-zero retry count.
      *
      * @return {@code true} if at least one payload is a retry
-     *
-     * @implNote WAWebHandleMsgParser: {@code encs.some(e => e.retryCount > 0)}.
      */
     public boolean isRetry() {
-        // WAWebHandleMsgParser
-        // Returns true when at least one enc payload has a positive retry count
         return encs.stream().anyMatch(enc -> enc.retryCount() > 0);
     }
 }

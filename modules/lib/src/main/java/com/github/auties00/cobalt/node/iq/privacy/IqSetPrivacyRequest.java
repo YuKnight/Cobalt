@@ -35,13 +35,13 @@ public final class IqSetPrivacyRequest implements IqOperation.Request {
     private final List<IqSetPrivacyUserEntry> users;
 
     /**
-     * The wire addressing mode — selects between PN and LID
+     * The wire addressing mode. Selects between PN and LID
      * envelopes when {@link #users} is non-empty.
      */
     private final IqSetPrivacyAddressingMode addressingMode;
 
     /**
-     * The optional category-list digest — emitted as
+     * The optional category-list digest. Emitted as
      * {@code dhash="…"} on the {@code <category/>} element when
      * {@link #users} is non-empty. {@code null} maps to the literal
      * {@code "none"} per WA Web's fallback.
@@ -51,13 +51,13 @@ public final class IqSetPrivacyRequest implements IqOperation.Request {
     /**
      * Constructs a request.
      *
-     * @param name           the category; never {@code null}
-     * @param value          the new value; never {@code null}
-     * @param users          the user-list mutation; never
+     * @param name           the category. Never {@code null}
+     * @param value          the new value. Never {@code null}
+     * @param users          the user-list mutation. Never
      *                       {@code null} (use {@link List#of()} for
      *                       the bare-category shape)
-     * @param addressingMode the addressing mode; never {@code null}
-     * @param dhash          the optional category-list digest; may be
+     * @param addressingMode the addressing mode. Never {@code null}
+     * @param dhash          the optional category-list digest. May be
      *                       {@code null}
      * @throws NullPointerException if any non-{@code null}-allowed
      *                              argument is {@code null}
@@ -78,7 +78,7 @@ public final class IqSetPrivacyRequest implements IqOperation.Request {
     /**
      * Returns the category being set.
      *
-     * @return the category; never {@code null}
+     * @return the category. Never {@code null}
      */
     public IqQueryPrivacySettingsCategoryName name() {
         return name;
@@ -87,7 +87,7 @@ public final class IqSetPrivacyRequest implements IqOperation.Request {
     /**
      * Returns the new value for the category.
      *
-     * @return the value; never {@code null}
+     * @return the value. Never {@code null}
      */
     public IqQueryPrivacySettingsVisibility value() {
         return value;
@@ -96,7 +96,7 @@ public final class IqSetPrivacyRequest implements IqOperation.Request {
     /**
      * Returns the user-list mutation list.
      *
-     * @return an unmodifiable list; never {@code null}; empty for
+     * @return an unmodifiable list. Never {@code null}. Empty for
      *         the bare-category shape
      */
     public List<IqSetPrivacyUserEntry> users() {
@@ -106,7 +106,7 @@ public final class IqSetPrivacyRequest implements IqOperation.Request {
     /**
      * Returns the wire addressing mode.
      *
-     * @return the addressing mode; never {@code null}
+     * @return the addressing mode. Never {@code null}
      */
     public IqSetPrivacyAddressingMode addressingMode() {
         return addressingMode;

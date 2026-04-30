@@ -11,111 +11,93 @@ import java.nio.charset.StandardCharsets;
 import java.security.*;
 
 /**
- * A Noise protocol handshake helper for the WhatsApp Noise XX key exchange.
+ * Cryptographic state machine for the WhatsApp Noise XX key exchange.
  *
- * <p>This class manages the cryptographic state needed during the Noise XX
- * handshake: a chained hash, a salt (for HKDF key derivation), a symmetric
- * cipher key, and a nonce counter.  Each call to {@link #cipher(byte[], boolean)}
- * encrypts or decrypts a payload and updates the chained hash, advancing the
- * handshake state.
+ * <p>The handshake chains a SHA-256 hash, an HKDF salt, a symmetric
+ * cipher key and a 64-bit nonce counter. Each {@link #cipher(byte[], boolean)}
+ * call encrypts or decrypts a payload, mixes the resulting bytes into
+ * the running hash and advances the nonce. {@link #mixIntoKey(byte[])}
+ * folds new key material into the salt and cipher key whenever a Diffie
+ * Hellman shared secret has been computed.
  *
- * <p>After the handshake completes, {@link #finish()} derives the final
- * read and write keys (64 bytes total: 32 bytes write key followed by 32
- * bytes read key).
+ * <p>{@link #finish()} derives the final 64 bytes of key material (32
+ * bytes write key followed by 32 bytes read key) once both sides have
+ * exchanged their {@code ClientFinish}/{@code ServerHello} messages.
  *
- * <p>Instances are {@link AutoCloseable} and should be used in a
- * try-with-resources block to ensure key material is destroyed promptly.
+ * <p>Instances are {@link AutoCloseable} and the WhatsApp socket client
+ * always uses them inside a try-with-resources block so that the AES
+ * key is destroyed promptly when the handshake completes or fails.
  *
- * @implNote WANoiseHandshake.NoiseHandshake
+ * @implNote Adapts WA Web's {@code WANoiseHandshake.NoiseHandshake} class.
  */
 final class WhatsAppSocketHandshake implements AutoCloseable {
     /**
-     * Empty IKM used by {@link #finish()} to derive final keys.
-     *
-     * @implNote WANoiseHandshake.finish — corresponds to
-     *     {@code new Uint8Array(0)} passed as IKM to HKDF
+     * Empty IKM passed to HKDF when {@link #finish()} expands the final
+     * read and write keys, mirroring WA Web's {@code new Uint8Array(0)}.
      */
     private static final byte[] FINISH_KEY = DataUtils.EMPTY_BYTE_ARRAY;
 
     /**
-     * The Noise protocol name, null-padded to 32 bytes.
-     *
-     * <p>Since this value is exactly 32 bytes, it is used directly as the
-     * initial hash, salt, and cipher key without SHA-256 hashing.
-     *
-     * @implNote WANoiseHandshake.NoiseHandshake.start — the protocol name
-     *     is used directly when its byte length equals 32
+     * Noise protocol name padded to exactly 32 bytes so it can be used
+     * verbatim as the initial hash, salt and cipher key without an
+     * additional SHA-256 reduction.
      */
     private static final byte[] NOISE_PROTOCOL = "Noise_XX_25519_AESGCM_SHA256\0\0\0\0".getBytes(StandardCharsets.UTF_8);
 
     /**
-     * The HKDF-SHA256 key derivation function instance.
-     *
-     * @implNote WANoiseHandshake — corresponds to
-     *     {@code WACryptoHkdf.extractWithSaltAndExpand} calls
+     * HKDF-SHA256 instance reused for every salt rotation.
      */
     private final KDF kdf;
 
     /**
-     * The SHA-256 message digest for hash chaining.
-     *
-     * @implNote WANoiseHandshake.authenticate — corresponds to
-     *     {@code WACryptoSha256.sha256} calls used in authenticate
+     * SHA-256 digest reused to chain {@code SHA-256(hash || data)} into
+     * the running handshake hash.
      */
     private final MessageDigest hashDigest;
 
     /**
-     * The AES/GCM/NoPadding cipher for handshake payloads.
-     *
-     * @implNote WANoiseHandshake — corresponds to
-     *     {@code WACryptoDependencies.getCrypto().subtle.encrypt/decrypt}
-     *     with {@code AES-GCM} algorithm
+     * AES/GCM/NoPadding cipher reused to encrypt and decrypt every
+     * handshake payload.
      */
     private final Cipher cipher;
 
     /**
-     * The current chained hash value.
-     *
-     * @implNote WANoiseHandshake.NoiseHandshake — field {@code $2}
+     * Running handshake hash; starts at {@link #NOISE_PROTOCOL} and is
+     * updated on every {@code authenticate} step.
      */
     private byte[] hash;
 
     /**
-     * The current HKDF salt, derived from key mixing operations.
-     *
-     * @implNote WANoiseHandshake.NoiseHandshake — field {@code $3}
+     * Current HKDF salt; rotated by {@link #mixIntoKey(byte[])} whenever
+     * fresh shared key material is folded in.
      */
     private SecretKeySpec salt;
 
     /**
-     * The current symmetric cipher key.
-     *
-     * @implNote WANoiseHandshake.NoiseHandshake — field {@code $4},
-     *     stored as raw bytes rather than a {@code CryptoKey} object
+     * Current symmetric AES key used as AAD-bearing payload cipher.
      */
     private SecretKeySpec cryptoKey;
 
     /**
-     * The nonce counter for the current cipher key.
-     *
-     * @implNote WANoiseHandshake.NoiseHandshake — field {@code $5}
+     * AES-GCM nonce counter; reset to zero whenever the cipher key
+     * rotates.
      */
     private long counter;
 
     /**
-     * Creates a new handshake helper and initializes the chained hash with
-     * the given prologue.
+     * Initializes the handshake state and mixes in the protocol prologue.
      *
-     * <p>This constructor merges the WA Web {@code constructor} and {@code start}
-     * methods: it sets the hash, salt, and cipher key to the Noise protocol
-     * name (which is exactly 32 bytes, so no SHA-256 hashing is needed),
-     * then mixes in the prologue via {@link #updateHash(byte[])}.
+     * <p>Merges WA Web's {@code constructor} and {@code start} steps. The
+     * hash, salt and cipher key all begin as the 32-byte Noise protocol
+     * name, then the prologue (the WhatsApp version header) is folded
+     * into the running hash via {@link #updateHash(byte[])}.
      *
-     * @implNote WANoiseHandshake.NoiseHandshake.constructor and
-     *     WANoiseHandshake.NoiseHandshake.start
-     * @param prologue the protocol prologue bytes (version header)
-     * @throws NoSuchAlgorithmException if HKDF-SHA256 or SHA-256 is unavailable
-     * @throws NoSuchPaddingException   if AES/GCM/NoPadding is unavailable
+     * @param prologue the protocol prologue bytes that identify the
+     *                 client variant (web or mobile)
+     * @throws NoSuchAlgorithmException if HKDF-SHA256 or SHA-256 is
+     *         unavailable on this JDK
+     * @throws NoSuchPaddingException   if AES/GCM/NoPadding is
+     *         unavailable on this JDK
      */
     WhatsAppSocketHandshake(byte[] prologue) throws NoSuchAlgorithmException, NoSuchPaddingException {
         this.kdf = KDF.getInstance("HKDF-SHA256");
@@ -129,12 +111,11 @@ final class WhatsAppSocketHandshake implements AutoCloseable {
     }
 
     /**
-     * Updates the chained hash by hashing the current hash concatenated
-     * with the given data.
+     * Folds {@code data} into the running hash by computing
+     * {@code SHA-256(hash || data)} and storing the digest as the new
+     * hash.
      *
-     * @implNote WANoiseHandshake.NoiseHandshake.authenticate — computes
-     *     {@code SHA-256(hash || data)} and stores as the new hash
-     * @param data the data to mix into the hash
+     * @param data the bytes to mix into the running hash
      */
     public void updateHash(byte[] data) {
         hashDigest.update(hash);
@@ -143,23 +124,22 @@ final class WhatsAppSocketHandshake implements AutoCloseable {
     }
 
     /**
-     * Encrypts or decrypts a payload using the current cipher key and
-     * updates the chained hash.
+     * Encrypts or decrypts a payload with the current AES key, using the
+     * running hash as AES-GCM AAD and the monotonic nonce counter.
      *
-     * <p>The current hash is used as AAD (authenticated additional data).
-     * After encryption, the ciphertext is mixed into the hash; after
-     * decryption, the original ciphertext (input) is mixed.
+     * <p>Encryption mixes the produced ciphertext into the running hash;
+     * decryption mixes the input ciphertext.
      *
-     * @implNote WANoiseHandshake.NoiseHandshake.encrypt and
-     *     WANoiseHandshake.NoiseHandshake.decrypt — unified into a single
-     *     method with a boolean flag; uses AES-GCM with a 12-byte nonce
-     *     (4 zero bytes followed by the big-endian 64-bit counter)
-     * @param text    the plaintext (if encrypting) or ciphertext (if decrypting)
+     * @implNote The 12-byte nonce is built as four zero bytes followed
+     *     by the big-endian 64-bit counter; the counter is incremented
+     *     on every call so consecutive payloads never reuse a nonce.
+     * @param text    plaintext when {@code encrypt} is {@code true},
+     *                ciphertext when {@code false}
      * @param encrypt {@code true} to encrypt, {@code false} to decrypt
-     * @return the ciphertext (if encrypting) or plaintext (if decrypting)
-     * @throws IllegalBlockSizeException          if the text length is invalid
-     * @throws BadPaddingException                if authentication fails (decrypt)
-     * @throws InvalidAlgorithmParameterException if the nonce is invalid
+     * @return the ciphertext or plaintext respectively
+     * @throws IllegalBlockSizeException          if the input length is invalid
+     * @throws BadPaddingException                if the GCM authentication tag fails
+     * @throws InvalidAlgorithmParameterException if the nonce parameters are invalid
      * @throws InvalidKeyException                if the cipher key is invalid
      */
     byte[] cipher(byte[] text, boolean encrypt) throws IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException, InvalidKeyException {
@@ -175,18 +155,16 @@ final class WhatsAppSocketHandshake implements AutoCloseable {
     }
 
     /**
-     * Derives the final 64-byte key material (32 bytes write key + 32
-     * bytes read key) from the current salt using HKDF with an empty IKM.
+     * Derives the final 64 bytes of key material from the current salt
+     * via HKDF with an empty IKM.
      *
-     * <p>In WA Web, this method returns a {@code NoiseSocket} wrapping the
-     * derived encrypt and decrypt keys. In Cobalt, the raw 64-byte key
-     * material is returned and the caller constructs the cipher state.
+     * <p>The first 32 bytes are the write key and the remaining 32
+     * bytes are the read key. WA Web wraps the same material in a
+     * {@code NoiseSocket}; Cobalt returns the raw bytes so the caller
+     * can install them in its {@link Cipher} pair directly.
      *
-     * @implNote WANoiseHandshake.NoiseHandshake.finish — calls
-     *     {@code WACryptoHkdf.extractWithSaltAndExpand(IKM=empty, salt, "", 64)},
-     *     then splits into encrypt key (bytes 0-31) and decrypt key (bytes 32-63)
-     * @return the 64-byte key material
-     * @throws GeneralSecurityException if key derivation fails
+     * @return the concatenated write and read key material
+     * @throws GeneralSecurityException if HKDF expansion fails
      */
     byte[] finish() throws GeneralSecurityException {
         var params = HKDFParameterSpec.ofExtract()
@@ -197,17 +175,16 @@ final class WhatsAppSocketHandshake implements AutoCloseable {
     }
 
     /**
-     * Mixes the given key material into the handshake state using HKDF.
+     * Folds new key material into the handshake state.
      *
-     * <p>This updates both the salt and the cipher key, and resets the
-     * nonce counter to zero.
+     * <p>HKDF-Extract-and-Expand under the current salt produces 64
+     * bytes. The first 32 bytes become the new salt, the remaining 32
+     * bytes become the new cipher key, and the nonce counter is reset
+     * to zero so the rotated key starts at nonce 0.
      *
-     * @implNote WANoiseHandshake.NoiseHandshake.mixIntoKey — calls
-     *     {@code WACryptoHkdf.extractWithSaltAndExpand(IKM=bytes, salt, "", 64)},
-     *     then assigns bytes 0-31 as the new salt and bytes 32-63 as the new
-     *     cipher key, and resets the counter to zero
-     * @param bytes the key material to mix in (typically a shared secret)
-     * @throws GeneralSecurityException if key derivation fails
+     * @param bytes the new key material, typically a Curve25519 shared
+     *              secret produced during the handshake
+     * @throws GeneralSecurityException if HKDF expansion fails
      */
     void mixIntoKey(byte[] bytes) throws GeneralSecurityException {
         var params = HKDFParameterSpec.ofExtract()
@@ -221,14 +198,14 @@ final class WhatsAppSocketHandshake implements AutoCloseable {
     }
 
     /**
-     * Destroys all key material held by this handshake instance.
+     * Releases the handshake's key material.
      *
-     * <p>Sets the hash and salt references to {@code null}, attempts to
-     * destroy the cipher key via {@link SecretKeySpec#destroy()}, and resets
-     * the counter to zero.
-     *
-     * @implNote NO_WA_BASIS — Java-specific {@link AutoCloseable} adaptation
-     *     for deterministic key material cleanup
+     * <p>Drops the hash and salt references, attempts to destroy the
+     * cipher key via {@link SecretKeySpec#destroy()} (silently ignoring
+     * implementations that do not support destruction) and resets the
+     * nonce counter. WA Web relies on the browser's garbage collector
+     * for the same effect; Cobalt does it eagerly so secrets do not
+     * linger in heap memory for longer than the handshake.
      */
     @Override
     public void close() {

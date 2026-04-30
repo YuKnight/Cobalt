@@ -20,17 +20,17 @@ import java.util.LinkedHashMap;
 /**
  * Recursive-descent parser for Apple's XML property-list format,
  * tailored to the small subset Cobalt's APNS code exchanges with
- * Apple's activation and bag endpoints — no streaming, no
+ * Apple's activation and bag endpoints. No streaming, no
  * namespaces, no DTD validation.
  *
  * <p>The parser is single-pass over the source {@code byte[]} (no
  * {@code Reader} wrappers) and tolerates the {@code <?xml?>}
  * prolog, a single {@code <!DOCTYPE>}, and {@code <!-- ... -->}
- * comments interleaved between elements; everything else is
+ * comments interleaved between elements. Everything else is
  * rejected with an {@link IOException}.
  *
  * <p>Callers normally route through the
- * {@code Plist} facade; this class is the implementation.
+ * {@code Plist} facade. This class is the implementation.
  */
 public final class PlistXmlParser {
     /**
@@ -230,7 +230,7 @@ public final class PlistXmlParser {
 
     /**
      * Skips whitespace, XML/processing-instruction prologs,
-     * {@code <!DOCTYPE>} declarations, and comments — in any
+     * {@code <!DOCTYPE>} declarations, and comments. In any
      * order, repeatedly.
      *
      * @throws IOException if a comment or doctype is unterminated

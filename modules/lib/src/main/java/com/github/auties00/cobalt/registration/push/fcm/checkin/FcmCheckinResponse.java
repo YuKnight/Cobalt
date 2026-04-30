@@ -6,8 +6,8 @@ import it.auties.protobuf.model.ProtobufType;
 
 /**
  * Wire shape of the response to {@code POST /checkin}, gunzipped before
- * decoding. Only the two fields Cobalt cares about — the assigned
- * Android id and its security token — are mapped; all other fields the
+ * decoding. Only the two fields Cobalt cares about. The assigned
+ * Android id and its security token. Are mapped. All other fields the
  * server returns are ignored.
  */
 @ProtobufMessage(name = "FcmCheckinResponse")

@@ -15,7 +15,7 @@ import java.util.OptionalInt;
 
 /**
  * Documented {@code status} enum carried by the
- * {@code <meta_verified/>} and {@code <genai/>} children — the binary
+ * {@code <meta_verified/>} and {@code <genai/>} children. The binary
  * pass / fail eligibility marker.
  *
  * @implNote Mirrors {@code WASmaxInBizMarketingMessageEnums.ENUM_FAIL_SUCCESS}.

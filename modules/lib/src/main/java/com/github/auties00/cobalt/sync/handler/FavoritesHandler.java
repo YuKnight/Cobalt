@@ -55,7 +55,7 @@ public final class FavoritesHandler implements WebAppStateActionHandler {
      *
      * @implNote ADAPTED: WAWebFavoritesSync uses WALogger; Cobalt uses java.util.logging
      */
-    private static final Logger LOGGER = Logger.getLogger(FavoritesHandler.class.getName()); // ADAPTED: WAWebFavoritesSync — WALogger
+    private static final Logger LOGGER = Logger.getLogger(FavoritesHandler.class.getName());
 
     /**
      * Private constructor to enforce singleton pattern.
@@ -76,7 +76,7 @@ public final class FavoritesHandler implements WebAppStateActionHandler {
     @WhatsAppWebExport(moduleName = "WAWebFavoritesSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     @Override
     public String actionName() {
-        return FavoritesAction.ACTION_NAME; // WAWebFavoritesSync.getAction: return o("WASyncdConst").Actions.Favorites
+        return FavoritesAction.ACTION_NAME;
     }
 
     /**
@@ -88,7 +88,7 @@ public final class FavoritesHandler implements WebAppStateActionHandler {
     @WhatsAppWebExport(moduleName = "WAWebFavoritesSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     @Override
     public SyncPatchType collectionName() {
-        return FavoritesAction.COLLECTION_NAME; // WAWebFavoritesSync: this.collectionName = o("WASyncdConst").CollectionName.RegularHigh
+        return FavoritesAction.COLLECTION_NAME;
     }
 
     /**
@@ -100,7 +100,7 @@ public final class FavoritesHandler implements WebAppStateActionHandler {
     @WhatsAppWebExport(moduleName = "WAWebFavoritesSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     @Override
     public int version() {
-        return FavoritesAction.ACTION_VERSION; // WAWebFavoritesSync.getVersion: return 1
+        return FavoritesAction.ACTION_VERSION;
     }
 
     /**
@@ -118,7 +118,7 @@ public final class FavoritesHandler implements WebAppStateActionHandler {
     @WhatsAppWebExport(moduleName = "WAWebFavoritesSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     @Override
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: WAWebFavoritesSync.applyMutations — single-mutation convenience
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -142,41 +142,41 @@ public final class FavoritesHandler implements WebAppStateActionHandler {
     @WhatsAppWebExport(moduleName = "WAWebFavoritesSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     @Override
     public List<MutationApplicationResult> applyMutationBatchResults(WhatsAppClient client, WamService wamService, List<DecryptedMutation.Trusted> mutations) {
-        DecryptedMutation.Trusted latest = null; // WAWebFavoritesSync.applyMutations: var i
-        var unsupportedCount = 0; // WAWebFavoritesSync.applyMutations: var l = 0
-        var malformedCount = 0; // WAWebFavoritesSync.applyMutations: var d = 0
-        var results = new ArrayList<MutationApplicationResult>(mutations.size()); // WAWebFavoritesSync.applyMutations: var m = t.map(function(e) {...})
-        for (var mutation : mutations) { // WAWebFavoritesSync.applyMutations: t.map(function(e) {...})
-            if (mutation.operation() != SyncdOperation.SET) { // WAWebFavoritesSync.applyMutations: e.operation !== "set"
-                unsupportedCount++; // WAWebFavoritesSync.applyMutations: l++
-                results.add(malformedActionValue()); // WAWebFavoritesSync.applyMutations: return o("WAWebSyncdIndexUtils").malformedActionValue(r.collectionName)
+        DecryptedMutation.Trusted latest = null;
+        var unsupportedCount = 0;
+        var malformedCount = 0;
+        var results = new ArrayList<MutationApplicationResult>(mutations.size());
+        for (var mutation : mutations) {
+            if (mutation.operation() != SyncdOperation.SET) {
+                unsupportedCount++;
+                results.add(malformedActionValue());
                 continue;
             }
 
-            if (!(mutation.value().action().orElse(null) instanceof FavoritesAction)) { // WAWebFavoritesSync.applyMutations: ((t=e.value.favoritesAction)==null?void 0:t.favorites)==null
-                malformedCount++; // WAWebFavoritesSync.applyMutations: d++
-                results.add(malformedActionValue()); // WAWebFavoritesSync.applyMutations: return o("WAWebSyncdIndexUtils").malformedActionValue(r.collectionName)
+            if (!(mutation.value().action().orElse(null) instanceof FavoritesAction)) {
+                malformedCount++;
+                results.add(malformedActionValue());
                 continue;
             }
 
-            if (latest == null || mutation.timestamp().compareTo(latest.timestamp()) > 0) { // WAWebFavoritesSync.applyMutations: (i == null || e.timestamp > i.timestamp) && (i = e)
+            if (latest == null || mutation.timestamp().compareTo(latest.timestamp()) > 0) {
                 latest = mutation;
             }
-            results.add(MutationApplicationResult.success()); // WAWebFavoritesSync.applyMutations: return {actionState: o("WASyncdConst").SyncActionState.Success}
+            results.add(MutationApplicationResult.success());
         }
 
-        if (unsupportedCount > 0) { // WAWebFavoritesSync.applyMutations: l > 0 && o("WALogger").WARN(...)
-            LOGGER.warning("favorites sync: " + unsupportedCount + " operations not supported"); // WAWebFavoritesSync.applyMutations: WALogger.WARN("favorites sync: " + l + " operations not supported")
+        if (unsupportedCount > 0) {
+            LOGGER.warning("favorites sync: " + unsupportedCount + " operations not supported");
         }
-        if (malformedCount > 0) { // WAWebFavoritesSync.applyMutations: d > 0 && o("WALogger").WARN(...)
-            LOGGER.warning("favorites sync: " + malformedCount + " malformed mutations"); // WAWebFavoritesSync.applyMutations: WALogger.WARN("favorites sync: " + d + " malformed mutations")
-        }
-
-        if (latest != null) { // WAWebFavoritesSync.applyMutations: if (p != null)
-            applyLatestMutation(client, latest); // WAWebFavoritesSync.applyMutations: core application logic for the latest mutation
+        if (malformedCount > 0) {
+            LOGGER.warning("favorites sync: " + malformedCount + " malformed mutations");
         }
 
-        return results; // WAWebFavoritesSync.applyMutations: return m
+        if (latest != null) {
+            applyLatestMutation(client, latest);
+        }
+
+        return results;
     }
 
     /**
@@ -196,16 +196,16 @@ public final class FavoritesHandler implements WebAppStateActionHandler {
     @WhatsAppWebExport(moduleName = "WAWebFavoritesSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     @Override
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        if (mutation.operation() != SyncdOperation.SET) { // WAWebFavoritesSync.applyMutations: e.operation !== "set"
-            return malformedActionValue(); // WAWebFavoritesSync.applyMutations: return o("WAWebSyncdIndexUtils").malformedActionValue(r.collectionName)
+        if (mutation.operation() != SyncdOperation.SET) {
+            return malformedActionValue();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof FavoritesAction)) { // WAWebFavoritesSync.applyMutations: ((t=e.value.favoritesAction)==null?void 0:t.favorites)==null
-            return malformedActionValue(); // WAWebFavoritesSync.applyMutations: return o("WAWebSyncdIndexUtils").malformedActionValue(r.collectionName)
+        if (!(mutation.value().action().orElse(null) instanceof FavoritesAction)) {
+            return malformedActionValue();
         }
 
-        applyLatestMutation(client, mutation); // WAWebFavoritesSync.applyMutations: core application logic
-        return MutationApplicationResult.success(); // WAWebFavoritesSync.applyMutations: {actionState: SyncActionState.Success}
+        applyLatestMutation(client, mutation);
+        return MutationApplicationResult.success();
     }
 
     /**
@@ -229,25 +229,23 @@ public final class FavoritesHandler implements WebAppStateActionHandler {
      */
     @WhatsAppWebExport(moduleName = "WAWebFavoritesSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private void applyLatestMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        var action = (FavoritesAction) mutation.value().action().orElseThrow(); // WAWebFavoritesSync.applyMutations: var p = i.value.favoritesAction.favorites
-        var favorites = new ArrayList<Jid>(); // WAWebFavoritesSync.applyMutations: var f = p.reduce(...)
-        for (var favorite : action.favorites()) { // WAWebFavoritesSync.applyMutations: p.reduce(function(e, t) {...})
-            var rawId = favorite.id().orElse(null); // WAWebFavoritesSync.applyMutations: var n = t.id
-            if (rawId == null) { // WAWebFavoritesSync.applyMutations: if (n != null)
+        var action = (FavoritesAction) mutation.value().action().orElseThrow();
+        var favorites = new ArrayList<Jid>();
+        for (var favorite : action.favorites()) {
+            var rawId = favorite.id().orElse(null);
+            if (rawId == null) {
                 continue;
             }
 
-            var rawJid = Jid.of(rawId); // WAWebFavoritesSync.applyMutations: o("WAWebWidFactory").createWid(e.id)
-            var resolved = client.store().findChatByJid(rawJid) // WAWebFavoritesSync.applyMutations: yield o("WAWebSyncdGetChat").resolveChatForMutationIndex(...)
-                    .map(entry -> entry.jid()) // WAWebFavoritesSync.applyMutations: if (t.success === true) return {id: t.chat.id}
-                    .or(() -> rawJid.hasLidServer() ? client.store().findPhoneByLid(rawJid) : Optional.<Jid>empty()) // WAWebFavoritesSync.applyMutations: if (isLidMigrated() && n.isLid()) { var r = getPhoneNumber(n); if (r != null) return {id: r.toString()} }
-                    .orElse(rawJid); // WAWebFavoritesSync.applyMutations: return {id: e.id}
-            favorites.add(resolved); // WAWebFavoritesSync.applyMutations: f.push(...)
+            var rawJid = Jid.of(rawId);
+            var resolved = client.store().findChatByJid(rawJid)
+                    .map(entry -> entry.jid())
+                    .or(() -> rawJid.hasLidServer() ? client.store().findPhoneByLid(rawJid) : Optional.<Jid>empty())
+                    .orElse(rawJid);
+            favorites.add(resolved);
         }
 
-        client.store().setFavoriteChats(favorites); // WAWebFavoritesSync.applyMutations: yield o("WAWebDBFavoriteDatabaseApi").setFavorites(h)
-        // WAWebFavoritesSync.applyMutations: o("WAWebBackendApi").frontendFireAndForget("setFavoriteCollection", ...) — ADAPTED: Cobalt does not have frontend event dispatching
-        // WAWebFavoritesSync.applyMutations: o("WALogger").LOG("[favorites] set ok, resolved " + g + " of " + h.length) — logging skipped
+        client.store().setFavoriteChats(favorites);
     }
 
     /**
@@ -270,26 +268,26 @@ public final class FavoritesHandler implements WebAppStateActionHandler {
      */
     @WhatsAppWebExport(moduleName = "WAWebFavoritesSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncPendingMutation getFavoritesMutation(List<Jid> favoriteJids, Instant timestamp) {
-        var favoriteEntries = favoriteJids.stream() // WAWebFavoritesSync.getFavoritesMutation: a.sort(function(e,t){return e.orderIndex-t.orderIndex}).map(function(e){var t=e.mutationIndex; return {id:t}})
-                .map(jid -> new FavoritesActionFavoriteBuilder() // WAWebFavoritesSync.getFavoritesMutation: {id: t}
-                        .id(jid.toString()) // WAWebFavoritesSync.getFavoritesMutation: id: e.mutationIndex — ADAPTED: Cobalt uses JID string directly
+        var favoriteEntries = favoriteJids.stream()
+                .map(jid -> new FavoritesActionFavoriteBuilder()
+                        .id(jid.toString())
                         .build())
                 .toList();
-        var action = new FavoritesActionBuilder() // WAWebFavoritesSync.getFavoritesMutation: {favoritesAction: {favorites: [...]}}
-                .favorites(favoriteEntries) // WAWebFavoritesSync.getFavoritesMutation: favorites: a.sort(...).map(...)
+        var action = new FavoritesActionBuilder()
+                .favorites(favoriteEntries)
                 .build();
-        var value = new SyncActionValueBuilder() // WAWebSyncdActionUtils.buildPendingMutation: encodeProtobuf(SyncActionValueSpec, {...l, timestamp: i})
-                .timestamp(timestamp) // WAWebSyncdActionUtils.buildPendingMutation: timestamp: t
-                .favoritesAction(action) // WAWebFavoritesSync.getFavoritesMutation: {favoritesAction: ...}
+        var value = new SyncActionValueBuilder()
+                .timestamp(timestamp)
+                .favoritesAction(action)
                 .build();
-        var index = JSON.toJSONString(List.of(actionName())); // WAWebSyncdActionUtils.buildPendingMutation: index = JSON.stringify([action].concat(indexArgs)) where indexArgs = []
-        var mutation = new DecryptedMutation.Trusted( // WAWebSyncdActionUtils.buildPendingMutation: return { collection, index, ... }
-                index, // WAWebSyncdActionUtils.buildPendingMutation: index
-                value, // WAWebSyncdActionUtils.buildPendingMutation: binarySyncAction
-                SyncdOperation.SET, // WAWebFavoritesSync.getFavoritesMutation: operation: SyncdMutation$SyncdOperation.SET
-                timestamp, // WAWebSyncdActionUtils.buildPendingMutation: timestamp
-                version() // WAWebSyncdActionUtils.buildPendingMutation: version: this.getVersion()
+        var index = JSON.toJSONString(List.of(actionName()));
+        var mutation = new DecryptedMutation.Trusted(
+                index,
+                value,
+                SyncdOperation.SET,
+                timestamp,
+                version()
         );
-        return new SyncPendingMutation(mutation, 0); // WAWebSyncdActionUtils.buildPendingMutation
+        return new SyncPendingMutation(mutation, 0);
     }
 }

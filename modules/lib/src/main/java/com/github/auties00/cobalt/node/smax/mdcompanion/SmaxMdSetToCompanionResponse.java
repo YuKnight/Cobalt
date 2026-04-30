@@ -18,7 +18,7 @@ import java.util.Optional;
  *
  * @implNote {@code WASmaxInMdSetToCompanionRequest.parseSetToCompanionRequest}
  *           validates the {@code <iq xmlns="md" from="s.whatsapp.net"
- *           type="set">} envelope, asserts the presence of the
+ *           type="set">} envelope. Asserts the presence of the
  *           {@code <pair-device/>} child, and extracts the six
  *           {@code <ref/>} content-byte payloads.
  */
@@ -26,13 +26,13 @@ import java.util.Optional;
 @WhatsAppWebModule(moduleName = "WASmaxInMdBaseIQSetRequestMixin")
 public final class SmaxMdSetToCompanionResponse implements SmaxOperation.Response {
     /**
-     * The {@code id} attribute of the inbound IQ stanza — needed to
+     * The {@code id} attribute of the inbound IQ stanza, needed to
      * echo back into the {@link SmaxMdSetToCompanionAcknowledgement} ack.
      */
     private final String iqId;
 
     /**
-     * The {@code from} attribute of the inbound IQ stanza — needed
+     * The {@code from} attribute of the inbound IQ stanza, needed
      * to echo back into the {@link SmaxMdSetToCompanionAcknowledgement} ack as the ack's
      * {@code to} attribute.
      */

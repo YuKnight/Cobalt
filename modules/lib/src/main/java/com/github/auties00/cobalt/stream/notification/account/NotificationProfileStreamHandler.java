@@ -33,8 +33,6 @@ import java.util.Objects;
  * notifications similarly distinguish between a direct {@code change} (inline
  * content) and a {@code sideListChange} (hash-based contact resolution with
  * server-side status fetch).
- *
- * @implNote WAWebHandleProfilePicNotification, WAWebHandleAboutNotification
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleProfilePicNotification")
 @WhatsAppWebModule(moduleName = "WAWebHandleAboutNotification")
@@ -53,10 +51,8 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
      * The salt string appended to a contact's user component before MD5 hashing,
      * used by the WhatsApp contact hash algorithm to produce a short hash for
      * side-list contact resolution.
-     *
-     * @implNote WAWebApiContact.getContactHash
      */
-    private static final String CONTACT_HASH_SALT = "WA_ADD_NOTIF"; // WAWebApiContact.getContactHash
+    private static final String CONTACT_HASH_SALT = "WA_ADD_NOTIF";
 
     /**
      * The WhatsApp client instance providing access to the store, query methods,
@@ -118,40 +114,36 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
      *
      * @param node the non-{@code null} notification stanza node with
      *             {@code type="picture"}
-     * @implNote WAWebHandleProfilePicNotification.handleProfilePicNotificationJob
      */
     private void handlePicture(Node node) {
         try {
             var actionNode = node.getChild("delete", "set", "request", "set_avatar")
                     .orElse(null);
             if (actionNode == null) {
-                // WAWebHandleProfilePicNotification.m: parser throws on unexpected type
                 LOGGER.log(System.Logger.Level.DEBUG,
                         "Picture notification {0} has no known action child",
                         node.getAttributeAsString("id", "[missing-id]"));
                 return;
             }
 
-            var actionType = actionNode.description(); // WAWebHandleProfilePicNotification.m: t (type)
-            var stanzaId = node.getAttributeAsString("id", null); // WAWebHandleProfilePicNotification.m: stanzaId
-            var from = node.getAttributeAsJid("from") // WAWebHandleProfilePicNotification.m: from
+            var actionType = actionNode.description();
+            var stanzaId = node.getAttributeAsString("id", null);
+            var from = node.getAttributeAsJid("from")
                     .map(Jid::withoutData)
                     .orElse(null);
 
-            // WAWebHandleProfilePicNotification.m: two parser branches based on n.hasAttr("jid")
             Jid targetJid;
             if (actionNode.getAttributeAsJid("jid").isPresent()) {
                 // Branch 1: child has jid attr -> use it directly
-                targetJid = actionNode.getAttributeAsJid("jid") // WAWebHandleProfilePicNotification.m: jid
+                targetJid = actionNode.getAttributeAsJid("jid")
                         .map(Jid::withoutData)
                         .orElse(null);
             } else {
                 // Branch 2: child has hash attr -> resolve via contact hash lookup
-                var hash = actionNode.getAttributeAsString("hash", null); // WAWebHandleProfilePicNotification.m: hash
+                var hash = actionNode.getAttributeAsString("hash", null);
                 if (hash != null) {
-                    targetJid = resolveContactByHash(hash); // WAWebHandleProfilePicNotification._: getContactRecordByHash
+                    targetJid = resolveContactByHash(hash);
                     if (targetJid == null) {
-                        // WAWebHandleProfilePicNotification._: WARN "side contact hash not found for pic update"
                         LOGGER.log(System.Logger.Level.WARNING,
                                 "Side contact hash not found for pic update");
                     }
@@ -160,33 +152,29 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
                 }
             }
 
-            // WAWebHandleProfilePicNotification._: if(a.jid||a.hash) { ... } - only process if we have target info
             if (targetJid != null) {
                 switch (actionType) {
-                    case "delete", "set" -> { // WAWebHandleProfilePicNotification._: case "delete": case "set":
+                    case "delete", "set" -> {
                         handlePictureSetOrDelete(targetJid, actionType, node, actionNode);
                     }
-                    case "request" -> { // WAWebHandleProfilePicNotification._: case "request": break
+                    case "request" -> {
                         // No-op: WA Web also does nothing for request type
                     }
-                    case "set_avatar" -> { // WAWebHandleProfilePicNotification._: case "set_avatar"
-                        // WAWebHandleProfilePicNotification._: WARN "set_avatar picture notification is not implemented"
+                    case "set_avatar" -> {
                         LOGGER.log(System.Logger.Level.WARNING,
                                 "set_avatar picture notification is not implemented");
                     }
-                    default -> { // WAWebHandleProfilePicNotification._: default: WARN "Invalid type received"
+                    default -> {
                         LOGGER.log(System.Logger.Level.WARNING,
                                 "Invalid type received for picture notification: {0}", actionType);
                     }
                 }
             }
         } catch (Throwable throwable) {
-            // ADAPTED: WAWebHandleProfilePicNotification (Cobalt error model)
             LOGGER.log(System.Logger.Level.WARNING,
                     "Failed to handle picture notification {0}: {1}",
                     node.getAttributeAsString("id", "[missing-id]"), throwable.getMessage());
         } finally {
-            // WAWebHandleProfilePicNotification._: ack at the end (return i.then(ack))
             sendPictureNotificationAck(node);
         }
     }
@@ -213,26 +201,21 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
      *           WAWebChangeProfilePicThumb.changeProfilePicThumb
      */
     private void handlePictureSetOrDelete(Jid targetJid, String actionType, Node node, Node actionNode) {
-        // WAWebChangeProfilePicThumb.changeProfilePicThumb: updates pic thumb for target.
         // ADAPTED: Cobalt only persists the picture URI for the local account; non-self
         // contact and group pictures are fetched on demand via queryPicture(). Listeners
         // still receive the change event below for all targets.
         if (isSelf(targetJid)) {
             if ("delete".equals(actionType)) {
-                // WAWebChangeProfilePicThumb.c: ProfilePicCommand.Remove -> persistProfilePicToDB (clears thumb)
                 whatsapp.store().setProfilePicture((URI) null);
             } else {
-                // WAWebChangeProfilePicThumb.c: ProfilePicCommand.Set -> workerSafeSendAndReceive("setProfilePicThumb")
                 var picture = whatsapp.queryPicture(targetJid).orElse(null);
                 whatsapp.store().setProfilePicture(picture);
             }
         }
 
-        // WAWebHandleProfilePicNotification._: group pic change generates system message
         if (targetJid.hasGroupOrCommunityServer()) {
             var ts = node.getAttributeAsLong("t", (Long) null);
             if (ts != null) {
-                // WAWebHandleProfilePicNotification._: genGroupPicChangeNotificationMsg + handleSingleMsg
                 // NOTE: Full group system message generation requires MessageService which
                 // is not injected into this handler. The group pic change event is still
                 // reported via the onProfilePictureChanged listener below.
@@ -245,7 +228,7 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
         }
 
         // Fire listener for all targets (not just self)
-        fireProfilePictureChanged(targetJid); // WAWebHandleProfilePicNotification._ (implicit via changeProfilePicThumb)
+        fireProfilePictureChanged(targetJid);
     }
 
     /**
@@ -264,34 +247,26 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
      *
      * @param node the non-{@code null} notification stanza node with
      *             {@code type="status"}
-     * @implNote WAWebHandleAboutNotification.handleAboutNotification
      */
     private void handleAbout(Node node) {
         try {
-            var stanzaId = node.getAttributeAsString("id", null); // WAWebHandleAboutNotification.p: stanzaId
+            var stanzaId = node.getAttributeAsString("id", null);
             var setNode = node.getChild("set").orElse(null);
 
-            // WAWebHandleAboutNotification.p: three parser branches
             if (setNode != null && !setNode.hasAttribute("hash")) {
-                // WAWebHandleAboutNotification.p: type="change"
                 handleAboutChange(node, setNode, stanzaId);
             } else if (setNode != null && setNode.hasAttribute("hash")) {
-                // WAWebHandleAboutNotification.p: type="sideListChange"
                 handleAboutSideListChange(setNode, stanzaId);
             } else {
-                // WAWebHandleAboutNotification.p: type="unknown"
-                // WAWebHandleAboutNotification.f: default: WARN "unhandled type"
                 var fromStr = node.getAttributeAsString("from", "[unknown]");
                 LOGGER.log(System.Logger.Level.WARNING,
                         "handleAboutNotification: unhandled type unknown from {0}", fromStr);
             }
         } catch (Throwable throwable) {
-            // ADAPTED: WAWebHandleAboutNotification (Cobalt error model)
             LOGGER.log(System.Logger.Level.WARNING,
                     "Failed to handle status notification {0}: {1}",
                     node.getAttributeAsString("id", "[missing-id]"), throwable.getMessage());
         } finally {
-            // WAWebHandleAboutNotification.f: ack returned at end
             sendStatusNotificationAck(node);
         }
     }
@@ -310,7 +285,7 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
      * @implNote WAWebHandleAboutNotification.f (case "change")
      */
     private void handleAboutChange(Node node, Node setNode, String stanzaId) {
-        var from = node.getAttributeAsJid("from") // WAWebHandleAboutNotification.p: from
+        var from = node.getAttributeAsJid("from")
                 .map(Jid::toUserJid)
                 .orElse(null);
         if (from == null) {
@@ -320,33 +295,29 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
             return;
         }
 
-        // WAWebHandleAboutNotification.p: pushname from notify attr (parsed but only used for logging in WA Web)
         // ADAPTED: Cobalt updates the contact's chosen name from pushname
         node.getAttributeAsString("notify")
                 .ifPresent(pushName -> updateContactChosenName(from, pushName));
 
-        var content = setNode.toContentString().orElse(null); // WAWebHandleAboutNotification.p: content
+        var content = setNode.toContentString().orElse(null);
 
-        // WAWebHandleAboutNotification.f: case "change"
         // Build list of JIDs to update: [from, alternateWid]
-        var jidsToUpdate = new ArrayList<Jid>(); // WAWebHandleAboutNotification.f: m=[l]
+        var jidsToUpdate = new ArrayList<Jid>();
         jidsToUpdate.add(from);
-        var alternateJid = getAlternateUserJid(from); // WAWebHandleAboutNotification.f: getAlternateUserWid
+        var alternateJid = getAlternateUserJid(from);
         if (alternateJid != null) {
-            jidsToUpdate.add(alternateJid); // WAWebHandleAboutNotification.f: p&&m.push(p)
+            jidsToUpdate.add(alternateJid);
         }
 
-        for (var jid : jidsToUpdate) { // WAWebHandleAboutNotification.f: for(var _ of m)
+        for (var jid : jidsToUpdate) {
             var existingStatus = whatsapp.store()
                     .findContactTextStatus(jid)
                     .orElse(null);
             if (existingStatus != null && content != null) {
-                // WAWebHandleAboutNotification.f: f.status = e.content
                 existingStatus.setText(content);
                 whatsapp.store().addContactTextStatus(jid.toUserJid(), existingStatus);
                 notifyContactTextStatusChanged(jid.toUserJid(), existingStatus);
             } else {
-                // WAWebHandleAboutNotification.f: WARN "unknown contact"
                 LOGGER.log(System.Logger.Level.WARNING,
                         "handleAboutNotification: unknown contact {0}", jid);
             }
@@ -366,29 +337,24 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
      * @implNote WAWebHandleAboutNotification.f (case "sideListChange")
      */
     private void handleAboutSideListChange(Node setNode, String stanzaId) {
-        var hash = setNode.getAttributeAsString("hash", null); // WAWebHandleAboutNotification.p: hash
+        var hash = setNode.getAttributeAsString("hash", null);
         if (hash == null) {
             return;
         }
 
-        // WAWebHandleAboutNotification.f: getContactRecordByHash(e.hash)
         var resolvedJid = resolveContactByHash(hash);
         if (resolvedJid == null) {
-            // WAWebHandleAboutNotification.f: WARN "side contact hash not found for status update"
             LOGGER.log(System.Logger.Level.WARNING,
                     "Side contact hash not found for status update");
             return;
         }
 
-        // WAWebHandleAboutNotification.f: createUserWidOrThrow(t.id)
         var userJid = resolvedJid.toUserJid();
 
-        // WAWebHandleAboutNotification.f: TextStatusCollection.get(n) -> getStatus(n).then(...)
         var existingStatus = whatsapp.store()
                 .findContactTextStatus(userJid)
                 .orElse(null);
         if (existingStatus != null) {
-            // WAWebHandleAboutNotification.f: getStatus(n).then(e => a.set({status: e.status}))
             var refreshed = whatsapp.queryAbout(userJid).orElse(null);
             if (refreshed != null) {
                 existingStatus.setText(refreshed);
@@ -408,17 +374,16 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
      *
      * @param targetHash the Base64-encoded contact hash to look up
      * @return the resolved contact JID, or {@code null} if no match was found
-     * @implNote WAWebApiContact.getContactRecordByHash, WAWebApiContact.getContactHash
      */
     private Jid resolveContactByHash(String targetHash) {
-        for (var contact : whatsapp.store().contacts()) { // WAWebApiContact.z: iterate contacts
+        for (var contact : whatsapp.store().contacts()) {
             var jid = contact.jid();
             var user = jid.user();
             if (user == null) {
                 continue;
             }
 
-            var computed = computeContactHash(user); // WAWebApiContact.k: getContactHash
+            var computed = computeContactHash(user);
             if (targetHash.equals(computed)) {
                 return jid;
             }
@@ -439,12 +404,12 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
      */
     private String computeContactHash(String user) {
         try {
-            var md5 = MessageDigest.getInstance("MD5"); // WAWebApiContact.k: md5(t+"WA_ADD_NOTIF")
+            var md5 = MessageDigest.getInstance("MD5");
             var input = (user + CONTACT_HASH_SALT).getBytes(StandardCharsets.UTF_8);
             var digest = md5.digest(input);
-            var truncated = new byte[3]; // WAWebApiContact.k: slice(0,3)
+            var truncated = new byte[3];
             System.arraycopy(digest, 0, truncated, 0, 3);
-            return Base64.getEncoder().encodeToString(truncated); // WAWebApiContact.k: encodeB64
+            return Base64.getEncoder().encodeToString(truncated);
         } catch (NoSuchAlgorithmException exception) {
             // MD5 is guaranteed to be available in all JDK implementations
             throw new AssertionError("MD5 algorithm not available", exception);
@@ -461,13 +426,12 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
      *
      * @param jid the JID to find the alternate for
      * @return the alternate JID, or {@code null} if no mapping exists
-     * @implNote WAWebApiContact.getAlternateUserWid
      */
     private Jid getAlternateUserJid(Jid jid) {
         if (jid.hasUserServer()) {
-            return whatsapp.store().findLidByPhone(jid).orElse(null); // WAWebApiContact.P: isLid()?A(e):w(e)
+            return whatsapp.store().findLidByPhone(jid).orElse(null);
         } else if (jid.hasLidServer()) {
-            return whatsapp.store().findPhoneByLid(jid).orElse(null); // WAWebApiContact.P: isLid()?A(e):w(e)
+            return whatsapp.store().findPhoneByLid(jid).orElse(null);
         }
         return null;
     }
@@ -477,7 +441,6 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
      *
      * @param jid the JID to check
      * @return {@code true} if the JID matches the local account
-     * @implNote WAWebUserPrefsMeUser.isMeAccount
      */
     private boolean isSelf(Jid jid) {
         return whatsapp.store().jid()
@@ -543,13 +506,12 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
      * @implNote WAWebHandleProfilePicNotification._ (ack stanza)
      */
     private void sendPictureNotificationAck(Node node) {
-        var stanzaId = node.getAttributeAsString("id", null); // WAWebHandleProfilePicNotification._: a.stanzaId
-        var stanzaFrom = node.getAttributeAsJid("from", null); // WAWebHandleProfilePicNotification._: a.from
+        var stanzaId = node.getAttributeAsString("id", null);
+        var stanzaFrom = node.getAttributeAsJid("from", null);
         if (stanzaId == null || stanzaFrom == null) {
             return;
         }
 
-        // WAWebHandleProfilePicNotification._: wap("ack", {id, to, class:"notification", type:"picture"})
         whatsapp.sendNodeWithNoResponse(new NodeBuilder()
                 .description("ack")
                 .attribute("id", stanzaId)
@@ -569,13 +531,12 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
      * @implNote WAWebHandleAboutNotification.f (ack stanza)
      */
     private void sendStatusNotificationAck(Node node) {
-        var stanzaId = node.getAttributeAsString("id", null); // WAWebHandleAboutNotification.f: e.stanzaId
-        var stanzaFrom = node.getAttributeAsJid("from", null); // WAWebHandleAboutNotification.f: e.from
+        var stanzaId = node.getAttributeAsString("id", null);
+        var stanzaFrom = node.getAttributeAsJid("from", null);
         if (stanzaId == null || stanzaFrom == null) {
             return;
         }
 
-        // WAWebHandleAboutNotification.f: wap("ack", {id, to, class:"notification", type:"status"})
         whatsapp.sendNodeWithNoResponse(new NodeBuilder()
                 .description("ack")
                 .attribute("id", stanzaId)

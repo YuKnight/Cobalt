@@ -15,12 +15,12 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Sealed family of payload variants — either a {@link Config}
+ * Sealed family of payload variants. Either a {@link Config}
  * registration or a {@link Clear} de-registration.
  *
  * @implNote {@code WASmaxOutPushConfigSetSetConfigOrSetClearMixinGroup.mergeSetSetConfigOrSetClearMixinGroup}
  *           switches over the {@code (setSetConfig, setClear)}
- *           pair; Cobalt models the disjunction as a sealed
+ *           pair. Cobalt models the disjunction as a sealed
  *           interface.
  */
 public sealed interface SmaxPushConfigSetSetVariant
@@ -34,7 +34,7 @@ public sealed interface SmaxPushConfigSetSetVariant
     Node toNode();
 
     /**
-     * The {@code <config>} variant — registers the push channel
+     * The {@code <config>} variant. Registers the push channel
      * for a specific client family.
      *
      * <p>Carries exactly one of the platform-specific config
@@ -53,7 +53,7 @@ public sealed interface SmaxPushConfigSetSetVariant
         /**
          * Constructs a new config variant.
          *
-         * @param config the platform-specific config; never
+         * @param config the platform-specific config. Never
          *               {@code null}
          * @throws NullPointerException if {@code config} is
          *                              {@code null}
@@ -65,7 +65,7 @@ public sealed interface SmaxPushConfigSetSetVariant
         /**
          * Returns the platform-specific config payload.
          *
-         * @return the payload; never {@code null}
+         * @return the payload. Never {@code null}
          */
         public SmaxPushConfigSetConfigVariant config() {
             return config;
@@ -108,7 +108,7 @@ public sealed interface SmaxPushConfigSetSetVariant
     }
 
     /**
-     * The {@code <clear>} variant — drops the push registration
+     * The {@code <clear>} variant. Drops the push registration
      * entirely.
      */
     @WhatsAppWebModule(moduleName = "WASmaxOutPushConfigSetClearMixin")
@@ -123,7 +123,7 @@ public sealed interface SmaxPushConfigSetSetVariant
         /**
          * Constructs a new clear variant.
          *
-         * @param clearPlatform the optional platform scope; may be
+         * @param clearPlatform the optional platform scope. May be
          *                      {@code null}
          */
         public Clear(String clearPlatform) {

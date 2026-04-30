@@ -33,84 +33,58 @@ import com.github.auties00.cobalt.wam.type.WamSizeBuckets;
 import java.util.*;
 
 /**
- * Sends status updates ({@code status@broadcast}).
- *
- * <p>Status messages use sender-key encryption, similar to group messages,
- * but are addressed to the status broadcast JID.  The audience is
- * determined by the user's status privacy list (contacts, allowlist,
- * or denylist).
- *
- * <p>The stanza includes a {@code <meta status_setting="...">} attribute
- * indicating the privacy setting.
- *
- * @apiNote WAWebEncryptAndSendStatusMsg.encryptAndSendStatusMsg: builds
- * the status stanza with sender-key encryption, SK distribution for
- * new devices, and optional status_setting meta attribute.
+ * Sends status updates to the {@code status@broadcast} broadcast JID. Status
+ * messages use sender-key encryption (like groups) but the audience is
+ * derived from the user's status privacy preferences. The wire stanza
+ * includes a {@code <meta status_setting="...">} attribute that mirrors the
+ * configured privacy mode.
  */
 @WhatsAppWebModule(moduleName = "WAWebEncryptAndSendStatusMsg")
 final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
     /**
-     * Logger for status message sending diagnostics.
-     *
-     * @implNote ADAPTED: WAWebEncryptAndSendStatusMsg uses WALogger;
-     * Cobalt uses {@link System.Logger}.
+     * Holds the logger used for status-message diagnostics.
      */
     private static final System.Logger LOGGER = System.getLogger(StatusMessageSender.class.getName());
 
     /**
-     * The encryption service for sender-key and per-device encryption.
-     *
-     * @implNote WAWebEncryptAndSendStatusMsg: uses WAWebSignal.Cipher
-     * for sender-key encryption and WAWebEncryptMsgProtobuf for per-device.
+     * Holds the encryption service used for sender-key and per-device
+     * encryption paths.
      */
     private final MessageEncryption encryption;
 
     /**
-     * The device service for fanout list resolution and session management.
-     *
-     * @implNote WAWebEncryptAndSendStatusMsg: uses
-     * WAWebDBDeviceListFanout.getFanOutList and
-     * WAWebManageE2ESessionsJob.ensureE2ESessions.
+     * Holds the device service used for audience fanout and session management.
      */
     private final DeviceService deviceService;
 
     /**
-     * The sender-key distribution service for distributing keys to new devices.
-     *
-     * @implNote WAWebEncryptAndSendStatusMsg.genMessageBody: calls
-     * WAWebGetGroupKeyDistributionMsg.getKeyDistributionMsg for SK distribution.
+     * Holds the sender-key distribution service used to push the sender key to
+     * audience devices that do not yet hold it.
      */
     private final SenderKeyDistribution senderKeyDistribution;
 
     /**
-     * The meta stanza builder for status_setting and other meta attributes.
-     *
-     * @implNote WAWebEncryptAndSendStatusMsg: builds meta node inline
-     * with status_setting; Cobalt delegates to MetaStanza.
+     * Holds the meta stanza builder responsible for the {@code status_setting}
+     * and other meta attributes.
      */
     private final MetaStanza metaStanza;
 
     /**
-     * The reporting stanza builder for reporting token generation.
-     *
-     * @implNote WAWebEncryptAndSendStatusMsg: calls
-     * WAWebReportingTokenUtils.genReportingTokenBody for the reporting node.
+     * Holds the reporting stanza builder responsible for generating the
+     * {@code reporting} node payload.
      */
     private final ReportingStanza reportingStanza;
 
     /**
-     * Creates a new status message sender.
+     * Constructs a status sender bound to the given dependencies.
      *
-     * @param client                the WhatsApp client for sending stanzas
+     * @param client                the WhatsApp client used to dispatch stanzas
      * @param encryption            the message encryption service
-     * @param deviceService         the device service for fanout calculation
+     * @param deviceService         the device service used for audience fanout
      * @param senderKeyDistribution the sender-key distribution service
      * @param metaStanza            the meta stanza builder
      * @param reportingStanza       the reporting stanza builder
-     * @param wamService            the WAM telemetry service for committing send events
-     *
-     * @implNote ADAPTED: WAWebEncryptAndSendStatusMsg uses module-level
-     * imports; Cobalt uses constructor-based DI instead.
+     * @param wamService            the WAM telemetry service shared with the base sender
      */
     @WhatsAppWebExport(moduleName = "WAWebEncryptAndSendStatusMsg", exports = "encryptAndSendStatusMsg",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -132,22 +106,15 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
     }
 
     /**
-     * Sends a status update to all devices in the user's status audience.
+     * Sends a status update to every device in the resolved audience. The
+     * payload is encrypted with the sender key (SKMSG), the sender key is
+     * distributed to devices that do not yet hold it, and the wire stanza
+     * carries a {@code <meta>} child whose {@code status_setting} attribute
+     * mirrors the privacy preference (omitted for revokes).
      *
-     * <p>Encrypts the message using sender-key encryption (SKMSG),
-     * distributes the sender key to new devices, creates receipt records
-     * for all recipients, and sends the stanza with a
-     * {@code status_setting} meta attribute indicating the privacy
-     * setting.
-     *
-     * @param statusJid   the status broadcast JID ({@code status@broadcast})
+     * @param statusJid   the status broadcast JID
      * @param messageInfo the outgoing status message
      * @return the server ack result
-     *
-     * @implNote WAWebEncryptAndSendStatusMsg.encryptAndSendStatusMsg:
-     * orchestrates the full status send flow including audience
-     * resolution, revoke handling, SK distribution, receipt record
-     * creation, sender-key encryption, and stanza building.
      */
     @WhatsAppWebExport(moduleName = "WAWebEncryptAndSendStatusMsg", exports = "encryptAndSendStatusMsg",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -157,14 +124,8 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
         var container = messageInfo.message();
         var selfJid = requireSelfJid();
 
-        // WAWebEncryptAndSendStatusMsg: get status audience fanout
-        // WAWebEncryptAndSendStatusMsg: R = getMaybeMeDeviceLid(), sender LID for phash
         var fanout = deviceService.getGroupFanout(statusJid, selfLidOrPn());
 
-        // WAWebEncryptAndSendStatusMsg: for revokes, resolve the target
-        // device list in one pass. Returns a direct-revoke list if any
-        // original recipients are outside the current audience, otherwise
-        // a narrowed SKMSG audience (or the full list for non-revokes).
         var revokeResult = resolveRevokeDevices(container, fanout.devices());
         if (revokeResult.useDirect()) {
             LOGGER.log(System.Logger.Level.DEBUG,
@@ -174,12 +135,9 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
 
         var allDevices = revokeResult.devices();
 
-        // WAWebEncryptAndSendStatusMsg: createOrMergeReceiptRecords for all
-        // devices before encryption, so revoke can find original recipients
         var messageId = messageInfo.key().id().orElseThrow();
         store.createOrMergeReceiptRecords(messageId, allDevices);
 
-        // WAWebEncryptAndSendStatusMsg: split into SK distribution and existing
         var skDistribDevices = new ArrayList<Jid>();
         var skExistingDevices = new ArrayList<Jid>();
         for (var device : allDevices) {
@@ -190,8 +148,6 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
             }
         }
 
-        // WAWebUserPrefsStatus.getStatusSkDistribList: rotate sender key
-        // when viewers have been removed from the status audience
         var rotateKey = store.clearKeyRotation(statusJid);
         if (rotateKey) {
             encryption.rotateSenderKey(statusJid, selfJid);
@@ -199,36 +155,24 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
             skExistingDevices.clear();
         }
 
-        // WAWebEncryptAndSendStatusMsg: encrypt with sender key
-        // The status JID acts as the "group" for sender-key purposes
         var plaintext = MessageContainerSpec.encode(container);
         var skmsgPayload = encryption.encryptForGroup(statusJid, selfJid, plaintext);
         var senderKeyBytes = encryption.getSenderKeyBytes(statusJid, selfJid);
 
-        // WAWebEncryptAndSendStatusMsg: encrypt SK distribution for new devices
-        // WAWebGetGroupKeyDistributionMsg: populates ICDC per device
         List<MessageEncryptedPayload> skDistPayloads;
         if (skDistribDevices.isEmpty()) {
             skDistPayloads = List.of();
         } else {
-            // WAWebEncryptAndSendStatusMsg: yield ensureE2ESessions(U, !1, k) — ensureE2ESessions
-            // for skDistribList and emit PrekeysDepletionEvent before encrypting distribution.
             var depletedPrekeyCount = deviceService.ensureSessions(skDistribDevices);
-            // WAWebEncryptAndSendStatusMsg -> WAWebPostPrekeysDepletionMetric.maybePostPrekeysDepletionMetric:
-            // {count, prekeysFetchReason: SEND_MESSAGE, messageType: STATUS,
-            // deviceSizeBucket: numberToSizeBucket(B.length)} where B is the full audience list.
             emitPrekeysDepletionEvents(depletedPrekeyCount, MessageType.STATUS, allDevices.size());
             skDistPayloads = senderKeyDistribution.encrypt(statusJid, senderKeyBytes, skDistribDevices);
         }
 
-        // WAWebEncryptAndSendStatusMsg: build participants node
-        // Contains both SK distribution <to> and existing device <to> nodes
         var participantsChildren = new ArrayList<Node>();
         for (var payload : skDistPayloads) {
             if (payload.recipientJid() == null) {
                 continue;
             }
-            // WAWebEncryptAndSendStatusMsg: SK distribution <to> with <enc>
             var encNode = new NodeBuilder()
                     .description("enc")
                     .attribute("v", String.valueOf(MessageEncryption.CIPHERTEXT_VERSION))
@@ -241,7 +185,6 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
                     .content(encNode)
                     .build());
         }
-        // WAWebEncryptAndSendStatusMsg: existing SK device <to> nodes (no enc)
         for (var device : skExistingDevices) {
             participantsChildren.add(new NodeBuilder()
                     .description("to")
@@ -254,12 +197,8 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
                 .content(participantsChildren)
                 .build();
 
-        // WAWebEncryptAndSendStatusMsg: updateIdentityRange with the full
-        // device list (not just SK distribution devices)
         store.updateIdentityRange(allDevices);
 
-        // WAWebEncryptAndSendStatusMsg.genMessageBody: SKMSG <enc> node
-        // with mediatype from the protobuf (WAWebBackendJobsCommon.mediaTypeFromProtobuf)
         var skmsgEncNode = new NodeBuilder()
                 .description("enc")
                 .attribute("v", String.valueOf(MessageEncryption.CIPHERTEXT_VERSION))
@@ -268,14 +207,9 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
                 .content(skmsgPayload.ciphertext())
                 .build();
 
-        // WAWebEncryptAndSendStatusMsg: identity node when any pkmsg
         var identityNode = ParticipantsStanza.requiresIdentityNode(skDistPayloads)
                 ? buildIdentityNode() : null;
 
-
-        // WAWebEncryptAndSendStatusMsg: status_setting meta is only
-        // included for non-revoke messages. For revokes (narrowed or
-        // direct), the meta node omits status_setting.
         var isRevoke = container.content() instanceof ProtocolMessage pm
                 && pm.type().orElse(null) == ProtocolMessage.Type.REVOKE;
         var statusSetting = isRevoke ? null : resolveStatusSetting();
@@ -283,7 +217,6 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
 
         var reportingNode = reportingStanza.build(messageInfo, selfJid, statusJid);
 
-        // WAWebEncryptAndSendStatusMsg: build the stanza
         var stanza = new NodeBuilder()
                 .description("message")
                 .attribute("id", messageId)
@@ -302,7 +235,6 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
         var ackNode = client.sendNode(stanza);
         var ack = AckParser.parse(ackNode);
 
-        // WAWebEncryptAndSendStatusMsg: mark SK as distributed on success
         if (ack.isSuccess()) {
             for (var device : skDistribDevices) {
                 store.markSenderKeyDistributed(statusJid, device);
@@ -314,15 +246,12 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
 
     /**
      * Resolves the {@code status_setting} meta attribute from the user's
-     * status privacy preference.
+     * status privacy preference. Cobalt returns {@code null} for unknown
+     * privacy values rather than throwing, departing from WA Web on this
+     * one branch.
      *
      * @return {@code "contacts"}, {@code "allowlist"}, {@code "denylist"},
-     *         or {@code null} if unavailable
-     *
-     * @implNote WAWebEncryptAndSendStatusMsg.I: maps
-     * {@code StatusPrivacySettingType.Contact → "contacts"},
-     * {@code AllowList → "allowlist"}, {@code DenyList → "denylist"}.
-     * WA Web throws on unknown values; Cobalt returns {@code null} (ADAPTED).
+     *         or {@code null} when the preference is unavailable or unknown
      */
     @WhatsAppWebExport(moduleName = "WAWebEncryptAndSendStatusMsg", exports = "encryptAndSendStatusMsg",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -341,13 +270,15 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
     }
 
     /**
-     * Resolves the target device list for a message in a single pass.
+     * Resolves the target device list for the given outgoing container in a
+     * single pass. Returns the full audience for non-revokes; for revokes
+     * either narrows the audience to the original recipients (when they all
+     * remain inside the audience) or marks the result for the per-device
+     * direct path (when at least one original recipient is outside).
      *
-     * @implNote WAWebEncryptAndSendStatusMsg.encryptAndSendStatusMsg:
-     * calls calculateRevokeSenderList (T) for revoke messages, then
-     * checks D(F, M.list) to decide between direct and narrowed paths.
-     * WAWebEncryptAndSendStatusMsg.D: returns true if any original
-     * recipient is not self and not in the current status list.
+     * @param container       the outgoing message container
+     * @param currentAudience the resolved status audience
+     * @return the resolution describing the device list and dispatch path
      */
     @WhatsAppWebExport(moduleName = "WAWebEncryptAndSendStatusMsg", exports = "encryptAndSendStatusMsg",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -372,7 +303,6 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
             return new RevokeResolution(false, currentAudience);
         }
 
-        // Build a HashSet of current audience user JIDs for O(1) membership checks
         var currentUserJids = new HashSet<String>(currentAudience.size());
         for (var device : currentAudience) {
             currentUserJids.add(device.toUserJid().toString());
@@ -406,28 +336,26 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
     }
 
     /**
-     * Result of resolving the revoke device list.
+     * Carries the result of resolving the device list for a status revoke.
      *
-     * @param useDirect whether to use the direct (per-device) path
+     * @param useDirect {@code true} when the revoke must use the per-device
+     *                  direct path
      * @param devices   the target device list
-     *
-     * @implNote ADAPTED: WAWebEncryptAndSendStatusMsg uses separate
-     * variables for direct vs narrowed resolution; Cobalt encapsulates
-     * them in a record for clarity.
      */
     private record RevokeResolution(boolean useDirect, Collection<Jid> devices) {
 
     }
 
     /**
-     * Sends a status revoke via GROUP_DIRECT fanout (per-device encryption)
-     * when the original recipients include devices outside the current
-     * status audience.
+     * Sends a status revoke via per-device fanout encryption (the GROUP_DIRECT
+     * branch). This path is used when at least one original recipient is no
+     * longer part of the current status audience.
      *
-     * @implNote WAWebEncryptAndSendStatusMsg.encryptAndSendStatusDirectMsg:
-     * uses createFanoutMsgStanza with FANOUT_TYPE.GROUP_DIRECT and
-     * SessionScope.STATUS. Encrypts per-device, builds via
-     * ChatFanoutStanza, and sends via deprecatedSendStanzaAndReturnAck.
+     * @param statusJid   the status broadcast JID
+     * @param messageInfo the outgoing revoke message
+     * @param allDevices  the union of original recipients and current audience
+     * @return the server ack result
+     * @throws WhatsAppMessageException.Send.Unknown if encryption fails for every device
      */
     @WhatsAppWebExport(moduleName = "WAWebEncryptAndSendStatusMsg", exports = "encryptAndSendStatusDirectMsg",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -439,11 +367,6 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
         var container = messageInfo.message();
 
         var depletedPrekeyCount = deviceService.ensureSessions(allDevices);
-        // WAWebEncryptAndSendStatusMsg.encryptAndSendStatusDirectMsg routes through
-        // WAWebSendMsgCreateFanoutStanza.createFanoutMsgStanza with fanoutType=GROUP_DIRECT,
-        // so WAWebPostPrekeysDepletionMetric.maybePostPrekeysDepletionMetric is called with
-        // messageType=MESSAGE_TYPE.GROUP (per the GROUP_DIRECT branch in createFanoutMsgStanza,
-        // which maps GROUP_DIRECT->GROUP and INDIVIDUAL fanoutType->INDIVIDUAL).
         emitPrekeysDepletionEvents(depletedPrekeyCount, MessageType.GROUP, allDevices.size());
         var senderIcdc = deviceService.computeIcdc(requireSelfJid()).orElse(null);
         var payloads = encryptForDevices(encryption, allDevices, container, statusJid, senderIcdc, null);
@@ -490,32 +413,25 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
     }
 
     /**
-     * Emits one {@link com.github.auties00.cobalt.wam.event.PrekeysDepletionEvent} per
-     * depleted one-time pre-key reported by the last {@code ensureSessions} call.
+     * Commits one {@link com.github.auties00.cobalt.wam.event.PrekeysDepletionEvent}
+     * per depleted one-time pre-key reported by the last
+     * {@code ensureSessions} call. No-op when {@code depletedPrekeyCount} is
+     * not positive.
      *
-     * <p>No-op when {@code depletedPrekeyCount} is {@code 0}, matching the early return in
-     * {@code WAWebPostPrekeysDepletionMetric.maybePostPrekeysDepletionMetric}.
-     *
-     * @param depletedPrekeyCount number of depleted one-time pre-keys (may be zero)
+     * @param depletedPrekeyCount the number of depleted one-time pre-keys
      * @param messageType         the WAM message type for this send
-     * @param deviceCount         the number of devices used for
-     *                            {@code deviceSizeBucket} classification via
-     *                            {@link WamSizeBuckets#numberToSizeBucket(int)}
-     *
-     * @implNote WAWebPostPrekeysDepletionMetric.maybePostPrekeysDepletionMetric: emits
-     *     {@code t} (count) events inside a {@code setTimeout(...,0)}; Cobalt emits
-     *     synchronously on the calling virtual thread.
+     * @param deviceCount         the device count used for the
+     *                            {@code deviceSizeBucket} classification, or
+     *                            {@code null} to omit the bucket
      */
     @WhatsAppWebExport(moduleName = "WAWebPostPrekeysDepletionMetric",
             exports = "maybePostPrekeysDepletionMetric",
             adaptation = WhatsAppAdaptation.ADAPTED)
     private void emitPrekeysDepletionEvents(int depletedPrekeyCount, MessageType messageType, Integer deviceCount) {
-        // WAWebPostPrekeysDepletionMetric.maybePostPrekeysDepletionMetric: early-return guard
         if (depletedPrekeyCount <= 0) {
             return;
         }
         var bucket = deviceCount == null ? null : WamSizeBuckets.numberToSizeBucket(deviceCount);
-        // WAWebPostPrekeysDepletionMetric.maybePostPrekeysDepletionMetric: for (var e=0;e<t;e++) commit()
         for (var i = 0; i < depletedPrekeyCount; i++) {
             wamService.commit(new PrekeysDepletionEventBuilder()
                     .prekeysFetchReason(PrekeysFetchContext.SEND_MESSAGE)

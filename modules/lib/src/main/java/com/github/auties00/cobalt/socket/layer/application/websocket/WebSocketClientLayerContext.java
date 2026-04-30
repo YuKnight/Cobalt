@@ -1,6 +1,5 @@
 package com.github.auties00.cobalt.socket.layer.application.websocket;
 
-import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.socket.threading.SocketClientInboundResult;
 import com.github.auties00.cobalt.socket.threading.SocketClientLayerContext;
 import com.github.auties00.cobalt.socket.threading.SocketClientPendingRead;
@@ -14,31 +13,18 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 /**
- * A layer context that handles WebSocket frame decoding and encoding for
- * a single connection.
- *
- * <p>Adapts the behaviour of WA Web's {@code WebSocketTransport} class
- * (module {@code WASocketTransport}).  The WA Web class simply wires
- * browser {@code onmessage}/{@code onclose}/{@code onerror} callbacks to
- * {@code onData}/{@code onClose}/{@code onError} consumers; here the
- * same dispatch happens inside the selector's inbound pipeline, where
- * decoded data frames flow up to the next layer and control frames
- * (PING, PONG, CLOSE) are echoed or ignored according to
+ * Layer context that decodes inbound WebSocket frames, dispatches data
+ * frames to the next layer up and echoes control frames as required by
  * <a href="https://datatracker.ietf.org/doc/html/rfc6455">RFC 6455</a>.
  *
- * <p>Unlike WA Web, which delegates RFC 6455 framing entirely to the
- * browser, Cobalt implements the wire format itself via
- * {@link WebSocketFrameDecoder} and {@link WebSocketFrameEncoder}.  The
- * CLOSE echo, PING → PONG echo and upgrade-phase pending-read redirection
- * have no WA Web counterpart for this reason.
- *
- * @implNote WA Web's {@code WebSocketTransport.$3} ({@code onmessage}),
- *     {@code $4} ({@code onclose}), {@code $5} ({@code onerror}) and
- *     {@code $6} (shared close helper) map onto
- *     {@link #feedWebSocket(ByteBuffer)}, {@link #onDisconnect()} and
- *     {@link #handleControl(byte, byte[], int)} respectively.
+ * <p>Decoding runs through {@link WebSocketFrameDecoder}; the encoder
+ * lives in {@link WebSocketFrameEncoder}. PING is answered with a PONG,
+ * CLOSE is echoed and the connection is then closed, and PONG is
+ * ignored. During the HTTP upgrade phase the context redirects inbound
+ * bytes into a pending blocking read instead of running them through
+ * the frame decoder, so the {@link WebSocketClientLayer} can parse the
+ * 101 response on the caller thread.
  */
-@WhatsAppWebModule(moduleName = "WASocketTransport")
 final class WebSocketClientLayerContext implements SocketClientApplicationLayerContext {
     /**
      * Capacity of the inbound frame-decode buffer in bytes.  Sized to
@@ -255,11 +241,11 @@ final class WebSocketClientLayerContext implements SocketClientApplicationLayerC
     }
 
     /**
-     * Feeds source bytes into the WebSocket frame decoder and processes
-     * decoded frames.
+     * Feeds source bytes into the frame decoder and dispatches decoded
+     * frames.
      *
-     * <p>This method is also used by the TLS layer to feed decrypted
-     * data that was unwrapped into the app-in buffer (slow path).
+     * <p>Used by the TLS layer to push the decrypted bytes that
+     * surfaced through the slow {@code appInBuffer} path.
      *
      * @param source the buffer containing bytes to decode, in read mode
      * @return the processing result
@@ -271,22 +257,14 @@ final class WebSocketClientLayerContext implements SocketClientApplicationLayerC
     }
 
     /**
-     * Drains {@code source} through the stateful WebSocket frame decoder,
-     * dispatching decoded frames to the rest of the pipeline.
+     * Drains {@code source} through the stateful frame decoder.
      *
-     * <p>Data frames are delivered to the next layer via
-     * {@link SocketClientLayerContext#feedFromSource(ByteBuffer)}.
-     * Control frames are handled internally by
-     * {@link #handleControl(byte, byte[], int)}; a {@code null} return
-     * from that helper (PONG) is ignored and the loop continues with the
-     * next frame.
+     * <p>Data frames flow to the next layer through
+     * {@link SocketClientLayerContext#feedFromSource(ByteBuffer)};
+     * control frames are handled by
+     * {@link #handleControl(byte, byte[], int)}, with PONG returning
+     * {@code null} so the loop continues with the next frame.
      *
-     * @implNote Adapts WA Web's {@code WebSocketTransport.$3}
-     *     ({@code onmessage}) behaviour: WA Web calls
-     *     {@code onData(new Uint8Array(event.data))} once per frame;
-     *     here the decoder emits a chunked stream of
-     *     {@link WebSocketDecodedFrame.Data} values, each delivered to
-     *     the next layer in turn.
      * @param source the buffer containing bytes to decode, in read mode
      * @return the processing result to return to the selector
      * @throws IOException if layer processing fails
@@ -320,27 +298,24 @@ final class WebSocketClientLayerContext implements SocketClientApplicationLayerC
     }
 
     /**
-     * Handles an incoming control frame according to
+     * Handles an inbound control frame according to
      * <a href="https://datatracker.ietf.org/doc/html/rfc6455#section-5.5">RFC 6455 §5.5</a>.
      *
      * <ul>
-     * <li>PING → a matching PONG is scheduled to be written to the channel.
-     * <li>CLOSE → the closed flag is latched and a CLOSE echo is scheduled;
-     *     the subsequent {@link #processInbound(int)} will close the
-     *     connection.
-     * <li>PONG → returns {@code null} so the caller continues with the
-     *     next frame.
-     * <li>Any other opcode → the connection is closed.
+     * <li>PING schedules a matching PONG.</li>
+     * <li>CLOSE latches the close flag and schedules a CLOSE echo;
+     *     the next {@link #processInbound(int)} closes the
+     *     connection.</li>
+     * <li>PONG returns {@code null} so the caller proceeds to the next
+     *     frame.</li>
+     * <li>Any other opcode closes the connection.</li>
      * </ul>
      *
-     * @implNote WA Web has no counterpart because PING/PONG/CLOSE are
-     *     handled internally by the browser's native WebSocket before any
-     *     observable event reaches JS.
      * @param opcode  the control opcode
      * @param payload the control payload bytes
      * @param length  the number of valid bytes in {@code payload}
-     * @return a {@link SocketClientInboundResult} to return to the
-     *         selector, or {@code null} to continue decoding
+     * @return a {@link SocketClientInboundResult} for the selector, or
+     *         {@code null} to continue decoding
      */
     private SocketClientInboundResult handleControl(byte opcode, byte[] payload, int length) {
         return switch (opcode) {
@@ -359,18 +334,11 @@ final class WebSocketClientLayerContext implements SocketClientApplicationLayerC
     }
 
     /**
-     * Tears down per-connection state when the transport is disconnected.
+     * Tears down per-connection state when the transport disconnects.
      *
-     * <p>If a pending upgrade read is still active, it is resolved with
-     * an EOF sentinel so the blocking handshake thread can observe the
-     * disconnection and throw.  The disconnect signal is then propagated
-     * upwards along the inbound chain.
-     *
-     * @implNote Adapts WA Web's {@code WebSocketTransport.$4}
-     *     ({@code onclose}) and {@code $6} helper: WA Web sets the
-     *     closed flag and invokes the {@code onClose} consumer; Cobalt
-     *     translates that into a fan-out across the layered-selector
-     *     chain.
+     * <p>Resolves any active upgrade read with an EOF sentinel so the
+     * blocking handshake thread observes the disconnection and throws,
+     * then propagates the disconnect signal up the inbound chain.
      */
     @Override
     public void onDisconnect() {

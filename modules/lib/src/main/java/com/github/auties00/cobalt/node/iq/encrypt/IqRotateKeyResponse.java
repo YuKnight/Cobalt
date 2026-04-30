@@ -12,16 +12,17 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants produced by the relay in
- * response to a {@link IqRotateKeyRequest}.
+ * response to an {@link IqRotateKeyRequest}.
  *
  * @implNote {@code WAWebRotateKeyJob.rotateKeyResponseParser} only
  *           asserts {@code assertFromServer()}; the success/failure
- *           split happens via {@code WADeprecatedSendIq.success} +
- *           the {@code errorCode} switch in {@code uploadKeys}.
- *           Cobalt collapses to the standard
+ *           split happens via {@code WADeprecatedSendIq.success} and
+ *           the {@code errorCode} switch in {@code uploadKeys}. Cobalt
+ *           collapses both into the standard
  *           {@code Success}/{@code ClientError}/{@code ServerError}
  *           split.
  */
+@WhatsAppWebModule(moduleName = "WAWebRotateKeyJob")
 public sealed interface IqRotateKeyResponse extends IqOperation.Response
         permits IqRotateKeyResponse.Success, IqRotateKeyResponse.ClientError, IqRotateKeyResponse.ServerError {
 

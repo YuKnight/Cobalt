@@ -19,8 +19,8 @@ public sealed interface IqSendProfilePictureResponse extends IqOperation.Respons
     /**
      * Tries each {@link IqSendProfilePictureResponse} variant in priority order.
      *
-     * @param node    the inbound IQ stanza; never {@code null}
-     * @param request the original outbound stanza; never {@code null}
+     * @param node    the inbound IQ stanza. Never {@code null}
+     * @param request the original outbound stanza. Never {@code null}
      * @return an {@link Optional} carrying the parsed variant, or
      *         empty when no documented variant matched
      * @throws NullPointerException if either argument is
@@ -43,7 +43,7 @@ public sealed interface IqSendProfilePictureResponse extends IqOperation.Respons
     }
 
     /**
-     * The {@code Success} reply variant — carries the relay-assigned
+     * The {@code Success} reply variant. Carries the relay-assigned
      * picture identifier (or empty when the picture was cleared).
      *
      * @implNote {@code WAWebSendProfilePictureJob.photoResponseParser}:
@@ -53,7 +53,7 @@ public sealed interface IqSendProfilePictureResponse extends IqOperation.Respons
     @WhatsAppWebModule(moduleName = "WAWebSendProfilePictureJob")
     final class Success implements IqSendProfilePictureResponse {
         /**
-         * The relay-assigned picture identifier; {@code null} when
+         * The relay-assigned picture identifier. {@code null} when
          * the picture was cleared (i.e. the request omitted the
          * {@code <picture>} child).
          */
@@ -131,7 +131,7 @@ public sealed interface IqSendProfilePictureResponse extends IqOperation.Respons
     }
 
     /**
-     * The {@code ClientError} reply variant — {@code 4xx} rejection
+     * The {@code ClientError} reply variant. {@code 4xx} rejection
      * (e.g. {@code 403} when the caller is not an admin of the
      * target group, {@code 406} for a payload that fails relay-side
      * format validation).
@@ -152,7 +152,7 @@ public sealed interface IqSendProfilePictureResponse extends IqOperation.Respons
          * Constructs a client-error reply.
          *
          * @param errorCode the numeric error code
-         * @param errorText the optional text; may be {@code null}
+         * @param errorText the optional text. May be {@code null}
          */
         public ClientError(int errorCode, String errorText) {
             this.errorCode = errorCode;
@@ -223,7 +223,7 @@ public sealed interface IqSendProfilePictureResponse extends IqOperation.Respons
     }
 
     /**
-     * The {@code ServerError} reply variant — {@code 5xx} transient
+     * The {@code ServerError} reply variant. {@code 5xx} transient
      * failure.
      */
     @WhatsAppWebModule(moduleName = "WAWebSendProfilePictureJob")
@@ -242,7 +242,7 @@ public sealed interface IqSendProfilePictureResponse extends IqOperation.Respons
          * Constructs a server-error reply.
          *
          * @param errorCode the numeric error code
-         * @param errorText the optional text; may be {@code null}
+         * @param errorText the optional text. May be {@code null}
          */
         public ServerError(int errorCode, String errorText) {
             this.errorCode = errorCode;

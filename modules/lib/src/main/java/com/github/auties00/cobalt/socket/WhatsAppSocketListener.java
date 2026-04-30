@@ -4,28 +4,32 @@ import com.github.auties00.cobalt.exception.WhatsAppException;
 import com.github.auties00.cobalt.node.Node;
 
 /**
- * A listener for events produced by the {@link WhatsAppSocketClient}.
+ * Receives the events that a {@link WhatsAppSocketClient} surfaces once
+ * the Noise handshake has completed.
  *
- * <p>Implementations receive notifications when complete deserialized
- * nodes arrive, when errors occur, and when the connection is closed.
+ * <p>Implementations are notified when an inbound datagram has been
+ * decrypted and parsed into a {@link Node}, when a recoverable or fatal
+ * error is detected on the connection, and when the channel is closed.
  */
 public interface WhatsAppSocketListener {
     /**
-     * Called when a complete WhatsApp node has been received and decrypted.
+     * Receives a decrypted and decoded WhatsApp node.
      *
      * @param node the deserialized node
      */
     void onNode(Node node);
 
     /**
-     * Called when an error occurs during processing.
+     * Receives an exception observed while processing inbound traffic
+     * or while interacting with the underlying transport.
      *
      * @param exception the error
      */
     void onError(WhatsAppException exception);
 
     /**
-     * Called when the connection has been closed.
+     * Receives notification that the connection has been closed; no
+     * further events will be delivered after this call.
      */
     void onClose();
 }

@@ -44,7 +44,7 @@ public sealed interface SmaxStatusReportV2Response extends SmaxOperation.Respons
     }
 
     /**
-     * The {@code Success} reply variant — the relay accepted the
+     * The {@code Success} reply variant. The relay accepted the
      * report.
      *
      * @implNote {@code WASmaxInSpamStatusReportV2ResponseSuccess.parseStatusReportV2ResponseSuccess}
@@ -124,7 +124,7 @@ public sealed interface SmaxStatusReportV2Response extends SmaxOperation.Respons
     }
 
     /**
-     * The {@code Error} reply variant — the relay rejected the
+     * The {@code Error} reply variant. The relay rejected the
      * report.
      *
      * @implNote {@code WASmaxInSpamStatusReportV2ResponseError.parseStatusReportV2ResponseError}

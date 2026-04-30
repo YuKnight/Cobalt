@@ -4,67 +4,66 @@ import java.nio.ByteBuffer;
 import java.util.Objects;
 
 /**
- * A result returned by {@link SocketClientLayerContext#processInbound(int)}
- * to indicate to the selector what action to take after processing inbound
- * data through a layer context.
+ * Result returned by {@link SocketClientLayerContext#processInbound(int)}
+ * to instruct the selector how to proceed after a read.
  *
- * <p>The selector examines the result and acts accordingly: delivering
- * complete datagrams, flushing handshake data, suspending processing while
- * delegated tasks run, or closing the connection.
+ * <p>The selector picks the next action from the result: deliver
+ * complete datagrams, flush handshake bytes, suspend the key while
+ * delegated tasks run on a virtual thread, or close the connection.
  */
 public sealed interface SocketClientInboundResult {
     /**
-     * The layer chain completed normally.
-     *
-     * <p>All data was processed and any complete datagrams were delivered
-     * to the listener.  The selector should continue its event loop.
+     * Indicates that processing finished normally and the selector
+     * should continue its event loop.
      */
     record Continue() implements SocketClientInboundResult {
 
     }
 
     /**
-     * A layer needs to write data to the channel.
+     * Indicates that the layer needs to write data back to the channel.
      *
-     * <p>This is returned during TLS handshakes when the engine requires
-     * a {@code NEED_WRAP} operation, or when a WebSocket control frame
-     * (such as a PONG response to a PING) must be sent.
+     * <p>Returned during TLS handshakes when the engine reports
+     * {@code NEED_WRAP} and when WebSocket has to echo a control frame
+     * (PONG response to a PING, CLOSE echo).
      *
      * @param data the buffers to write to the channel
      */
     record NeedsWrite(ByteBuffer... data) implements SocketClientInboundResult {
+        /**
+         * Validates the {@code data} component.
+         *
+         * @throws NullPointerException if {@code data} is {@code null}
+         */
         public NeedsWrite {
             Objects.requireNonNull(data, "data cannot be null");
         }
     }
 
     /**
-     * The layer does not have enough data to produce output yet.
-     *
-     * <p>The selector should wait for more data to arrive on the channel
-     * before calling {@code processInbound} again.
+     * Indicates that the layer does not yet have enough bytes to
+     * produce output and is waiting for more inbound data.
      */
     record Buffering() implements SocketClientInboundResult {
 
     }
 
     /**
-     * A layer has delegated CPU-intensive tasks to virtual threads.
+     * Indicates that the layer has delegated CPU-heavy tasks (typically
+     * {@code SSLEngine}'s {@code NEED_TASK}) to a virtual thread.
      *
-     * <p>This is returned during TLS handshakes when the engine returns
-     * {@code NEED_TASK}.  The selector should suspend interest ops for
-     * this key until the tasks complete and re-register interest.
+     * <p>The selector clears the key's interest ops until the tasks
+     * complete and {@link SocketClientLayerContext#runDelegatedTasks(Runnable)}
+     * fires the callback that re-arms them.
      */
     record Suspended() implements SocketClientInboundResult {
 
     }
 
     /**
-     * The connection should be closed.
-     *
-     * <p>This is returned when the channel reaches end-of-stream, the
-     * TLS engine signals {@code CLOSED}, or an unrecoverable protocol
-     * error is detected.
+     * Indicates that the connection should be closed, either because
+     * the channel reached end-of-stream, the TLS engine signalled
+     * {@code CLOSED}, or an unrecoverable protocol error was detected.
      */
     record Close() implements SocketClientInboundResult {
 

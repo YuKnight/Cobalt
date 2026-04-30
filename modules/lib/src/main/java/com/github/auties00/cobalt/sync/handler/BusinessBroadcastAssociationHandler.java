@@ -92,7 +92,7 @@ public final class BusinessBroadcastAssociationHandler implements WebAppStateAct
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBroadcastListSync", exports = "getAction", adaptation = WhatsAppAdaptation.ADAPTED)
     public String actionName() {
-        return BusinessBroadcastAssociationAction.ACTION_NAME; // WASyncdConst.Actions.BroadcastJid
+        return BusinessBroadcastAssociationAction.ACTION_NAME;
     }
 
     /**
@@ -107,7 +107,7 @@ public final class BusinessBroadcastAssociationHandler implements WebAppStateAct
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBroadcastListSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncPatchType collectionName() {
-        return BusinessBroadcastAssociationAction.COLLECTION_NAME; // ADAPTED: WAWebBroadcastListSync.collectionName = Regular
+        return BusinessBroadcastAssociationAction.COLLECTION_NAME;
     }
 
     /**
@@ -120,7 +120,7 @@ public final class BusinessBroadcastAssociationHandler implements WebAppStateAct
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBroadcastListSync", exports = "getVersion", adaptation = WhatsAppAdaptation.ADAPTED)
     public int version() {
-        return BusinessBroadcastAssociationAction.ACTION_VERSION; // ADAPTED: WAWebBroadcastListSync.getVersion = 1
+        return BusinessBroadcastAssociationAction.ACTION_VERSION;
     }
 
     /**
@@ -141,7 +141,7 @@ public final class BusinessBroadcastAssociationHandler implements WebAppStateAct
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBroadcastListSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: WAWebBroadcastListSync.applyMutations
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -193,17 +193,17 @@ public final class BusinessBroadcastAssociationHandler implements WebAppStateAct
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBroadcastListSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        if (mutation.operation() != SyncdOperation.SET) { // NO_WA_BASIS: only SET makes sense for an additive participant action
+        if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
 
         var indexArray = JSON.parseArray(mutation.index()); // ADAPTED: WAWebBroadcastListSync.applyMutations: var t = e.indexParts (pre-parsed in WA Web)
-        if (indexArray.size() < 3) { // NO_WA_BASIS: index format ["broadcast_jid", listId, recipientJid] requires three elements
+        if (indexArray.size() < 3) {
             return MutationApplicationResult.malformed();
         }
 
-        var listId = indexArray.getString(1); // NO_WA_BASIS: indexArgs[0] = broadcast list id
-        var recipientJidString = indexArray.getString(2); // NO_WA_BASIS: indexArgs[1] = recipient jid string
+        var listId = indexArray.getString(1);
+        var recipientJidString = indexArray.getString(2);
         if (listId == null || listId.isBlank() || recipientJidString == null || recipientJidString.isBlank()) { // ADAPTED: WAWebBroadcastListSync.applyMutations: if (!n) return r.malformedActionIndex()
             return MutationApplicationResult.malformed();
         }
@@ -213,25 +213,24 @@ public final class BusinessBroadcastAssociationHandler implements WebAppStateAct
         }
 
         // ADAPTED: WAWebBroadcastListSync resolves the parent broadcast list via
-        // WAWebBroadcastListStorageUtils; Cobalt collapses storage into a flat
         // ConcurrentHashMap on WhatsAppStore.
-        var lists = new HashMap<>(client.store().businessBroadcastLists()); // ADAPTED: copy from unmodifiable map
-        var broadcastList = lists.get(listId); // ADAPTED: lookup parent list
-        if (broadcastList == null) { // NO_WA_BASIS: orphan handling for the parent list
+        var lists = new HashMap<>(client.store().businessBroadcastLists());
+        var broadcastList = lists.get(listId);
+        if (broadcastList == null) {
             return MutationApplicationResult.orphan(listId, "BroadcastList");
         }
 
-        var recipientJid = Jid.of(recipientJidString); // NO_WA_BASIS: parse recipient JID for participant matching
+        var recipientJid = Jid.of(recipientJidString);
         var participants = new ArrayList<>(broadcastList.participants()); // ADAPTED: WAWebBroadcastListSync uses BroadcastListParticipantAction[]; Cobalt copies to a mutable list before mutating
-        participants.removeIf(participant -> // NO_WA_BASIS: drop any prior entry for this recipient before re-adding
+        participants.removeIf(participant ->
                 recipientJid.equals(participant.lidJid())
                         || participant.pnJid().filter(recipientJid::equals).isPresent()
         );
-        if (!action.deleted()) { // NO_WA_BASIS: BusinessBroadcastAssociationAction.deleted=true means remove
-            var participant = new BroadcastListParticipantAction(); // NO_WA_BASIS: build a fresh BroadcastListParticipant entry
-            if (recipientJid.hasLidServer() || recipientJid.hasHostedLidServer()) { // NO_WA_BASIS: LID/HostedLID recipients are stored as lidJid only
+        if (!action.deleted()) {
+            var participant = new BroadcastListParticipantAction();
+            if (recipientJid.hasLidServer() || recipientJid.hasHostedLidServer()) {
                 participant.setLidJid(recipientJid);
-            } else { // NO_WA_BASIS: phone-number recipients carry pnJid plus the resolved lidJid for cross-indexing
+            } else {
                 participant.setPnJid(recipientJid);
                 participant.setLidJid(client.store().getLidByPhoneNumber(recipientJid).orElse(recipientJid)); // ADAPTED: WhatsAppStore.getLidByPhoneNumber resolves the LID/PN map maintained by Cobalt
             }
@@ -239,8 +238,8 @@ public final class BusinessBroadcastAssociationHandler implements WebAppStateAct
         }
 
         broadcastList.setParticipants(participants); // ADAPTED: WAWebBroadcastListSync writes participants via WAWebBroadcastListStorageUtils.updateBroadcastListStorage
-        lists.put(listId, broadcastList); // ADAPTED: re-insert the mutated parent
-        client.store().setBusinessBroadcastLists(lists); // ADAPTED: persist via store setter
-        return MutationApplicationResult.success(); // ADAPTED: WAWebBroadcastListSync.applyMutations: {actionState: Success}
+        lists.put(listId, broadcastList);
+        client.store().setBusinessBroadcastLists(lists);
+        return MutationApplicationResult.success();
     }
 }

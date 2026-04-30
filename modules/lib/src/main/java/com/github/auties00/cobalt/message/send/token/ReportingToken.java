@@ -18,23 +18,16 @@ import java.util.Optional;
 /**
  * Generates reporting tokens (franking tags) for outgoing messages.
  *
- * <p>A reporting token cryptographically binds a message's content to
- * its sender and recipient, enabling the server to verify abuse reports
- * without accessing plaintext.  The token is a 16-byte HMAC-SHA-256
- * truncation computed over the <em>reporting token content</em>
- * (a deterministic extract of the serialised protobuf), keyed by a
- * 32-byte key derived from the message secret via HKDF-SHA-256.
- *
- * @implNote WAWebReportingTokenUtils: provides {@code genReportingToken},
- * {@code genReportingTokenKeyFromMessageSecret}, and
- * {@code genReportingTokenBody}.
+ * <p>A reporting token cryptographically binds a message's content to its sender and
+ * recipient, enabling the server to verify abuse reports without accessing plaintext.
+ * The token is the first 16 bytes of an HMAC-SHA-256 computed over the
+ * <em>reporting token content</em> (a deterministic extract of the serialised
+ * protobuf), keyed by a 32-byte key derived from the message secret via HKDF-SHA-256.
  */
 @WhatsAppWebModule(moduleName = "WAWebReportingTokenUtils")
 public final class ReportingToken {
     /**
      * Output length for the HKDF-derived reporting token key.
-     *
-     * @implNote WAWebReportingTokenUtils: {@code REPORTING_TOKEN_KEY_SIZE = 32}
      */
     @WhatsAppWebExport(moduleName = "WAWebReportingTokenUtils", exports = "REPORTING_TOKEN_KEY_SIZE",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -42,9 +35,6 @@ public final class ReportingToken {
 
     /**
      * Number of leading HMAC bytes kept as the reporting token.
-     *
-     * @implNote WAWebReportingTokenUtils: {@code REPORTING_TOKEN_SIZE = 16},
-     *          used as the third argument to {@code hmacSha256(key, content, 16)}.
      */
     @WhatsAppWebExport(moduleName = "WAWebReportingTokenUtils", exports = "REPORTING_TOKEN_SIZE",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -53,14 +43,11 @@ public final class ReportingToken {
     /**
      * Storage size for a valid reporting token entry.
      *
-     * <p>Used by the IndexedDB-backed storage layer
-     * ({@code WAWebDBReportingTokenUtils}) to allocate fixed-size rows for
-     * reporting-token records. Cobalt does not persist reporting tokens
-     * because outgoing tokens are computed on demand and incoming-side
-     * validation is not implemented; the constant is preserved here for
-     * parity with the WA Web export surface.
-     *
-     * @implNote WAWebReportingTokenUtils: {@code REPORTING_TOKEN_STORAGE_SIZE = 6}.
+     * @implNote Used by the IndexedDB-backed storage layer
+     * ({@code WAWebDBReportingTokenUtils}) to allocate fixed-size rows. Cobalt does not
+     * persist reporting tokens because outgoing tokens are computed on demand and
+     * incoming-side validation is not implemented; the constant is preserved for parity
+     * with the WA Web export surface.
      */
     @WhatsAppWebExport(moduleName = "WAWebReportingTokenUtils", exports = "REPORTING_TOKEN_STORAGE_SIZE",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -69,12 +56,9 @@ public final class ReportingToken {
     /**
      * Storage size sentinel for an invalid reporting token entry.
      *
-     * <p>WA Web writes this length when a reporting token failed
-     * validation, distinguishing it from a missing record. Cobalt does
-     * not persist reporting tokens; the constant is preserved for parity.
-     *
-     * @implNote WAWebReportingTokenUtils:
-     * {@code REPORTING_TOKEN_INVALID_STORAGE_SIZE = 7}.
+     * @implNote WA Web writes this length when a reporting token failed validation,
+     * distinguishing it from a missing record. Cobalt does not persist reporting tokens;
+     * the constant is preserved for parity.
      */
     @WhatsAppWebExport(moduleName = "WAWebReportingTokenUtils", exports = "REPORTING_TOKEN_INVALID_STORAGE_SIZE",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -82,30 +66,22 @@ public final class ReportingToken {
 
     /**
      * The HKDF algorithm used for key derivation.
-     *
-     * @implNote WACryptoHkdf: uses HMAC-SHA-256 for both extract and expand steps.
      */
     private static final String HKDF_ALGORITHM = "HKDF-SHA256";
 
     /**
      * The HMAC algorithm used for token computation.
-     *
-     * @implNote WACryptoHmac.hmacSha256: uses HMAC-SHA-256.
      */
     private static final String HMAC_ALGORITHM = "HmacSHA256";
 
     /**
-     * The use-case secret modification type string used in the HKDF
-     * info parameter for reporting token key derivation.
-     *
-     * @implNote WAUseCaseSecret.UseCaseSecretModificationType.REPORT_TOKEN = "Report Token"
+     * Use-case secret modification type string used in the HKDF info parameter for
+     * reporting token key derivation.
      */
     private static final String USE_CASE_TYPE = "Report Token";
 
     /**
-     * Private constructor to prevent instantiation of this utility class.
-     *
-     * @implNote WAWebReportingTokenUtils: module-level functions, not a class.
+     * Prevents instantiation of this utility class.
      */
     private ReportingToken() {
         throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
@@ -117,20 +93,15 @@ public final class ReportingToken {
      * @param messageSecret         the 32-byte message secret
      * @param stanzaId              the message's stanza ID
      * @param senderJid             the sender's user JID
-     * @param remoteJid             the remote JID (recipient for 1:1, or
-     *                              self JID for groups/broadcasts)
-     * @param reportingTokenContent the deterministic content extract from
-     *                              the serialised protobuf, or {@code null}
-     *                              if the message type is not compatible
+     * @param remoteJid             the remote JID (recipient for 1:1, self JID for
+     *                              groups or broadcasts)
+     * @param reportingTokenContent the deterministic content extract from the
+     *                              serialised protobuf, or {@code null} when the
+     *                              message type is not compatible
      * @param version               the reporting token version
-     * @return the reporting token, or empty if the content is {@code null}
-     *         or empty
+     * @return the reporting token, or empty when the content is {@code null} or empty
      * @throws NullPointerException     if a required argument is {@code null}
      * @throws GeneralSecurityException if a cryptographic operation fails
-     *
-     * @implNote WAWebReportingTokenUtils.genReportingToken: derives the key
-     * via {@code genReportingTokenKeyFromMessageSecret}, then
-     * {@code hmacSha256(key, content, 16)}.
      */
     @WhatsAppWebExport(moduleName = "WAWebReportingTokenUtils", exports = "genReportingToken",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -151,25 +122,22 @@ public final class ReportingToken {
             return Optional.empty();
         }
 
-        // WAWebReportingTokenUtils.genReportingTokenKeyFromMessageSecret
         var key = deriveKey(messageSecret, stanzaId, senderJid, remoteJid);
 
-        // WAWebReportingTokenUtils: hmacSha256(key, content, 16)
         var token = hmacTruncated(key, reportingTokenContent);
 
         return Optional.of(new ReportingTokenResult(version, token));
     }
 
     /**
-     * Derives the 32-byte reporting token key from the message secret
-     * via HKDF-SHA-256 extract-and-expand.
+     * Derives the 32-byte reporting token key from the message secret via HKDF-SHA-256
+     * extract-and-expand.
      *
-     * <p>The extract step uses a {@code null} salt (defaulting to a zero-filled
-     * byte array of SHA-256 hash length) with the message secret as the input
-     * keying material. The expand step uses the info parameter, which is the
-     * binary concatenation of
-     * {@code stanzaId || senderJid || remoteJid || "Report Token"},
-     * all encoded as UTF-8.
+     * <p>The extract step uses a {@code null} salt (defaulting to a zero-filled byte
+     * array of SHA-256 hash length) with the message secret as input keying material.
+     * The expand step uses
+     * {@code stanzaId || senderJid || remoteJid || "Report Token"} (UTF-8 encoded) as
+     * the info parameter.
      *
      * @param messageSecret the 32-byte message secret (IKM for HKDF extract)
      * @param stanzaId      the message's stanza ID
@@ -177,13 +145,6 @@ public final class ReportingToken {
      * @param remoteJid     the remote JID
      * @return a 32-byte key
      * @throws GeneralSecurityException if HKDF is unavailable
-     *
-     * @implNote WAWebReportingTokenUtils.genReportingTokenKeyFromMessageSecret:
-     * {@code WABinary.Binary.build(stanzaId, senderJid, remoteJid, REPORT_TOKEN)}
-     * produces the info, then
-     * {@code WACryptoHkdf.extractAndExpand(messageSecret, info, 32)} which calls
-     * {@code extractSha256(null, messageSecret)} followed by
-     * {@code expand(prk, info, 32)}.
      */
     @WhatsAppWebExport(moduleName = "WAWebReportingTokenUtils", exports = "genReportingTokenKeyFromMessageSecret",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -193,12 +154,9 @@ public final class ReportingToken {
             Jid senderJid,
             Jid remoteJid
     ) throws GeneralSecurityException {
-        // WAWebReportingTokenUtils: Binary.build(stanzaId, senderJid, remoteJid, REPORT_TOKEN)
         var info = (stanzaId + senderJid + remoteJid + USE_CASE_TYPE)
                 .getBytes(StandardCharsets.UTF_8);
 
-        // WACryptoHkdf.extractAndExpand(messageSecret, info, 32):
-        // Extract with null salt (zeros), then expand with info
         var kdf = KDF.getInstance(HKDF_ALGORITHM);
         var params = HKDFParameterSpec.ofExtract()
                 .addIKM(messageSecret)
@@ -207,16 +165,13 @@ public final class ReportingToken {
     }
 
     /**
-     * Computes HMAC-SHA-256 of {@code data} keyed by {@code key},
-     * truncated to the first {@value #TOKEN_LENGTH} bytes.
+     * Computes HMAC-SHA-256 of {@code data} keyed by {@code key}, truncated to the
+     * first {@value #TOKEN_LENGTH} bytes.
      *
      * @param key  the HMAC key
      * @param data the data to authenticate
      * @return the first {@value #TOKEN_LENGTH} bytes of the HMAC
      * @throws GeneralSecurityException if HMAC computation fails
-     *
-     * @implNote WAWebReportingTokenUtils.genReportingToken:
-     * {@code WACryptoHmac.hmacSha256(key, content, 16)}.
      */
     private static byte[] hmacTruncated(byte[] key, byte[] data) throws GeneralSecurityException {
         var mac = Mac.getInstance(HMAC_ALGORITHM);

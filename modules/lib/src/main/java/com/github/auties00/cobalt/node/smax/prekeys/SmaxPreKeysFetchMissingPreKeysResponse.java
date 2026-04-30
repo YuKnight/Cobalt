@@ -22,7 +22,7 @@ import java.util.Optional;
  *
  * @implNote {@code WASmaxPreKeysFetchMissingPreKeysRPC.sendFetchMissingPreKeysRPC}
  *           tries {@code Success} → {@code RequestError} →
- *           {@code ServerError} in order; Cobalt mirrors the priority
+ *           {@code ServerError} in order. Cobalt mirrors the priority
  *           and renames {@code RequestError} to the consistent
  *           {@link SmaxPreKeysFetchMissingPreKeysResponse.ClientError} naming.
  */
@@ -32,8 +32,8 @@ public sealed interface SmaxPreKeysFetchMissingPreKeysResponse extends SmaxOpera
     /**
      * Tries each {@link SmaxPreKeysFetchMissingPreKeysResponse} variant in priority order.
      *
-     * @param node    the inbound IQ stanza; never {@code null}
-     * @param request the original outbound stanza; never {@code null}
+     * @param node    the inbound IQ stanza. Never {@code null}
+     * @param request the original outbound stanza. Never {@code null}
      * @return an {@link Optional} carrying the parsed variant, or empty
      *         on no-match
      * @throws NullPointerException if either argument is {@code null}
@@ -55,7 +55,7 @@ public sealed interface SmaxPreKeysFetchMissingPreKeysResponse extends SmaxOpera
     }
 
     /**
-     * The {@code Success} reply variant — the relay produced a
+     * The {@code Success} reply variant. The relay produced a
      * {@code <list>} carrying one {@code <user>} entry per requested
      * user, each entry carrying one {@code <device>} per requested
      * device.
@@ -80,7 +80,7 @@ public sealed interface SmaxPreKeysFetchMissingPreKeysResponse extends SmaxOpera
         /**
          * Constructs a successful reply.
          *
-         * @param users the per-user entries; never {@code null}
+         * @param users the per-user entries. Never {@code null}
          *              (defaults to empty)
          */
         public Success(List<UserEntry> users) {
@@ -90,7 +90,7 @@ public sealed interface SmaxPreKeysFetchMissingPreKeysResponse extends SmaxOpera
         /**
          * Returns the list of per-user projections.
          *
-         * @return an unmodifiable list; never {@code null}
+         * @return an unmodifiable list. Never {@code null}
          */
         public List<UserEntry> users() {
             return users;
@@ -150,7 +150,7 @@ public sealed interface SmaxPreKeysFetchMissingPreKeysResponse extends SmaxOpera
         }
 
         /**
-         * Sealed disjunction of the two per-user reply shapes — either a
+         * Sealed disjunction of the two per-user reply shapes. Either a
          * {@link UserDeviceBundle} carrying device-level pre-key
          * projections, or a {@link UserError} when the relay rejected
          * the per-user fetch.
@@ -160,7 +160,7 @@ public sealed interface SmaxPreKeysFetchMissingPreKeysResponse extends SmaxOpera
             /**
              * Returns the per-user JID echoed by the relay.
              *
-             * @return the JID; never {@code null}
+             * @return the JID. Never {@code null}
              */
             Jid userJid();
 
@@ -168,7 +168,7 @@ public sealed interface SmaxPreKeysFetchMissingPreKeysResponse extends SmaxOpera
              * Tries to parse a {@link UserEntry} from the given
              * {@code <user/>} grandchild.
              *
-             * @param userNode the {@code <user/>} grandchild; never
+             * @param userNode the {@code <user/>} grandchild. Never
              *                 {@code null}
              * @return an {@link Optional} carrying the parsed entry, or
              *         empty on no-match
@@ -187,7 +187,7 @@ public sealed interface SmaxPreKeysFetchMissingPreKeysResponse extends SmaxOpera
         }
 
         /**
-         * The successful per-user projection — carries one
+         * The successful per-user projection. Carries one
          * {@link DeviceKeyBundle} per device the relay was able to
          * resolve.
          *
@@ -214,8 +214,8 @@ public sealed interface SmaxPreKeysFetchMissingPreKeysResponse extends SmaxOpera
             /**
              * Constructs a per-user projection.
              *
-             * @param userJid the user JID; never {@code null}
-             * @param devices the per-device bundles; never {@code null}
+             * @param userJid the user JID. Never {@code null}
+             * @param devices the per-device bundles. Never {@code null}
              *                (defaults to empty)
              * @throws NullPointerException if {@code userJid} is
              *                              {@code null}
@@ -228,7 +228,7 @@ public sealed interface SmaxPreKeysFetchMissingPreKeysResponse extends SmaxOpera
             /**
              * Returns the per-user JID echoed by the relay.
              *
-             * @return the JID; never {@code null}
+             * @return the JID. Never {@code null}
              */
             @Override
             public Jid userJid() {
@@ -238,7 +238,7 @@ public sealed interface SmaxPreKeysFetchMissingPreKeysResponse extends SmaxOpera
             /**
              * Returns the per-device bundle projections.
              *
-             * @return an unmodifiable list; never {@code null}
+             * @return an unmodifiable list. Never {@code null}
              */
             public List<DeviceKeyBundle> devices() {
                 return devices;
@@ -274,7 +274,7 @@ public sealed interface SmaxPreKeysFetchMissingPreKeysResponse extends SmaxOpera
                 }
                 if (devicesList.isEmpty()) {
                     // The mixin requires at least one device per user
-                    // (REPEATED_CHILD min=1) — surface as parse-fail so
+                    // (REPEATED_CHILD min=1). Surface as parse-fail so
                     // the UserError branch can be tried.
                     return Optional.empty();
                 }
@@ -307,7 +307,7 @@ public sealed interface SmaxPreKeysFetchMissingPreKeysResponse extends SmaxOpera
         }
 
         /**
-         * The per-device pre-key bundle projection — carries every
+         * The per-device pre-key bundle projection. Carries every
          * piece of cryptographic material needed to seed a Signal
          * session for one device of a target user.
          *
@@ -374,18 +374,18 @@ public sealed interface SmaxPreKeysFetchMissingPreKeysResponse extends SmaxOpera
              * Constructs a device-key-bundle projection.
              *
              * @param deviceId       the device id
-             * @param timestamp      the optional relay timestamp; may be
+             * @param timestamp      the optional relay timestamp. May be
              *                       {@code null}
              * @param cloudApi       whether the cloud-api marker was set
-             * @param registrationId the 4-byte registration id; never
+             * @param registrationId the 4-byte registration id. Never
              *                       {@code null}
              * @param keyType        the optional 1-byte key-type marker;
              *                       may be {@code null}
-             * @param identityKey    the 32-byte identity key; never
+             * @param identityKey    the 32-byte identity key. Never
              *                       {@code null}
-             * @param preKey         the optional pre-key; may be
+             * @param preKey         the optional pre-key. May be
              *                       {@code null}
-             * @param signedPreKey   the signed pre-key; never
+             * @param signedPreKey   the signed pre-key. Never
              *                       {@code null}
              * @param deviceIdentity the optional device-identity bytes;
              *                       may be {@code null}
@@ -442,7 +442,7 @@ public sealed interface SmaxPreKeysFetchMissingPreKeysResponse extends SmaxOpera
             /**
              * Returns the 4-byte registration id.
              *
-             * @return the registration bytes; never {@code null}
+             * @return the registration bytes. Never {@code null}
              */
             public byte[] registrationId() {
                 return registrationId;
@@ -460,7 +460,7 @@ public sealed interface SmaxPreKeysFetchMissingPreKeysResponse extends SmaxOpera
             /**
              * Returns the 32-byte identity key.
              *
-             * @return the identity key bytes; never {@code null}
+             * @return the identity key bytes. Never {@code null}
              */
             public byte[] identityKey() {
                 return identityKey;
@@ -478,7 +478,7 @@ public sealed interface SmaxPreKeysFetchMissingPreKeysResponse extends SmaxOpera
             /**
              * Returns the signed pre-key.
              *
-             * @return the signed pre-key; never {@code null}
+             * @return the signed pre-key. Never {@code null}
              */
             public SmaxPreKeysFetchKeyBundlesResponse.Success.UserKeyBundle.SignedPreKey signedPreKey() {
                 return signedPreKey;
@@ -622,11 +622,11 @@ public sealed interface SmaxPreKeysFetchMissingPreKeysResponse extends SmaxOpera
         }
 
         /**
-         * The per-user error projection — surfaces a relay-side
+         * The per-user error projection. Surfaces a relay-side
          * rejection for a single addressee.
          *
          * @implNote {@code WASmaxInPreKeysFetchMissingPreKeysUserErrorMixin.parseFetchMissingPreKeysUserErrorMixin}
-         *           parses the literal {@code code="500"} variant; the
+         *           parses the literal {@code code="500"} variant. The
          *           companion
          *           {@code WASmaxInPreKeysFetchMissingPreKeysUserErrorFallbackMixin}
          *           accepts {@code code} in {@code [500, 599]}.
@@ -652,9 +652,9 @@ public sealed interface SmaxPreKeysFetchMissingPreKeysResponse extends SmaxOpera
             /**
              * Constructs a per-user error projection.
              *
-             * @param userJid   the per-user JID; never {@code null}
+             * @param userJid   the per-user JID. Never {@code null}
              * @param errorCode the numeric error code
-             * @param errorText the human-readable text; never
+             * @param errorText the human-readable text. Never
              *                  {@code null}
              * @throws NullPointerException if {@code userJid} or
              *                              {@code errorText} is
@@ -669,7 +669,7 @@ public sealed interface SmaxPreKeysFetchMissingPreKeysResponse extends SmaxOpera
             /**
              * Returns the per-user JID echoed by the relay.
              *
-             * @return the JID; never {@code null}
+             * @return the JID. Never {@code null}
              */
             @Override
             public Jid userJid() {
@@ -688,7 +688,7 @@ public sealed interface SmaxPreKeysFetchMissingPreKeysResponse extends SmaxOpera
             /**
              * Returns the human-readable error text.
              *
-             * @return the error text; never {@code null}
+             * @return the error text. Never {@code null}
              */
             public String errorText() {
                 return errorText;
@@ -758,7 +758,7 @@ public sealed interface SmaxPreKeysFetchMissingPreKeysResponse extends SmaxOpera
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected the
+     * The {@code ClientError} reply variant. The relay rejected the
      * outer request as malformed, unauthorised, or referencing no valid
      * JIDs.
      *
@@ -784,7 +784,7 @@ public sealed interface SmaxPreKeysFetchMissingPreKeysResponse extends SmaxOpera
          * Constructs a new client-error reply.
          *
          * @param errorCode the numeric error code
-         * @param errorText the optional human-readable text; may be
+         * @param errorText the optional human-readable text. May be
          *                  {@code null}
          */
         public ClientError(int errorCode, String errorText) {
@@ -855,7 +855,7 @@ public sealed interface SmaxPreKeysFetchMissingPreKeysResponse extends SmaxOpera
     }
 
     /**
-     * The {@code ServerError} reply variant — the relay encountered a
+     * The {@code ServerError} reply variant. The relay encountered a
      * transient internal failure while processing the request.
      *
      * @implNote {@code WASmaxInPreKeysFetchMissingPreKeysResponseServerError.parseFetchMissingPreKeysResponseServerError}
@@ -880,7 +880,7 @@ public sealed interface SmaxPreKeysFetchMissingPreKeysResponse extends SmaxOpera
          * Constructs a new server-error reply.
          *
          * @param errorCode the numeric error code
-         * @param errorText the optional human-readable text; may be
+         * @param errorText the optional human-readable text. May be
          *                  {@code null}
          */
         public ServerError(int errorCode, String errorText) {

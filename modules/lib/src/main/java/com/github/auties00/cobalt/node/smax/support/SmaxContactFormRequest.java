@@ -20,7 +20,7 @@ import java.util.Optional;
 @WhatsAppWebModule(moduleName = "WASmaxOutSupportBaseIQSetRequestMixin")
 public final class SmaxContactFormRequest implements SmaxOperation.Request {
     /**
-     * The optional sender JID — when set, routed verbatim into
+     * The optional sender JID. When set, routed verbatim into
      * the IQ's {@code from} attribute.
      */
     private final Jid iqFrom;
@@ -190,41 +190,35 @@ public final class SmaxContactFormRequest implements SmaxOperation.Request {
             exports = "makeContactFormRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
         var children = new ArrayList<Node>();
-        // <description>{descriptionElementValue}</description>
         children.add(new NodeBuilder()
                 .description("description")
                 .content(descriptionElementValue)
                 .build());
         if (topicElementValue != null) {
-            // OPTIONAL_CHILD: <topic>{topicElementValue}</topic>
             children.add(new NodeBuilder()
                     .description("topic")
                     .content(topicElementValue)
                     .build());
         }
         if (topicIdElementValue != null) {
-            // OPTIONAL_CHILD: <topic_id>{topicIdElementValue}</topic_id>
             children.add(new NodeBuilder()
                     .description("topic_id")
                     .content(topicIdElementValue)
                     .build());
         }
         if (debugInformationJsonElementValue != null) {
-            // OPTIONAL_CHILD: <debug_information_json>{...}</debug_information_json>
             children.add(new NodeBuilder()
                     .description("debug_information_json")
                     .content(debugInformationJsonElementValue)
                     .build());
         }
         if (uploadedLogsIdElementValue != null) {
-            // OPTIONAL_CHILD: <uploaded_logs_id>{...}</uploaded_logs_id>
             children.add(new NodeBuilder()
                     .description("uploaded_logs_id")
                     .content(uploadedLogsIdElementValue)
                     .build());
         }
         if (additionalAttributesContextFlow != null) {
-            // OPTIONAL_CHILD: <additional_attributes context_flow="…"/>
             children.add(new NodeBuilder()
                     .description("additional_attributes")
                     .attribute("context_flow", additionalAttributesContextFlow)

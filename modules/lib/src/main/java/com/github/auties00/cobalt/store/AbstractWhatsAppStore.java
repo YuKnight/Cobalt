@@ -97,96 +97,25 @@ import static java.util.Objects.requireNonNullElseGet;
  * session field, setting, collection and Signal-protocol key into a single
  * flat protobuf message.
  *
- * <p>This class intentionally collapses WhatsApp Web's multi-database
- * architecture into a single in-memory aggregate:
- * <ul>
- *   <li>~12 IndexedDB databases carrying chats, contacts, messages, sync
- *       keys and sync state</li>
- *   <li>~100 IndexedDB tables that WA Web queries via its reactive
- *       Collection layer</li>
- *   <li>~45 in-memory reactive {@code Collection} models (contacts,
- *       chats, calls, newsletters, etc.)</li>
- *   <li>the key-value UserPrefs store used for AB props, encrypted rid,
- *       pairing metadata and so on</li>
- * </ul>
- * All of these are exposed as {@code ConcurrentHashMap} fields,
- * {@link ConcurrentLinkedHashMap} caches,
- * or plain scalar fields on this class, so that a concrete subclass only
- * needs to decide how to serialise/load the aggregate.
+ * <p>Collapses WhatsApp Web's multi-database architecture into a single
+ * in-memory aggregate. Every IndexedDB schema module ({@code WAWebSchema*})
+ * maps to a corresponding {@link ConcurrentHashMap} field, every reactive
+ * collection maps to an accessor method on the public interface, every
+ * Signal-protocol storage table maps to a typed map field, and every
+ * UserPrefs key maps to a scalar field. Concrete subclasses only need to
+ * decide how to serialise and load the aggregate.
  *
  * <p>The Signal protocol state (identity keys, pre-keys, signed pre-keys,
  * sessions, sender keys, app-state sync keys, noise keys) lives on this
  * class as well, so that instances can be used directly as a
  * {@link com.github.auties00.libsignal.SignalProtocolStore}.
  *
- * @implNote WAWebModelStorageInitialize: each WA Web IndexedDB schema
- * module ({@code WAWebSchema*}) maps to a corresponding field or map on
- * this class. The WA Web collection modules ({@code WAWebChatCollection},
- * {@code WAWebContactCollection}, {@code WAWebCallsCollection}, ...) are
- * represented by the {@link ConcurrentHashMap} fields
- * and accessor methods. The Signal storage module
- * {@code WAWebSignalStorage} is absorbed through the {@code SignalProtocol}
- * fields. The UserPrefs module {@code WAWebUserPrefsBase} corresponds to
- * the scalar fields (registered, showSecurityNotifications,
- * primaryDeviceSupportsSyncdRecovery, etc.).
- *
- * <p>The three {@code WAWebModelStorageInitialize} lifecycle exports map
- * to Cobalt as follows:
- * <ul>
- *   <li>{@code initializeWithoutGKs}: the per-table {@code addTable()}
- *       fan-out plus {@code WAWebModelStorageUtils.createStorage(...).
- *       initialize()} is replaced by
- *       {@code WhatsAppStoreFactory.create(...)} /
- *       {@code WhatsAppStoreFactory.load(...)}. Each WA Web
- *       {@code WAWebSchema*.addTable()} call corresponds to one of the
- *       {@link ConcurrentHashMap} fields declared on
- *       this class; the maps are unconditionally allocated, so there is
- *       no rollout / column-packing branch
- *       ({@code WAWebDbRolloutUtil.loadSchemaVersions} and
- *       {@code WAWebStorageGatingUtils.columnPackingEnabled} have no
- *       counterpart).</li>
- *   <li>{@code destroy}: implemented by
- *       {@link WhatsAppStore#delete()}, which removes the persistent
- *       backing directory. Both branches of the WA Web fall-back chain
- *       ({@code destroyStorage()} and {@code new Dexie(DATABASE_NAME).
- *       delete()}) collapse here; the {@code s = null} reset of the
- *       cached init promise has no analog because Cobalt does not
- *       memoize one.</li>
- *   <li>{@code clearInitializePromise}: no analog. WA Web uses it as a
- *       test-only reset of the module-level {@code s} cache; Cobalt's
- *       store factory is stateless and re-materializes the aggregate
- *       on every call.</li>
- * </ul>
- *
- * <p>The {@code WAWebSignalStorage} module is absorbed in the same way:
- * <ul>
- *   <li>{@code initialize}: replaced by the constructor of this class,
- *       which allocates the seven Signal-state maps unconditionally.
- *       The WA Web sequence
- *       ({@code WAWebSchemaBasekey.addTable()}, {@code WAWebSchemaIdentity.addTable()},
- *       {@code WAWebSchemaMeta.addTable()}, {@code WAWebSchemaPrekey.addTable()},
- *       {@code WAWebSchemaSenderkey.addTable()}, {@code WAWebSchemaSession.addTable()},
- *       {@code WAWebSchemaSignedPrekey.addTable()},
- *       {@code WAWebSignalStorageUtils.createStorage().initialize()})
- *       maps to the constructor's allocation of {@link #baseKeys},
- *       {@link #remoteIdentities} (plus {@link #registrationId},
- *       {@link #identityKeyPair}, {@link #noiseKeyPair},
- *       {@link #signedDeviceIdentity} for the meta keys), {@link #preKeys},
- *       {@link #senderKeys}, {@link #sessions} and {@link #signedKeyPair}
- *       respectively. The {@code WALogger} crash-and-rethrow branch in
- *       {@code WAWebSignalStorage.initialize} has no analog because
- *       allocation cannot fail.</li>
- *   <li>{@code destroy}: covered by the same {@link WhatsAppStore#delete()}
- *       call described above; the protobuf aggregate is the only
- *       persistent backing.</li>
- *   <li>{@code getBaseKeyTable}, {@code getIdentityTable},
- *       {@code getMetaTable}, {@code getPreKeyTable},
- *       {@code getSenderKeyTable}, {@code getSessionTable},
- *       {@code getSignedPreKeyTable}: replaced by the typed accessor
- *       methods on this class; the Dexie {@code Table} object is
- *       sidestepped because the in-memory {@code ConcurrentHashMap} is
- *       directly accessible.</li>
- * </ul>
+ * @implNote The {@code WAWebModelStorageInitialize} and
+ *           {@code WAWebSignalStorage} lifecycle exports collapse into the
+ *           constructor (allocates every map unconditionally, no schema
+ *           rollout) and {@link WhatsAppStore#delete()} (drops the persistent
+ *           backing directory). The {@code clearInitializePromise} export
+ *           has no analog because the factory is stateless.
  */
 @WhatsAppWebModule(moduleName = "WAWebModelStorageInitialize")
 @WhatsAppWebModule(moduleName = "WAWebCollections")
@@ -610,18 +539,9 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
 
     /**
      * The dedicated outgoing contact store, keyed by phone-number JID.
-     *
-     * <p>This field is the persistent backing store for the WhatsApp Web
-     * "invite by contact" feature, mirroring the dedicated {@code out-contact}
-     * IndexedDB table that WA Web maintains separately from its regular
-     * contact table. The map is owned exclusively by the
-     * {@link com.github.auties00.cobalt.sync.handler.OutContactHandler outgoing
-     * contact sync handler}, which routes both upserts and removals through
-     * the public store accessors below.
-     *
-     * @implNote WAWebDBOutContactDatabaseApi — backs the {@code out-contact}
-     *           table accessed exclusively through this database API; the
-     *           protobuf index slot {@code 81} is reserved for this field
+     * Persistent backing for the invite-by-contact feature, owned exclusively
+     * by the outgoing contact sync handler which routes upserts and removals
+     * through the public store accessors below.
      */
     @ProtobufProperty(index = 81, type = ProtobufType.MAP, mapKeyType = ProtobufType.STRING, mapValueType = ProtobufType.MESSAGE)
     protected ConcurrentHashMap<Jid, OutContact> outContacts;
@@ -629,85 +549,62 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
     /**
      * The server-vs-local clock skew, in seconds, captured from the
      * {@code <success>} stanza's {@code t} attribute.
-     *
-     * @implNote WAWebUpdateClockSkewUtils.updateClockSkew -
-     *           {@code WATimeUtils.setClockSkew(n)}
      */
     @ProtobufProperty(index = 84, type = ProtobufType.INT64)
-    protected long clockSkewSeconds; // WAWebUpdateClockSkewUtils.updateClockSkew
+    protected long clockSkewSeconds;
 
     /**
      * The timestamp of the last group AB-props emergency push signalled by
      * the server via the {@code <success>} stanza's {@code group_abprops}
      * attribute.
-     *
-     * @implNote WAWebABPropsLocalStorage.setGroupAbPropsEmergencyPushTimestamp
      */
     @ProtobufProperty(index = 85, type = ProtobufType.UINT64, mixins = InstantSecondsMixin.class)
-    protected Instant groupAbPropsEmergencyPushTimestamp; // WAWebABPropsLocalStorage.setGroupAbPropsEmergencyPushTimestamp
+    protected Instant groupAbPropsEmergencyPushTimestamp;
 
     /**
-     * The {@code abKey} field of the {@code ABPROPS} JSON blob most recently
-     * persisted by {@code updateAttributesLocalStorage}.
-     *
-     * @implNote WAWebABPropsLocalStorage.updateAttributesLocalStorage
+     * The {@code abKey} field of the persisted AB-props JSON blob.
      */
     @ProtobufProperty(index = 86, type = ProtobufType.STRING)
-    protected String abPropsAbKey; // WAWebABPropsLocalStorage.updateAttributesLocalStorage
+    protected String abPropsAbKey;
 
     /**
-     * The {@code hash} field of the {@code ABPROPS} JSON blob most recently
-     * persisted by {@code updateAttributesLocalStorage}.
-     *
-     * @implNote WAWebABPropsLocalStorage.updateAttributesLocalStorage
+     * The {@code hash} field of the persisted AB-props JSON blob.
      */
     @ProtobufProperty(index = 87, type = ProtobufType.STRING)
-    protected String abPropsHash; // WAWebABPropsLocalStorage.updateAttributesLocalStorage
+    protected String abPropsHash;
 
     /**
-     * The clamped {@code refresh} interval (seconds) of the {@code ABPROPS}
-     * JSON blob. Stored as a primitive so the protobuf manifest does not need
-     * a wrapper; the explicit {@code 0} sentinel is interpreted as "never
-     * recorded" by {@link #abPropsRefresh()}, which then surfaces the
-     * {@code 86400} default to mirror {@code WAWebABPropsLocalStorage.getRefresh}.
-     *
-     * @implNote WAWebABPropsLocalStorage.updateAttributesLocalStorage
+     * The clamped AB-props refresh interval, in seconds. The explicit
+     * {@code 0} sentinel is interpreted as never recorded by
+     * {@link #abPropsRefresh()}, which then surfaces the {@code 86400}
+     * default.
      */
     @ProtobufProperty(index = 88, type = ProtobufType.INT64)
-    protected long abPropsRefresh; // WAWebABPropsLocalStorage.updateAttributesLocalStorage
+    protected long abPropsRefresh;
 
     /**
-     * The {@code lastSyncTime} field of the {@code ABPROPS} JSON blob most
-     * recently persisted by {@code updateAttributesLocalStorage}.
-     *
-     * @implNote WAWebABPropsLocalStorage.updateAttributesLocalStorage
+     * The {@code lastSyncTime} field of the persisted AB-props JSON blob.
      */
     @ProtobufProperty(index = 89, type = ProtobufType.UINT64, mixins = InstantMillisMixin.class)
-    protected Instant abPropsLastSyncTime; // WAWebABPropsLocalStorage.updateAttributesLocalStorage
+    protected Instant abPropsLastSyncTime;
 
     /**
-     * The {@code ABPROPS_REFRESH_ID} {@code localStorage} value.
-     *
-     * @implNote WAWebABPropsLocalStorage.setRefreshId
+     * The persisted AB-props refresh id used to gate sync requests.
      */
     @ProtobufProperty(index = 90, type = ProtobufType.INT64)
-    protected long abPropsRefreshId; // WAWebABPropsLocalStorage.setRefreshId
+    protected long abPropsRefreshId;
 
     /**
-     * The {@code UserPrefs.AbpropsWebRefreshId} {@code localStorage} value.
-     *
-     * @implNote WAWebABPropsLocalStorage.setWebRefreshId
+     * The persisted web-only AB-props refresh id.
      */
     @ProtobufProperty(index = 91, type = ProtobufType.INT64)
-    protected long abPropsWebRefreshId; // WAWebABPropsLocalStorage.setWebRefreshId
+    protected long abPropsWebRefreshId;
 
     /**
-     * The {@code GROUP_ABPROPS_REFRESH_ID} {@code localStorage} value.
-     *
-     * @implNote WAWebABPropsLocalStorage.setGroupAbPropsRefreshId
+     * The persisted group AB-props refresh id.
      */
     @ProtobufProperty(index = 92, type = ProtobufType.INT64)
-    protected long groupAbPropsRefreshId; // WAWebABPropsLocalStorage.setGroupAbPropsRefreshId
+    protected long groupAbPropsRefreshId;
 
     /**
      * The Alice base-key dedupe table for inbound pre-key messages.
@@ -950,16 +847,16 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
         this.lid = lid;
         this.contacts = Objects.requireNonNull(contacts, "contacts cannot be null");
         this.contactTextStatuses = new ConcurrentHashMap<>();
-        this.outContacts = requireNonNullElseGet(outContacts, ConcurrentHashMap::new); // WAWebDBOutContactDatabaseApi — initialise the dedicated out-contact store
-        this.clockSkewSeconds = clockSkewSeconds; // WAWebUpdateClockSkewUtils.updateClockSkew
-        this.groupAbPropsEmergencyPushTimestamp = groupAbPropsEmergencyPushTimestamp; // WAWebABPropsLocalStorage.setGroupAbPropsEmergencyPushTimestamp
-        this.abPropsAbKey = abPropsAbKey; // WAWebABPropsLocalStorage.updateAttributesLocalStorage
-        this.abPropsHash = abPropsHash; // WAWebABPropsLocalStorage.updateAttributesLocalStorage
-        this.abPropsRefresh = abPropsRefresh; // WAWebABPropsLocalStorage.updateAttributesLocalStorage
-        this.abPropsLastSyncTime = abPropsLastSyncTime; // WAWebABPropsLocalStorage.updateAttributesLocalStorage
-        this.abPropsRefreshId = abPropsRefreshId; // WAWebABPropsLocalStorage.setRefreshId
-        this.abPropsWebRefreshId = abPropsWebRefreshId; // WAWebABPropsLocalStorage.setWebRefreshId
-        this.groupAbPropsRefreshId = groupAbPropsRefreshId; // WAWebABPropsLocalStorage.setGroupAbPropsRefreshId
+        this.outContacts = requireNonNullElseGet(outContacts, ConcurrentHashMap::new);
+        this.clockSkewSeconds = clockSkewSeconds;
+        this.groupAbPropsEmergencyPushTimestamp = groupAbPropsEmergencyPushTimestamp;
+        this.abPropsAbKey = abPropsAbKey;
+        this.abPropsHash = abPropsHash;
+        this.abPropsRefresh = abPropsRefresh;
+        this.abPropsLastSyncTime = abPropsLastSyncTime;
+        this.abPropsRefreshId = abPropsRefreshId;
+        this.abPropsWebRefreshId = abPropsWebRefreshId;
+        this.groupAbPropsRefreshId = groupAbPropsRefreshId;
 
         this.privacySettings = Objects.requireNonNull(privacySettings, "privacySettings cannot be null");
         this.calls = Objects.requireNonNull(calls, "calls cannot be null");
@@ -1065,7 +962,7 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
         this.mentionEveryoneMuteExpirations = requireNonNullElseGet(mentionEveryoneMuteExpirations, ConcurrentHashMap::new);
         this.orphanMutationEntries = new ConcurrentHashMap<>();
         this.identityEncryptionRange = new ConcurrentHashMap<>();
-        this.baseKeys = requireNonNullElseGet(baseKeys, ConcurrentHashMap::new); // WAWebSignalStorage.getBaseKeyTable
+        this.baseKeys = requireNonNullElseGet(baseKeys, ConcurrentHashMap::new);
         this.encryptionSequence = new AtomicLong();
         this.logger = System.getLogger(this.getClass().getName());
         this.mediaConnectionLock = new Object();
@@ -1373,26 +1270,11 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
         return this;
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote WAWebSchemaCtwaPerCustomerDataSharing (data-sharing-3pd-lid-v2 IDB table) —
-     *           returns an unmodifiable view backed by the live
-     *           {@link ConcurrentHashMap} keyed by account LID raw string
-     */
     @Override
     public Map<String, Boolean> ctwaPerCustomerDataSharing() {
         return Collections.unmodifiableMap(ctwaPerCustomerDataSharing);
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote WAWebSchemaCtwaPerCustomerDataSharing (data-sharing-3pd-lid-v2 IDB table) —
-     *           equivalent to a {@code get(lidRawString)} read on the IDB table;
-     *           returns {@link Optional#empty()} when {@code accountLid} is
-     *           {@code null} or no entry exists for it
-     */
     @Override
     public Optional<Boolean> findCtwaDataSharing(String accountLid) {
         if (accountLid == null) {
@@ -1401,13 +1283,6 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
         return Optional.ofNullable(ctwaPerCustomerDataSharing.get(accountLid));
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote WAWebSchemaCtwaPerCustomerDataSharing (data-sharing-3pd-lid-v2 IDB table) —
-     *           equivalent to a {@code createOrReplace} write on the IDB table
-     *           with the row {@code (lidRawString, dataSharing3pdEnabled)}
-     */
     @Override
     public WhatsAppStore setCtwaDataSharing(String accountLid, Boolean enabled) {
         Objects.requireNonNull(accountLid, "accountLid cannot be null");
@@ -1416,13 +1291,6 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
         return this;
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote WAWebSchemaCtwaPerCustomerDataSharing (data-sharing-3pd-lid-v2 IDB table) —
-     *           equivalent to a {@code remove(lidRawString)} delete on the IDB
-     *           table; a {@code null} {@code accountLid} is a no-op
-     */
     @Override
     public WhatsAppStore removeCtwaDataSharing(String accountLid) {
         if (accountLid != null) {
@@ -1443,41 +1311,22 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
     }
 
     /**
-     * Returns the underlying outgoing contact map for protobuf serialization.
+     * Returns the underlying outgoing contact map for protobuf serialisation.
+     * Exposes the live mutable map so that generated protobuf encode and
+     * decode glue can iterate the entries directly without the unmodifiable
+     * wrapper applied by {@link #outContacts()}.
      *
-     * <p>This package-private accessor exposes the live mutable map so that
-     * generated protobuf encode/decode glue can iterate the entries directly
-     * without the unmodifiable wrapper applied by {@link #outContacts()}.
-     *
-     * @return the live {@code ConcurrentHashMap} backing the outgoing contact
-     *         store
-     * @implNote WAWebDBOutContactDatabaseApi — internal accessor used to
-     *           serialise the dedicated {@code out-contact} table
+     * @return the live concurrent map backing the outgoing contact store
      */
     protected ConcurrentHashMap<Jid, OutContact> outContactsField() {
         return outContacts;
     }
 
-    /**
-     * Returns an unmodifiable view of all outgoing contacts.
-     *
-     * @return an unmodifiable map of outgoing contacts keyed by JID
-     * @implNote WAWebDBOutContactDatabaseApi — replaces the
-     *           {@code getAllOutContacts} accessor on the WA Web database API
-     */
     @Override
     public Map<Jid, OutContact> outContacts() {
         return Collections.unmodifiableMap(outContacts);
     }
 
-    /**
-     * Finds an outgoing contact by its phone-number JID.
-     *
-     * @param jid the JID to look up, may be {@code null}
-     * @return an {@code Optional} containing the outgoing contact if it exists
-     * @implNote WAWebDBOutContactDatabaseApi — mirrors the
-     *           {@code getOutContact} lookup on the WA Web database API
-     */
     @Override
     public Optional<OutContact> findOutContact(Jid jid) {
         if (jid == null) {
@@ -1487,18 +1336,12 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
     }
 
     /**
-     * Adds or merges an outgoing contact in the store.
+     * {@inheritDoc}
      *
-     * <p>If an entry with the same JID is already present, its name fields are
-     * overwritten with the values supplied by the new record. This mirrors the
-     * batched upsert semantics used by WA Web's
-     * {@code putOutContactBatch} call.
-     *
-     * @param outContact the outgoing contact to add or merge, must not be
-     *                   {@code null}
-     * @return this store instance for method chaining
-     * @implNote WAWebDBOutContactDatabaseApi.putOutContactBatch — bulk upsert
-     *           into the {@code out-contact} table
+     * @implNote When an entry with the same JID is already present its
+     *           {@code fullName} and {@code firstName} fields are overwritten
+     *           with the values supplied by the new record, mirroring WA
+     *           Web's batched upsert semantics.
      */
     @Override
     public WhatsAppStore addOutContact(OutContact outContact) {
@@ -1511,14 +1354,6 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
         return this;
     }
 
-    /**
-     * Removes an outgoing contact from the store by its phone-number JID.
-     *
-     * @param jid the JID of the outgoing contact to remove, may be {@code null}
-     * @return this store instance for method chaining
-     * @implNote WAWebDBOutContactDatabaseApi.removeOutContactBatch — bulk
-     *           removal from the {@code out-contact} table
-     */
     @Override
     public WhatsAppStore removeOutContact(Jid jid) {
         if (jid != null) {
@@ -2460,8 +2295,6 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
         var seq = encryptionSequence.incrementAndGet();
         for (var device : devices) {
             var address = device.toSignalAddress();
-            // WAWebSignalProtocolStoreUnifiedApi: only set if null or > seq
-            // (i.e. record the *earliest* sequence for this identity)
             identityEncryptionRange.merge(address, seq, Math::min);
         }
         return seq;
@@ -2530,17 +2363,6 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote Per WAWebGetSyncKey.getAllSyncKeysInTransaction:
-     *           {@code runInTransaction({SyncKeyStore: true}, t => t.SyncKeyStore.getAll())}
-     *           which delegates to
-     *           {@code WAWebSyncdDb.getAllSyncKeys() ->
-     *           getSyncKeysTable().all().map(convertToSyncKeyFromRow)}.
-     *           Cobalt returns the in-memory map's sequenced values
-     *           wrapped in an unmodifiable view.
-     */
     @Override
     @WhatsAppWebExport(
             moduleName = "WAWebGetSyncKey",
@@ -2548,23 +2370,9 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
             adaptation = WhatsAppAdaptation.ADAPTED
     )
     public SequencedCollection<AppStateSyncKey> appStateKeys() {
-        // WAWebSyncdDb.getAllSyncKeys: getSyncKeysTable().all()
         return Collections.unmodifiableSequencedCollection(appStateKeys.sequencedValues());
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote Per WAWebGetSyncKey.getSyncKeyInTransaction_DO_NOT_USE:
-     *           {@code runInTransaction({SyncKeyStore: true}, t => t.SyncKeyStore.get(id))}
-     *           which delegates to
-     *           {@code WAWebSyncdDb.getSyncKey(id) ->
-     *           getSyncKeysTable().get(new Uint8Array(fromSyncKeyId(id)))}.
-     *           {@code WASyncdKeyTypes.fromSyncKeyId} is the identity
-     *           function so the lookup is by raw {@code keyId} bytes.
-     *           Cobalt keys the in-memory map by hex-encoded
-     *           {@code keyId} for {@link String}-keyed storage.
-     */
     @Override
     @WhatsAppWebExport(
             moduleName = "WAWebGetSyncKey",
@@ -2572,29 +2380,17 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
             adaptation = WhatsAppAdaptation.ADAPTED
     )
     public Optional<AppStateSyncKey> findWebAppStateKeyById(byte[] id) {
-        // WAWebSyncdDb.getSyncKey: getSyncKeysTable().get(new Uint8Array(fromSyncKeyId(e)))
         return Optional.ofNullable(appStateKeys.get(HexFormat.of().formatHex(id)));
     }
 
     /**
      * {@inheritDoc}
      *
-     * @implNote Per WAWebGetSyncKey.setSyncKeyInTransaction:
-     *           {@code runInTransaction({SyncKeyStore: true}, t => t.SyncKeyStore.set(key))}
-     *           which delegates to
-     *           {@code WAWebSyncdDb.createSyncKey(key) ->
-     *           getSyncKeysTable().createOrReplace(convertFromSyncKeyToRow(key))}.
-     *           Cobalt accepts a {@link Collection} per call to amortise
-     *           the rotation/key-share batched store path
-     *           ({@code SyncKeyRotationService}) — WA Web invokes
-     *           {@code setSyncKeyInTransaction} once per key from
-     *           {@code WAWebSyncdHandleKeyShare.handleKeyShare} and
-     *           {@code WAWebSyncdKeyManagement}. The empty
-     *           {@code keyData} guard is an ADAPTED defensive filter
-     *           with no JS counterpart: WA Web's call sites pass
-     *           individual fully-populated keys after a {@code n != null}
-     *           check, while Cobalt's bulk wrapper additionally rejects
-     *           rows whose payload is absent or zero-length.
+     * @implNote The empty-{@code keyData} guard is a defensive filter
+     *           without a WA Web counterpart. WA Web's callers pass
+     *           individual fully populated keys, but the Cobalt bulk wrapper
+     *           is also driven by recovery flows that may otherwise admit
+     *           empty payloads.
      */
     @Override
     @WhatsAppWebExport(
@@ -2604,7 +2400,6 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
     )
     public void addWebAppStateKeys(Collection<AppStateSyncKey> keys) {
         for (var key : keys) {
-            // ADAPTED: defensive filter with no WA Web counterpart — reject keys without payload.
             var hasKeyData = key.keyData()
                     .flatMap(AppStateSyncKeyData::keyData)
                     .map(data -> data.length > 0)
@@ -2612,7 +2407,6 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
             if (!hasKeyData) {
                 continue;
             }
-            // WAWebSyncdDb.createSyncKey: getSyncKeysTable().createOrReplace(convertFromSyncKeyToRow(e))
             key.keyId()
                     .flatMap(AppStateSyncKeyId::keyId)
                     .ifPresent(keyId -> appStateKeys.put(HexFormat.of().formatHex(keyId), key));
@@ -2622,13 +2416,10 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
     /**
      * {@inheritDoc}
      *
-     * @implNote NO_WA_BASIS — WA Web's {@code SyncKeyStore} only exposes
-     *           {@code expire(epoch)} (mapped to
-     *           {@link #expireAppStateKeysByEpoch(int)}) and
-     *           {@code clear()} ({@code WAWebSchemaSyncKeys.getSyncKeysTable().clear}).
-     *           This timestamp-threshold variant has no equivalent and
-     *           is currently unused; retained pending cleanup by the
-     *           phantom-sweep agent.
+     * @implNote No WA Web counterpart. WA Web's {@code SyncKeyStore} exposes
+     *           only the epoch-based {@link #expireAppStateKeysByEpoch(int)}
+     *           and a full {@code clear()}. Currently unused, retained
+     *           pending phantom-sweep cleanup.
      */
     @Override
     public void expireAppStateKeys(Instant threshold) {
@@ -2646,23 +2437,10 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
     /**
      * {@inheritDoc}
      *
-     * @implNote Per WAWebGetSyncKey.expireSyncKeyInTransaction:
-     *           {@code runInTransaction({SyncKeyStore: true}, t => t.SyncKeyStore.expire(epoch))}
-     *           which delegates to
-     *           {@code WAWebSyncdDb.expireSyncKey(epoch)}:
-     *           <pre>{@code
-     *             const t = yield getSyncKeysTable().equals(["keyEpoch"], epoch);
-     *             t.forEach(e => getSyncKeysTable().merge({keyId: e.keyId},
-     *                                                    {timestamp: 0}));
-     *           }</pre>
-     *           — i.e. the IndexedDB {@code keyEpoch} index lookup is
-     *           replaced by an in-memory scan over
-     *           {@link #appStateKeys}, and the partial-row merge is
-     *           replaced by mutating the embedded
-     *           {@link AppStateSyncKeyData#setTimestamp} to
-     *           {@link Instant#EPOCH} (the Java equivalent of
-     *           {@code timestamp: 0}). Note that this is a soft-mark,
-     *           NOT a deletion — keys remain in the map.
+     * @implNote Soft-mark expiration. Keys whose epoch matches keep their
+     *           presence in the map but have their timestamp reset to
+     *           {@link Instant#EPOCH}, mirroring WA Web's
+     *           {@code timestamp: 0} merge.
      */
     @Override
     @WhatsAppWebExport(
@@ -2672,12 +2450,10 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
     )
     public void expireAppStateKeysByEpoch(int epoch) {
         for (var key : appStateKeys.values()) {
-            // WAWebSyncdDb.expireSyncKey: getSyncKeysTable().equals(["keyEpoch"], e) — Cobalt scans values, no secondary index.
             if (SyncKeyUtils.getKeyEpoch(key) != epoch) {
                 continue;
             }
 
-            // WAWebSyncdDb.expireSyncKey: getSyncKeysTable().merge({keyId: e.keyId}, {timestamp: 0})
             key.keyData().ifPresent(data -> data.setTimestamp(Instant.EPOCH));
         }
     }
@@ -2736,7 +2512,7 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
     )
     public void putSyncActionEntry(SyncPatchType patchType, byte[] indexMac, SyncActionEntry entry) {
         syncActionEntries.computeIfAbsent(patchType, _ -> new ConcurrentHashMap<>())
-                .put(HexFormat.of().formatHex(indexMac), entry); // WAWebSyncActionStore.bulkSet/bulkUpdate: setSyncActionRows / updateSyncActionRows
+                .put(HexFormat.of().formatHex(indexMac), entry);
     }
 
     @Override
@@ -2786,7 +2562,7 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
     public int countSyncActionEntries() {
         var total = 0;
         for (var inner : syncActionEntries.values()) {
-            total += inner.size(); // WAWebSyncActionStore.count: getSyncActionsTable().count()
+            total += inner.size();
         }
         return total;
     }
@@ -2803,7 +2579,7 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
         }
         var all = new ArrayList<SyncActionEntry>();
         for (var inner : syncActionEntries.values()) {
-            all.addAll(inner.values()); // WAWebSyncActionStore.getAll: getSyncActionsTable().all()
+            all.addAll(inner.values());
         }
         return Collections.unmodifiableCollection(all);
     }
@@ -2815,7 +2591,7 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
             adaptation = WhatsAppAdaptation.ADAPTED
     )
     public Collection<MissingDeviceSyncKey> missingSyncKeys() {
-        return Collections.unmodifiableCollection(missingSyncKeys.values()); // WAWebMissingKeyStore.getAll: WAWebSyncdDb.getAllMissingKeys()
+        return Collections.unmodifiableCollection(missingSyncKeys.values());
     }
 
     @Override
@@ -2825,8 +2601,6 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
             adaptation = WhatsAppAdaptation.ADAPTED
     )
     public Optional<MissingDeviceSyncKey> findMissingSyncKey(byte[] keyId) {
-        // ADAPTED: WAWebMissingKeyStore.bulkGet takes a list of keyHex strings;
-        //         Cobalt looks up a single entry by raw keyId bytes encoded with HexFormat.
         return Optional.ofNullable(missingSyncKeys.get(HexFormat.of().formatHex(keyId)));
     }
 
@@ -2837,7 +2611,7 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
             adaptation = WhatsAppAdaptation.ADAPTED
     )
     public int missingSyncKeyCount() {
-        return missingSyncKeys.size(); // WAWebMissingKeyStore.count: WAWebSyncdDb.getMissingKeyCount()
+        return missingSyncKeys.size();
     }
 
     @Override
@@ -2847,8 +2621,6 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
             adaptation = WhatsAppAdaptation.ADAPTED
     )
     public void addMissingSyncKey(MissingDeviceSyncKey missingKey) {
-        // Single-element form of WAWebMissingKeyStore.bulkUpdate:
-        //   WAWebSyncdDb.createOrUpdateMissingKeys([{keyHex, keyId, timestamp, deviceResponses}])
         missingSyncKeys.put(HexFormat.of().formatHex(missingKey.keyId()), missingKey);
     }
 
@@ -2860,7 +2632,6 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
     )
     public void addMissingSyncKeys(Collection<MissingDeviceSyncKey> missingKeys) {
         Objects.requireNonNull(missingKeys, "missingKeys cannot be null");
-        // WAWebMissingKeyStore.bulkUpdate: WAWebSyncdDb.createOrUpdateMissingKeys(records)
         for (var missingKey : missingKeys) {
             this.missingSyncKeys.put(HexFormat.of().formatHex(missingKey.keyId()), missingKey);
         }
@@ -2868,8 +2639,6 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
 
     @Override
     public void removeMissingSyncKey(byte[] keyId) {
-        // Single-element form of WAWebMissingKeyStore.bulkRemove:
-        //   WAWebSyncdDb.bulkRemoveMissingKeys([keyHex])
         missingSyncKeys.remove(HexFormat.of().formatHex(keyId));
     }
 
@@ -3060,17 +2829,18 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
         }
     }
 
-    public void markWebAppStateDirty(SyncPatchType collectionName) { // WAWebSyncdCollectionsStateMachine.moveCollectionsToDirty
+    @Override
+    public void markWebAppStateDirty(SyncPatchType collectionName) {
         webAppStateCollections.compute(collectionName, (_, current) -> {
             if (current == null) {
                 return new SyncCollectionMetadataBuilder()
                         .name(collectionName)
                         .version(0)
                         .ltHash(MutationLTHash.copy(MutationLTHash.EMPTY_HASH))
-                        .lastSyncTimestamp(null) // WAWebSyncdCollectionsStateMachine.moveCollectionsToDirty: no lastSyncTimestamp field in WA Web state entry
-                        .state(SyncCollectionState.DIRTY) // WAWebSyncdCollectionsStateMachine.moveCollectionsToDirty: state = Dirty
+                        .lastSyncTimestamp(null)
+                        .state(SyncCollectionState.DIRTY)
                         .retryCount(0)
-                        .lastErrorTimestamp(null) // WAWebSyncdCollectionsStateMachine.moveCollectionsToDirty: finiteFailureStartTime = undefined for new entries
+                        .lastErrorTimestamp(null)
                         .macMismatch(false)
                         .bootstrapped(false)
                         .build();
@@ -3078,19 +2848,27 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
             return new SyncCollectionMetadataBuilder()
                     .name(current.name())
                     .version(current.version())
-                    .ltHash(current.ltHash()) // ADAPTED: Cobalt shares record reference, no copy needed
-                    .lastSyncTimestamp(current.lastSyncTimestamp().orElse(null)) // WAWebSyncdCollectionsStateMachine.moveCollectionsToDirty: WA Web does not update lastSyncTimestamp
-                    .state(SyncCollectionState.DIRTY) // WAWebSyncdCollectionsStateMachine.moveCollectionsToDirty: state = Dirty
-                    .retryCount(current.retryCount()) // ADAPTED: retryCount preserved (WA Web tracks retries via global counter W in WAWebSyncd)
-                    .lastErrorTimestamp(current.lastErrorTimestamp().orElse(null)) // WAWebSyncdCollectionsStateMachine.moveCollectionsToDirty: unconditionally preserves finiteFailureStartTime
+                    .ltHash(current.ltHash())
+                    .lastSyncTimestamp(current.lastSyncTimestamp().orElse(null))
+                    .state(SyncCollectionState.DIRTY)
+                    .retryCount(current.retryCount())
+                    .lastErrorTimestamp(current.lastErrorTimestamp().orElse(null))
                     .macMismatch(current.macMismatch())
                     .bootstrapped(current.bootstrapped())
                     .build();
         });
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * @implNote {@code IN_FLIGHT} has no WA Web counterpart. WA Web tracks
+     *           in-flight collections via an in-memory set rather than a
+     *           persistent state, so Cobalt introduces this state to make the
+     *           transition visible across reconnects.
+     */
     @Override
-    public void markWebAppStateInFlight(SyncPatchType collectionName) { // NO_WA_BASIS: InFlight is a Cobalt-only state (WA Web uses in-memory Set A for inflight tracking)
+    public void markWebAppStateInFlight(SyncPatchType collectionName) {
         webAppStateCollections.computeIfPresent(collectionName, (_, current) ->
                 new SyncCollectionMetadataBuilder()
                         .name(current.name())
@@ -3107,24 +2885,31 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
     }
 
     @Override
-    public void markWebAppStateUpToDate(SyncPatchType collectionName) { // WAWebSyncdCollectionsStateMachine.moveCollectionsToUpToDate
+    public void markWebAppStateUpToDate(SyncPatchType collectionName) {
         webAppStateCollections.computeIfPresent(collectionName, (_, current) ->
                 new SyncCollectionMetadataBuilder()
                         .name(current.name())
                         .version(current.version())
                         .ltHash(current.ltHash())
                         .lastSyncTimestamp(Instant.now())
-                        .state(SyncCollectionState.UP_TO_DATE) // WAWebSyncdCollectionsStateMachine.moveCollectionsToUpToDate: state = UpToDate
-                        .retryCount(0) // ADAPTED: reset retry count (WA Web uses global counter W)
-                        .lastErrorTimestamp(null) // WAWebSyncdCollectionsStateMachine.moveCollectionsToUpToDate: finiteFailureStartTime = undefined
+                        .state(SyncCollectionState.UP_TO_DATE)
+                        .retryCount(0)
+                        .lastErrorTimestamp(null)
                         .macMismatch(current.macMismatch())
                         .bootstrapped(current.bootstrapped())
                         .build()
         );
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * @implNote {@code PENDING} has no WA Web counterpart. WA Web tracks
+     *           pending collections via an in-memory set rather than a
+     *           persistent state.
+     */
     @Override
-    public void markWebAppStatePending(SyncPatchType collectionName) { // NO_WA_BASIS: Pending is a Cobalt-only state (WA Web uses in-memory Set F for pending tracking)
+    public void markWebAppStatePending(SyncPatchType collectionName) {
         webAppStateCollections.computeIfPresent(collectionName, (_, current) ->
                 new SyncCollectionMetadataBuilder()
                         .name(current.name())
@@ -3141,16 +2926,16 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
     }
 
     @Override
-    public void markWebAppStateBlocked(SyncPatchType collectionName) { // WAWebSyncdCollectionsStateMachine.moveCollectionsToBlocked
+    public void markWebAppStateBlocked(SyncPatchType collectionName) {
         webAppStateCollections.computeIfPresent(collectionName, (_, current) ->
                 new SyncCollectionMetadataBuilder()
                         .name(current.name())
                         .version(current.version())
                         .ltHash(current.ltHash())
                         .lastSyncTimestamp(current.lastSyncTimestamp().orElse(null))
-                        .state(SyncCollectionState.BLOCKED) // WAWebSyncdCollectionsStateMachine.moveCollectionsToBlocked: state = Blocked
+                        .state(SyncCollectionState.BLOCKED)
                         .retryCount(current.retryCount())
-                        .lastErrorTimestamp(current.lastErrorTimestamp().orElse(null)) // WAWebSyncdCollectionsStateMachine.moveCollectionsToBlocked: preserves finiteFailureStartTime
+                        .lastErrorTimestamp(current.lastErrorTimestamp().orElse(null))
                         .macMismatch(current.macMismatch())
                         .bootstrapped(current.bootstrapped())
                         .build()
@@ -3158,16 +2943,16 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
     }
 
     @Override
-    public void markWebAppStateErrorRetry(SyncPatchType collectionName) { // WAWebSyncdCollectionsStateMachine.moveCollectionsToFiniteRetry
+    public void markWebAppStateErrorRetry(SyncPatchType collectionName) {
         webAppStateCollections.computeIfPresent(collectionName, (_, current) ->
                 new SyncCollectionMetadataBuilder()
                         .name(current.name())
                         .version(current.version())
                         .ltHash(current.ltHash())
                         .lastSyncTimestamp(current.lastSyncTimestamp().orElse(null))
-                        .state(SyncCollectionState.ERROR_RETRY) // WAWebSyncdCollectionsStateMachine.moveCollectionsToFiniteRetry: state = FailingFiniteRetry
-                        .retryCount(current.retryCount() + 1) // ADAPTED: per-collection retry count (WA Web uses global W counter in WAWebSyncd)
-                        .lastErrorTimestamp(current.lastErrorTimestamp().orElseGet(Instant::now)) // WAWebSyncdCollectionsStateMachine.moveCollectionsToFiniteRetry: finiteFailureStartTime ?? unixTimeMs()
+                        .state(SyncCollectionState.ERROR_RETRY)
+                        .retryCount(current.retryCount() + 1)
+                        .lastErrorTimestamp(current.lastErrorTimestamp().orElseGet(Instant::now))
                         .macMismatch(current.macMismatch())
                         .bootstrapped(current.bootstrapped())
                         .build()
@@ -3175,16 +2960,16 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
     }
 
     @Override
-    public void markWebAppStateErrorFatal(SyncPatchType collectionName) { // WAWebSyncdCollectionsStateMachine.moveCollectionsToFatal
+    public void markWebAppStateErrorFatal(SyncPatchType collectionName) {
         webAppStateCollections.computeIfPresent(collectionName, (_, current) ->
                 new SyncCollectionMetadataBuilder()
                         .name(current.name())
                         .version(current.version())
                         .ltHash(current.ltHash())
                         .lastSyncTimestamp(current.lastSyncTimestamp().orElse(null))
-                        .state(SyncCollectionState.ERROR_FATAL) // WAWebSyncdCollectionsStateMachine.moveCollectionsToFatal: state = Fatal
+                        .state(SyncCollectionState.ERROR_FATAL)
                         .retryCount(current.retryCount())
-                        .lastErrorTimestamp(null) // WAWebSyncdCollectionsStateMachine.moveCollectionsToFatal: does not include finiteFailureStartTime (undefined)
+                        .lastErrorTimestamp(null)
                         .macMismatch(current.macMismatch())
                         .bootstrapped(current.bootstrapped())
                         .build()
@@ -3198,11 +2983,6 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
             adaptation = WhatsAppAdaptation.ADAPTED
     )
     public boolean isCollectionInMacMismatchFatal(SyncPatchType collectionName) {
-        // WAWebGetCollectionVersion.getIsCollectionInMacMismatchFatalInTransaction:
-        // n.get(e).then(e => e?.isCollectionInMacMismatchFatal)
-        // The optional-chain `e?.isCollectionInMacMismatchFatal` resolves to `undefined`
-        // (falsy) when no entry exists; findWebAppState returns a default with
-        // macMismatch == false in that case, matching that semantics.
         var current = webAppStateCollections.get(collectionName);
         return current != null && current.macMismatch();
     }
@@ -3214,8 +2994,6 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
             adaptation = WhatsAppAdaptation.ADAPTED
     )
     public void markWebAppStateMacMismatch(SyncPatchType collectionName) {
-        // Per WA Web: isCollectionInMacMismatchFatal is a persistent boolean
-        // that survives all state transitions, not a state enum value
         webAppStateCollections.computeIfPresent(collectionName, (_, current) ->
                 new SyncCollectionMetadataBuilder()
                         .name(current.name())
@@ -3236,17 +3014,17 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
             moduleName = "WAWebSyncdCollectionsStateMachine",
             exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED
-    ) // WAWebSyncdCollectionsStateMachine.getCollectionState
-    public SyncCollectionMetadata findWebAppState(SyncPatchType collectionName) { // WAWebSyncdCollectionsStateMachine.getCollectionState
-        return webAppStateCollections.computeIfAbsent(collectionName, key -> // WAWebSyncdCollectionsStateMachine.getCollectionState: missing -> moveCollectionsToUpToDate, return UpToDate
+    )
+    public SyncCollectionMetadata findWebAppState(SyncPatchType collectionName) {
+        return webAppStateCollections.computeIfAbsent(collectionName, key ->
                 new SyncCollectionMetadataBuilder()
                         .name(key)
                         .version(0)
                         .ltHash(MutationLTHash.copy(MutationLTHash.EMPTY_HASH))
                         .lastSyncTimestamp(null)
-                        .state(SyncCollectionState.UP_TO_DATE) // WAWebSyncdCollectionsStateMachine.getCollectionState: default = UpToDate
+                        .state(SyncCollectionState.UP_TO_DATE)
                         .retryCount(0)
-                        .lastErrorTimestamp(null) // WAWebSyncdCollectionsStateMachine.moveCollectionsToUpToDate: finiteFailureStartTime = undefined
+                        .lastErrorTimestamp(null)
                         .macMismatch(false)
                         .bootstrapped(false)
                         .build()
@@ -3261,8 +3039,6 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
     )
     public void updateWebAppStateVersion(SyncPatchType collectionName, long newVersion, byte[] newLtHash) {
         var copiedHash = MutationLTHash.copy(newLtHash);
-        // Per WA Web: update both collection metadata and hash state atomically
-        // to prevent inconsistent state on crash between writes
         webAppStateCollections.compute(collectionName, (_, current) ->
                 new SyncCollectionMetadataBuilder()
                         .name(collectionName)
@@ -3270,10 +3046,10 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
                         .ltHash(copiedHash)
                         .lastSyncTimestamp(Instant.now())
                         .state(current != null ? current.state() : SyncCollectionState.UP_TO_DATE)
-                        .retryCount(0)  // Reset retry count on successful update
-                        .lastErrorTimestamp(null)  // Reset error timestamp
+                        .retryCount(0)
+                        .lastErrorTimestamp(null)
                         .macMismatch(current != null && current.macMismatch())
-                        .bootstrapped(true)  // Collection has been synced at least once
+                        .bootstrapped(true)
                         .build()
         );
         var hashState = new SyncHashValue(collectionName);
@@ -3381,11 +3157,6 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
                 : Optional.ofNullable(quickReplies.remove(id));
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote WAWebSchemaQuickReply.getQuickReplyTable().getAll()
-     */
     @Override
     public List<QuickReply> quickReplies() {
         return List.copyOf(quickReplies.values());
@@ -3584,91 +3355,42 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
         coexHostedVerificationCache.clear();
     }
 
-    /**
-     * Records that the stored CTWA UTM payload for the given chat has been
-     * consumed, so that {@link #hasReadUtmForChat(Jid)} returns {@code true}
-     * on subsequent reads until the entry is evicted.
-     *
-     * @param chatJid the chat JID whose UTM payload has just been read;
-     *                {@code null} is ignored
-     * @implNote Mirrors {@code WAWebChatUtmCache.read(t)} which performs
-     *           {@code this.utmReadChatIds.add(t)} on the singleton instance.
-     */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebChatUtmCache", exports = "default.read", adaptation = WhatsAppAdaptation.ADAPTED)
     public void markUtmReadForChat(Jid chatJid) {
         if (chatJid != null) {
-            utmReadChatIds.add(chatJid); // WAWebChatUtmCache.read
+            utmReadChatIds.add(chatJid);
         }
     }
 
-    /**
-     * Returns whether the CTWA UTM payload for the given chat has already
-     * been consumed during this session.
-     *
-     * @param chatJid the chat JID to check
-     * @return {@code true} if {@link #markUtmReadForChat(Jid)} was invoked
-     *         for this chat and the entry has not since been evicted
-     * @implNote Mirrors {@code WAWebChatUtmCache.hasRead(t)} which returns
-     *           {@code this.utmReadChatIds.has(t)} on the singleton instance.
-     */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebChatUtmCache", exports = "default.hasRead", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean hasReadUtmForChat(Jid chatJid) {
         if (chatJid == null) {
             return false;
         }
-        return utmReadChatIds.contains(chatJid); // WAWebChatUtmCache.hasRead
+        return utmReadChatIds.contains(chatJid);
     }
 
-    /**
-     * Evicts the given chat from the UTM-read cache so that its UTM payload
-     * will be re-read the next time it is requested. Invoked by
-     * {@code WAWebUpdateUtmAction.addUtmToChat} after a new UTM value is
-     * persisted for the chat.
-     *
-     * @param chatJid the chat JID to forget; {@code null} is ignored
-     * @implNote Mirrors {@code WAWebChatUtmCache.deleteChatId(t)} which
-     *           performs {@code this.utmReadChatIds.delete(t)} on the
-     *           singleton instance.
-     */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebChatUtmCache", exports = "default.deleteChatId", adaptation = WhatsAppAdaptation.ADAPTED)
     public void deleteUtmReadChatId(Jid chatJid) {
         if (chatJid != null) {
-            utmReadChatIds.remove(chatJid); // WAWebChatUtmCache.deleteChatId
+            utmReadChatIds.remove(chatJid);
         }
     }
 
-    /**
-     * Clears every entry from the UTM-read cache. Mirrors the
-     * {@code clearAll} lifecycle hook called during logout / account-swap.
-     *
-     * @implNote Mirrors {@code WAWebChatUtmCache.clearAll()} which performs
-     *           {@code this.utmReadChatIds.clear()} on the singleton
-     *           instance.
-     */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebChatUtmCache", exports = "default.clearAll", adaptation = WhatsAppAdaptation.ADAPTED)
     public void clearUtmReadChatIds() {
-        utmReadChatIds.clear(); // WAWebChatUtmCache.clearAll
+        utmReadChatIds.clear();
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote {@code WAWebApiBlocklist.getBlocklist}
-     */
     @Override
     public Set<Jid> blockedContacts() {
         return Collections.unmodifiableSet(blockedContacts);
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote {@code WAWebApiBlocklist.updateBlocklist} add branch
-     */
     @Override
     public void addBlockedContact(Jid contact) {
         if (contact != null) {
@@ -3676,11 +3398,6 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote {@code WAWebApiBlocklist.updateBlocklist} remove branch
-     */
     @Override
     public void removeBlockedContact(Jid contact) {
         if (contact != null) {
@@ -3688,12 +3405,6 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote {@code WAWebGetBlocklistJob.getBlocklist} bulk replace on
-     * {@code GetBlockListResponseSuccessWithMismatch}
-     */
     @Override
     public void setBlockedContacts(Collection<Jid> contacts) {
         blockedContacts.clear();
@@ -3930,21 +3641,10 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
         return this;
     }
 
-    /**
-     * Returns the JIDs of every stored business broadcast list.
-     *
-     * <p>Projects the stored broadcast list identifiers into JIDs on the
-     * broadcast server so callers can address the broadcast targets directly.
-     *
-     * @return a snapshot list of broadcast list JIDs; empty if no broadcast
-     *         lists are known
-     *
-     * @implNote WAWebBroadcastListStorageUtils.getAllBroadcastLists
-     */
     @Override
     public SequencedCollection<Jid> broadcasts() {
         return businessBroadcastLists.keySet().stream()
-                .map(id -> Jid.of(id, JidServer.broadcast())) // ADAPTED: map stored string ids to broadcast-server JIDs
+                .map(id -> Jid.of(id, JidServer.broadcast()))
                 .toList();
     }
 
@@ -4139,21 +3839,11 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
         return this;
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote WAWebProtobufSyncAction.pb.MusicUserIdAction
-     */
     @Override
     public Optional<MusicUserIdAction> musicUserIdState() {
         return Optional.ofNullable(musicUserIdState);
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote WAWebProtobufSyncAction.pb.MusicUserIdAction
-     */
     @Override
     public WhatsAppStore setMusicUserIdState(MusicUserIdAction action) {
         this.musicUserIdState = action;
@@ -4193,21 +3883,11 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
         return this;
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote WAWebProtobufSyncAction.pb.PrivacySettingChannelsPersonalisedRecommendationAction
-     */
     @Override
     public Optional<Boolean> channelsPersonalisedRecommendationOptOut() {
         return Optional.ofNullable(channelsPersonalisedRecommendationOptOut);
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote WAWebProtobufSyncAction.pb.PrivacySettingChannelsPersonalisedRecommendationAction
-     */
     @Override
     public WhatsAppStore setChannelsPersonalisedRecommendationOptOut(Boolean optOut) {
         this.channelsPersonalisedRecommendationOptOut = optOut;
@@ -4225,128 +3905,68 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
         return this;
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote WAWebProtobufSyncAction.pb.MaibaAIFeaturesControlAction
-     */
     @Override
     public Optional<MaibaAIFeaturesControlAction.MaibaAIFeatureStatus> maibaAiFeatureStatus() {
         return Optional.ofNullable(maibaAiFeatureStatus);
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote WAWebProtobufSyncAction.pb.MaibaAIFeaturesControlAction
-     */
     @Override
     public WhatsAppStore setMaibaAiFeatureStatus(MaibaAIFeaturesControlAction.MaibaAIFeatureStatus status) {
         this.maibaAiFeatureStatus = status;
         return this;
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote WAWebUserPrefsMultiDevice.getPairingTimestamp
-     */
     @Override
     public Optional<Instant> pairingTimestamp() {
         return Optional.ofNullable(pairingTimestamp);
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote WAWebUserPrefsMultiDevice.getPairingTimestamp
-     */
     @Override
     public WhatsAppStore setPairingTimestamp(Instant pairingTimestamp) {
         this.pairingTimestamp = pairingTimestamp;
         return this;
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote WAWebUpdateClockSkewUtils.updateClockSkew
-     */
     @Override
-    public long clockSkewSeconds() { // WAWebUpdateClockSkewUtils.updateClockSkew
+    public long clockSkewSeconds() {
         return clockSkewSeconds;
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote WAWebUpdateClockSkewUtils.updateClockSkew
-     */
     @Override
-    public WhatsAppStore setClockSkewSeconds(long clockSkewSeconds) { // WAWebUpdateClockSkewUtils.updateClockSkew - WATimeUtils.setClockSkew(n)
+    public WhatsAppStore setClockSkewSeconds(long clockSkewSeconds) {
         this.clockSkewSeconds = clockSkewSeconds;
         return this;
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote WAWebABPropsLocalStorage.setGroupAbPropsEmergencyPushTimestamp
-     */
     @Override
-    public Optional<Instant> groupAbPropsEmergencyPushTimestamp() { // WAWebABPropsLocalStorage.setGroupAbPropsEmergencyPushTimestamp
+    public Optional<Instant> groupAbPropsEmergencyPushTimestamp() {
         return Optional.ofNullable(groupAbPropsEmergencyPushTimestamp);
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote WAWebABPropsLocalStorage.setGroupAbPropsEmergencyPushTimestamp
-     */
     @Override
-    public WhatsAppStore setGroupAbPropsEmergencyPushTimestamp(Instant timestamp) { // WAWebABPropsLocalStorage.setGroupAbPropsEmergencyPushTimestamp
+    public WhatsAppStore setGroupAbPropsEmergencyPushTimestamp(Instant timestamp) {
         this.groupAbPropsEmergencyPushTimestamp = timestamp;
         return this;
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote WAWebABPropsLocalStorage.getABKey
-     */
     @Override
-    public Optional<String> abPropsAbKey() { // WAWebABPropsLocalStorage.getABKey
+    public Optional<String> abPropsAbKey() {
         return Optional.ofNullable(abPropsAbKey);
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote WAWebABPropsLocalStorage.updateAttributesLocalStorage
-     */
     @Override
-    public WhatsAppStore setAbPropsAbKey(String abKey) { // WAWebABPropsLocalStorage.updateAttributesLocalStorage
+    public WhatsAppStore setAbPropsAbKey(String abKey) {
         this.abPropsAbKey = abKey;
         return this;
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote WAWebABPropsLocalStorage.getHash
-     */
     @Override
-    public Optional<String> abPropsHash() { // WAWebABPropsLocalStorage.getHash
+    public Optional<String> abPropsHash() {
         return Optional.ofNullable(abPropsHash);
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote WAWebABPropsLocalStorage.updateAttributesLocalStorage
-     */
     @Override
-    public WhatsAppStore setAbPropsHash(String hash) { // WAWebABPropsLocalStorage.updateAttributesLocalStorage
+    public WhatsAppStore setAbPropsHash(String hash) {
         this.abPropsHash = hash;
         return this;
     }
@@ -4354,26 +3974,22 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
     /**
      * {@inheritDoc}
      *
-     * <p>Returns the persisted refresh interval, or the JS-side
-     * {@code parseInt(86400, 10)} default when no value has been recorded.
-     *
-     * @implNote WAWebABPropsLocalStorage.getRefresh
+     * <p>Returns the persisted refresh interval, or the {@code 86400}
+     * one-day default when no value has been recorded.
      */
     @Override
-    public long abPropsRefresh() { // WAWebABPropsLocalStorage.getRefresh
+    public long abPropsRefresh() {
         return abPropsRefresh != 0L ? abPropsRefresh : 86400L;
     }
 
     /**
      * {@inheritDoc}
      *
-     * <p>The refresh value is clamped into the {@code [600, 604800]}
-     * inclusive range, matching the bounds checked by the JS export.
-     *
-     * @implNote WAWebABPropsLocalStorage.updateAttributesLocalStorage
+     * <p>The supplied value is clamped into the inclusive
+     * {@code [600, 604800]} range before being persisted.
      */
     @Override
-    public WhatsAppStore setAbPropsRefresh(long refreshSeconds) { // WAWebABPropsLocalStorage.updateAttributesLocalStorage
+    public WhatsAppStore setAbPropsRefresh(long refreshSeconds) {
         var clamped = refreshSeconds;
         if (clamped < 600L) {
             clamped = 600L;
@@ -4384,95 +4000,50 @@ abstract class AbstractWhatsAppStore implements WhatsAppStore {
         return this;
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote WAWebABPropsLocalStorage.updateAttributesLocalStorage
-     */
     @Override
-    public Optional<Instant> abPropsLastSyncTime() { // WAWebABPropsLocalStorage.updateAttributesLocalStorage
+    public Optional<Instant> abPropsLastSyncTime() {
         return Optional.ofNullable(abPropsLastSyncTime);
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote WAWebABPropsLocalStorage.updateAttributesLocalStorage
-     */
     @Override
-    public WhatsAppStore setAbPropsLastSyncTime(Instant lastSyncTime) { // WAWebABPropsLocalStorage.updateAttributesLocalStorage
+    public WhatsAppStore setAbPropsLastSyncTime(Instant lastSyncTime) {
         this.abPropsLastSyncTime = lastSyncTime;
         return this;
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote WAWebABPropsLocalStorage.getRefreshId
-     */
     @Override
-    public long abPropsRefreshId() { // WAWebABPropsLocalStorage.getRefreshId
+    public long abPropsRefreshId() {
         return abPropsRefreshId;
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote WAWebABPropsLocalStorage.setRefreshId
-     */
     @Override
-    public WhatsAppStore setAbPropsRefreshId(long refreshId) { // WAWebABPropsLocalStorage.setRefreshId
+    public WhatsAppStore setAbPropsRefreshId(long refreshId) {
         this.abPropsRefreshId = refreshId;
         return this;
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote WAWebABPropsLocalStorage.getWebRefreshId
-     */
     @Override
-    public long abPropsWebRefreshId() { // WAWebABPropsLocalStorage.getWebRefreshId
+    public long abPropsWebRefreshId() {
         return abPropsWebRefreshId;
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote WAWebABPropsLocalStorage.setWebRefreshId
-     */
     @Override
-    public WhatsAppStore setAbPropsWebRefreshId(long webRefreshId) { // WAWebABPropsLocalStorage.setWebRefreshId
+    public WhatsAppStore setAbPropsWebRefreshId(long webRefreshId) {
         this.abPropsWebRefreshId = webRefreshId;
         return this;
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote WAWebABPropsLocalStorage.getGroupAbPropsRefreshId
-     */
     @Override
-    public long groupAbPropsRefreshId() { // WAWebABPropsLocalStorage.getGroupAbPropsRefreshId
+    public long groupAbPropsRefreshId() {
         return groupAbPropsRefreshId;
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote WAWebABPropsLocalStorage.setGroupAbPropsRefreshId
-     */
     @Override
-    public WhatsAppStore setGroupAbPropsRefreshId(long groupRefreshId) { // WAWebABPropsLocalStorage.setGroupAbPropsRefreshId
+    public WhatsAppStore setGroupAbPropsRefreshId(long groupRefreshId) {
         this.groupAbPropsRefreshId = groupRefreshId;
         return this;
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote WAWebRecentStickerCollectionMd.removeAllRecentAvatarStickers
-     */
     @Override
     public int removeAllRecentAvatarStickers() {
         var iterator = recentStickers.entrySet().iterator();

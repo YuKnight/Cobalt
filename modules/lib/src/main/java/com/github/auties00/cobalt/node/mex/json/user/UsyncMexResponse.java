@@ -19,11 +19,21 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The parsed response for this MEX query.
+ * Parsed response for the usync MEX query. Carries the per-user directory metadata projected from
+ * {@code data.xwa2_fetch_wa_users}.
  */
+@WhatsAppWebModule(moduleName = "WAWebMexUsync")
 public final class UsyncMexResponse implements MexOperation.Response.Json {
+    /**
+     * The per-user directory records returned by the relay.
+     */
     private final List<Item> items;
 
+    /**
+     * Constructs a new response carrying the given items.
+     *
+     * @param items the per-user directory records
+     */
     private UsyncMexResponse(List<Item> items) {
         this.items = items;
     }
@@ -31,13 +41,10 @@ public final class UsyncMexResponse implements MexOperation.Response.Json {
     /**
      * Parses the MEX response carried by an inbound IQ stanza.
      *
-     * @implNote WAWebMexUsyncQuery.graphql: reads the {@code items[]}
-     * array of per-user directory records.
      * @param node the inbound IQ stanza carrying the {@code <result>} child
-     * @return the parsed response, or {@code Optional.empty()} if the
-     *         expected JSON shape is absent
+     * @return the parsed response, or {@link Optional#empty()} if the expected JSON shape is absent
      */
-    @WhatsAppWebExport(moduleName = "WAWebMexUsyncQuery.graphql", exports = "params.id",
+    @WhatsAppWebExport(moduleName = "WAWebMexUsync", exports = "mexUsyncQuery",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public static Optional<UsyncMexResponse> of(Node node) {
         return node.getChild("result")
@@ -46,7 +53,7 @@ public final class UsyncMexResponse implements MexOperation.Response.Json {
     }
 
     /**
-     * Returns the list of items in this response.
+     * Returns the per-user directory records carried by this response.
      *
      * @return the list of items, empty if absent
      */
@@ -55,15 +62,44 @@ public final class UsyncMexResponse implements MexOperation.Response.Json {
     }
 
     /**
-     * A parsed {@code Item} object.
+     * Single per-user directory record. Carries the JID, country code, optional username info and optional
+     * about-status info for a queried user.
      */
     public static final class Item {
+        /**
+         * The user's JID.
+         */
         private final String jid;
+
+        /**
+         * The user's phone country code, when requested.
+         */
         private final String countryCode;
+
+        /**
+         * The user's username record, when requested.
+         */
         private final UsernameInfo usernameInfo;
+
+        /**
+         * The user's about-status record, when requested.
+         */
         private final AboutStatusInfo aboutStatusInfo;
+
+        /**
+         * The opaque record identifier reported by the relay.
+         */
         private final String id;
 
+        /**
+         * Constructs a new item with the given fields.
+         *
+         * @param jid the user's JID
+         * @param countryCode the user's phone country code
+         * @param usernameInfo the user's username record
+         * @param aboutStatusInfo the user's about-status record
+         * @param id the opaque record identifier
+         */
         private Item(String jid, String countryCode, UsernameInfo usernameInfo, AboutStatusInfo aboutStatusInfo, String id) {
             this.jid = jid;
             this.countryCode = countryCode;
@@ -73,60 +109,89 @@ public final class UsyncMexResponse implements MexOperation.Response.Json {
         }
 
         /**
-         * Returns the {@code jid} field.
+         * Returns the user's JID.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+         * @return an {@link Optional} containing the JID, or empty if absent
          */
         public Optional<String> jid() {
             return Optional.ofNullable(jid);
         }
 
         /**
-         * Returns the {@code country_code} field.
+         * Returns the user's phone country code.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+         * @return an {@link Optional} containing the country code, or empty if absent
          */
         public Optional<String> countryCode() {
             return Optional.ofNullable(countryCode);
         }
 
         /**
-         * Returns the {@code username_info} field.
+         * Returns the user's username record.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+         * @return an {@link Optional} containing the record, or empty if absent
          */
         public Optional<UsernameInfo> usernameInfo() {
             return Optional.ofNullable(usernameInfo);
         }
 
         /**
-         * Returns the {@code about_status_info} field.
+         * Returns the user's about-status record.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+         * @return an {@link Optional} containing the record, or empty if absent
          */
         public Optional<AboutStatusInfo> aboutStatusInfo() {
             return Optional.ofNullable(aboutStatusInfo);
         }
 
         /**
-         * Returns the {@code id} field.
+         * Returns the opaque record identifier reported by the relay.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+         * @return an {@link Optional} containing the identifier, or empty if absent
          */
         public Optional<String> id() {
             return Optional.ofNullable(id);
         }
 
         /**
-         * A parsed {@code UsernameInfo} object.
+         * Username record carried by a usync entry. Captures the assigned username, its registration state, the
+         * registration timestamp, the recovery PIN hash and the per-user query status.
          */
         public static final class UsernameInfo {
+            /**
+             * The username currently assigned to the user.
+             */
             private final String username;
+
+            /**
+             * The registration state of the username.
+             */
             private final String state;
+
+            /**
+             * The epoch-second timestamp at which the username was registered.
+             */
             private final Long timestamp;
+
+            /**
+             * The recovery PIN hash associated with the username.
+             */
             private final String pin;
+
+            /**
+             * The per-user status reported by the usync request.
+             */
             private final String status;
 
+            /**
+             * Constructs a new username record.
+             *
+             * @param username the assigned username
+             * @param state the registration state
+             * @param timestamp the registration epoch-second timestamp
+             * @param pin the recovery PIN hash
+             * @param status the per-user query status
+             */
             private UsernameInfo(String username, String state, Long timestamp, String pin, String status) {
                 this.username = username;
                 this.state = state;
@@ -136,55 +201,55 @@ public final class UsyncMexResponse implements MexOperation.Response.Json {
             }
 
             /**
-             * Returns the {@code username} field.
+             * Returns the username currently assigned to the user.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+             * @return an {@link Optional} containing the username, or empty if absent
              */
             public Optional<String> username() {
                 return Optional.ofNullable(username);
             }
 
             /**
-             * Returns the {@code state} field.
+             * Returns the registration state of the username.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+             * @return an {@link Optional} containing the state, or empty if absent
              */
             public Optional<String> state() {
                 return Optional.ofNullable(state);
             }
 
             /**
-             * Returns the {@code timestamp} field.
+             * Returns the registration timestamp.
              *
-             * @return an {@link Optional} containing the value as an {@link Instant}, or empty if absent
+             * @return an {@link Optional} containing the {@link Instant}, or empty if absent
              */
             public Optional<Instant> timestamp() {
                 return Optional.ofNullable(timestamp).map(Instant::ofEpochSecond);
             }
 
             /**
-             * Returns the {@code pin} field.
+             * Returns the recovery PIN hash.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+             * @return an {@link Optional} containing the PIN hash, or empty if absent
              */
             public Optional<String> pin() {
                 return Optional.ofNullable(pin);
             }
 
             /**
-             * Returns the {@code status} field.
+             * Returns the per-user status reported by the request.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+             * @return an {@link Optional} containing the status, or empty if absent
              */
             public Optional<String> status() {
                 return Optional.ofNullable(status);
             }
 
             /**
-             * Parses a {@code UsernameInfo} from the given JSON object.
+             * Parses a username record from the given JSON object.
              *
              * @param obj the JSON object to parse
-             * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+             * @return an {@link Optional} containing the parsed record, or empty if {@code obj} is {@code null}
              */
             static Optional<UsernameInfo> of(JSONObject obj) {
                 if (obj == null) {
@@ -200,10 +265,10 @@ public final class UsyncMexResponse implements MexOperation.Response.Json {
             }
 
             /**
-             * Parses a list of {@code UsernameInfo} from the given JSON array.
+             * Parses a list of username records from the given JSON array.
              *
              * @param arr the JSON array to parse
-             * @return the list of parsed results, empty if {@code arr} is {@code null}
+             * @return the list of parsed records, empty if {@code arr} is {@code null}
              */
             static List<UsernameInfo> ofArray(JSONArray arr) {
                 if (arr == null) {
@@ -219,13 +284,32 @@ public final class UsyncMexResponse implements MexOperation.Response.Json {
         }
 
         /**
-         * A parsed {@code AboutStatusInfo} object.
+         * About-status record carried by a usync entry. Captures the about-status text body, the last-update epoch-
+         * second timestamp and the per-user query status.
          */
         public static final class AboutStatusInfo {
+            /**
+             * The about-status text body.
+             */
             private final String text;
+
+            /**
+             * The epoch-second timestamp at which the about-status was last updated.
+             */
             private final Long timestamp;
+
+            /**
+             * The per-user query status reported for the about-status field.
+             */
             private final String status;
 
+            /**
+             * Constructs a new about-status record.
+             *
+             * @param text the about-status text body
+             * @param timestamp the last-update epoch-second timestamp
+             * @param status the per-user query status
+             */
             private AboutStatusInfo(String text, Long timestamp, String status) {
                 this.text = text;
                 this.timestamp = timestamp;
@@ -233,37 +317,37 @@ public final class UsyncMexResponse implements MexOperation.Response.Json {
             }
 
             /**
-             * Returns the {@code text} field.
+             * Returns the about-status text body.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+             * @return an {@link Optional} containing the text, or empty if absent
              */
             public Optional<String> text() {
                 return Optional.ofNullable(text);
             }
 
             /**
-             * Returns the {@code timestamp} field.
+             * Returns the last-update timestamp of the about-status.
              *
-             * @return an {@link Optional} containing the value as an {@link Instant}, or empty if absent
+             * @return an {@link Optional} containing the {@link Instant}, or empty if absent
              */
             public Optional<Instant> timestamp() {
                 return Optional.ofNullable(timestamp).map(Instant::ofEpochSecond);
             }
 
             /**
-             * Returns the {@code status} field.
+             * Returns the per-user query status reported for this field.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+             * @return an {@link Optional} containing the status, or empty if absent
              */
             public Optional<String> status() {
                 return Optional.ofNullable(status);
             }
 
             /**
-             * Parses a {@code AboutStatusInfo} from the given JSON object.
+             * Parses an about-status record from the given JSON object.
              *
              * @param obj the JSON object to parse
-             * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+             * @return an {@link Optional} containing the parsed record, or empty if {@code obj} is {@code null}
              */
             static Optional<AboutStatusInfo> of(JSONObject obj) {
                 if (obj == null) {
@@ -277,10 +361,10 @@ public final class UsyncMexResponse implements MexOperation.Response.Json {
             }
 
             /**
-             * Parses a list of {@code AboutStatusInfo} from the given JSON array.
+             * Parses a list of about-status records from the given JSON array.
              *
              * @param arr the JSON array to parse
-             * @return the list of parsed results, empty if {@code arr} is {@code null}
+             * @return the list of parsed records, empty if {@code arr} is {@code null}
              */
             static List<AboutStatusInfo> ofArray(JSONArray arr) {
                 if (arr == null) {
@@ -296,10 +380,10 @@ public final class UsyncMexResponse implements MexOperation.Response.Json {
         }
 
         /**
-         * Parses a {@code Item} from the given JSON object.
+         * Parses a single item from the given JSON object.
          *
          * @param obj the JSON object to parse
-         * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
+         * @return an {@link Optional} containing the parsed item, or empty if {@code obj} is {@code null}
          */
         static Optional<Item> of(JSONObject obj) {
             if (obj == null) {
@@ -315,10 +399,10 @@ public final class UsyncMexResponse implements MexOperation.Response.Json {
         }
 
         /**
-         * Parses a list of {@code Item} from the given JSON array.
+         * Parses a list of items from the given JSON array.
          *
          * @param arr the JSON array to parse
-         * @return the list of parsed results, empty if {@code arr} is {@code null}
+         * @return the list of parsed items, empty if {@code arr} is {@code null}
          */
         static List<Item> ofArray(JSONArray arr) {
             if (arr == null) {
@@ -333,6 +417,12 @@ public final class UsyncMexResponse implements MexOperation.Response.Json {
         }
     }
 
+    /**
+     * Parses the response from the raw JSON payload bytes.
+     *
+     * @param json the raw JSON bytes from the {@code <result>} child
+     * @return an {@link Optional} containing the parsed response, or empty if the envelope is missing
+     */
     private static Optional<UsyncMexResponse> of(byte[] json) {
         var jsonObject = JSON.parseObject(json);
         if (jsonObject == null) {

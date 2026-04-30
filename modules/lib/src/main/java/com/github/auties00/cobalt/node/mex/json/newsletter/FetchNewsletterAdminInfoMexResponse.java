@@ -15,11 +15,7 @@ import java.util.Optional;
 import java.util.OptionalLong;
 
 /**
- * The response variant of {@link FetchNewsletterAdminInfoMexResponse} that exposes the data
- * returned by the server after a successful query.
- *
- * @implNote WAWebMexFetchNewsletterAdminInfoJob: adapts the JSON root returned by the GraphQL
- * query into a Java value object.
+ * Response variant for {@link FetchNewsletterAdminInfoMexRequest} carrying the parsed server reply.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexFetchNewsletterAdminInfoJob")
 public final class FetchNewsletterAdminInfoMexResponse implements MexOperation.Response.Json {
@@ -34,9 +30,6 @@ public final class FetchNewsletterAdminInfoMexResponse implements MexOperation.R
     /**
      * Parses a MEX response from the given IQ response node.
      *
-     * @implNote WAWebMexFetchNewsletterAdminInfoJob.mexFetchNewsletterAdminInfo: WA Web relies on the
-     * GraphQL client to unwrap the response. Cobalt performs the
-     * unwrapping manually from the IQ {@code <result>} child.
      * @param node the IQ response node received from the relay
      * @return an {@link Optional} containing the parsed response, or
      *         empty if the node is missing a result payload
@@ -69,30 +62,21 @@ public final class FetchNewsletterAdminInfoMexResponse implements MexOperation.R
      * Parses a {@link FetchNewsletterAdminInfoMexResponse} from the raw JSON bytes of the
      * {@code <result>} child.
      *
-     * @implNote WAWebMexFetchNewsletterAdminInfoJob.mexFetchNewsletterAdminInfo: mirrors the implicit
-     * unwrapping that WA Web performs on the GraphQL response,
-     * extracting the {@code xwa2_newsletter_admin} root.
      * @param json the UTF-8 encoded JSON payload
      * @return an {@link Optional} containing the parsed response, or
      *         empty if the envelope is missing expected fields
      */
     private static Optional<FetchNewsletterAdminInfoMexResponse> of(byte[] json) {
-        // WAWebMexFetchNewsletterAdminInfoJob.mexFetchNewsletterAdminInfo
-        // Parses the raw JSON payload, bailing out if fastjson2 returns null
         var jsonObject = JSON.parseObject(json);
         if (jsonObject == null) {
             return Optional.empty();
         }
 
-        // WAWebMexFetchNewsletterAdminInfoJob.mexFetchNewsletterAdminInfo
-        // Descends into the standard GraphQL "data" envelope
         var data = jsonObject.getJSONObject("data");
         if (data == null) {
             return Optional.empty();
         }
 
-        // WAWebMexFetchNewsletterAdminInfoJob.mexFetchNewsletterAdminInfo
-        // Extracts the operation-specific root keyed by xwa2_newsletter_admin
         var root = data.getJSONObject("xwa2_newsletter_admin");
         if (root == null) {
             return Optional.empty();

@@ -19,11 +19,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The response variant of {@link FetchNewsletterInsightsMexResponse} that exposes the data
- * returned by the server after a successful query.
- *
- * @implNote WAWebMexFetchNewsletterInsightsJob: adapts the JSON root returned by the GraphQL
- * query into a Java value object.
+ * Response variant for {@link FetchNewsletterInsightsMexRequest} carrying the parsed server reply.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexFetchNewsletterInsightsJob")
 public final class FetchNewsletterInsightsMexResponse implements MexOperation.Response.Json {
@@ -44,9 +40,6 @@ public final class FetchNewsletterInsightsMexResponse implements MexOperation.Re
     /**
      * Parses a MEX response from the given IQ response node.
      *
-     * @implNote WAWebMexFetchNewsletterInsightsJob.mexFetchNewsletterInsights: WA Web relies on the
-     * GraphQL client to unwrap the response. Cobalt performs the
-     * unwrapping manually from the IQ {@code <result>} child.
      * @param node the IQ response node received from the relay
      * @return an {@link Optional} containing the parsed response, or
      *         empty if the node is missing a result payload
@@ -115,7 +108,7 @@ public final class FetchNewsletterInsightsMexResponse implements MexOperation.Re
         /**
          * Returns the {@code type} field.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
          */
         public Optional<String> type() {
             return Optional.ofNullable(type);
@@ -124,7 +117,7 @@ public final class FetchNewsletterInsightsMexResponse implements MexOperation.Re
         /**
          * Parses a {@code State} from the given JSON object.
          *
-         * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
          * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
          */
         static Optional<State> of(JSONObject obj) {
@@ -139,7 +132,7 @@ public final class FetchNewsletterInsightsMexResponse implements MexOperation.Re
         /**
          * Parses a list of {@code State} from the given JSON array.
          *
-         * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
          * @return the list of parsed results, empty if {@code arr} is {@code null}
          */
         static List<State> ofArray(JSONArray arr) {
@@ -170,7 +163,7 @@ public final class FetchNewsletterInsightsMexResponse implements MexOperation.Re
         /**
          * Returns the {@code id} field.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
          */
         public Optional<String> id() {
             return Optional.ofNullable(id);
@@ -179,7 +172,7 @@ public final class FetchNewsletterInsightsMexResponse implements MexOperation.Re
         /**
          * Returns the {@code values} field.
          *
-         * @return the list of values, empty if absent
+     * @return the list of values, empty if absent
          */
         public List<Values> values() {
             return values;
@@ -204,7 +197,7 @@ public final class FetchNewsletterInsightsMexResponse implements MexOperation.Re
             /**
              * Returns the {@code value} field.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
              */
             public Optional<String> value() {
                 return Optional.ofNullable(value);
@@ -213,7 +206,7 @@ public final class FetchNewsletterInsightsMexResponse implements MexOperation.Re
             /**
              * Returns the {@code country} field.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
              */
             public Optional<String> country() {
                 return Optional.ofNullable(country);
@@ -222,7 +215,7 @@ public final class FetchNewsletterInsightsMexResponse implements MexOperation.Re
             /**
              * Returns the {@code role} field.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
              */
             public Optional<String> role() {
                 return Optional.ofNullable(role);
@@ -231,7 +224,7 @@ public final class FetchNewsletterInsightsMexResponse implements MexOperation.Re
             /**
              * Returns the {@code timestamp} field.
              *
-             * @return an {@link Optional} containing the value as an {@link Instant}, or empty if absent
+     * @return an {@link Optional} containing the value as an {@link Instant}, or empty if absent
              */
             public Optional<Instant> timestamp() {
                 return Optional.ofNullable(timestamp).map(Instant::ofEpochSecond);
@@ -240,7 +233,7 @@ public final class FetchNewsletterInsightsMexResponse implements MexOperation.Re
             /**
              * Parses a {@code Values} from the given JSON object.
              *
-             * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
              * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
              */
             static Optional<Values> of(JSONObject obj) {
@@ -258,7 +251,7 @@ public final class FetchNewsletterInsightsMexResponse implements MexOperation.Re
             /**
              * Parses a list of {@code Values} from the given JSON array.
              *
-             * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
              * @return the list of parsed results, empty if {@code arr} is {@code null}
              */
             static List<Values> ofArray(JSONArray arr) {
@@ -277,7 +270,7 @@ public final class FetchNewsletterInsightsMexResponse implements MexOperation.Re
         /**
          * Parses a {@code Result} from the given JSON object.
          *
-         * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
          * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
          */
         static Optional<Result> of(JSONObject obj) {
@@ -293,7 +286,7 @@ public final class FetchNewsletterInsightsMexResponse implements MexOperation.Re
         /**
          * Parses a list of {@code Result} from the given JSON array.
          *
-         * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
          * @return the list of parsed results, empty if {@code arr} is {@code null}
          */
         static List<Result> ofArray(JSONArray arr) {
@@ -313,30 +306,21 @@ public final class FetchNewsletterInsightsMexResponse implements MexOperation.Re
      * Parses a {@link FetchNewsletterInsightsMexResponse} from the raw JSON bytes of the
      * {@code <result>} child.
      *
-     * @implNote WAWebMexFetchNewsletterInsightsJob.mexFetchNewsletterInsights: mirrors the implicit
-     * unwrapping that WA Web performs on the GraphQL response,
-     * extracting the {@code xwa2_newsletter_admin_insights} root.
      * @param json the UTF-8 encoded JSON payload
      * @return an {@link Optional} containing the parsed response, or
      *         empty if the envelope is missing expected fields
      */
     private static Optional<FetchNewsletterInsightsMexResponse> of(byte[] json) {
-        // WAWebMexFetchNewsletterInsightsJob.mexFetchNewsletterInsights
-        // Parses the raw JSON payload, bailing out if fastjson2 returns null
         var jsonObject = JSON.parseObject(json);
         if (jsonObject == null) {
             return Optional.empty();
         }
 
-        // WAWebMexFetchNewsletterInsightsJob.mexFetchNewsletterInsights
-        // Descends into the standard GraphQL "data" envelope
         var data = jsonObject.getJSONObject("data");
         if (data == null) {
             return Optional.empty();
         }
 
-        // WAWebMexFetchNewsletterInsightsJob.mexFetchNewsletterInsights
-        // Extracts the operation-specific root keyed by xwa2_newsletter_admin_insights
         var root = data.getJSONObject("xwa2_newsletter_admin_insights");
         if (root == null) {
             return Optional.empty();

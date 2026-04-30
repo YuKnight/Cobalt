@@ -14,7 +14,7 @@ import java.util.Optional;
  * Sealed family of inbound reply variants produced by the relay.
  *
  * @implNote {@code WAWebSetPrivacyTokensJob.issuePrivacyToken} folds
- *           every non-result envelope into {@code ServerStatusCodeError};
+ *           every non-result envelope into {@code ServerStatusCodeError}.
  *           Cobalt splits the failure path into typed
  *           {@code ClientError}/{@code ServerError} variants.
  */
@@ -25,8 +25,8 @@ public sealed interface IqSetPrivacyTokensResponse extends IqOperation.Response
      * Tries each {@link IqSetPrivacyTokensResponse} variant in priority order and
      * returns the first that parses cleanly.
      *
-     * @param node    the inbound IQ stanza; never {@code null}
-     * @param request the original outbound stanza; never {@code null}
+     * @param node    the inbound IQ stanza. Never {@code null}
+     * @param request the original outbound stanza. Never {@code null}
      * @return an {@link Optional} carrying the parsed variant, or
      *         empty when no documented variant matched
      * @throws NullPointerException if either argument is
@@ -49,12 +49,12 @@ public sealed interface IqSetPrivacyTokensResponse extends IqOperation.Response
     }
 
     /**
-     * The {@code Success} reply variant — the relay accepted the
+     * The {@code Success} reply variant. The relay accepted the
      * batch and registered every token. Carries no payload beyond
      * the envelope echo.
      *
      * @implNote {@code WAWebSetPrivacyTokensJob.setPrivacyTokensParser}
-     *           projects only {@code {stanzaId}}; Cobalt's
+     *           projects only {@code {stanzaId}}. Cobalt's
      *           {@link Success} mirrors the no-payload shape with
      *           the singleton type marker.
      */
@@ -106,7 +106,7 @@ public sealed interface IqSetPrivacyTokensResponse extends IqOperation.Response
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected
+     * The {@code ClientError} reply variant. The relay rejected
      * the request with a {@code 4xx} error code.
      */
     @WhatsAppWebModule(moduleName = "WAWebSetPrivacyTokensJob")
@@ -125,7 +125,7 @@ public sealed interface IqSetPrivacyTokensResponse extends IqOperation.Response
          * Constructs a client-error reply.
          *
          * @param errorCode the numeric error code
-         * @param errorText the optional text; may be {@code null}
+         * @param errorText the optional text. May be {@code null}
          */
         public ClientError(int errorCode, String errorText) {
             this.errorCode = errorCode;
@@ -197,7 +197,7 @@ public sealed interface IqSetPrivacyTokensResponse extends IqOperation.Response
     }
 
     /**
-     * The {@code ServerError} reply variant — the relay encountered
+     * The {@code ServerError} reply variant. The relay encountered
      * a transient internal failure ({@code 5xx} error code).
      */
     @WhatsAppWebModule(moduleName = "WAWebSetPrivacyTokensJob")
@@ -216,7 +216,7 @@ public sealed interface IqSetPrivacyTokensResponse extends IqOperation.Response
          * Constructs a server-error reply.
          *
          * @param errorCode the numeric error code
-         * @param errorText the optional text; may be {@code null}
+         * @param errorText the optional text. May be {@code null}
          */
         public ServerError(int errorCode, String errorText) {
             this.errorCode = errorCode;

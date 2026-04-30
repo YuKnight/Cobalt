@@ -34,7 +34,7 @@ public sealed interface SmaxSyncPrivacySettingResponse extends SmaxOperation.Res
     }
 
     /**
-     * The {@code Notification} variant — carries the optional
+     * The {@code Notification} variant. Carries the optional
      * post-update consent value plus the standard envelope echoes.
      *
      * @implNote {@code WASmaxInBizSettingsSyncPrivacySettingRequest.parseSyncPrivacySettingRequest}
@@ -42,8 +42,8 @@ public sealed interface SmaxSyncPrivacySettingResponse extends SmaxOperation.Res
      *           {@code from="s.whatsapp.net"}, the literal
      *           {@code type="business"}, then projects the optional
      *           {@code <smb_data_sharing_with_meta_consent>} attribute.
-     *           Cobalt mirrors the optional-projection semantics —
-     *           the JS uses {@code success ? value : null} on the
+     *           Cobalt mirrors the optional-projection semantics.
+     *           The JS uses {@code success ? value : null} on the
      *           inner mixin, so the field is genuinely optional.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBizSettingsSyncPrivacySettingRequest")
@@ -61,7 +61,7 @@ public sealed interface SmaxSyncPrivacySettingResponse extends SmaxOperation.Res
         /**
          * The optional consent value from the
          * {@code <smb_data_sharing_with_meta_consent value="..."/>}
-         * inner — one of {@code "true"} / {@code "false"} /
+         * inner. One of {@code "true"} / {@code "false"} /
          * {@code "notSet"} or {@code null} when the relay cleared
          * the preference.
          */

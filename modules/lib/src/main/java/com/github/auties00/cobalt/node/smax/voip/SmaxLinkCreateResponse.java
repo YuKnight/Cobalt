@@ -30,7 +30,7 @@ public sealed interface SmaxLinkCreateResponse extends SmaxOperation.Response
      *
      * @param node    the inbound stanza received from the relay;
      *                never {@code null}
-     * @param request the original outbound stanza — used to validate
+     * @param request the original outbound stanza. Used to validate
      *                the echoed identifier; never {@code null}
      * @return an {@link Optional} carrying the parsed variant, or
      *         {@link Optional#empty()} when no documented variant
@@ -90,19 +90,13 @@ public sealed interface SmaxLinkCreateResponse extends SmaxOperation.Response
     }
 
     /**
-     * The {@code Success} reply variant — the relay accepted the
+     * The {@code Success} reply variant. The relay accepted the
      * request and returned the freshly minted call-link token.
-     *
-     * @implNote {@code WASmaxInVoipLinkCreateResponseLinkCreateAck.parseLinkCreateResponseLinkCreateAck}
-     *           parses the {@code <link_create token media call-creator
-     *           call-id/>} child of the {@code <ack>} envelope and
-     *           projects {@code (linkCreateToken, linkCreateMedia,
-     *           linkCreateCallCreator, linkCreateCallId)}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInVoipLinkCreateResponseLinkCreateAck")
     final class Success implements SmaxLinkCreateResponse {
         /**
-         * The freshly minted call-link token — the short string that
+         * The freshly minted call-link token. The short string that
          * forms the suffix of the shareable call-link URL.
          */
         private final String linkCreateToken;
@@ -250,7 +244,7 @@ public sealed interface SmaxLinkCreateResponse extends SmaxOperation.Response
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected the
+     * The {@code ClientError} reply variant. The relay rejected the
      * request, typically because the user is not authorised to
      * create call links or because the supplied call id is invalid.
      *

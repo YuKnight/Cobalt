@@ -113,7 +113,6 @@ public final class SmaxGroupsRemoveParticipantsRequest implements SmaxOperation.
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsRemoveParticipantsRequest",
             exports = "makeRemoveParticipantsRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutGroupsRemoveParticipantsRequest: smax("participant", {jid: JID(t)})
         var participantNodes = new ArrayList<Node>(participants.size());
         for (var participantJid : participants) {
             var participantNode = new NodeBuilder()
@@ -122,17 +121,12 @@ public final class SmaxGroupsRemoveParticipantsRequest implements SmaxOperation.
                     .build();
             participantNodes.add(participantNode);
         }
-        // WASmaxOutGroupsRemoveParticipantsRequest: smax("remove",
-        //   {linked_groups: OPTIONAL_LITERAL("true", r)},
-        //   REPEATED_CHILD(participant, 1, 1024))
         var removeBuilder = new NodeBuilder()
                 .description("remove")
                 .content(participantNodes);
         if (removeLinkedGroups) {
             removeBuilder.attribute("linked_groups", "true");
         }
-        // WASmaxOutGroupsBaseSetGroupMixin: smax("iq", {to: GROUP_JID(t), xmlns: "w:g2"})
-        // WASmaxOutGroupsBaseIQSetRequestMixin: smax("iq", {id: generateId(), type: "set"})
         return new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "w:g2")

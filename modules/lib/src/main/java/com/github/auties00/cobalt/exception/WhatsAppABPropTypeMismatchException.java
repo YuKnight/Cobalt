@@ -3,62 +3,35 @@ package com.github.auties00.cobalt.exception;
 import java.util.Objects;
 
 /**
- * Exception thrown when an A/B test property (AB prop) value cannot be converted to the expected type.
- * <p>
- * WhatsApp uses A/B testing configuration properties to control feature rollouts and behavior.
- * These properties are sent from the server as string values with associated type hints. This
- * exception is thrown when the client attempts to read a property as a specific type, but the
- * value cannot be parsed as that type.
+ * Thrown when an A/B configuration property cannot be decoded as the type
+ * the caller asked for.
  *
- * <h2>AB Props Architecture</h2>
- * AB props are used by WhatsApp to:
- * <ul>
- *   <li>Control feature flags and rollouts</li>
- *   <li>Configure rate limits and thresholds</li>
- *   <li>Enable/disable experimental features</li>
- *   <li>Customize behavior per user segment</li>
- * </ul>
+ * <p>WhatsApp ships A/B test ("AB prop") values from the server to drive
+ * feature flags, rate limits, and rollout percentages. Each property is
+ * keyed by a numeric configuration code and is read from the client by
+ * specifying the expected Java type ({@code Boolean}, {@code Integer},
+ * {@code Long}, {@code Double}, {@code String}). When the raw string
+ * value the server delivered cannot be parsed as the expected type, this
+ * exception is raised so the caller can fall back to a default.
  *
- * <h2>Property Types</h2>
- * AB props can contain values of various types:
- * <ul>
- *   <li>{@link Boolean} - Feature flags (true/false)</li>
- *   <li>{@link Integer} - Numeric configuration values</li>
- *   <li>{@link Long} - Large numeric values or timestamps</li>
- *   <li>{@link Double} - Decimal values (e.g., probabilities)</li>
- *   <li>{@link String} - Text configuration values</li>
- * </ul>
- *
- * <h2>Possible Causes</h2>
- * <ul>
- *   <li><b>Server configuration error:</b> Server sent wrong type for config code</li>
- *   <li><b>Protocol update:</b> Property type changed in a new protocol version</li>
- *   <li><b>Client bug:</b> Code expects wrong type for a property</li>
- *   <li><b>Data corruption:</b> Value was corrupted during transmission</li>
- * </ul>
- *
- * <h2>Recovery</h2>
- * This is a non-fatal error. When this occurs:
- * <ol>
- *   <li>Log the mismatch for debugging</li>
- *   <li>Use a default value if available</li>
- *   <li>Consider updating the code to handle the actual type</li>
- * </ol>
+ * <p>The failure does not invalidate the session. {@link #isFatal()}
+ * always returns {@code false}.
  */
 public final class WhatsAppABPropTypeMismatchException extends WhatsAppException {
 
     /**
-     * The numeric configuration code that identifies the AB prop.
+     * The numeric configuration code identifying the AB prop that could
+     * not be decoded.
      */
     private final int configCode;
 
     /**
-     * The type that the caller expected to receive.
+     * The Java type the caller asked the AB prop to be decoded as.
      */
     private final Class<?> expectedType;
 
     /**
-     * The actual string value that could not be converted to the expected type.
+     * The raw string value delivered by the server, exactly as received.
      */
     private final String actualValue;
 
@@ -66,11 +39,9 @@ public final class WhatsAppABPropTypeMismatchException extends WhatsAppException
      * Constructs a new AB prop type mismatch exception.
      *
      * @param configCode   the numeric configuration code identifying the AB prop
-     * @param expectedType the type that was expected but could not be obtained;
-     *                     must not be null
-     * @param actualValue  the actual string value that couldn't be converted;
-     *                     must not be null
-     * @throws NullPointerException if expectedType or actualValue is null
+     * @param expectedType the type that was expected but could not be obtained
+     * @param actualValue  the raw string value that could not be converted
+     * @throws NullPointerException if {@code expectedType} or {@code actualValue} is {@code null}
      */
     public WhatsAppABPropTypeMismatchException(int configCode, Class<?> expectedType, String actualValue) {
         super(String.format(
@@ -85,45 +56,39 @@ public final class WhatsAppABPropTypeMismatchException extends WhatsAppException
     }
 
     /**
-     * Returns the numeric configuration code that identifies the AB prop.
-     * <p>
-     * Configuration codes are unique identifiers assigned to each AB prop by WhatsApp.
-     * This code can be used to look up the expected type and meaning of the property.
+     * Returns the numeric configuration code of the AB prop whose value
+     * could not be decoded.
      *
-     * @return the config code
+     * @return the configuration code
      */
     public int configCode() {
         return configCode;
     }
 
     /**
-     * Returns the type that was expected but could not be obtained.
-     * <p>
-     * This is the type parameter that was passed to the property accessor method.
+     * Returns the Java type the caller requested when reading the AB prop.
      *
-     * @return the expected type class; never null
+     * @return the expected type, never {@code null}
      */
     public Class<?> expectedType() {
         return expectedType;
     }
 
     /**
-     * Returns the actual string value that couldn't be converted to the expected type.
-     * <p>
-     * This value can be examined to determine the actual type or format of the property,
-     * which may help in diagnosing the cause of the mismatch.
+     * Returns the raw string value the server delivered for this AB prop.
      *
-     * @return the actual string value; never null
+     * @return the actual value, never {@code null}
      */
     public String actualValue() {
         return actualValue;
     }
 
     /**
-     * Returns whether this exception represents a fatal error.
-     * <p>
-     * AB prop type mismatches are non-fatal. The client can continue operating,
-     * typically by using a default value for the affected property.
+     * Returns whether the failure invalidates the current session.
+     *
+     * <p>An AB prop type mismatch is local to a single configuration
+     * lookup. The session is unaffected and the caller can fall back to a
+     * default value.
      *
      * @return {@code false}
      */

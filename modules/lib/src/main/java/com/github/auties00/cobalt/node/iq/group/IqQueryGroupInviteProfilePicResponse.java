@@ -11,8 +11,10 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Sealed family of inbound reply variants.
+ * Sealed family of inbound reply variants produced by the relay in
+ * response to an {@link IqQueryGroupInviteProfilePicRequest}.
  */
+@WhatsAppWebModule(moduleName = "WAWebQueryGroupInviteProfilePicApi")
 public sealed interface IqQueryGroupInviteProfilePicResponse extends IqOperation.Response
         permits IqQueryGroupInviteProfilePicResponse.Success, IqQueryGroupInviteProfilePicResponse.ClientError, IqQueryGroupInviteProfilePicResponse.ServerError {
 

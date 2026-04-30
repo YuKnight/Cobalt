@@ -55,20 +55,24 @@ public sealed class WhatsAppClientBuilder {
     }
 
     /**
-     * Creates a web client with the default Protobuf serializer
+     * Returns a web client builder backed by an in-memory store.
      *
-     * @return a non-null web client instance
+     * <p>The resulting builder follows the web companion linking flow,
+     * which authenticates against an existing primary device via QR code
+     * or pairing code.
+     *
+     * @return the web client builder
      */
     public Client.Web webClient() {
         return new Client.Web(WhatsAppStoreFactory.inMemory());
     }
 
     /**
-     * Creates a web client with a custom factory
+     * Returns a web client builder backed by the given store factory.
      *
-     * @param factory the factory to use for data persistence, must not be null
-     * @return a non-null web client instance
-     * @throws NullPointerException if factory is null
+     * @param factory the factory to use for data persistence
+     * @return the web client builder
+     * @throws NullPointerException if {@code factory} is {@code null}
      */
     public Client.Web webClient(WhatsAppStoreFactory factory) {
         Objects.requireNonNull(factory, "factory must not be null");
@@ -76,20 +80,23 @@ public sealed class WhatsAppClientBuilder {
     }
 
     /**
-     * Creates a mobile client with the default Protobuf serializer
+     * Returns a mobile client builder backed by an in-memory store.
      *
-     * @return a non-null mobile client instance
+     * <p>The resulting builder follows the mobile registration flow,
+     * which registers a phone number directly with the WhatsApp servers.
+     *
+     * @return the mobile client builder
      */
     public Client.Mobile mobileClient() {
         return new Client.Mobile(WhatsAppStoreFactory.inMemory());
     }
 
     /**
-     * Creates a mobile client with a custom factory
+     * Returns a mobile client builder backed by the given store factory.
      *
-     * @param factory the factory to use for data persistence, must not be null
-     * @return a non-null mobile client instance
-     * @throws NullPointerException if factory is null
+     * @param factory the factory to use for data persistence
+     * @return the mobile client builder
+     * @throws NullPointerException if {@code factory} is {@code null}
      */
     public Client.Mobile mobileClient(WhatsAppStoreFactory factory) {
         Objects.requireNonNull(factory, "factory must not be null");
@@ -97,9 +104,11 @@ public sealed class WhatsAppClientBuilder {
     }
 
     /**
-     * Creates a custom client for advanced configuration
+     * Returns a low-level builder that bypasses the
+     * {@link WhatsAppStoreFactory} flow and accepts a pre-built
+     * {@link WhatsAppStore} directly.
      *
-     * @return a non-null custom client instance
+     * @return the custom client builder
      */
     public Custom customClient() {
         return new Custom();
@@ -132,70 +141,90 @@ public sealed class WhatsAppClientBuilder {
         }
 
         /**
-         * Creates a new connection using a random UUID
+         * Creates a fresh connection identified by a random UUID.
          *
-         * @return a non-null options selector
+         * @return the next builder stage configured with a brand-new
+         *         store
+         * @throws IOException if the store cannot be created on disk
          */
         public abstract Options createConnection() throws IOException;
 
         /**
-         * Loads a connection from the six parts key representation
+         * Loads a connection from a six-parts credentials representation.
          *
-         * @param sixParts the six parts keys to use to create the connection, must not be null
-         * @return a non-null options selector
-         * @throws NullPointerException if sixParts is null
+         * @param sixParts the credentials to load
+         * @return the next builder stage if a matching store was found,
+         *         empty otherwise
+         * @throws NullPointerException if {@code sixParts} is {@code null}
+         * @throws IOException if the store cannot be read from disk
          */
         public abstract Optional<? extends Options> loadConnection(WhatsAppClientSixPartsKeys sixParts) throws IOException;
 
         /**
-         * Loads the last serialized connection.
-         * If no connection is available, an empty {@link Optional} will be returned.
+         * Loads the most recently serialised connection.
          *
-         * @return an {@link Optional} containing the last serialized connection, empty otherwise
+         * @return the next builder stage if a previous connection exists,
+         *         empty otherwise
+         * @throws IOException if the store cannot be read from disk
          */
         public abstract Optional<Options> loadLatestConnection() throws IOException;
 
         /**
-         * Loads the last serialized connection.
-         * If no connection is available, a new one will be created.
+         * Loads the most recently serialised connection, or provisions a
+         * fresh one if none exists yet.
          *
-         * @return a non-null options selector
+         * @return the next builder stage
+         * @throws IOException if the store cannot be read from or written
+         *                     to disk
          */
         public abstract Options loadLatestOrCreateConnection() throws IOException;
 
         /**
-         * Loads the connection whose id matches {@code uuid}.
-         * If {@code uuid} is null, or if no connection has an id that matches {@code uuid}, an empty {@link Optional} will be returned.
+         * Loads the connection whose identifier matches {@code uuid}.
          *
-         * @param uuid the id to use for the connection; can be null
-         * @return an {@link Optional} containing the connection whose id matches {@code uuid}, empty otherwise
+         * @param uuid the identifier of the connection to load, or
+         *             {@code null} to skip the lookup
+         * @return the next builder stage if a matching store was found,
+         *         empty otherwise
+         * @throws IOException if the store cannot be read from disk
          */
         public abstract Optional<? extends Options> loadConnection(UUID uuid) throws IOException;
 
         /**
-         * Loads the connection whose id matches {@code uuid}.
-         * If {@code uuid} is null, or if no connection has an id that matches {@code uuid}, a new connection will be created.
+         * Loads the connection whose identifier matches {@code uuid}, or
+         * provisions a fresh one if none exists yet.
          *
-         * @param uuid the id to use for the connection; can be null
-         * @return a non-null options selector
+         * @param uuid the identifier of the connection to load, or
+         *             {@code null} to provision under a fresh random UUID
+         * @return the next builder stage
+         * @throws IOException if the store cannot be read from or written
+         *                     to disk
          */
         public abstract Options loadOrCreateConnection(UUID uuid) throws IOException;
 
         /**
-         * Loads the connection whose phone number matches the given UUID.
-         * If the UUID is null, or if no connection matches the given UUID, a new connection will be created.
+         * Loads the connection whose phone number matches
+         * {@code phoneNumber}.
          *
-         * @param phoneNumber the phone value to use to create the connection, can be null (will generate a random UUID)
-         * @return a non-null options selector
+         * @param phoneNumber the phone number associated with the
+         *                    connection, or {@code null} to skip the
+         *                    lookup
+         * @return the next builder stage if a matching store was found,
+         *         empty otherwise
+         * @throws IOException if the store cannot be read from disk
          */
         public abstract Optional<? extends Options> loadConnection(Long phoneNumber) throws IOException;
 
         /**
-         * Loads the connection whose id matches {@code phoneNumber}.
-         * If {@code phoneNumber} is null, or if no connection matches {@code phoneNumber}, a new connection will be created.
+         * Loads the connection whose phone number matches
+         * {@code phoneNumber}, or provisions a fresh one if none exists
+         * yet.
          *
-         * @param phoneNumber the id to use for the connection, can be null
-         * @return a non-null options selector
+         * @param phoneNumber the phone number to load, or {@code null} to
+         *                    provision under a fresh random UUID
+         * @return the next builder stage
+         * @throws IOException if the store cannot be read from or written
+         *                     to disk
          */
         public abstract Options loadOrCreateConnection(Long phoneNumber) throws IOException;
 
@@ -483,12 +512,15 @@ public sealed class WhatsAppClientBuilder {
         }
 
         /**
-         * Sets the display name
-         * On Mobile, this is the preferred name that contacts that haven't saved you yet see next to your phone number.
-         * On Web, this is the name of the companion device, visible in the "Linked Devices" tab
+         * Sets the display name advertised by this session.
          *
-         * @param name the name to set, can be null
-         * @return the same instance for chaining
+         * <p>On mobile this is the preferred name that contacts who have
+         * not saved the user yet see next to the phone number. On web
+         * this is the companion-device name visible in the
+         * "Linked Devices" tab.
+         *
+         * @param name the name to set, or {@code null} to clear it
+         * @return this builder, for chaining
          */
         public Options name(String name) {
             store.setName(name);
@@ -496,10 +528,10 @@ public sealed class WhatsAppClientBuilder {
         }
 
         /**
-         * Sets a proxy for the connection
+         * Sets the proxy used by the connection.
          *
-         * @param proxy the proxy to use, can be null to use no proxy
-         * @return the same instance for chaining
+         * @param proxy the proxy, or {@code null} to use no proxy
+         * @return this builder, for chaining
          */
         public Options proxy(WhatsAppProxy proxy) {
             store.setProxy(proxy);
@@ -507,10 +539,10 @@ public sealed class WhatsAppClientBuilder {
         }
 
         /**
-         * Sets the companion device for the connection
+         * Sets the device descriptor advertised by the connection.
          *
-         * @param device the companion device, can be null
-         * @return the same instance for chaining
+         * @param device the device, or {@code null} to clear it
+         * @return this builder, for chaining
          */
         public Options device(WhatsAppDevice device) {
             store.setDevice(device);
@@ -518,12 +550,17 @@ public sealed class WhatsAppClientBuilder {
         }
 
         /**
-         * Controls whether the library should send receipts automatically for messages
-         * By default disabled
-         * For the web API, if enabled, the companion won't receive notifications
+         * Controls whether the library sends read receipts automatically
+         * for incoming messages.
          *
-         * @param automaticMessageReceipts true to enable automatic message receipts, false otherwise
-         * @return the same instance for chaining
+         * <p>Disabled by default. For the web API, enabling this option
+         * suppresses notifications on the companion device because the
+         * server only delivers notifications for unread messages.
+         *
+         * @param automaticMessageReceipts {@code true} to enable automatic
+         *                                 receipts, {@code false}
+         *                                 otherwise
+         * @return this builder, for chaining
          */
         public Options automaticMessageReceipts(boolean automaticMessageReceipts) {
             store.setAutomaticMessageReceipts(automaticMessageReceipts);
@@ -531,11 +568,11 @@ public sealed class WhatsAppClientBuilder {
         }
 
         /**
-         * Sets the client version for the connection
-         * This allows customization of the WhatsApp client version identifier
+         * Sets the WhatsApp client version advertised by the connection.
          *
-         * @param clientVersion the client version to use, can be null to use the default
-         * @return the same instance for chaining
+         * @param clientVersion the client version, or {@code null} to
+         *                      keep the default
+         * @return this builder, for chaining
          */
         public Options clientVersion(ClientAppVersion clientVersion) {
             store.setClientVersion(clientVersion);
@@ -543,10 +580,12 @@ public sealed class WhatsAppClientBuilder {
         }
 
         /**
-         * Sets an error handler for the connection
+         * Sets the error handler that decides how the future client
+         * reacts to failures.
          *
-         * @param errorHandler the error handler to use, can be null
-         * @return the same instance for chaining
+         * @param errorHandler the error handler, or {@code null} to use
+         *                     the default terminal-printing handler
+         * @return this builder, for chaining
          */
         public Options errorHandler(WhatsAppClientErrorHandler errorHandler) {
             this.errorHandler = errorHandler;
@@ -574,10 +613,7 @@ public sealed class WhatsAppClientBuilder {
             }
 
             /**
-             * Sets the display name for the companion device, visible in the "Linked Devices" tab
-             *
-             * @param name the name to set, can be null
-             * @return the same instance for chaining
+             * {@inheritDoc}
              */
             @Override
             public Mobile name(String name) {
@@ -585,10 +621,7 @@ public sealed class WhatsAppClientBuilder {
             }
 
             /**
-             * Sets a proxy for the connection
-             *
-             * @param proxy the proxy to use, can be null to use no proxy
-             * @return the same instance for chaining
+             * {@inheritDoc}
              */
             @Override
             public Web proxy(WhatsAppProxy proxy) {
@@ -596,10 +629,7 @@ public sealed class WhatsAppClientBuilder {
             }
 
             /**
-             * Sets the companion device for the connection
-             *
-             * @param device the companion device, can be null
-             * @return the same instance for chaining
+             * {@inheritDoc}
              */
             @Override
             public Web device(WhatsAppDevice device) {
@@ -607,10 +637,7 @@ public sealed class WhatsAppClientBuilder {
             }
 
             /**
-             * Sets an error handler for the connection
-             *
-             * @param errorHandler the error handler to use, can be null
-             * @return the same instance for chaining
+             * {@inheritDoc}
              */
             @Override
             public Web errorHandler(WhatsAppClientErrorHandler errorHandler) {
@@ -618,12 +645,7 @@ public sealed class WhatsAppClientBuilder {
             }
 
             /**
-             * Controls whether the library should send receipts automatically for messages
-             * By default disabled
-             * For the web API, if enabled, the companion won't receive notifications
-             *
-             * @param automaticMessageReceipts true to enable automatic message receipts, false otherwise
-             * @return the same instance for chaining
+             * {@inheritDoc}
              */
             @Override
             public Web automaticMessageReceipts(boolean automaticMessageReceipts) {
@@ -631,11 +653,7 @@ public sealed class WhatsAppClientBuilder {
             }
 
             /**
-             * Sets the client version for the connection
-             * This allows customization of the WhatsApp client version identifier
-             *
-             * @param clientVersion the client version to use, can be null to use the default
-             * @return the same instance for chaining
+             * {@inheritDoc}
              */
             @Override
             public Web clientVersion(ClientAppVersion clientVersion) {
@@ -643,12 +661,19 @@ public sealed class WhatsAppClientBuilder {
             }
 
             /**
-             * Sets how much chat history WhatsApp should send when the QR is first scanned
-             * By default, one year
+             * Sets the chat-history policy applied during the initial
+             * history sync that runs after companion linking completes.
              *
-             * @param historyLength the history policy to use, must not be null
-             * @return the same instance for chaining
-             * @throws NullPointerException if historyLength is null
+             * <p>The default is one year of history. Use
+             * {@link WhatsAppWebClientHistory#discard(boolean)},
+             * {@link WhatsAppWebClientHistory#standard(boolean)}, or
+             * {@link WhatsAppWebClientHistory#extended(boolean)} for
+             * common presets.
+             *
+             * @param historyLength the history policy
+             * @return this builder, for chaining
+             * @throws NullPointerException if {@code historyLength} is
+             *                              {@code null}
              */
             public Web historySetting(WhatsAppWebClientHistory historyLength) {
                 Objects.requireNonNull(historyLength, "historyLength must not be null");
@@ -657,11 +682,13 @@ public sealed class WhatsAppClientBuilder {
             }
 
             /**
-             * Creates a WhatsApp instance with a QR code handler
+             * Builds a web client whose linking ceremony surfaces a QR
+             * code through the supplied handler.
              *
-             * @param qrHandler the handler to process QR codes, must not be null
-             * @return a non-null WhatsApp instance
-             * @throws NullPointerException if qrHandler is null
+             * @param qrHandler the QR code handler
+             * @return the configured client
+             * @throws NullPointerException if {@code qrHandler} is
+             *                              {@code null}
              */
             public WhatsAppClient unregistered(WhatsAppClientVerificationHandler.Web.QrCode qrHandler) {
                 Objects.requireNonNull(qrHandler, "qrHandler must not be null");
@@ -670,12 +697,15 @@ public sealed class WhatsAppClientBuilder {
             }
 
             /**
-             * Creates a WhatsApp instance with an OTP handler
+             * Builds a web client whose linking ceremony surfaces a
+             * pairing code through the supplied handler.
              *
-             * @param phoneNumber the phone value of the user, must be valid
-             * @param pairingCodeHandler the handler for the pairing code, must not be null
-             * @return a non-null WhatsApp instance
-             * @throws NullPointerException if pairingCodeHandler is null
+             * @param phoneNumber        the phone number of the primary
+             *                           account being linked
+             * @param pairingCodeHandler the pairing-code handler
+             * @return the configured client
+             * @throws NullPointerException if {@code pairingCodeHandler}
+             *                              is {@code null}
              */
             public WhatsAppClient unregistered(long phoneNumber, WhatsAppClientVerificationHandler.Web.PairingCode pairingCodeHandler) {
                 Objects.requireNonNull(pairingCodeHandler, "pairingCodeHandler must not be null");
@@ -685,11 +715,11 @@ public sealed class WhatsAppClientBuilder {
             }
 
             /**
-             * Creates a WhatsApp instance with no handlers
-             * This method assumes that you have already logged in using a QR code or OTP
-             * Otherwise, it returns an empty optional.
+             * Builds a web client for a session that has already been
+             * registered, reusing the persisted credentials.
              *
-             * @return an optional containing the WhatsApp instance if registered, empty otherwise
+             * @return the configured client if the underlying store is
+             *         registered, empty otherwise
              */
             public Optional<WhatsAppClient> registered() {
                 if (!store.registered()) {
@@ -774,10 +804,7 @@ public sealed class WhatsAppClientBuilder {
             }
 
             /**
-             * Sets a proxy for the connection
-             *
-             * @param proxy the proxy to use, can be null to use no proxy
-             * @return the same instance for chaining
+             * {@inheritDoc}
              */
             @Override
             public Mobile proxy(WhatsAppProxy proxy) {
@@ -1077,10 +1104,7 @@ public sealed class WhatsAppClientBuilder {
             }
 
             /**
-             * Sets an error handler for the connection
-             *
-             * @param errorHandler the error handler to use, can be null
-             * @return the same instance for chaining
+             * {@inheritDoc}
              */
             @Override
             public Mobile errorHandler(WhatsAppClientErrorHandler errorHandler) {
@@ -1089,12 +1113,7 @@ public sealed class WhatsAppClientBuilder {
             }
 
             /**
-             * Controls whether the library should send receipts automatically for messages
-             * By default disabled
-             * For the web API, if enabled, the companion won't receive notifications
-             *
-             * @param automaticMessageReceipts true to enable automatic message receipts, false otherwise
-             * @return the same instance for chaining
+             * {@inheritDoc}
              */
             @Override
             public Mobile automaticMessageReceipts(boolean automaticMessageReceipts) {
@@ -1103,11 +1122,7 @@ public sealed class WhatsAppClientBuilder {
             }
 
             /**
-             * Sets the client version for the connection
-             * This allows customization of the WhatsApp client version identifier
-             *
-             * @param clientVersion the client version to use, can be null to use the default
-             * @return the same instance for chaining
+             * {@inheritDoc}
              */
             @Override
             public Mobile clientVersion(ClientAppVersion clientVersion) {
@@ -1115,11 +1130,7 @@ public sealed class WhatsAppClientBuilder {
             }
 
             /**
-             * Sets the display name for the WhatsApp account
-             * This is the preferred name that contacts that haven't saved you yet see next to your phone number.
-             *
-             * @param name the name to set, can be null
-             * @return the same instance for chaining
+             * {@inheritDoc}
              */
             @Override
             public Mobile name(String name) {
@@ -1127,10 +1138,10 @@ public sealed class WhatsAppClientBuilder {
             }
 
             /**
-             * Sets the about/status message for the WhatsApp account
+             * Sets the about/status message attached to the account.
              *
-             * @param about the about message to set, can be null
-             * @return the same instance for chaining
+             * @param about the about text, or {@code null} to clear it
+             * @return this builder, for chaining
              */
             public Mobile about(String about) {
                 store.setAbout(about);
@@ -1138,10 +1149,12 @@ public sealed class WhatsAppClientBuilder {
             }
 
             /**
-             * Sets the business' address
+             * Sets the business address advertised on the account's
+             * business profile.
              *
-             * @param businessAddress the address to set, can be null
-             * @return the same instance for chaining
+             * @param businessAddress the address, or {@code null} to
+             *                        clear it
+             * @return this builder, for chaining
              */
             public Mobile businessAddress(String businessAddress) {
                 store.setBusinessAddress(businessAddress);
@@ -1149,10 +1162,12 @@ public sealed class WhatsAppClientBuilder {
             }
 
             /**
-             * Sets the business' address longitude
+             * Sets the longitude component of the business address
+             * geolocation.
              *
-             * @param businessLongitude the longitude to set, can be null
-             * @return the same instance for chaining
+             * @param businessLongitude the longitude, or {@code null} to
+             *                          clear it
+             * @return this builder, for chaining
              */
             public Mobile businessLongitude(Double businessLongitude) {
                 store.setBusinessLongitude(businessLongitude);
@@ -1160,10 +1175,12 @@ public sealed class WhatsAppClientBuilder {
             }
 
             /**
-             * Sets the business' address latitude
+             * Sets the latitude component of the business address
+             * geolocation.
              *
-             * @param businessLatitude the latitude to set, can be null
-             * @return the same instance for chaining
+             * @param businessLatitude the latitude, or {@code null} to
+             *                         clear it
+             * @return this builder, for chaining
              */
             public Mobile businessLatitude(Double businessLatitude) {
                 store.setBusinessLatitude(businessLatitude);
@@ -1171,10 +1188,12 @@ public sealed class WhatsAppClientBuilder {
             }
 
             /**
-             * Sets the business' description
+             * Sets the business description shown on the account's
+             * business profile.
              *
-             * @param businessDescription the description to set, can be null
-             * @return the same instance for chaining
+             * @param businessDescription the description, or {@code null}
+             *                            to clear it
+             * @return this builder, for chaining
              */
             public Mobile businessDescription(String businessDescription) {
                 store.setBusinessDescription(businessDescription);
@@ -1182,10 +1201,11 @@ public sealed class WhatsAppClientBuilder {
             }
 
             /**
-             * Sets the business' website URL
+             * Sets the business website URL.
              *
-             * @param businessWebsite the website URL to set, can be null
-             * @return the same instance for chaining
+             * @param businessWebsite the website URL, or {@code null} to
+             *                        clear it
+             * @return this builder, for chaining
              */
             public Mobile businessWebsite(String businessWebsite) {
                 store.setBusinessWebsite(businessWebsite);
@@ -1193,10 +1213,11 @@ public sealed class WhatsAppClientBuilder {
             }
 
             /**
-             * Sets the business' email address
+             * Sets the business contact email address.
              *
-             * @param businessEmail the email address to set, can be null
-             * @return the same instance for chaining
+             * @param businessEmail the email address, or {@code null} to
+             *                      clear it
+             * @return this builder, for chaining
              */
             public Mobile businessEmail(String businessEmail) {
                 store.setBusinessEmail(businessEmail);
@@ -1204,10 +1225,12 @@ public sealed class WhatsAppClientBuilder {
             }
 
             /**
-             * Sets the business' category
+             * Sets the business category advertised on the business
+             * profile.
              *
-             * @param businessCategory the category to set, can be null
-             * @return the same instance for chaining
+             * @param businessCategory the category, or {@code null} to
+             *                         clear it
+             * @return this builder, for chaining
              */
             public Mobile businessCategory(BusinessCategory businessCategory) {
                 store.setBusinessCategory(businessCategory);
@@ -1215,20 +1238,15 @@ public sealed class WhatsAppClientBuilder {
             }
 
             /**
-             * Creates a WhatsApp instance assuming the session is already registered
-             * This means that the verification code has already been sent to WhatsApp
+             * Builds a mobile client for a session that has already been
+             * registered, reusing the persisted credentials.
              *
-             * @return an optional containing the WhatsApp instance if registered, empty otherwise
-             * @throws IllegalArgumentException if an attestor was
-             *                                  attached via
-             *                                  {@link #deviceAttestor}
-             *                                  whose platform does not
-             *                                  match the configured
-             *                                  device, or if a push
-             *                                  client was attached via
-             *                                  {@link #devicePushClient}
-             *                                  that does not support
-             *                                  the configured device's
+             * @return the configured client if the underlying store is
+             *         registered, empty otherwise
+             * @throws IllegalArgumentException if a previously attached
+             *                                  attestor or push client
+             *                                  does not match the
+             *                                  configured device
              *                                  platform
              */
             public Optional<WhatsAppClient> registered() {
@@ -1244,14 +1262,21 @@ public sealed class WhatsAppClientBuilder {
             }
 
             /**
-             * Creates a WhatsApp instance for a session that needs registration
-             * This means that you may or may not have a verification code, but it hasn't been sent to WhatsApp yet
+             * Builds a mobile client and runs the registration ceremony
+             * for a session that has not yet been registered.
              *
-             * @param phoneNumber the phone value to register, must be valid
-             * @param verification the verification handler to use, must not be null
-             * @return a non-null WhatsApp instance
-             * @throws NullPointerException if verification is null
-             * @throws IllegalArgumentException if the store already has a phone number set, and the phone number is different from the one being registered
+             * @param phoneNumber  the phone number being registered
+             * @param verification the verification handler used to drive
+             *                     the OTP exchange
+             * @return the configured client
+             * @throws NullPointerException     if {@code verification} is
+             *                                  {@code null}
+             * @throws IllegalArgumentException if the store already
+             *                                  carries a different phone
+             *                                  number, or if a previously
+             *                                  attached attestor or push
+             *                                  client does not match the
+             *                                  configured device platform
              */
             public WhatsAppClient register(long phoneNumber, WhatsAppClientVerificationHandler.Mobile verification) {
                 Objects.requireNonNull(verification, "verification must not be null");
@@ -1323,10 +1348,11 @@ public sealed class WhatsAppClientBuilder {
         }
 
         /**
-         * Sets the store for the connection
+         * Sets the externally-supplied store backing the client.
          *
-         * @param store the store to use, can be null
-         * @return the same instance for chaining
+         * @param store the store, or {@code null} to leave it unset
+         *              (which fails fast at {@link #build()})
+         * @return this builder, for chaining
          */
         public Custom store(WhatsAppStore store) {
             this.store = store;
@@ -1334,10 +1360,12 @@ public sealed class WhatsAppClientBuilder {
         }
 
         /**
-         * Sets an error handler for the connection
+         * Sets the error handler that decides how the future client
+         * reacts to failures.
          *
-         * @param errorHandler the error handler to use, can be null
-         * @return the same instance for chaining
+         * @param errorHandler the error handler, or {@code null} to use
+         *                     the default terminal-printing handler
+         * @return this builder, for chaining
          */
         public Custom errorHandler(WhatsAppClientErrorHandler errorHandler) {
             this.errorHandler = errorHandler;
@@ -1345,10 +1373,13 @@ public sealed class WhatsAppClientBuilder {
         }
 
         /**
-         * Sets the web verification handler for the connection
+         * Sets the web verification handler used when the supplied store
+         * is configured for {@link WhatsAppClientType#WEB}.
          *
-         * @param webVerificationHandler the verification handler to use, can be null
-         * @return the same instance for chaining
+         * @param webVerificationHandler the verification handler, or
+         *                               {@code null} to use the default
+         *                               terminal-rendering handler
+         * @return this builder, for chaining
          */
         public Custom webVerificationSupport(WhatsAppClientVerificationHandler.Web webVerificationHandler) {
             this.webVerificationHandler = webVerificationHandler;
@@ -1356,11 +1387,10 @@ public sealed class WhatsAppClientBuilder {
         }
 
         /**
-         * Builds a WhatsApp instance with the configured parameters
+         * Builds the configured client.
          *
-         * @return a non-null WhatsApp instance
-         * @throws NullPointerException if store or keys are null
-         * @throws IllegalArgumentException if there is a UUID mismatch between store and keys
+         * @return the configured client
+         * @throws NullPointerException if no store has been supplied
          */
         public WhatsAppClient build() {
             var store = Objects.requireNonNull(this.store, "Expected a valid store");

@@ -7,48 +7,28 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Base exception for message processing errors in the WhatsApp protocol.
+ * Thrown for failures while sending or receiving an individual
+ * WhatsApp message.
  *
- * <p>This sealed class hierarchy represents all message-related failures that can occur during
- * message sending, receiving, and processing operations. Message exceptions are categorized
- * into decryption failures ({@link Receive}) which represent cryptographic and protocol-level
- * errors that prevent message content from being accessed, and send failures ({@link Send})
- * which represent encryption, addressing, and server-rejection errors that prevent outgoing
- * messages from reaching their recipients.
-
- * <p>Message exceptions are generally non-fatal errors, meaning the client connection should
- * remain active and continue processing other messages. The specific error information is
- * used by the configurable error handler to generate appropriate retry receipts or error
- * acknowledgments back to the sender, or to decide whether to re-attempt an outgoing send.
+ * <p>The hierarchy is split into two halves. {@link Receive}
+ * subtypes describe everything that can go wrong while decrypting and
+ * validating an incoming message: missing Signal sessions, invalid
+ * keys, replayed counters, MAC failures, sender-key issues for group
+ * messages, multi-device validation problems, ADV failures, protobuf
+ * validation, and a small number of WhatsApp-specific protocol
+ * errors. {@link Send} subtypes describe the equivalent problems on
+ * the outgoing side: session and key bring-up failures, stale device
+ * lists, server NACKs with their numeric error code, recipient-level
+ * problems, payload too large, expired messages, monthly send caps,
+ * timeouts, duplicate sends, and authorization failures.
  *
- * <h2>Exception Hierarchy</h2>
- * <ul>
- *   <li>{@link Receive} - Abstract base for all decryption failures
- *     <ul>
- *       <li>{@link Receive.NoSession} - Signal session does not exist</li>
- *       <li>{@link Receive.InvalidKey} - Signal key validation failed</li>
- *       <li>{@link Receive.InvalidKeyId} - Signal key identifier is invalid</li>
- *       <li>{@link Receive.InvalidOneTimeKey} - One-time prekey validation failed</li>
- *       <li>{@link Receive.InvalidSignedPreKey} - Signed prekey validation failed</li>
- *       <li>{@link Receive.InvalidMessage} - Signal message structure is malformed</li>
- *       <li>{@link Receive.InvalidSignature} - Signal signature verification failed</li>
- *       <li>{@link Receive.DuplicateMessage} - Message counter already processed</li>
- *       <li>{@link Receive.FutureMessage} - Message counter too far ahead</li>
- *       <li>{@link Receive.BadMac} - Message authentication code failed</li>
- *       <li>{@link Receive.NoSenderKey} - Group sender key not available</li>
- *       <li>{@link Receive.InvalidSenderKey} - Group sender key validation failed</li>
- *       <li>{@link Receive.UnknownDevice} - Message from unrecognized companion device</li>
- *       <li>{@link Receive.InvalidDeviceSentMessage} - Device sent message validation failed</li>
- *       <li>{@link Receive.AdvFailure} - Account device verification failed</li>
- *       <li>{@link Receive.InvalidProtobuf} - Protobuf deserialization or validation failed</li>
- *       <li>{@link Receive.BroadcastEphemeralSettings} - Broadcast ephemeral settings error</li>
- *       <li>{@link Receive.HsmMismatch} - HSM template mismatch</li>
- *       <li>{@link Receive.Unknown} - Unclassified decryption failure</li>
- *     </ul>
- *   </li>
- * </ul>
+ * <p>Message exceptions are not fatal at the session level: a single
+ * failed message does not bring the connection down. The configurable
+ * error handler decides whether to send a retry receipt (for
+ * receives), retry the send, or surface the failure to the caller.
  *
  * @see Receive
+ * @see Send
  */
 public sealed class WhatsAppMessageException extends WhatsAppException
         permits WhatsAppMessageException.Receive, WhatsAppMessageException.Send {
@@ -82,12 +62,12 @@ public sealed class WhatsAppMessageException extends WhatsAppException
     }
 
     /**
-     * Returns whether this exception represents a fatal error.
-     * <p>
-     * Message exceptions are non-fatal by default, as individual message failures
-     * should not terminate the entire client session.
+     * Returns whether the failure invalidates the current session.
      *
-     * @return {@code false} for all message exceptions
+     * <p>Per-message failures never tear the session down; they are
+     * reported so the caller can react to a single bad message.
+     *
+     * @return {@code false}
      */
     @Override
     public boolean isFatal() {
@@ -95,39 +75,17 @@ public sealed class WhatsAppMessageException extends WhatsAppException
     }
 
     /**
-     * Abstract base exception for all message decryption failures.
-     * <p>
-     * This sealed class hierarchy represents the complete taxonomy of errors that can occur
-     * when attempting to decrypt an incoming WhatsApp message. Each subclass corresponds to
-     * a specific failure mode in the Signal protocol, sender key distribution, device
-     * verification, or message validation pipeline.
+     * Thrown for failures during the decryption and validation of an
+     * incoming WhatsApp message.
      *
-     * <h2>Retry Receipt System</h2>
-     * When decryption fails for retryable errors, the client sends a retry receipt to the
-     * sender requesting message retransmission. The retry receipt includes:
-     * <ul>
-     *   <li><b>Retry reason code:</b> An integer indicating the failure type (see {@link RetryReason})</li>
-     *   <li><b>Retry count:</b> Number of retry attempts made</li>
-     *   <li><b>Registration ID:</b> Client's Signal registration identifier</li>
-     *   <li><b>Key bundle:</b> Optional prekey bundle for session re-establishment</li>
-     * </ul>
-     *
-     * <h2>Error Categories</h2>
-     * Decryption errors fall into several categories:
-     * <ul>
-     *   <li><b>Session errors:</b> {@link NoSession} - No Signal session exists with the sender</li>
-     *   <li><b>Key errors:</b> {@link InvalidKey}, {@link InvalidKeyId}, {@link InvalidOneTimeKey},
-     *       {@link InvalidSignedPreKey} - Cryptographic key validation failures</li>
-     *   <li><b>Message errors:</b> {@link InvalidMessage}, {@link InvalidSignature},
-     *       {@link DuplicateMessage}, {@link FutureMessage} - Message structure or ordering issues</li>
-     *   <li><b>MAC errors:</b> {@link BadMac} - Message integrity check failed</li>
-     *   <li><b>Group errors:</b> {@link NoSenderKey}, {@link InvalidSenderKey} - Sender key distribution issues</li>
-     *   <li><b>Device errors:</b> {@link UnknownDevice}, {@link InvalidDeviceSentMessage} - Multi-device validation failures</li>
-     *   <li><b>ADV errors:</b> {@link AdvFailure} - Account device verification failed</li>
-     *   <li><b>Validation errors:</b> {@link InvalidProtobuf} - Protobuf deserialization failures</li>
-     *   <li><b>Protocol errors:</b> {@link BroadcastEphemeralSettings}, {@link HsmMismatch} - Protocol-specific failures</li>
-     *   <li><b>Unknown:</b> {@link Unknown} - Unclassified failures</li>
-     * </ul>
+     * <p>Most of these failures cause Cobalt to send a retry receipt
+     * back to the sender so the message can be retransmitted with
+     * fresh cryptographic material. The retry reason carried in that
+     * receipt is exposed through {@link #retryReason()};
+     * {@link #shouldSendRetryReceipt()} indicates whether the receipt
+     * should be sent at all (for example, duplicate messages do not
+     * warrant a retry); and {@link #errorCode()} carries the optional
+     * NACK error code used for validation-style failures.
      *
      * @see RetryReason
      */
@@ -162,234 +120,133 @@ public sealed class WhatsAppMessageException extends WhatsAppException
         }
 
         /**
-         * Returns the retry reason code for this decryption failure.
-         * <p>
-         * The retry reason is sent in retry receipt stanzas to inform the sender
-         * what type of failure occurred. The sender uses this information to determine
-         * how to retransmit the message (e.g., re-establish session, redistribute sender key).
+         * Returns the retry reason that should accompany a retry
+         * receipt for this failure.
          *
-         * @return the retry reason for this decryption failure
+         * @return the retry reason, never {@code null}
          */
         public abstract RetryReason retryReason();
 
         /**
-         * Returns whether a retry receipt should be sent for this failure.
-         * <p>
-         * Most decryption failures trigger retry receipts, but some (like duplicate messages)
-         * are silently ignored since they don't represent actual failures.
+         * Returns whether a retry receipt should be sent to the
+         * sender for this failure.
          *
-         * @return {@code true} if a retry receipt should be sent
+         * <p>Most failures warrant a retry receipt so the sender
+         * retransmits the message; the exception is duplicate
+         * messages, which are silently dropped.
+         *
+         * @return {@code true} when a retry receipt should be sent
          */
         public boolean shouldSendRetryReceipt() {
             return true;
         }
 
         /**
-         * Returns the optional error code for NACK receipts.
-         * <p>
-         * Some decryption failures (particularly validation errors) include an error code
-         * that should be sent in a NACK receipt instead of or in addition to a retry receipt.
+         * Returns the NACK error code for this failure, when one
+         * applies.
          *
-         * @return the error code for NACK receipts, or empty if not applicable
+         * <p>Validation-style failures (such as a malformed
+         * protobuf or a bad device-sent message) trigger a NACK
+         * receipt instead of, or in addition to, a retry receipt.
+         *
+         * @return the NACK error code, or empty when none applies
          */
         public Optional<String> errorCode() {
             return Optional.empty();
         }
 
         /**
-         * Retry reason codes sent in retry receipt stanzas when message decryption fails.
-         * <p>
-         * These integer codes are defined by the WhatsApp protocol and indicate to the sender
-         * what type of failure occurred. The sender uses this information to determine the
-         * appropriate recovery action.
+         * The retry reason codes WhatsApp defines for retry receipts.
          *
-         * <h2>Protocol Values</h2>
-         * <table border="1">
-         *   <caption>Retry Reason Protocol Values</caption>
-         *   <tr><th>Code</th><th>Name</th><th>Recovery Action</th></tr>
-         *   <tr><td>0</td><td>UNKNOWN_ERROR</td><td>Generic retry</td></tr>
-         *   <tr><td>1</td><td>SIGNAL_ERROR_NO_SESSION</td><td>Send PreKeySignalMessage</td></tr>
-         *   <tr><td>2</td><td>SIGNAL_ERROR_INVALID_KEY</td><td>Refresh key bundle</td></tr>
-         *   <tr><td>3</td><td>SIGNAL_ERROR_INVALID_KEY_ID</td><td>Refresh key bundle</td></tr>
-         *   <tr><td>4</td><td>SIGNAL_ERROR_INVALID_MESSAGE</td><td>Re-encrypt message</td></tr>
-         *   <tr><td>5</td><td>SIGNAL_ERROR_INVALID_SIGNATURE</td><td>Verify identity</td></tr>
-         *   <tr><td>6</td><td>SIGNAL_ERROR_FUTURE_MESSAGE</td><td>Synchronize counters</td></tr>
-         *   <tr><td>7</td><td>SIGNAL_ERROR_BAD_MAC</td><td>Re-encrypt message</td></tr>
-         *   <tr><td>8</td><td>SIGNAL_ERROR_INVALID_SESSION</td><td>Re-establish session</td></tr>
-         *   <tr><td>9</td><td>SIGNAL_ERROR_INVALID_MSG_KEY</td><td>Re-encrypt message</td></tr>
-         *   <tr><td>10</td><td>BAD_BROADCAST_EPH_SETTINGS</td><td>Resend broadcast settings</td></tr>
-         *   <tr><td>11</td><td>UNKNOWN_COMPANION_NO_PREKEY</td><td>Register device</td></tr>
-         *   <tr><td>12</td><td>ADV_FAILURE</td><td>Re-verify device</td></tr>
-         *   <tr><td>13</td><td>STATUS_REVOKE_DELAY</td><td>Wait and retry</td></tr>
-         * </table>
+         * <p>The numeric value carried in the receipt tells the
+         * sender what kind of failure happened so it can pick the
+         * right corrective action (resend the message, redeliver the
+         * key bundle, redistribute the sender key, and so on).
          */
         public enum RetryReason {
             /**
-             * Unknown or unclassified error.
-             * <p>
-             * Used when the specific failure reason cannot be determined.
-             * The sender should perform a generic retry attempt.
+             * Generic failure that does not match any specific reason.
              */
             UNKNOWN_ERROR(0),
 
             /**
-             * No Signal session exists with the sender device.
-             * <p>
-             * The recipient has no cryptographic session established with the sender.
-             * This typically occurs when:
-             * <ul>
-             *   <li>First message from a new contact</li>
-             *   <li>Session was deleted due to storage cleanup</li>
-             *   <li>Sender device was recently registered</li>
-             * </ul>
-             * <p>
-             * Recovery: Sender should transmit a PreKeySignalMessage to establish a new session.
+             * No Signal session exists with the sender device, so the
+             * message cannot be decrypted as a regular Signal message.
              */
             SIGNAL_ERROR_NO_SESSION(1),
 
             /**
-             * Invalid cryptographic key in the message.
-             * <p>
-             * The public key included in the message failed validation.
-             * This can occur due to:
-             * <ul>
-             *   <li>Corrupted key data</li>
-             *   <li>Invalid elliptic curve point</li>
-             *   <li>Key format mismatch</li>
-             * </ul>
-             * <p>
-             * Recovery: Sender should refresh their key bundle and retry.
+             * A public key in the message failed validation.
              */
             SIGNAL_ERROR_INVALID_KEY(2),
 
             /**
-             * Invalid key identifier in the message.
-             * <p>
-             * The key ID referenced does not match any known key.
-             * This can occur when keys are rotated on one side but not synchronized.
-             * <p>
-             * Recovery: Sender should refresh their key bundle and retry.
+             * A key identifier in the message does not match any
+             * stored key.
              */
             SIGNAL_ERROR_INVALID_KEY_ID(3),
 
             /**
-             * Invalid Signal message structure.
-             * <p>
-             * The message format does not conform to the Signal protocol specification.
-             * This indicates corruption, truncation, or protocol version mismatch.
-             * <p>
-             * Recovery: Sender should re-encrypt and resend the message.
+             * The Signal message body does not conform to the
+             * expected layout.
              */
             SIGNAL_ERROR_INVALID_MESSAGE(4),
 
             /**
-             * Invalid cryptographic signature.
-             * <p>
-             * The signature on the message or key bundle failed verification.
-             * This could indicate:
-             * <ul>
-             *   <li>Message tampering</li>
-             *   <li>Identity key mismatch</li>
-             *   <li>Corrupted signature data</li>
-             * </ul>
-             * <p>
-             * Recovery: Sender should verify their identity key and retry.
+             * A cryptographic signature on the message or key bundle
+             * did not verify.
              */
             SIGNAL_ERROR_INVALID_SIGNATURE(5),
 
             /**
-             * Message counter is too far in the future.
-             * <p>
-             * The message's sequence number exceeds the acceptable lookahead window.
-             * This can happen when:
-             * <ul>
-             *   <li>Messages were lost or reordered significantly</li>
-             *   <li>Counter synchronization was lost</li>
-             *   <li>Potential replay attack with manipulated counters</li>
-             * </ul>
-             * <p>
-             * Recovery: Both parties should synchronize their message counters.
+             * The message counter is too far ahead of the local
+             * counter to be accepted.
              */
             SIGNAL_ERROR_FUTURE_MESSAGE(6),
 
             /**
-             * Message authentication code (MAC) verification failed.
-             * <p>
-             * The HMAC computed over the message did not match the expected value.
-             * This is a strong indicator of:
-             * <ul>
-             *   <li>Message corruption during transmission</li>
-             *   <li>Incorrect encryption key derivation</li>
-             *   <li>Potential tampering or man-in-the-middle attack</li>
-             * </ul>
-             * <p>
-             * Recovery: Sender should re-encrypt the message with fresh key material.
+             * The HMAC over the message did not validate.
              */
             SIGNAL_ERROR_BAD_MAC(7),
 
             /**
-             * Signal session state is invalid.
-             * <p>
-             * The session exists but is in an inconsistent or corrupted state
-             * that prevents decryption.
-             * <p>
-             * Recovery: Both parties should re-establish the session from scratch.
+             * The Signal session exists but is in an inconsistent
+             * state.
              */
             SIGNAL_ERROR_INVALID_SESSION(8),
 
             /**
-             * Invalid message key derivation.
-             * <p>
-             * The symmetric key derived for this specific message is invalid
-             * or cannot be computed from the current session state.
-             * <p>
-             * Recovery: Sender should re-encrypt the message.
+             * The per-message key derived from the session is
+             * unusable.
              */
             SIGNAL_ERROR_INVALID_MSG_KEY(9),
 
             /**
-             * Invalid broadcast ephemeral settings.
-             * <p>
-             * The ephemeral messaging settings for a broadcast list could not
-             * be decrypted or validated.
-             * <p>
-             * Recovery: Sender should resend the broadcast settings stanza.
+             * The ephemeral-message settings published for a
+             * broadcast list could not be validated.
              */
             BAD_BROADCAST_EPH_SETTINGS(10),
 
             /**
-             * Unknown companion device without prekey.
-             * <p>
-             * A message was received from an unrecognized companion device
-             * and no prekey bundle is available to establish a session.
-             * <p>
-             * Recovery: The unknown device should register its prekeys with the server.
+             * A message arrived from a companion device that has
+             * not yet uploaded a prekey bundle.
              */
             UNKNOWN_COMPANION_NO_PREKEY(11),
 
             /**
-             * Account Device Verification (ADV) failure.
-             * <p>
-             * The device's identity could not be verified using ADV signatures.
-             * This indicates the device may not be legitimately associated with
-             * the claimed account.
-             * <p>
-             * Recovery: Sender's device should re-verify its ADV chain.
+             * The sender's Advanced Device Verification chain did
+             * not validate.
              */
             ADV_FAILURE(12),
 
             /**
-             * Status message revoke delay.
-             * <p>
-             * A status-related operation could not be processed due to
-             * timing constraints on revocation.
-             * <p>
-             * Recovery: Wait for the delay period and retry.
+             * A status revoke arrived too soon after the original
+             * status, so the operation has to wait.
              */
             STATUS_REVOKE_DELAY(13);
 
             /**
-             * The protocol integer value sent in retry receipt stanzas.
+             * The integer value carried in retry receipt stanzas.
              */
             private final int protocolValue;
 
@@ -403,9 +260,7 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns the protocol integer value for this retry reason.
-             * <p>
-             * This value is encoded in the {@code error} attribute of retry receipt stanzas.
+             * Returns the integer value carried in retry receipt stanzas.
              *
              * @return the protocol integer value
              */
@@ -415,24 +270,20 @@ public sealed class WhatsAppMessageException extends WhatsAppException
 
             /**
              * Returns whether a retry receipt should be sent for this reason.
-             * <p>
-             * Most retry reasons trigger retry receipts, but some (like duplicate messages
-             * indicated by future message counter issues) may be silently ignored.
              *
-             * @return {@code true} if a retry receipt should be sent
+             * @return {@code true} when a retry receipt should be sent
              */
             public boolean shouldSendRetryReceipt() {
-                // All reasons should send retry receipts except for specific cases
-                // that are handled by the Decrypt subclass overrides
                 return true;
             }
 
             /**
-             * Parses a retry reason from its protocol integer value.
+             * Returns the retry reason that matches the given
+             * protocol integer value.
              *
              * @param value the protocol integer value
-             * @return the corresponding retry reason
-             * @throws IllegalArgumentException if the value does not match any known reason
+             * @return the matching retry reason
+             * @throws IllegalArgumentException when {@code value} does not match any known reason
              */
             public static RetryReason fromProtocolValue(int value) {
                 for (var reason : values()) {
@@ -445,32 +296,19 @@ public sealed class WhatsAppMessageException extends WhatsAppException
         }
 
         /**
-         * Exception thrown when no Signal session exists with the sender device.
-         * <p>
-         * In the Signal protocol, a session must be established before encrypted messages
-         * can be exchanged. This exception occurs when:
-         * <ul>
-         *   <li>Receiving a {@code msg} (Signal message) type when no session exists</li>
-         *   <li>Receiving a {@code skmsg} (sender key message) when no sender key session exists</li>
-         *   <li>The session was deleted from local storage</li>
-         *   <li>The sender is a newly registered device</li>
-         * </ul>
-         * <p>
-         * When this exception is thrown, a retry receipt is sent to the sender with reason
-         * {@link RetryReason#SIGNAL_ERROR_NO_SESSION}, prompting them to resend the message
-         * as a {@code pkmsg} (PreKeySignalMessage) which includes the key material needed
-         * to establish a new session.
+         * Thrown when no Signal session exists with the sender of an
+         * incoming message.
          *
-         * <h2>Signal Error Messages</h2>
-         * This exception maps to the following Signal library error strings:
-         * <ul>
-         *   <li>{@code errSignalNoSession} - No 1:1 session with sender</li>
-         *   <li>{@code errLoadSenderKeySession} - No group sender key session</li>
-         * </ul>
+         * <p>This can happen when the contact is new, when the local
+         * session was evicted, or when the sender just registered a
+         * new device. The retry receipt asks the sender to retransmit
+         * the message as a {@code pkmsg} that carries the prekey
+         * material needed to start a session.
          */
         public static final class NoSession extends Receive {
             /**
-             * Indicates whether this is a group (sender key) session error.
+             * Whether this is a group sender-key session error rather
+             * than a one-to-one Signal session error.
              */
             private final boolean isGroupSession;
 
@@ -486,7 +324,7 @@ public sealed class WhatsAppMessageException extends WhatsAppException
              * Constructs a new no-session exception with the specified message.
              *
              * @param message        the detail message
-             * @param isGroupSession {@code true} if this is a group sender key session error
+             * @param isGroupSession {@code true} when the missing session is a group sender-key session
              */
             public NoSession(String message, boolean isGroupSession) {
                 super(message);
@@ -497,7 +335,7 @@ public sealed class WhatsAppMessageException extends WhatsAppException
              * Constructs a new no-session exception with a cause.
              *
              * @param message        the detail message
-             * @param isGroupSession {@code true} if this is a group sender key session error
+             * @param isGroupSession {@code true} when the missing session is a group sender-key session
              * @param cause          the underlying cause
              */
             public NoSession(String message, boolean isGroupSession, Throwable cause) {
@@ -506,16 +344,17 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns whether this is a group (sender key) session error.
+             * Returns whether this is a group sender-key session error.
              *
-             * @return {@code true} if this is a group session error, {@code false} for 1:1 sessions
+             * @return {@code true} for a group session error,
+             *         {@code false} for a 1:1 session error
              */
             public boolean isGroupSession() {
                 return isGroupSession;
             }
 
             /**
-             * Returns the retry reason code for this decryption failure.
+             * Returns the retry reason for this failure.
              *
              * @return {@link RetryReason#SIGNAL_ERROR_NO_SESSION}
              */
@@ -526,22 +365,9 @@ public sealed class WhatsAppMessageException extends WhatsAppException
         }
 
         /**
-         * Exception thrown when a cryptographic key in the message is invalid.
-         * <p>
-         * This exception occurs when public key validation fails during message decryption.
-         * The Signal protocol uses Curve25519 elliptic curve keys, and this error indicates
-         * the key data does not represent a valid point on the curve.
-         *
-         * <h2>Possible Causes</h2>
-         * <ul>
-         *   <li>Key data was corrupted during transmission</li>
-         *   <li>Key encoding/decoding error</li>
-         *   <li>Intentionally malformed key (potential attack)</li>
-         *   <li>Protocol version mismatch</li>
-         * </ul>
-         *
-         * <h2>Signal Error Message</h2>
-         * This exception maps to {@code errSignalInvalidKey}.
+         * Thrown when a public key carried by an incoming message
+         * fails validation (for example, it does not encode a valid
+         * Curve25519 point).
          */
         public static final class InvalidKey extends Receive {
             /**
@@ -571,7 +397,7 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns the retry reason code for this decryption failure.
+             * Returns the retry reason for this failure.
              *
              * @return {@link RetryReason#SIGNAL_ERROR_INVALID_KEY}
              */
@@ -582,28 +408,20 @@ public sealed class WhatsAppMessageException extends WhatsAppException
         }
 
         /**
-         * Exception thrown when a key identifier in the message does not match any known key.
-         * <p>
-         * Signal protocol messages reference keys by numeric identifiers. This exception occurs
-         * when the referenced key ID is not found in the local key store, typically due to:
-         * <ul>
-         *   <li>Key rotation where old keys were deleted</li>
-         *   <li>Key ID collision or wrap-around</li>
-         *   <li>Corrupted key ID value</li>
-         *   <li>Message referencing a key that was never stored</li>
-         * </ul>
+         * Thrown when a key identifier in an incoming message does
+         * not match any stored key.
          *
-         * <h2>Signal Error Message</h2>
-         * This exception maps to {@code errSignalInvalidKeyId}.
+         * <p>This is most commonly caused by key rotation that
+         * happened on one side but not the other.
          */
         public static final class InvalidKeyId extends Receive {
             /**
-             * The invalid key identifier, if known.
+             * The unrecognized key identifier, when known.
              */
             private final Integer keyId;
 
             /**
-             * Constructs a new invalid key ID exception.
+             * Constructs a new invalid key id exception.
              */
             public InvalidKeyId() {
                 super("Invalid key identifier in Signal message");
@@ -611,9 +429,9 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Constructs a new invalid key ID exception with the problematic key ID.
+             * Constructs a new invalid key id exception with the offending key id.
              *
-             * @param keyId the invalid key identifier
+             * @param keyId the unrecognized key identifier
              */
             public InvalidKeyId(int keyId) {
                 super("Invalid key identifier in Signal message: " + keyId);
@@ -621,7 +439,7 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Constructs a new invalid key ID exception with a cause.
+             * Constructs a new invalid key id exception with a cause.
              *
              * @param message the detail message
              * @param cause   the underlying cause
@@ -632,16 +450,16 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns the invalid key identifier, if known.
+             * Returns the unrecognized key identifier, when known.
              *
-             * @return an {@link Optional} containing the key ID, or empty if not available
+             * @return the key id, or empty when not available
              */
             public Optional<Integer> keyId() {
                 return Optional.ofNullable(keyId);
             }
 
             /**
-             * Returns the retry reason code for this decryption failure.
+             * Returns the retry reason for this failure.
              *
              * @return {@link RetryReason#SIGNAL_ERROR_INVALID_KEY_ID}
              */
@@ -652,22 +470,13 @@ public sealed class WhatsAppMessageException extends WhatsAppException
         }
 
         /**
-         * Exception thrown when a one-time prekey validation fails.
-         * <p>
-         * One-time prekeys are ephemeral Curve25519 keys used for initial session establishment.
-         * Each prekey can only be used once to establish a session. This exception occurs when:
-         * <ul>
-         *   <li>The prekey was already consumed by another session</li>
-         *   <li>The prekey ID does not exist in the local store</li>
-         *   <li>The prekey data is corrupted or invalid</li>
-         * </ul>
-         *
-         * <h2>Signal Error Message</h2>
-         * This exception maps to {@code errSignalInvalidOneTimeKey}.
+         * Thrown when a one-time prekey referenced by an incoming
+         * message is not usable, typically because it was already
+         * consumed or no longer exists locally.
          */
         public static final class InvalidOneTimeKey extends Receive {
             /**
-             * The invalid prekey identifier, if known.
+             * The offending prekey identifier, when known.
              */
             private final Integer prekeyId;
 
@@ -680,9 +489,9 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Constructs a new invalid one-time key exception with the problematic key ID.
+             * Constructs a new invalid one-time key exception with the offending key id.
              *
-             * @param prekeyId the invalid prekey identifier
+             * @param prekeyId the prekey identifier
              */
             public InvalidOneTimeKey(int prekeyId) {
                 super("Invalid one-time prekey in Signal message: " + prekeyId);
@@ -701,16 +510,16 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns the invalid prekey identifier, if known.
+             * Returns the prekey identifier, when known.
              *
-             * @return an {@link Optional} containing the prekey ID, or empty if not available
+             * @return the prekey id, or empty when not available
              */
             public Optional<Integer> prekeyId() {
                 return Optional.ofNullable(prekeyId);
             }
 
             /**
-             * Returns the retry reason code for this decryption failure.
+             * Returns the retry reason for this failure.
              *
              * @return {@link RetryReason#SIGNAL_ERROR_INVALID_KEY}
              */
@@ -721,23 +530,14 @@ public sealed class WhatsAppMessageException extends WhatsAppException
         }
 
         /**
-         * Exception thrown when signed prekey validation fails.
-         * <p>
-         * Signed prekeys are medium-term keys signed by the identity key. They are used
-         * in PreKeySignalMessage to establish sessions. This exception occurs when:
-         * <ul>
-         *   <li>The signed prekey signature is invalid</li>
-         *   <li>The signed prekey has expired</li>
-         *   <li>The signed prekey ID does not exist</li>
-         *   <li>The key data is corrupted</li>
-         * </ul>
-         *
-         * <h2>Signal Error Message</h2>
-         * This exception maps to {@code errSignalInvalidSignedPreKey}.
+         * Thrown when the signed prekey referenced by an incoming
+         * message is not usable, typically because the signature does
+         * not verify, the key has expired, or the identifier is not
+         * known locally.
          */
         public static final class InvalidSignedPreKey extends Receive {
             /**
-             * The invalid signed prekey identifier, if known.
+             * The offending signed prekey identifier, when known.
              */
             private final Integer signedPrekeyId;
 
@@ -750,9 +550,9 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Constructs a new invalid signed prekey exception with the problematic key ID.
+             * Constructs a new invalid signed prekey exception with the offending key id.
              *
-             * @param signedPrekeyId the invalid signed prekey identifier
+             * @param signedPrekeyId the signed prekey identifier
              */
             public InvalidSignedPreKey(int signedPrekeyId) {
                 super("Invalid signed prekey in Signal message: " + signedPrekeyId);
@@ -771,16 +571,16 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns the invalid signed prekey identifier, if known.
+             * Returns the signed prekey identifier, when known.
              *
-             * @return an {@link Optional} containing the signed prekey ID, or empty if not available
+             * @return the signed prekey id, or empty when not available
              */
             public Optional<Integer> signedPrekeyId() {
                 return Optional.ofNullable(signedPrekeyId);
             }
 
             /**
-             * Returns the retry reason code for this decryption failure.
+             * Returns the retry reason for this failure.
              *
              * @return {@link RetryReason#SIGNAL_ERROR_INVALID_KEY}
              */
@@ -791,20 +591,9 @@ public sealed class WhatsAppMessageException extends WhatsAppException
         }
 
         /**
-         * Exception thrown when the Signal message structure is malformed.
-         * <p>
-         * Signal messages have a specific binary format that must be correctly parsed.
-         * This exception occurs when:
-         * <ul>
-         *   <li>The message is truncated or incomplete</li>
-         *   <li>The message version is unsupported</li>
-         *   <li>Required fields are missing</li>
-         *   <li>The ciphertext length is incorrect</li>
-         *   <li>The message type indicator is invalid</li>
-         * </ul>
-         *
-         * <h2>Signal Error Message</h2>
-         * This exception maps to {@code errSignalInvalidMsg}.
+         * Thrown when an incoming Signal message has a structurally
+         * invalid body (truncated, wrong version, missing field, or
+         * bad ciphertext length).
          */
         public static final class InvalidMessage extends Receive {
             /**
@@ -834,7 +623,7 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns the retry reason code for this decryption failure.
+             * Returns the retry reason for this failure.
              *
              * @return {@link RetryReason#SIGNAL_ERROR_INVALID_MESSAGE}
              */
@@ -845,20 +634,12 @@ public sealed class WhatsAppMessageException extends WhatsAppException
         }
 
         /**
-         * Exception thrown when cryptographic signature verification fails.
-         * <p>
-         * Signal uses Ed25519 signatures to authenticate messages and key bundles.
-         * This exception occurs when:
-         * <ul>
-         *   <li>The signature does not match the message content</li>
-         *   <li>The signing key does not match the expected identity</li>
-         *   <li>The signature data is corrupted or truncated</li>
-         * </ul>
-         * <p>
-         * Signature failures are a security concern and may indicate tampering.
+         * Thrown when an Ed25519 signature on an incoming message or
+         * key bundle does not verify.
          *
-         * <h2>Signal Error Message</h2>
-         * This exception maps to {@code errSignalInvalidSignature}.
+         * <p>Signature failures may indicate tampering and are
+         * therefore worth surfacing even when the same retry receipt
+         * is sent as for other key-related failures.
          */
         public static final class InvalidSignature extends Receive {
             /**
@@ -888,7 +669,7 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns the retry reason code for this decryption failure.
+             * Returns the retry reason for this failure.
              *
              * @return {@link RetryReason#SIGNAL_ERROR_INVALID_SIGNATURE}
              */
@@ -899,26 +680,16 @@ public sealed class WhatsAppMessageException extends WhatsAppException
         }
 
         /**
-         * Exception thrown when a duplicate message is detected.
-         * <p>
-         * Signal tracks message counters to detect and prevent replay attacks.
-         * This exception occurs when a message is received with a counter value
+         * Thrown when an incoming message reuses a counter value
          * that has already been processed.
-         * <p>
-         * Duplicate messages are silently dropped and do NOT trigger retry receipts,
-         * as they represent either:
-         * <ul>
-         *   <li>Network-level retransmission (normal operation)</li>
-         *   <li>Sync messages from other devices</li>
-         *   <li>Potential replay attacks</li>
-         * </ul>
          *
-         * <h2>Signal Error Message</h2>
-         * This exception maps to {@code errDuplicateMsg}.
+         * <p>Duplicates are silently dropped: they are usually
+         * harmless retransmissions, but {@link #shouldSendRetryReceipt()}
+         * returns {@code false} so the sender is not asked to retry.
          */
         public static final class DuplicateMessage extends Receive {
             /**
-             * The duplicate message counter value, if known.
+             * The duplicated message counter value, when known.
              */
             private final Long counter;
 
@@ -933,7 +704,7 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             /**
              * Constructs a new duplicate message exception with the counter value.
              *
-             * @param counter the duplicate message counter
+             * @param counter the duplicated message counter
              */
             public DuplicateMessage(long counter) {
                 super("Duplicate message counter detected: " + counter);
@@ -952,16 +723,16 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns the duplicate message counter value, if known.
+             * Returns the duplicated counter value, when known.
              *
-             * @return an {@link Optional} containing the counter, or empty if not available
+             * @return the counter, or empty when not available
              */
             public Optional<Long> counter() {
                 return Optional.ofNullable(counter);
             }
 
             /**
-             * Returns the retry reason code for this decryption failure.
+             * Returns the retry reason for this failure.
              *
              * @return {@link RetryReason#SIGNAL_ERROR_FUTURE_MESSAGE}
              */
@@ -971,7 +742,7 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Duplicate messages should not trigger retry receipts.
+             * Returns whether a retry receipt should be sent for this failure.
              *
              * @return {@code false}
              */
@@ -982,32 +753,20 @@ public sealed class WhatsAppMessageException extends WhatsAppException
         }
 
         /**
-         * Exception thrown when the message counter is too far in the future.
-         * <p>
-         * Signal maintains a lookahead window of acceptable future message counters.
-         * This exception occurs when a message's counter exceeds this window, which
-         * may indicate:
-         * <ul>
-         *   <li>Significant message loss or reordering</li>
-         *   <li>Counter desynchronization after device restore</li>
-         *   <li>Intentional counter manipulation (potential attack)</li>
-         * </ul>
+         * Thrown when an incoming message carries a counter that is
+         * too far ahead of the next expected counter to be accepted.
          *
-         * <h2>Signal Error Messages</h2>
-         * This exception maps to:
-         * <ul>
-         *   <li>{@code errSignalTooManyMessagesInFuture} - 1:1 messages</li>
-         *   <li>{@code errSignalGrpTooManyMessagesInFuture} - Group messages</li>
-         * </ul>
+         * <p>This typically follows extended message loss or counter
+         * desynchronization after a backup restore.
          */
         public static final class FutureMessage extends Receive {
             /**
-             * The future message counter value, if known.
+             * The unexpected counter value, when known.
              */
             private final Long counter;
 
             /**
-             * Whether this is a group message.
+             * Whether the offending message was a group message.
              */
             private final boolean isGroupMessage;
 
@@ -1024,7 +783,7 @@ public sealed class WhatsAppMessageException extends WhatsAppException
              * Constructs a new future message exception with the counter value.
              *
              * @param counter        the future message counter
-             * @param isGroupMessage {@code true} if this is a group message
+             * @param isGroupMessage {@code true} when the offending message was a group message
              */
             public FutureMessage(long counter, boolean isGroupMessage) {
                 super("Message counter too far in future: " + counter + (isGroupMessage ? " (group)" : ""));
@@ -1045,25 +804,25 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns the future message counter value, if known.
+             * Returns the unexpected counter value, when known.
              *
-             * @return an {@link Optional} containing the counter, or empty if not available
+             * @return the counter, or empty when not available
              */
             public Optional<Long> counter() {
                 return Optional.ofNullable(counter);
             }
 
             /**
-             * Returns whether this is a group message error.
+             * Returns whether the offending message was a group message.
              *
-             * @return {@code true} if this is a group message error
+             * @return {@code true} for group messages
              */
             public boolean isGroupMessage() {
                 return isGroupMessage;
             }
 
             /**
-             * Returns the retry reason code for this decryption failure.
+             * Returns the retry reason for this failure.
              *
              * @return {@link RetryReason#SIGNAL_ERROR_FUTURE_MESSAGE}
              */
@@ -1074,39 +833,17 @@ public sealed class WhatsAppMessageException extends WhatsAppException
         }
 
         /**
-         * Exception thrown when message authentication code (MAC) verification fails.
-         * <p>
-         * Each Signal message includes an HMAC computed over the ciphertext using a
-         * derived authentication key. This exception occurs when the computed MAC
-         * does not match the MAC included in the message.
+         * Thrown when the HMAC over an incoming Signal message does
+         * not validate.
          *
-         * <h2>Possible Causes</h2>
-         * <ul>
-         *   <li>Message was corrupted during transmission</li>
-         *   <li>Encryption keys are out of sync</li>
-         *   <li>Message was tampered with (man-in-the-middle attack)</li>
-         *   <li>Cipher key derivation failed</li>
-         * </ul>
-         *
-         * <h2>MAC Error Types</h2>
-         * Different MAC errors indicate different failure points:
-         * <ul>
-         *   <li>{@link MacErrorType#WITH_DECRYPTED_PLAINTEXT} - MAC failed but decryption succeeded (suspicious)</li>
-         *   <li>{@link MacErrorType#INVALID_CIPHER_KEY} - Cipher key derivation failed</li>
-         *   <li>{@link MacErrorType#INVALID_CIPHER_KEY_NEW_CHAIN} - Cipher key failed on new ratchet chain</li>
-         * </ul>
-         *
-         * <h2>Signal Error Messages</h2>
-         * This exception maps to:
-         * <ul>
-         *   <li>{@code errInvalidMacWithDecryptedPlaintext}</li>
-         *   <li>{@code errInvalidMacInvalidCipherKey}</li>
-         *   <li>{@code errInvalidMacInvalidCipherKeyNewChain}</li>
-         * </ul>
+         * <p>The {@link MacErrorType} narrows down the failure mode
+         * (whether decryption produced plaintext anyway, whether the
+         * cipher key derivation failed, whether the failure happened
+         * on a fresh ratchet chain).
          */
         public static final class BadMac extends Receive {
             /**
-             * The specific type of MAC error.
+             * The specific kind of MAC failure.
              */
             private final MacErrorType errorType;
 
@@ -1121,7 +858,8 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             /**
              * Constructs a new bad MAC exception with the specified error type.
              *
-             * @param errorType the specific MAC error type
+             * @param errorType the kind of MAC failure
+             * @throws NullPointerException if {@code errorType} is {@code null}
              */
             public BadMac(MacErrorType errorType) {
                 super("Message authentication code verification failed: " + errorType);
@@ -1140,7 +878,7 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns the specific type of MAC error.
+             * Returns the specific kind of MAC failure.
              *
              * @return the MAC error type
              */
@@ -1149,7 +887,7 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns the retry reason code for this decryption failure.
+             * Returns the retry reason for this failure.
              *
              * @return {@link RetryReason#SIGNAL_ERROR_BAD_MAC}
              */
@@ -1159,53 +897,43 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Types of MAC verification failures.
+             * The kinds of MAC failure that can be reported by
+             * {@link BadMac}.
              */
             public enum MacErrorType {
                 /**
-                 * Unknown MAC error type.
+                 * The specific failure mode is not known.
                  */
                 UNKNOWN,
 
                 /**
-                 * MAC verification failed but decryption produced plaintext.
-                 * <p>
-                 * This is suspicious as it could indicate key compromise where an attacker
-                 * has the encryption key but not the authentication key.
+                 * The MAC did not verify, yet decryption still
+                 * produced plaintext. Worth investigating because it
+                 * can indicate a key compromise.
                  */
                 WITH_DECRYPTED_PLAINTEXT,
 
                 /**
-                 * MAC verification failed due to invalid cipher key.
-                 * <p>
-                 * The derived cipher key could not be used to verify the MAC,
-                 * indicating a key derivation or synchronization issue.
+                 * The cipher key derived for this message could not
+                 * be used to verify the MAC.
                  */
                 INVALID_CIPHER_KEY,
 
                 /**
-                 * MAC verification failed due to invalid cipher key on a new ratchet chain.
-                 * <p>
-                 * The Double Ratchet created a new chain but the derived key is invalid.
+                 * The cipher key derived on a freshly created
+                 * ratchet chain could not be used to verify the MAC.
                  */
                 INVALID_CIPHER_KEY_NEW_CHAIN
             }
         }
 
         /**
-         * Exception thrown when no sender key exists for group message decryption.
-         * <p>
-         * Group messages in WhatsApp use the Sender Keys protocol for efficient group
-         * encryption. Each group member distributes a sender key that others use to
-         * decrypt messages from that sender. This exception occurs when:
-         * <ul>
-         *   <li>Receiving a message from a new group member before their key distribution</li>
-         *   <li>The sender key was deleted due to storage cleanup</li>
-         *   <li>Joining a group and receiving old messages</li>
-         * </ul>
+         * Thrown when no sender key exists for decrypting an
+         * incoming group message.
          *
-         * <h2>Signal Error Message</h2>
-         * This exception maps to {@code errLoadSenderKeySession}.
+         * <p>The sender has not yet distributed its sender key for
+         * the group, the local sender key was evicted, or the
+         * recipient just joined the group.
          */
         public static final class NoSenderKey extends Receive {
             /**
@@ -1235,7 +963,7 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns the retry reason code for this decryption failure.
+             * Returns the retry reason for this failure.
              *
              * @return {@link RetryReason#SIGNAL_ERROR_NO_SESSION}
              */
@@ -1246,10 +974,8 @@ public sealed class WhatsAppMessageException extends WhatsAppException
         }
 
         /**
-         * Exception thrown when sender key validation fails.
-         * <p>
-         * This occurs when a sender key message cannot be decrypted because the
-         * sender key state is corrupted or invalid.
+         * Thrown when the sender key state for a group is corrupt
+         * or otherwise unusable.
          */
         public static final class InvalidSenderKey extends Receive {
             /**
@@ -1279,7 +1005,7 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns the retry reason code for this decryption failure.
+             * Returns the retry reason for this failure.
              *
              * @return {@link RetryReason#SIGNAL_ERROR_NO_SESSION}
              */
@@ -1290,15 +1016,13 @@ public sealed class WhatsAppMessageException extends WhatsAppException
         }
 
         /**
-         * Exception thrown when a message is received from an unknown companion device.
-         * <p>
-         * In WhatsApp's multi-device architecture, messages can come from any of a user's
-         * companion devices. This exception occurs when:
-         * <ul>
-         *   <li>A message arrives from a device not in the known device list</li>
-         *   <li>The device has not yet distributed its prekeys</li>
-         *   <li>The device was recently added and hasn't synchronized</li>
-         * </ul>
+         * Thrown when an incoming message comes from a companion
+         * device that is not on the local device list for the
+         * sender.
+         *
+         * <p>The retry receipt asks the unknown device to publish
+         * its prekey bundle so the recipient can establish a session
+         * with it.
          */
         public static final class UnknownDevice extends Receive {
             /**
@@ -1328,7 +1052,7 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns the retry reason code for this decryption failure.
+             * Returns the retry reason for this failure.
              *
              * @return {@link RetryReason#UNKNOWN_COMPANION_NO_PREKEY}
              */
@@ -1339,26 +1063,16 @@ public sealed class WhatsAppMessageException extends WhatsAppException
         }
 
         /**
-         * Exception thrown when device sent message (DSM) validation fails.
-         * <p>
-         * Device Sent Messages are a multi-device feature where messages sent from one device
-         * are synchronized to other devices owned by the same user. DSM validation ensures:
-         * <ul>
-         *   <li>Messages that should be DSMs are properly formatted</li>
-         *   <li>DSMs are only accepted from legitimate sender devices</li>
-         *   <li>DSM structure matches protocol requirements</li>
-         * </ul>
+         * Thrown when a Device Sent Message (DSM, the multi-device
+         * synchronization envelope) does not pass validation.
          *
-         * <h2>DSM Error Types</h2>
-         * <ul>
-         *   <li>{@link DsmErrorType#INVALID_SENDER} - Message should not be a DSM but is marked as one</li>
-         *   <li>{@link DsmErrorType#MISSING_DSM} - Message should be a DSM but isn't</li>
-         *   <li>{@link DsmErrorType#INVALID_DSM} - DSM structure is malformed or invalid</li>
-         * </ul>
+         * <p>The {@link DsmErrorType} disambiguates whether the
+         * incoming envelope should not have been a DSM, should have
+         * been one, or had a malformed structure.
          */
         public static final class InvalidDeviceSentMessage extends Receive {
             /**
-             * The specific type of DSM error.
+             * The specific kind of DSM failure.
              */
             private final DsmErrorType errorType;
 
@@ -1373,7 +1087,8 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             /**
              * Constructs a new invalid DSM exception with the specified error type.
              *
-             * @param errorType the specific DSM error type
+             * @param errorType the kind of DSM failure
+             * @throws NullPointerException if {@code errorType} is {@code null}
              */
             public InvalidDeviceSentMessage(DsmErrorType errorType) {
                 super("Device sent message validation failed: " + errorType);
@@ -1392,7 +1107,7 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns the specific type of DSM error.
+             * Returns the specific kind of DSM failure.
              *
              * @return the DSM error type
              */
@@ -1401,7 +1116,7 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns the retry reason code for this decryption failure.
+             * Returns the retry reason for this failure.
              *
              * @return {@link RetryReason#UNKNOWN_ERROR}
              */
@@ -1411,7 +1126,7 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns the NACK error code associated with this failure.
+             * Returns the NACK error code for this failure.
              *
              * @return {@code "400"}
              */
@@ -1421,32 +1136,27 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Types of device sent message validation failures.
+             * The kinds of Device Sent Message validation failure.
              */
             public enum DsmErrorType {
                 /**
-                 * Message should not be a device sent message but is marked as one.
-                 * <p>
-                 * Protocol value: 1
+                 * The message was tagged as a DSM but should not have
+                 * been.
                  */
                 INVALID_SENDER(1),
 
                 /**
-                 * Message should be a device sent message but isn't.
-                 * <p>
-                 * Protocol value: 2
+                 * The message should have been a DSM but is not.
                  */
                 MISSING_DSM(2),
 
                 /**
-                 * Device sent message structure is malformed or invalid.
-                 * <p>
-                 * Protocol value: 3
+                 * The DSM envelope structure is malformed.
                  */
                 INVALID_DSM(3);
 
                 /**
-                 * The protocol integer value.
+                 * The integer value used in the protocol.
                  */
                 private final int protocolValue;
 
@@ -1460,7 +1170,7 @@ public sealed class WhatsAppMessageException extends WhatsAppException
                 }
 
                 /**
-                 * Returns the protocol integer value.
+                 * Returns the integer value used in the protocol.
                  *
                  * @return the protocol value
                  */
@@ -1469,11 +1179,12 @@ public sealed class WhatsAppMessageException extends WhatsAppException
                 }
 
                 /**
-                 * Parses a DSM error type from its protocol value.
+                 * Returns the DSM error type that matches the given
+                 * protocol integer value.
                  *
                  * @param value the protocol integer value
-                 * @return the corresponding error type
-                 * @throws IllegalArgumentException if the value is unknown
+                 * @return the matching error type
+                 * @throws IllegalArgumentException when {@code value} is unknown
                  */
                 public static DsmErrorType fromProtocolValue(int value) {
                     for (var type : values()) {
@@ -1487,21 +1198,11 @@ public sealed class WhatsAppMessageException extends WhatsAppException
         }
 
         /**
-         * Exception thrown when Account Device Verification (ADV) fails during message decryption.
-         * <p>
-         * ADV is WhatsApp's mechanism for verifying that a device is legitimately associated
-         * with an account. When processing PreKeySignalMessages, the device identity included
-         * in the message is validated using ADV signatures.
-         * <p>
-         * ADV failure during message decryption indicates the sender's device could not be
-         * verified, which may indicate:
-         * <ul>
-         *   <li>The device is not properly registered</li>
-         *   <li>ADV signatures are corrupted or forged</li>
-         *   <li>Potential impersonation attack</li>
-         * </ul>
+         * Thrown when the sender's Advanced Device Verification
+         * chain does not validate during decryption of an incoming
+         * message.
          *
-         * @see WhatsAppAdvValidationException for detailed ADV failure types
+         * @see WhatsAppAdvValidationException
          */
         public static final class AdvFailure extends Receive {
             /**
@@ -1524,14 +1225,14 @@ public sealed class WhatsAppMessageException extends WhatsAppException
              * Constructs a new ADV failure exception with a cause.
              *
              * @param message the detail message
-             * @param cause   the underlying cause (typically a WhatsAppAdvValidationException)
+             * @param cause   the underlying cause
              */
             public AdvFailure(String message, Throwable cause) {
                 super(message, cause);
             }
 
             /**
-             * Returns the retry reason code for this decryption failure.
+             * Returns the retry reason for this failure.
              *
              * @return {@link RetryReason#ADV_FAILURE}
              */
@@ -1542,34 +1243,22 @@ public sealed class WhatsAppMessageException extends WhatsAppException
         }
 
         /**
-         * Exception thrown when protobuf message deserialization or validation fails.
-         * <p>
-         * After Signal decryption succeeds, the plaintext is deserialized as a Protocol Buffer
-         * message. This exception occurs when:
-         * <ul>
-         *   <li>The protobuf data is malformed or truncated</li>
-         *   <li>Required protobuf fields are missing</li>
-         *   <li>The message type does not match expectations</li>
-         *   <li>Multiple message types are present when only one is expected</li>
-         *   <li>Message validation rules are violated</li>
-         * </ul>
+         * Thrown when the protobuf body of a successfully decrypted
+         * message cannot be deserialized or fails validation.
          *
-         * <h2>Validation Failures</h2>
-         * Different validation failures have specific error reasons:
-         * <ul>
-         *   <li>{@link ProtobufErrorReason#INVALID_MESSAGE} - General protobuf parsing failure</li>
-         *   <li>{@link ProtobufErrorReason#MESSAGE_TYPE_MISMATCH} - Message type doesn't match stanza type</li>
-         *   <li>{@link ProtobufErrorReason#INVALID_NUMBER_OF_MESSAGE_TYPES} - Multiple message types present</li>
-         * </ul>
+         * <p>The {@link ProtobufErrorReason} pinpoints which check
+         * failed: a generic parse error, a mismatch between the
+         * advertised stanza type and the protobuf body, or the
+         * presence of multiple message bodies where one is expected.
          */
         public static final class InvalidProtobuf extends Receive {
             /**
-             * The error code for NACK receipts.
+             * The NACK error code to send.
              */
             private final String errorCode;
 
             /**
-             * The specific error reason.
+             * The specific protobuf failure reason.
              */
             private final ProtobufErrorReason errorReason;
 
@@ -1596,9 +1285,10 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             /**
              * Constructs a new invalid protobuf exception with detailed information.
              *
-             * @param errorCode   the error code for NACK receipts
+             * @param errorCode   the NACK error code
              * @param message     the detail message
-             * @param errorReason the specific error reason
+             * @param errorReason the specific protobuf failure reason
+             * @throws NullPointerException if {@code errorCode} or {@code errorReason} is {@code null}
              */
             public InvalidProtobuf(String errorCode, String message, ProtobufErrorReason errorReason) {
                 super(message);
@@ -1621,10 +1311,11 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             /**
              * Constructs a new invalid protobuf exception with full details and a cause.
              *
-             * @param errorCode   the error code for NACK receipts
+             * @param errorCode   the NACK error code
              * @param message     the detail message
-             * @param errorReason the specific error reason
+             * @param errorReason the specific protobuf failure reason
              * @param cause       the underlying cause
+             * @throws NullPointerException if {@code errorCode} or {@code errorReason} is {@code null}
              */
             public InvalidProtobuf(String errorCode, String message, ProtobufErrorReason errorReason, Throwable cause) {
                 super(message, cause);
@@ -1633,16 +1324,16 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns the specific protobuf error reason.
+             * Returns the specific protobuf failure reason.
              *
-             * @return the error reason
+             * @return the failure reason
              */
             public ProtobufErrorReason errorReason() {
                 return errorReason;
             }
 
             /**
-             * Returns the retry reason code for this decryption failure.
+             * Returns the retry reason for this failure.
              *
              * @return {@link RetryReason#UNKNOWN_ERROR}
              */
@@ -1652,9 +1343,9 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns the NACK error code associated with this failure.
+             * Returns the NACK error code for this failure.
              *
-             * @return the error code string (typically {@code "400"})
+             * @return the error code, typically {@code "400"}
              */
             @Override
             public Optional<String> errorCode() {
@@ -1662,34 +1353,32 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Reasons for protobuf validation failures.
+             * The kinds of protobuf validation failure.
              */
             public enum ProtobufErrorReason {
                 /**
-                 * General protobuf parsing or validation failure.
+                 * The protobuf could not be parsed or failed
+                 * generic validation.
                  */
                 INVALID_MESSAGE,
 
                 /**
-                 * The message type in the protobuf does not match the expected stanza type.
-                 * <p>
-                 * For example, receiving a poll update message when a reaction was expected.
+                 * The message body inside the protobuf does not
+                 * match the stanza type that wrapped it.
                  */
                 MESSAGE_TYPE_MISMATCH,
 
                 /**
-                 * Multiple message types are present in a message that should contain only one.
+                 * The protobuf carries more than one message body
+                 * where exactly one is expected.
                  */
                 INVALID_NUMBER_OF_MESSAGE_TYPES
             }
         }
 
         /**
-         * Exception thrown when broadcast ephemeral settings decryption fails.
-         * <p>
-         * Broadcast lists in WhatsApp can have ephemeral (disappearing) message settings.
-         * These settings are encrypted and sent to recipients. This exception occurs when
-         * the ephemeral settings cannot be decrypted or validated.
+         * Thrown when the encrypted ephemeral-message settings of a
+         * broadcast list cannot be decrypted or validated.
          */
         public static final class BroadcastEphemeralSettings extends Receive {
             /**
@@ -1719,7 +1408,7 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns the retry reason code for this decryption failure.
+             * Returns the retry reason for this failure.
              *
              * @return {@link RetryReason#BAD_BROADCAST_EPH_SETTINGS}
              */
@@ -1730,16 +1419,9 @@ public sealed class WhatsAppMessageException extends WhatsAppException
         }
 
         /**
-         * Exception thrown when an HSM (Hardware Security Module) template mismatch occurs.
-         * <p>
-         * HSM templates are used by business accounts for approved message templates.
-         * This exception occurs when the decrypted message does not match the expected
-         * HSM template, which can happen due to:
-         * <ul>
-         *   <li>Template version mismatch</li>
-         *   <li>Template was modified or revoked</li>
-         *   <li>Incorrect template parameters</li>
-         * </ul>
+         * Thrown when an incoming business HSM (Highly Structured
+         * Message) template does not match the template the sender's
+         * account has registered with WhatsApp.
          */
         public static final class HsmMismatch extends Receive {
             /**
@@ -1769,7 +1451,7 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns the retry reason code for this decryption failure.
+             * Returns the retry reason for this failure.
              *
              * @return {@link RetryReason#UNKNOWN_ERROR}
              */
@@ -1779,7 +1461,7 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns the NACK error code associated with this failure.
+             * Returns the NACK error code for this failure.
              *
              * @return {@code "400"}
              */
@@ -1790,11 +1472,8 @@ public sealed class WhatsAppMessageException extends WhatsAppException
         }
 
         /**
-         * Exception thrown for unclassified decryption failures.
-         * <p>
-         * This is a catch-all for decryption errors that don't fit into other categories.
-         * When this exception is thrown, additional investigation may be needed to determine
-         * the root cause.
+         * Thrown for decryption failures that do not match any of
+         * the more specific subtypes.
          */
         public static final class Unknown extends Receive {
             /**
@@ -1824,7 +1503,7 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns the retry reason code for this decryption failure.
+             * Returns the retry reason for this failure.
              *
              * @return {@link RetryReason#UNKNOWN_ERROR}
              */
@@ -1836,39 +1515,19 @@ public sealed class WhatsAppMessageException extends WhatsAppException
     }
 
     /**
-     * Abstract base exception for all message sending failures.
-     * <p>
-     * This sealed class hierarchy represents the complete taxonomy of errors that can occur
-     * when attempting to send a WhatsApp message. Each subclass corresponds to a specific
-     * failure mode in the encryption, network transmission, or server acknowledgment pipeline.
+     * Thrown for failures while sending a WhatsApp message.
      *
-     * <h2>Exception Categories</h2>
-     * <ul>
-     *   <li><b>Encryption errors:</b> {@link NoSession}, {@link InvalidKey}, {@link NoSenderKey},
-     *       {@link SenderKeyExpired} - Cryptographic failures during message encryption</li>
-     *   <li><b>Device errors:</b> {@link PhashMismatch}, {@link MissingPreKeys}, {@link IdentityChanged} - Multi-device synchronization failures</li>
-     *   <li><b>Protocol errors:</b> {@link ServerNack}, {@link InvalidRecipient}, {@link PayloadTooLarge},
-     *       {@link MessageExpired} - Server-side rejections</li>
-     *   <li><b>Network errors:</b> {@link Timeout} - Transport failure</li>
-     *   <li><b>Unknown:</b> {@link Unknown} - Unclassified failures</li>
-     * </ul>
+     * <p>Each subtype describes a different stage of the send
+     * pipeline: missing or invalid Signal sessions, missing or
+     * expired sender keys for groups, stale device lists, identity
+     * key changes that need user confirmation, server NACK
+     * rejections (with their numeric error code), invalid
+     * recipients, oversize payloads, expired messages, monthly
+     * caps, timeouts, duplicate sends, and authorization errors.
      *
-     * <h2>Server NACK Error Codes</h2>
-     * <table border="1">
-     *   <caption>Server NACK Error Codes</caption>
-     *   <tr><th>Code</th><th>Name</th><th>Description</th></tr>
-     *   <tr><td>421</td><td>StaleGroupAddressingMode</td><td>Group addressing mode is stale</td></tr>
-     *   <tr><td>475</td><td>NewChatMessagesCapped</td><td>Monthly message limit reached</td></tr>
-     *   <tr><td>487</td><td>ParsingError</td><td>Server failed to parse message</td></tr>
-     *   <tr><td>491</td><td>InvalidProtobuf</td><td>Invalid protobuf structure</td></tr>
-     *   <tr><td>495</td><td>MissingMessageSecret</td><td>Message secret is required but missing</td></tr>
-     *   <tr><td>496</td><td>SignalErrorOldCounter</td><td>Signal message counter is too old</td></tr>
-     *   <tr><td>499</td><td>MessageDeletedOnPeer</td><td>Referenced message was deleted</td></tr>
-     *   <tr><td>500</td><td>UnhandledError</td><td>Server encountered unhandled error</td></tr>
-     *   <tr><td>550</td><td>UnsupportedAdminRevoke</td><td>Admin revoke not supported</td></tr>
-     *   <tr><td>551</td><td>UnsupportedLIDGroup</td><td>LID groups not supported</td></tr>
-     *   <tr><td>552</td><td>DBOperationFailed</td><td>Server database operation failed</td></tr>
-     * </table>
+     * <p>{@link #isRetryable()} indicates whether the caller can
+     * retry the send after applying the corrective action implied by
+     * the subtype.
      */
     public sealed static abstract class Send extends WhatsAppMessageException
             permits Send.NoSession, Send.InvalidKey, Send.NoSenderKey, Send.SenderKeyExpired,
@@ -1896,40 +1555,31 @@ public sealed class WhatsAppMessageException extends WhatsAppException
         }
 
         /**
-         * Returns whether this send failure is retryable.
-         * <p>
-         * Most send failures can be retried after taking appropriate recovery actions
-         * (e.g., refreshing device lists, fetching prekeys). Some failures like
-         * {@link InvalidRecipient} or {@link MessageCapped} are not retryable.
+         * Returns whether the failure can be recovered from by
+         * retrying the send (possibly after the implied corrective
+         * action).
          *
-         * @return {@code true} if this failure can be retried
+         * @return {@code true} when the send can be retried
          */
         public abstract boolean isRetryable();
 
         /**
-         * Exception thrown when no Signal session exists with the target device.
-         * <p>
-         * This occurs when attempting to encrypt a message for a device without
-         * an established Signal session. Recovery requires fetching the device's
-         * prekey bundle and establishing a new session.
+         * Thrown when the local device has no Signal session with a
+         * device that should receive the message.
          *
-         * <h2>Recovery Action</h2>
-         * <ol>
-         *   <li>Fetch prekey bundle for the device</li>
-         *   <li>Process the bundle to establish a Signal session</li>
-         *   <li>Retry the message send</li>
-         * </ol>
+         * <p>Recovery is to fetch the device's prekey bundle and
+         * establish a session before retrying the send.
          */
         public static final class NoSession extends Send {
             /**
-             * The device JID that has no session.
+             * The device that has no session.
              */
             private final Jid deviceJid;
 
             /**
              * Constructs a new no-session exception.
              *
-             * @param deviceJid the device JID missing a session
+             * @param deviceJid the device that has no session
              */
             public NoSession(Jid deviceJid) {
                 super("No Signal session exists with device: " + deviceJid);
@@ -1939,7 +1589,7 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             /**
              * Constructs a new no-session exception with a cause.
              *
-             * @param deviceJid the device JID missing a session
+             * @param deviceJid the device that has no session
              * @param cause     the underlying cause
              */
             public NoSession(Jid deviceJid, Throwable cause) {
@@ -1948,7 +1598,7 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns the device JID that has no session.
+             * Returns the device that has no session.
              *
              * @return the device JID
              */
@@ -1957,9 +1607,9 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns whether this send failure is retryable.
+             * Returns whether the failure can be recovered from by retrying.
              *
-             * @return {@code true}; fetching a prekey bundle establishes the session
+             * @return {@code true}
              */
             @Override
             public boolean isRetryable() {
@@ -1968,25 +1618,20 @@ public sealed class WhatsAppMessageException extends WhatsAppException
         }
 
         /**
-         * Exception thrown when encryption fails due to an invalid cryptographic key.
-         * <p>
-         * This can occur when:
-         * <ul>
-         *   <li>The session's ratchet key is corrupted</li>
-         *   <li>Key derivation produces invalid material</li>
-         *   <li>The recipient's public key is malformed</li>
-         * </ul>
+         * Thrown when message encryption fails because of an
+         * invalid key, either on the local ratchet or in the
+         * recipient's published key bundle.
          */
         public static final class InvalidKey extends Send {
             /**
-             * The device JID with the invalid key.
+             * The device with the invalid key.
              */
             private final Jid deviceJid;
 
             /**
              * Constructs a new invalid key exception.
              *
-             * @param deviceJid the device JID with invalid key
+             * @param deviceJid the device with the invalid key
              */
             public InvalidKey(Jid deviceJid) {
                 super("Invalid cryptographic key for device: " + deviceJid);
@@ -1996,7 +1641,7 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             /**
              * Constructs a new invalid key exception with a cause.
              *
-             * @param deviceJid the device JID with invalid key
+             * @param deviceJid the device with the invalid key
              * @param cause     the underlying cause
              */
             public InvalidKey(Jid deviceJid, Throwable cause) {
@@ -2005,7 +1650,7 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns the device JID with the invalid key.
+             * Returns the device with the invalid key.
              *
              * @return the device JID
              */
@@ -2014,10 +1659,9 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns whether this send failure is retryable.
+             * Returns whether the failure can be recovered from by retrying.
              *
-             * @return {@code true}; refreshing the recipient's key bundle can
-             *         replace the invalid key
+             * @return {@code true}
              */
             @Override
             public boolean isRetryable() {
@@ -2026,29 +1670,22 @@ public sealed class WhatsAppMessageException extends WhatsAppException
         }
 
         /**
-         * Exception thrown when no sender key exists for group message encryption.
-         * <p>
-         * Sender keys are used for efficient group encryption. This exception occurs
-         * when attempting to encrypt a group message before the sender key has been
-         * initialized or when the sender key record is missing.
+         * Thrown when sending a group message but no sender key has
+         * been generated yet for the group.
          *
-         * <h2>Recovery Action</h2>
-         * <ol>
-         *   <li>Generate a new sender key for the group</li>
-         *   <li>Distribute the sender key to all group members</li>
-         *   <li>Retry the message send</li>
-         * </ol>
+         * <p>Recovery is to generate a sender key, distribute it to
+         * the participants, and retry the send.
          */
         public static final class NoSenderKey extends Send {
             /**
-             * The group JID missing the sender key.
+             * The group missing the sender key.
              */
             private final Jid groupJid;
 
             /**
              * Constructs a new no-sender-key exception.
              *
-             * @param groupJid the group JID missing sender key
+             * @param groupJid the group missing the sender key
              */
             public NoSenderKey(Jid groupJid) {
                 super("No sender key exists for group: " + groupJid);
@@ -2058,7 +1695,7 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             /**
              * Constructs a new no-sender-key exception with a cause.
              *
-             * @param groupJid the group JID missing sender key
+             * @param groupJid the group missing the sender key
              * @param cause    the underlying cause
              */
             public NoSenderKey(Jid groupJid, Throwable cause) {
@@ -2067,7 +1704,7 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns the group JID missing the sender key.
+             * Returns the group missing the sender key.
              *
              * @return the group JID
              */
@@ -2076,10 +1713,9 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns whether this send failure is retryable.
+             * Returns whether the failure can be recovered from by retrying.
              *
-             * @return {@code true}; generating and distributing a new sender key
-             *         unblocks the send
+             * @return {@code true}
              */
             @Override
             public boolean isRetryable() {
@@ -2088,21 +1724,19 @@ public sealed class WhatsAppMessageException extends WhatsAppException
         }
 
         /**
-         * Exception thrown when the sender key has expired and needs rotation.
-         * <p>
-         * Sender keys are rotated periodically for forward secrecy. When a sender key
-         * expires, a new key must be generated and distributed to all group members.
+         * Thrown when the local sender key for a group has expired
+         * and must be rotated and redistributed before sending again.
          */
         public static final class SenderKeyExpired extends Send {
             /**
-             * The group JID with expired sender key.
+             * The group whose sender key expired.
              */
             private final Jid groupJid;
 
             /**
              * Constructs a new sender-key-expired exception.
              *
-             * @param groupJid the group JID with expired key
+             * @param groupJid the group whose sender key expired
              */
             public SenderKeyExpired(Jid groupJid) {
                 super("Sender key expired for group: " + groupJid);
@@ -2110,7 +1744,7 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns the group JID with expired sender key.
+             * Returns the group whose sender key expired.
              *
              * @return the group JID
              */
@@ -2119,10 +1753,9 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns whether this send failure is retryable.
+             * Returns whether the failure can be recovered from by retrying.
              *
-             * @return {@code true}; rotating the sender key and re-distributing it
-             *         resolves the expiration
+             * @return {@code true}
              */
             @Override
             public boolean isRetryable() {
@@ -2131,27 +1764,30 @@ public sealed class WhatsAppMessageException extends WhatsAppException
         }
 
         /**
-         * Exception thrown when the participant hash (phash) doesn't match the server's expectation.
-         * <p>
-         * The phash is a hash of all device JIDs that should receive the message. A mismatch
-         * indicates the client's device list is stale and needs to be refreshed.
+         * Thrown when the participant hash (the hash of all the
+         * recipient device JIDs) the client computed does not match
+         * the value the server expects.
+         *
+         * <p>This means the local device list is out of date;
+         * refreshing it produces a matching hash and the send can
+         * be retried.
          */
         public static final class PhashMismatch extends Send {
             /**
-             * The phash the server expected.
+             * The participant hash the server expected.
              */
             private final String expectedHash;
 
             /**
-             * The phash the client sent.
+             * The participant hash the client sent.
              */
             private final String actualHash;
 
             /**
              * Constructs a new phash mismatch exception.
              *
-             * @param expectedHash the phash the server expected
-             * @param actualHash   the phash the client computed and sent
+             * @param expectedHash the participant hash the server expected
+             * @param actualHash   the participant hash the client sent
              */
             public PhashMismatch(String expectedHash, String actualHash) {
                 super("Phash mismatch: computed " + expectedHash);
@@ -2160,27 +1796,27 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns the phash the server expected.
+             * Returns the participant hash the server expected.
              *
-             * @return the expected phash
+             * @return the expected hash
              */
             public String expectedHash() {
                 return expectedHash;
             }
 
             /**
-             * Returns the phash the client sent.
+             * Returns the participant hash the client sent.
              *
-             * @return the actual phash
+             * @return the actual hash
              */
             public String actualHash() {
                 return actualHash;
             }
 
             /**
-             * Returns whether this send failure is retryable.
+             * Returns whether the failure can be recovered from by retrying.
              *
-             * @return {@code true}; refreshing the device list recomputes a matching phash
+             * @return {@code true}
              */
             @Override
             public boolean isRetryable() {
@@ -2189,21 +1825,22 @@ public sealed class WhatsAppMessageException extends WhatsAppException
         }
 
         /**
-         * Exception thrown when prekey bundles are missing for some recipient devices.
-         * <p>
-         * This occurs when the client needs to establish Signal sessions with devices
-         * but doesn't have their prekey bundles cached.
+         * Thrown when one or more recipient devices need a Signal
+         * session but no prekey bundle for them has been fetched yet.
+         *
+         * <p>Recovery is to fetch the missing bundles, establish the
+         * sessions, and retry the send.
          */
         public static final class MissingPreKeys extends Send {
             /**
-             * The device JIDs missing prekeys.
+             * The devices for which prekey bundles are missing.
              */
             private final List<Jid> devices;
 
             /**
              * Constructs a new missing prekeys exception.
              *
-             * @param devices the device JIDs missing prekeys
+             * @param devices the devices for which prekey bundles are missing
              */
             public MissingPreKeys(List<Jid> devices) {
                 super("Missing prekey bundles for " + devices.size() + " devices");
@@ -2211,7 +1848,7 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns the device JIDs missing prekeys.
+             * Returns the devices for which prekey bundles are missing.
              *
              * @return the device JIDs
              */
@@ -2220,9 +1857,9 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns whether this send failure is retryable.
+             * Returns whether the failure can be recovered from by retrying.
              *
-             * @return {@code true}; fetching the missing prekey bundles unblocks the send
+             * @return {@code true}
              */
             @Override
             public boolean isRetryable() {
@@ -2231,25 +1868,25 @@ public sealed class WhatsAppMessageException extends WhatsAppException
         }
 
         /**
-         * Exception thrown when a recipient's identity key has changed.
-         * <p>
-         * This typically indicates the recipient has reinstalled the app or is using
-         * a new device. The user should be notified of the safety number change.
+         * Thrown when one or more recipient devices have a different
+         * identity key than the one the local session was established
+         * with.
          *
-         * <h2>Security Consideration</h2>
-         * Identity key changes may indicate a man-in-the-middle attack. Users should
-         * verify the new safety number with the recipient through an out-of-band channel.
+         * <p>An identity key change means the recipient reinstalled
+         * the app or paired a new primary device. WhatsApp surfaces
+         * this as a "safety number changed" notice and asks the user
+         * to confirm before sending again.
          */
         public static final class IdentityChanged extends Send {
             /**
-             * The device JIDs with changed identity keys.
+             * The devices whose identity key changed.
              */
             private final List<Jid> devices;
 
             /**
              * Constructs a new identity changed exception.
              *
-             * @param devices the device JIDs with changed identities
+             * @param devices the devices whose identity key changed
              */
             public IdentityChanged(List<Jid> devices) {
                 super("Identity key changed for " + devices.size() + " devices");
@@ -2257,7 +1894,7 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns the device JIDs with changed identity keys.
+             * Returns the devices whose identity key changed.
              *
              * @return the device JIDs
              */
@@ -2266,10 +1903,9 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns whether this send failure is retryable.
+             * Returns whether the failure can be recovered from by retrying.
              *
-             * @return {@code true}; accepting the new identity keys and refreshing
-             *         sessions allows the send to proceed (subject to user confirmation)
+             * @return {@code true}
              */
             @Override
             public boolean isRetryable() {
@@ -2278,102 +1914,112 @@ public sealed class WhatsAppMessageException extends WhatsAppException
         }
 
         /**
-         * Exception thrown when the server sends a negative acknowledgment (NACK).
-         * <p>
-         * NACK responses include an error code indicating why the message was rejected.
-         * Different error codes require different recovery strategies.
+         * Thrown when the server explicitly rejects a message with
+         * a NACK response.
+         *
+         * <p>The numeric {@link #errorCode()} narrows down the
+         * reason: stale group addressing, monthly cap, parsing
+         * failure, invalid protobuf, missing message secret, stale
+         * Signal counter, deletion on the peer, generic unhandled
+         * error, unsupported admin revoke, unsupported LID group,
+         * server-side database failure, and a few others.
          */
         public static final class ServerNack extends Send {
             /**
-             * Group addressing mode is stale.
+             * The group addressing mode the client used is stale.
              */
             public static final int STALE_GROUP_ADDRESSING_MODE = 421;
 
             /**
-             * Monthly new chat message limit reached.
+             * The account has hit the monthly new-chat-message cap.
              */
             public static final int NEW_CHAT_MESSAGES_CAPPED = 475;
 
             /**
-             * Server failed to parse the message.
+             * The server failed to parse the message.
              */
             public static final int PARSING_ERROR = 487;
 
             /**
-             * Unrecognized stanza received.
+             * The stanza shape was not recognized.
              */
             public static final int UNRECOGNIZED_STANZA = 488;
 
             /**
-             * Unrecognized stanza class.
+             * The stanza class was not recognized.
              */
             public static final int UNRECOGNIZED_STANZA_CLASS = 489;
 
             /**
-             * Unrecognized stanza type.
+             * The stanza type was not recognized.
              */
             public static final int UNRECOGNIZED_STANZA_TYPE = 490;
 
             /**
-             * Invalid protobuf structure.
+             * The protobuf body did not validate on the server.
              */
             public static final int INVALID_PROTOBUF = 491;
 
             /**
-             * Invalid hosted companion stanza.
+             * The hosted-companion stanza was rejected.
              */
             public static final int INVALID_HOSTED_COMPANION_STANZA = 493;
 
             /**
-             * Message secret is required but missing.
+             * The message did not include a required message
+             * secret.
              */
             public static final int MISSING_MESSAGE_SECRET = 495;
 
             /**
-             * Signal message counter is too old.
+             * The Signal counter on the message was older than the
+             * server's view.
              */
             public static final int SIGNAL_ERROR_OLD_COUNTER = 496;
 
             /**
-             * Referenced message was deleted on peer.
+             * The referenced message has already been deleted on
+             * the peer.
              */
             public static final int MESSAGE_DELETED_ON_PEER = 499;
 
             /**
-             * Server encountered an unhandled error.
+             * The server hit a generic unhandled error.
              */
             public static final int UNHANDLED_ERROR = 500;
 
             /**
-             * Admin revoke not supported.
+             * The admin-revoke operation is not supported in this
+             * context.
              */
             public static final int UNSUPPORTED_ADMIN_REVOKE = 550;
 
             /**
-             * LID groups not supported.
+             * LID groups are not supported here.
              */
             public static final int UNSUPPORTED_LID_GROUP = 551;
 
             /**
-             * Server database operation failed.
+             * A server-side database operation failed.
              */
             public static final int DB_OPERATION_FAILED = 552;
 
             /**
-             * The NACK error code from the server.
+             * The numeric NACK error code returned by the server.
              */
             private final int errorCode;
 
             /**
-             * The error description, if available.
+             * The human-readable description carried by the NACK,
+             * when one was provided.
              */
             private final String errorDescription;
 
             /**
              * Constructs a new server NACK exception.
              *
-             * @param errorCode        the NACK error code
-             * @param errorDescription the error description
+             * @param errorCode        the numeric NACK error code
+             * @param errorDescription the human-readable description
              */
             public ServerNack(int errorCode, String errorDescription) {
                 super("Server NACK: " + errorCode + " - " + errorDescription);
@@ -2382,7 +2028,7 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns the NACK error code.
+             * Returns the numeric NACK error code returned by the server.
              *
              * @return the error code
              */
@@ -2391,22 +2037,24 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns the error description.
+             * Returns the human-readable description carried by the NACK.
              *
-             * @return the error description, or null if not available
+             * @return the description, or {@code null} when none was provided
              */
             public String errorDescription() {
                 return errorDescription;
             }
 
             /**
-             * Returns whether this send failure is retryable based on the NACK error code.
+             * Returns whether the failure can be recovered from by
+             * retrying.
              *
-             * <p>Only a whitelisted subset of server NACK codes is retryable:
-             * stale group addressing, stale Signal counter, and generic unhandled
-             * server errors. All other codes indicate permanent rejections.
+             * <p>Only a small subset of NACK codes are retryable
+             * (stale group addressing, stale Signal counter, and the
+             * generic unhandled error). All other codes describe
+             * permanent rejections.
              *
-             * @return {@code true} if the error code is recoverable, {@code false} otherwise
+             * @return {@code true} for retryable error codes
              */
             @Override
             public boolean isRetryable() {
@@ -2418,19 +2066,14 @@ public sealed class WhatsAppMessageException extends WhatsAppException
         }
 
         /**
-         * Exception thrown when the message recipient is invalid.
-         * <p>
-         * This can occur when:
-         * <ul>
-         *   <li>The recipient JID is malformed</li>
-         *   <li>The recipient type is not supported (e.g., sending to a call JID)</li>
-         *   <li>The recipient has blocked the sender</li>
-         *   <li>The recipient account no longer exists</li>
-         * </ul>
+         * Thrown when the recipient cannot be addressed by this
+         * device, for example because the JID is malformed,
+         * references an unsupported entity kind, or the recipient
+         * has blocked the sender.
          */
         public static final class InvalidRecipient extends Send {
             /**
-             * The invalid recipient JID.
+             * The JID that was rejected.
              */
             private final Jid recipientJid;
 
@@ -2442,7 +2085,7 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             /**
              * Constructs a new invalid recipient exception.
              *
-             * @param recipientJid the invalid recipient JID
+             * @param recipientJid the JID that was rejected
              * @param reason       the reason the recipient is invalid
              */
             public InvalidRecipient(Jid recipientJid, String reason) {
@@ -2452,7 +2095,7 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns the invalid recipient JID.
+             * Returns the JID that was rejected.
              *
              * @return the recipient JID
              */
@@ -2463,16 +2106,16 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             /**
              * Returns the reason the recipient is invalid.
              *
-             * @return the reason
+             * @return the rejection reason
              */
             public String reason() {
                 return reason;
             }
 
             /**
-             * Returns whether this send failure is retryable.
+             * Returns whether the failure can be recovered from by retrying.
              *
-             * @return {@code false}; the recipient is permanently unreachable by this client
+             * @return {@code false}
              */
             @Override
             public boolean isRetryable() {
@@ -2481,10 +2124,8 @@ public sealed class WhatsAppMessageException extends WhatsAppException
         }
 
         /**
-         * Exception thrown when the message payload exceeds the maximum allowed size.
-         * <p>
-         * WhatsApp imposes limits on message sizes to prevent abuse. Media messages
-         * should be uploaded separately and referenced by URL.
+         * Thrown when the message payload exceeds the size limit
+         * the server enforces.
          */
         public static final class PayloadTooLarge extends Send {
             /**
@@ -2493,15 +2134,16 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             private final long actualSize;
 
             /**
-             * The maximum allowed size in bytes.
+             * The maximum payload size accepted by the server, in
+             * bytes.
              */
             private final long maxSize;
 
             /**
              * Constructs a new payload too large exception.
              *
-             * @param actualSize the actual payload size
-             * @param maxSize    the maximum allowed size
+             * @param actualSize the actual payload size in bytes
+             * @param maxSize    the maximum allowed payload size in bytes
              */
             public PayloadTooLarge(long actualSize, long maxSize) {
                 super("Message payload too large: " + actualSize + " bytes (max: " + maxSize + ")");
@@ -2519,18 +2161,18 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns the maximum allowed size in bytes.
+             * Returns the maximum payload size accepted by the server.
              *
-             * @return the maximum size
+             * @return the maximum size in bytes
              */
             public long maxSize() {
                 return maxSize;
             }
 
             /**
-             * Returns whether this send failure is retryable.
+             * Returns whether the failure can be recovered from by retrying.
              *
-             * @return {@code false}; the payload must be reduced before it can be sent
+             * @return {@code false}
              */
             @Override
             public boolean isRetryable() {
@@ -2539,11 +2181,10 @@ public sealed class WhatsAppMessageException extends WhatsAppException
         }
 
         /**
-         * Exception thrown when the message has expired before delivery.
-         * <p>
-         * Messages have a time-to-live after which they cannot be delivered.
-         * This typically applies to ephemeral messages or messages queued
-         * while offline for too long.
+         * Thrown when a queued message has expired before delivery.
+         *
+         * <p>Typically applies to disappearing messages whose timer
+         * elapsed while the message was queued offline.
          */
         public static final class MessageExpired extends Send {
             /**
@@ -2554,19 +2195,18 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Constructs a new message expired exception with a message ID.
+             * Constructs a new message expired exception with a message id.
              *
-             * @param messageId the expired message ID
+             * @param messageId the id of the expired message
              */
             public MessageExpired(String messageId) {
                 super("Message " + messageId + " expired before delivery");
             }
 
             /**
-             * Returns whether this send failure is retryable.
+             * Returns whether the failure can be recovered from by retrying.
              *
-             * @return {@code false}; expired messages cannot be delivered and must
-             *         be re-composed with a fresh identifier
+             * @return {@code false}
              */
             @Override
             public boolean isRetryable() {
@@ -2575,10 +2215,8 @@ public sealed class WhatsAppMessageException extends WhatsAppException
         }
 
         /**
-         * Exception thrown when the user has reached their monthly message cap.
-         * <p>
-         * WhatsApp limits the number of new chat messages a user can send per month.
-         * This limit applies to messages to contacts the user hasn't messaged before.
+         * Thrown when the account has hit its monthly cap for new
+         * chat messages.
          */
         public static final class MessageCapped extends Send {
             /**
@@ -2589,9 +2227,9 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns whether this send failure is retryable.
+             * Returns whether the failure can be recovered from by retrying.
              *
-             * @return {@code false}; the user must wait until the monthly cap resets
+             * @return {@code false}
              */
             @Override
             public boolean isRetryable() {
@@ -2600,28 +2238,21 @@ public sealed class WhatsAppMessageException extends WhatsAppException
         }
 
         /**
-         * Exception thrown when the message send times out.
-         * <p>
-         * Timeouts can occur when:
-         * <ul>
-         *   <li>The server doesn't respond within the expected time</li>
-         *   <li>Network congestion causes excessive delays</li>
-         *   <li>The connection is unstable</li>
-         * </ul>
+         * Thrown when the server does not acknowledge the send
+         * within the expected time window.
          */
         public static final class Timeout extends Send {
             /**
              * Constructs a new timeout exception.
-             *
              */
             public Timeout() {
                 super("Message send timed out");
             }
 
             /**
-             * Returns whether this send failure is retryable.
+             * Returns whether the failure can be recovered from by retrying.
              *
-             * @return {@code true}; transient timeouts can be retried after backoff
+             * @return {@code true}
              */
             @Override
             public boolean isRetryable() {
@@ -2630,10 +2261,8 @@ public sealed class WhatsAppMessageException extends WhatsAppException
         }
 
         /**
-         * Exception thrown for unclassified send failures.
-         * <p>
-         * This is a catch-all for send errors that don't fit into other categories.
-         * Additional investigation may be needed to determine the root cause.
+         * Thrown for send failures that do not match any of the
+         * more specific subtypes.
          */
         public static final class Unknown extends Send {
             /**
@@ -2663,9 +2292,9 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns whether this send failure is retryable.
+             * Returns whether the failure can be recovered from by retrying.
              *
-             * @return {@code false}; unknown failures should not be retried blindly
+             * @return {@code false}
              */
             @Override
             public boolean isRetryable() {
@@ -2674,24 +2303,19 @@ public sealed class WhatsAppMessageException extends WhatsAppException
         }
 
         /**
-         * Exception thrown when a duplicate message send is attempted.
-         * <p>
-         * This occurs when the same message ID is sent while a previous send
-         * with that ID is still in progress. This prevents duplicate messages
-         * from being sent due to race conditions or retries.
-         *
-         * @apiNote WAWebMessageDedupUtils: manages pending message cache to handle deduplication
+         * Thrown when a send is attempted with a message id that is
+         * already being processed by another in-flight send.
          */
         public static final class Duplicate extends Send {
             /**
-             * The message ID that was duplicated.
+             * The duplicated message id.
              */
             private final String messageId;
 
             /**
              * Constructs a new duplicate exception.
              *
-             * @param messageId the duplicate message ID
+             * @param messageId the duplicated message id
              */
             public Duplicate(String messageId) {
                 super("Duplicate message send attempted: " + messageId);
@@ -2699,18 +2323,18 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns the message ID that was duplicated.
+             * Returns the duplicated message id.
              *
-             * @return the duplicate message ID
+             * @return the message id
              */
             public String messageId() {
                 return messageId;
             }
 
             /**
-             * Returns whether this send failure is retryable.
+             * Returns whether the failure can be recovered from by retrying.
              *
-             * @return {@code false}; duplicate sends must not be retried
+             * @return {@code false}
              */
             @Override
             public boolean isRetryable() {
@@ -2719,20 +2343,12 @@ public sealed class WhatsAppMessageException extends WhatsAppException
         }
 
         /**
-         * Exception thrown when the sender lacks permission to send a message.
-         * <p>
-         * This occurs when attempting to send to a group where the sender does not
-         * have the required permissions. For example, non-admins cannot send messages
-         * to Community Announcement Groups (CAGs) with admin-only send permissions.
+         * Thrown when the sender is not authorized to publish a
+         * message in the destination chat.
          *
-         * <h2>Common Causes</h2>
-         * <ul>
-         *   <li>Non-admin sending to a CAG with admin-only send policy</li>
-         *   <li>User removed from group but send still attempted</li>
-         *   <li>Group settings changed after message was composed</li>
-         * </ul>
-         *
-         * @apiNote WAWebGroupPermissionsApi.validateCagPermissions
+         * <p>The most common case is a non-admin trying to send to a
+         * Community Announcement Group whose policy restricts
+         * sending to admins.
          */
         public static final class Unauthorized extends Send {
             /**
@@ -2745,9 +2361,9 @@ public sealed class WhatsAppMessageException extends WhatsAppException
             }
 
             /**
-             * Returns whether this send failure is retryable.
+             * Returns whether the failure can be recovered from by retrying.
              *
-             * @return {@code false}; permission errors cannot be recovered by retrying
+             * @return {@code false}
              */
             @Override
             public boolean isRetryable() {

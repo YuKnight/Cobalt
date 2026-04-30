@@ -3,8 +3,9 @@ package com.github.auties00.cobalt.node.iq.biz;
 import java.util.Objects;
 
 /**
- * One service area — radius around a center point plus a free-text
- * description.
+ * Typed service-area entry carried inside the {@code <service_areas/>}
+ * child of an {@link IqEditBusinessProfileRequest}. Combines a free-text
+ * description, a radius in meters, and a center latitude and longitude.
  */
 public final class IqEditBusinessProfileServiceArea {
     /**

@@ -53,7 +53,7 @@ public sealed interface SmaxNewslettersGetNewsletterResponsesResponse extends Sm
     }
 
     /**
-     * The {@code Success} reply variant — the relay returned the
+     * The {@code Success} reply variant. The relay returned the
      * requested response slice.
      *
      * @implNote {@code WASmaxInNewslettersGetNewsletterResponsesResponseSuccess.parseGetNewsletterResponsesResponseSuccess}
@@ -204,7 +204,7 @@ public sealed interface SmaxNewslettersGetNewsletterResponsesResponse extends Sm
     }
 
     /**
-     * One question-response entry — the per-subscriber free-form
+     * One question-response entry. The per-subscriber free-form
      * reply against a newsletter question post.
      *
      * @implNote {@code WASmaxInNewslettersGetNewsletterResponsesResponseSuccess.parseGetNewsletterResponsesResponseSuccessQuestionResponsesQuestionResponse}
@@ -238,7 +238,7 @@ public sealed interface SmaxNewslettersGetNewsletterResponsesResponse extends Sm
         private final boolean fromSelf;
 
         /**
-         * The optional sender LID — present for non-self entries when
+         * The optional sender LID. Present for non-self entries when
          * the relay knows the responder's anonymised LID.
          */
         private final Jid senderLid;
@@ -256,13 +256,13 @@ public sealed interface SmaxNewslettersGetNewsletterResponsesResponse extends Sm
 
         /**
          * Whether the question owner has explicitly replied to this
-         * response — derived from the optional {@code <replied/>}
+         * response, derived from the optional {@code <replied/>}
          * flag.
          */
         private final boolean hasRepliedFlag;
 
         /**
-         * The underlying {@link Node} — exposed so callers can drill
+         * The underlying {@link Node}. Exposed so callers can drill
          * into the variable-shape content-type / payload children.
          */
         private final Node raw;
@@ -472,9 +472,9 @@ public sealed interface SmaxNewslettersGetNewsletterResponsesResponse extends Sm
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected the
+     * The {@code ClientError} reply variant. The relay rejected the
      * request as malformed, unauthorised, referencing a non-existent
-     * newsletter or question, the newsletter is suspended, or the
+     * newsletter or question. The newsletter is suspended, or the
      * caller hit a rate / not-allowed limit.
      *
      * @implNote {@code WASmaxInNewslettersGetNewsletterResponsesResponseClientError.parseGetNewsletterResponsesResponseClientError}
@@ -572,7 +572,7 @@ public sealed interface SmaxNewslettersGetNewsletterResponsesResponse extends Sm
     }
 
     /**
-     * The {@code ServerError} reply variant — the relay encountered a
+     * The {@code ServerError} reply variant. The relay encountered a
      * transient internal failure while processing the request.
      *
      * @implNote {@code WASmaxInNewslettersGetNewsletterResponsesResponseServerError.parseGetNewsletterResponsesResponseServerError}

@@ -18,12 +18,6 @@ import java.util.Optional;
 /**
  * The optional {@code <smax$any><tctoken t?>{any}</tctoken></smax$any>}
  * payload carried by a {@link SmaxProfilePictureGetRequest}.
- *
- * @implNote {@code WASmaxOutProfilePictureTCTokenMixin.mergeTCTokenMixin}
- *           wraps the {@code <tctoken/>} element under a
- *           {@code <smax$any/>} placeholder which itself nests a
- *           {@code <smax$any/>} grandchild carrying the privacy-token
- *           contents bytes.
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutProfilePictureTCTokenMixin")
 @WhatsAppWebModule(moduleName = "WASmaxOutProfilePicturePrivacyTokenContentsMixin")

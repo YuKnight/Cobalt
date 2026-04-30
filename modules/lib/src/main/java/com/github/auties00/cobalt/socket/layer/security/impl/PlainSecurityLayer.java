@@ -10,20 +10,22 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 
 /**
- * A plain (no-op) security layer that transparently delegates all
- * operations to the inner layer.
+ * No-op security layer that forwards every operation to the layer it
+ * wraps.
  *
- * <p>No layer context is registered because the layer has no state to
- * maintain and performs no transformation of inbound or outbound bytes.
- * The linked chain therefore skips this position entirely, which means the
- * next inner context's {@code nextLayer} points directly at the next outer
- * context — no wasted link traversals and no placeholder objects.
+ * <p>It deliberately registers no layer context with the selector;
+ * the chain therefore skips this position entirely so the next inner
+ * context's {@code nextLayer} points directly at the next outer
+ * context, with no placeholder objects or wasted link traversals.
  */
 public final class PlainSecurityLayer implements SocketClientSecurityLayer {
+    /**
+     * The layer that receives every delegated operation.
+     */
     private final SocketClientLayer<?> innerLayer;
 
     /**
-     * Creates a plain security layer wrapping the given inner layer.
+     * Creates a plain security layer wrapping {@code innerLayer}.
      *
      * @param innerLayer the layer below
      */
@@ -31,6 +33,9 @@ public final class PlainSecurityLayer implements SocketClientSecurityLayer {
         this.innerLayer = innerLayer;
     }
 
+    /**
+     * No-op handshake; this layer never encrypts anything.
+     */
     @Override
     public void startHandshake() throws IOException {
     }

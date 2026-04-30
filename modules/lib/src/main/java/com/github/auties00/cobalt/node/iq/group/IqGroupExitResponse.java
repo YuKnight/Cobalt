@@ -15,10 +15,10 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants produced by the relay in
- * response to a {@link IqGroupExitRequest}.
+ * response to an {@link IqGroupExitRequest}.
  *
  * @implNote {@code WAWebGroupExitJob} parses the reply via
- *           {@code leaveGroupsResultParser}/
+ *           {@code leaveGroupsResultParser} and
  *           {@code leaveCommunitiesResultParser} and rejects on a
  *           non-result envelope by throwing
  *           {@code ServerStatusCodeError}; Cobalt splits the
@@ -26,6 +26,7 @@ import java.util.Optional;
  *           {@code ClientError}/{@code ServerError} variants and
  *           returns {@link Optional#empty()} on no-match.
  */
+@WhatsAppWebModule(moduleName = "WAWebGroupExitJob")
 public sealed interface IqGroupExitResponse extends IqOperation.Response
         permits IqGroupExitResponse.Success, IqGroupExitResponse.ClientError, IqGroupExitResponse.ServerError {
 

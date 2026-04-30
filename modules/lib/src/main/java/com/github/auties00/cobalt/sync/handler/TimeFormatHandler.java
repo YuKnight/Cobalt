@@ -81,7 +81,7 @@ public final class TimeFormatHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebTimeFormatSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return TimeFormatAction.ACTION_NAME; // WAWebTimeFormatSync.getAction -> Actions.TimeFormat
+        return TimeFormatAction.ACTION_NAME;
     }
 
     /**
@@ -97,7 +97,7 @@ public final class TimeFormatHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebTimeFormatSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return TimeFormatAction.COLLECTION_NAME; // WAWebTimeFormatSync -> CollectionName.RegularLow
+        return TimeFormatAction.COLLECTION_NAME;
     }
 
     /**
@@ -109,7 +109,7 @@ public final class TimeFormatHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebTimeFormatSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return TimeFormatAction.ACTION_VERSION; // WAWebTimeFormatSync.getVersion -> 7
+        return TimeFormatAction.ACTION_VERSION;
     }
 
     /**
@@ -131,7 +131,7 @@ public final class TimeFormatHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebTimeFormatSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: WAWebTimeFormatSync.applyMutations
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -187,18 +187,15 @@ public final class TimeFormatHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebTimeFormatSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        // WAWebTimeFormatSync.applyMutations: if (e.operation !== "set") return r++, {actionState: Unsupported}
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
 
-        // WAWebTimeFormatSync.applyMutations: var a = (t = e.value.timeFormatAction) == null ? void 0 : t.isTwentyFourHourFormatEnabled; return a == null ? n.malformedActionIndex() : ...
         if (!(mutation.value().action().orElse(null) instanceof TimeFormatAction action)) {
             return malformedActionIndex();
         }
 
         // ADAPTED: WAWebTimeFormatSync.applyMutations:
-        //   WAWebBackendApi.frontendFireAndForget("setIs24Hour", {is24Hour: a})
         // Cobalt has no frontend, so the value is persisted into the store
         // instead. The nullable Boolean field is coalesced to false via the
         // existing accessor on TimeFormatAction.
@@ -207,7 +204,6 @@ public final class TimeFormatHandler implements WebAppStateActionHandler {
         // NO_WA_BASIS: the WA Web "r" unsupported counter and the trailing
         // WALogger.WARN("time format sync: %s operations not supported", r)
         // are intentionally dropped as telemetry-only logging.
-        // WAWebTimeFormatSync.applyMutations: return {actionState: Success}
         return MutationApplicationResult.success();
     }
 

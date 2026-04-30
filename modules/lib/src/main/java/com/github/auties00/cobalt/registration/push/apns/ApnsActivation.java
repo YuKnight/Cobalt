@@ -30,33 +30,33 @@ import java.util.regex.Pattern;
  * <p>The handshake is the same flow a freshly-flashed iOS device
  * performs on first boot:
  * <ol>
- *   <li>generate a 2048-bit RSA keypair via
- *       {@link ApnsActivationCrypto#newRsaKeyPair()};</li>
- *   <li>encode a PKCS#10 CSR for that keypair and wrap it in an
- *       {@code ActivationInfo} plist;</li>
- *   <li>sign the plist bytes with the leaked FairPlay private key;</li>
+ *   <li>Generate a 2048-bit RSA keypair via
+ *       {@link ApnsActivationCrypto#newRsaKeyPair()}.</li>
+ *   <li>Encode a PKCS#10 CSR for that keypair and wrap it in an
+ *       {@code ActivationInfo} plist.</li>
+ *   <li>Sign the plist bytes with the leaked FairPlay private key.</li>
  *   <li>POST the signed bundle to
- *       {@code albert.apple.com/.../deviceActivation};</li>
- *   <li>extract the {@code DeviceCertificate} from the
+ *       {@code albert.apple.com/.../deviceActivation}.</li>
+ *   <li>Extract the {@code DeviceCertificate} from the
  *       {@code <Protocol>} block of the response.</li>
  * </ol>
  *
- * <p>The resulting cert is valid for ~3 years; subsequent runs
+ * <p>The resulting cert is valid for ~3 years. Subsequent runs
  * restore the saved cert plus keypair via
  * {@link ApnsClient#loadSession(ApnsSession)} and skip the round-trip
  * entirely.
  */
 final class ApnsActivation {
     /**
-     * Logger shared with the rest of the APNS client — same logger
+     * Logger shared with the rest of the APNS client. Uses the logger
      * name {@code cobalt.apns} so consumers can configure verbosity
      * uniformly.
      */
     private static final Logger LOG = System.getLogger("cobalt.apns");
 
     /**
-     * Endpoint that signs the device CSR. Must be hit over HTTPS;
-     * the response is a plist whose {@code <Protocol>} element holds
+     * Endpoint that signs the device CSR. Must be hit over HTTPS.
+     * The response is a plist whose {@code <Protocol>} element holds
      * the signed device certificate.
      */
     private static final String ACTIVATION_URL = "https://albert.apple.com/WebObjects/ALUnbrick.woa/wa/deviceActivation";

@@ -15,7 +15,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps zero or more
+ * The outbound stanza variant. Wraps zero or more
  * {@code <get_disclosure_stage_by_id id="…" t="…"/>} children in the
  * canonical {@code <iq xmlns="tos" type="get" to="s.whatsapp.net">}
  * envelope.
@@ -31,7 +31,7 @@ public final class SmaxUserNoticeGetDisclosureStageByIdsRequest implements SmaxO
     /**
      * Constructs a request.
      *
-     * @param queries the list of per-disclosure queries; never
+     * @param queries the list of per-disclosure queries. Never
      *                {@code null}, may be empty
      * @throws NullPointerException if {@code queries} is {@code null}
      */
@@ -43,7 +43,7 @@ public final class SmaxUserNoticeGetDisclosureStageByIdsRequest implements SmaxO
     /**
      * Returns the per-disclosure queries.
      *
-     * @return an unmodifiable list; never {@code null}
+     * @return an unmodifiable list. Never {@code null}
      */
     public List<DisclosureStageQuery> queries() {
         return queries;
@@ -66,14 +66,11 @@ public final class SmaxUserNoticeGetDisclosureStageByIdsRequest implements SmaxO
             exports = "makeGetDisclosureStageByIdsRequest",
             adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // smax("iq", {to: S_WHATSAPP_NET, xmlns: "tos", id: generateId(), type: "get"})
         var iqBuilder = new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "tos")
                 .attribute("to", JidServer.user())
                 .attribute("type", "get");
-        // WASmaxOutUserNoticeGetDisclosureStageByIdsRequest:
-        //   smax("get_disclosure_stage_by_id", {id: INT(t), t: INT(n)})
         for (var query : queries) {
             var child = new NodeBuilder()
                     .description("get_disclosure_stage_by_id")
@@ -108,8 +105,8 @@ public final class SmaxUserNoticeGetDisclosureStageByIdsRequest implements SmaxO
     }
 
     /**
-     * One {@code <get_disclosure_stage_by_id id="…" t="…"/>} child —
-     * a (disclosure id, timestamp) pair routed verbatim into the
+     * One {@code <get_disclosure_stage_by_id id="…" t="…"/>} child.
+     * A (disclosure id, timestamp) pair routed verbatim into the
      * outbound stanza.
      */
     public static final class DisclosureStageQuery {

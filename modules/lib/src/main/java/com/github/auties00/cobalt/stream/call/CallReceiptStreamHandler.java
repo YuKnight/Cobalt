@@ -24,8 +24,6 @@ import com.github.auties00.cobalt.stream.SocketStream;
  * via {@code frontendSendAndReceive("getTcToken", ...)} before sending the ack,
  * but Cobalt does not implement a VoIP media runtime, so both steps are
  * intentionally omitted. The ack stanza shape is preserved exactly.
- *
- * @implNote WAWebHandleVoipCallReceipt
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleVoipCallReceipt")
 public final class CallReceiptStreamHandler implements SocketStream.Handler {
@@ -102,58 +100,42 @@ public final class CallReceiptStreamHandler implements SocketStream.Handler {
             adaptation = WhatsAppAdaptation.ADAPTED)
     @Override
     public void handle(Node node) {
-        // WAWebHandleVoipCallReceipt: callReceiptParser does e.assertTag("receipt") then
-        //     var t = e.maybeChild("offer") || e.maybeChild("accept") || e.maybeChild("reject");
-        //     if (!t) throw e.createParseError("Unrecognized call stanza")
-        // The maybeChild calls scan all children, so an offer/accept/reject anywhere wins.
+        // The WA Web parser scans all children for offer/accept/reject; the first match wins.
         if (!node.hasChild("offer", "accept", "reject")) {
-            // WAWebHandleVoipCallReceipt: WALogger.ERROR("Parsing Error: ", error.toString())
             LOGGER.log(System.Logger.Level.WARNING, "Parsing Error: Unrecognized call stanza: {0}", node);
             return;
         }
 
-        // WAWebHandleVoipCallReceipt: a.from = WAWebJidToWid.jidWithTypeToWid(e.attrJidWithType("from"))
-        // attrJidWithType throws if "from" is missing; that becomes a parse error logged via WALogger.ERROR.
         var from = node.getAttributeAsJid("from", null);
         if (from == null) {
             LOGGER.log(System.Logger.Level.WARNING, "Parsing Error: missing from attribute in call receipt: {0}", node);
             return;
         }
 
-        // WAWebHandleVoipCallReceipt: a.stanzaId = e.attrString("id")
-        // attrString throws on a missing id, which surfaces as a parse error.
         var stanzaId = node.getAttributeAsString("id", null);
         if (stanzaId == null) {
             LOGGER.log(System.Logger.Level.WARNING, "Parsing Error: missing id attribute in call receipt: {0}", node);
             return;
         }
 
-        // WAWebHandleVoipCallReceipt: a.type = e.maybeAttrString("type")
         var type = node.getAttributeAsString("type", null);
 
-        // WAWebHandleVoipCallReceipt: from = WAWebUserPrefsMeUser.getMePnUserOrThrow_DO_NOT_USE()
-        // which is asUserWidOrThrow(getMeDevicePnOrThrow_DO_NOT_USE()) — the device-stripped PN user JID.
-        // This is unconditional in WAWebHandleVoipCallReceipt; the LID-vs-PN branching that exists
-        // in the sibling module WAWebHandleVoipCall (signaling sender) is NOT used here.
+        // WA Web uses getMePnUserOrThrow_DO_NOT_USE unconditionally here, even though the sibling signaling sender branches on LID-vs-PN.
         var meDevicePn = whatsapp.store().jid().orElse(null);
         if (meDevicePn == null) {
-            // WA Web throws via getMePnUserOrThrow_DO_NOT_USE; Cobalt drops the ack defensively
-            // because the connection state is not yet ready.
+            // Drop the ack defensively when the connection state is not yet ready instead of throwing.
             return;
         }
-        var meUserPn = meDevicePn.toUserJid(); // WAWebUserPrefsMeUser.getMePnUserOrThrow_DO_NOT_USE = asUserWidOrThrow
+        var meUserPn = meDevicePn.toUserJid();
 
-        // WAWebHandleVoipCallReceipt: WAWap.wap("ack", { id, to, from, class:"receipt", type })
         var ack = new NodeBuilder()
-                .description("ack") // WAWebHandleVoipCallReceipt: "ack"
-                .attribute("id", stanzaId) // WAWebHandleVoipCallReceipt: id: WAWap.CUSTOM_STRING(l)
-                .attribute("to", from) // WAWebHandleVoipCallReceipt: to: WAWebCommsWapMd.JID(i)
-                .attribute("from", meUserPn) // WAWebHandleVoipCallReceipt: from: WAWebCommsWapMd.JID(getMePnUserOrThrow_DO_NOT_USE())
-                .attribute("class", "receipt") // WAWebHandleVoipCallReceipt: class: "receipt"
-                .attribute("type", type) // WAWebHandleVoipCallReceipt: type: WAWap.MAYBE_CUSTOM_STRING(c) — drops attr when undefined
+                .description("ack")
+                .attribute("id", stanzaId)
+                .attribute("to", from)
+                .attribute("from", meUserPn)
+                .attribute("class", "receipt")
+                .attribute("type", type)
                 .build();
-        // ADAPTED: WAWebHandleVoipCallReceipt returns the ack from the case-"receipt" branch in
-        // WAWebCommsHandleWorkerCompatibleStanza.handleWorkerCompatibleStanza; the dispatcher sends it.
         whatsapp.sendNodeWithNoResponse(ack);
     }
 }

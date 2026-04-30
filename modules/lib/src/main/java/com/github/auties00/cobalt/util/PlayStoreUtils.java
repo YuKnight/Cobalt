@@ -32,26 +32,26 @@ import java.util.stream.Collectors;
  *         Google accounts, so no user Google account is ever involved.</li>
  *     <li>Queries {@code /fdfe/details} to resolve the latest
  *         {@code versionCode} for the requested package.</li>
- *     <li>Acquires the app through {@code /fdfe/purchase} (free-app
- *         equivalent of pressing "Install"). Best-effort: already-owned
- *         apps return non-{@code 2xx}, which is silently ignored.</li>
+ *     <li>Acquires the app through {@code /fdfe/purchase} (the free-app
+ *         equivalent of pressing "Install"). Best-effort, since
+ *         already-owned apps return non-{@code 2xx} which is silently
+ *         ignored.</li>
  *     <li>Calls {@code /fdfe/delivery} and decodes the returned
- *         {@code AppDeliveryData} protobuf to extract the signed CDN URLs
- *         for the base APK and every split, plus the auth cookies that
- *         gate the downloads.</li>
+ *         {@code AppDeliveryData} protobuf to extract the signed CDN
+ *         URLs for the base APK and every split, plus the auth cookies
+ *         that gate the downloads.</li>
  *     <li>Opens one HTTP stream per APK (base plus splits) with the
  *         cookies attached and returns them to the caller.</li>
  * </ol>
  *
  * <p>Responses are decoded with the schema-driven Cobalt protobuf
- * library: a minimal Play FDFE schema is declared as nested
+ * library. A minimal Play FDFE schema is declared as nested
  * {@code @ProtobufMessage} records and the annotation processor emits
  * the matching {@code *Spec} decoders at compile time.
  *
- * @implNote Pure Cobalt utility class; no WhatsApp Web counterpart. The
- *     Aurora dispenser URL, encoded-targets blob and fallback Finsky
- *     user-agent match the values shipped by {@code gplaydl} and the
- *     Aurora Store so upstream compatibility is maintained.
+ * @implNote The Aurora dispenser URL, encoded-targets blob, and fallback
+ *     Finsky user-agent match the values shipped by {@code gplaydl} and
+ *     the Aurora Store so upstream compatibility is maintained.
  */
 public final class PlayStoreUtils {
     /**
@@ -223,16 +223,15 @@ public final class PlayStoreUtils {
      * Builds the shared {@link HttpClient} used by
      * {@link #downloadApk(String)} and {@link #downloadApk(String, int)}.
      *
-     * <p>The instance is deliberately not wrapped in try-with-resources
-     * at the call site: {@link HttpClient#close()} blocks until every
-     * streaming body handler has been drained (see the class javadoc's
-     * "closing" note), and our streams are handed back to the caller.
-     * Per the javadoc's "gc" section, the JDK implementation releases the
-     * client's resources when it becomes unreachable and all requests
-     * have completed, so the returned streams keep it alive and GC
-     * reclaims it once the caller closes the {@link DownloadedApk}.
-     *
-     * @return a freshly-built {@link HttpClient}
+     * @implNote The instance is deliberately not wrapped in
+     *     try-with-resources at the call site, because
+     *     {@link HttpClient#close()} blocks until every streaming body
+     *     handler is drained and our streams are handed back to the
+     *     caller. The JDK releases the client's resources when it becomes
+     *     unreachable and all requests have completed, so the returned
+     *     streams keep it alive and GC reclaims it once the caller closes
+     *     the {@link DownloadedApk}.
+     * @return a freshly built {@link HttpClient}
      */
     private static HttpClient newClient() {
         return HttpClient.newBuilder()

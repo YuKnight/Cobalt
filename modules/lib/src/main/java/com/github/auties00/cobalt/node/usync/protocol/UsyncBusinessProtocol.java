@@ -14,13 +14,15 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * USync {@code business} protocol.
- *
- * @implNote WAWebUsyncBusiness.USyncBusinessProtocol.
+ * USync {@code business} protocol descriptor. Wraps a {@code <business>} query
+ * carrying an inner {@code <verified_name/>} child that asks the relay for the
+ * peer's verified-name signed certificate.
  */
 @WhatsAppWebModule(moduleName = "WAWebUsyncBusiness")
 public final class UsyncBusinessProtocol implements UsyncProtocol {
-    /** Wire literal for the protocol tag name. */
+    /**
+     * Wire literal for the protocol tag name.
+     */
     public static final String NAME = "business";
 
     /**
@@ -31,6 +33,11 @@ public final class UsyncBusinessProtocol implements UsyncProtocol {
     public UsyncBusinessProtocol() {
     }
 
+    /**
+     * Returns the wire literal for this protocol's tag name.
+     *
+     * @return the tag name
+     */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUsyncBusiness",
             exports = "USyncBusinessProtocol.getName", adaptation = WhatsAppAdaptation.DIRECT)
@@ -38,6 +45,12 @@ public final class UsyncBusinessProtocol implements UsyncProtocol {
         return NAME;
     }
 
+    /**
+     * Builds the {@code <business>} query element wrapping a single empty
+     * {@code <verified_name/>} child.
+     *
+     * @return the query-element node
+     */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUsyncBusiness",
             exports = "USyncBusinessProtocol.getQueryElement", adaptation = WhatsAppAdaptation.DIRECT)
@@ -48,6 +61,13 @@ public final class UsyncBusinessProtocol implements UsyncProtocol {
                 .build();
     }
 
+    /**
+     * Returns no per-user element because the business protocol carries no
+     * per-user payload on the request side.
+     *
+     * @param user the user the {@code <user>} entry refers to
+     * @return always {@link Optional#empty()}
+     */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUsyncBusiness",
             exports = "USyncBusinessProtocol.getUserElement", adaptation = WhatsAppAdaptation.DIRECT)
@@ -55,6 +75,14 @@ public final class UsyncBusinessProtocol implements UsyncProtocol {
         return Optional.empty();
     }
 
+    /**
+     * Parses the {@code <business>} child of a {@code <user>} response into a
+     * {@link BusinessResult} or a per-protocol error.
+     *
+     * @param child the protocol-tagged response node
+     * @return the parsed result
+     * @throws IllegalStateException if the node tag is not {@link #NAME}
+     */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUsyncBusiness",
             exports = "businessParser", adaptation = WhatsAppAdaptation.ADAPTED)

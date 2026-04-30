@@ -32,7 +32,7 @@ public sealed interface SmaxGetBusinessEligibilityResponse extends SmaxOperation
      *
      * @param node    the inbound IQ stanza received from the relay;
      *                never {@code null}
-     * @param request the original outbound stanza — used to validate
+     * @param request the original outbound stanza. Used to validate
      *                echoed identifiers; never {@code null}
      * @return an {@link Optional} carrying the parsed variant, or
      *         {@link Optional#empty()} when no documented variant
@@ -57,7 +57,7 @@ public sealed interface SmaxGetBusinessEligibilityResponse extends SmaxOperation
     }
 
     /**
-     * The {@code Success} reply variant — carries 0..3 optional
+     * The {@code Success} reply variant. Carries 0..3 optional
      * feature-eligibility projections.
      *
      * @implNote {@code WASmaxInBizMarketingMessageGetBusinessEligibilityResponseSuccess.parseGetBusinessEligibilityResponseSuccess}
@@ -210,7 +210,7 @@ public sealed interface SmaxGetBusinessEligibilityResponse extends SmaxOperation
         }
 
         /**
-         * The {@code <meta_verified/>} child projection — the
+         * The {@code <meta_verified/>} child projection. The
          * Meta-Verified eligibility status plus optional
          * onboarding-flow toggles.
          */
@@ -229,8 +229,8 @@ public sealed interface SmaxGetBusinessEligibilityResponse extends SmaxOperation
             private final SmaxGetBusinessEligibilityFalseTrueFlag shouldShowPrivacyInterstitialToNewUsers;
 
             /**
-             * The optional {@code additional_params} attribute —
-             * relay-side opaque payload.
+             * The optional {@code additional_params} attribute.
+             * Relay-side opaque payload.
              */
             private final String additionalParams;
 
@@ -357,7 +357,7 @@ public sealed interface SmaxGetBusinessEligibilityResponse extends SmaxOperation
         }
 
         /**
-         * The {@code <marketing_messages/>} child projection — the
+         * The {@code <marketing_messages/>} child projection. The
          * marketing-messages eligibility plus the optional
          * expiration timestamp.
          */
@@ -474,7 +474,7 @@ public sealed interface SmaxGetBusinessEligibilityResponse extends SmaxOperation
         }
 
         /**
-         * The {@code <genai/>} child projection — the GenAI feature
+         * The {@code <genai/>} child projection. The GenAI feature
          * eligibility status.
          */
         @WhatsAppWebModule(moduleName = "WASmaxInBizMarketingMessageGetBusinessEligibilityResponseSuccess")
@@ -553,7 +553,7 @@ public sealed interface SmaxGetBusinessEligibilityResponse extends SmaxOperation
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected the
+     * The {@code ClientError} reply variant. The relay rejected the
      * request with a {@code 4xx} error code.
      *
      * @implNote {@code WASmaxInBizMarketingMessageGetBusinessEligibilityResponseError.parseGetBusinessEligibilityResponseError}
@@ -653,7 +653,7 @@ public sealed interface SmaxGetBusinessEligibilityResponse extends SmaxOperation
     }
 
     /**
-     * The {@code ServerError} reply variant — the relay encountered
+     * The {@code ServerError} reply variant. The relay encountered
      * a transient internal failure ({@code 5xx}).
      *
      * @implNote Sourced from the {@code 5xx} arms of

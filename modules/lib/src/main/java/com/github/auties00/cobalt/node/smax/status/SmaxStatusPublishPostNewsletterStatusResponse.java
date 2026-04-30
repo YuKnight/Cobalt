@@ -28,7 +28,7 @@ public sealed interface SmaxStatusPublishPostNewsletterStatusResponse extends Sm
      *
      * @param node    the inbound ack stanza received from the
      *                relay; never {@code null}
-     * @param request the original outbound stanza — used to
+     * @param request the original outbound stanza. Used to
      *                validate echoed identifiers; never
      *                {@code null}
      * @return an {@link Optional} carrying the parsed variant, or
@@ -59,8 +59,6 @@ public sealed interface SmaxStatusPublishPostNewsletterStatusResponse extends Sm
      * @param reply   the inbound ack stanza
      * @param request the original outbound status
      * @return {@code true} when the envelope echo-checks pass
-     *
-     * @implNote {@code WASmaxInStatusPublishStatusAckMixin.parseStatusAckMixin}.
      */
     @WhatsAppWebExport(moduleName = "WASmaxInStatusPublishStatusAckMixin",
             exports = "parseStatusAckMixin", adaptation = WhatsAppAdaptation.ADAPTED)
@@ -91,13 +89,8 @@ public sealed interface SmaxStatusPublishPostNewsletterStatusResponse extends Sm
     }
 
     /**
-     * The {@code Success} reply variant — the relay accepted the
+     * The {@code Success} reply variant. The relay accepted the
      * status publish.
-     *
-     * @implNote {@code WASmaxInStatusPublishPostNewsletterStatusResponseSuccess.parsePostNewsletterStatusResponseSuccess}
-     *           composes
-     *           {@code WASmaxInStatusPublishStatusAckMixin} with an
-     *           optional {@code server_id} (99..2_147_476_647).
      */
     @WhatsAppWebModule(moduleName = "WASmaxInStatusPublishPostNewsletterStatusResponseSuccess")
     final class Success implements SmaxStatusPublishPostNewsletterStatusResponse {
@@ -199,17 +192,9 @@ public sealed interface SmaxStatusPublishPostNewsletterStatusResponse extends Sm
     }
 
     /**
-     * The {@code Negative} reply variant — the relay rejected the
+     * The {@code Negative} reply variant. The relay rejected the
      * status publish with an application-level error code, optionally
      * carrying a retry backoff.
-     *
-     * @implNote {@code WASmaxInStatusPublishPostNewsletterStatusResponseNegative.parsePostNewsletterStatusResponseNegative}
-     *           composes
-     *           {@code WASmaxInStatusPublishStatusNegativeAckMixin}
-     *           which extracts the {@code error} attribute, the
-     *           standard ack envelope, the optional
-     *           {@code application_error} integer, and the optional
-     *           {@code backoff} integer (0..86400 seconds).
      */
     @WhatsAppWebModule(moduleName = "WASmaxInStatusPublishPostNewsletterStatusResponseNegative")
     @WhatsAppWebModule(moduleName = "WASmaxInStatusPublishStatusNegativeAckMixin")

@@ -5,10 +5,10 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Plist array node — an ordered list of values.
+ * Plist array node. An ordered list of values.
  *
  * <p>The {@link #items()} accessor returns an unmodifiable view of
- * the backing list; the field itself is stored as-is to avoid the
+ * the backing list. The field itself is stored as-is to avoid the
  * defensive wrap on every construction.
  *
  * @param items the contained values

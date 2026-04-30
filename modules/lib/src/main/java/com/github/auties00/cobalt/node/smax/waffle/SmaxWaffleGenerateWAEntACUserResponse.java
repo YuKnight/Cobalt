@@ -44,14 +44,9 @@ public sealed interface SmaxWaffleGenerateWAEntACUserResponse extends SmaxOperat
     }
 
     /**
-     * The {@code Success} reply variant — the relay returned a fresh
+     * The {@code Success} reply variant. The relay returned a fresh
      * encryption-metadata subtree carrying the bootstrapped
      * identity.
-     *
-     * @implNote {@code WASmaxInWaffleGenerateWAEntACUserResponseSuccess.parseGenerateWAEntACUserResponseSuccess}
-     *           projects the {@code <encryption_metadata/>} subtree
-     *           via the shared
-     *           {@link SmaxWaffleRsaEncryptionMetadata#of(Node)}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInWaffleGenerateWAEntACUserResponseSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxInWaffleIQResultResponseMixin")

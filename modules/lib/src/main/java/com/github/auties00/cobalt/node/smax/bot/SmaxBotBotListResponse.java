@@ -17,10 +17,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants.
- *
- * @implNote {@code WASmaxBotBotListRPC.sendBotListRPC} tries
- *           {@code SuccessV2} → {@code SuccessV3} → {@code Error}
- *           in order.
  */
 public sealed interface SmaxBotBotListResponse extends SmaxOperation.Response
         permits SmaxBotBotListResponse.SuccessV2, SmaxBotBotListResponse.SuccessV3, SmaxBotBotListResponse.Error {
@@ -31,7 +27,7 @@ public sealed interface SmaxBotBotListResponse extends SmaxOperation.Response
      *
      * @param node    the inbound IQ stanza received from the relay;
      *                never {@code null}
-     * @param request the original outbound stanza — used to validate
+     * @param request the original outbound stanza. Used to validate
      *                echoed identifiers; never {@code null}
      * @return an {@link Optional} carrying the parsed variant, or
      *         {@link Optional#empty()} when no documented variant
@@ -43,7 +39,6 @@ public sealed interface SmaxBotBotListResponse extends SmaxOperation.Response
     static Optional<? extends SmaxBotBotListResponse> of(Node node, Node request) {
         Objects.requireNonNull(node, "node cannot be null");
         Objects.requireNonNull(request, "request cannot be null");
-        // WASmaxBotBotListRPC: tries V2 → V3 → Error
         var v2 = SuccessV2.of(node, request);
         if (v2.isPresent()) {
             return v2;
@@ -56,25 +51,15 @@ public sealed interface SmaxBotBotListResponse extends SmaxOperation.Response
     }
 
     /**
-     * The {@code SuccessV2} reply variant — the legacy v2 directory
+     * The {@code SuccessV2} reply variant. The legacy v2 directory
      * shape. Distinguished by the literal {@code v="2"} on the
      * top-level {@code <bot>} child.
-     *
-     * @implNote {@code WASmaxInBotBotListResponseSuccessV2.parseBotListResponseSuccessV2}
-     *           validates the IQ-result envelope, asserts
-     *           {@code <bot v="2">}, requires a {@code <default>}
-     *           bot-of-the-day entry, then projects every
-     *           {@code <section>} child via
-     *           {@code mapChildrenWithTag(section, 1, ∞)} into
-     *           typed sections each carrying typed
-     *           {@link BotEntry} children with optional
-     *           {@link ThemeBundle} overrides.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBotBotListResponseSuccessV2")
     @WhatsAppWebModule(moduleName = "WASmaxInBotIQResultResponseMixin")
     final class SuccessV2 implements SmaxBotBotListResponse {
         /**
-         * The protocol revision — always the literal {@code "2"}.
+         * The protocol revision. Always the literal {@code "2"}.
          */
         private final String botV;
 
@@ -232,7 +217,7 @@ public sealed interface SmaxBotBotListResponse extends SmaxOperation.Response
         }
 
         /**
-         * A single V2 section — carries a typed list of
+         * A single V2 section. Carries a typed list of
          * {@link BotEntry} entries.
          */
         public static final class Section {
@@ -360,7 +345,7 @@ public sealed interface SmaxBotBotListResponse extends SmaxOperation.Response
         }
 
         /**
-         * A single V2 bot entry — carries the bot JID, persona id,
+         * A single V2 bot entry. Carries the bot JID, persona id,
          * optional usage count, and optional theme overrides.
          */
         public static final class BotEntry {
@@ -380,7 +365,7 @@ public sealed interface SmaxBotBotListResponse extends SmaxOperation.Response
             private final Integer count;
 
             /**
-             * The optional theme overrides (0..2 entries — the WA
+             * The optional theme overrides (0..2 entries. The WA
              * Web parser asserts {@code mapChildrenWithTag(theme, 0, 2)}).
              */
             private final List<ThemeBundle> theme;
@@ -517,7 +502,7 @@ public sealed interface SmaxBotBotListResponse extends SmaxOperation.Response
         }
 
         /**
-         * A single theme bundle — carries the dark/light mode
+         * A single theme bundle. Carries the dark/light mode
          * literal plus the three colour element values
          * (background, primary text, secondary text).
          */
@@ -689,26 +674,15 @@ public sealed interface SmaxBotBotListResponse extends SmaxOperation.Response
     }
 
     /**
-     * The {@code SuccessV3} reply variant — the current v3 directory
+     * The {@code SuccessV3} reply variant. The current v3 directory
      * shape. Distinguished by the literal {@code v="3"} on the
      * top-level {@code <bot>} child.
-     *
-     * @implNote {@code WASmaxInBotBotListResponseSuccessV3.parseBotListResponseSuccessV3}
-     *           validates the IQ-result envelope, asserts
-     *           {@code <bot v="3" bhash="…">}, optionally accepts
-     *           a {@code <default>} bot entry, then projects every
-     *           {@code <section>} child via
-     *           {@code mapChildrenWithTag(section, 0, ∞)}. Each
-     *           section carries a {@code display_type} routing
-     *           literal and typed {@link BotEntry} children with
-     *           an optional {@code card_title} attribute (no theme
-     *           overrides at the v3 wire layer).
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBotBotListResponseSuccessV3")
     @WhatsAppWebModule(moduleName = "WASmaxInBotIQResultResponseMixin")
     final class SuccessV3 implements SmaxBotBotListResponse {
         /**
-         * The protocol revision — always the literal {@code "3"}.
+         * The protocol revision. Always the literal {@code "3"}.
          */
         private final String botV;
 
@@ -863,7 +837,7 @@ public sealed interface SmaxBotBotListResponse extends SmaxOperation.Response
         }
 
         /**
-         * The V3 "bot of the day" default entry — carries the bot
+         * The V3 "bot of the day" default entry. Carries the bot
          * JID and persona id only.
          */
         public static final class DefaultEntry {
@@ -960,7 +934,7 @@ public sealed interface SmaxBotBotListResponse extends SmaxOperation.Response
         }
 
         /**
-         * A single V3 section — adds {@link SmaxBotBotListSectionDisplayType}
+         * A single V3 section. Adds {@link SmaxBotBotListSectionDisplayType}
          * routing on top of the V2 (name, type, bot[]) shape.
          */
         public static final class Section {
@@ -1119,7 +1093,7 @@ public sealed interface SmaxBotBotListResponse extends SmaxOperation.Response
         }
 
         /**
-         * A single V3 bot entry — carries the bot JID, persona id,
+         * A single V3 bot entry. Carries the bot JID, persona id,
          * optional card title, and optional usage count (no theme
          * overrides at the v3 wire layer).
          */
@@ -1265,7 +1239,7 @@ public sealed interface SmaxBotBotListResponse extends SmaxOperation.Response
     }
 
     /**
-     * The {@code Error} reply variant — the relay rejected the
+     * The {@code Error} reply variant. The relay rejected the
      * request.
      *
      * <p>The bot domain projects four documented variants:
@@ -1274,12 +1248,6 @@ public sealed interface SmaxBotBotListResponse extends SmaxOperation.Response
      * {@code bad-request/400},
      * {@code not-allowed/405}. Cobalt collapses them into the
      * single {@code (errorCode, errorText)} pair.
-     *
-     * @implNote {@code WASmaxInBotBotListResponseError.parseBotListResponseError}
-     *           composes the IQ-error envelope check with
-     *           {@code WASmaxInBotBotListErrors.parseBotListErrors}
-     *           which is the disjunction of the four projected
-     *           error mixins.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBotBotListResponseError")
     @WhatsAppWebModule(moduleName = "WASmaxInBotBotListErrors")

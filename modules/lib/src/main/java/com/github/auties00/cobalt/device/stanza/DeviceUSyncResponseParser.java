@@ -89,7 +89,6 @@ public final class DeviceUSyncResponseParser {
             exports = "usyncParser",
             adaptation = WhatsAppAdaptation.DIRECT)
     public List<DeviceListResult> parse(Node responseNode) {
-        // WAWebUsync.usyncParser: r = t.child("usync")
         var usyncNode = responseNode.getChild("usync");
         if (usyncNode.isEmpty()) {
             return List.of();
@@ -97,8 +96,7 @@ public final class DeviceUSyncResponseParser {
 
         var usync = usyncNode.get();
 
-        // WAWebAdvHandlerApi: error.all is fatal and aborts entire request
-        // WAWebUsync.USyncQuery.execute: if IQ fails, returns error.all
+        // A global error is fatal and aborts the entire batch.
         var globalErrorNode = usync.getChild("error");
         if (globalErrorNode.isPresent()) {
             var error = globalErrorNode.get();
@@ -110,11 +108,9 @@ public final class DeviceUSyncResponseParser {
             return List.of(errorResult);
         }
 
-        // WAWebUsyncUsername.usernameParser: extracts username from usync/list/user nodes
         var usernameMap = parseUsernameMap(usync);
 
-        // WAWebUsync.usyncParser: check protocol-level devices error from result > devices > error
-        // WAWebAdvHandlerApi: error.devices is non-fatal, allows continuing with other users
+        // A protocol-level devices error is non-fatal and only affects matching users.
         var protocolErrorStream = usync.streamChild("result")
                 .flatMap(result -> result.streamChild("devices"))
                 .flatMap(devices -> devices.streamChild("error"))
@@ -125,8 +121,6 @@ public final class DeviceUSyncResponseParser {
                     return (DeviceListResult) new DeviceListResult.Error(null, errorCode, errorText, false);
                 });
 
-        // WAWebUsync.usyncParser.m: per-user data is in usync > list > user
-        // WAWebUsyncDevice.deviceParser: each user has a devices child with device-list and key-index-list
         var listNode = usync.getChild("list");
         if (listNode.isEmpty()) {
             return protocolErrorStream.toList();
@@ -184,7 +178,6 @@ public final class DeviceUSyncResponseParser {
 
         var userJid = jidAttr.get().toUserJid();
 
-        // WAWebUsyncDevice.deviceParser: operates on the <devices> child of the user node
         var devicesNode = userNode.getChild("devices");
         if (devicesNode.isEmpty()) {
             return Stream.empty();
@@ -192,7 +185,6 @@ public final class DeviceUSyncResponseParser {
 
         var devices = devicesNode.get();
 
-        // WAWebUsyncDevice.deviceParser: e.assertTag("devices"), then check for error child
         var errorChild = devices.getChild("error");
         if (errorChild.isPresent()) {
             var error = errorChild.get();
@@ -203,21 +195,17 @@ public final class DeviceUSyncResponseParser {
             return Stream.of(new DeviceListResult.Error(userJid, errorCode, errorText, false));
         }
 
-        // WAWebUsyncDevice.deviceParser: extract key-index-list and device-list
         var keyIndexListNode = devices.getChild("key-index-list", null);
         var deviceListNode = devices.getChild("device-list").orElse(null);
 
-        // WAWebHandleAdvForUsyncApi.handleADVSyncResultSync: parse signed content once for reuse
         var signedKeyIndexBytes = keyIndexListNode != null
                 ? keyIndexListNode.toContentBytes().orElse(null)
                 : null;
 
-        // WAWebHandleAdvForUsyncApi.handleADVSyncResultSync: omitted result when no signed content
         if (signedKeyIndexBytes == null) {
             return parseOmittedResult(userJid, deviceListNode, keyIndexListNode);
         }
 
-        // WAWebHandleAdvForUsyncApi.handleADVSyncResultSync: full device list response
         if (deviceListNode == null) {
             return Stream.empty();
         }
@@ -244,14 +232,13 @@ public final class DeviceUSyncResponseParser {
             exports = "handleADVSyncResultSync",
             adaptation = WhatsAppAdaptation.DIRECT)
     private Stream<DeviceListResult> parseOmittedResult(Jid userJid, Node deviceListNode, Node keyIndexListNode) {
-        // WAWebHandleAdvOmittedResultApi: reject if device-list has companion devices
+        // A device-list carrying companion devices without a signed key index is invalid.
         if (deviceListNode != null && hasCompanionDevices(deviceListNode)) {
             return Stream.empty();
         }
 
         if (keyIndexListNode == null) {
-            var result = new DeviceListResult.Omitted(userJid, null, null, true);
-            return Stream.of(result);
+            return Stream.of(new DeviceListResult.Omitted(userJid, null, null, true));
         }
 
         var ts = keyIndexListNode.getAttributeAsLong("ts", null);
@@ -260,8 +247,7 @@ public final class DeviceUSyncResponseParser {
         var expTs = keyIndexListNode.getAttributeAsLong("expected_ts", null);
         var expectedTs = expTs != null ? Instant.ofEpochSecond(expTs) : null;
 
-        var result = new DeviceListResult.Omitted(userJid, timestamp, expectedTs, true);
-        return Stream.of(result);
+        return Stream.of(new DeviceListResult.Omitted(userJid, timestamp, expectedTs, true));
     }
 
     /**
@@ -306,12 +292,9 @@ public final class DeviceUSyncResponseParser {
             Node keyIndexListNode,
             byte[] signedKeyIndexBytes
     ) {
-        // Extract expected timestamp
         var expectedTsSeconds = keyIndexListNode.getAttributeAsLong("expected_ts", 0);
         var expectedTs = expectedTsSeconds != 0  ? Instant.ofEpochSecond(expectedTsSeconds) : null;
 
-        // WAWebHandleAdvDeviceNotificationUtils: validate signed key index
-        // WAWebHandleAdvKeyIndexResultApi: if validation fails, return null (skip this user)
         var validatedInfo = advValidatorService.validateAndDecodeSignedKeyIndexList(signedKeyIndexBytes);
         if (validatedInfo.isEmpty()) {
             LOGGER.log(System.Logger.Level.WARNING,
@@ -321,36 +304,26 @@ public final class DeviceUSyncResponseParser {
 
         var info = validatedInfo.get();
 
-        // Build key index map from key-index-list/device nodes
         var keyIndexMap = keyIndexListNode.streamChildren("device")
                 .flatMap(this::parseKeyIndexEntry)
                 .collect(Collectors.toUnmodifiableMap(KeyIndexEntry::deviceId, KeyIndexEntry::keyIndex));
 
-        // WAWebUsyncDevice.deviceParser: parse device nodes with validation
         var devices = deviceListNode.streamChildren("device")
                 .flatMap(deviceNode -> parseDeviceEntry(deviceNode, keyIndexMap, info.validIndexes()))
                 .toList();
 
-        // Extract metadata from validated info
-        var rawId = String.valueOf(info.rawId());
-        var advAccountType = info.accountType();
-        var accountSignatureKey = info.accountSignatureKey();
-        var currentIndex = info.currentIndex();
-
-        // WAWebHandleAdvKeyIndexResultApi: use server timestamp from signed key index list
         var deviceList = new DeviceListBuilder()
                 .userJid(userJid)
                 .devices(devices)
                 .timestamp(info.timestamp())
-                .rawId(rawId)
-                .advAccountType(advAccountType)
+                .rawId(String.valueOf(info.rawId()))
+                .advAccountType(info.accountType())
                 .expectedTimestamp(expectedTs)
-                .currentIndex(currentIndex)
+                .currentIndex(info.currentIndex())
                 .validIndexes(info.validIndexes())
                 .build();
 
-        var result = new DeviceListResult.Full(deviceList, accountSignatureKey, username);
-        return Stream.of(result);
+        return Stream.of(new DeviceListResult.Full(deviceList, info.accountSignatureKey(), username));
     }
 
     /**
@@ -409,9 +382,8 @@ public final class DeviceUSyncResponseParser {
         var deviceId = id.getAsInt();
         var keyIndex = keyIndexMap.getOrDefault(deviceId, 0);
 
-        // WAWebHandleAdvKeyIndexResultApi: validate keyIndex for server response devices
-        // Primary device (keyIndex 0) is always accepted
-        // If validIndexes is null or empty, skip validation (allow all devices)
+        // The primary device (keyIndex 0) is always accepted. An empty validIndexes set
+        // skips validation and allows every device.
         if (validIndexes != null && !validIndexes.isEmpty() && keyIndex != 0 && !validIndexes.contains(keyIndex)) {
             LOGGER.log(System.Logger.Level.WARNING,
                     "Device {0} has keyIndex {1} not in validIndexes {2}, excluding",
@@ -419,18 +391,11 @@ public final class DeviceUSyncResponseParser {
             return Stream.empty();
         }
 
-        // WAWebUsyncDevice.deviceParser: isHosted is only set when bizHostedDevicesEnabled()
-        // AND the is_hosted attribute is present and equals the literal string "true".
-        // Note: WA Web uses strict string equality (attrString("is_hosted") === "true"),
-        // so compare as a case-sensitive string rather than through Boolean.parseBoolean.
+        // The is_hosted attribute is read with strict string equality, matching WA Web.
         var bizHostedDevicesEnabled = advValidatorService.isBizHostedDevicesEnabled();
         var isHosted = bizHostedDevicesEnabled
                 && "true".equals(deviceNode.getAttributeAsString("is_hosted").orElse(null));
 
-        // WAWebHandleAdvKeyIndexResultApi: id === 99 is treated as hosted only when
-        // bizHostedDevicesEnabled is true. When the gate is off, WA Web produces a
-        // regular {id, keyIndex} record without the isHosted flag, so fall through
-        // to the E2EE branch here as well.
         if (deviceId == DeviceConstants.HOSTED_DEVICE_ID && bizHostedDevicesEnabled) {
             return Stream.of(DeviceInfo.ofHosted(keyIndex));
         } else {
@@ -466,8 +431,6 @@ public final class DeviceUSyncResponseParser {
             return Stream.empty();
         }
 
-        // WAWebUsyncUsername.usernameParser: e.assertTag("username") — enforced by locating
-        // the child by tag name.
         var usernameNode = userNode.getChild("username");
         if (usernameNode.isEmpty()) {
             return Stream.empty();
@@ -475,13 +438,12 @@ public final class DeviceUSyncResponseParser {
 
         var node = usernameNode.get();
 
-        // WAWebUsyncUsername.usernameParser: var t=e.maybeChild("error"); if(t) return
-        // {errorCode, errorText}. ADAPTED: no consumer for per-user username errors, so drop.
+        // Per-user username errors are dropped because Cobalt has no downstream consumer
+        // that observes them.
         if (node.getChild("error").isPresent()) {
             return Stream.empty();
         }
 
-        // WAWebUsyncUsername.usernameParser: e.hasContent() ? e.contentString() : null
         var usernameContent = node.toContentString();
         if (usernameContent.isEmpty() || usernameContent.get().isEmpty()) {
             return Stream.empty();

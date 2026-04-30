@@ -33,7 +33,7 @@ public sealed interface SmaxNewslettersMyAddOnsResponse extends SmaxOperation.Re
      *
      * @param node    the inbound IQ stanza received from the relay;
      *                never {@code null}
-     * @param request the original outbound stanza — used to validate
+     * @param request the original outbound stanza, used to validate
      *                echoed identifiers; never {@code null}
      * @return an {@link Optional} carrying the parsed variant, or empty
      *         when no documented variant matched the stanza shape
@@ -56,12 +56,12 @@ public sealed interface SmaxNewslettersMyAddOnsResponse extends SmaxOperation.Re
     }
 
     /**
-     * The {@code Success} reply variant — the relay returned the user's
+     * The {@code Success} reply variant. The relay returned the user's
      * per-newsletter add-on list.
      *
      * @implNote {@code WASmaxInNewslettersMyAddOnsResponseSuccess.parseMyAddOnsResponseSuccess}
      *           validates the {@code <iq>} envelope through
-     *           {@code parseIQResultResponseMixin}, asserts the
+     *           {@code parseIQResultResponseMixin}. Asserts the
      *           {@code <my_addons>} child exists, then projects every
      *           {@code <messages>} child through
      *           {@code parseMyAddOnsResponseSuccessMyAddonsMessages}.
@@ -146,7 +146,7 @@ public sealed interface SmaxNewslettersMyAddOnsResponse extends SmaxOperation.Re
         }
 
         /**
-         * One per-newsletter block returned by the relay — projects a
+         * One per-newsletter block returned by the relay. Projects a
          * {@code <messages jid="<newsletterJid>"><message ...>*</messages>}
          * sub-tree into a typed pair of {@code (newsletterJid,
          * messages)}.
@@ -263,7 +263,7 @@ public sealed interface SmaxNewslettersMyAddOnsResponse extends SmaxOperation.Re
         }
 
         /**
-         * One per-message add-on entry — projects a
+         * One per-message add-on entry. Projects a
          * {@code <message server_id><reaction?/><votes?/></message>}
          * sub-tree into a typed bundle.
          *
@@ -394,7 +394,7 @@ public sealed interface SmaxNewslettersMyAddOnsResponse extends SmaxOperation.Re
         }
 
         /**
-         * The user's own reaction on a newsletter message —
+         * The user's own reaction on a newsletter message .
          * {@code <reaction code t/>}.
          *
          * @implNote {@code WASmaxInNewslettersNewsletterMyReactionMixin.parseNewsletterMyReactionMixin}.
@@ -498,7 +498,7 @@ public sealed interface SmaxNewslettersMyAddOnsResponse extends SmaxOperation.Re
         }
 
         /**
-         * The user's own poll-vote projection —
+         * The user's own poll-vote projection .
          * {@code <votes t><vote/>+</votes>} where every {@code <vote/>}
          * carries an opaque 32-byte option id as its content.
          *
@@ -623,7 +623,7 @@ public sealed interface SmaxNewslettersMyAddOnsResponse extends SmaxOperation.Re
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected the
+     * The {@code ClientError} reply variant. The relay rejected the
      * request as malformed, unauthorised, or referencing a
      * non-existent newsletter.
      *
@@ -641,7 +641,7 @@ public sealed interface SmaxNewslettersMyAddOnsResponse extends SmaxOperation.Re
         private final int errorCode;
 
         /**
-         * The human-readable error text, when the relay supplied one.
+         * The human-readable error text. When the relay supplied one.
          */
         private final String errorText;
 
@@ -722,7 +722,7 @@ public sealed interface SmaxNewslettersMyAddOnsResponse extends SmaxOperation.Re
     }
 
     /**
-     * The {@code ServerError} reply variant — the relay encountered a
+     * The {@code ServerError} reply variant. The relay encountered a
      * transient internal failure while processing the request.
      *
      * @implNote {@code WASmaxInNewslettersMyAddOnsResponseServerError.parseMyAddOnsResponseServerError}
@@ -739,7 +739,7 @@ public sealed interface SmaxNewslettersMyAddOnsResponse extends SmaxOperation.Re
         private final int errorCode;
 
         /**
-         * The human-readable error text, when the relay supplied one.
+         * The human-readable error text. When the relay supplied one.
          */
         private final String errorText;
 

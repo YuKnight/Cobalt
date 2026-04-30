@@ -30,8 +30,6 @@ import java.util.Set;
  * for fatal extension errors and non-null data), dispatches to the appropriate operation
  * handler based on the {@code op_name} attribute, and sends an acknowledgement stanza
  * only on successful processing.</p>
- *
- * @implNote WAWebHandleMexNotification
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleMexNotification")
 final class NotificationMexStreamHandler implements SocketStream.Handler {
@@ -46,8 +44,6 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
      * Set of operation names that are known but unsupported.
      * When these operations are encountered and unhandled, a warning is logged
      * and the notification is nacked (no ack sent) rather than throwing an error.
-     *
-     * @implNote WAWebHandleMexNotification.c
      */
     private static final Set<String> KNOWN_UNSUPPORTED_OPS = Set.of(
             "NotificationLinkedProfilesUpdatesSideSub",
@@ -89,7 +85,6 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
      * this method handles ack sending within the dispatch flow, sending it only on
      * successful processing.</p>
      *
-     * @implNote WAWebHandleMexNotification.handleMexNotification
      * @param node the incoming node to handle
      */
     @Override
@@ -112,13 +107,11 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
      * @param node the notification node
      */
     private void handleNotification(Node node) {
-        // WAWebHandleMexNotification — parser m: e.assertTag("notification"), e.assertAttr("type","mex")
         var updateNode = node.getChild("update").orElse(null);
         if (updateNode == null) {
             return;
         }
 
-        // WAWebHandleMexNotification — parser m: extract fields
         var stanzaId = node.getAttributeAsString("id", null);
         var stanzaFrom = node.getAttributeAsJid("from", null);
         var operationName = updateNode.getAttributeAsString("op_name", "");
@@ -127,19 +120,15 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
         try {
             dispatch(operationName, stanzaId, stanzaFrom, payload);
         } catch (MissingMexNotificationHandlerException e) {
-            // WAWebHandleMexNotification — error handling for MissingMEXNotificationHandler
             if (KNOWN_UNSUPPORTED_OPS.contains(e.operationName())) {
-                // WAWebHandleMexNotification — known unsupported ops: just WARN, nack
                 LOGGER.log(System.Logger.Level.WARNING,
                         "[mex] handleMexNotification: {0} unsupported, nack", e.operationName());
             } else {
-                // WAWebHandleMexNotification — unknown ops: ERROR and nack (throw)
                 LOGGER.log(System.Logger.Level.ERROR,
                         "[mex] handleMexNotification: {0} unknown op, nack", e.operationName());
             }
             // No ack sent (nack behavior)
         } catch (Throwable throwable) {
-            // WAWebHandleMexNotification — unexpected error: no ack (nack)
             LOGGER.log(System.Logger.Level.WARNING,
                     "Cannot handle mex notification {0}: {1}",
                     stanzaId != null ? stanzaId : "<missing>",
@@ -163,15 +152,13 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
      * @throws MissingMexNotificationHandlerException if no handler exists for the operation
      */
     private void dispatch(String operationName, String stanzaId, Jid stanzaFrom, JSONObject payload) {
-        // WAWebHandleMexNotification.h/y — check for fatal extension errors
-        var errors = payload.getJSONArray("errors"); // WAWebHandleMexNotification.y — n.errors
-        if (hasFatalExtensionError(errors)) { // WAWebMexRelayEnvironment.parseFatalExtensionError
+        var errors = payload.getJSONArray("errors");
+        if (hasFatalExtensionError(errors)) {
             LOGGER.log(System.Logger.Level.WARNING,
                     "[mex] Fatal extension error in mex notification for operation {0}", operationName);
             return;
         }
 
-        // WAWebHandleMexNotification.y — n.data != null check; null data throws XmppParsingFailure (no ack)
         var data = payload.get("data");
         if (data == null) {
             LOGGER.log(System.Logger.Level.WARNING,
@@ -179,10 +166,8 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
             return;
         }
 
-        // WAWebHandleMexNotification.f — dispatch by OperationName
         switch (operationName) {
             case "MexNotificationEvent" -> {
-                // WAWebHandleMexNotification.b/v — empty async handler (no-op)
             }
             case "NotificationNewsletterUserSettingChange",
                  "NotificationNewsletterJoin",
@@ -206,9 +191,9 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
                  "NotificationGroupSafetyCheckPropertyUpdate",
                  "NotificationGroupMemberLinkPropertyUpdate",
                  "NotificationGroupMemberShareGroupHistoryModePropertyUpdate" ->
-                    refreshGroups(payload); // WAWebMexGroupPropertyUpdateNotificationHandler.mexHandleGroupPropertyUpdate
+                    refreshGroups(payload);
             case "NotificationCommunityOwnerUpdate" ->
-                    refreshGroups(payload); // ADAPTED: WAWebMexCommunityOwnerUpdateNotificationHandler.mexHandleCommunityOwnerUpdate
+                    refreshGroups(payload);
             case "UsernameSetNotification",
                  "UsernameDeleteNotification",
                  "UsernameUpdateNotification",
@@ -217,27 +202,21 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
             case "NotificationUserBrigadingUpdate" ->
                     LOGGER.log(System.Logger.Level.DEBUG,
                             "Ignoring brigading update mex operation (UI-only feature)");
-                    // ADAPTED: WAWebHandleBrigadingUpdateNotification.mexHandleBrigadingNotification — UI/IndexedDB only
             case "NotificationGroupLimitSharingPropertyUpdate" ->
                     LOGGER.log(System.Logger.Level.DEBUG,
                             "Ignoring limit sharing update mex operation (UI-only feature)");
-                    // ADAPTED: WAWebMexLimitSharingUpdateHandler.mexHandleLimitSharingUpdate — UI/Opus gating only
             case "NotificationUserReachoutTimelockUpdate" ->
                     LOGGER.log(System.Logger.Level.DEBUG,
                             "Ignoring reachout timelock update mex operation (UI-only feature)");
-                    // ADAPTED: WAWebMexReachoutTimelockNotificationHandler.mexHandleReachoutTimelockNotification — UI only
             case "NotificationIntegrityChallengeRequest" ->
                     LOGGER.log(System.Logger.Level.DEBUG,
                             "Ignoring integrity challenge request mex operation (UI-only feature)");
-                    // ADAPTED: WAWebMexIntegrityChallengeNotificationHandler.mexHandleIntegrityChallengeNotification — UI only
             case "MessageCappingInfoNotification" ->
                     LOGGER.log(System.Logger.Level.DEBUG,
                             "Ignoring message capping info mex operation (UI-only feature)");
-                    // ADAPTED: WAWebNewChatMessageCappingNotificationHandler.mexHandleNewChatMessageCappingNotification — UI only
             default -> throw new MissingMexNotificationHandlerException(operationName);
         }
 
-        // WAWebHandleMexNotification.y — on success, send ack via C(stanzaId, from)
         sendNotificationAck(stanzaId, stanzaFrom);
     }
 
@@ -263,7 +242,6 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
                 return jsonObject;
             }
         } catch (Throwable throwable) {
-            // WAWebHandleMexNotification — parser m throws XmppParsingFailure on JSON parse error
             LOGGER.log(System.Logger.Level.DEBUG,
                     "Cannot parse mex JSON payload: {0}", throwable.getMessage());
         }
@@ -285,10 +263,9 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
      */
     private boolean hasFatalExtensionError(JSONArray errors) {
         if (errors == null || errors.isEmpty()) {
-            return false; // WAWebMexRelayEnvironment.p — if errors null or empty, return null
+            return false;
         }
 
-        // WAWebMexRelayEnvironment.p — look for is_summary or error_code
         for (var i = 0; i < errors.size(); i++) {
             var error = errors.getJSONObject(i);
             if (error == null) {
@@ -306,7 +283,6 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
             }
         }
 
-        // WAWebMexRelayEnvironment.p — if no specific match, first error is fatal (error_code=500)
         return true;
     }
 
@@ -321,14 +297,12 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
     private void handleNewsletterOperation(String operationName, JSONObject payload) {
         switch (operationName) {
             case "NotificationNewsletterLeave" -> {
-                // WAWebMexNewsletterLeaveHandler.mexHandleNewsletterLeave
                 var newsletterJid = parseNewsletterId(payload, "xwa2_notify_newsletter_on_leave", "id");
                 if (newsletterJid != null) {
                     removeNewsletter(newsletterJid);
                 }
             }
             case "NotificationNewsletterStateChange" -> handleNewsletterStateChange(payload);
-                // WAWebMexNewsletterStateChangeHandler.mexHandleNewsletterStateChange
             default -> refreshNewsletters(payload);
                 // ADAPTED: remaining newsletter ops refresh metadata
         }
@@ -338,7 +312,6 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
      * Handles a newsletter state change notification by parsing the state and
      * either removing, marking as terminated, or refreshing the newsletter.
      *
-     * @implNote WAWebMexNewsletterStateChangeHandler.mexHandleNewsletterStateChange
      * @param payload the parsed JSON payload
      */
     private void handleNewsletterStateChange(JSONObject payload) {
@@ -404,15 +377,10 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
     private void handleUserOperation(String operationName, JSONObject payload) {
         switch (operationName) {
             case "UsernameSetNotification" -> handleUsernameSet(payload);
-                // WAWebMexUsernameUpdateNotificationHandler.mexHandleUsernameChange
             case "UsernameDeleteNotification" -> handleUsernameDelete(payload);
-                // WAWebMexUsernameUpdateNotificationHandler.mexHandleUsernameDelete
             case "UsernameUpdateNotification" -> refreshUsers(payload);
-                // ADAPTED: WAWebMexUsernameUpdateNotificationHandler.mexHandleUsernameChangeForSideSub
             case "AccountSyncUsernameNotification" -> handleUsernameAccountSync(payload);
-                // WAWebMexUsernameAccountSyncNotificationHandler.mexHandleUsernameAccountSync
             case "LidChangeNotification" -> handleLidChange(payload);
-                // WAWebMexLidChangeNotificationHandler.mexHandleLidChangeNotification
             default -> refreshUsers(payload);
         }
     }
@@ -421,7 +389,6 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
      * Handles a username set notification by extracting the LID and username
      * from the payload and updating the contact.
      *
-     * @implNote WAWebMexUsernameUpdateNotificationHandler.mexHandleUsernameChange
      * @param payload the parsed JSON payload
      */
     private void handleUsernameSet(JSONObject payload) {
@@ -443,7 +410,6 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
      * Handles a username delete notification by extracting the LID from the
      * payload and clearing the username on the contact.
      *
-     * @implNote WAWebMexUsernameUpdateNotificationHandler.mexHandleUsernameDelete
      * @param payload the parsed JSON payload
      */
     private void handleUsernameDelete(JSONObject payload) {
@@ -464,7 +430,6 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
      * Handles an account sync username notification by extracting the LID and
      * optional username info from the payload.
      *
-     * @implNote WAWebMexUsernameAccountSyncNotificationHandler.mexHandleUsernameAccountSync
      * @param payload the parsed JSON payload
      */
     private void handleUsernameAccountSync(JSONObject payload) {
@@ -495,11 +460,9 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
      * directly applicable, so the {@code old}/{@code new} fields are read
      * straight off the {@link JSONObject}.
      *
-     * @implNote WAWebMexLidChangeNotificationHandler.mexHandleLidChangeNotification
      * @param payload the parsed JSON payload
      */
     private void handleLidChange(JSONObject payload) {
-        // WAWebMexLidChangeNotificationHandler.mexHandleLidChangeNotification:
         //   pulls the same {old, new} pair LidChangeNotificationMexResponse surfaces
         var root = payload.getJSONObject("xwa2_notify_lid_change");
         if (root == null) {
@@ -538,7 +501,6 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
     /**
      * Refreshes group metadata for all group/community JIDs found in the payload.
      *
-     * @implNote WAWebMexGroupPropertyUpdateNotificationHandler.mexHandleGroupPropertyUpdate
      * @param payload the parsed JSON payload
      */
     private void refreshGroups(JSONObject payload) {
@@ -577,7 +539,6 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
     /**
      * Refreshes user (contact) metadata for all user/LID/bot JIDs found in the payload.
      *
-     * @implNote WAWebMexUsernameUpdateNotificationHandler.mexHandleUsernameChangeForSideSub
      * @param payload the parsed JSON payload
      */
     private void refreshUsers(JSONObject payload) {
@@ -605,7 +566,6 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
      * Updates the username for a contact identified by its LID JID.
      * Also updates the associated chat if one exists.
      *
-     * @implNote WAWebMexUsernameUpdateNotificationHandler.mexHandleUsernameChange
      * @param lidJid the LID JID of the contact
      * @param username the new username, or {@code null} to clear
      */
@@ -849,7 +809,6 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
             return;
         }
 
-        // WAWebHandleMexNotification.C — wap("ack", {id, to, class:"notification", type:"mex"})
         whatsapp.sendNodeWithNoResponse(new NodeBuilder()
                 .description("ack")
                 .attribute("id", stanzaId)
@@ -871,8 +830,6 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
     private static final class MissingMexNotificationHandlerException extends RuntimeException {
         /**
          * The operation name that has no registered handler.
-         *
-         * @implNote WAWebHandleMexNotification.MissingMEXNotificationHandler.operationName
          */
         private final String operationName;
 
@@ -889,8 +846,6 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
 
         /**
          * Returns the operation name that has no registered handler.
-         *
-         * @implNote WAWebHandleMexNotification.MissingMEXNotificationHandler.operationName
          * @return the unhandled operation name
          */
         String operationName() {
@@ -899,8 +854,6 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
 
         /**
          * Returns a string representation including the operation name.
-         *
-         * @implNote WAWebHandleMexNotification.MissingMEXNotificationHandler.toString
          * @return the string representation
          */
         @Override

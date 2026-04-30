@@ -5,31 +5,20 @@ import com.github.auties00.cobalt.node.Node;
 import java.util.Objects;
 
 /**
- * Exception thrown when an error occurs in the WhatsApp protocol stream.
- * <p>
- * This sealed class hierarchy represents errors at the protocol stream level, which sits
- * above the session layer but below application-level message handling. Stream errors
- * typically indicate problems with the XMPP-like node (stanza) structure or protocol
- * timing issues.
+ * Thrown when a problem is detected in the WhatsApp protocol stream
+ * carried over the WebSocket connection.
  *
- * <h2>Stream Architecture</h2>
- * The WhatsApp stream layer handles:
- * <ul>
- *   <li>Binary node encoding and decoding</li>
- *   <li>Request/response correlation via message IDs</li>
- *   <li>Timeout handling for pending requests</li>
- *   <li>Node structure validation</li>
- * </ul>
+ * <p>WhatsApp speaks an XMPP-flavored protocol where every message is a
+ * "node" (a stanza with a tag, attributes, and child content). Stream
+ * exceptions cover the layer that frames, encodes, and correlates those
+ * nodes. Two concrete failure modes exist: a node that arrives in an
+ * unparseable shape ({@link MalformedNode}) and a request whose
+ * response never arrives ({@link NodeTimeout}).
  *
- * <h2>Exception Hierarchy</h2>
- * <ul>
- *   <li>{@link MalformedNode} - Node structure is invalid or malformed</li>
- *   <li>{@link NodeTimeout} - Node request did not receive a response in time</li>
- * </ul>
- *
- * <h2>Fatality</h2>
- * All stream exceptions are fatal because they indicate fundamental protocol issues
- * that cannot be recovered from without re-establishing the connection.
+ * <p>Stream exceptions are fatal because the node pipeline is a shared
+ * resource: a single corrupted frame poisons the in-flight protocol
+ * state and the connection has to be re-established before traffic can
+ * resume.
  *
  * @see MalformedNode
  * @see NodeTimeout
@@ -73,12 +62,12 @@ public sealed class WhatsAppStreamException extends WhatsAppException
     }
 
     /**
-     * Returns whether this exception represents a fatal error.
-     * <p>
-     * Stream exceptions are always fatal as they indicate protocol-level failures
-     * that cannot be recovered from within the current session.
+     * Returns whether the failure invalidates the current session.
      *
-     * @return {@code true} for all stream exceptions
+     * <p>Any stream-level fault leaves the protocol pipeline in an
+     * unrecoverable state so the connection has to be reset.
+     *
+     * @return {@code true}
      */
     @Override
     public boolean isFatal() {
@@ -86,41 +75,16 @@ public sealed class WhatsAppStreamException extends WhatsAppException
     }
 
     /**
-     * Exception thrown when a malformed or invalid node is encountered in the protocol stream.
-     * <p>
-     * Nodes in WhatsApp are XMPP-like structures with a tag name, attributes, and content.
-     * This exception is thrown when a received node does not conform to the expected structure.
+     * Thrown when a stanza received from the server is structurally
+     * invalid.
      *
-     * <h2>Node Structure</h2>
-     * A valid node consists of:
-     * <ul>
-     *   <li><b>Tag:</b> A string identifier (e.g., "message", "receipt", "iq")</li>
-     *   <li><b>Attributes:</b> Key-value pairs with string values</li>
-     *   <li><b>Content:</b> Either child nodes, binary data, or text</li>
-     * </ul>
-     *
-     * <h2>Possible Causes</h2>
-     * <ul>
-     *   <li><b>Decoding error:</b> The binary node format could not be parsed</li>
-     *   <li><b>Missing required fields:</b> A node is missing required attributes or children</li>
-     *   <li><b>Type mismatch:</b> An attribute or content has an unexpected type</li>
-     *   <li><b>Truncation:</b> The node data was cut off mid-stream</li>
-     *   <li><b>Protocol violation:</b> The node structure violates protocol requirements</li>
-     * </ul>
-     *
-     * <h2>Examples</h2>
-     * <ul>
-     *   <li>A message node missing the "from" attribute</li>
-     *   <li>An IQ response with an invalid "type" value</li>
-     *   <li>A receipt node with malformed timestamp</li>
-     * </ul>
+     * <p>The decoder raises this exception when a stanza is truncated,
+     * has a missing required attribute, has the wrong content shape for
+     * its tag, or otherwise cannot be parsed into a {@link Node}.
      */
     public static final class MalformedNode extends WhatsAppStreamException {
         /**
          * Constructs a new malformed node exception with no detail message.
-         * <p>
-         * This constructor is used when the error context is self-evident from the call stack
-         * or when additional details are not available.
          */
         public MalformedNode() {
             super();
@@ -139,7 +103,7 @@ public sealed class WhatsAppStreamException extends WhatsAppException
          * Constructs a new malformed node exception with the specified message and cause.
          *
          * @param message the detail message describing why the node is malformed
-         * @param cause   the underlying cause (e.g., parsing exception)
+         * @param cause   the underlying cause
          */
         public MalformedNode(String message, Throwable cause) {
             super(message, cause);
@@ -147,52 +111,29 @@ public sealed class WhatsAppStreamException extends WhatsAppException
     }
 
     /**
-     * Exception thrown when a WhatsApp protocol node request does not receive a response
-     * within the expected timeout period.
-     * <p>
-     * The WhatsApp protocol uses a request-response pattern for many operations, where
-     * nodes are sent to the server and responses are correlated by message ID. This
-     * exception occurs when the expected response is not received within the configured
-     * timeout (typically 60 seconds).
+     * Thrown when a request stanza never receives the matching response
+     * within the expected window.
      *
-     * <h2>Timeout Architecture</h2>
-     * <ul>
-     *   <li>Each request is assigned a unique message ID</li>
-     *   <li>Responses are matched by ID and delivered to waiting handlers</li>
-     *   <li>If no response arrives within the timeout, this exception is thrown</li>
-     * </ul>
-     *
-     * <h2>Possible Causes</h2>
-     * <ul>
-     *   <li><b>Network issues:</b> Connectivity problems preventing server communication</li>
-     *   <li><b>Server unavailability:</b> The server is overloaded or unreachable</li>
-     *   <li><b>Invalid request:</b> The request was malformed and the server ignores it</li>
-     *   <li><b>Authentication issues:</b> Session problems causing the server to ignore requests</li>
-     *   <li><b>Rate limiting:</b> Too many requests caused the server to stop responding</li>
-     * </ul>
-     *
-     * <h2>Captured Information</h2>
-     * The exception captures the original node that timed out, which is valuable for:
-     * <ul>
-     *   <li>Debugging which operation failed</li>
-     *   <li>Logging for later analysis</li>
-     *   <li>Potential retry logic (with appropriate backoff)</li>
-     * </ul>
+     * <p>WhatsApp uses a request-response pattern where each outgoing
+     * stanza is tagged with an id and the server eventually returns a
+     * stanza carrying the same id. When the response does not arrive
+     * before the timeout fires, this exception is raised carrying the
+     * original request as {@link #node()} so the caller can log or
+     * retry the operation.
      *
      * @see Node
      */
     public static final class NodeTimeout extends WhatsAppStreamException {
         /**
-         * The WhatsApp protocol node that did not receive a response in time.
+         * The request stanza that did not receive a response.
          */
         private final Node node;
 
         /**
          * Constructs a new node timeout exception with the node that timed out.
          *
-         * @param node the WhatsApp protocol node that did not receive a response in time;
-         *             must not be {@code null}
-         * @throws NullPointerException if node is null
+         * @param node the stanza that did not receive a response in time
+         * @throws NullPointerException if {@code node} is {@code null}
          */
         public NodeTimeout(Node node) {
             super("Node timeout: " + Objects.requireNonNull(node, "node cannot be null"));
@@ -203,9 +144,8 @@ public sealed class WhatsAppStreamException extends WhatsAppException
          * Constructs a new node timeout exception with a custom message and the timed-out node.
          *
          * @param message the detail message describing the timeout condition
-         * @param node    the WhatsApp protocol node that did not receive a response in time;
-         *                must not be {@code null}
-         * @throws NullPointerException if node is null
+         * @param node    the stanza that did not receive a response in time
+         * @throws NullPointerException if {@code node} is {@code null}
          */
         public NodeTimeout(String message, Node node) {
             super(message);
@@ -216,10 +156,9 @@ public sealed class WhatsAppStreamException extends WhatsAppException
          * Constructs a new node timeout exception with a message, cause, and the timed-out node.
          *
          * @param message the detail message describing the timeout condition
-         * @param node    the WhatsApp protocol node that did not receive a response in time;
-         *                must not be {@code null}
+         * @param node    the stanza that did not receive a response in time
          * @param cause   the underlying cause of the timeout
-         * @throws NullPointerException if node is null
+         * @throws NullPointerException if {@code node} is {@code null}
          */
         public NodeTimeout(String message, Node node, Throwable cause) {
             super(message, cause);
@@ -227,12 +166,10 @@ public sealed class WhatsAppStreamException extends WhatsAppException
         }
 
         /**
-         * Returns the WhatsApp protocol node that did not receive a response within the timeout period.
-         * <p>
-         * This node can be examined to understand which operation failed and potentially
-         * retry the operation after reconnecting.
+         * Returns the stanza that did not receive a response within the
+         * timeout.
          *
-         * @return the node that timed out; never {@code null}
+         * @return the timed-out request stanza, never {@code null}
          */
         public Node node() {
             return node;

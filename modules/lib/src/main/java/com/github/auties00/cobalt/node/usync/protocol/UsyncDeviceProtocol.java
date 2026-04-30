@@ -16,18 +16,19 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * USync {@code devices} protocol.
- *
- * @implNote WAWebUsyncDevice.USyncDeviceProtocol.
+ * USync {@code devices} protocol descriptor. Asks the relay for each peer's
+ * device list and signed key-index metadata.
  */
 @WhatsAppWebModule(moduleName = "WAWebUsyncDevice")
 public final class UsyncDeviceProtocol implements UsyncProtocol {
-    /** Wire literal for the protocol tag name. */
+    /**
+     * Wire literal for the protocol tag name.
+     */
     public static final String NAME = "devices";
 
     /**
-     * Wire-protocol version emitted on the {@code version} attribute of
-     * the {@code <devices>} query element.
+     * Wire-protocol version emitted on the {@code version} attribute of the
+     * {@code <devices>} query element.
      */
     @WhatsAppWebExport(moduleName = "WAWebUsyncDevice",
             exports = "USyncDeviceProtocol", adaptation = WhatsAppAdaptation.DIRECT)
@@ -41,6 +42,11 @@ public final class UsyncDeviceProtocol implements UsyncProtocol {
     public UsyncDeviceProtocol() {
     }
 
+    /**
+     * Returns the wire literal for this protocol's tag name.
+     *
+     * @return the tag name
+     */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUsyncDevice",
             exports = "USyncDeviceProtocol.getName", adaptation = WhatsAppAdaptation.DIRECT)
@@ -48,6 +54,12 @@ public final class UsyncDeviceProtocol implements UsyncProtocol {
         return NAME;
     }
 
+    /**
+     * Builds the {@code <devices>} query element carrying the
+     * {@link #PROTOCOL_VERSION} on the {@code version} attribute.
+     *
+     * @return the query-element node
+     */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUsyncDevice",
             exports = "USyncDeviceProtocol.getQueryElement", adaptation = WhatsAppAdaptation.DIRECT)
@@ -58,6 +70,14 @@ public final class UsyncDeviceProtocol implements UsyncProtocol {
                 .build();
     }
 
+    /**
+     * Builds the per-user {@code <devices>} child carrying the cached device
+     * hash, the cache timestamp, and the expected timestamp when any of those
+     * are populated. Returns empty when the user has no cache state to send.
+     *
+     * @param user the user the {@code <user>} entry refers to
+     * @return the per-user element, or empty
+     */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUsyncDevice",
             exports = "USyncDeviceProtocol.getUserElement", adaptation = WhatsAppAdaptation.DIRECT)
@@ -75,6 +95,14 @@ public final class UsyncDeviceProtocol implements UsyncProtocol {
         return Optional.of(builder.build());
     }
 
+    /**
+     * Parses the {@code <devices>} child of a {@code <user>} response into a
+     * {@link DeviceResult} or a per-protocol error.
+     *
+     * @param child the protocol-tagged response node
+     * @return the parsed result
+     * @throws IllegalStateException if the node tag is not {@link #NAME}
+     */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUsyncDevice",
             exports = "deviceParser", adaptation = WhatsAppAdaptation.ADAPTED)

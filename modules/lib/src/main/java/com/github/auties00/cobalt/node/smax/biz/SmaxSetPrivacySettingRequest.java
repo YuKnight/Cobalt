@@ -13,7 +13,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps the
+ * The outbound stanza variant. Wraps the
  * {@code <privacy><smb_data_sharing_with_meta_consent value="..."/></privacy>}
  * payload in the canonical
  * {@code <iq xmlns="w:biz" type="set" to="s.whatsapp.net">}
@@ -25,7 +25,7 @@ import java.util.Optional;
 @WhatsAppWebModule(moduleName = "WASmaxOutBizSettingsBaseIQSetRequestMixin")
 public final class SmaxSetPrivacySettingRequest implements SmaxOperation.Request {
     /**
-     * The optional consent value — one of {@code "true"} /
+     * The optional consent value. One of {@code "true"} /
      * {@code "false"} / {@code "notSet"}; {@code null} omits the
      * inner {@code <smb_data_sharing_with_meta_consent>} child via
      * the {@code optionalMerge} of the JS mixin pair.
@@ -74,20 +74,15 @@ public final class SmaxSetPrivacySettingRequest implements SmaxOperation.Request
     @WhatsAppWebExport(moduleName = "WASmaxOutBizSettingsSetPrivacySettingRequest",
             exports = "makeSetPrivacySettingRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutBizSettingsSmbDataSharingSettingMixin: smax("privacy", null,
-        //   mergeSmbDataSharingSettingValueMixin(smax("smb_data_sharing_with_meta_consent", null), t))
         var privacyBuilder = new NodeBuilder()
                 .description("privacy");
         if (dataSharingConsent != null) {
-            // WASmaxOutBizSettingsSmbDataSharingSettingValueMixin:
-            //   smax("smb_data_sharing_with_meta_consent", {value: CUSTOM_STRING(t)}) via smax$any merge
             var consentNode = new NodeBuilder()
                     .description("smb_data_sharing_with_meta_consent")
                     .attribute("value", dataSharingConsent)
                     .build();
             privacyBuilder.content(consentNode);
         }
-        // smax("iq", {xmlns: "w:biz", to: S_WHATSAPP_NET, id: generateId(), type: "set"})
         return new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "w:biz")

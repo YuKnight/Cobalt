@@ -13,19 +13,19 @@ import it.auties.protobuf.model.ProtobufType;
 @ProtobufMessage(name = "FcmMcsIqStanza")
 public final class FcmMcsIqStanza {
     /**
-     * Iq type — Cobalt sends {@code 1} (set) for stream acks.
+     * Iq type. Cobalt sends {@code 1} (set) for stream acks.
      */
     @ProtobufProperty(index = 2, type = ProtobufType.INT64)
     long type;
 
     /**
-     * Iq id; the native client sends an empty string for stream acks.
+     * Iq id. The native client sends an empty string for stream acks.
      */
     @ProtobufProperty(index = 3, type = ProtobufType.STRING)
     String id;
 
     /**
-     * Extension nested message; carries the iq-specific payload. For a
+     * Extension nested message. Carries the iq-specific payload. For a
      * stream ack the extension's {@code id} is {@code 13} and its
      * {@code data} is a zero-length byte string.
      */

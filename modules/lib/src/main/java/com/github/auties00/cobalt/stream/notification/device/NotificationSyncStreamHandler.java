@@ -28,35 +28,24 @@ import java.util.stream.Collectors;
  * to critical collections during bootstrap, calls
  * {@code WAWebSyncd.markCollectionsForSync}, and returns an ack promise.
  *
- * @implNote WAWebHandleServerSyncNotification.handleServerSyncNotification (f),
- *           WAWebHandleServerSyncNotification._ (helper)
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleServerSyncNotification")
 public final class NotificationSyncStreamHandler implements SocketStream.Handler {
     /**
-     * Logger for this handler.
-     *
-     * @implNote WAWebHandleServerSyncNotification (module-level WALogger usage)
+     * Logger for diagnostic output from this handler.
      */
     private static final System.Logger LOGGER =
             System.getLogger(NotificationSyncStreamHandler.class.getName());
 
     /**
-     * The WhatsApp client instance used to access the store and send nodes.
-     *
-     * @implNote WAWebHandleServerSyncNotification (module-level dependency on WAWap, WAWebSyncd, etc.)
+     * The WhatsApp client used to access the store and send nodes.
      */
     private final WhatsAppClient whatsapp;
 
     /**
-     * The shared reporter used to accumulate per-collection offline
-     * {@code server_sync} notification counts for the
-     * {@code MdAppStateOfflineNotifications} WAM event.
+     * The shared reporter used to accumulate per-collection offline {@code server_sync} notification counts for the {@code MdAppStateOfflineNotifications} WAM event.
      *
-     * @implNote WAWebHandleReportServerSyncNotification.offlineNotificationsCount:
-     * WA Web stores the count map at module scope; Cobalt models it as a
-     * shared reporter consumed by both this handler (producer) and
-     * {@code InfoBulletinStreamHandler} (flush on offline bulletin).
+     * @implNote WA Web stores the count map at module scope; Cobalt models it as a shared reporter consumed by both this handler (producer) and {@code InfoBulletinStreamHandler} (flush on offline bulletin).
      */
     private final OfflineNotificationsReporter offlineNotificationsReporter;
 
@@ -64,10 +53,7 @@ public final class NotificationSyncStreamHandler implements SocketStream.Handler
      * Constructs a new notification sync stream handler.
      *
      * @param whatsapp                     the WhatsApp client instance
-     * @param offlineNotificationsReporter the shared reporter used to record
-     *                                     per-collection offline server-sync
-     *                                     observations for later WAM flushing
-     * @implNote WAWebHandleServerSyncNotification (module-level dependency injection)
+     * @param offlineNotificationsReporter the shared reporter used to record per-collection offline server-sync observations for later WAM flushing
      */
     public NotificationSyncStreamHandler(WhatsAppClient whatsapp, OfflineNotificationsReporter offlineNotificationsReporter) {
         this.whatsapp = whatsapp;
@@ -91,30 +77,28 @@ public final class NotificationSyncStreamHandler implements SocketStream.Handler
      * ({@code critical_block}, {@code critical_unblock_low}) are processed.
      *
      * @param node the incoming notification node
-     * @implNote WAWebHandleServerSyncNotification.handleServerSyncNotification (f: parser + dispatch),
-     *           WAWebHandleServerSyncNotification._ (collection filtering + markCollectionsForSync)
      */
     @Override
     public void handle(Node node) {
-        if (!node.hasDescription("notification") || !node.hasAttribute("type", "server_sync")) { // ADAPTED: WAWebHandleServerSyncNotification.p (assertTag("notification")); dispatcher already checks type
+        if (!node.hasDescription("notification") || !node.hasAttribute("type", "server_sync")) {
             return;
         }
 
-        if (!node.hasChild("collection")) { // WAWebHandleServerSyncNotification.p (!t.hasChild("collection") -> throw parseError)
+        if (!node.hasChild("collection")) {
             LOGGER.log(System.Logger.Level.ERROR,
-                    "Server sync notification does not contain any collections"); // WAWebHandleServerSyncNotification.p
-            sendNotificationAck(node); // ADAPTED: always ack even on parse failure (WA Web rejects promise instead)
+                    "Server sync notification does not contain any collections");
+            sendNotificationAck(node);
             return;
         }
 
         try {
-            processNotification(node); // WAWebHandleServerSyncNotification._ (helper function)
-        } catch (Throwable throwable) { // ADAPTED: defensive error handling (Java practice; WA Web rejects promise)
+            processNotification(node);
+        } catch (Throwable throwable) {
             LOGGER.log(System.Logger.Level.WARNING,
                     "Failed to handle server_sync notification {0}: {1}",
                     node.getAttributeAsString("id", "[missing-id]"), throwable.getMessage());
         } finally {
-            sendNotificationAck(node); // WAWebHandleServerSyncNotification._ (return Promise.resolve(wap("ack", ...)))
+            sendNotificationAck(node);
         }
     }
 
@@ -133,63 +117,60 @@ public final class NotificationSyncStreamHandler implements SocketStream.Handler
      * bulletin handler once the offline backlog window ends.
      *
      * @param node the notification node to process
-     * @implNote WAWebHandleServerSyncNotification._ (main processing logic)
      */
     private void processNotification(Node node) {
-        var from = node.getAttributeAsString("from", null); // WAWebHandleServerSyncNotification.p (i = t.attrString("from"))
-        if (from != null && !from.equals(JidServer.user().toString())) { // WAWebHandleServerSyncNotification.p (i !== S_WHATSAPP_NET.toString())
+        var from = node.getAttributeAsString("from", null);
+        if (from != null && !from.equals(JidServer.user().toString())) {
             LOGGER.log(System.Logger.Level.ERROR,
-                    "handleServerSyncNotification: \"from\" is not domain jid \"s.whatsapp.net\""); // WAWebHandleServerSyncNotification.p
+                    "handleServerSyncNotification: \"from\" is not domain jid \"s.whatsapp.net\"");
         }
 
-        var changedCollections = new LinkedHashMap<SyncPatchType, Integer>(); // WAWebHandleServerSyncNotification._ (t = new Map)
-        var unknownNames = new ArrayList<String>(); // WAWebHandleServerSyncNotification._ (a = [])
-        for (var collectionNode : node.getChildren("collection")) { // WAWebHandleServerSyncNotification._ (for(var i of e.changedCollections))
-            var collectionName = collectionNode.getAttributeAsString("name", null); // WAWebHandleServerSyncNotification._ (l = i[0])
-            var collectionVersion = collectionNode.getAttributeAsInt("version", 0); // WAWebHandleServerSyncNotification._ (d = i[1])
-            var collectionType = SyncPatchType.of(collectionName).orElse(null); // WAWebHandleServerSyncNotification._ (p = CollectionName.cast(l))
-            if (collectionType != null) { // WAWebHandleServerSyncNotification._ (p != null)
-                changedCollections.put(collectionType, collectionVersion); // WAWebHandleServerSyncNotification._ (t.set(p, d))
-            } else if (unknownNames.size() < 3) { // WAWebHandleServerSyncNotification._ (a.length < 3 && a.push(l))
+        var changedCollections = new LinkedHashMap<SyncPatchType, Integer>();
+        var unknownNames = new ArrayList<String>();
+        for (var collectionNode : node.getChildren("collection")) {
+            var collectionName = collectionNode.getAttributeAsString("name", null);
+            var collectionVersion = collectionNode.getAttributeAsInt("version", 0);
+            var collectionType = SyncPatchType.of(collectionName).orElse(null);
+            if (collectionType != null) {
+                changedCollections.put(collectionType, collectionVersion);
+            } else if (unknownNames.size() < 3) {
                 unknownNames.add(collectionName);
             }
         }
 
-        if (!unknownNames.isEmpty()) { // WAWebHandleServerSyncNotification._ (a.length > 0)
+        if (!unknownNames.isEmpty()) {
             LOGGER.log(System.Logger.Level.WARNING,
                     "syncd: {0} unknown collection names in notification => {1}",
-                    unknownNames.size(), unknownNames); // WAWebHandleServerSyncNotification._ (WARN)
+                    unknownNames.size(), unknownNames);
         }
 
-        var collectionsToSync = new ArrayList<>(changedCollections.keySet()); // WAWebHandleServerSyncNotification._ (_ = Array.from(t.keys()))
+        var collectionsToSync = new ArrayList<>(changedCollections.keySet());
 
-        // WAWebHandleServerSyncNotification._ (e.offline && _.forEach(offlineNotificationsCount)): records per-collection
-        // observation counts so that the info-bulletin offline handler can emit MdAppStateOfflineNotificationsWamEvent
-        // with the accumulated redundantCount when the offline backlog window ends.
-        var offline = node.hasAttribute("offline"); // WAWebHandleServerSyncNotification.p (a = t.hasAttr("offline"))
+        // Records per-collection observation counts when offline so the info-bulletin offline handler can emit MdAppStateOfflineNotifications with the accumulated redundantCount once the offline backlog window ends.
+        var offline = node.hasAttribute("offline");
         if (offline) {
             for (var collection : collectionsToSync) {
-                offlineNotificationsReporter.increment(collection); // WAWebHandleServerSyncNotification._ (offlineNotificationsCount.set(e, t+1) or set(e, 1))
+                offlineNotificationsReporter.increment(collection);
             }
         }
-        LOGGER.log(System.Logger.Level.INFO, // WAWebHandleServerSyncNotification._ (LOG("syncd: incoming sync notification for collections\n    ..."))
+        LOGGER.log(System.Logger.Level.INFO,
                 "syncd: incoming sync notification for collections\n    {0}",
                 changedCollections.entrySet().stream()
                         .map(e -> e.getKey() + " v" + e.getValue())
                         .collect(Collectors.joining("\n    ")));
 
-        if (isCriticalDataSyncInProcess()) { // WAWebHandleServerSyncNotification._ (isSyncDCriticalDataSyncInProcess())
+        if (isCriticalDataSyncInProcess()) {
             collectionsToSync = collectionsToSync.stream()
-                    .filter(SyncPatchType::isCritical) // WAWebHandleServerSyncNotification._ (isCriticalCollection(e))
+                    .filter(SyncPatchType::isCritical)
                     .collect(Collectors.toCollection(ArrayList::new));
-            LOGGER.log(System.Logger.Level.INFO, // WAWebHandleServerSyncNotification._ (LOG("syncd: filtered non critical collections..."))
+            LOGGER.log(System.Logger.Level.INFO,
                     "syncd: filtered non critical collections during bootstrap. new collections: {0}",
                     collectionsToSync);
         }
 
-        if (!collectionsToSync.isEmpty()) { // ADAPTED: no-op guard (WA Web calls markCollectionsForSync unconditionally but it's a no-op for empty)
-            whatsapp.store().setSyncedWebAppState(false); // ADAPTED: Cobalt store flag to signal pending sync
-            whatsapp.pullWebAppState(collectionsToSync.toArray(SyncPatchType[]::new)); // ADAPTED: WAWebHandleServerSyncNotification._ -> WAWebSyncd.markCollectionsForSync(_, t) (no version map filtering)
+        if (!collectionsToSync.isEmpty()) {
+            whatsapp.store().setSyncedWebAppState(false);
+            whatsapp.pullWebAppState(collectionsToSync.toArray(SyncPatchType[]::new));
         }
     }
 
@@ -204,10 +185,10 @@ public final class NotificationSyncStreamHandler implements SocketStream.Handler
      * result.
      *
      * @return {@code true} if critical data sync is still in process
-     * @implNote WAWebSyncBootstrap.isSyncDCriticalDataSyncInProcess
+     * @implNote Cobalt approximates WA Web's global state machine by checking whether the {@code critical_block} collection has not yet been bootstrapped, which yields the same behavioural result.
      */
     private boolean isCriticalDataSyncInProcess() {
-        return !whatsapp.store() // ADAPTED: WAWebSyncBootstrap.isSyncDCriticalDataSyncInProcess (global state machine → per-collection bootstrapped check)
+        return !whatsapp.store()
                 .findWebAppState(SyncPatchType.CRITICAL_BLOCK)
                 .bootstrapped();
     }
@@ -222,20 +203,19 @@ public final class NotificationSyncStreamHandler implements SocketStream.Handler
      * node via {@link WhatsAppClient#sendNodeWithNoResponse(Node)}.
      *
      * @param node the notification node to acknowledge
-     * @implNote WAWebHandleServerSyncNotification._ (return Promise.resolve(wap("ack", {...})))
      */
     private void sendNotificationAck(Node node) {
-        var stanzaId = node.getAttributeAsString("id", null); // WAWebHandleServerSyncNotification._ (e.stanzaId)
-        if (stanzaId == null) { // ADAPTED: defensive null check (Java practice; WA Web parser always extracts id via attrString)
+        var stanzaId = node.getAttributeAsString("id", null);
+        if (stanzaId == null) {
             return;
         }
 
-        whatsapp.sendNodeWithNoResponse(new NodeBuilder() // WAWebHandleServerSyncNotification._ (wap("ack", {...}))
-                .description("ack") // WAWebHandleServerSyncNotification._ (tag: "ack")
-                .attribute("id", stanzaId) // WAWebHandleServerSyncNotification._ (id: CUSTOM_STRING(e.stanzaId))
-                .attribute("class", "notification") // WAWebHandleServerSyncNotification._ (class: "notification")
-                .attribute("type", "server_sync") // WAWebHandleServerSyncNotification._ (type: "server_sync")
-                .attribute("to", JidServer.user()) // WAWebHandleServerSyncNotification._ (to: S_WHATSAPP_NET)
+        whatsapp.sendNodeWithNoResponse(new NodeBuilder()
+                .description("ack")
+                .attribute("id", stanzaId)
+                .attribute("class", "notification")
+                .attribute("type", "server_sync")
+                .attribute("to", JidServer.user())
                 .build());
     }
 }

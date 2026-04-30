@@ -14,7 +14,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps the encryption metadata,
+ * The outbound stanza variant. Wraps the encryption metadata,
  * timestamp, and fbid into the {@code <iq xmlns="waffle"
  * smax_id="83">} envelope.
  */
@@ -86,15 +86,6 @@ public final class SmaxWaffleWFPingRequest implements SmaxOperation.Request {
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         encrypted payload
-     *
-     * @implNote {@code WASmaxOutWaffleWFPingRequest.makeWFPingRequest}
-     *           composes
-     *           {@code WASmaxOutWaffleBaseIQGetRequestMixin}
-     *           ({@code id=generateId()}, {@code type="get"}) over the
-     *           {@code <encryption_metadata/>}/{@code <timestamp/>}/{@code <fbid/>}
-     *           triple inside an
-     *           {@code <iq xmlns="waffle" smax_id="83"
-     *           to=S_WHATSAPP_NET>} envelope.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutWaffleWFPingRequest",

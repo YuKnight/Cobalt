@@ -42,7 +42,6 @@ public final class NewsletterPreviewResolver {
      * @param client the WhatsApp client used to query the server
      * @param url    the URL whose preview is requested
      * @return the preview details and matching thumbnail, or empty
-     * @implNote WAWebNewsletterFetchLinkPreviewAction.fetchPlaintextLinkPreviewAction.
      */
     @WhatsAppWebExport(moduleName = "WAWebNewsletterFetchLinkPreviewAction", exports = "fetchPlaintextLinkPreviewAction",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -66,10 +65,10 @@ public final class NewsletterPreviewResolver {
                 ExtendedTextMessage.PreviewType.NONE,
                 true
         );
-        // WAWebNewsletterFetchLinkPreviewAction: when the server returns directPath +
-        // hash + dimensions, surface them on the outgoing message so receivers can
-        // download the HQ thumbnail on demand. The base64 thumbData stays as the
-        // inline JPEG fallback rendered while the HQ download is in flight.
+        // When the server returns directPath, hash and dimensions, surface them on the
+        // outgoing message so receivers can download the HQ thumbnail on demand. The
+        // base64 thumbData stays as the inline JPEG fallback rendered while the HQ
+        // download is in flight.
         var thumbHash = resolved.hash().map(NewsletterPreviewResolver::decodeBase64).orElse(null);
         var width = resolved.width().map(NewsletterPreviewResolver::parsePositiveInt).orElse(null);
         var height = resolved.height().map(NewsletterPreviewResolver::parsePositiveInt).orElse(null);

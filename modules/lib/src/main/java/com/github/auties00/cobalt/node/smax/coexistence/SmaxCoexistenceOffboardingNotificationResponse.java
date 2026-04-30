@@ -39,7 +39,7 @@ public final class SmaxCoexistenceOffboardingNotificationResponse implements Sma
 
     /**
      * The {@code product_surface} attribute on
-     * {@code <offboarding/>} — one of {@code "ai_from_meta"},
+     * {@code <offboarding/>} . one of {@code "ai_from_meta"},
      * {@code "automation"}, {@code "business_platform"}.
      */
     private final String offboardingProductSurface;
@@ -52,10 +52,10 @@ public final class SmaxCoexistenceOffboardingNotificationResponse implements Sma
     /**
      * Constructs a new {@code SmaxCoexistenceOffboardingNotificationResponse} projection.
      *
-     * @param notificationId            the notification id; never {@code null}
-     * @param notificationFrom          the from JID; never {@code null}
-     * @param offboardingProductSurface the product-surface enum literal; never {@code null}
-     * @param offboardingProviderInfo   the provider-info projection; never {@code null}
+     * @param notificationId            the notification id. Never {@code null}
+     * @param notificationFrom          the from JID. Never {@code null}
+     * @param offboardingProductSurface the product-surface enum literal. Never {@code null}
+     * @param offboardingProviderInfo   the provider-info projection. Never {@code null}
      * @throws NullPointerException if any argument is {@code null}
      */
     public SmaxCoexistenceOffboardingNotificationResponse(String notificationId,
@@ -71,7 +71,7 @@ public final class SmaxCoexistenceOffboardingNotificationResponse implements Sma
     /**
      * Returns the notification id.
      *
-     * @return the id; never {@code null}
+     * @return the id. Never {@code null}
      */
     public String notificationId() {
         return notificationId;
@@ -80,7 +80,7 @@ public final class SmaxCoexistenceOffboardingNotificationResponse implements Sma
     /**
      * Returns the notification from JID.
      *
-     * @return the JID; never {@code null}
+     * @return the JID. Never {@code null}
      */
     public Jid notificationFrom() {
         return notificationFrom;
@@ -89,7 +89,7 @@ public final class SmaxCoexistenceOffboardingNotificationResponse implements Sma
     /**
      * Returns the product-surface enum literal.
      *
-     * @return the literal; never {@code null}
+     * @return the literal. Never {@code null}
      */
     public String offboardingProductSurface() {
         return offboardingProductSurface;
@@ -98,7 +98,7 @@ public final class SmaxCoexistenceOffboardingNotificationResponse implements Sma
     /**
      * Returns the provider-info projection.
      *
-     * @return the projection; never {@code null}
+     * @return the projection. Never {@code null}
      */
     public SmaxCoexistenceOffboardingNotificationProviderInfo offboardingProviderInfo() {
         return offboardingProviderInfo;
@@ -107,7 +107,7 @@ public final class SmaxCoexistenceOffboardingNotificationResponse implements Sma
     /**
      * Tries to parse a {@link SmaxCoexistenceOffboardingNotificationResponse} projection.
      *
-     * @param node the inbound notification stanza; never {@code null}
+     * @param node the inbound notification stanza. Never {@code null}
      * @return an {@link Optional} carrying the projection
      * @throws NullPointerException if {@code node} is {@code null}
      */

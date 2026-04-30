@@ -10,11 +10,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The {@code SmaxClientNotificationPaused} state-type — the user has stopped typing.
- *
- * @implNote {@code WASmaxOutChatstatePausedMixin.mergePausedMixin}
- *           emits {@code smax("paused", null)} — a bare,
- *           attribute-less child.
+ * The {@code SmaxClientNotificationPaused} state-type. The user has stopped typing.
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutChatstatePausedMixin")
 public final class SmaxClientNotificationPaused implements SmaxClientNotificationStateType {

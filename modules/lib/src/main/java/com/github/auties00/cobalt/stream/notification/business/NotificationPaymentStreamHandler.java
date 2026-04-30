@@ -32,8 +32,6 @@ import java.util.Objects;
  * <p>When a transaction notification references a message not yet in the store, the
  * payment data is saved as an orphan payment notification for later resolution when
  * the message arrives via the message stream handler.
- *
- * @implNote WAWebPaymentNotificationHandler
  */
 @WhatsAppWebModule(moduleName = "WAWebPaymentNotificationHandler")
 @WhatsAppWebModule(moduleName = "WAWebPaymentNotificationParser")
@@ -72,7 +70,6 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
      * child, the transaction child (if any) is not processed. This mirrors the WA Web
      * ternary dispatch: {@code invite != null ? handleInvite(invite) : transaction != null && handleTransaction(transaction)}.
      *
-     * @implNote WAWebPaymentNotificationHandler.handlePaymentNotification
      * @param node the incoming notification stanza node
      */
     @Override
@@ -82,7 +79,6 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
         }
 
         try {
-            // WAWebPaymentNotificationHandler.handlePaymentNotification:
             // invite takes priority over transaction (if/else, not both)
             var invite = node.getChild("invite").orElse(null);
             if (invite != null) {
@@ -121,7 +117,6 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
      * @param invite the invite child node
      */
     private void handlePaymentInvite(Node node, Node invite) {
-        // WAWebPaymentNotificationHandler: only "account-set-up" invites are processed
         var type = invite.getAttributeAsString("type", null);
         var service = invite.getAttributeAsString("service", null);
         LOGGER.log(System.Logger.Level.DEBUG,
@@ -131,13 +126,11 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
             return;
         }
 
-        // WAWebPaymentNotificationHandler function R: from = invite.from
         var from = invite.getAttributeAsJid("from").orElse(null);
         if (from == null) {
             return;
         }
 
-        // WAWebPaymentNotificationHandler function R: id = await MsgKey.newId()
         var key = new MessageKeyBuilder()
                 .id(RandomIdUtils.newId())
                 .parentJid(from)
@@ -145,13 +138,11 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
                 .senderJid(from)
                 .build();
 
-        // WAWebPaymentNotificationHandler function R: t = invite.timestamp
         var timestampAttr = invite.getAttributeAsLong("t");
         var timestamp = timestampAttr.isPresent()
                 ? Instant.ofEpochSecond(timestampAttr.getAsLong())
                 : Instant.now();
 
-        // WAWebPaymentNotificationHandler function R:
         // {type: NOTIFICATION_TEMPLATE, kind: NotificationTemplate,
         //  subtype: PaymentInviteAccountSetUp, templateParams: [from], ...}
         var info = new ChatMessageInfoBuilder()
@@ -164,7 +155,6 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
                 .message(MessageContainer.empty())
                 .build();
 
-        // WAWebHandleSingleMsgWorkerCompatible.handleSingleMsg:
         //   chatId: from -> resolve or create the chat, append the message, bump unread
         var chat = whatsapp.store()
                 .findChatByJid(from)
@@ -174,7 +164,6 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
         chat.setUnreadCount(chat.unreadCount().orElse(0) + 1);
         chat.addMessage(info);
 
-        // WAWebBackendEventBus dispatch -> Cobalt listener callbacks
         for (var listener : whatsapp.store().listeners()) {
             Thread.startVirtualThread(() -> listener.onNewMessage(whatsapp, info));
         }
@@ -192,9 +181,8 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
      * @param transaction the transaction child node from the notification stanza
      */
     private void handlePaymentTransaction(Node transaction) {
-        // WAWebPaymentNotificationParser.parseTransactionNode: skip Novi transactions
         var service = transaction.getAttributeAsString("service", null);
-        if (service != null && service.equalsIgnoreCase("NOVI")) { // WAWebPaymentNotificationParser.isNoviTransaction
+        if (service != null && service.equalsIgnoreCase("NOVI")) {
             LOGGER.log(System.Logger.Level.WARNING, "Payment notification from Novi not supported.");
             return;
         }
@@ -214,7 +202,6 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
 
         var message = findPaymentMessage(remote, participant, messageId, fromMe);
         if (!(message instanceof ChatMessageInfo chatMessageInfo)) {
-            // WAWebPaymentNotificationHandler: store orphan for later resolution
             whatsapp.store().addOrphanPaymentNotification(new OrphanPaymentNotificationBuilder()
                     .messageId(messageId)
                     .receiverJid(receiver)
@@ -252,7 +239,6 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
         var type = transaction.getAttributeAsString("transaction-type", null);
         var status = transaction.getAttributeAsString("status", null);
 
-        // WAWebPaymentNotificationHandler function y: update message payment fields
         var paymentInfo = chatMessageInfo.paymentInfo().orElseGet(this::newPaymentInfo);
         paymentInfo.setReceiverJid(receiver);
         paymentInfo.setAmount1000(transaction.getAttributeAsLong("amount_1000", (Long) null));
@@ -262,7 +248,6 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
         paymentInfo.setTxnStatus(mapTxnStatus(type, status, fromMe));
         chatMessageInfo.setPaymentInfo(paymentInfo);
 
-        // WAWebPaymentNotificationHandler function h: if the payment references an
         // originating request message, propagate the resolved status onto it and
         // coerce the txnStatus through determinePaymentRequestFulfilledStatus.
         paymentInfo.requestMessageKey().ifPresent(requestKey -> {
@@ -281,9 +266,7 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
                 return;
             }
             var requestPaymentInfo = requestChat.paymentInfo().orElseGet(this::newPaymentInfo);
-            // WAWebPaymentNotificationHandler: s.paymentStatus = e.paymentStatus
             requestPaymentInfo.setStatus(paymentInfo.status().orElse(PaymentInfo.Status.UNKNOWN_STATUS));
-            // WAWebPaymentNotificationHandler: s.paymentTxnStatus =
             //   determinePaymentRequestFulfilledStatus(e.paymentTxnStatus)
             requestPaymentInfo.setTxnStatus(determinePaymentRequestFulfilledStatus(
                     paymentInfo.txnStatus().orElse(PaymentInfo.TxnStatus.UNKNOWN)));
@@ -293,12 +276,10 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
             }
         });
 
-        // WAWebPaymentNotificationHandler: notify listeners
         for (var listener : whatsapp.store().listeners()) {
             Thread.startVirtualThread(() -> listener.onMessageStatus(whatsapp, chatMessageInfo));
         }
 
-        // WAWebPaymentNotificationHandler function h: bulkRemove orphan after
         // successful processing (only the primary message's id is pushed to n).
         chatMessageInfo.key().id().ifPresent(whatsapp.store()::removeOrphanPaymentNotification);
     }
@@ -314,12 +295,10 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
      * {@link PaymentInfo.TxnStatus#COLLECT_INIT}, signalling that the request is
      * still awaiting a fulfilling payment.
      *
-     * @implNote WAWebPaymentStatusUtils.determinePaymentRequestFulfilledStatus
      * @param txnStatus the transaction status from the fulfilling payment message
      * @return the coerced status to apply to the originating request message
      */
     private PaymentInfo.TxnStatus determinePaymentRequestFulfilledStatus(PaymentInfo.TxnStatus txnStatus) {
-        // WAWebPaymentStatusUtils function g + h:
         // isPaymentRequestFulfilled(e) returns e===COMPLETED || e===SUCCESS;
         // h returns isFulfilled ? e : COLLECT_INIT
         if (txnStatus == PaymentInfo.TxnStatus.COMPLETED || txnStatus == PaymentInfo.TxnStatus.SUCCESS) {
@@ -345,7 +324,6 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
      * @return the found {@link MessageInfo}, or {@code null} if not found
      */
     private MessageInfo findPaymentMessage(Jid remote, Jid participant, String messageId, boolean fromMe) {
-        // WAWebPaymentNotificationHandler.getMessageFromCollection: in-memory lookup by key
         var direct = whatsapp.store()
                 .findMessageByKey(new MessageKeyBuilder()
                         .id(messageId)
@@ -358,7 +336,6 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
             return direct;
         }
 
-        // WAWebPaymentNotificationHandler.getMessageFromDb: persistent lookup by id
         return whatsapp.store().findMessageById(remote, messageId)
                 .map(MessageInfo.class::cast)
                 .orElse(null);
@@ -382,14 +359,12 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
      * Maps the resolved payment message status and transaction type to a high-level
      * {@link PaymentInfo.Status} for user-facing display.
      *
-     * @implNote WAWebPaymentStatusUtils.getPaymentWebStatus
      * @param type   the raw transaction type string from the stanza
      * @param status the raw status string from the stanza
      * @param fromMe whether the current user is the sender
      * @return the mapped {@link PaymentInfo.Status}
      */
     private PaymentInfo.Status mapPaymentStatus(String type, String status, boolean fromMe) {
-        // WAWebPaymentStatusUtils.getPaymentWebStatus
         return switch (paymentMessageStatus(type, status, fromMe)) {
             case SEND_PAY_INIT, SEND_PAY_PENDING, RECV_PAY_INIT, RECV_PAY_PENDING, RECV_PAY_RETRY_ON_FAILURE, REQUEST_PAY_INIT -> PaymentInfo.Status.PROCESSING;
             case SEND_PAY_PENDING_RECEIVER, SEND_PAY_FAILURE_RECEIVER -> PaymentInfo.Status.SENT;
@@ -398,7 +373,7 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
             case SEND_PAY_SUCCESS, RECV_PAY_SUCCESS, REQUEST_PAY_FULFILLED -> PaymentInfo.Status.COMPLETE;
             case SEND_PAY_FAILURE, SEND_PAY_FAILURE_RISK, SEND_PAY_PENDING_REFUND, SEND_PAY_REFUND_PENDING, SEND_PAY_REFUND_FAILED, SEND_PAY_REFUND_FAILED_PROCESSING, RECV_PAY_FAILURE, REQUEST_PAY_FAILED, REQUEST_PAY_FAILED_RISK -> PaymentInfo.Status.COULD_NOT_COMPLETE;
             case SEND_PAY_REFUNDED -> PaymentInfo.Status.REFUNDED;
-            case RECV_PAY_EXPIRED, REQUEST_PAY_EXPIRED, SEND_PAY_AUTH_CANCELED, SEND_PAY_AUTH_CANCEL_FAILED, SEND_PAY_AUTH_CANCEL_FAILED_PROCESSING -> PaymentInfo.Status.EXPIRED; // WAWebPaymentStatusUtils: SEND_PAY_EXPIRED is NOT in EXPIRED
+            case RECV_PAY_EXPIRED, REQUEST_PAY_EXPIRED, SEND_PAY_AUTH_CANCELED, SEND_PAY_AUTH_CANCEL_FAILED, SEND_PAY_AUTH_CANCEL_FAILED_PROCESSING -> PaymentInfo.Status.EXPIRED;
             case REQUEST_PAY_REJECTED -> PaymentInfo.Status.REJECTED;
             case REQUEST_PAY_CANCELLED -> PaymentInfo.Status.CANCELLED;
             default -> PaymentInfo.Status.UNKNOWN_STATUS;
@@ -409,14 +384,12 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
      * Maps the resolved payment message status to a fine-grained
      * {@link PaymentInfo.TxnStatus} that tracks the internal transaction state machine.
      *
-     * @implNote WAWebPaymentStatusUtils.getPaymentTxnWebStatus
      * @param type   the raw transaction type string from the stanza
      * @param status the raw status string from the stanza
      * @param fromMe whether the current user is the sender
      * @return the mapped {@link PaymentInfo.TxnStatus}
      */
     private PaymentInfo.TxnStatus mapTxnStatus(String type, String status, boolean fromMe) {
-        // WAWebPaymentStatusUtils.getPaymentTxnWebStatus
         return switch (paymentMessageStatus(type, status, fromMe)) {
             case RECV_PAY_EXPIRED, SEND_PAY_EXPIRED -> PaymentInfo.TxnStatus.EXPIRED_TXN;
             case RECV_PAY_FAILURE, SEND_PAY_FAILURE -> PaymentInfo.TxnStatus.FAILED;
@@ -457,18 +430,15 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
      * select the appropriate status mapping table, then matches the uppercased status
      * string against the known server-reported values.
      *
-     * @implNote WAWebPaymentStatusUtils.getNotificationTransactionStatus
      * @param type   the raw transaction type string from the stanza, or {@code null}
      * @param status the raw status string from the stanza, or {@code null}
      * @param fromMe whether the current user is the sender
      * @return the resolved {@link PaymentMessageStatus}
      */
     private PaymentMessageStatus paymentMessageStatus(String type, String status, boolean fromMe) {
-        // WAWebPaymentStatusUtils.getNotificationTransactionStatus:
-        // if (!t) return u.STATUS_UNSET; var n = t.toUpperCase();
         var statusValue = status == null ? "" : status.toUpperCase();
         return switch (paymentMessageTransactionType(type, fromMe)) {
-            case TYPE_P2M_PAYOUT -> PaymentMessageStatus.STATUS_UNSET; // WAWebPaymentStatusUtils: falls through to STATUS_UNSET
+            case TYPE_P2M_PAYOUT -> PaymentMessageStatus.STATUS_UNSET;
             case TYPE_P2P_SENT, TYPE_P2M_SENT, TYPE_DEPOSIT -> switch (statusValue) {
                 case "PENDING_RECEIVER_SETUP" -> PaymentMessageStatus.SEND_PAY_PENDING_RECEIVER;
                 case "FAILED_DA" -> PaymentMessageStatus.SEND_PAY_PENDING;
@@ -484,8 +454,8 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
                 case "FAILED_DA_FINAL" -> PaymentMessageStatus.SEND_PAY_PENDING_REFUND;
                 case "AUTH_CANCEL_FAILED_PROCESSING" -> PaymentMessageStatus.SEND_PAY_AUTH_CANCEL_FAILED_PROCESSING;
                 case "AUTH_CANCEL_FAILED" -> PaymentMessageStatus.SEND_PAY_AUTH_CANCEL_FAILED;
-                case "AUTH_CANCELED" -> PaymentMessageStatus.SEND_PAY_AUTH_CANCELED; // WAWebPaymentStatusUtils: d.AUTH_CANCELED = "AUTH_CANCELED"
-                case "CANCELLED" -> PaymentMessageStatus.SEND_PAY_USER_CANCELED; // WAWebPaymentStatusUtils: d.CANCELED = "CANCELLED" -> SEND_PAY_USER_CANCELED
+                case "AUTH_CANCELED" -> PaymentMessageStatus.SEND_PAY_AUTH_CANCELED;
+                case "CANCELLED" -> PaymentMessageStatus.SEND_PAY_USER_CANCELED;
                 case "EXPIRED" -> PaymentMessageStatus.SEND_PAY_EXPIRED;
                 case "IN_REVIEW" -> PaymentMessageStatus.SEND_PAY_IN_REVIEW;
                 case "PENDING" -> PaymentMessageStatus.SEND_PAY_PENDING_PROCESSING;
@@ -493,7 +463,7 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
             };
             case TYPE_P2P_RCVD, TYPE_P2M_RCVD -> switch (statusValue) {
                 case "PENDING_SETUP" -> PaymentMessageStatus.RECV_PAY_PENDING_SETUP;
-                case "FAILED_DA" -> PaymentMessageStatus.RECV_PAY_PENDING; // WAWebPaymentStatusUtils: only FAILED_DA, no PENDING
+                case "FAILED_DA" -> PaymentMessageStatus.RECV_PAY_PENDING;
                 case "FAILED_PROCESSING" -> PaymentMessageStatus.RECV_PAY_RETRY_ON_FAILURE;
                 case "SUCCESS", "COMPLETED" -> PaymentMessageStatus.RECV_PAY_SUCCESS;
                 case "FAILURE", "FAILED" -> PaymentMessageStatus.RECV_PAY_FAILURE;
@@ -502,7 +472,7 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
                 case "WITHDRAWAL_PROCESSING" -> PaymentMessageStatus.RECV_PAY_WITHDRAWAL_PROCESSING;
                 case "WITHDRAWAL_FAILURE" -> PaymentMessageStatus.RECV_PAY_WITHDRAWAL_FAILURE;
                 case "WITHDRAWAL_PERMANENT_FAILED" -> PaymentMessageStatus.RECV_PAY_WITHDRAWAL_PERMANENT_FAILED;
-                case "CANCELLED" -> PaymentMessageStatus.RECV_PAY_SENDER_CANCELED; // WAWebPaymentStatusUtils: d.CANCELED = "CANCELLED"
+                case "CANCELLED" -> PaymentMessageStatus.RECV_PAY_SENDER_CANCELED;
                 default -> PaymentMessageStatus.STATUS_UNSET;
             };
             case TYPE_P2P_REQ_SENT, TYPE_P2P_REQ_RCVD -> switch (statusValue) {
@@ -528,12 +498,11 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
                 case "IN_REVIEW" -> PaymentMessageStatus.WITHDRAWAL_IN_REVIEW;
                 case "SUCCESS", "COMPLETED" -> PaymentMessageStatus.WITHDRAWAL_SUCCESS;
                 case "FAILED", "DECLINED" -> PaymentMessageStatus.WITHDRAWAL_FAILED;
-                case "CANCELLED" -> PaymentMessageStatus.WITHDRAWAL_USER_CANCELED; // WAWebPaymentStatusUtils: d.CANCELED = "CANCELLED"
+                case "CANCELLED" -> PaymentMessageStatus.WITHDRAWAL_USER_CANCELED;
                 case "EXPIRED" -> PaymentMessageStatus.WITHDRAWAL_EXPIRED;
                 case "WITHDRAWAL_ACTIVE" -> PaymentMessageStatus.WITHDRAWAL_ACTIVE;
                 default -> PaymentMessageStatus.STATUS_UNSET;
             };
-            // WAWebPaymentStatusUtils: unmapped transaction types fall through to STATUS_UNSET
             case TYPE_UNSET, TYPE_P2P_GRP, TYPE_P2P_NO_INFO, TYPE_FUTURE, TYPE_P2P_REQ_GRP, TYPE_MISSING_DETAILS ->
                     PaymentMessageStatus.STATUS_UNSET;
         };
@@ -548,13 +517,11 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
      * {@link PaymentMessageTransactionType#TYPE_P2P_RCVD} based on the {@code fromMe}
      * flag.
      *
-     * @implNote WAWebPaymentStatusUtils.getPaymentTransactionType
      * @param type   the raw transaction type string, or {@code null}
      * @param fromMe whether the current user is the sender
      * @return the resolved {@link PaymentMessageTransactionType}
      */
     private PaymentMessageTransactionType paymentMessageTransactionType(String type, boolean fromMe) {
-        // WAWebPaymentStatusUtils.getPaymentTransactionType
         if (type == null) {
             return fromMe ? PaymentMessageTransactionType.TYPE_P2P_SENT : PaymentMessageTransactionType.TYPE_P2P_RCVD;
         }
@@ -581,8 +548,6 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
      * @param node the notification stanza to acknowledge
      */
     private void sendNotificationAck(Node node) {
-        // WAWebPaymentNotificationHandler function E:
-        // wap("ack", {class: "notification", type: "pay", id: CUSTOM_STRING(stanzaId), to: from})
         var stanzaId = node.getAttributeAsString("id", null);
         var stanzaFrom = node.getAttributeAsJid("from").orElse(null);
         if (stanzaId == null || stanzaFrom == null) {
@@ -592,9 +557,9 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
         whatsapp.sendNodeWithNoResponse(new NodeBuilder()
                 .description("ack")
                 .attribute("id", stanzaId)
-                .attribute("class", "notification") // WAWebPaymentNotificationHandler: hardcoded "notification"
+                .attribute("class", "notification")
                 .attribute("to", stanzaFrom)
-                .attribute("type", "pay") // WAWebPaymentNotificationHandler: hardcoded "pay"
+                .attribute("type", "pay")
                 .build());
     }
 }

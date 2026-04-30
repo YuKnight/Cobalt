@@ -11,7 +11,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps the disjunctive
+ * The outbound stanza variant. Wraps the disjunctive
  * {@link SmaxStatusPublishPostNewsletterStatusPayload} children inside a
  * {@code <status to=NEWSLETTER_JID>} envelope.
  */
@@ -24,7 +24,7 @@ public final class SmaxStatusPublishPostNewsletterStatusRequest implements SmaxO
     private final Jid newsletterJid;
 
     /**
-     * The publish payload — selects between "client + server id"
+     * The publish payload. Selects between "client + server id"
      * and "client id only".
      */
     private final SmaxStatusPublishPostNewsletterStatusPayload payload;
@@ -66,11 +66,6 @@ public final class SmaxStatusPublishPostNewsletterStatusRequest implements SmaxO
      *
      * @return a {@link NodeBuilder} carrying the status envelope
      *         and the disjunctive payload children
-     *
-     * @implNote {@code WASmaxOutStatusPublishPostNewsletterStatusRequest.makePostNewsletterStatusRequest}
-     *           composes
-     *           {@code WASmaxOutStatusPublishClientPostNewsletterStatusAndServerOrPostNewsletterStatusIDMixinGroup}
-     *           over a {@code <status to=JID(statusTo)>} envelope.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutStatusPublishPostNewsletterStatusRequest",

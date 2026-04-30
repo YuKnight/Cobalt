@@ -52,7 +52,6 @@ public final class CatalogPreviewResolver {
      * @param timeout    the per-download timeout
      * @return the preview details and inline thumbnail, or empty when
      *         the lookup failed or no eligible product was found
-     * @implNote WAWebBizLinkPreviewCatalogUtils.getProductOrCatalogLinkPreview.
      */
     @WhatsAppWebExport(moduleName = "WAWebBizLinkPreviewCatalogUtils", exports = "getProductOrCatalogLinkPreview",
             adaptation = WhatsAppAdaptation.ADAPTED)

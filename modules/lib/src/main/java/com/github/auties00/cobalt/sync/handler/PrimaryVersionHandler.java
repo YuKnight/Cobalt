@@ -45,7 +45,7 @@ public final class PrimaryVersionHandler implements WebAppStateActionHandler {
      *           {@code u.CURRENT = "current"}
      */
     @WhatsAppWebExport(moduleName = "WAWebPrimaryVersionSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
-    private static final String INDEX_CURRENT = "current"; // WAWebPrimaryVersionSync: u.CURRENT = "current"
+    private static final String INDEX_CURRENT = "current";
 
     /**
      * Sub-index value identifying the {@code "session_start"} primary version
@@ -55,7 +55,7 @@ public final class PrimaryVersionHandler implements WebAppStateActionHandler {
      *           {@code u.SESSION_START = "session_start"}
      */
     @WhatsAppWebExport(moduleName = "WAWebPrimaryVersionSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
-    private static final String INDEX_SESSION_START = "session_start"; // WAWebPrimaryVersionSync: u.SESSION_START = "session_start"
+    private static final String INDEX_SESSION_START = "session_start";
 
     /**
      * The singleton instance of {@code PrimaryVersionHandler}.
@@ -87,7 +87,7 @@ public final class PrimaryVersionHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPrimaryVersionSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return PrimaryVersionAction.ACTION_NAME; // WAWebPrimaryVersionSync.getAction
+        return PrimaryVersionAction.ACTION_NAME;
     }
 
     /**
@@ -99,18 +99,16 @@ public final class PrimaryVersionHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPrimaryVersionSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return PrimaryVersionAction.COLLECTION_NAME; // WAWebPrimaryVersionSync constructor: e.collectionName = RegularLow
+        return PrimaryVersionAction.COLLECTION_NAME;
     }
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote WAWebPrimaryVersionSync.getVersion — returns the literal {@code 7}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPrimaryVersionSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return PrimaryVersionAction.ACTION_VERSION; // WAWebPrimaryVersionSync.getVersion: return 7
+        return PrimaryVersionAction.ACTION_VERSION;
     }
 
     /**
@@ -157,15 +155,12 @@ public final class PrimaryVersionHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPrimaryVersionSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.DIRECT)
     public List<MutationApplicationResult> applyMutationBatchResults(WhatsAppClient client, WamService wamService, List<DecryptedMutation.Trusted> mutations) {
-        // WAWebPrimaryVersionSync.applyMutations: var n = this, r = 0, a = 0
         // r and a are local counters for the WALogger WARN telemetry, intentionally omitted in Cobalt
-        var results = new ArrayList<MutationApplicationResult>(mutations.size()); // WAWebPrimaryVersionSync.applyMutations: var i = t.map(...)
-        for (var mutation : mutations) { // WAWebPrimaryVersionSync.applyMutations: t.map(function(e) {...})
-            results.add(applyMutationResult(client, wamService, mutation)); // WAWebPrimaryVersionSync.applyMutations: per-mutation classification
+        var results = new ArrayList<MutationApplicationResult>(mutations.size());
+        for (var mutation : mutations) {
+            results.add(applyMutationResult(client, wamService, mutation));
         }
-        // WAWebPrimaryVersionSync.applyMutations: r > 0 && WALogger.WARN("syncd: primary version sync, %s operations not supported", r) — telemetry skipped
-        // WAWebPrimaryVersionSync.applyMutations: a > 0 && WALogger.WARN("syncd: primary version sync, %s malformed mutations", a) — telemetry skipped
-        return results; // WAWebPrimaryVersionSync.applyMutations: return i
+        return results;
     }
 
     /**
@@ -190,20 +185,20 @@ public final class PrimaryVersionHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPrimaryVersionSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        if (mutation.operation() != SyncdOperation.SET) { // WAWebPrimaryVersionSync.applyMutations: if (e.operation !== "set")
-            return MutationApplicationResult.unsupported(); // WAWebPrimaryVersionSync.applyMutations: r++, return {actionState: Unsupported}
+        if (mutation.operation() != SyncdOperation.SET) {
+            return MutationApplicationResult.unsupported();
         }
 
-        var indexArray = JSON.parseArray(mutation.index()); // WAWebPrimaryVersionSync.applyMutations: var i = e.indexParts
-        var subIndex = indexArray.getString(1); // WAWebPrimaryVersionSync.applyMutations: var s = i[1]
-        if (subIndex == null || subIndex.isEmpty() || (!subIndex.equals(INDEX_CURRENT) && !subIndex.equals(INDEX_SESSION_START))) { // WAWebPrimaryVersionSync.applyMutations: if (!s || s !== u.CURRENT && s !== u.SESSION_START)
-            return malformedActionIndex(); // WAWebPrimaryVersionSync.applyMutations: return n.malformedActionIndex()
+        var indexArray = JSON.parseArray(mutation.index());
+        var subIndex = indexArray.getString(1);
+        if (subIndex == null || subIndex.isEmpty() || (!subIndex.equals(INDEX_CURRENT) && !subIndex.equals(INDEX_SESSION_START))) {
+            return malformedActionIndex();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof PrimaryVersionAction action) || action.version().isEmpty()) { // WAWebPrimaryVersionSync.applyMutations: var c = (t = l.primaryVersionAction) == null ? void 0 : t.version; if (c == null)
-            return malformedActionValue(); // WAWebPrimaryVersionSync.applyMutations: a++, return WAWebSyncdIndexUtils.malformedActionValue(n.collectionName)
+        if (!(mutation.value().action().orElse(null) instanceof PrimaryVersionAction action) || action.version().isEmpty()) {
+            return malformedActionValue();
         }
 
-        return MutationApplicationResult.success(); // WAWebPrimaryVersionSync.applyMutations: return {actionState: Success}
+        return MutationApplicationResult.success();
     }
 }

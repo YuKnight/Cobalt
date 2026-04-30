@@ -9,7 +9,7 @@ import com.github.auties00.cobalt.node.iq.IqOperation;
 import java.util.Objects;
 
 /**
- * The outbound stanza variant — wraps a single
+ * The outbound stanza variant. Wraps a single
  * {@code <category name="readreceipts" value="all|none"/>} child in
  * the canonical {@code <iq xmlns="privacy" type="set"><privacy>...
  * </privacy></iq>} envelope.

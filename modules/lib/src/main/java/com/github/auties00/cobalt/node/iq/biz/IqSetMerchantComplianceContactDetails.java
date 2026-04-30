@@ -4,8 +4,10 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The customer-care or grievance-officer contact triple — every field
- * is independently optional.
+ * Typed customer-care or grievance-officer contact triple
+ * (email, landline number, mobile number) carried inside an
+ * {@link IqSetMerchantComplianceRequest}. Every field is independently
+ * optional.
  */
 public final class IqSetMerchantComplianceContactDetails {
     /**

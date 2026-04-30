@@ -31,7 +31,7 @@ public sealed interface SmaxRequestSilentNonceResponse extends SmaxOperation.Res
      *
      * @param node    the inbound IQ stanza received from the relay;
      *                never {@code null}
-     * @param request the original outbound stanza — used to validate
+     * @param request the original outbound stanza. Used to validate
      *                echoed identifiers; never {@code null}
      * @return an {@link Optional} carrying the parsed variant, or
      *         {@link Optional#empty()} when no documented variant
@@ -59,14 +59,14 @@ public sealed interface SmaxRequestSilentNonceResponse extends SmaxOperation.Res
     }
 
     /**
-     * The {@code Success} reply variant — the relay supplied a silent
+     * The {@code Success} reply variant. The relay supplied a silent
      * nonce token directly without requiring an account-recovery
      * confirmation step.
      *
      * @implNote {@code WASmaxInBizAccessTokenRequestSilentNonceResponseSuccess.parseRequestSilentNonceResponseSuccess}
      *           validates the {@code <iq from id type="result">}
      *           envelope, asserts a {@code <result status="Success">}
-     *           child exists, and projects nothing else — the silent
+     *           child exists, and projects nothing else. The silent
      *           nonce is delivered out-of-band via the standard CTWA
      *           push-notification channel, NOT in this reply payload.
      */
@@ -127,7 +127,7 @@ public sealed interface SmaxRequestSilentNonceResponse extends SmaxOperation.Res
     }
 
     /**
-     * The {@code RecoveryRequired} reply variant — the relay refused
+     * The {@code RecoveryRequired} reply variant. The relay refused
      * to issue a silent nonce because the user must first confirm
      * account ownership via an email recovery code.
      *
@@ -138,7 +138,7 @@ public sealed interface SmaxRequestSilentNonceResponse extends SmaxOperation.Res
      *           validates the {@code <iq from id type="result">}
      *           envelope, asserts a {@code <result status="RecoveryRequired" email="...">}
      *           child exists, and projects only the {@code email}
-     *           attribute — the structured return value mostly echoes
+     *           attribute. The structured return value mostly echoes
      *           the result-envelope projections from
      *           {@code parseHackBaseIQResultResponseMixin}.
      */
@@ -227,7 +227,7 @@ public sealed interface SmaxRequestSilentNonceResponse extends SmaxOperation.Res
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected the
+     * The {@code ClientError} reply variant. The relay rejected the
      * request as malformed, unauthorised, or with a transient
      * client-recoverable code.
      *
@@ -336,7 +336,7 @@ public sealed interface SmaxRequestSilentNonceResponse extends SmaxOperation.Res
     }
 
     /**
-     * The {@code ServerError} reply variant — the relay encountered a
+     * The {@code ServerError} reply variant. The relay encountered a
      * transient internal failure ({@code 500} / {@code 503}) while
      * processing the request.
      *

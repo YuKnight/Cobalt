@@ -90,31 +90,22 @@ public final class SmaxWaffleGetCertificateRequest implements SmaxOperation.Requ
      * Builds the outbound IQ stanza ready for dispatch.
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope
-     *
-     * @implNote {@code WASmaxOutWaffleGetCertificateRequest.makeGetCertificateRequest}
-     *           composes the timestamp child plus zero, one, or both
-     *           marker children inside an
-     *           {@code <iq xmlns="waffle" smax_id="51"
-     *           to=S_WHATSAPP_NET>} envelope.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutWaffleGetCertificateRequest",
             exports = "makeGetCertificateRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
         var children = new ArrayList<Node>();
-        // WASmaxOutWaffleGetCertificateRequest: smax("timestamp", null, INT(t))
         children.add(new NodeBuilder()
                 .description("timestamp")
                 .content(timestamp)
                 .build());
         if (hasPayloadEncCertificates) {
-            // WASmaxOutWaffleGetCertificateRequest.makeGetCertificateRequestPayloadEncCertificates
             children.add(new NodeBuilder()
                     .description("payload_enc_certificates")
                     .build());
         }
         if (hasPasswordPem) {
-            // WASmaxOutWaffleGetCertificateRequest.makeGetCertificateRequestPasswordPem
             children.add(new NodeBuilder()
                     .description("password_pem")
                     .build());

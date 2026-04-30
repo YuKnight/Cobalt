@@ -18,11 +18,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The response variant of {@link DeleteNewsletterMexResponse} exposing the
- * newsletter identifier and its post-deletion state.
- *
- * @implNote WAWebMexDeleteNewsletterJob: adapts the
- * {@code xwa2_newsletter_delete_v2} root of the JSON response.
+ * Response variant for {@link DeleteNewsletterMexRequest} carrying the parsed server reply.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexDeleteNewsletterJob")
 public final class DeleteNewsletterMexResponse implements MexOperation.Response.Json {
@@ -52,9 +48,6 @@ public final class DeleteNewsletterMexResponse implements MexOperation.Response.
     /**
      * Parses a MEX response from the given IQ response node.
      *
-     * @implNote WAWebMexDeleteNewsletterJob.mexDeleteNewsletter: WA Web
-     * relies on the GraphQL client to unwrap the response. Cobalt
-     * performs the unwrapping manually from the IQ {@code <result>} child.
      * @param node the IQ response node received from the relay
      * @return an {@link Optional} containing the parsed response, or
      *         empty if the node is missing a result payload
@@ -101,7 +94,7 @@ public final class DeleteNewsletterMexResponse implements MexOperation.Response.
         /**
          * Creates a state object wrapping the textual type.
          *
-         * @param type the raw state identifier returned by the server
+     * @param type the raw state identifier returned by the server
          */
         private State(String type) {
             this.type = type;
@@ -110,7 +103,7 @@ public final class DeleteNewsletterMexResponse implements MexOperation.Response.
         /**
          * Returns the textual state identifier.
          *
-         * @return an {@link Optional} containing the type, or empty if
+     * @return an {@link Optional} containing the type, or empty if
          *         absent from the server reply
          */
         public Optional<String> type() {
@@ -120,7 +113,7 @@ public final class DeleteNewsletterMexResponse implements MexOperation.Response.
         /**
          * Parses a single {@link State} object from the given JSON map.
          *
-         * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
          * @return an {@link Optional} containing the parsed state, or
          *         empty if {@code obj} is {@code null}
          */
@@ -137,7 +130,7 @@ public final class DeleteNewsletterMexResponse implements MexOperation.Response.
          * Parses a list of {@link State} objects from the given JSON
          * array.
          *
-         * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
          * @return the list of parsed states, empty if {@code arr} is
          *         {@code null}
          */
@@ -158,30 +151,21 @@ public final class DeleteNewsletterMexResponse implements MexOperation.Response.
      * Parses a {@link DeleteNewsletterMexResponse} from the raw JSON bytes of the
      * {@code <result>} child.
      *
-     * @implNote WAWebMexDeleteNewsletterJob.mexDeleteNewsletter: mirrors
-     * the implicit unwrapping that WA Web performs on the GraphQL
-     * response, extracting the {@code xwa2_newsletter_delete_v2} root.
      * @param json the UTF-8 encoded JSON payload
      * @return an {@link Optional} containing the parsed response, or
      *         empty if the envelope is missing expected fields
      */
     private static Optional<DeleteNewsletterMexResponse> of(byte[] json) {
-        // WAWebMexDeleteNewsletterJob.mexDeleteNewsletter
-        // Parses the raw JSON payload, bailing out if fastjson2 returns null
         var jsonObject = JSON.parseObject(json);
         if (jsonObject == null) {
             return Optional.empty();
         }
 
-        // WAWebMexDeleteNewsletterJob.mexDeleteNewsletter
-        // Descends into the standard GraphQL "data" envelope
         var data = jsonObject.getJSONObject("data");
         if (data == null) {
             return Optional.empty();
         }
 
-        // WAWebMexDeleteNewsletterJob.mexDeleteNewsletter
-        // Extracts the mutation-specific root keyed by xwa2_newsletter_delete_v2
         var root = data.getJSONObject("xwa2_newsletter_delete_v2");
         if (root == null) {
             return Optional.empty();

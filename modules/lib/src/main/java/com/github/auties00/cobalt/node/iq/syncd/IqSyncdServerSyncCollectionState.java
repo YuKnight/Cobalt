@@ -15,7 +15,7 @@ package com.github.auties00.cobalt.node.iq.syncd;
  *           derived from the wire response itself but assigned later by
  *           {@code WAWebSyncdServerSync} after a fatal global error.
  *           Cobalt's enum exposes only the values the response parser
- *           can produce — {@code Blocked} lives outside the wire-shape
+ *           can produce. {@code Blocked} lives outside the wire-shape
  *           projection and is therefore omitted here.
  */
 public enum IqSyncdServerSyncCollectionState {
@@ -32,7 +32,7 @@ public enum IqSyncdServerSyncCollectionState {
 
     /**
      * The collection synced cleanly but the relay has additional
-     * patches queued — the caller must issue a follow-up sync to
+     * patches queued. The caller must issue a follow-up sync to
      * fetch them.
      *
      * @implNote {@code WASyncdConst.CollectionState.SuccessHasMore}:
@@ -54,7 +54,7 @@ public enum IqSyncdServerSyncCollectionState {
 
     /**
      * Like {@link #CONFLICT}, but the relay has additional patches
-     * queued after the divergence point — the caller must reconcile
+     * queued after the divergence point. The caller must reconcile
      * and then issue a follow-up sync.
      *
      * @implNote {@code WASyncdConst.CollectionState.ConflictHasMore}:
@@ -65,7 +65,7 @@ public enum IqSyncdServerSyncCollectionState {
 
     /**
      * The relay rejected the collection with a fatal error
-     * ({@code 400}, {@code 404} or {@code 405}); the caller must
+     * ({@code 400}, {@code 404} or {@code 405}). The caller must
      * not retry without intervention.
      *
      * @implNote {@code WASyncdConst.CollectionState.ErrorFatal}:
@@ -75,8 +75,8 @@ public enum IqSyncdServerSyncCollectionState {
     ERROR_FATAL,
 
     /**
-     * The relay rejected the collection with a transient error;
-     * the caller may retry after the optional server backoff.
+     * The relay rejected the collection with a transient error.
+     * The caller may retry after the optional server backoff.
      *
      * @implNote {@code WASyncdConst.CollectionState.ErrorRetry}:
      *           {@code type="error"} with any other error code.

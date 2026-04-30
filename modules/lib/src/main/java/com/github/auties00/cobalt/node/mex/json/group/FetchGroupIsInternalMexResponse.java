@@ -14,19 +14,27 @@ import java.io.UncheckedIOException;
 import java.util.Optional;
 
 /**
- * The response variant of {@link FetchGroupIsInternalMexResponse} that exposes
- * the data returned by the server after a successful query.
+ * Parsed response of the {@link FetchGroupIsInternalMexRequest} query,
+ * exposing whether the queried group is flagged as internal by the relay.
  *
- * @implNote WAWebMexFetchGroupIsInternalJob: adapts the JSON root
- * returned by the GraphQL query into a Java value object. WA Web's
- * {@code mexFetchGroupIsInternal} unwraps the response by reading
- * {@code n.xwa2_group_query_by_id?.properties?.internal === true};
- * Cobalt mirrors the same triple-strict-equality projection.
+ * @implNote WA Web's {@code mexFetchGroupIsInternal} unwraps the response by
+ * reading {@code n.xwa2_group_query_by_id?.properties?.internal === true}.
+ * Cobalt mirrors the same triple-strict-equality projection so {@code null},
+ * absent objects and explicit {@code false} all collapse to {@code false}.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexFetchGroupIsInternalJob")
 public final class FetchGroupIsInternalMexResponse implements MexOperation.Response.Json {
+    /**
+     * The internal-flag scalar projected from
+     * {@code xwa2_group_query_by_id.properties.internal}.
+     */
     private final boolean internal;
 
+    /**
+     * Constructs a response wrapping the boolean internal-flag scalar.
+     *
+     * @param internal whether the relay reports the group as internal
+     */
     private FetchGroupIsInternalMexResponse(boolean internal) {
         this.internal = internal;
     }
@@ -34,13 +42,9 @@ public final class FetchGroupIsInternalMexResponse implements MexOperation.Respo
     /**
      * Parses a MEX response from the given IQ response node.
      *
-     * @implNote WAWebMexFetchGroupIsInternalJob.mexFetchGroupIsInternal:
-     * WA Web relies on the GraphQL client to unwrap the response.
-     * Cobalt performs the unwrapping manually from the IQ
-     * {@code <result>} child.
      * @param node the IQ response node received from the relay
-     * @return an {@link Optional} containing the parsed response, or
-     *         empty if the node is missing a result payload
+     * @return an {@link Optional} containing the parsed response, or empty
+     *         if the node is missing a result payload
      */
     @WhatsAppWebExport(moduleName = "WAWebMexFetchGroupIsInternalJob", exports = "mexFetchGroupIsInternal",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -53,11 +57,6 @@ public final class FetchGroupIsInternalMexResponse implements MexOperation.Respo
     /**
      * Returns whether the queried group is flagged as internal.
      *
-     * @implNote WAWebMexFetchGroupIsInternalJob.mexFetchGroupIsInternal:
-     * mirrors WA Web's strict-equality projection
-     * {@code properties?.internal === true}, which collapses
-     * {@code null}, {@code undefined} and explicit {@code false} to
-     * {@code false}.
      * @return {@code true} if the relay reports the group as internal,
      *         {@code false} otherwise
      */
@@ -66,47 +65,35 @@ public final class FetchGroupIsInternalMexResponse implements MexOperation.Respo
     }
 
     /**
-     * Parses a {@link FetchGroupIsInternalMexResponse} from the raw JSON bytes of the
-     * {@code <result>} child.
+     * Parses a {@link FetchGroupIsInternalMexResponse} from the raw JSON
+     * bytes of the {@code <result>} child.
      *
-     * @implNote WAWebMexFetchGroupIsInternalJob.mexFetchGroupIsInternal:
-     * mirrors the implicit unwrapping that WA Web performs on the
-     * GraphQL response, extracting the
-     * {@code xwa2_group_query_by_id.properties.internal} scalar.
      * @param json the UTF-8 encoded JSON payload
-     * @return an {@link Optional} containing the parsed response, or
-     *         empty if the envelope is missing expected fields
+     * @return an {@link Optional} containing the parsed response, or empty
+     *         if the envelope is missing expected fields
      */
     private static Optional<FetchGroupIsInternalMexResponse> of(byte[] json) {
-        // WAWebMexFetchGroupIsInternalJob.mexFetchGroupIsInternal
-        // Parses the raw JSON payload, bailing out if fastjson2 returns null
         var jsonObject = JSON.parseObject(json);
         if (jsonObject == null) {
             return Optional.empty();
         }
 
-        // WAWebMexFetchGroupIsInternalJob.mexFetchGroupIsInternal
-        // Descends into the standard GraphQL "data" envelope
         var data = jsonObject.getJSONObject("data");
         if (data == null) {
             return Optional.empty();
         }
 
-        // WAWebMexFetchGroupIsInternalJob.mexFetchGroupIsInternal
-        // Extracts the operation-specific root keyed by xwa2_group_query_by_id
         var root = data.getJSONObject("xwa2_group_query_by_id");
         if (root == null) {
             return Optional.empty();
         }
 
-        // WAWebMexFetchGroupIsInternalJob.mexFetchGroupIsInternal
-        // Walks into the "properties" sub-object shared by all four group inline fragments
+        // The "properties" sub-object is shared by all four group inline fragments
         var properties = root.getJSONObject("properties");
         if (properties == null) {
             return Optional.of(new FetchGroupIsInternalMexResponse(false));
         }
 
-        // WAWebMexFetchGroupIsInternalJob.mexFetchGroupIsInternal
         // ((t = n.xwa2_group_query_by_id) == null || (t = t.properties) == null ? void 0 : t.internal) === true
         var internal = Boolean.TRUE.equals(properties.getBoolean("internal"));
 

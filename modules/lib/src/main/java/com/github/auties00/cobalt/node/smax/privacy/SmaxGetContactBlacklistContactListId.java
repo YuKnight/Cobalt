@@ -29,11 +29,9 @@ public sealed interface SmaxGetContactBlacklistContactListId
         permits SmaxGetContactBlacklistContactListId.Username, SmaxGetContactBlacklistContactListId.PnJid, SmaxGetContactBlacklistContactListId.Empty {
 
     /**
-     * The {@code Username} discriminator — the {@code <user/>} child
+     * The {@code Username} discriminator. The {@code <user/>} child
      * carries a {@code username="…"} attribute identifying the entry by
      * its WhatsApp username rather than by JID.
-     *
-     * @implNote {@code WASmaxInPrivacyUsernameMixin.parseUsernameMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInPrivacyUsernameMixin")
     final class Username implements SmaxGetContactBlacklistContactListId {
@@ -86,11 +84,9 @@ public sealed interface SmaxGetContactBlacklistContactListId
     }
 
     /**
-     * The {@code PnJid} discriminator — the {@code <user/>} child carries
+     * The {@code PnJid} discriminator. The {@code <user/>} child carries
      * a {@code pn_jid="…"} attribute echoing the legacy PN JID associated
      * with the LID-addressed entry.
-     *
-     * @implNote {@code WASmaxInPrivacyPnJidMixin.parsePnJidMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInPrivacyPnJidMixin")
     final class PnJid implements SmaxGetContactBlacklistContactListId {
@@ -142,11 +138,9 @@ public sealed interface SmaxGetContactBlacklistContactListId
     }
 
     /**
-     * The {@code Empty} discriminator — the {@code <user/>} child carries
+     * The {@code Empty} discriminator. The {@code <user/>} child carries
      * neither {@code username} nor {@code pn_jid}, indicating the relay
      * has no PN echo for this LID-addressed entry.
-     *
-     * @implNote {@code WASmaxInPrivacyEmptyContactListIdentifierMixin.parseEmptyContactListIdentifierMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInPrivacyEmptyContactListIdentifierMixin")
     final class Empty implements SmaxGetContactBlacklistContactListId {

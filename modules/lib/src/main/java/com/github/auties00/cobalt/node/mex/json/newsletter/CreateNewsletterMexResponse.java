@@ -20,11 +20,12 @@ import java.util.Optional;
 import java.util.OptionalLong;
 
 /**
- * The response variant of {@link CreateNewsletterMexResponse} that exposes the data
- * returned by the server after a successful mutation.
+ * Response variant for {@link CreateNewsletterMexRequest} that exposes the
+ * fully-hydrated newsletter metadata returned by the server after a
+ * successful create.
  *
- * @implNote WAWebMexCreateNewsletterJob: adapts the JSON root returned by the GraphQL
- * mutation into a Java value object.
+ * @implNote The body wraps the {@code data.xwa2_newsletter_create} root of
+ *           the JSON response.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexCreateNewsletterJob")
 public final class CreateNewsletterMexResponse implements MexOperation.Response.Json {
@@ -43,12 +44,9 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
     /**
      * Parses a MEX response from the given IQ response node.
      *
-     * @implNote WAWebMexCreateNewsletterJob.mexCreateNewsletter: WA Web relies on the
-     * GraphQL client to unwrap the response. Cobalt performs the
-     * unwrapping manually from the IQ {@code <result>} child.
      * @param node the IQ response node received from the relay
-     * @return an {@link Optional} containing the parsed response, or
-     *         empty if the node is missing a result payload
+     * @return an {@link Optional} containing the parsed response, or empty if
+     *         the node is missing a result payload
      */
     public static Optional<CreateNewsletterMexResponse> of(Node node) {
         return node.getChild("result")
@@ -105,7 +103,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
         /**
          * Returns the {@code type} field.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
          */
         public Optional<String> type() {
             return Optional.ofNullable(type);
@@ -114,7 +112,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
         /**
          * Parses a {@code State} from the given JSON object.
          *
-         * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
          * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
          */
         static Optional<State> of(JSONObject obj) {
@@ -129,7 +127,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
         /**
          * Parses a list of {@code State} from the given JSON array.
          *
-         * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
          * @return the list of parsed results, empty if {@code arr} is {@code null}
          */
         static List<State> ofArray(JSONArray arr) {
@@ -174,7 +172,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
         /**
          * Returns the {@code name} field.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
          */
         public Optional<Name> name() {
             return Optional.ofNullable(name);
@@ -183,7 +181,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
         /**
          * Returns the {@code description} field.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
          */
         public Optional<Description> description() {
             return Optional.ofNullable(description);
@@ -192,7 +190,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
         /**
          * Returns the {@code picture} field.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
          */
         public Optional<Picture> picture() {
             return Optional.ofNullable(picture);
@@ -201,7 +199,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
         /**
          * Returns the {@code preview} field.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
          */
         public Optional<Preview> preview() {
             return Optional.ofNullable(preview);
@@ -210,7 +208,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
         /**
          * Returns the {@code invite} field.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
          */
         public Optional<String> invite() {
             return Optional.ofNullable(invite);
@@ -219,7 +217,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
         /**
          * Returns the {@code handle} field.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
          */
         public Optional<String> handle() {
             return Optional.ofNullable(handle);
@@ -228,7 +226,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
         /**
          * Returns the {@code verification} field.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
          */
         public Optional<String> verification() {
             return Optional.ofNullable(verification);
@@ -237,7 +235,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
         /**
          * Returns the {@code subscribers_count} field.
          *
-         * @return an {@link OptionalLong} containing the value, or empty if absent
+     * @return an {@link OptionalLong} containing the value, or empty if absent
          */
         public OptionalLong subscribersCount() {
             return subscribersCount != null ? OptionalLong.of(subscribersCount) : OptionalLong.empty();
@@ -246,7 +244,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
         /**
          * Returns the {@code creation_time} field.
          *
-         * @return an {@link Optional} containing the value as an {@link Instant}, or empty if absent
+     * @return an {@link Optional} containing the value as an {@link Instant}, or empty if absent
          */
         public Optional<Instant> creationTime() {
             return Optional.ofNullable(creationTime).map(Instant::ofEpochSecond);
@@ -269,7 +267,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
             /**
              * Returns the {@code id} field.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
              */
             public Optional<String> id() {
                 return Optional.ofNullable(id);
@@ -278,7 +276,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
             /**
              * Returns the {@code text} field.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
              */
             public Optional<String> text() {
                 return Optional.ofNullable(text);
@@ -287,7 +285,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
             /**
              * Returns the {@code update_time} field.
              *
-             * @return an {@link Optional} containing the value as an {@link Instant}, or empty if absent
+     * @return an {@link Optional} containing the value as an {@link Instant}, or empty if absent
              */
             public Optional<Instant> updateTime() {
                 return Optional.ofNullable(updateTime).map(Instant::ofEpochSecond);
@@ -296,7 +294,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
             /**
              * Parses a {@code Name} from the given JSON object.
              *
-             * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
              * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
              */
             static Optional<Name> of(JSONObject obj) {
@@ -313,7 +311,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
             /**
              * Parses a list of {@code Name} from the given JSON array.
              *
-             * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
              * @return the list of parsed results, empty if {@code arr} is {@code null}
              */
             static List<Name> ofArray(JSONArray arr) {
@@ -346,7 +344,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
             /**
              * Returns the {@code id} field.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
              */
             public Optional<String> id() {
                 return Optional.ofNullable(id);
@@ -355,7 +353,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
             /**
              * Returns the {@code text} field.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
              */
             public Optional<String> text() {
                 return Optional.ofNullable(text);
@@ -364,7 +362,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
             /**
              * Returns the {@code update_time} field.
              *
-             * @return an {@link Optional} containing the value as an {@link Instant}, or empty if absent
+     * @return an {@link Optional} containing the value as an {@link Instant}, or empty if absent
              */
             public Optional<Instant> updateTime() {
                 return Optional.ofNullable(updateTime).map(Instant::ofEpochSecond);
@@ -373,7 +371,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
             /**
              * Parses a {@code Description} from the given JSON object.
              *
-             * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
              * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
              */
             static Optional<Description> of(JSONObject obj) {
@@ -390,7 +388,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
             /**
              * Parses a list of {@code Description} from the given JSON array.
              *
-             * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
              * @return the list of parsed results, empty if {@code arr} is {@code null}
              */
             static List<Description> ofArray(JSONArray arr) {
@@ -423,7 +421,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
             /**
              * Returns the {@code id} field.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
              */
             public Optional<String> id() {
                 return Optional.ofNullable(id);
@@ -432,7 +430,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
             /**
              * Returns the {@code type} field.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
              */
             public Optional<String> type() {
                 return Optional.ofNullable(type);
@@ -441,7 +439,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
             /**
              * Returns the {@code direct_path} field.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
              */
             public Optional<String> directPath() {
                 return Optional.ofNullable(directPath);
@@ -450,7 +448,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
             /**
              * Parses a {@code Picture} from the given JSON object.
              *
-             * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
              * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
              */
             static Optional<Picture> of(JSONObject obj) {
@@ -467,7 +465,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
             /**
              * Parses a list of {@code Picture} from the given JSON array.
              *
-             * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
              * @return the list of parsed results, empty if {@code arr} is {@code null}
              */
             static List<Picture> ofArray(JSONArray arr) {
@@ -500,7 +498,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
             /**
              * Returns the {@code id} field.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
              */
             public Optional<String> id() {
                 return Optional.ofNullable(id);
@@ -509,7 +507,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
             /**
              * Returns the {@code type} field.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
              */
             public Optional<String> type() {
                 return Optional.ofNullable(type);
@@ -518,7 +516,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
             /**
              * Returns the {@code direct_path} field.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
              */
             public Optional<String> directPath() {
                 return Optional.ofNullable(directPath);
@@ -527,7 +525,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
             /**
              * Parses a {@code Preview} from the given JSON object.
              *
-             * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
              * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
              */
             static Optional<Preview> of(JSONObject obj) {
@@ -544,7 +542,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
             /**
              * Parses a list of {@code Preview} from the given JSON array.
              *
-             * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
              * @return the list of parsed results, empty if {@code arr} is {@code null}
              */
             static List<Preview> ofArray(JSONArray arr) {
@@ -563,7 +561,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
         /**
          * Parses a {@code ThreadMetadata} from the given JSON object.
          *
-         * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
          * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
          */
         static Optional<ThreadMetadata> of(JSONObject obj) {
@@ -586,7 +584,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
         /**
          * Parses a list of {@code ThreadMetadata} from the given JSON array.
          *
-         * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
          * @return the list of parsed results, empty if {@code arr} is {@code null}
          */
         static List<ThreadMetadata> ofArray(JSONArray arr) {
@@ -617,7 +615,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
         /**
          * Returns the {@code settings} field.
          *
-         * @return the list of values, empty if absent
+     * @return the list of values, empty if absent
          */
         public List<Settings> settings() {
             return settings;
@@ -626,7 +624,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
         /**
          * Returns the {@code role} field.
          *
-         * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
          */
         public Optional<String> role() {
             return Optional.ofNullable(role);
@@ -647,7 +645,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
             /**
              * Returns the {@code type} field.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
              */
             public Optional<String> type() {
                 return Optional.ofNullable(type);
@@ -656,7 +654,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
             /**
              * Returns the {@code value} field.
              *
-             * @return an {@link Optional} containing the value, or empty if absent
+     * @return an {@link Optional} containing the value, or empty if absent
              */
             public Optional<String> value() {
                 return Optional.ofNullable(value);
@@ -665,7 +663,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
             /**
              * Parses a {@code Settings} from the given JSON object.
              *
-             * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
              * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
              */
             static Optional<Settings> of(JSONObject obj) {
@@ -681,7 +679,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
             /**
              * Parses a list of {@code Settings} from the given JSON array.
              *
-             * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
              * @return the list of parsed results, empty if {@code arr} is {@code null}
              */
             static List<Settings> ofArray(JSONArray arr) {
@@ -700,7 +698,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
         /**
          * Parses a {@code ViewerMetadata} from the given JSON object.
          *
-         * @param obj the JSON object to parse
+     * @param obj the JSON object to parse
          * @return an {@link Optional} containing the parsed result, or empty if {@code obj} is {@code null}
          */
         static Optional<ViewerMetadata> of(JSONObject obj) {
@@ -716,7 +714,7 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
         /**
          * Parses a list of {@code ViewerMetadata} from the given JSON array.
          *
-         * @param arr the JSON array to parse
+     * @param arr the JSON array to parse
          * @return the list of parsed results, empty if {@code arr} is {@code null}
          */
         static List<ViewerMetadata> ofArray(JSONArray arr) {
@@ -733,33 +731,24 @@ public final class CreateNewsletterMexResponse implements MexOperation.Response.
     }
 
     /**
-     * Parses a {@link CreateNewsletterMexResponse} from the raw JSON bytes of the
-     * {@code <result>} child.
+     * Parses a response from the raw JSON bytes of the {@code <result>}
+     * child.
      *
-     * @implNote WAWebMexCreateNewsletterJob.mexCreateNewsletter: mirrors the implicit
-     * unwrapping that WA Web performs on the GraphQL response,
-     * extracting the {@code xwa2_newsletter_create} root.
      * @param json the UTF-8 encoded JSON payload
-     * @return an {@link Optional} containing the parsed response, or
-     *         empty if the envelope is missing expected fields
+     * @return an {@link Optional} containing the parsed response, or empty if
+     *         the envelope is missing expected fields
      */
     private static Optional<CreateNewsletterMexResponse> of(byte[] json) {
-        // WAWebMexCreateNewsletterJob.mexCreateNewsletter
-        // Parses the raw JSON payload, bailing out if fastjson2 returns null
         var jsonObject = JSON.parseObject(json);
         if (jsonObject == null) {
             return Optional.empty();
         }
 
-        // WAWebMexCreateNewsletterJob.mexCreateNewsletter
-        // Descends into the standard GraphQL "data" envelope
         var data = jsonObject.getJSONObject("data");
         if (data == null) {
             return Optional.empty();
         }
 
-        // WAWebMexCreateNewsletterJob.mexCreateNewsletter
-        // Extracts the operation-specific root keyed by xwa2_newsletter_create
         var root = data.getJSONObject("xwa2_newsletter_create");
         if (root == null) {
             return Optional.empty();

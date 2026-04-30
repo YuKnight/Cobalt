@@ -131,7 +131,6 @@ public final class SmaxGroupsSetDescriptionRequest implements SmaxOperation.Requ
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsSetDescriptionRequest",
             exports = "makeSetDescriptionRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutGroupsSetDescriptionRequest: smax("description", {id, prev, delete}, OPTIONAL_CHILD(body))
         var descriptionBuilder = new NodeBuilder().description("description");
         if (descriptionId != null) {
             descriptionBuilder.attribute("id", descriptionId);

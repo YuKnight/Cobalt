@@ -37,7 +37,7 @@ public final class AndroidUnsupportedActionsHandler implements WebAppStateAction
      *
      * @implNote ADAPTED: WAWebAndroidUnsupportedActionsSync uses WALogger; Cobalt uses java.util.logging
      */
-    private static final Logger LOGGER = Logger.getLogger(AndroidUnsupportedActionsHandler.class.getName()); // ADAPTED: WALogger
+    private static final Logger LOGGER = Logger.getLogger(AndroidUnsupportedActionsHandler.class.getName());
 
     /**
      * The singleton instance of {@code AndroidUnsupportedActionsHandler}.
@@ -69,7 +69,7 @@ public final class AndroidUnsupportedActionsHandler implements WebAppStateAction
     @Override
     @WhatsAppWebExport(moduleName = "WAWebAndroidUnsupportedActionsSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return AndroidUnsupportedActions.ACTION_NAME; // WAWebAndroidUnsupportedActionsSync.getAction -> WASyncdConst.Actions.AndroidUnsupportedActions
+        return AndroidUnsupportedActions.ACTION_NAME;
     }
 
     /**
@@ -83,7 +83,7 @@ public final class AndroidUnsupportedActionsHandler implements WebAppStateAction
     @Override
     @WhatsAppWebExport(moduleName = "WAWebAndroidUnsupportedActionsSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return AndroidUnsupportedActions.COLLECTION_NAME; // WAWebAndroidUnsupportedActionsSync: this.collectionName = WASyncdConst.CollectionName.RegularLow
+        return AndroidUnsupportedActions.COLLECTION_NAME;
     }
 
     /**
@@ -95,7 +95,7 @@ public final class AndroidUnsupportedActionsHandler implements WebAppStateAction
     @Override
     @WhatsAppWebExport(moduleName = "WAWebAndroidUnsupportedActionsSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return AndroidUnsupportedActions.ACTION_VERSION; // WAWebAndroidUnsupportedActionsSync.getVersion: return 4
+        return AndroidUnsupportedActions.ACTION_VERSION;
     }
 
     /**
@@ -114,7 +114,7 @@ public final class AndroidUnsupportedActionsHandler implements WebAppStateAction
     @Override
     @WhatsAppWebExport(moduleName = "WAWebAndroidUnsupportedActionsSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebAndroidUnsupportedActionsSync.applyMutations: actionState === Success
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -139,22 +139,22 @@ public final class AndroidUnsupportedActionsHandler implements WebAppStateAction
     @Override
     @WhatsAppWebExport(moduleName = "WAWebAndroidUnsupportedActionsSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        try { // WAWebAndroidUnsupportedActionsSync.applyMutations: try { ... } catch(e) { return {actionState: Failed} }
-            if (mutation.operation() != SyncdOperation.SET) { // WAWebAndroidUnsupportedActionsSync.applyMutations: if (e.operation==="set") ... else: return Unsupported
-                return MutationApplicationResult.unsupported(); // WAWebAndroidUnsupportedActionsSync.applyMutations: {actionState: SyncActionState.Unsupported}
+        try {
+            if (mutation.operation() != SyncdOperation.SET) {
+                return MutationApplicationResult.unsupported();
             }
 
-            if (!(mutation.value().action().orElse(null) instanceof AndroidUnsupportedActions action)) { // WAWebAndroidUnsupportedActionsSync.applyMutations: var r = n.androidUnsupportedActions; if (!r) return malformedActionValue
-                return malformedActionValue(); // WAWebAndroidUnsupportedActionsSync.applyMutations: o("WAWebSyncdIndexUtils").malformedActionValue(t.collectionName)
+            if (!(mutation.value().action().orElse(null) instanceof AndroidUnsupportedActions action)) {
+                return malformedActionValue();
             }
 
-            if (action.allowed()) { // WAWebAndroidUnsupportedActionsSync.applyMutations: l === true
-                updatePrimaryAllowsAllMutationsFlag(client); // WAWebAndroidUnsupportedActionsSync.applyMutations: t.updatePrimaryAllowsAllMutationsFlag("allow_unsupported_mutation")
+            if (action.allowed()) {
+                updatePrimaryAllowsAllMutationsFlag(client);
             }
 
-            return MutationApplicationResult.success(); // WAWebAndroidUnsupportedActionsSync.applyMutations: {actionState: SyncActionState.Success}
-        } catch (Exception e) { // WAWebAndroidUnsupportedActionsSync.applyMutations: catch(e) { return {actionState: Failed} }
-            return MutationApplicationResult.failed(); // WAWebAndroidUnsupportedActionsSync.applyMutations: {actionState: SyncActionState.Failed}
+            return MutationApplicationResult.success();
+        } catch (Exception e) {
+            return MutationApplicationResult.failed();
         }
     }
 
@@ -171,9 +171,9 @@ public final class AndroidUnsupportedActionsHandler implements WebAppStateAction
      */
     @WhatsAppWebExport(moduleName = "WAWebAndroidUnsupportedActionsSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     private void updatePrimaryAllowsAllMutationsFlag(WhatsAppClient client) {
-        if (!client.store().primaryAllowsAllMutations()) { // WAWebAndroidUnsupportedActionsSync.updatePrimaryAllowsAllMutationsFlag: o("WAWebUserPrefsAppStateSync").getPrimaryAllowsAllMutations() || ...
-            LOGGER.info("[syncd] primary allows all mutations flag set: allow_unsupported_mutation"); // WAWebAndroidUnsupportedActionsSync.updatePrimaryAllowsAllMutationsFlag: WALogger.LOG("[syncd] primary allows all mutations flag set: ", t)
-            client.store().setPrimaryAllowsAllMutations(true); // WAWebAndroidUnsupportedActionsSync.updatePrimaryAllowsAllMutationsFlag: o("WAWebUserPrefsAppStateSync").setPrimaryAllowsAllMutations()
+        if (!client.store().primaryAllowsAllMutations()) {
+            LOGGER.info("[syncd] primary allows all mutations flag set: allow_unsupported_mutation");
+            client.store().setPrimaryAllowsAllMutations(true);
         }
     }
 }

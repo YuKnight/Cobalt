@@ -76,7 +76,6 @@ public final class SmaxGroupsSetSubjectRequest implements SmaxOperation.Request 
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsSetSubjectRequest",
             exports = "makeSetSubjectRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutGroupsSetSubjectChangeSubjectMixin: smax("subject", null, BODY)
         var subjectNode = new NodeBuilder()
                 .description("subject")
                 .content(subject.getBytes(StandardCharsets.UTF_8))

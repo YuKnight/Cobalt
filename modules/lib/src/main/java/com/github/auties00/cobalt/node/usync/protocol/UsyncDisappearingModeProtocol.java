@@ -15,13 +15,14 @@ import java.time.Instant;
 import java.util.Optional;
 
 /**
- * USync {@code disappearing_mode} protocol.
- *
- * @implNote WAWebUsyncDisappearingMode.USyncDisappearingModeProtocol.
+ * USync {@code disappearing_mode} protocol descriptor. Asks the relay for the
+ * peer's current disappearing-message timer.
  */
 @WhatsAppWebModule(moduleName = "WAWebUsyncDisappearingMode")
 public final class UsyncDisappearingModeProtocol implements UsyncProtocol {
-    /** Wire literal for the protocol tag name. */
+    /**
+     * Wire literal for the protocol tag name.
+     */
     public static final String NAME = "disappearing_mode";
 
     /**
@@ -32,6 +33,11 @@ public final class UsyncDisappearingModeProtocol implements UsyncProtocol {
     public UsyncDisappearingModeProtocol() {
     }
 
+    /**
+     * Returns the wire literal for this protocol's tag name.
+     *
+     * @return the tag name
+     */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUsyncDisappearingMode",
             exports = "USyncDisappearingModeProtocol.getName", adaptation = WhatsAppAdaptation.DIRECT)
@@ -39,6 +45,11 @@ public final class UsyncDisappearingModeProtocol implements UsyncProtocol {
         return NAME;
     }
 
+    /**
+     * Builds an empty {@code <disappearing_mode/>} query element.
+     *
+     * @return the query-element node
+     */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUsyncDisappearingMode",
             exports = "USyncDisappearingModeProtocol.getQueryElement", adaptation = WhatsAppAdaptation.DIRECT)
@@ -46,6 +57,13 @@ public final class UsyncDisappearingModeProtocol implements UsyncProtocol {
         return new NodeBuilder().description(NAME).build();
     }
 
+    /**
+     * Returns no per-user element because the disappearing-mode protocol
+     * carries no per-user payload on the request side.
+     *
+     * @param user the user the {@code <user>} entry refers to
+     * @return always {@link Optional#empty()}
+     */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUsyncDisappearingMode",
             exports = "USyncDisappearingModeProtocol.getUserElement", adaptation = WhatsAppAdaptation.DIRECT)
@@ -53,6 +71,14 @@ public final class UsyncDisappearingModeProtocol implements UsyncProtocol {
         return Optional.empty();
     }
 
+    /**
+     * Parses the {@code <disappearing_mode>} child of a {@code <user>}
+     * response into a {@link DisappearingModeResult} or a per-protocol error.
+     *
+     * @param child the protocol-tagged response node
+     * @return the parsed result
+     * @throws IllegalStateException if the node tag is not {@link #NAME}
+     */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUsyncDisappearingMode",
             exports = "disappearingModeParser", adaptation = WhatsAppAdaptation.ADAPTED)

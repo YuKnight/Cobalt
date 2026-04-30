@@ -10,50 +10,37 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * Carries the output of a group message fanout computation: the set of target devices and
- * the matching participant hash.
+ * Holds the output of a group message fanout computation, namely the set of target
+ * device JIDs and the matching participant hash.
  *
- * <p>When Cobalt sends a group message it must both decide which companion devices to
- * encrypt for and attach a {@code phash} stanza attribute so the server can detect whether
- * the sender has a stale membership view. This record bundles the two values together so
- * callers cannot accidentally use one without the other.
+ * <p>When sending a group message Cobalt must decide which companion devices to
+ * encrypt for and attach a {@code phash} stanza attribute so the server can detect a
+ * stale membership view. This record bundles the two values together so callers
+ * cannot accidentally use one without the other.
  *
  * <p>Produced by
- * {@link com.github.auties00.cobalt.device.DeviceService#getGroupFanout(Jid, Jid)} and
- * consumed by the outbound group message encoder.
- *
- * @implNote WAWebDBDeviceListFanout.getFanOutList: returns the device list.
- * WAWebPhashUtils.phashV2: calculates the participant hash. Cobalt groups the two into
- * a single result object whereas WA Web passes them as separate locals at the call site.
+ * {@link com.github.auties00.cobalt.device.DeviceService#getGroupFanout(Jid, Jid)}.
  */
 @WhatsAppWebModule(moduleName = "WAWebDBDeviceListFanout")
 @WhatsAppWebModule(moduleName = "WAWebPhashUtils")
 public final class DeviceGroupFanoutResult {
 
     /**
-     * The set of device JIDs to send the message to.
-     *
-     * @implNote WAWebDBDeviceListFanout.getFanOutList: the filtered device list from
-     * fanout calculation.
+     * The set of device JIDs the message is encrypted for.
      */
     private final Set<Jid> devices;
 
     /**
-     * The participant hash for server-side message delivery verification.
-     *
-     * @implNote WAWebPhashUtils.phashV2: hash of sorted participant JIDs used by the
-     * server to verify that the client has an up-to-date view of the group.
+     * The participant hash attached to the stanza for server-side verification.
      */
     private final String phash;
 
     /**
-     * Creates a new device group fanout result.
+     * Constructs a new fanout result.
      *
-     * @param devices the collection of device JIDs to send to
-     * @param phash   the calculated participant hash for server verification
-     * @implNote ADAPTED: WAWebDBDeviceListFanout.getFanOutList: in WA Web, the device
-     * list and phash are computed separately and combined at the call site. Cobalt
-     * groups them into this result object for type safety.
+     * @param devices the device JIDs to send to
+     * @param phash   the computed participant hash
+     * @throws NullPointerException if any argument is {@code null}
      */
     @WhatsAppWebExport(moduleName = "WAWebDBDeviceListFanout",
             exports = "getFanOutList",
@@ -67,11 +54,9 @@ public final class DeviceGroupFanoutResult {
     }
 
     /**
-     * Returns the set of device JIDs to send to.
+     * Returns the device JIDs the message is encrypted for.
      *
-     * @return an unmodifiable view of the set of device JIDs
-     * @implNote WAWebDBDeviceListFanout.getFanOutList: the return value of the fanout
-     * calculation after identity change filtering.
+     * @return an unmodifiable view of the device JID set
      */
     @WhatsAppWebExport(moduleName = "WAWebDBDeviceListFanout",
             exports = "getFanOutList",
@@ -81,11 +66,9 @@ public final class DeviceGroupFanoutResult {
     }
 
     /**
-     * Returns the calculated participant hash for server verification.
+     * Returns the participant hash for the message stanza's {@code phash} attribute.
      *
-     * @return the participant hash string
-     * @implNote WAWebPhashUtils.phashV2: the computed hash value used in the message
-     * stanza's {@code phash} attribute.
+     * @return the participant hash
      */
     @WhatsAppWebExport(moduleName = "WAWebPhashUtils",
             exports = "phashV2",

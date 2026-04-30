@@ -13,40 +13,39 @@ import java.util.Optional;
  * Per-protocol error returned for a single {@code <user>} entry.
  *
  * <p>Every {@code WAWebUsync*Protocol.parser} starts by asserting the
- * protocol's tag and then probing for an {@code <error/>} child; if found,
+ * protocol's tag and then probing for an {@code <error/>} child. When found,
  * the parser returns {@code {errorCode, errorText}} instead of the
  * protocol-specific shape. Cobalt collapses both cases into the
- * {@link UsyncProtocolResult} sealed family — every protocol's success
- * variant and {@code UsyncProtocolError} share the same supertype so the
- * caller can pattern-match without lossy casts.
+ * {@link UsyncProtocolResult} sealed family so every protocol's success
+ * variant and {@code UsyncProtocolError} share the same supertype, allowing
+ * the caller to pattern-match without lossy casts.
  *
- * <p>The optional {@link #errorBackoff()} carries the
- * {@code error_backoff} attribute, expressed as a {@link Duration}; when
- * present, {@link UsyncQuery} forwards it to
- * {@link UsyncBackoff#setProtocolBackoffMs} so subsequent queries for the
- * same protocol observe the timeout.
+ * <p>The optional {@link #errorBackoff()} carries the {@code error_backoff}
+ * attribute expressed as a {@link Duration}. When present, {@link UsyncQuery}
+ * forwards it to {@link UsyncBackoff#setProtocolBackoffMs} so subsequent
+ * queries for the same protocol observe the timeout.
  *
- * @implNote each {@code WAWebUsync*Protocol.parser}: the JS shape returns
- *     {@code {errorCode, errorText}} (the device parser also reads
- *     {@code error_backoff}). Cobalt always reads the optional backoff so
+ * @implNote The JS shape from each {@code WAWebUsync*Protocol.parser} returns
+ *     {@code {errorCode, errorText}}; the device parser also reads
+ *     {@code error_backoff}. Cobalt always reads the optional backoff so
  *     every protocol benefits from rate-limit feedback.
  */
 @WhatsAppWebModule(moduleName = "WAWebUsync")
 public final class UsyncProtocolError implements UsyncProtocolResult {
     /**
-     * The {@code code} attribute on the {@code <error/>} child.
+     * Holds the {@code code} attribute on the {@code <error/>} child.
      */
     private final int errorCode;
 
     /**
-     * The {@code text} attribute on the {@code <error/>} child; never
-     * {@code null} (defaults to the empty string when absent).
+     * Holds the {@code text} attribute on the {@code <error/>} child. Never
+     * {@code null} because it defaults to the empty string when absent.
      */
     private final String errorText;
 
     /**
-     * The {@code error_backoff} attribute, decoded as a {@link Duration}
-     * of seconds, or {@code null} if absent.
+     * Holds the {@code error_backoff} attribute, decoded as a
+     * {@link Duration} of seconds, or {@code null} if absent.
      */
     private final Duration errorBackoff;
 

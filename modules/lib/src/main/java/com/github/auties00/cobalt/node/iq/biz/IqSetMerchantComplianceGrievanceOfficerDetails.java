@@ -4,8 +4,10 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The grievance-officer block — a {@link IqSetMerchantComplianceContactDetails} plus an
- * optional name field.
+ * Typed grievance-officer block carried inside an
+ * {@link IqSetMerchantComplianceRequest}. Wraps a
+ * {@link IqSetMerchantComplianceContactDetails} contact triple together
+ * with an optional officer name.
  */
 public final class IqSetMerchantComplianceGrievanceOfficerDetails {
     /**

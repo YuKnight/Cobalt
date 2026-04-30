@@ -24,19 +24,19 @@ import java.util.Optional;
 @WhatsAppWebModule(moduleName = "WASmaxOutBugReportingBaseIQSetRequestMixin")
 public final class SmaxBugReportingReportBugRequest implements SmaxOperation.Request {
     /**
-     * The optional sender JID — when set, routed verbatim into the
+     * The optional sender JID. When set, routed verbatim into the
      * IQ's {@code from} attribute.
      */
     private final Jid iqFrom;
 
     /**
-     * The free-form description text shown to the user; never
+     * The free-form description text shown to the user. Never
      * {@code null}.
      */
     private final String descriptionElementValue;
 
     /**
-     * The free-form debug-information JSON blob; never {@code null}.
+     * The free-form debug-information JSON blob. Never {@code null}.
      */
     private final String debugInformationJsonElementValue;
 
@@ -46,7 +46,7 @@ public final class SmaxBugReportingReportBugRequest implements SmaxOperation.Req
     private final String deviceLogHandleElementValue;
 
     /**
-     * The optional list of media uploads — between {@code 0} and
+     * The optional list of media uploads. Between {@code 0} and
      * {@code 10} entries.
      */
     private final List<SmaxBugReportingReportBugMediaUpload> mediaUploads;
@@ -75,19 +75,19 @@ public final class SmaxBugReportingReportBugRequest implements SmaxOperation.Req
      * Constructs a new bug-report request.
      *
      * @param iqFrom                          the optional sender
-     *                                        JID; may be
+     *                                        JID. May be
      *                                        {@code null}
      * @param descriptionElementValue         the free-form
-     *                                        description; never
+     *                                        description. Never
      *                                        {@code null}
-     * @param debugInformationJsonElementValue the debug JSON; never
+     * @param debugInformationJsonElementValue the debug JSON. Never
      *                                        {@code null}
      * @param deviceLogHandleElementValue     the optional log
-     *                                        handle; may be
+     *                                        handle. May be
      *                                        {@code null}
      * @param mediaUploads                    the optional media
-     *                                        uploads; never
-     *                                        {@code null}; at most
+     *                                        uploads. Never
+     *                                        {@code null}. At most
      *                                        {@code 10} entries
      * @param titleElementValue               the optional title;
      *                                        may be {@code null}
@@ -97,7 +97,7 @@ public final class SmaxBugReportingReportBugRequest implements SmaxOperation.Req
      *                                        may be {@code null}
      * @param reproducibilityElementValue     the optional
      *                                        reproducibility
-     *                                        marker; may be
+     *                                        marker. May be
      *                                        {@code null}
      * @throws NullPointerException     if any required argument is
      *                                  {@code null}
@@ -144,7 +144,7 @@ public final class SmaxBugReportingReportBugRequest implements SmaxOperation.Req
     /**
      * Returns the free-form description text.
      *
-     * @return the description; never {@code null}
+     * @return the description. Never {@code null}
      */
     public String descriptionElementValue() {
         return descriptionElementValue;
@@ -153,7 +153,7 @@ public final class SmaxBugReportingReportBugRequest implements SmaxOperation.Req
     /**
      * Returns the debug-information JSON blob.
      *
-     * @return the blob; never {@code null}
+     * @return the blob. Never {@code null}
      */
     public String debugInformationJsonElementValue() {
         return debugInformationJsonElementValue;
@@ -171,7 +171,7 @@ public final class SmaxBugReportingReportBugRequest implements SmaxOperation.Req
     /**
      * Returns the list of media uploads.
      *
-     * @return an unmodifiable list; never {@code null}
+     * @return an unmodifiable list. Never {@code null}
      */
     public List<SmaxBugReportingReportBugMediaUpload> mediaUploads() {
         return mediaUploads;

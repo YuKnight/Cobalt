@@ -23,37 +23,29 @@ public final class WebAppStateHandlerRegistry {
     /**
      * Map of action names to their registered handlers.
      *
-     * <p>Per WhatsApp Web {@code WAWebSyncdGetActionHandler}: this corresponds to the
-     * lazily-constructed {@code Map} variable {@code e}, keyed by each handler's
-     * {@code getAction()} value. In Cobalt, the map is eagerly constructed at
-     * registry creation time.
-     *
-     * @implNote WAWebSyncdGetActionHandler (var e)
+     * @implNote Mirrors the lazily-constructed {@code Map e} in
+     *           {@code WAWebSyncdGetActionHandler}, keyed by each handler's
+     *           {@code getAction()} value. Cobalt constructs the map eagerly
+     *           at registry creation time.
      */
-    private final Map<String, WebAppStateActionHandler> handlers; // WAWebSyncdGetActionHandler: var e (lazy Map keyed by getAction())
+    private final Map<String, WebAppStateActionHandler> handlers;
 
     /**
      * Constructs a new handler registry and registers the default handlers.
-     *
-     * @implNote WAWebSyncdGetActionHandler.setActionHandlers, WAWebCollectionHandlerActions.ActionHandlers
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdGetActionHandler", exports = "setActionHandlers", adaptation = WhatsAppAdaptation.ADAPTED)
     public WebAppStateHandlerRegistry() {
-        this.handlers = new HashMap<>(); // ADAPTED: WAWebSyncdGetActionHandler (eagerly created vs WA Web lazy Map)
-        registerDefaultHandlers(); // WAWebHandleSuccess -> WAWebSyncdGetActionHandler.setActionHandlers(WAWebCollectionHandlerActions.ActionHandlers)
+        this.handlers = new HashMap<>();
+        registerDefaultHandlers();
     }
 
     /**
-     * Registers all default action handlers that correspond to the WhatsApp Web
-     * {@code WAWebCollectionHandlerActions.ActionHandlers} array.
-     *
-     * <p>Per WhatsApp Web, this array is passed to
-     * {@code WAWebSyncdGetActionHandler.setActionHandlers} during the success
-     * handler flow ({@code WAWebHandleSuccess}).
-     *
-     * @implNote WAWebCollectionHandlerActions.ActionHandlers
+     * Registers all default action handlers that correspond to the WA Web
+     * {@code WAWebCollectionHandlerActions.ActionHandlers} array, which is passed
+     * to {@code WAWebSyncdGetActionHandler.setActionHandlers} during the success
+     * handler flow in {@code WAWebHandleSuccess}.
      */
-    private void registerDefaultHandlers() { // WAWebCollectionHandlerActions.ActionHandlers
+    private void registerDefaultHandlers() {
         // Chat actions
         registerHandler(ArchiveChatHandler.INSTANCE); // WAWebArchiveChatSync
         registerHandler(PinChatHandler.INSTANCE); // WAWebPinChatSync
@@ -143,49 +135,42 @@ public final class WebAppStateHandlerRegistry {
     /**
      * Registers a handler for its declared action name.
      *
-     * <p>Per WhatsApp Web {@code WAWebSyncdGetActionHandler.setActionHandlers}:
-     * the array of handlers is stored and lazily indexed by action name via
-     * {@code e.getAction()}.
+     * <p>Stores the handler keyed by its {@code actionName()}.
      *
      * @param handler the handler to register
-     * @implNote WAWebSyncdGetActionHandler.setActionHandlers
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdGetActionHandler", exports = "setActionHandlers", adaptation = WhatsAppAdaptation.ADAPTED)
     public void registerHandler(WebAppStateActionHandler handler) {
-        handlers.put(handler.actionName(), handler); // WAWebSyncdGetActionHandler.setActionHandlers
+        handlers.put(handler.actionName(), handler);
     }
 
     /**
      * Finds a handler by action name.
      *
-     * <p>Per WhatsApp Web {@code WAWebSyncdGetActionHandler.getActionHandler}:
-     * looks up the handler map by action string. Returns {@code Optional.empty()}
+     * <p>Looks up the handler map by action string and returns {@code Optional.empty()}
      * when no handler is registered for the given action.
      *
      * @param actionName the action name to look up
-     * @return the handler, or empty if not registered
-     * @implNote WAWebSyncdGetActionHandler.getActionHandler
+     * @return the handler, or empty when no handler is registered
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdGetActionHandler", exports = "getActionHandler", adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<WebAppStateActionHandler> findHandler(String actionName) {
-        return Optional.ofNullable(handlers.get(actionName)); // ADAPTED: WAWebSyncdGetActionHandler.getActionHandler (returns Optional instead of undefined, no lazy Map init)
+        return Optional.ofNullable(handlers.get(actionName));
     }
 
     /**
      * Returns the maximum version supported by any registered handler.
      *
-     * <p>Per WhatsApp Web {@code WAWebSyncdGetActionHandler.maxSupportedVersion}:
-     * computes the maximum of all handler versions. Used for fast pre-filtering
+     * <p>Computes the maximum of all handler versions, used for fast pre-filtering
      * of mutations whose version exceeds any handler's capability.
      *
      * @return the maximum supported version across all handlers
-     * @implNote WAWebSyncdGetActionHandler.maxSupportedVersion
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdGetActionHandler", exports = "maxSupportedVersion", adaptation = WhatsAppAdaptation.ADAPTED)
     public int maxSupportedVersion() {
-        return handlers.values().stream() // ADAPTED: WAWebSyncdGetActionHandler.maxSupportedVersion (recomputes each call vs WA Web lazy cache in var s)
-                .mapToInt(WebAppStateActionHandler::version) // WAWebSyncdGetActionHandler.maxSupportedVersion: e.getVersion()
-                .max() // WAWebSyncdGetActionHandler.maxSupportedVersion: Math.max.apply(Math, ...)
-                .orElse(0); // ADAPTED: returns 0 when empty vs WA Web returns -Infinity (impossible in practice)
+        return handlers.values().stream()
+                .mapToInt(WebAppStateActionHandler::version)
+                .max()
+                .orElse(0);
     }
 }

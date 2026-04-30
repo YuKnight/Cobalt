@@ -9,7 +9,7 @@ package com.github.auties00.cobalt.registration.push.apns.plist.value;
  * {@link PlistDataValue}, {@link PlistIntegerValue},
  * {@link PlistFloatingPointValue}, {@link PlistBooleanValue}, and
  * {@link PlistDateValue}. Every variant is an immutable
- * {@code record}; the hierarchy is closed so callers can
+ * {@code record}. The hierarchy is closed so callers can
  * pattern-match exhaustively over its members.
  */
 public sealed interface PlistValue permits

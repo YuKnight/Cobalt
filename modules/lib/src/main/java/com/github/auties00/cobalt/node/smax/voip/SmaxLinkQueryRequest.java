@@ -12,7 +12,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant — wraps a {@code <link_query token
+ * The outbound stanza variant. Wraps a {@code <link_query token
  * media action/>} payload in the {@code <call to="call">} envelope.
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutVoipLinkQueryRequest")
@@ -30,7 +30,7 @@ public final class SmaxLinkQueryRequest implements SmaxOperation.Request {
     private final String linkQueryMedia;
 
     /**
-     * The optional action the caller is performing — typically
+     * The optional action the caller is performing. Typically
      * {@code "preview"} for a passive resolve and {@code "edit"} for
      * a creator-side metadata edit.
      */
@@ -85,16 +85,11 @@ public final class SmaxLinkQueryRequest implements SmaxOperation.Request {
      *
      * @return a {@link NodeBuilder} carrying the {@code <call>}
      *         envelope around a {@code <link_query/>} payload
-     *
-     * @implNote {@code WASmaxOutVoipLinkQueryRequest.makeLinkQueryRequest}
-     *           composes {@code <call to="call" id="…"><link_query
-     *           token media action/></call>}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutVoipLinkQueryRequest",
             exports = "makeLinkQueryRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutVoipLinkQueryRequest: smax("link_query", {token, media, action})
         var linkQueryBuilder = new NodeBuilder()
                 .description("link_query")
                 .attribute("token", linkQueryToken)
@@ -102,7 +97,6 @@ public final class SmaxLinkQueryRequest implements SmaxOperation.Request {
         if (linkQueryAction != null) {
             linkQueryBuilder.attribute("action", linkQueryAction);
         }
-        // WASmaxOutVoipLinkQueryRequest: smax("call", {id: generateId(), to: JID("call")})
         return new NodeBuilder()
                 .description("call")
                 .attribute("to", JidServer.call())

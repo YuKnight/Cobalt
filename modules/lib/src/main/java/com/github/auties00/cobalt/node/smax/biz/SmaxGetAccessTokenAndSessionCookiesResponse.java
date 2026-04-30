@@ -33,7 +33,7 @@ public sealed interface SmaxGetAccessTokenAndSessionCookiesResponse extends Smax
      *
      * @param node    the inbound IQ stanza received from the relay;
      *                never {@code null}
-     * @param request the original outbound stanza — used to validate
+     * @param request the original outbound stanza. Used to validate
      *                echoed identifiers; never {@code null}
      * @return an {@link Optional} carrying the parsed variant, or
      *         {@link Optional#empty()} when no documented variant
@@ -66,7 +66,7 @@ public sealed interface SmaxGetAccessTokenAndSessionCookiesResponse extends Smax
     }
 
     /**
-     * The {@code Success} reply variant — the relay validated the
+     * The {@code Success} reply variant. The relay validated the
      * verification code and supplied the access token, session
      * cookies, and business-person identity.
      *
@@ -81,22 +81,22 @@ public sealed interface SmaxGetAccessTokenAndSessionCookiesResponse extends Smax
     @WhatsAppWebModule(moduleName = "WASmaxInBizCtwaAdAccountGetAccessTokenAndSessionCookiesResponseSuccess")
     final class Success implements SmaxGetAccessTokenAndSessionCookiesResponse {
         /**
-         * The element-content of the {@code <access_token>} child —
-         * the bearer token used to authenticate to the Facebook Graph
+         * The element-content of the {@code <access_token>} child.
+         * The bearer token used to authenticate to the Facebook Graph
          * API.
          */
         private final String accessToken;
 
         /**
          * The element-content of the {@code <session_cookies>}
-         * child — JSON-encoded blob of session cookies for the
+         * child. JSON-encoded blob of session cookies for the
          * Facebook Ads Manager web UI.
          */
         private final String sessionCookies;
 
         /**
          * The {@code id} attribute of the {@code <business_person>}
-         * child — the Facebook business-person identifier the token
+         * child. The Facebook business-person identifier the token
          * is scoped to.
          */
         private final String businessPersonId;
@@ -255,7 +255,7 @@ public sealed interface SmaxGetAccessTokenAndSessionCookiesResponse extends Smax
     }
 
     /**
-     * The {@code TooManyAttempts} reply variant — the relay refused
+     * The {@code TooManyAttempts} reply variant. The relay refused
      * to validate further verification codes because the user has
      * exhausted the rate limit for this nonce.
      *
@@ -326,7 +326,7 @@ public sealed interface SmaxGetAccessTokenAndSessionCookiesResponse extends Smax
     }
 
     /**
-     * The {@code IncorrectNonce} reply variant — the user-supplied
+     * The {@code IncorrectNonce} reply variant. The user-supplied
      * verification code did not match the relay-side nonce.
      *
      * <p>Identified by the literal
@@ -396,7 +396,7 @@ public sealed interface SmaxGetAccessTokenAndSessionCookiesResponse extends Smax
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected the
+     * The {@code ClientError} reply variant. The relay rejected the
      * request with a documented common-ad-account error code in the
      * {@code 4xx} range that is NOT one of the dedicated
      * {@code 431}/{@code 432} literals.
@@ -500,7 +500,7 @@ public sealed interface SmaxGetAccessTokenAndSessionCookiesResponse extends Smax
     }
 
     /**
-     * The {@code ServerError} reply variant — the relay encountered a
+     * The {@code ServerError} reply variant. The relay encountered a
      * transient internal failure ({@code 5xx}) while processing the
      * request.
      *

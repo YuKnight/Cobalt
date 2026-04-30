@@ -76,7 +76,7 @@ public final class MuteChatHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebMuteChatSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return MuteAction.ACTION_NAME; // WAWebMuteChatSync.getAction -> WASyncdConst.Actions.Mute
+        return MuteAction.ACTION_NAME;
     }
 
     /**
@@ -92,7 +92,7 @@ public final class MuteChatHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebMuteChatSync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return MuteAction.COLLECTION_NAME; // WAWebMuteChatSync: this.collectionName = CollectionName.RegularHigh
+        return MuteAction.COLLECTION_NAME;
     }
 
     /**
@@ -104,7 +104,7 @@ public final class MuteChatHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebMuteChatSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return MuteAction.ACTION_VERSION; // WAWebMuteChatSync.getVersion -> 2
+        return MuteAction.ACTION_VERSION;
     }
 
     /**
@@ -122,7 +122,7 @@ public final class MuteChatHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebMuteChatSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebMuteChatSync.applyMutations
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -169,74 +169,68 @@ public final class MuteChatHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebMuteChatSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        if (mutation.operation() != SyncdOperation.SET) { // WAWebMuteChatSync.applyMutations: if (e.operation === "set") { ... } l++; return {actionState: Unsupported}
-            return MutationApplicationResult.unsupported(); // WAWebMuteChatSync.applyMutations: {actionState: Unsupported}
+        if (mutation.operation() != SyncdOperation.SET) {
+            return MutationApplicationResult.unsupported();
         }
 
-        try { // WAWebMuteChatSync.applyMutations: try/catch wrapping per-mutation logic
-            if (!(mutation.value().action().orElse(null) instanceof MuteAction action)) { // WAWebMuteChatSync.applyMutations: var s = e.value; var c = s.muteAction
-                return malformedActionValue(); // WAWebMuteChatSync.applyMutations: malformedActionValue(this.collectionName) (defensive; WA Web assumes muteAction is present)
+        try {
+            if (!(mutation.value().action().orElse(null) instanceof MuteAction action)) {
+                return malformedActionValue();
             }
 
-            var chatJidString = JSON.parseArray(mutation.index()).getString(1); // WAWebMuteChatSync.applyMutations: var a = e.indexParts; var u = a[1]
-            if (chatJidString == null || chatJidString.isEmpty()) { // WAWebMuteChatSync.applyMutations: if (!u || !isWid(u)) return this.malformedActionIndex()
-                return malformedActionIndex(); // WAWebMuteChatSync.applyMutations: this.malformedActionIndex()
+            var chatJidString = JSON.parseArray(mutation.index()).getString(1);
+            if (chatJidString == null || chatJidString.isEmpty()) {
+                return malformedActionIndex();
             }
 
-            // WAWebMuteChatSync.applyMutations: var d = s.muteAction?.muted; var m = maybeNumberOrThrowIfTooLarge(c?.muteEndTimestamp)
-            // WAWebMuteChatSync.applyMutations: if (d == null || (d && m == null)) return malformedActionValue(this.collectionName)
             // ADAPTED: Cobalt's MuteAction.muted() coalesces null to false per Cobalt nullable-Boolean
             // conventions; the (d && m == null) check — muted=true with missing timestamp — is preserved.
             if (action.muted() && action.muteEndTimestamp().isEmpty()) {
-                return malformedActionValue(); // WAWebMuteChatSync.applyMutations: i++, malformedActionValue(this.collectionName)
+                return malformedActionValue();
             }
 
-            var chatJid = Jid.of(chatJidString); // WAWebMuteChatSync.applyMutations: createWid(u)
+            var chatJid = Jid.of(chatJidString);
             if (chatJid == null) { // ADAPTED: Jid.of returns null for null input; WA Web uses isWid() validation
-                return malformedActionIndex(); // WAWebMuteChatSync.applyMutations: this.malformedActionIndex()
+                return malformedActionIndex();
             }
 
-            var chat = client.store().findChatByJid(chatJid); // WAWebMuteChatSync.applyMutations: yield resolveChatForMutationIndex(createWid(u))
-            if (chat.isEmpty()) { // WAWebMuteChatSync.applyMutations: if (!p.success) return {actionState: Orphan, orphanModel: p.orphanModel}
-                return MutationApplicationResult.orphan(chatJidString, "Chat"); // WAWebMuteChatSync.applyMutations: {actionState: SyncActionState.Orphan, orphanModel: p.orphanModel}
+            var chat = client.store().findChatByJid(chatJid);
+            if (chat.isEmpty()) {
+                return MutationApplicationResult.orphan(chatJidString, "Chat");
             }
 
-            // WAWebMuteChatSync.applyMutations: var f = m != null ? m : 0 — muteEndMillis, defaulting to 0
             var muteEndMillis = action.muteEndTimestamp().map(Instant::toEpochMilli).orElse(0L);
-            // WAWebMuteChatSync.applyMutations: var g = f > 0 && f < unixTimeMs() ? 0 : Math.floor(f / 1e3)
             var muteEndSeconds = muteEndMillis > 0 && muteEndMillis < System.currentTimeMillis()
                     ? 0L
-                    : muteEndMillis / 1000; // WAWebMuteChatSync.applyMutations: Math.floor(f / 1e3) — Java integer division floors toward zero (matches for non-negative f)
-            chat.get().setMute(ChatMute.mutedUntil(muteEndSeconds)); // WAWebMuteChatSync.applyMutations: getChatTable().merge(_, {muteExpiration: g})
+                    : muteEndMillis / 1000;
+            chat.get().setMute(ChatMute.mutedUntil(muteEndSeconds));
 
-            // WAWebMuteChatSync.applyMutations:
             //   var h = maybeNumberOrThrowIfTooLarge(c?.muteEveryoneMentionEndTimestamp);
             //   var y;
             //   h != null && getABPropConfigValue("enable_mention_everyone_receiver_web") && (
             //     h > unixTimeMs() ? y = Math.floor(h / 1e3) : h > 0 ? y = 0 : y = h
             //   );
             //   isGroup(createWid(_)) && y != null && (C.mentionAllMuteExpiration = y)
-            if (chatJid.hasGroupOrCommunityServer() // WAWebMuteChatSync.applyMutations: isGroup(createWid(_)) — WA Web isGroup checks server === "g.us"
-                    && client.abPropsService().getBool(ABProp.ENABLE_MENTION_EVERYONE_RECEIVER_WEB)) { // WAWebMuteChatSync.applyMutations: getABPropConfigValue("enable_mention_everyone_receiver_web")
-                action.muteEveryoneMentionEndTimestamp().ifPresent(mentionTs -> { // WAWebMuteChatSync.applyMutations: h != null (null-check on nullable int64)
+            if (chatJid.hasGroupOrCommunityServer()
+                    && client.abPropsService().getBool(ABProp.ENABLE_MENTION_EVERYONE_RECEIVER_WEB)) {
+                action.muteEveryoneMentionEndTimestamp().ifPresent(mentionTs -> {
                     var mentionMillis = mentionTs.toEpochMilli();
-                    long mentionSeconds; // WAWebMuteChatSync.applyMutations: var y
-                    if (mentionMillis > System.currentTimeMillis()) { // WAWebMuteChatSync.applyMutations: h > unixTimeMs()
-                        mentionSeconds = mentionMillis / 1000; // WAWebMuteChatSync.applyMutations: y = Math.floor(h / 1e3)
-                    } else if (mentionMillis > 0) { // WAWebMuteChatSync.applyMutations: h > 0
-                        mentionSeconds = 0L; // WAWebMuteChatSync.applyMutations: y = 0 (past positive timestamp collapses)
+                    long mentionSeconds;
+                    if (mentionMillis > System.currentTimeMillis()) {
+                        mentionSeconds = mentionMillis / 1000;
+                    } else if (mentionMillis > 0) {
+                        mentionSeconds = 0L;
                     } else {
-                        mentionSeconds = mentionMillis; // WAWebMuteChatSync.applyMutations: y = h — preserves sentinel values such as -1 (indefinite) and 0 without scaling
+                        mentionSeconds = mentionMillis;
                     }
-                    client.store().setMentionEveryoneMuteExpiration(chatJid, ChatMute.mutedUntil(mentionSeconds)); // WAWebMuteChatSync.applyMutations: C.mentionAllMuteExpiration = y; getChatTable().merge(_, C)
+                    client.store().setMentionEveryoneMuteExpiration(chatJid, ChatMute.mutedUntil(mentionSeconds));
                 });
             }
 
-            // WAWebMuteChatSync.applyMutations: frontendFireAndForget("muteCollectionAdd", {muteData: b})
             // SKIPPED: Cobalt has no frontend consumer for UI collection updates.
-            return MutationApplicationResult.success(); // WAWebMuteChatSync.applyMutations: {actionState: SyncActionState.Success}
-        } catch (Exception e) { // WAWebMuteChatSync.applyMutations: catch(e) { return {actionState: Failed} }
-            return MutationApplicationResult.failed(); // WAWebMuteChatSync.applyMutations: {actionState: SyncActionState.Failed}
+            return MutationApplicationResult.success();
+        } catch (Exception e) {
+            return MutationApplicationResult.failed();
         }
     }
 
@@ -315,38 +309,36 @@ public final class MuteChatHandler implements WebAppStateActionHandler {
             long muteEndSeconds,
             Long mentionAllSeconds
     ) {
-        var now = Instant.now(); // WAWebMuteChatSync.generateMuteMutation: var i = unixTimeMs()
-        var muted = muteEndSeconds != 0L; // WAWebMuteChatSync.generateMuteMutation: var a = t !== void 0 && t !== 0 (Cobalt's primitive long never collapses void, so t !== 0 is the only gate)
-        // WAWebMuteChatSync.generateMuteMutation: var l = t; l !== c && (l *= 1e3) where c = -1
+        var now = Instant.now();
+        var muted = muteEndSeconds != 0L;
         // Preserves the -1 sentinel; all other values are scaled from seconds to milliseconds.
-        var muteEndInstant = muteEndSeconds == -1L // WAWebMuteChatSync.generateMuteMutation: l !== c (c === -1)
-                ? Instant.ofEpochMilli(-1L) // WAWebMuteChatSync.generateMuteMutation: l (unchanged when l === -1)
-                : Instant.ofEpochMilli(muteEndSeconds * 1000L); // WAWebMuteChatSync.generateMuteMutation: l *= 1e3
-        var actionBuilder = new MuteActionBuilder() // WAWebMuteChatSync.generateMuteMutation: var s = {muted: a, muteEndTimestamp: l}
-                .muted(muted) // WAWebMuteChatSync.generateMuteMutation: muted: a
-                .muteEndTimestamp(muteEndInstant); // WAWebMuteChatSync.generateMuteMutation: muteEndTimestamp: l
-        // WAWebMuteChatSync.generateMuteMutation: isGroup(e) && n != null && getABPropConfigValue("enable_mention_everyone_syncd_sender")
+        var muteEndInstant = muteEndSeconds == -1L
+                ? Instant.ofEpochMilli(-1L)
+                : Instant.ofEpochMilli(muteEndSeconds * 1000L);
+        var actionBuilder = new MuteActionBuilder()
+                .muted(muted)
+                .muteEndTimestamp(muteEndInstant);
         //   && (n > 0 ? s.muteEveryoneMentionEndTimestamp = n * 1e3 : s.muteEveryoneMentionEndTimestamp = n)
-        if (chatJid.hasGroupOrCommunityServer() // WAWebMuteChatSync.generateMuteMutation: isGroup(e) — server === "g.us"
-                && mentionAllSeconds != null // WAWebMuteChatSync.generateMuteMutation: n != null
-                && client.abPropsService().getBool(ABProp.ENABLE_MENTION_EVERYONE_SYNCD_SENDER)) { // WAWebMuteChatSync.generateMuteMutation: getABPropConfigValue("enable_mention_everyone_syncd_sender")
-            var mentionMillis = mentionAllSeconds > 0 // WAWebMuteChatSync.generateMuteMutation: n > 0 ? n * 1e3 : n
-                    ? mentionAllSeconds * 1000L // WAWebMuteChatSync.generateMuteMutation: n * 1e3
-                    : mentionAllSeconds; // WAWebMuteChatSync.generateMuteMutation: n (preserves sentinel / zero)
-            actionBuilder.muteEveryoneMentionEndTimestamp(Instant.ofEpochMilli(mentionMillis)); // WAWebMuteChatSync.generateMuteMutation: s.muteEveryoneMentionEndTimestamp = ...
+        if (chatJid.hasGroupOrCommunityServer()
+                && mentionAllSeconds != null
+                && client.abPropsService().getBool(ABProp.ENABLE_MENTION_EVERYONE_SYNCD_SENDER)) {
+            var mentionMillis = mentionAllSeconds > 0
+                    ? mentionAllSeconds * 1000L
+                    : mentionAllSeconds;
+            actionBuilder.muteEveryoneMentionEndTimestamp(Instant.ofEpochMilli(mentionMillis));
         }
         var action = actionBuilder.build();
-        var value = new SyncActionValueBuilder() // WAWebSyncdActionUtils.buildPendingMutation: encodeProtobuf(SyncActionValueSpec, {...value, timestamp: i})
-                .timestamp(now) // WAWebSyncdActionUtils.buildPendingMutation: timestamp: i (encoder overlay)
-                .muteAction(action) // WAWebMuteChatSync.generateMuteMutation: var u = {muteAction: s}
+        var value = new SyncActionValueBuilder()
+                .timestamp(now)
+                .muteAction(action)
                 .build();
-        var index = JSON.toJSONString(List.of(actionName(), chatJid.toString())); // WAWebSyncdActionUtils.buildIndex: JSON.stringify([action].concat(indexArgs)); indexArgs = [await getChatJidMutationIndexForChat(e, Actions.Mute)]
-        var trusted = new DecryptedMutation.Trusted( // WAWebSyncdActionUtils.buildPendingMutation: return { collection, index, binarySyncAction, version, operation, timestamp, action }
+        var index = JSON.toJSONString(List.of(actionName(), chatJid.toString()));
+        var trusted = new DecryptedMutation.Trusted(
                 index,
                 value,
-                SyncdOperation.SET, // WAWebMuteChatSync.generateMuteMutation: operation: SyncdMutation$SyncdOperation.SET
-                now, // WAWebMuteChatSync.generateMuteMutation: timestamp: i
-                version() // WAWebMuteChatSync.generateMuteMutation: version: this.getVersion()
+                SyncdOperation.SET,
+                now,
+                version()
         );
         return new SyncPendingMutation(trusted, 0); // ADAPTED: WA Web returns the raw mutation object; Cobalt wraps it in SyncPendingMutation for the outgoing queue
     }

@@ -2,10 +2,10 @@ package com.github.auties00.cobalt.message.send;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceService;
-import com.github.auties00.cobalt.message.send.crypto.MessageEncryptedPayload;
-import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
 import com.github.auties00.cobalt.message.send.ack.AckParser;
 import com.github.auties00.cobalt.message.send.ack.AckResult;
+import com.github.auties00.cobalt.message.send.crypto.MessageEncryptedPayload;
+import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -19,65 +19,39 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Sends peer protocol messages to the user's own devices.
+ * Sends peer protocol messages to one of the user's own devices. These cover
+ * app-state-sync key shares and requests, fatal-exception notifications, peer
+ * data operation requests and responses, and ephemeral-sync responses.
  *
- * <p>Peer messages are protocol-level messages exchanged between the
- * user's own devices for state synchronisation.  They include:
- * <ul>
- *   <li>App state sync key shares and requests</li>
- *   <li>Fatal exception notifications</li>
- *   <li>Peer data operation requests/responses</li>
- *   <li>Ephemeral sync responses</li>
- * </ul>
- *
- * <p>These messages are encrypted per-device via the Signal session
- * cipher and tagged with {@code category="peer"} to distinguish them
- * from regular messages.  They use {@code push_priority="high"} to
- * ensure prompt delivery.
- *
- * @apiNote WAWebSendAppStateSyncMsgJob.encryptAndSendKeyMsg: sends peer
- * messages via createUserDeviceMsgStanza with category="peer" and
- * push_priority="high".
- * WAWebSendMsgCreateDeviceStanza.createUserDeviceMsgStanza: builds the
- * single-device stanza for peer messages.
+ * <p>Peer messages are encrypted per device using the Signal session cipher
+ * and are tagged on the wire with {@code category="peer"} and
+ * {@code push_priority="high"} so they are dispatched promptly.
  */
 @WhatsAppWebModule(moduleName = "WAWebSendAppStateSyncMsgJob")
 @WhatsAppWebModule(moduleName = "WAWebSendMsgCreateDeviceStanza")
 final class PeerMessageSender extends MessageSender<ChatMessageInfo> {
     /**
-     * Logger for peer message sending diagnostics.
-     *
-     * @implNote ADAPTED: WAWebSendAppStateSyncMsgJob uses WALogger;
-     * Cobalt uses {@link System.Logger}.
+     * Holds the logger used for peer-message diagnostics.
      */
     private static final System.Logger LOGGER = System.getLogger(PeerMessageSender.class.getName());
 
     /**
-     * The encryption service for per-device Signal encryption.
-     *
-     * @implNote WAWebSendMsgCreateDeviceStanza.createUserDeviceMsgStanza:
-     * delegates to WAWebEncryptMsgProtobuf.encryptMsgProtobuf.
+     * Holds the encryption service used for per-device Signal encryption.
      */
     private final MessageEncryption encryption;
 
     /**
-     * The device service for ensuring E2E sessions before encryption.
-     *
-     * @implNote WAWebSendMsgCreateDeviceStanza.createUserDeviceMsgStanza:
-     * calls WAWebManageE2ESessionsJob.ensureE2ESessions.
+     * Holds the device service used to ensure an E2E session before encryption.
      */
     private final DeviceService deviceService;
 
     /**
-     * Creates a new peer message sender.
+     * Constructs a peer-message sender bound to the given dependencies.
      *
-     * @param client        the WhatsApp client for sending stanzas
+     * @param client        the WhatsApp client used to dispatch stanzas
      * @param encryption    the message encryption service
-     * @param deviceService the device service for session management
-     * @param wamService    the WAM telemetry service inherited by the base sender
-     *
-     * @implNote ADAPTED: WAWebSendAppStateSyncMsgJob uses module-level
-     * imports; Cobalt uses constructor-based DI instead.
+     * @param deviceService the device service used to manage Signal sessions
+     * @param wamService    the WAM telemetry service shared with the base sender
      */
     @WhatsAppWebExport(moduleName = "WAWebSendAppStateSyncMsgJob", exports = "encryptAndSendKeyMsg",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -93,24 +67,13 @@ final class PeerMessageSender extends MessageSender<ChatMessageInfo> {
     }
 
     /**
-     * Sends a peer protocol message to a single target device.
+     * Encrypts the given peer protocol message for the target device, builds a
+     * {@code <message>} stanza tagged with {@code category="peer"} and
+     * {@code push_priority="high"}, and waits for the server acknowledgement.
      *
-     * <p>Encrypts the message container using the Signal session cipher
-     * for the target device, wraps it in a {@code <message>} stanza with
-     * {@code category="peer"} and {@code push_priority="high"}, and
-     * waits for the server acknowledgement.
-     *
-     * @param targetDevice the target device JID (typically the user's
-     *                     own primary device)
+     * @param targetDevice the target device JID, typically the user's primary device
      * @param messageInfo  the outgoing peer protocol message
      * @return the server ack result
-     *
-     * @implNote WAWebSendAppStateSyncMsgJob.encryptAndSendKeyMsg:
-     * waits for offline delivery end, calls createPeerMsgProtobuf,
-     * then delegates to createUserDeviceMsgStanza with
-     * {@code MsgType.AppStateSync}, which sets {@code category="peer"},
-     * {@code push_priority="high"}, and {@code appdata="default"} on
-     * the meta node. Finally sends via deprecatedSendStanzaAndWaitForAck.
      */
     @WhatsAppWebExport(moduleName = "WAWebSendAppStateSyncMsgJob", exports = "encryptAndSendKeyMsg",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -118,35 +81,24 @@ final class PeerMessageSender extends MessageSender<ChatMessageInfo> {
             adaptation = WhatsAppAdaptation.DIRECT)
     @Override
     AckResult send(Jid targetDevice, ChatMessageInfo messageInfo) {
-        // WAWebSendAppStateSyncMsgJob: yield waitForOfflineDeliveryEnd()
         waitForOfflineDelivery();
 
         var container = messageInfo.message();
         var plaintext = MessageContainerSpec.encode(container);
 
-        // WAWebSendMsgCreateDeviceStanza: ensureE2ESessions then encrypt
         deviceService.ensureSessions(List.of(targetDevice));
         MessageEncryptedPayload payload;
         try {
             payload = encryption.encryptForDevice(targetDevice, plaintext);
-            // WAWebEncryptMsgProtobuf -> WAWebPostE2eMessageSendMetric.postSuccessDirectE2eMessageSendMetric:
-            // peer/app-state-sync send path also routes through encryptMsgProtobuf and
-            // therefore emits E2eMessageSend (id 476) on success.
             emitE2eMessageSendEvent(targetDevice, container, true, payload.type(), 0);
         } catch (RuntimeException encryptionError) {
-            // WAWebEncryptMsgProtobuf -> WAWebPostE2eMessageSendMetric.postFailureDirectE2eMessageSendMetric:
-            // emit E2eMessageSend (id 476) with e2eSuccessful=false on failure before rethrowing.
             emitE2eMessageSendEvent(targetDevice, container, false, null, 0);
             throw encryptionError;
         }
 
-        // WAWebSendMsgCreateDeviceStanza: identity node when pkmsg
         var identityNode = payload.isPreKeyMessage()
                 ? buildIdentityNode() : null;
 
-        // WAWebSendMsgCreateDeviceStanza: build the stanza
-        // category="peer" distinguishes from regular messages
-        // push_priority="high" ensures prompt delivery
         var encNode = new NodeBuilder()
                 .description("enc")
                 .attribute("v", String.valueOf(MessageEncryption.CIPHERTEXT_VERSION))
@@ -154,18 +106,11 @@ final class PeerMessageSender extends MessageSender<ChatMessageInfo> {
                 .content(payload.ciphertext())
                 .build();
 
-        // WAWebSendMsgCreateDeviceStanza: build meta node with appdata="default"
-        // for peer messages (isCategoryPeerMessage=true)
         var metaNode = new NodeBuilder()
                 .description("meta")
                 .attribute("appdata", "default")
                 .build();
 
-        // WAWebSendMsgCreateDeviceStanza: the edit attribute comes from
-        // editAttribute(n, d.subtype) returns DROP_ATTR for peer messages
-        // since none of the edit/revoke conditions apply.
-        // There is NO "subtype" attribute on the wire stanza.
-        // WAWebE2EProtoUtils.typeAttributeFromProtobuf: protocolMessage → "text"
         var stanza = new NodeBuilder()
                 .description("message")
                 .attribute("id", messageInfo.key().id().orElseThrow())

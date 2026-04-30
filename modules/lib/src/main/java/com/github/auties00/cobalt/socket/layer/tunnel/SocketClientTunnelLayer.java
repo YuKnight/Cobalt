@@ -7,13 +7,15 @@ import com.github.auties00.cobalt.socket.layer.tunnel.impl.HttpSocketClientTunne
 import com.github.auties00.cobalt.socket.layer.tunnel.impl.SocksSocketClientTunnelLayer;
 
 /**
- * A tunnel layer in the socket client stack.
+ * Tunnel layer in the socket client stack.
  *
- * <p>Every connection uses a tunnel layer: proxy connections use
- * {@link HttpSocketClientTunnelLayer} or {@link SocksSocketClientTunnelLayer},
- * and direct connections use {@link DirectSocketClientTunnelLayer}.
- * The tunnel layer registers a {@link SocketClientTunnelLayerContext} during
- * {@code connect()} to support blocking reads in the handshake phase.
+ * <p>Every connection has a tunnel layer: proxied connections use
+ * {@link HttpSocketClientTunnelLayer} or
+ * {@link SocksSocketClientTunnelLayer}, direct connections use
+ * {@link DirectSocketClientTunnelLayer}. Each tunnel registers a
+ * {@link SocketClientTunnelLayerContext} during
+ * {@code connect()} so blocking reads work during the handshake
+ * phase, then becomes a pure passthrough afterwards.
  */
 public interface SocketClientTunnelLayer extends SocketClientLayer<SocketClientTunnelLayerContext> {
     /**

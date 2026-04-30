@@ -17,7 +17,7 @@ import java.util.Optional;
  *
  * @implNote {@code WASmaxInMdPrimaryHelloNotifyCompanionRequest.parsePrimaryHelloNotifyCompanionRequest}
  *           validates the {@code <notification type="link_code_companion_reg"
- *           from="s.whatsapp.net">} envelope, asserts
+ *           from="s.whatsapp.net">} envelope. Asserts
  *           {@code stage="primary_hello"} on the
  *           {@code <link_code_companion_reg/>} child, and extracts
  *           three byte payloads:

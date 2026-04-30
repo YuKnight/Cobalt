@@ -44,19 +44,19 @@ public final class SmaxUpdateOptOutListRequest implements SmaxOperation.Request 
     private final String itemDhash;
 
     /**
-     * The optional reason marker — surfaced through the marketing
+     * The optional reason marker. Surfaced through the marketing
      * messages user-controls reasons enum.
      */
     private final String itemReason;
 
     /**
-     * The optional entry-point marker — the user-controls entry-point
+     * The optional entry-point marker. The user-controls entry-point
      * enum.
      */
     private final String itemEntryPoint;
 
     /**
-     * The optional signup id — set when the action originates from
+     * The optional signup id. Set when the action originates from
      * a marketing-message signup.
      */
     private final String itemSignupId;
@@ -178,17 +178,11 @@ public final class SmaxUpdateOptOutListRequest implements SmaxOperation.Request 
      * Builds the outbound IQ stanza.
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope
-     *
-     * @implNote {@code WASmaxOutBlocklistsUpdateOptOutListRequest.makeUpdateOptOutListRequest}
-     *           composes {@code <iq to="s.whatsapp.net" xmlns="optoutlist"
-     *           type="set" id="…"><item jid category action dhash?
-     *           reason? entry_point? signup_id? duration?/></iq>}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutBlocklistsUpdateOptOutListRequest",
             exports = "makeUpdateOptOutListRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        // WASmaxOutBlocklistsUpdateOptOutListRequest: smax("item",
         //   {jid, category, action, dhash?, reason?, entry_point?, signup_id?, duration?})
         var itemBuilder = new NodeBuilder()
                 .description("item")
@@ -210,7 +204,6 @@ public final class SmaxUpdateOptOutListRequest implements SmaxOperation.Request 
         if (itemDuration != null) {
             itemBuilder.attribute("duration", itemDuration.intValue());
         }
-        // WASmaxOutBlocklistsUpdateOptOutListRequest: smax("iq",
         //   {to: S_WHATSAPP_NET, xmlns: "optoutlist", type: "set", id: generateId()})
         return new NodeBuilder()
                 .description("iq")

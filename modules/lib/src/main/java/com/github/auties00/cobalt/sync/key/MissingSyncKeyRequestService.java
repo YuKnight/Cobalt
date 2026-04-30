@@ -64,22 +64,16 @@ import java.util.*;
 public final class MissingSyncKeyRequestService {
     /**
      * Logger for this service.
-     *
-     * @implNote WAWebSyncdHandleMissingKeys: WALogger.LOG usage
      */
     private static final System.Logger LOGGER = System.getLogger(MissingSyncKeyRequestService.class.getName());
 
     /**
      * The WhatsApp client instance, used for sending peer messages.
-     *
-     * @implNote ADAPTED: Cobalt DI pattern (constructor injection)
      */
     private final WhatsAppClient client;
 
     /**
      * The WhatsApp store, used for querying and tracking missing keys.
-     *
-     * @implNote ADAPTED: Cobalt DI pattern (constructor injection)
      */
     private final WhatsAppStore store;
 

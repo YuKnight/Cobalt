@@ -56,7 +56,7 @@ public final class PinChatHandler implements WebAppStateActionHandler {
      *
      * @implNote WAWebPinChatLimits.MAX_PINNED_CHATS
      */
-    private static final int MAX_PINNED_CHATS = 3; // WAWebPinChatLimits.MAX_PINNED_CHATS = 3
+    private static final int MAX_PINNED_CHATS = 3;
 
     /**
      * Maximum number of pinned newsletters allowed.
@@ -65,7 +65,7 @@ public final class PinChatHandler implements WebAppStateActionHandler {
      *
      * @implNote WAWebPinChatLimits.MAX_PINNED_NEWSLETTERS
      */
-    private static final int MAX_PINNED_NEWSLETTERS = 2; // WAWebPinChatLimits.MAX_PINNED_NEWSLETTERS = 2
+    private static final int MAX_PINNED_NEWSLETTERS = 2;
 
     /**
      * Singleton instance of the pin chat handler.
@@ -96,7 +96,7 @@ public final class PinChatHandler implements WebAppStateActionHandler {
      */
     @Override
     public String actionName() {
-        return PinAction.ACTION_NAME; // WAWebPinChatSync.getAction -> WASyncdConst.Actions.Pin
+        return PinAction.ACTION_NAME;
     }
 
     /**
@@ -111,7 +111,7 @@ public final class PinChatHandler implements WebAppStateActionHandler {
      */
     @Override
     public SyncPatchType collectionName() {
-        return PinAction.COLLECTION_NAME; // WAWebPinChatSync.collectionName = WASyncdConst.CollectionName.RegularLow
+        return PinAction.COLLECTION_NAME;
     }
 
     /**
@@ -122,7 +122,7 @@ public final class PinChatHandler implements WebAppStateActionHandler {
      */
     @Override
     public int version() {
-        return PinAction.ACTION_VERSION; // WAWebPinChatSync.getVersion -> 5
+        return PinAction.ACTION_VERSION;
     }
 
     /**
@@ -139,7 +139,7 @@ public final class PinChatHandler implements WebAppStateActionHandler {
      */
     @Override
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebPinChatSync.applyMutations
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -186,109 +186,101 @@ public final class PinChatHandler implements WebAppStateActionHandler {
      */
     @Override
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        if (mutation.operation() != SyncdOperation.SET) { // WAWebPinChatSync.applyMutation: if (t.operation === "remove") return ... Unsupported
-            return MutationApplicationResult.unsupported(); // WAWebPinChatSync.applyMutation: WALogger.WARN("syncd: pin_chat_sync: REMOVE not supported"); return Unsupported
+        if (mutation.operation() != SyncdOperation.SET) {
+            return MutationApplicationResult.unsupported();
         }
 
-        try { // WAWebPinChatSync.applyMutation: try/catch wrapping per-mutation logic
-            var indexArray = JSON.parseArray(mutation.index()); // WAWebPinChatSync.applyMutation: var a = t.indexParts
-            var chatJidString = indexArray.size() > 1 ? indexArray.getString(1) : null; // WAWebPinChatSync.applyMutation: var m = a[1]; (chatJidIndex = 1)
-            if (chatJidString == null || chatJidString.isEmpty()) { // WAWebPinChatSync.applyMutation: if (!m) return malformedActionIndex()
-                return malformedActionIndex(); // WAWebPinChatSync.applyMutation: WALogger.WARN("missing chatJid in index"); return this.malformedActionIndex()
+        try {
+            var indexArray = JSON.parseArray(mutation.index());
+            var chatJidString = indexArray.size() > 1 ? indexArray.getString(1) : null;
+            if (chatJidString == null || chatJidString.isEmpty()) {
+                return malformedActionIndex();
             }
 
-            Jid chatJid; // WAWebPinChatSync.applyMutation: createWid(m)
+            Jid chatJid;
             try {
-                chatJid = Jid.of(chatJidString); // WAWebPinChatSync.applyMutation: WAWebWidFactory.createWid(m)
+                chatJid = Jid.of(chatJidString);
             } catch (Exception e) { // ADAPTED: Jid.of throws WhatsAppMalformedJidException; WA Web isWid() returns false
-                return malformedActionIndex(); // WAWebPinChatSync.applyMutation: if (!isWid(m)) return malformedActionIndex()
+                return malformedActionIndex();
             }
-            if (chatJid == null) { // WAWebPinChatSync.applyMutation: if (!isWid(m)) return malformedActionIndex()
-                return malformedActionIndex(); // WAWebPinChatSync.applyMutation: this.malformedActionIndex()
-            }
-
-            if (!(mutation.value().action().orElse(null) instanceof PinAction action)) { // WAWebPinChatSync.applyMutation: var p = l.pinAction; if (p == null) return malformedActionValue
-                return malformedActionValue(); // WAWebPinChatSync.applyMutation: WALogger.WARN("missing pinAction"); return malformedActionValue(collectionName)
+            if (chatJid == null) {
+                return malformedActionIndex();
             }
 
-            // WAWebPinChatSync.applyMutation: var _ = p.pinned; if (_ == null) return malformedActionValue
+            if (!(mutation.value().action().orElse(null) instanceof PinAction action)) {
+                return malformedActionValue();
+            }
+
             // ADAPTED: Cobalt's PinAction.pinned() boolean accessor coalesces null to false,
             // following the project-wide nullable boolean accessor pattern. A null pinned
             // field is therefore treated as "unpin" rather than "malformed".
-            var currentTimestamp = mutation.timestamp(); // WAWebPinChatSync.applyMutation: var i = t.timestamp
-            var isNewsletter = chatJid.hasNewsletterServer(); // WAWebPinChatSync.applyMutation: y.isNewsletter()
+            var currentTimestamp = mutation.timestamp();
+            var isNewsletter = chatJid.hasNewsletterServer();
 
             // ADAPTED: WA Web's WAWebSyncdGetChat.resolveChatForMutationIndex queries a
             // unified chat table that contains both chats and newsletters. Cobalt stores
             // them separately, so the dispatch is split based on the JID's server type
             // and routes to the dedicated newsletter pin path when the JID is a newsletter.
-            if (isNewsletter) { // WAWebPinChatSync.applyMutation: y.isNewsletter() ? getLocalNewsletterPins() : getLocalChatPins()
+            if (isNewsletter) {
                 return applyNewsletterPinMutation(client, wamService, chatJid, action, currentTimestamp); // ADAPTED: Cobalt routes newsletter pins through a separate code path
             }
 
-            var chat = client.store().findChatByJid(chatJid); // WAWebPinChatSync.applyMutation: yield WAWebSyncdGetChat.resolveChatForMutationIndex(createWid(m))
-            if (chat.isEmpty()) { // WAWebPinChatSync.applyMutation: if (!f.success) return Orphan
-                return MutationApplicationResult.orphan(chatJidString, "Chat"); // WAWebPinChatSync.applyMutation: {actionState: Orphan, orphanModel: f.orphanModel}
+            var chat = client.store().findChatByJid(chatJid);
+            if (chat.isEmpty()) {
+                return MutationApplicationResult.orphan(chatJidString, "Chat");
             }
 
-            if (!action.pinned()) { // WAWebPinChatSync.applyMutation: if (!_) return applyUpdates([{wid: y, pinned: false, timestamp: i}])
-                chat.get().setPinnedTimestamp(null); // WAWebPinChatSync.applyMutation: applyUpdates -> getChatTable().merge(id, {pin: 0})
-                return MutationApplicationResult.success(); // WAWebPinChatSync.applyMutation: {actionState: Success}
+            if (!action.pinned()) {
+                chat.get().setPinnedTimestamp(null);
+                return MutationApplicationResult.success();
             }
 
-            // WAWebPinChatSync.applyMutation: var C = yield this.getLocalChatPins()
             // Cobalt loads the current pinned chats directly from the in-memory store.
             // The "already pinned" early-out is checked first to mirror WA Web's
             // C.some(e => e.chatId.toString() === y.toString()) check.
-            var allPinnedChats = client.store().chats().stream() // WAWebPinChatSync.$PinChatSyncImpl$p_1: getChatTable().all().filter(e => e.pin != null && e.pin > 0)
-                    .filter(c -> c.pinnedTimestamp().isPresent()) // WAWebPinChatSync.$PinChatSyncImpl$p_1: e.pin != null && e.pin > 0
+            var allPinnedChats = client.store().chats().stream()
+                    .filter(c -> c.pinnedTimestamp().isPresent())
                     .toList();
 
-            // WAWebPinChatSync.applyMutation: if (C.some(e => e.chatId.toString() === y.toString())) return applyUpdates([{wid: y, pinned: true, timestamp: i}])
-            var alreadyPinned = allPinnedChats.stream() // WAWebPinChatSync.applyMutation: C.some(e => e.chatId.toString() === y.toString())
+            var alreadyPinned = allPinnedChats.stream()
                     .anyMatch(c -> c.jid().equals(chatJid));
-            if (alreadyPinned) { // WAWebPinChatSync.applyMutation: already in pin list -> bump timestamp
-                chat.get().setPinnedTimestamp(currentTimestamp); // WAWebPinChatSync.applyMutation: applyUpdates({wid: y, pinned: true, timestamp: i}) -> merge(id, {pin: i, archive: false})
-                chat.get().setArchived(false); // WAWebPinChatSync.applyMutation: applyUpdates -> if (pinned) o.archive = false
-                return MutationApplicationResult.success(); // WAWebPinChatSync.applyMutation: {actionState: Success}
+            if (alreadyPinned) {
+                chat.get().setPinnedTimestamp(currentTimestamp);
+                chat.get().setArchived(false);
+                return MutationApplicationResult.success();
             }
 
-            if (allPinnedChats.size() < MAX_PINNED_CHATS) { // WAWebPinChatSync.applyMutation: if (C.length < getPinLimit(y)) return applyUpdates([{wid: y, pinned: true, timestamp: i}])
-                chat.get().setPinnedTimestamp(currentTimestamp); // WAWebPinChatSync.applyMutation: applyUpdates -> merge(id, {pin: i, archive: false})
-                chat.get().setArchived(false); // WAWebPinChatSync.applyMutation: applyUpdates -> if (pinned) o.archive = false
-                return MutationApplicationResult.success(); // WAWebPinChatSync.applyMutation: {actionState: Success}
+            if (allPinnedChats.size() < MAX_PINNED_CHATS) {
+                chat.get().setPinnedTimestamp(currentTimestamp);
+                chat.get().setArchived(false);
+                return MutationApplicationResult.success();
             }
 
-            // WAWebPinChatSync.applyMutation: r("gkx")("26258") || new MdSyncdDogfoodingFeatureUsageWamEvent({mdSyncdDogfoodingFeature: UNPIN_4TH_CHAT_MUTATION}).commit()
             wamService.commit(new MdSyncdDogfoodingFeatureUsageEventBuilder()
                     .mdSyncdDogfoodingFeature(MdFeatureCode.UNPIN_4TH_CHAT_MUTATION)
                     .build());
 
-            // WAWebPinChatSync.applyMutation: var b = C.reduce((e, t) => t.timestamp < e.timestamp ? t : e)
             // Find the oldest pinned chat (lowest timestamp).
-            var oldestPinned = allPinnedChats.stream() // WAWebPinChatSync.applyMutation: C.reduce((e, t) => t.timestamp < e.timestamp ? t : e)
-                    .min(Comparator.comparing(c -> c.pinnedTimestamp().orElse(Instant.EPOCH))) // WAWebPinChatSync.applyMutation: t.timestamp < e.timestamp comparison
+            var oldestPinned = allPinnedChats.stream()
+                    .min(Comparator.comparing(c -> c.pinnedTimestamp().orElse(Instant.EPOCH)))
                     .orElseThrow(); // WA Web reduce on a non-empty array always succeeds; size >= MAX_PINNED_CHATS guarantees at least one entry
-            var oldestTimestamp = oldestPinned.pinnedTimestamp().orElse(Instant.EPOCH); // WAWebPinChatSync.applyMutation: b.timestamp
+            var oldestTimestamp = oldestPinned.pinnedTimestamp().orElse(Instant.EPOCH);
 
-            // WAWebPinChatSync.applyMutation: var S = b.timestamp < i ? b.chatId : y
             // If the oldest pin is older than the incoming pin, kick the oldest out
             // (S = oldest); otherwise the incoming pin is rejected (S = current).
-            if (oldestTimestamp.isBefore(currentTimestamp)) { // WAWebPinChatSync.applyMutation: b.timestamp < i (S = b.chatId branch)
-                // WAWebPinChatSync.applyMutation: S === b.chatId && v.push({wid: b.chatId, pinned: false, ...}, {wid: y, pinned: true, ...})
-                oldestPinned.setPinnedTimestamp(null); // WAWebPinChatSync.applyMutation: applyUpdates -> merge(b.chatId, {pin: 0})
-                queueUnpinMutation(client, oldestPinned.jid(), currentTimestamp); // WAWebPinChatSync.applyMutation: this.createPendingUnpin(S, i) where S = b.chatId
-                chat.get().setPinnedTimestamp(currentTimestamp); // WAWebPinChatSync.applyMutation: applyUpdates -> merge(y, {pin: i, archive: false})
-                chat.get().setArchived(false); // WAWebPinChatSync.applyMutation: applyUpdates -> if (pinned) o.archive = false
-                return MutationApplicationResult.success(); // WAWebPinChatSync.applyMutation: {actionState: Success}
+            if (oldestTimestamp.isBefore(currentTimestamp)) {
+                oldestPinned.setPinnedTimestamp(null);
+                queueUnpinMutation(client, oldestPinned.jid(), currentTimestamp);
+                chat.get().setPinnedTimestamp(currentTimestamp);
+                chat.get().setArchived(false);
+                return MutationApplicationResult.success();
             }
 
-            // WAWebPinChatSync.applyMutation: S = y branch (incoming pin is older than oldest existing pin)
             // No local update is applied (v stays empty), only a pending unpin is queued.
-            queueUnpinMutation(client, chatJid, currentTimestamp); // WAWebPinChatSync.applyMutation: this.createPendingUnpin(S, i) where S = y
-            return MutationApplicationResult.success(); // WAWebPinChatSync.applyMutation: {actionState: Success}
-        } catch (Exception e) { // WAWebPinChatSync.applyMutation: catch (e) { return {actionState: Failed} }
-            return MutationApplicationResult.failed(); // WAWebPinChatSync.applyMutation: {actionState: SyncActionState.Failed}
+            queueUnpinMutation(client, chatJid, currentTimestamp);
+            return MutationApplicationResult.success();
+        } catch (Exception e) {
+            return MutationApplicationResult.failed();
         }
     }
 
@@ -320,64 +312,58 @@ public final class PinChatHandler implements WebAppStateActionHandler {
      * @param currentTimestamp the mutation timestamp
      * @return the detailed application result
      */
-    private MutationApplicationResult applyNewsletterPinMutation( // ADAPTED: WAWebPinChatSync.applyMutation newsletter branch
+    private MutationApplicationResult applyNewsletterPinMutation(
             WhatsAppClient client,
             WamService wamService,
             Jid newsletterJid,
             PinAction action,
             Instant currentTimestamp
     ) {
-        var newsletter = client.store().findNewsletterByJid(newsletterJid); // WAWebPinChatSync.applyMutation: yield WAWebSyncdGetChat.resolveChatForMutationIndex(createWid(m))
-        if (newsletter.isEmpty()) { // WAWebPinChatSync.applyMutation: if (!f.success) return Orphan
-            return MutationApplicationResult.orphan(newsletterJid.toString(), "Newsletter"); // WAWebPinChatSync.applyMutation: {actionState: Orphan, orphanModel: f.orphanModel}
+        var newsletter = client.store().findNewsletterByJid(newsletterJid);
+        if (newsletter.isEmpty()) {
+            return MutationApplicationResult.orphan(newsletterJid.toString(), "Newsletter");
         }
 
         var states = new HashMap<>(client.store().newsletterPinStates()); // ADAPTED: snapshot the current map for read-modify-write
-        var key = newsletterJid.toString(); // WAWebPinChatSync.$PinChatSyncImpl$p_1: chatId.toString()
+        var key = newsletterJid.toString();
 
-        if (!action.pinned()) { // WAWebPinChatSync.applyMutation: if (!_) return applyUpdates([{wid: y, pinned: false, timestamp: i}])
-            states.remove(key); // WAWebPinChatSync.applyMutation: applyUpdates -> merge(id, {pin: 0})
+        if (!action.pinned()) {
+            states.remove(key);
             client.store().setNewsletterPinStates(states); // ADAPTED: persist the updated map back to the store
-            return MutationApplicationResult.success(); // WAWebPinChatSync.applyMutation: {actionState: Success}
+            return MutationApplicationResult.success();
         }
 
-        // WAWebPinChatSync.applyMutation: if (C.some(e => e.chatId.toString() === y.toString())) return applyUpdates([...]); already-pinned bumps timestamp
-        if (states.containsKey(key)) { // WAWebPinChatSync.applyMutation: C.some(e => e.chatId.toString() === y.toString())
-            states.put(key, currentTimestamp); // WAWebPinChatSync.applyMutation: applyUpdates({wid: y, pinned: true, timestamp: i}) -> merge(id, {pin: i})
+        if (states.containsKey(key)) {
+            states.put(key, currentTimestamp);
             client.store().setNewsletterPinStates(states); // ADAPTED: persist the updated map back to the store
-            return MutationApplicationResult.success(); // WAWebPinChatSync.applyMutation: {actionState: Success}
+            return MutationApplicationResult.success();
         }
 
-        if (states.size() < MAX_PINNED_NEWSLETTERS) { // WAWebPinChatSync.applyMutation: if (C.length < getPinLimit(y)) return applyUpdates([{wid: y, pinned: true, timestamp: i}])
-            states.put(key, currentTimestamp); // WAWebPinChatSync.applyMutation: applyUpdates -> merge(id, {pin: i})
+        if (states.size() < MAX_PINNED_NEWSLETTERS) {
+            states.put(key, currentTimestamp);
             client.store().setNewsletterPinStates(states); // ADAPTED: persist the updated map back to the store
-            return MutationApplicationResult.success(); // WAWebPinChatSync.applyMutation: {actionState: Success}
+            return MutationApplicationResult.success();
         }
 
-        // WAWebPinChatSync.applyMutation: r("gkx")("26258") || new MdSyncdDogfoodingFeatureUsageWamEvent({mdSyncdDogfoodingFeature: UNPIN_4TH_CHAT_MUTATION}).commit()
         wamService.commit(new MdSyncdDogfoodingFeatureUsageEventBuilder()
                 .mdSyncdDogfoodingFeature(MdFeatureCode.UNPIN_4TH_CHAT_MUTATION)
                 .build());
 
-        // WAWebPinChatSync.applyMutation: var b = C.reduce((e, t) => t.timestamp < e.timestamp ? t : e)
-        var oldest = states.entrySet().stream() // WAWebPinChatSync.applyMutation: C.reduce((e, t) => t.timestamp < e.timestamp ? t : e)
-                .min(Map.Entry.comparingByValue()) // WAWebPinChatSync.applyMutation: t.timestamp < e.timestamp comparison
+        var oldest = states.entrySet().stream()
+                .min(Map.Entry.comparingByValue())
                 .orElseThrow(); // size >= MAX_PINNED_NEWSLETTERS guarantees at least one entry
-        var oldestTimestamp = oldest.getValue(); // WAWebPinChatSync.applyMutation: b.timestamp
+        var oldestTimestamp = oldest.getValue();
 
-        // WAWebPinChatSync.applyMutation: var S = b.timestamp < i ? b.chatId : y
-        if (oldestTimestamp.isBefore(currentTimestamp)) { // WAWebPinChatSync.applyMutation: b.timestamp < i (S = b.chatId branch)
-            // WAWebPinChatSync.applyMutation: S === b.chatId && v.push({wid: b.chatId, pinned: false, ...}, {wid: y, pinned: true, ...})
-            states.remove(oldest.getKey()); // WAWebPinChatSync.applyMutation: applyUpdates -> merge(b.chatId, {pin: 0})
-            states.put(key, currentTimestamp); // WAWebPinChatSync.applyMutation: applyUpdates -> merge(y, {pin: i})
+        if (oldestTimestamp.isBefore(currentTimestamp)) {
+            states.remove(oldest.getKey());
+            states.put(key, currentTimestamp);
             client.store().setNewsletterPinStates(states); // ADAPTED: persist the updated map back to the store
-            queueUnpinMutation(client, Jid.of(oldest.getKey()), currentTimestamp); // WAWebPinChatSync.applyMutation: this.createPendingUnpin(S, i) where S = b.chatId
-            return MutationApplicationResult.success(); // WAWebPinChatSync.applyMutation: {actionState: Success}
+            queueUnpinMutation(client, Jid.of(oldest.getKey()), currentTimestamp);
+            return MutationApplicationResult.success();
         }
 
-        // WAWebPinChatSync.applyMutation: S = y branch (incoming pin is older than oldest existing pin)
-        queueUnpinMutation(client, newsletterJid, currentTimestamp); // WAWebPinChatSync.applyMutation: this.createPendingUnpin(S, i) where S = y
-        return MutationApplicationResult.success(); // WAWebPinChatSync.applyMutation: {actionState: Success}
+        queueUnpinMutation(client, newsletterJid, currentTimestamp);
+        return MutationApplicationResult.success();
     }
 
     /**
@@ -394,9 +380,8 @@ public final class PinChatHandler implements WebAppStateActionHandler {
      * @param timestamp the mutation timestamp
      */
     private void queueUnpinMutation(WhatsAppClient client, Jid chatJid, Instant timestamp) {
-        // WAWebPinChatSync.createPendingUnpin: yield WAWebSyncdDb.appendPendingMutationsRows([yield this.getPinMutation(t, false, e)])
-        var pending = getPinMutation(timestamp, false, chatJid); // WAWebPinChatSync.createPendingUnpin: this.getPinMutation(t, false, e)
-        client.store().addPendingMutations(collectionName(), List.of(pending)); // WAWebPinChatSync.createPendingUnpin: WAWebSyncdDb.appendPendingMutationsRows([...])
+        var pending = getPinMutation(timestamp, false, chatJid);
+        client.store().addPendingMutations(collectionName(), List.of(pending));
     }
 
     /**
@@ -421,25 +406,24 @@ public final class PinChatHandler implements WebAppStateActionHandler {
      * @return the pending mutation for the pin action
      */
     public SyncPendingMutation getPinMutation(Instant timestamp, boolean pinned, Jid chatJid) {
-        var pinAction = new PinActionBuilder() // WAWebPinChatSync.getPinMutation: var r = {pinAction: {pinned: t}}
-                .pinned(pinned) // WAWebPinChatSync.getPinMutation: pinned: t
+        var pinAction = new PinActionBuilder()
+                .pinned(pinned)
                 .build();
-        var value = new SyncActionValueBuilder() // WAWebSyncdActionUtils.buildPendingMutation: encodeProtobuf(SyncActionValueSpec, {...l, timestamp: i})
-                .timestamp(timestamp) // WAWebSyncdActionUtils.buildPendingMutation: timestamp: e
-                .pinAction(pinAction) // WAWebPinChatSync.getPinMutation: {pinAction: {pinned: t}}
+        var value = new SyncActionValueBuilder()
+                .timestamp(timestamp)
+                .pinAction(pinAction)
                 .build();
-        // WAWebPinChatSync.getPinMutation: indexArgs: [yield WAWebSyncdGetChat.getChatJidMutationIndexForChat(n, WASyncdConst.Actions.Pin)]
         // ADAPTED: Cobalt does not implement the LID 1:1 migration accountLid path,
         // so the chat-jid mutation index resolves to the JID's canonical string form.
-        var index = JSON.toJSONString(List.of(actionName(), chatJid.toString())); // WAWebSyncdActionUtils.buildPendingMutation: index = JSON.stringify([action].concat(indexArgs))
-        var mutation = new DecryptedMutation.Trusted( // WAWebSyncdActionUtils.buildPendingMutation: return {collection, index, binarySyncAction, version, operation, timestamp, action}
+        var index = JSON.toJSONString(List.of(actionName(), chatJid.toString()));
+        var mutation = new DecryptedMutation.Trusted(
                 index,
                 value,
-                SyncdOperation.SET, // WAWebPinChatSync.getPinMutation: operation: SyncdMutation$SyncdOperation.SET
+                SyncdOperation.SET,
                 timestamp,
-                version() // WAWebPinChatSync.getPinMutation: version: this.getVersion()
+                version()
         );
-        return new SyncPendingMutation(mutation, 0); // WAWebSyncdActionUtils.buildPendingMutation
+        return new SyncPendingMutation(mutation, 0);
     }
 
     /**
@@ -468,12 +452,10 @@ public final class PinChatHandler implements WebAppStateActionHandler {
      * @return the list of pending mutations for the pin operation
      */
     public List<SyncPendingMutation> getMutationsForPin(Instant timestamp, boolean pinned, Jid chatJid) {
-        // WAWebPinChatSync.getMutationsForPin: gkx("26258") || new MdSyncdDogfoodingFeatureUsageWamEvent({mdSyncdDogfoodingFeature: PIN_MUTATION}).commit()
         // The PIN_MUTATION WAM emission is performed at the caller (WhatsAppClient.pinChat) since
         // this method has no WamService handle (handler is a singleton with no injected client).
-        var mutations = new ArrayList<SyncPendingMutation>(); // WAWebPinChatSync.getMutationsForPin: var a = [yield this.getPinMutation(e, t, n)]
-        mutations.add(getPinMutation(timestamp, pinned, chatJid)); // WAWebPinChatSync.getMutationsForPin: yield this.getPinMutation(e, t, n)
-        // WAWebPinChatSync.getMutationsForPin: t && a.push(yield WAWebArchiveChatSync.getArchiveChatMutation(e, false, n))
+        var mutations = new ArrayList<SyncPendingMutation>();
+        mutations.add(getPinMutation(timestamp, pinned, chatJid));
         // ADAPTED: When pinning, WA Web also queues an unarchive mutation. Cobalt's
         // archive mutation requires a message range that callers must construct
         // separately, so the unarchive append is delegated to the caller.

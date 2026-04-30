@@ -66,7 +66,7 @@ public final class LabelAssociationHandler implements WebAppStateActionHandler {
      * @implNote WAWebLabelJidSync constructor, {@code e.chatJidIndex = 2}
      */
     @WhatsAppWebExport(moduleName = "WAWebLabelJidSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
-    private static final int CHAT_JID_INDEX = 2; // WAWebLabelJidSync constructor, e.chatJidIndex = 2
+    private static final int CHAT_JID_INDEX = 2;
 
     /**
      * Creates a new {@code LabelAssociationHandler}.
@@ -90,7 +90,7 @@ public final class LabelAssociationHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebLabelJidSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
     public String actionName() {
-        return LabelAssociationAction.ACTION_NAME; // WAWebLabelJidSync.getAction, return o("WASyncdConst").Actions.LabelJid
+        return LabelAssociationAction.ACTION_NAME;
     }
 
     /**
@@ -103,7 +103,7 @@ public final class LabelAssociationHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebLabelJidSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPatchType collectionName() {
-        return LabelAssociationAction.COLLECTION_NAME; // WAWebLabelJidSync constructor, e.collectionName = o("WASyncdConst").CollectionName.Regular
+        return LabelAssociationAction.COLLECTION_NAME;
     }
 
     /**
@@ -116,7 +116,7 @@ public final class LabelAssociationHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebLabelJidSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
-        return LabelAssociationAction.ACTION_VERSION; // WAWebLabelJidSync.getVersion, return o("WASyncdConst").LABEL_ASSOCIATION_SYNC_VERSION
+        return LabelAssociationAction.ACTION_VERSION;
     }
 
     /**
@@ -132,7 +132,7 @@ public final class LabelAssociationHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebLabelJidSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // WAWebLabelJidSync.applyMutations
+        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -181,47 +181,47 @@ public final class LabelAssociationHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebLabelJidSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        try { // WAWebLabelJidSync.applyMutations, try { ... } catch(e) { return {actionState: Failed} }
-            if (mutation.operation() != SyncdOperation.SET) { // WAWebLabelJidSync.applyMutations, if (e.operation === "set") { ... } return _++, {actionState: Unsupported}
-                return MutationApplicationResult.unsupported(); // WAWebLabelJidSync.applyMutations, {actionState: o("WASyncdConst").SyncActionState.Unsupported}
+        try {
+            if (mutation.operation() != SyncdOperation.SET) {
+                return MutationApplicationResult.unsupported();
             }
 
-            var indexArray = JSON.parseArray(mutation.index()); // WAWebLabelJidSync.applyMutations, var n = e.indexParts
-            var labelId = indexArray.getString(1); // WAWebLabelJidSync.applyMutations, u = n[1]
-            var targetJidString = indexArray.getString(CHAT_JID_INDEX); // WAWebLabelJidSync.applyMutations, f = n[2]
-            if (labelId == null || labelId.isEmpty() || targetJidString == null || targetJidString.isEmpty()) { // WAWebLabelJidSync.applyMutations, if (!u || !f)
-                return malformedActionIndex(); // WAWebLabelJidSync.applyMutations, return a.malformedActionIndex()
+            var indexArray = JSON.parseArray(mutation.index());
+            var labelId = indexArray.getString(1);
+            var targetJidString = indexArray.getString(CHAT_JID_INDEX);
+            if (labelId == null || labelId.isEmpty() || targetJidString == null || targetJidString.isEmpty()) {
+                return malformedActionIndex();
             }
 
-            if (!(mutation.value().action().orElse(null) instanceof LabelAssociationAction action)) { // WAWebLabelJidSync.applyMutations, var g = (t = s.labelAssociationAction) == null ? void 0 : t.labeled; if (g == null), Cobalt checks the whole action presence instead
-                return malformedActionValue(); // WAWebLabelJidSync.applyMutations, return o("WAWebSyncdIndexUtils").malformedActionValue(a.collectionName)
+            if (!(mutation.value().action().orElse(null) instanceof LabelAssociationAction action)) {
+                return malformedActionValue();
             }
 
             // ADAPTED: WAWebLabelJidSync.applyMutations, var g = (t = s.labelAssociationAction) == null ? void 0 : t.labeled; if (g == null) { p++; ... return malformedActionValue(a.collectionName) }
             // Cobalt's LabelAssociationAction.labeled() coalesces null Boolean to false per project convention,
             // so the null-vs-false distinction is intentionally lost here; a null labeled is treated as "remove".
-            var labeled = action.labeled(); // WAWebLabelJidSync.applyMutations, g = s.labelAssociationAction.labeled
+            var labeled = action.labeled();
 
             Jid targetJid;
             try {
-                targetJid = Jid.of(targetJidString); // WAWebLabelJidSync.applyMutations, o("WAWebWidFactory").createWid(f)
-            } catch (Exception jidError) { // WAWebLabelJidSync.applyMutations, if (!r("WAWebWid").isWid(f)) return a.malformedActionIndex()
-                return malformedActionIndex(); // WAWebLabelJidSync.applyMutations, return a.malformedActionIndex()
+                targetJid = Jid.of(targetJidString);
+            } catch (Exception jidError) {
+                return malformedActionIndex();
             }
-            if (targetJid == null) { // WAWebLabelJidSync.applyMutations, if (!r("WAWebWid").isWid(f))
-                return malformedActionIndex(); // WAWebLabelJidSync.applyMutations, return a.malformedActionIndex()
+            if (targetJid == null) {
+                return malformedActionIndex();
             }
 
             // ADAPTED: WAWebLabelJidSync.applyMutations, var v = yield o("WAWebSyncdGetChat").resolveChatForMutationIndex(b); if (v.success === true) b = createWid(v.chat.id); else if (isLidMigrated() && b.isLid()) { var S = getPhoneNumber(b); S != null && (b = S) }
             // Cobalt collapses the multi-strategy chat lookup into findChatByJid + LID-to-PN mapping fallback.
-            var resolvedTargetJid = targetJid; // WAWebLabelJidSync.applyMutations, b (mutable WID reference)
-            var resolvedChat = client.store().findChatByJid(targetJid); // WAWebLabelJidSync.applyMutations, resolveChatForMutationIndex(b)
-            if (resolvedChat.isPresent()) { // WAWebLabelJidSync.applyMutations, if (v.success === true)
-                resolvedTargetJid = resolvedChat.get().toJid(); // WAWebLabelJidSync.applyMutations, b = o("WAWebWidFactory").createWid(v.chat.id)
-            } else if (targetJid.hasLidServer()) { // WAWebLabelJidSync.applyMutations, else if (Lid1X1MigrationUtils.isLidMigrated() && b.isLid()), the migration flag is globally enabled in Cobalt
-                var phoneJid = client.store().getPhoneNumberByLid(targetJid); // WAWebLabelJidSync.applyMutations, var S = o("WAWebApiContact").getPhoneNumber(b)
-                if (phoneJid.isPresent()) { // WAWebLabelJidSync.applyMutations, S != null && (b = S)
-                    resolvedTargetJid = phoneJid.get(); // WAWebLabelJidSync.applyMutations, b = S
+            var resolvedTargetJid = targetJid;
+            var resolvedChat = client.store().findChatByJid(targetJid);
+            if (resolvedChat.isPresent()) {
+                resolvedTargetJid = resolvedChat.get().toJid();
+            } else if (targetJid.hasLidServer()) {
+                var phoneJid = client.store().getPhoneNumberByLid(targetJid);
+                if (phoneJid.isPresent()) {
+                    resolvedTargetJid = phoneJid.get();
                 }
             }
 
@@ -239,18 +239,15 @@ public final class LabelAssociationHandler implements WebAppStateActionHandler {
                         return newLabel;
                     });
 
-            if (labeled) { // WAWebLabelJidSync.applyMutations, if (g) { l.push(L); d.push({parentId: R, labels: [u], ...}) }
-                label.addAssignment(resolvedTargetJid); // WAWebLabelJidSync.applyMutations + WAWebDBLabelAssociationDatabaseApi.addOrEditLabelAssociations(l), persist add
-                // WAWebLabelJidSync.applyMutations, DetectedOutcome biz notification system message for DO_NEW_ORDER / DO_LEAD skipped (UI/notification feature)
-                // WAWebLabelJidSync.applyMutations, frontendFireAndForget("applyLabelAssociationChanges", {removals, additions}) skipped (frontend event)
-            } else { // WAWebLabelJidSync.applyMutations, else { c.push(createLabelAssociationPrimaryKey(L)); m.push({parentId: R, labelId: u, parentType: Chat}) }
-                label.removeAssignment(resolvedTargetJid); // WAWebLabelJidSync.applyMutations + WAWebDBLabelAssociationDatabaseApi.removeLabelAssociations(c), persist remove
+            if (labeled) {
+                label.addAssignment(resolvedTargetJid);
+            } else {
+                label.removeAssignment(resolvedTargetJid);
             }
 
-            // WAWebLabelJidSync.applyMutations, generateLabelJidHash(u, f).then(e => logLabelSyncEvent(...)) WAM telemetry skipped
-            return MutationApplicationResult.success(); // WAWebLabelJidSync.applyMutations, return {actionState: o("WASyncdConst").SyncActionState.Success}
-        } catch (Exception e) { // WAWebLabelJidSync.applyMutations, catch(e) { return {actionState: Failed} }
-            return MutationApplicationResult.failed(); // WAWebLabelJidSync.applyMutations, {actionState: o("WASyncdConst").SyncActionState.Failed}
+            return MutationApplicationResult.success();
+        } catch (Exception e) {
+            return MutationApplicationResult.failed();
         }
     }
 
@@ -283,18 +280,18 @@ public final class LabelAssociationHandler implements WebAppStateActionHandler {
             boolean labeled,
             Instant timestamp
     ) {
-        var action = new LabelAssociationActionBuilder() // WAWebLabelJidSync.createLabelAssociationMutations: {labelAssociationAction: {labeled: l === "add"}}
-                .labeled(labeled) // WAWebLabelJidSync.createLabelAssociationMutations: labeled: l === "add"
+        var action = new LabelAssociationActionBuilder()
+                .labeled(labeled)
                 .build();
         var value = new SyncActionValueBuilder()
-                .timestamp(timestamp) // WAWebSyncdActionUtils.buildPendingMutation: timestamp
-                .labelAssociationAction(action) // WAWebLabelJidSync.createLabelAssociationMutations: value: {labelAssociationAction: ...}
+                .timestamp(timestamp)
+                .labelAssociationAction(action)
                 .build();
-        var index = JSON.toJSONString(List.of(actionName(), labelId, targetJid.toString())); // WAWebLabelJidSync.createLabelAssociationMutations: indexArgs: [labelId].concat([targetJid])
+        var index = JSON.toJSONString(List.of(actionName(), labelId, targetJid.toString()));
         var mutation = new DecryptedMutation.Trusted(
                 index,
                 value,
-                SyncdOperation.SET, // WAWebLabelJidSync.createLabelAssociationMutations: operation: SET
+                SyncdOperation.SET,
                 timestamp,
                 version()
         );

@@ -20,19 +20,19 @@ import java.util.Optional;
 @WhatsAppWebModule(moduleName = "WASmaxOutSupportMessageFeedbackBaseIQSetRequestMixin")
 public final class SmaxSendFeedbackRequest implements SmaxOperation.Request {
     /**
-     * The optional sender JID — when set, routed verbatim into
+     * The optional sender JID. When set, routed verbatim into
      * the IQ's {@code from} attribute.
      */
     private final Jid iqFrom;
 
     /**
-     * The id of the rated message — echoed into the
+     * The id of the rated message, echoed into the
      * {@code <message id=…/>} child.
      */
     private final String messageId;
 
     /**
-     * The 1..10 feedback entries — each carrying a server-side
+     * The 1..10 feedback entries. Each carrying a server-side
      * {@code kind} label.
      */
     private final List<String> feedbackKinds;

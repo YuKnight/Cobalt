@@ -25,7 +25,7 @@ public sealed interface SmaxGetPrivacySettingResponse extends SmaxOperation.Resp
      *
      * @param node    the inbound IQ stanza received from the relay;
      *                never {@code null}
-     * @param request the original outbound stanza — used to validate
+     * @param request the original outbound stanza. Used to validate
      *                echoed identifiers; never {@code null}
      * @return an {@link Optional} carrying the parsed variant, or
      *         {@link Optional#empty()} when no documented variant
@@ -49,7 +49,7 @@ public sealed interface SmaxGetPrivacySettingResponse extends SmaxOperation.Resp
     }
 
     /**
-     * The {@code Success} reply variant — the relay returned the
+     * The {@code Success} reply variant. The relay returned the
      * current SMB-data-sharing consent value.
      *
      * @implNote {@code WASmaxInBizSettingsGetPrivacySettingResponseSuccess.parseGetPrivacySettingResponseSuccess}
@@ -67,7 +67,7 @@ public sealed interface SmaxGetPrivacySettingResponse extends SmaxOperation.Resp
     final class Success implements SmaxGetPrivacySettingResponse {
         /**
          * The {@code value} attribute of the
-         * {@code <smb_data_sharing_with_meta_consent>} child — one of
+         * {@code <smb_data_sharing_with_meta_consent>} child. One of
          * the {@code "true"} / {@code "false"} / {@code "notSet"}
          * enum literals.
          */
@@ -154,7 +154,7 @@ public sealed interface SmaxGetPrivacySettingResponse extends SmaxOperation.Resp
     }
 
     /**
-     * The {@code ClientError} reply variant — the relay rejected the
+     * The {@code ClientError} reply variant. The relay rejected the
      * request with a documented privacy-setting error code in the
      * {@code 4xx} range.
      *
@@ -255,7 +255,7 @@ public sealed interface SmaxGetPrivacySettingResponse extends SmaxOperation.Resp
     }
 
     /**
-     * The {@code ServerError} reply variant — the relay encountered a
+     * The {@code ServerError} reply variant. The relay encountered a
      * transient internal failure ({@code 5xx}) while processing the
      * request.
      *

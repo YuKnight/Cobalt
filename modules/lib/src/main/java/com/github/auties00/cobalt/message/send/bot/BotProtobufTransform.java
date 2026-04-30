@@ -4,9 +4,9 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.bot.feedback.BotFeedbackMessage;
+import com.github.auties00.cobalt.model.message.MessageContainer;
 import com.github.auties00.cobalt.model.message.context.ContextInfo;
 import com.github.auties00.cobalt.model.message.context.ContextualMessage;
-import com.github.auties00.cobalt.model.message.MessageContainer;
 import com.github.auties00.cobalt.model.message.system.FutureProofMessage;
 import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
 import com.github.auties00.cobalt.store.WhatsAppStore;
@@ -14,76 +14,54 @@ import com.github.auties00.cobalt.store.WhatsAppStore;
 import java.util.Objects;
 
 /**
- * Applies bot-specific protobuf transforms before encryption.
- *
- * <p>When sending a message to a bot device, the protobuf is modified
- * to avoid leaking the user's message secret, to strip quoted message
- * content for non-bot participants, and to convert PN JIDs to LID for
- * FBID bots.
- *
- * <p>All transforms mutate the container in place via setters.
- *
- * @implNote WAWebE2EProtoGenerator: provides
- * {@code updateBotInvokeMsgProtoCopyForCapi},
- * {@code updateFbidBotProtobuf}, {@code updateBotProtobuf}, and
- * {@code updateFbidBotInvokeProtobuf}.
+ * Applies the bot-specific protobuf transforms required before encrypting a
+ * message destined for a bot device. The transforms swap the user's message
+ * secret with the bot-derived secret, strip quoted-message content for non-bot
+ * participants, and convert PN JIDs to LID for FBID bots. Each method mutates
+ * the supplied container in place via setters.
  */
 @WhatsAppWebModule(moduleName = "WAWebE2EProtoGenerator")
 public final class BotProtobufTransform {
     /**
-     * The store used for LID-to-phone lookups during FBID bot transforms.
-     *
-     * @implNote ADAPTED: WAWebE2EProtoGenerator uses
-     * {@code WAWebLidMigrationUtils.toLid} directly; Cobalt uses
-     * constructor-injected store.
+     * Holds the store consulted for LID-to-phone lookups during the FBID bot
+     * transforms.
      */
     private final WhatsAppStore store;
 
     /**
-     * Creates a new bot protobuf transform with the specified store.
+     * Constructs a transform bound to the given store.
      *
-     * @param store the store for JID lookups
-     * @implNote ADAPTED: WAWebE2EProtoGenerator.updateFbidBotProtobuf
+     * @param store the store providing JID lookups
      */
     public BotProtobufTransform(WhatsAppStore store) {
         this.store = Objects.requireNonNull(store, "store");
     }
 
     /**
-     * Applies the CAPI bot invoke transform: replaces the message
-     * secret with the bot-derived secret, strips quoted message
-     * content for non-bot participants, and removes remoteJid from
-     * protocol message keys.
+     * Applies the CAPI bot-invoke transform: replaces the user message secret
+     * with the bot-derived secret, strips quoted-message content for non-bot
+     * participants, and removes the {@code remoteJid} from protocol-message keys.
      *
-     * @param container        the message container (mutated in place)
-     * @param botMessageSecret the derived bot message secret, or
-     *                         {@code null} to just clear the secret
-     *
-     * @implNote WAWebE2EProtoGenerator.updateBotInvokeMsgProtoCopyForCapi
+     * @param container        the message container, mutated in place
+     * @param botMessageSecret the derived bot message secret, or {@code null}
+     *                         to merely clear the existing secret
      */
     @WhatsAppWebExport(moduleName = "WAWebE2EProtoGenerator", exports = "updateBotInvokeMsgProtoCopyForCapi",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public void transformForCapi(MessageContainer container, byte[] botMessageSecret) {
-        // Replace messageSecret with botMessageSecret
         container.messageContextInfo().ifPresent(info -> {
             info.setMessageSecret(null);
             info.setBotMessageSecret(botMessageSecret);
         });
-
-        // Strip quoted message for non-bot participants
         stripQuotedMessageForNonBot(container);
-
-        // Strip remoteJid from protocol message keys
         stripProtocolMessageRemoteJid(container);
     }
 
     /**
-     * Applies the FBID bot transform: converts the PN participant
-     * JID to LID in quoted message context info.
+     * Applies the FBID bot transform by converting the PN participant JID in
+     * the quoted-message context info to LID.
      *
-     * @param container the message container (mutated in place)
-     *
-     * @implNote WAWebE2EProtoGenerator.updateFbidBotProtobuf
+     * @param container the message container, mutated in place
      */
     @WhatsAppWebExport(moduleName = "WAWebE2EProtoGenerator", exports = "updateFbidBotProtobuf",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -103,12 +81,10 @@ public final class BotProtobufTransform {
     }
 
     /**
-     * Applies the FBID bot invoke transform: converts the protocol
-     * message key's participant from PN to LID.
+     * Applies the FBID bot-invoke transform by converting the protocol message
+     * key's participant from PN to LID.
      *
-     * @param container the message container (mutated in place)
-     *
-     * @implNote WAWebE2EProtoGenerator.updateFbidBotInvokeProtobuf
+     * @param container the message container, mutated in place
      */
     @WhatsAppWebExport(moduleName = "WAWebE2EProtoGenerator", exports = "updateFbidBotInvokeProtobuf",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -131,12 +107,10 @@ public final class BotProtobufTransform {
     }
 
     /**
-     * Applies the generic bot transform: strips remoteJid and
-     * participant from protocol message keys.
+     * Applies the generic bot transform by stripping {@code remoteJid} and
+     * {@code participant} from protocol-message keys.
      *
-     * @param container the message container (mutated in place)
-     *
-     * @implNote WAWebE2EProtoGenerator.updateBotProtobuf
+     * @param container the message container, mutated in place
      */
     @WhatsAppWebExport(moduleName = "WAWebE2EProtoGenerator", exports = "updateBotProtobuf",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -152,17 +126,11 @@ public final class BotProtobufTransform {
     }
 
     /**
-     * Resolves the inner {@link ContextInfo}, handling the
-     * botInvokeMessage {@link FutureProofMessage} wrapper.
+     * Returns the inner {@link ContextInfo}, transparently unwrapping the
+     * {@link FutureProofMessage} botInvokeMessage wrapper.
      *
-     * @param container the message container to resolve from
-     * @return the inner context info, or {@code null} if not present
-     * @implNote ADAPTED: WAWebE2EProtoGenerator.updateBotInvokeMsgProtoCopyForCapi
-     * and updateFbidBotProtobuf both resolve contextInfo from
-     * {@code botInvokeMessage.message.extendedTextMessage.contextInfo}
-     * or {@code extendedTextMessage.contextInfo}. Cobalt's
-     * {@code MessageContainer.content()} already unwraps through
-     * the botInvokeMessage FutureProofMessage wrapper.
+     * @param container the message container to inspect
+     * @return the inner context info, or {@code null} when not present
      */
     private static ContextInfo resolveInnerContextInfo(MessageContainer container) {
         return container.content() instanceof ContextualMessage contextualMessage
@@ -171,12 +139,10 @@ public final class BotProtobufTransform {
     }
 
     /**
-     * Strips the quoted message from the inner context info if the
-     * quoted participant is not a bot.
+     * Strips the quoted message from the inner context info when the quoted
+     * participant is not itself a bot.
      *
-     * @implNote WAWebE2EProtoGenerator.updateBotInvokeMsgProtoCopyForCapi:
-     * deletes quotedMessage, stanzaId, remoteJid, participant when
-     * the participant is not a bot.
+     * @param container the message container to mutate
      */
     private static void stripQuotedMessageForNonBot(MessageContainer container) {
         var contextInfo = resolveInnerContextInfo(container);
@@ -193,21 +159,17 @@ public final class BotProtobufTransform {
     }
 
     /**
-     * Strips remoteJid from protocol message keys (feedback and revoke).
+     * Strips the {@code remoteJid} from protocol-message keys carried by the
+     * container, including the optional bot-feedback message key.
      *
-     * @implNote WAWebE2EProtoGenerator.updateBotInvokeMsgProtoCopyForCapi:
-     * deletes botFeedbackMessage.messageKey.remoteJid and
-     * protocolMessage.key.remoteJid for revoke messages.
+     * @param container the message container to mutate
      */
     private static void stripProtocolMessageRemoteJid(MessageContainer container) {
         if (!(container.content() instanceof ProtocolMessage pm)) {
             return;
         }
 
-        // Strip remoteJid from the protocol message key
         pm.key().ifPresent(key -> key.setParentJid(null));
-
-        // Strip remoteJid from the bot feedback message key
         pm.botFeedbackMessage()
                 .flatMap(BotFeedbackMessage::messageKey)
                 .ifPresent(key -> key.setParentJid(null));

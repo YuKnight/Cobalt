@@ -24,14 +24,14 @@ import java.util.List;
  * each object given the now-known reference width, computes per-
  * object offsets, sums them to locate the offset table, derives the
  * offset width, and finally allocates a {@code byte[]} of the exact
- * total size and fills it in place — header, object table, offset
+ * total size and fills it in place. Header, object table, offset
  * table, trailer.
  *
  * <p>No object deduplication is performed: equal-but-distinct
  * values get separate slots. Apple's parsers accept this.
  *
  * <p>Callers normally route through the
- * {@code Plist} facade; this class is the implementation.
+ * {@code Plist} facade. This class is the implementation.
  */
 public final class PlistBinaryWriter {
     /**
@@ -40,7 +40,7 @@ public final class PlistBinaryWriter {
     private static final int TRAILER_SIZE = 32;
 
     /**
-     * Hidden constructor — the class is a stateless namespace.
+     * Hidden constructor. The class is a stateless namespace.
      */
     private PlistBinaryWriter() {
     }
@@ -199,7 +199,7 @@ public final class PlistBinaryWriter {
     }
 
     /**
-     * Writes a container/data/string marker — combining the high
+     * Writes a container/data/string marker. Combining the high
      * nibble of the marker base ({@code 0x4n}, {@code 0x5n}, …)
      * with the inline count when {@code count < 15}, or with the
      * extension nibble {@code 0xF} followed by an integer marker
@@ -227,7 +227,7 @@ public final class PlistBinaryWriter {
     /**
      * Returns the smallest power-of-two byte width that holds
      * {@code value}. Negative values always require 8 bytes (signed
-     * two's complement); non-negative values use 1, 2, 4, or 8
+     * two's complement). Non-negative values use 1, 2, 4, or 8
      * unsigned per Apple's spec.
      *
      * @param value the integer value
@@ -251,7 +251,7 @@ public final class PlistBinaryWriter {
 
     /**
      * Returns the size of the extended-length suffix for a count
-     * that does not fit in the marker's low nibble — one byte for
+     * that does not fit in the marker's low nibble. One byte for
      * the integer marker plus the integer's own bytes. Returns
      * {@code 0} when the count is inline.
      *
@@ -312,7 +312,7 @@ public final class PlistBinaryWriter {
      * @param out       the destination buffer
      * @param pos       the start offset
      * @param value     the value to write
-     * @param byteCount the byte width (1–8)
+     * @param byteCount the byte width from 1 to 8
      */
     private static void writeBigEndian(byte[] out, int pos, long value, int byteCount) {
         for (int i = byteCount - 1; i >= 0; i--) {
@@ -323,13 +323,13 @@ public final class PlistBinaryWriter {
 
     /**
      * Tree-collection state shared between the sizing and encoding
-     * passes — every object's index in the object table, and for
+     * passes. Every object's index in the object table, and for
      * each dictionary the synthesized key strings (since dict keys
      * are themselves objects in the table).
      */
     private static final class Context {
         /**
-         * Object table in DFS order; root is at index 0.
+         * Object table in DFS order. Root is at index 0.
          */
         private final List<PlistValue> objects = new ArrayList<>();
 

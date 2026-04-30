@@ -34,7 +34,7 @@ public sealed interface SmaxNonceNotificationResponse extends SmaxOperation.Resp
     }
 
     /**
-     * The {@code Notification} variant — carries the freshly-pushed
+     * The {@code Notification} variant. Carries the freshly-pushed
      * nonce string plus the standard envelope echoes.
      *
      * @implNote {@code WASmaxInBizCtwaAdAccountNonceNotificationRequest.parseNonceNotificationRequest}
@@ -56,7 +56,7 @@ public sealed interface SmaxNonceNotificationResponse extends SmaxOperation.Resp
         private final Jid to;
 
         /**
-         * The freshly-pushed nonce — the text content of the
+         * The freshly-pushed nonce. The text content of the
          * {@code <wa_ad_account_nonce>} child.
          */
         private final String nonce;
